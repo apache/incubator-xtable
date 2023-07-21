@@ -1,0 +1,168 @@
+{
+  "type": "record",
+  "name": "Sample",
+  "namespace": "test",
+  "fields": [
+    {
+      "name": "key",
+      "type": "string"
+    },
+    {
+      "name": "ts",
+      "type": "long"
+    },
+    {
+      "name": "level",
+      "type": "string"
+    },
+    {
+      "name": "severity",
+      "type": ["null", "int"],
+      "default": null
+    },
+    {
+      "name": "double_field",
+      "type": "double",
+      "default": 0.0
+    },
+    {
+      "name": "float_field",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "int_field",
+      "type": "int",
+      "default": 0
+    },
+    {
+      "name": "long_field",
+      "type": "long",
+      "default": 0
+    },
+    {
+      "name": "boolean_field",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "name": "string_field",
+      "type": {
+        "type": "string",
+        "avro.java.string": "String"
+      },
+      "default": ""
+    },
+    {
+      "name": "bytes_field",
+      "type": "bytes",
+      "default": ""
+    },
+    {
+      "name": "decimal_field",
+      "type": {
+        "type": "fixed",
+        "name": "decimal_field_testing",
+        "size": 10,
+        "logicalType": "decimal",
+        "precision": 20,
+        "scale": 2
+      },
+      "default": "\u0000"
+    },
+    {
+      "name": "nested_record",
+      "type": [
+        "null",
+        {
+          "type": "record",
+          "name": "Nested",
+          "namespace": "test",
+          "fields": [
+            {
+              "name": "nested_int",
+              "type": "int",
+              "default": 0
+            },
+            {
+              "name": "level",
+              "type": "string"
+            }
+          ]
+        }
+      ],
+      "default": null
+    },
+    {
+      "name":"nullable_map_field",
+      "type":["null", {
+        "type":"map",
+        "values": "Nested"
+      }],
+      "default": null
+    },
+    {
+      "name": "array_field",
+      "type": {
+        "type": "array",
+        "items": "Nested"
+      },
+      "default": []
+    },
+    {
+      "name": "date_nullable_field",
+      "type": [
+        "null",
+        {
+          "type": "int",
+          "logicalType": "date"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "timestamp_millis_nullable_field",
+      "type": [
+        "null",
+        {
+          "type": "long",
+          "logicalType": "timestamp-millis"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "timestamp_micros_nullable_field",
+      "type": [
+        "null",
+        {
+          "type": "long",
+          "logicalType": "timestamp-micros"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "timestamp_local_millis_nullable_field",
+      "type": [
+        "null",
+        {
+          "type": "long",
+          "logicalType": "local-timestamp-millis"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "timestamp_local_micros_nullable_field",
+      "type": [
+        "null",
+        {
+          "type": "long",
+          "logicalType": "local-timestamp-micros"
+        }
+      ],
+      "default": null
+    }
+  ]
+}
