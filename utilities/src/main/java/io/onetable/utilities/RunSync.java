@@ -108,6 +108,7 @@ public class RunSync {
         PerTableConfig config =
             PerTableConfig.builder()
                 .tableBasePath(table.getTableBasePath())
+                .tableName(table.getTableBasePath())
                 .hudiSourceConfig(
                     HudiSourceConfig.builder()
                         .partitionSpecExtractorClass(
@@ -134,6 +135,7 @@ public class RunSync {
     @Data
     public static class Table {
       String tableBasePath;
+      String tableName;
       String partitionSpec;
     }
   }

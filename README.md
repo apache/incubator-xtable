@@ -30,11 +30,14 @@ tableFormats:
 dataset:
   -
     tableBasePath: s3://tpc-ds-datasets/1GB/hudi/call_center
+    tablename: call_center
   -
     tableBasePath: s3://tpc-ds-datasets/1GB/hudi/catalog_sales
+    tablename: catalog_sales
     partitionSpec: cs_sold_date_sk:VALUE
   -
     tableBasePath: s3://hudi/multi-partition-dataset
+    tablename: multi_partition_dataset
     partitionSpec: time_millis:DAY:yyyy-MM-dd,type:VALUE
 ```
 - `tableFormats` is a list of formats you want to create from your source Hudi tables
