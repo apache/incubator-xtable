@@ -15,18 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package io.onetable.utilities;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import io.onetable.client.OneTableClient;
-import io.onetable.client.PerTableConfig;
-import io.onetable.hudi.ConfigurationBasedPartitionSpecExtractor;
-import io.onetable.hudi.HudiSourceConfig;
-import io.onetable.model.storage.TableFormat;
-import io.onetable.model.sync.SyncMode;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,15 +25,29 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
+
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
+
 import org.apache.hudi.common.util.VisibleForTesting;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+
+import io.onetable.client.OneTableClient;
+import io.onetable.client.PerTableConfig;
+import io.onetable.hudi.ConfigurationBasedPartitionSpecExtractor;
+import io.onetable.hudi.HudiSourceConfig;
+import io.onetable.model.storage.TableFormat;
+import io.onetable.model.sync.SyncMode;
 
 /**
  * Provides a standalone runner for the sync process. See README.md for more details on how to run
@@ -84,8 +89,7 @@ public class RunSync {
       customConfig = Files.readAllBytes(Paths.get(cmd.getOptionValue(HADOOP_CONFIG_PATH)));
     }
 
-    RunSync runSync = new RunSync();
-    Configuration conf = runSync.loadHadoopConf(customConfig);
+    Configuration conf = loadHadoopConf(customConfig);
 
     List<TableFormat> tableFormatList =
         datasetConfig.getTableFormats().stream()
@@ -119,7 +123,7 @@ public class RunSync {
   }
 
   @VisibleForTesting
-  Configuration loadHadoopConf(byte[] customConfig) {
+  static Configuration loadHadoopConf(byte[] customConfig) {
     Configuration conf = new Configuration();
     conf.addResource("onetable-hadoop-defaults.xml");
     if (customConfig != null) {

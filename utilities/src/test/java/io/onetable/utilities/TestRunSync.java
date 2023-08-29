@@ -15,19 +15,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package io.onetable.utilities;
 
-import java.io.ByteArrayInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestRunSync {
 
-  /**
-   * Tests that the default hadoop configs are loaded.
-   */
+  /** Tests that the default hadoop configs are loaded. */
   @Test
   public void testLoadDefaultHadoopConfig() {
     Configuration conf;
@@ -35,15 +32,12 @@ class TestRunSync {
     String value = conf.get("fs.file.impl");
     Assertions.assertNull(value);
 
-    RunSync runSync = new RunSync();
-    conf = runSync.loadHadoopConf(null);
+    conf = RunSync.loadHadoopConf(null);
     value = conf.get("fs.file.impl");
     Assertions.assertEquals("org.apache.hadoop.fs.LocalFileSystem", value);
   }
 
-  /**
-   * Tests that the custom hadoop configs are loaded and can override defaults.
-   */
+  /** Tests that the custom hadoop configs are loaded and can override defaults. */
   @Test
   public void testLoadCustomHadoopConfig() {
     Configuration conf;
@@ -52,19 +46,19 @@ class TestRunSync {
     Assertions.assertNull(value);
 
     // build a custom hadoop config
-    String customXmlConfig = "<configuration>" +
-        "  <property>" +
-        "    <name>fs.file.impl</name>" +
-        "    <value>override_default_value</value>" +
-        "  </property>" +
-        "  <property>" +
-        "    <name>fs.azure.account.oauth2.client.endpoint</name>" +
-        "    <value>https://login.microsoftonline.com/</value>" +
-        "  </property>" +
-        "</configuration>";
+    String customXmlConfig =
+        "<configuration>"
+            + "  <property>"
+            + "    <name>fs.file.impl</name>"
+            + "    <value>override_default_value</value>"
+            + "  </property>"
+            + "  <property>"
+            + "    <name>fs.azure.account.oauth2.client.endpoint</name>"
+            + "    <value>https://login.microsoftonline.com/</value>"
+            + "  </property>"
+            + "</configuration>";
 
-    RunSync runSync = new RunSync();
-    conf = runSync.loadHadoopConf(customXmlConfig.getBytes());
+    conf = RunSync.loadHadoopConf(customXmlConfig.getBytes());
     value = conf.get("fs.file.impl");
     Assertions.assertEquals("override_default_value", value);
     value = conf.get("fs.azure.account.oauth2.client.endpoint");
