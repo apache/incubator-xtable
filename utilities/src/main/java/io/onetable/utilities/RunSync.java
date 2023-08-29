@@ -18,6 +18,7 @@
  
 package io.onetable.utilities;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -34,6 +35,8 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
+
+import org.apache.hudi.common.util.VisibleForTesting;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
@@ -52,8 +55,9 @@ import io.onetable.model.sync.SyncMode;
  */
 @Log4j2
 public class RunSync {
+
   private static final String CONFIG_OPTION = "c";
-  private static final String AWS_CREDENTIALS_OPTION = "a";
+  private static final String HADOOP_CONFIG_PATH = "h";
   private static final Options OPTIONS =
       new Options()
           .addOption(
@@ -62,78 +66,81 @@ public class RunSync {
               true,
               "The path to a yaml file containing your configuration")
           .addOption(
-              AWS_CREDENTIALS_OPTION,
-              "awsCredentialsProvider",
+              HADOOP_CONFIG_PATH,
+              "hadoopConfig",
               true,
-              "AWS Credentials Provider to use. Defaults to: com.amazonaws.auth.DefaultAWSCredentialsProviderChain");
+              "Hadoop config xml file path containing configs necessary to access the "
+                  + "file system. These configs will override the default configs.");
 
   public static void main(String[] args) throws IOException, ParseException {
     CommandLineParser parser = new DefaultParser();
     CommandLine cmd = parser.parse(OPTIONS, args);
+
+    DatasetConfig datasetConfig = new DatasetConfig();
     try (InputStream inputStream =
         Files.newInputStream(Paths.get(cmd.getOptionValue(CONFIG_OPTION)))) {
       ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-      DatasetConfig datasetConfig = new DatasetConfig();
       ObjectReader objectReader = mapper.readerForUpdating(datasetConfig);
       objectReader.readValue(inputStream);
+    }
 
-      String awsCredentialsProvider =
-          cmd.hasOption(AWS_CREDENTIALS_OPTION)
-              ? cmd.getOptionValue(AWS_CREDENTIALS_OPTION)
-              : "com.amazonaws.auth.DefaultAWSCredentialsProviderChain";
-      Configuration conf = new Configuration();
-      // Local Spark.
-      conf.set("spark.master", "local[2]");
-      conf.set("parquet.avro.write-old-list-structure", "false");
-      conf.set("fs.file.impl", "org.apache.hadoop.fs.LocalFileSystem");
-      // AWS permission dependencies.
-      conf.set("fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem");
-      conf.set("fs.s3.aws.credentials.provider", awsCredentialsProvider);
-      conf.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem");
-      conf.set("fs.s3a.aws.credentials.provider", awsCredentialsProvider);
-      // GCP dependencies
-      conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
-      conf.set("fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS");
+    byte[] customConfig = null;
+    if (cmd.hasOption(HADOOP_CONFIG_PATH)) {
+      customConfig = Files.readAllBytes(Paths.get(cmd.getOptionValue(HADOOP_CONFIG_PATH)));
+    }
 
-      List<TableFormat> tableFormatList =
-          datasetConfig.getTableFormats().stream()
-              .map(TableFormat::valueOf)
-              .collect(Collectors.toList());
-      OneTableClient client = new OneTableClient(conf);
-      for (DatasetConfig.Table table : datasetConfig.getDataset()) {
-        log.info(
-            "Running sync for basePath {} for following table formats {}",
-            table.getTableBasePath(),
-            tableFormatList);
-        PerTableConfig config =
-            PerTableConfig.builder()
-                .tableBasePath(table.getTableBasePath())
-                .tableName(table.getTableBasePath())
-                .hudiSourceConfig(
-                    HudiSourceConfig.builder()
-                        .partitionSpecExtractorClass(
-                            ConfigurationBasedPartitionSpecExtractor.class.getName())
-                        .partitionFieldSpecConfig(table.getPartitionSpec())
-                        .build())
-                .tableFormatsToSync(tableFormatList)
-                .syncMode(SyncMode.INCREMENTAL)
-                .build();
-        try {
-          client.sync(config);
-        } catch (Exception e) {
-          log.error(String.format("Error running sync for %s", table.getTableBasePath()), e);
-        }
+    Configuration conf = loadHadoopConf(customConfig);
+
+    List<TableFormat> tableFormatList =
+        datasetConfig.getTableFormats().stream()
+            .map(TableFormat::valueOf)
+            .collect(Collectors.toList());
+    OneTableClient client = new OneTableClient(conf);
+    for (DatasetConfig.Table table : datasetConfig.getDataset()) {
+      log.info(
+          "Running sync for basePath {} for following table formats {}",
+          table.getTableBasePath(),
+          tableFormatList);
+      PerTableConfig config =
+          PerTableConfig.builder()
+              .tableBasePath(table.getTableBasePath())
+              .tableName(table.getTableBasePath())
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionSpecExtractorClass(
+                          ConfigurationBasedPartitionSpecExtractor.class.getName())
+                      .partitionFieldSpecConfig(table.getPartitionSpec())
+                      .build())
+              .tableFormatsToSync(tableFormatList)
+              .syncMode(SyncMode.INCREMENTAL)
+              .build();
+      try {
+        client.sync(config);
+      } catch (Exception e) {
+        log.error(String.format("Error running sync for %s", table.getTableBasePath()), e);
       }
     }
   }
 
+  @VisibleForTesting
+  static Configuration loadHadoopConf(byte[] customConfig) {
+    Configuration conf = new Configuration();
+    conf.addResource("onetable-hadoop-defaults.xml");
+    if (customConfig != null) {
+      conf.addResource(new ByteArrayInputStream(customConfig), "customConfigStream");
+    }
+    return conf;
+  }
+
   @Data
   public static class DatasetConfig {
+
     List<String> tableFormats;
     List<Table> dataset;
 
     @Data
     public static class Table {
+
       String tableBasePath;
       String tableName;
       String partitionSpec;

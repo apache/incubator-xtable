@@ -277,6 +277,12 @@
                 <scope>runtime</scope>
             </dependency>
             <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-azure</artifactId>
+                <version>3.2.2</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
                 <groupId>com.amazonaws</groupId>
                 <artifactId>aws-java-sdk-bundle</artifactId>
                 <version>1.12.328</version>
