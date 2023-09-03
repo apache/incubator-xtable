@@ -29,23 +29,21 @@ import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 
 /** A client that provides the major functionality for syncing changes to a target system. */
-public interface TargetClient<SCHEMA, PARTITION_SPEC> {
+public interface TargetClient {
 
   /**
    * Syncs the current schema state.
    *
    * @param schema the current schema
-   * @return the updated schema from the target system
    */
-  SCHEMA syncSchema(OneSchema schema);
+  void syncSchema(OneSchema schema);
 
   /**
    * Syncs the current partition spec.
    *
    * @param partitionSpec the current partition spec
-   * @return the updated partition spec from the target system
    */
-  PARTITION_SPEC syncPartitionSpec(List<OnePartitionField> partitionSpec);
+  void syncPartitionSpec(List<OnePartitionField> partitionSpec);
 
   /**
    * Syncs the {@link OneTableMetadata} to the target for tracking metadata between runs. This is

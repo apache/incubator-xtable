@@ -35,6 +35,7 @@ import io.onetable.model.sync.SyncMode;
 public class PerTableConfig {
   /** table base path in local file system or HDFS or object stores like S3, GCS etc. */
   @Nonnull String tableBasePath;
+
   /** The name of the table */
   @Nonnull String tableName;
 
@@ -66,7 +67,7 @@ public class PerTableConfig {
   @Builder.Default HudiSourceConfig hudiSourceConfig = HudiSourceConfig.builder().build();
 
   /** List of table formats to sync. */
-  @Nonnull List<TableFormat> tableFormatsToSync;
+  @Nonnull List<TableFormat> targetTableFormats;
 
   /**
    * Mode of a sync. FULL is only supported right now.

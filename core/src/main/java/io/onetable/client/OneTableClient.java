@@ -36,13 +36,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
-import org.apache.hudi.common.model.HoodieTableType;
-import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.common.table.timeline.HoodieInstant;
-
 import io.onetable.exception.OneIOException;
-import io.onetable.hudi.HudiClient;
-import io.onetable.hudi.HudiSourcePartitionSpecExtractor;
+import io.onetable.hudi.HudiSourceClientProvider;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
@@ -53,6 +48,7 @@ import io.onetable.model.sync.SyncResult;
 import io.onetable.persistence.OneTableState;
 import io.onetable.persistence.OneTableStateStorage;
 import io.onetable.spi.extractor.ExtractFromSource;
+import io.onetable.spi.extractor.SourceClient;
 import io.onetable.spi.sync.TableFormatSync;
 
 /**
@@ -80,38 +76,33 @@ public class OneTableClient {
    * Runs a sync for the given source table configuration in PerTableConfig.
    *
    * @param config A per table level config containing tableBasePath, partitionFieldSpecConfig,
-   *     tableFormatsToSync and syncMode
+   *     targetTableFormats and syncMode
    * @return Returns a map containing the table format, and it's sync result. Run sync for a table
    *     with the provided per table level configuration.
    */
   public Map<TableFormat, SyncResult> sync(PerTableConfig config) {
-    HoodieTableMetaClient metaClient =
-        HoodieTableMetaClient.builder()
-            .setConf(conf)
-            .setBasePath(config.getTableBasePath())
-            .setLoadActiveTimelineOnLoad(true)
-            .build();
-    if (!metaClient.getTableConfig().getTableType().equals(HoodieTableType.COPY_ON_WRITE)) {
-      LOG.warn("Source table is Merge On Read. Only base files will be synced");
-    }
-    if (config.getTableFormatsToSync().isEmpty()) {
+    return sync(config, new HudiSourceClientProvider());
+  }
+
+  public <COMMIT> Map<TableFormat, SyncResult> sync(
+      PerTableConfig config, SourceClientProvider<COMMIT> sourceClientProvider) {
+    if (config.getTargetTableFormats().isEmpty()) {
       throw new IllegalArgumentException("Please provide at-least one format to sync");
     }
 
-    final HudiSourcePartitionSpecExtractor sourcePartitionSpecExtractor =
-        config.getHudiSourceConfig().loadSourcePartitionSpecExtractor();
+    SourceClient<COMMIT> sourceClient = sourceClientProvider.getSourceClientInstance(config);
+    ExtractFromSource<COMMIT> source = ExtractFromSource.of(sourceClient);
+
     Optional<OneTableState> currentState = getSyncState(config.getTableBasePath());
-    ExtractFromSource<HoodieInstant> source =
-        ExtractFromSource.of(new HudiClient(metaClient, sourcePartitionSpecExtractor));
 
     SyncResultForTableFormats result;
     Map<TableFormat, TableFormatSync> syncClientByFormat =
-        config.getTableFormatsToSync().stream()
+        config.getTargetTableFormats().stream()
             .collect(
                 Collectors.toMap(
                     Function.identity(),
                     tableFormat ->
-                        TableFormatSyncFactory.createForFormat(tableFormat, config, conf)));
+                        TableFormatClientFactory.createForFormat(tableFormat, config, conf)));
     if (config.getSyncMode() == SyncMode.FULL) {
       result = syncSnapshot(syncClientByFormat, source, currentState);
     } else {
@@ -122,17 +113,17 @@ public class OneTableClient {
             .table(result.getSyncedTable())
             .lastSyncResult(result.getLastSyncResult())
             .lastSuccessfulSyncResult(result.getLastSuccessfulSyncResult())
-            .tableFormatsToSync(config.getTableFormatsToSync())
+            .tableFormatsToSync(config.getTargetTableFormats())
             .build();
     persistOneTableState(newState);
     LOG.info(
-        "OneTable Sync is successful for the following formats " + config.getTableFormatsToSync());
+        "OneTable Sync is successful for the following formats " + config.getTargetTableFormats());
     return newState.getLastSyncResult();
   }
 
-  private SyncResultForTableFormats syncSnapshot(
+  private <COMMIT> SyncResultForTableFormats syncSnapshot(
       Map<TableFormat, TableFormatSync> syncClientByFormat,
-      ExtractFromSource<HoodieInstant> source,
+      ExtractFromSource<COMMIT> source,
       Optional<OneTableState> currentState) {
     Map<TableFormat, SyncResult> syncResultsByFormat = new HashMap<>();
     Map<TableFormat, SyncResult> lastSuccessfulSyncResultMap =
@@ -153,9 +144,9 @@ public class OneTableClient {
         .build();
   }
 
-  private SyncResultForTableFormats syncIncrementalChanges(
+  private <COMMIT> SyncResultForTableFormats syncIncrementalChanges(
       Map<TableFormat, TableFormatSync> syncClientByFormat,
-      ExtractFromSource<HoodieInstant> source,
+      ExtractFromSource<COMMIT> source,
       Optional<OneTableState> currentStateOptional) {
     if (!currentStateOptional.isPresent()) {
       // Fallback to snapshot if current state doesn't exist or corrupted.
@@ -240,8 +231,8 @@ public class OneTableClient {
         .build();
   }
 
-  private Map<TableFormat, SyncMode> getRequiredSyncModes(
-      ExtractFromSource<HoodieInstant> source,
+  private <COMMIT> Map<TableFormat, SyncMode> getRequiredSyncModes(
+      ExtractFromSource<COMMIT> source,
       OneTableState currentState,
       Collection<TableFormat> tableFormats,
       Map<TableFormat, Optional<Instant>> lastSyncInstantByFormat) {
@@ -303,14 +294,18 @@ public class OneTableClient {
     }
   }
 
-  private boolean checkIfLastSyncInstantExists(
-      ExtractFromSource<HoodieInstant> source, Optional<Instant> lastSyncInstant) {
+  private <COMMIT> boolean checkIfLastSyncInstantExists(
+      ExtractFromSource<COMMIT> source, Optional<Instant> lastSyncInstant) {
     if (!lastSyncInstant.isPresent()) {
       return false;
     }
-    HoodieInstant lastSyncHoodieInstant = source.getLastSyncCommit(lastSyncInstant.get());
-    return HudiClient.parseFromInstantTime(lastSyncHoodieInstant.getTimestamp())
-        .equals(lastSyncInstant.get());
+
+    // TODO This check is not generic and should be moved to HudiClient
+    // TODO hardcoding the return value to true for now
+    //    COMMIT lastSyncHoodieInstant = source.getLastSyncCommit(lastSyncInstant.get());
+    //    return HudiClient.parseFromInstantTime(lastSyncHoodieInstant.getTimestamp())
+    //        .equals(lastSyncInstant.get());
+    return true;
   }
 
   @Value

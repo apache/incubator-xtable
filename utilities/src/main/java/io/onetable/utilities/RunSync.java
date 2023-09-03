@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import lombok.Data;
@@ -36,18 +37,23 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.common.util.VisibleForTesting;
 
+import com.fasterxml.jackson.annotation.JsonMerge;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import io.onetable.client.OneTableClient;
 import io.onetable.client.PerTableConfig;
+import io.onetable.client.SourceClientProvider;
 import io.onetable.hudi.ConfigurationBasedPartitionSpecExtractor;
 import io.onetable.hudi.HudiSourceConfig;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
+import io.onetable.utilities.RunSync.TableFormatClients.ClientConfig;
 
 /**
  * Provides a standalone runner for the sync process. See README.md for more details on how to run
@@ -56,21 +62,28 @@ import io.onetable.model.sync.SyncMode;
 @Log4j2
 public class RunSync {
 
-  private static final String CONFIG_OPTION = "c";
+  private static final String DATASET_CONFIG_OPTION = "d";
   private static final String HADOOP_CONFIG_PATH = "h";
+  private static final String CLIENTS_CONFIG_PATH = "c";
   private static final Options OPTIONS =
       new Options()
           .addOption(
-              CONFIG_OPTION,
-              "configFilePath",
+              DATASET_CONFIG_OPTION,
+              "datasetConfig",
               true,
-              "The path to a yaml file containing your configuration")
+              "The path to a yaml file containing dataset configuration")
           .addOption(
               HADOOP_CONFIG_PATH,
               "hadoopConfig",
               true,
               "Hadoop config xml file path containing configs necessary to access the "
-                  + "file system. These configs will override the default configs.");
+                  + "file system. These configs will override the default configs.")
+          .addOption(
+              CLIENTS_CONFIG_PATH,
+              "clientsConfig",
+              true,
+              "The path to a yaml file containing onetable client configurations. "
+                  + "These configs will override the default");
 
   public static void main(String[] args) throws IOException, ParseException {
     CommandLineParser parser = new DefaultParser();
@@ -78,25 +91,35 @@ public class RunSync {
 
     DatasetConfig datasetConfig = new DatasetConfig();
     try (InputStream inputStream =
-        Files.newInputStream(Paths.get(cmd.getOptionValue(CONFIG_OPTION)))) {
+        Files.newInputStream(Paths.get(cmd.getOptionValue(DATASET_CONFIG_OPTION)))) {
       ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
       ObjectReader objectReader = mapper.readerForUpdating(datasetConfig);
       objectReader.readValue(inputStream);
     }
 
-    byte[] customConfig = null;
-    if (cmd.hasOption(HADOOP_CONFIG_PATH)) {
-      customConfig = Files.readAllBytes(Paths.get(cmd.getOptionValue(HADOOP_CONFIG_PATH)));
+    byte[] customConfig = getCustomConfigurations(cmd, HADOOP_CONFIG_PATH);
+    Configuration hadoopConf = loadHadoopConf(customConfig);
+
+    String sourceFormat = datasetConfig.sourceFormat;
+    customConfig = getCustomConfigurations(cmd, CLIENTS_CONFIG_PATH);
+    TableFormatClients tableFormatClients = loadTableFormatClientConfigs(customConfig);
+    ClientConfig sourceClientConfig = tableFormatClients.getTableFormatsClients().get(sourceFormat);
+    if (sourceClientConfig == null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Source format %s is not supported. Known source and target formats are %s",
+              sourceFormat, tableFormatClients.getTableFormatsClients().keySet()));
     }
+    String sourceProviderClass = sourceClientConfig.sourceClientProviderClass;
+    SourceClientProvider<?> sourceClientProvider = ReflectionUtils.loadClass(sourceProviderClass);
+    sourceClientProvider.init(hadoopConf, sourceClientConfig.configuration);
 
-    Configuration conf = loadHadoopConf(customConfig);
-
-    List<TableFormat> tableFormatList =
-        datasetConfig.getTableFormats().stream()
+    List<io.onetable.model.storage.TableFormat> tableFormatList =
+        datasetConfig.getTargetFormats().stream()
             .map(TableFormat::valueOf)
             .collect(Collectors.toList());
-    OneTableClient client = new OneTableClient(conf);
-    for (DatasetConfig.Table table : datasetConfig.getDataset()) {
+    OneTableClient client = new OneTableClient(hadoopConf);
+    for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
       log.info(
           "Running sync for basePath {} for following table formats {}",
           table.getTableBasePath(),
@@ -111,15 +134,23 @@ public class RunSync {
                           ConfigurationBasedPartitionSpecExtractor.class.getName())
                       .partitionFieldSpecConfig(table.getPartitionSpec())
                       .build())
-              .tableFormatsToSync(tableFormatList)
+              .targetTableFormats(tableFormatList)
               .syncMode(SyncMode.INCREMENTAL)
               .build();
       try {
-        client.sync(config);
+        client.sync(config, sourceClientProvider);
       } catch (Exception e) {
         log.error(String.format("Error running sync for %s", table.getTableBasePath()), e);
       }
     }
+  }
+
+  private static byte[] getCustomConfigurations(CommandLine cmd, String option) throws IOException {
+    byte[] customConfig = null;
+    if (cmd.hasOption(option)) {
+      customConfig = Files.readAllBytes(Paths.get(cmd.getOptionValue(option)));
+    }
+    return customConfig;
   }
 
   @VisibleForTesting
@@ -132,18 +163,73 @@ public class RunSync {
     return conf;
   }
 
+  /**
+   * Loads the client configs. The method first loads the default configs and then merges any custom
+   * configs provided by the user.
+   *
+   * @param customConfigs the custom configs provided by the user
+   * @return available tableFormatsClients and their configs
+   */
+  @VisibleForTesting
+  static TableFormatClients loadTableFormatClientConfigs(byte[] customConfigs) throws IOException {
+    // get resource stream from default client config yaml file
+    try (InputStream inputStream =
+        RunSync.class.getClassLoader().getResourceAsStream("onetable-client-defaults.yaml")) {
+      ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+      TableFormatClients clients = mapper.readValue(inputStream, TableFormatClients.class);
+      if (customConfigs != null) {
+        mapper.readerForUpdating(clients).readValue(customConfigs);
+      }
+      return clients;
+    }
+  }
+
   @Data
   public static class DatasetConfig {
 
-    List<String> tableFormats;
-    List<Table> dataset;
+    /**
+     * Table format of the source table. This is a {@link TableFormat} value. Although the format of
+     * the source can be auto-detected, it is recommended to specify it explicitly for cases where
+     * the directory contains metadata of multiple formats.
+     */
+    String sourceFormat;
+
+    /** The target formats to sync to. This is a list of {@link TableFormat} values. */
+    List<String> targetFormats;
+
+    /** Configuration of the dataset to sync, path, table name, etc. */
+    List<Table> datasets;
 
     @Data
     public static class Table {
-
+      /**
+       * The base path of the table to sync. Any authentication configuration needed by HDFS client
+       * can be provided using hadoop config file
+       */
       String tableBasePath;
+
       String tableName;
       String partitionSpec;
+    }
+  }
+
+  @Data
+  public static class TableFormatClients {
+    /** Map of table format name to the client configs. */
+    @JsonProperty("tableFormatsClients")
+    @JsonMerge
+    Map<String, ClientConfig> tableFormatsClients;
+
+    @Data
+    public static class ClientConfig {
+      /** The class name of the source client which reads the table metadata. */
+      String sourceClientProviderClass;
+
+      /** The class name of the target client which writes the table metadata. */
+      String targetClientProviderClass;
+
+      /** the configuration specific to the table format. */
+      @JsonMerge Map<String, String> configuration;
     }
   }
 }

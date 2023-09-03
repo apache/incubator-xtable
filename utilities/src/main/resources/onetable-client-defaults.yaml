@@ -1,0 +1,21 @@
+# This file contains the default configuration of known OneTable tableFormatsClients for both source and target
+# table formats. The config maps a table format name to a client class, and contains the default
+# configuration values needed by the client.
+
+# sourceClientProviderClass: The class name of the client to use for reading from a table of this format.
+#                    An instance of this class will be created by providing HadoopConfiguration
+#                    provided by the user and any other configuration specific to this client.
+# targetClientProviderClass: The class name of the client to use for writing to a table of this format.
+# configuration: A map of configuration values specific to this client.
+
+tableFormatsClients:
+    HUDI:
+      sourceClientProviderClass: io.onetable.hudi.HudiSourceClientProvider
+    DELTA:
+      targetClientProviderClass: io.onetable.delta.DeltaClient
+      configuration:
+        spark.master: local[2]
+        spark.app.name: onetableclient
+    ICEBERG:
+      sourceClientProviderClass: io.onetable.iceberg.IcebergSourceClient
+      targetClientProviderClass: io.onetable.iceberg.IcebergTargetClient

@@ -41,7 +41,7 @@ import io.onetable.model.sync.SyncResult;
 @AllArgsConstructor(staticName = "of")
 public class TableFormatSync {
   private static final Logger LOG = LogManager.getLogger(TableFormatSync.class);
-  private final TargetClient<?, ?> client;
+  private final TargetClient client;
 
   /**
    * Syncs the provided snapshot to the target table format.
@@ -131,7 +131,7 @@ public class TableFormatSync {
 
   @FunctionalInterface
   private interface SyncFiles {
-    void sync(TargetClient<?, ?> client);
+    void sync(TargetClient client);
   }
 
   private SyncResult buildResultForError(SyncMode mode, Instant startTime, Exception e) {

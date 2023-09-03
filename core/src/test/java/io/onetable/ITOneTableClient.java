@@ -159,7 +159,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
@@ -195,7 +195,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
@@ -226,7 +226,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder().partitionFieldSpecConfig("level:VALUE").build())
@@ -258,7 +258,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder().partitionFieldSpecConfig("level:VALUE").build())
@@ -295,7 +295,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(tableWithInitialSchema.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
@@ -314,7 +314,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(tableWithUpdatedSchema.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
@@ -355,7 +355,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(tableWithUpdatedSchema.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
@@ -376,7 +376,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(tableWithUpdatedSchema.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
@@ -407,7 +407,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
@@ -448,7 +448,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
@@ -488,7 +488,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
@@ -531,7 +531,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
@@ -577,7 +577,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .syncMode(syncMode)
               .build();
@@ -651,7 +651,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(targetTableFormats)
+              .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
@@ -683,7 +683,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfigIceberg =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(ImmutableList.of(TableFormat.ICEBERG))
+              .targetTableFormats(ImmutableList.of(TableFormat.ICEBERG))
               .tableBasePath(table.getBasePath())
               .syncMode(syncMode)
               .build();
@@ -691,7 +691,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfigDelta =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(ImmutableList.of(TableFormat.DELTA))
+              .targetTableFormats(ImmutableList.of(TableFormat.DELTA))
               .tableBasePath(table.getBasePath())
               .syncMode(syncMode)
               .build();
@@ -731,7 +731,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(ImmutableList.of())
+              .targetTableFormats(ImmutableList.of())
               .tableBasePath(table.getBasePath())
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
@@ -749,7 +749,7 @@ public class ITOneTableClient {
       PerTableConfig singleTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(ImmutableList.of(TableFormat.ICEBERG))
+              .targetTableFormats(ImmutableList.of(TableFormat.ICEBERG))
               .tableBasePath(table.getBasePath())
               .syncMode(SyncMode.INCREMENTAL)
               .build();
@@ -757,7 +757,7 @@ public class ITOneTableClient {
       PerTableConfig dualTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
+              .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
               .tableBasePath(table.getBasePath())
               .syncMode(SyncMode.INCREMENTAL)
               .build();
@@ -814,7 +814,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .tableFormatsToSync(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
+              .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
               .tableBasePath(table.getBasePath())
               .syncMode(SyncMode.INCREMENTAL)
               .targetMetadataRetentionInHours(0) // force cleanup
