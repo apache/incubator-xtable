@@ -1,11 +1,13 @@
 # This file contains the default configuration of known OneTable tableFormatsClients for both source and target
-# table formats. The config maps a table format name to a client class, and contains the default
-# configuration values needed by the client.
+# table formats. The config maps a table format name to a client class, and contains the default configuration
+# values needed by the client.
 
-# sourceClientProviderClass: The class name of the client to use for reading from a table of this format.
-#                    An instance of this class will be created by providing HadoopConfiguration
-#                    provided by the user and any other configuration specific to this client.
-# targetClientProviderClass: The class name of the client to use for writing to a table of this format.
+# sourceClientProviderClass: The class name of a table format's client factory, where the client is
+#     used for reading from a table of this format. All user configurations, including hadoop config
+#     and client specific configuration, will be available to the factory for instantiation of the
+#     client.
+# targetClientProviderClass: The class name of a table format's client factory, where the client is
+#     used for writing to a table of this format.
 # configuration: A map of configuration values specific to this client.
 
 tableFormatsClients:
