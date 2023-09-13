@@ -33,7 +33,7 @@ import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.sync.TableFormatSync;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class TableFormatSyncFactory {
+public class TableFormatClientFactory {
   public static TableFormatSync createForFormat(
       TableFormat tableFormat, PerTableConfig perTableConfig, Configuration configuration) {
     switch (tableFormat) {

@@ -127,7 +127,7 @@ public class TestDeltaSync {
                     .tableName(tableName)
                     .tableBasePath(basePath.toString())
                     .targetMetadataRetentionInHours(1)
-                    .tableFormatsToSync(Collections.singletonList(TableFormat.DELTA))
+                    .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
                     .build(),
                 sparkSession));
   }

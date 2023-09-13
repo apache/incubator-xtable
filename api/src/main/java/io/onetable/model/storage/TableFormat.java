@@ -19,7 +19,7 @@
 package io.onetable.model.storage;
 
 /**
- * Supported TableFormat list
+ * Default enumeration of supported Table Formats
  *
  * @since 0.1
  */

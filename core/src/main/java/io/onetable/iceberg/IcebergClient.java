@@ -48,7 +48,7 @@ import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.sync.TargetClient;
 
-public class IcebergClient implements TargetClient<Schema, PartitionSpec> {
+public class IcebergClient implements TargetClient {
   private static final String METADATA_DIR_PATH = "/metadata/";
   private final IcebergSchemaExtractor schemaExtractor;
   private final IcebergSchemaSync schemaSync;
@@ -130,18 +130,16 @@ public class IcebergClient implements TargetClient<Schema, PartitionSpec> {
   }
 
   @Override
-  public Schema syncSchema(OneSchema schema) {
+  public void syncSchema(OneSchema schema) {
     Schema latestSchema = schemaExtractor.toIceberg(schema);
     schemaSync.sync(transaction.table().schema(), latestSchema, transaction);
-    return latestSchema;
   }
 
   @Override
-  public PartitionSpec syncPartitionSpec(List<OnePartitionField> partitionSpec) {
+  public void syncPartitionSpec(List<OnePartitionField> partitionSpec) {
     PartitionSpec latestPartitionSpec =
         partitionSpecExtractor.toPartitionSpec(partitionSpec, transaction.table().schema());
     partitionSpecSync.sync(table.spec(), latestPartitionSpec, transaction);
-    return latestPartitionSpec;
   }
 
   @Override

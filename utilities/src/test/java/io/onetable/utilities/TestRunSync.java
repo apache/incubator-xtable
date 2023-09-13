@@ -18,9 +18,15 @@
  
 package io.onetable.utilities;
 
+import java.io.IOException;
+import java.util.Map;
+
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import io.onetable.utilities.RunSync.TableFormatClients;
+import io.onetable.utilities.RunSync.TableFormatClients.ClientConfig;
 
 class TestRunSync {
 
@@ -63,5 +69,52 @@ class TestRunSync {
     Assertions.assertEquals("override_default_value", value);
     value = conf.get("fs.azure.account.oauth2.client.endpoint");
     Assertions.assertEquals("https://login.microsoftonline.com/", value);
+  }
+
+  @Test
+  public void testTableFormatClientConfigDefault() throws IOException {
+    TableFormatClients clients = RunSync.loadTableFormatClientConfigs(null);
+    Map<String, ClientConfig> tfClients = clients.getTableFormatsClients();
+    Assertions.assertEquals(3, tfClients.size());
+    Assertions.assertNotNull(tfClients.get("DELTA"));
+    Assertions.assertNotNull(tfClients.get("HUDI"));
+    Assertions.assertNotNull(tfClients.get("ICEBERG"));
+
+    Assertions.assertEquals(
+        "io.onetable.hudi.HudiSourceClientProvider",
+        tfClients.get("HUDI").getSourceClientProviderClass());
+    Assertions.assertEquals(
+        "io.onetable.iceberg.IcebergTargetClient",
+        tfClients.get("ICEBERG").getTargetClientProviderClass());
+    Assertions.assertEquals(
+        "io.onetable.iceberg.IcebergSourceClient",
+        tfClients.get("ICEBERG").getSourceClientProviderClass());
+  }
+
+  @Test
+  public void testTableFormatClientCustom() throws IOException {
+    String customClients =
+        "tableFormatsClients:\n"
+            + "  HUDI:\n"
+            + "    sourceClientProviderClass: foo\n"
+            + "  DELTA:\n"
+            + "    configuration:\n"
+            + "      spark.master: local[4]\n"
+            + "      foo: bar\n"
+            + "  NEW_FORMAT:\n"
+            + "    sourceClientProviderClass: bar\n";
+    TableFormatClients clients = RunSync.loadTableFormatClientConfigs(customClients.getBytes());
+    Map<String, ClientConfig> tfClients = clients.getTableFormatsClients();
+    Assertions.assertEquals(4, tfClients.size());
+
+    Assertions.assertNotNull(tfClients.get("NEW_FORMAT"));
+    Assertions.assertEquals("bar", tfClients.get("NEW_FORMAT").getSourceClientProviderClass());
+
+    Assertions.assertEquals("foo", tfClients.get("HUDI").getSourceClientProviderClass());
+
+    Map<String, String> deltaClientConfigs = tfClients.get("DELTA").getConfiguration();
+    Assertions.assertEquals(3, deltaClientConfigs.size());
+    Assertions.assertEquals("local[4]", deltaClientConfigs.get("spark.master"));
+    Assertions.assertEquals("bar", deltaClientConfigs.get("foo"));
   }
 }

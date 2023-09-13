@@ -24,10 +24,11 @@ transformations between source and target formats in the future.
 1. Get a pre-built bundled jar or create the jar with `mvn install -DskipTests`
 2. create a yaml file that follows the format below:
 ```yaml
+sourceFormat: HUDI
 tableFormats:
   - DELTA
   - ICEBERG
-dataset:
+datasets:
   -
     tableBasePath: s3://tpc-ds-datasets/1GB/hudi/call_center
     tablename: call_center
@@ -51,7 +52,25 @@ dataset:
     - `DAY`: same as `YEAR` but with day granularity
     - `HOUR`: same as `YEAR` but with hour granularity
   - `format`: if your partition type is `YEAR`, `MONTH`, `DAY`, or `HOUR` specify the format for the date string as it appears in your file paths
-3. run with `java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --configFilePath my_config.yaml`  
+3. The default implementations of table format clients can be replaced with custom implementations by specifying a client configs yaml file in the format below:
+```yaml
+# sourceClientProviderClass: The class name of a table format's client factory, where the client is
+#     used for reading from a table of this format. All user configurations, including hadoop config
+#     and client specific configuration, will be available to the factory for instantiation of the
+#     client.
+# targetClientProviderClass: The class name of a table format's client factory, where the client is
+#     used for writing to a table of this format.
+# configuration: A map of configuration values specific to this client.
+tableFormatsClients:
+    HUDI:
+      sourceClientProviderClass: io.onetable.hudi.HudiSourceClientProvider
+    DELTA:
+      targetClientProviderClass: io.onetable.delta.DeltaClient
+      configuration:
+        spark.master: local[2]
+        spark.app.name: onetableclient
+```
+4. run with `java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [ --hadoopConfig hdfs-site.xml ] [--clientsConfig clients.yaml]`
 The bundled jar includes hadoop dependencies for AWS and GCP. Authentication for AWS is done with 
 `com.amazonaws.auth.DefaultAWSCredentialsProviderChain`. To override this setting, specify a different implementation 
 with the `--awsCredentialsProvider` option.

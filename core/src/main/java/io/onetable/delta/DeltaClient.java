@@ -59,7 +59,7 @@ import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.sync.TargetClient;
 
-public class DeltaClient implements TargetClient<StructType, Map<String, StructField>> {
+public class DeltaClient implements TargetClient {
   private static final String MIN_READER_VERSION = String.valueOf(1);
   // gets access to generated columns.
   private static final String MIN_WRITER_VERSION = String.valueOf(4);
@@ -113,14 +113,13 @@ public class DeltaClient implements TargetClient<StructType, Map<String, StructF
   }
 
   @Override
-  public StructType syncSchema(OneSchema schema) {
+  public void syncSchema(OneSchema schema) {
     StructType latestSchema = schemaExtractor.schema(schema);
     transactionState.setLatestSchema(latestSchema);
-    return latestSchema;
   }
 
   @Override
-  public Map<String, StructField> syncPartitionSpec(List<OnePartitionField> partitionSpec) {
+  public void syncPartitionSpec(List<OnePartitionField> partitionSpec) {
     Map<String, StructField> spec = partitionExtractor.getPartitionColumns(partitionSpec);
     if (partitionSpec != null) {
       for (Map.Entry<String, StructField> e : spec.entrySet()) {
@@ -132,7 +131,6 @@ public class DeltaClient implements TargetClient<StructType, Map<String, StructF
         }
       }
     }
-    return spec;
   }
 
   @Override

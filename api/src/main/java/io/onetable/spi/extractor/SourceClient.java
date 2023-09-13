@@ -31,7 +31,6 @@ import io.onetable.model.storage.OneDataFiles;
  * to be as generic as possible across source table formats.
  */
 public interface SourceClient<COMMIT> {
-
   /**
    * Extracts the {@link OneTable} definition as of the provided commit.
    *
