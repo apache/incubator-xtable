@@ -139,7 +139,11 @@ public class OneTableStateStorage {
               new BufferedReader(
                   new InputStreamReader(fsDataInputStream, StandardCharsets.UTF_8))) {
         String readLine = bufferedReader.readLine();
-        return Optional.of(MAPPER.readValue(readLine, OneTableState.class));
+        if (readLine != null) {
+          return Optional.of(MAPPER.readValue(readLine, OneTableState.class));
+        } else {
+          return Optional.empty();
+        }
       }
     }
     return Optional.empty();

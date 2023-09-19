@@ -281,16 +281,19 @@ public class OneTableClient {
   private void persistOneTableState(OneTableState state) {
     try {
       storage.write(state);
-    } catch (IOException e) {
-      throw new OneIOException("Failed to persist sync result", e);
+    } catch (IOException ex) {
+      LOG.error(String.format("Failed to persist one table state for table path: %s",
+          state.getTable().getBasePath()), ex);
+      throw new OneIOException("Failed to persist sync result", ex);
     }
   }
 
   private Optional<OneTableState> getSyncState(String tableBasePath) {
     try {
       return storage.read(tableBasePath);
-    } catch (IOException e) {
-      throw new OneIOException("Failed to get one table state", e);
+    } catch (IOException ex) {
+      LOG.error(String.format("Failed to get one table state for table path: %s", tableBasePath), ex);
+      throw new OneIOException("Failed to get one table state", ex);
     }
   }
 

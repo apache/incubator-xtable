@@ -19,13 +19,14 @@
 package io.onetable.persistence;
 
 import static io.onetable.constants.OneTableConstants.ONETABLE_META_DIR;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 
 import org.apache.hadoop.conf.Configuration;
@@ -244,6 +246,19 @@ class TestOneTableStateStorage {
         }
       }
     }
+  }
+
+  @Test
+  void testReadEmptyFile() throws IOException {
+    Path basePath = tempDir.resolve(TABLE_NAME);
+    Path oneTableStatePath = basePath.resolve(ONETABLE_META_DIR);
+    if (!Files.exists(oneTableStatePath)) {
+      Files.createDirectories(oneTableStatePath);
+    }
+    Path stateFilePath = oneTableStatePath.resolve("state");
+    Files.createFile(stateFilePath);
+    Optional<OneTableState> stateFromStorage = storage.read(basePath.toString());
+    assertFalse(stateFromStorage.isPresent());
   }
 
   private OneDataFile getOneDataFile(
