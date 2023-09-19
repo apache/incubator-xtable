@@ -40,6 +40,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import io.onetable.client.SourceClientProvider;
+import io.onetable.hudi.HudiSourceClientProvider;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 
@@ -66,6 +68,7 @@ import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import org.apache.iceberg.Table;
 import org.apache.iceberg.hadoop.HadoopTables;
@@ -89,6 +92,7 @@ public class ITOneTableClient {
 
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;
+  private static SourceClientProvider<HoodieInstant> hudiSourceClientProvider;
 
   @BeforeAll
   public static void setupOnce() {
@@ -118,6 +122,8 @@ public class ITOneTableClient {
         .hadoopConfiguration()
         .set("parquet.avro.write-old-list-structure", "false");
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
+    hudiSourceClientProvider = new HudiSourceClientProvider();
+    hudiSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
   }
 
   @AfterAll
@@ -168,7 +174,7 @@ public class ITOneTableClient {
               .syncMode(syncMode)
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
 
       table.insertRecords(100, true);
@@ -204,7 +210,7 @@ public class ITOneTableClient {
               .syncMode(syncMode)
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 50);
 
       table.deleteRecords(insertedRecords.subList(0, 20), true);
@@ -233,12 +239,12 @@ public class ITOneTableClient {
               .syncMode(syncMode)
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 10);
 
       table.insertRecords(10, "WARN", true);
 
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 20);
     }
   }
@@ -265,12 +271,12 @@ public class ITOneTableClient {
               .syncMode(syncMode)
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
 
       table.deletePartition(partitionToDelete);
 
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI,
           targetTableFormats,
@@ -304,7 +310,7 @@ public class ITOneTableClient {
               .syncMode(syncMode)
               .build();
       insertedRecords = tableWithInitialSchema.insertRecords(50, true);
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI, targetTableFormats, tableWithInitialSchema.getBasePath(), 50);
     }
@@ -364,7 +370,7 @@ public class ITOneTableClient {
               .syncMode(syncMode)
               .build();
       tableWithUpdatedSchema.insertRecords(50, true);
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 100);
       previousSchema = tableWithUpdatedSchema.getSchema();
@@ -385,7 +391,7 @@ public class ITOneTableClient {
               .syncMode(syncMode)
               .build();
       tableWithUpdatedSchema.insertRecords(50, true);
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 150);
     }
@@ -417,17 +423,17 @@ public class ITOneTableClient {
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       // sync once to establish initial OneTable state
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       table.upsertRecords(insertedRecords.subList(0, 20), true);
       if (tableType == HoodieTableType.MERGE_ON_READ) {
         table.compact();
       }
       table.insertRecords(50, true);
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
       table.clean();
 
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
     }
   }
@@ -458,7 +464,7 @@ public class ITOneTableClient {
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       // sync once to establish initial OneTable state
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
 
       table.upsertRecords(insertedRecords.subList(0, 20), true);
       table.insertRecords(50, true);
@@ -467,7 +473,7 @@ public class ITOneTableClient {
       }
       table.cluster();
 
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
     }
   }
@@ -498,19 +504,19 @@ public class ITOneTableClient {
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       // sync once to establish initial OneTable state
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
 
       table.insertRecords(50, true);
       table.insertRecords(50, true);
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 150);
 
       table.savepointRestoreForPreviousInstant();
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
 
       table.insertRecords(50, true);
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 150);
     }
   }
@@ -541,27 +547,27 @@ public class ITOneTableClient {
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       // sync once to establish initial OneTable state
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
 
       table.insertRecords(50, true);
       table.insertRecords(50, true);
       table.insertRecords(50, true);
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 200);
 
       table.rollback(
           table.getActiveTimeline().getCommitsTimeline().lastInstant().get().getTimestamp());
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 150);
       table.rollback(
           table.getActiveTimeline().getCommitsTimeline().lastInstant().get().getTimestamp());
       table.rollback(
           table.getActiveTimeline().getCommitsTimeline().lastInstant().get().getTimestamp());
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 50);
       table.rollback(
           table.getActiveTimeline().getCommitsTimeline().lastInstant().get().getTimestamp());
-      assertThrows(SchemaExtractorException.class, () -> oneTableClient.sync(perTableConfig));
+      assertThrows(SchemaExtractorException.class, () -> oneTableClient.sync(perTableConfig, hudiSourceClientProvider));
     }
   }
 
@@ -582,15 +588,15 @@ public class ITOneTableClient {
               .syncMode(syncMode)
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       Instant instantAfterFirstSync = Instant.now();
 
       table.insertRecords(50, true);
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       Instant instantAfterSecondSync = Instant.now();
 
       table.insertRecords(50, true);
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
 
       checkDatasetEquivalence(
           TableFormat.HUDI,
@@ -661,10 +667,10 @@ public class ITOneTableClient {
               .build();
       table.insertRecords(100, true);
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       // Do a second sync to force the test to read back the metadata it wrote earlier
       table.insertRecords(100, true);
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
 
       checkDatasetEquivalenceWithFilter(
           TableFormat.HUDI, targetTableFormats, table.getBasePath(), filter);
@@ -697,24 +703,24 @@ public class ITOneTableClient {
               .build();
 
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-      oneTableClient.sync(perTableConfigIceberg);
+      oneTableClient.sync(perTableConfigIceberg, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI,
           Collections.singletonList(TableFormat.ICEBERG),
           table.getBasePath(),
           100);
-      oneTableClient.sync(perTableConfigDelta);
+      oneTableClient.sync(perTableConfigDelta, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI, Collections.singletonList(TableFormat.DELTA), table.getBasePath(), 100);
 
       table.insertRecords(100, true);
-      oneTableClient.sync(perTableConfigIceberg);
+      oneTableClient.sync(perTableConfigIceberg, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI,
           Collections.singletonList(TableFormat.ICEBERG),
           table.getBasePath(),
           200);
-      oneTableClient.sync(perTableConfigDelta);
+      oneTableClient.sync(perTableConfigDelta, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI, Collections.singletonList(TableFormat.DELTA), table.getBasePath(), 200);
     }
@@ -736,7 +742,7 @@ public class ITOneTableClient {
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
 
-      assertThrows(IllegalArgumentException.class, () -> oneTableClient.sync(perTableConfig));
+      assertThrows(IllegalArgumentException.class, () -> oneTableClient.sync(perTableConfig, hudiSourceClientProvider));
     }
   }
 
@@ -765,7 +771,7 @@ public class ITOneTableClient {
       table.insertRecords(50, true);
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       // sync iceberg only
-      oneTableClient.sync(singleTableConfig);
+      oneTableClient.sync(singleTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI,
           Collections.singletonList(TableFormat.ICEBERG),
@@ -774,7 +780,7 @@ public class ITOneTableClient {
       // insert more records
       table.insertRecords(50, true);
       // iceberg will be an incremental sync and delta will need to bootstrap with snapshot sync
-      oneTableClient.sync(dualTableConfig);
+      oneTableClient.sync(dualTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI,
           Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
@@ -786,7 +792,7 @@ public class ITOneTableClient {
       // insert more records
       table.insertRecords(50, true);
       // incremental sync for two commits for iceberg only
-      oneTableClient.sync(singleTableConfig);
+      oneTableClient.sync(singleTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI,
           Collections.singletonList(TableFormat.ICEBERG),
@@ -796,7 +802,7 @@ public class ITOneTableClient {
       // insert more records
       table.insertRecords(50, true);
       // incremental sync for one commit for iceberg and three commits for delta
-      oneTableClient.sync(dualTableConfig);
+      oneTableClient.sync(dualTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI,
           Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
@@ -821,7 +827,7 @@ public class ITOneTableClient {
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       table.insertRecords(10, true);
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       // later we will ensure we can still read the source table at this instant to ensure that
       // neither target cleaned up the underlying parquet files in the table
       Instant instantAfterFirstCommit = Instant.now();
@@ -830,7 +836,7 @@ public class ITOneTableClient {
           .forEach(
               unused -> {
                 table.insertRecords(10, true);
-                oneTableClient.sync(perTableConfig);
+                oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
               });
       // ensure that hudi rows can still be read and underlying files were not removed
       List<Row> rows =
@@ -859,13 +865,13 @@ public class ITOneTableClient {
       OneTableClient oneTableClient) {
     if (tableType == HoodieTableType.MERGE_ON_READ) {
       // sync once before compaction and assert no failures
-      Map<TableFormat, SyncResult> syncResults = oneTableClient.sync(perTableConfig);
+      Map<TableFormat, SyncResult> syncResults = oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       assertNoSyncFailures(syncResults);
 
       table.compact();
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
     } else {
-      oneTableClient.sync(perTableConfig);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
     }
   }
 
