@@ -57,6 +57,7 @@ import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -92,7 +93,7 @@ public class ITOneTableClient {
 
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;
-  private static SourceClientProvider<HoodieInstant> hudiSourceClientProvider;
+  private SourceClientProvider<HoodieInstant> hudiSourceClientProvider;
 
   @BeforeAll
   public static void setupOnce() {
@@ -122,6 +123,10 @@ public class ITOneTableClient {
         .hadoopConfiguration()
         .set("parquet.avro.write-old-list-structure", "false");
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
+  }
+
+  @BeforeEach
+  public void setup() {
     hudiSourceClientProvider = new HudiSourceClientProvider();
     hudiSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
   }
