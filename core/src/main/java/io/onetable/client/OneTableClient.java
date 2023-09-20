@@ -37,7 +37,6 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import io.onetable.exception.OneIOException;
-import io.onetable.hudi.HudiSourceClientProvider;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
@@ -77,13 +76,10 @@ public class OneTableClient {
    *
    * @param config A per table level config containing tableBasePath, partitionFieldSpecConfig,
    *     targetTableFormats and syncMode
+   * @param sourceClientProvider A provider for the source client instance, {@link SourceClientProvider#init(Configuration, Map)} must be called before calling this method.
    * @return Returns a map containing the table format, and it's sync result. Run sync for a table
    *     with the provided per table level configuration.
    */
-  public Map<TableFormat, SyncResult> sync(PerTableConfig config) {
-    return sync(config, new HudiSourceClientProvider());
-  }
-
   public <COMMIT> Map<TableFormat, SyncResult> sync(
       PerTableConfig config, SourceClientProvider<COMMIT> sourceClientProvider) {
     if (config.getTargetTableFormats().isEmpty()) {
