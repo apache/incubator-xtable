@@ -227,7 +227,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
               .forEach(
                   (partitionPath, fileIds) -> {
                     Set<String> affectedFileGroupIds = new HashSet<>(fileIds);
-                    replaceMetadata.getPartitionToWriteStats().get(partitionPath).stream()
+                    replaceMetadata.getPartitionToWriteStats().getOrDefault(partitionPath, Collections.emptyList())
+                        .stream()
                         .map(HoodieWriteStat::getFileId)
                         .forEach(affectedFileGroupIds::add);
                     Pair<Optional<PartitionInfo>, Optional<PartitionInfo>> addedAndRemovedFiles =
