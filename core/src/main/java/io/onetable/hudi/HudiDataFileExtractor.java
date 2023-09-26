@@ -26,8 +26,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.spi.DefaultSnapshotVisitor;
 import lombok.Builder;
 import lombok.Value;
 
@@ -129,7 +131,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
         timelineForInstant = activeTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp());
       }
     }
-    HoodieTableFileSystemView fsView = new HoodieMetadataFileSystemView(localEngineContext, metaClient, timelineForInstant, HoodieMetadataConfig.newBuilder().enable(true).build());
+    HoodieTableFileSystemView fsView = new HoodieMetadataFileSystemView(localEngineContext, metaClient, activeTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp()),
+        HoodieMetadataConfig.newBuilder().enable(true).build());
 
     List<Pair<List<PartitionInfo>, List<PartitionInfo>>> allInfo = timelineForInstant.getInstants().stream().map(instant -> getInfo(activeTimeline, instant, fsView, startCommit)).collect(Collectors.toList());
     List<PartitionInfo> added = allInfo.stream().flatMap(pair -> pair.getLeft().stream()).collect(Collectors.toList());
@@ -139,10 +142,24 @@ public class HudiDataFileExtractor implements AutoCloseable {
     HudiPartitionDataFileExtractor statsExtractor =
         new HudiPartitionDataFileExtractor(metaClient, table, partitionValuesExtractor, timelineForInstant);
     List<OneDataFile> filesAdded = localEngineContext.map(added, statsExtractor, parallelism);
+    List<OneDataFile> extractedFilesAdded = filesAdded.stream().flatMap(oneDataFile -> {
+      if (oneDataFile instanceof OneDataFiles) {
+        return ((OneDataFiles) oneDataFile).getFiles().stream();
+      } else {
+        return Stream.of(oneDataFile);
+      }
+    }).collect(Collectors.toList());
     List<OneDataFile> filesRemoved = localEngineContext.map(removed, statsExtractor, parallelism);
+    List<OneDataFile> extractedFilesRemoved = filesRemoved.stream().flatMap(oneDataFile -> {
+      if (oneDataFile instanceof OneDataFiles) {
+        return ((OneDataFiles) oneDataFile).getFiles().stream();
+      } else {
+        return Stream.of(oneDataFile);
+      }
+    }).collect(Collectors.toList());
     return OneDataFilesDiff.builder()
-        .filesAdded(filesAdded)
-        .filesRemoved(filesRemoved)
+        .filesAdded(extractedFilesAdded)
+        .filesRemoved(extractedFilesRemoved)
         .build();
   }
 
