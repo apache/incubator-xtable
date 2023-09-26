@@ -24,6 +24,7 @@ import java.util.List;
 import io.onetable.model.OneTable;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.OneDataFilesDiff;
 
 /**
  * A client that provides the major functionality for extracting the state at a given instant in a
@@ -73,6 +74,8 @@ public interface SourceClient<COMMIT> {
    */
   OneDataFiles getFilesForAffectedPartitions(
       COMMIT startCommit, COMMIT endCommit, OneTable tableDefinition, OneDataFiles existingFiles);
+
+  OneDataFilesDiff getFilesDiffForAffectedPartitions(COMMIT startCommit, COMMIT endCommit, OneTable tableDefinition);
 
   /**
    * Get all the commit times that occurred after the provided commit from oldest to newest.

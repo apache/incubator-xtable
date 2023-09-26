@@ -39,6 +39,7 @@ import io.onetable.model.OneTable;
 import io.onetable.model.exception.OneParseException;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.extractor.SourceClient;
 
 public class HudiClient implements SourceClient<HoodieInstant> {
@@ -96,6 +97,11 @@ public class HudiClient implements SourceClient<HoodieInstant> {
             dataFileExtractor.getOneDataFilesForAffectedPartitions(
                 startCommit, endCommit, tableDefinition, existingFiles))
         .build();
+  }
+
+  @Override
+  public OneDataFilesDiff getFilesDiffForAffectedPartitions(HoodieInstant startCommit, HoodieInstant endCommit, OneTable table) {
+    return dataFileExtractor.getDiffBetweenCommits(startCommit, endCommit, table);
   }
 
   @Override

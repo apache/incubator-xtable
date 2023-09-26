@@ -81,7 +81,7 @@ public class TableFormatSync {
                 SyncMode.INCREMENTAL,
                 change.getCurrentTableState(),
                 client -> client.syncFilesForDiff(change.getFilesDiff()),
-                change.getDataFilesAfterDiff(),
+                null,
                 startTime));
       } catch (Exception e) {
         // Fallback to a sync where table changes are from changes.getInstant() to latest, write a

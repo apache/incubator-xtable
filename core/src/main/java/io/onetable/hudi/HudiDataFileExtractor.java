@@ -23,9 +23,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import io.onetable.model.storage.OneDataFilesDiff;
 import lombok.Builder;
 import lombok.Value;
 
@@ -34,19 +36,31 @@ import org.apache.hadoop.fs.Path;
 
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieLocalEngineContext;
+import org.apache.hudi.common.model.HoodieBaseFile;
+import org.apache.hudi.common.model.HoodieCommitMetadata;
+import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
+import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineUtils;
+import org.apache.hudi.common.table.view.FileSystemViewManager;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
+import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.collection.Pair;
+import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 
 import io.onetable.exception.OneIOException;
 import io.onetable.model.OneTable;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
+
+import static org.apache.hudi.common.table.timeline.HoodieTimeline.GREATER_THAN;
+import static org.apache.hudi.common.table.timeline.HoodieTimeline.LESSER_THAN;
+import static org.apache.hudi.common.table.timeline.HoodieTimeline.LESSER_THAN_OR_EQUALS;
 
 /** Extracts all the files for Hudi table represented by {@link OneTable}. */
 public class HudiDataFileExtractor implements AutoCloseable {
@@ -85,6 +99,108 @@ public class HudiDataFileExtractor implements AutoCloseable {
       throw new OneIOException("Unable to read partition paths from Hudi Metadata", ex);
     }
     return getOneDataFilesForPartitions(allPartitionPaths, timelineForInstant, table, null);
+  }
+
+  public OneDataFilesDiff getDiffBetweenCommits(HoodieInstant startCommit, HoodieInstant endCommit, OneTable table) {
+    HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
+    HoodieTimeline timelineForInstant =
+        activeTimeline.findInstantsInRange(startCommit.getTimestamp(), endCommit.getTimestamp());
+    if (timelineForInstant.getWriteTimeline().countInstants() == 0) {
+      // HoodieTableFileSystemView returns a view of files using the write timeline only.
+      // If there are no write commits between start and end - these are either savepoint, rollback,
+      // restore and clean commits.
+      // In such cases, we sync the commits from lastWriteInstantBeforeStart...start...end.
+      Option<HoodieInstant> lastWriteInstantBeforeStartCommit =
+          activeTimeline
+              .findInstantsBeforeOrEquals(startCommit.getTimestamp())
+              .getWriteTimeline()
+              .lastInstant();
+      if (lastWriteInstantBeforeStartCommit.isPresent()) {
+        timelineForInstant =
+            activeTimeline
+                .findInstantsBeforeOrEquals(endCommit.getTimestamp())
+                .filter(
+                    instant ->
+                        instant
+                            .getTimestamp()
+                            .compareTo(lastWriteInstantBeforeStartCommit.get().getTimestamp())
+                            >= 0);
+      } else {
+        timelineForInstant = activeTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp());
+      }
+    }
+    HoodieTableFileSystemView fsView = new HoodieMetadataFileSystemView(localEngineContext, metaClient, timelineForInstant, HoodieMetadataConfig.newBuilder().enable(true).build());
+
+    List<Pair<List<PartitionInfo>, List<PartitionInfo>>> allInfo = timelineForInstant.getInstants().stream().map(instant -> getInfo(activeTimeline, instant, fsView, startCommit)).collect(Collectors.toList());
+    List<PartitionInfo> added = allInfo.stream().flatMap(pair -> pair.getLeft().stream()).collect(Collectors.toList());
+    List<PartitionInfo> removed = allInfo.stream().flatMap(pair -> pair.getRight().stream()).collect(Collectors.toList());
+    int parallelism = Math.min(DEFAULT_PARALLELISM, added.size());
+
+    HudiPartitionDataFileExtractor statsExtractor =
+        new HudiPartitionDataFileExtractor(metaClient, table, partitionValuesExtractor, timelineForInstant);
+    List<OneDataFile> filesAdded = localEngineContext.map(added, statsExtractor, parallelism);
+    List<OneDataFile> filesRemoved = localEngineContext.map(removed, statsExtractor, parallelism);
+    return OneDataFilesDiff.builder()
+        .filesAdded(filesAdded)
+        .filesRemoved(filesRemoved)
+        .build();
+  }
+
+  private Pair<List<PartitionInfo>, List<PartitionInfo>> getInfo(HoodieTimeline timeline, HoodieInstant instant, HoodieTableFileSystemView fsView, HoodieInstant startCommit) {
+    try {
+      List<PartitionInfo> addedFiles = new ArrayList<>();
+      List<PartitionInfo> removedFiles = new ArrayList<>();
+      switch (instant.getAction()) {
+        case HoodieTimeline.COMMIT_ACTION:
+        case HoodieTimeline.DELTA_COMMIT_ACTION:
+          HoodieCommitMetadata commitMetadata =
+              HoodieCommitMetadata.fromBytes(timeline.getInstantDetails(instant).get(), HoodieCommitMetadata.class);
+          commitMetadata.getPartitionToWriteStats().entrySet().stream().forEach(entry -> {
+            String partitionPath = entry.getKey();
+            List<FileStatus> filesToAdd = new ArrayList<>();
+            List<FileStatus> filesToRemove = new ArrayList<>();
+            List<HoodieWriteStat> writeStats = entry.getValue();
+            Set<String> fileGroupIds = writeStats.stream().map(HoodieWriteStat::getFileId).collect(Collectors.toSet());
+            fsView.getAllFileGroups(partitionPath).forEach(fileGroup -> {
+              String fileId = fileGroup.getFileGroupId().getFileId();
+              if (fileGroupIds.contains(fileId)) {
+                List<HoodieBaseFile> baseFiles = fileGroup.getAllBaseFiles().collect(Collectors.toList());
+                if (HoodieTimeline.compareTimestamps(baseFiles.get(0).getCommitTime(), GREATER_THAN, startCommit.getTimestamp())) {
+                  filesToAdd.add(baseFiles.get(0).getFileStatus());
+                }
+                for (HoodieBaseFile baseFile : baseFiles) {
+                  if (HoodieTimeline.compareTimestamps(baseFile.getCommitTime(), LESSER_THAN_OR_EQUALS, startCommit.getTimestamp())) {
+                    filesToRemove.add(baseFile.getFileStatus());
+                    break;
+                  }
+                }
+              }
+            });
+            if (!filesToAdd.isEmpty()) {
+              addedFiles.add(PartitionInfo.builder()
+                  .partitionPath(partitionPath)
+                  .fileStatuses(filesToAdd.toArray(new FileStatus[0]))
+                  .build());
+            }
+            if (!filesToRemove.isEmpty()) {
+              removedFiles.add(PartitionInfo.builder()
+                  .partitionPath(partitionPath)
+                  .fileStatuses(filesToRemove.toArray(new FileStatus[0]))
+                  .build());
+            }
+          });
+          break;
+        case HoodieTimeline.REPLACE_COMMIT_ACTION:
+          HoodieReplaceCommitMetadata replaceMetadata =
+              HoodieReplaceCommitMetadata.fromBytes(timeline.getInstantDetails(instant).get(), HoodieReplaceCommitMetadata.class);
+          break;
+        default:
+          break; // TODO
+      }
+      return Pair.of(addedFiles, removedFiles);
+    } catch (IOException ex) {
+      throw new OneIOException("Unable to read commit metadata for commit " + instant, ex);
+    }
   }
 
   public List<OneDataFile> getOneDataFilesForAffectedPartitions(
