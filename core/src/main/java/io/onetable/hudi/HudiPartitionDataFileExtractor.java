@@ -89,7 +89,8 @@ public class HudiPartitionDataFileExtractor
                 .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
     List<OneDataFile> partitionFiles =
         fsView
-            .getLatestBaseFiles()
+            .getAllFileGroups()
+            .map(fg -> fg.getLatestDataFile().get())
             .parallel()
             .map(
                 hoodieBaseFile -> {

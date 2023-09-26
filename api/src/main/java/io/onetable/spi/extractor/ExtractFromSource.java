@@ -61,15 +61,17 @@ public class ExtractFromSource<COMMIT> {
     List<COMMIT> commitList = sourceClient.getCommits(lastCommitSynced);
     List<TableChange> tableChangeList = new ArrayList<>();
     COMMIT previousCommit = lastCommitSynced;
+    OneDataFiles latestFileState = lastSyncedDataFiles;
     for (COMMIT commit : commitList) {
       OneTable tableState = sourceClient.getTable(commit);
       OneDataFilesDiff filesDiff = sourceClient.getFilesDiffForAffectedPartitions(previousCommit, commit, tableState);
       // track updates to the state of the files in the table in memory
+      latestFileState = syncChanges(latestFileState, filesDiff);
       tableChangeList.add(
           TableChange.builder()
               .filesDiff(filesDiff)
               .currentTableState(tableState)
-              .dataFilesAfterDiff(null)
+              .dataFilesAfterDiff(latestFileState)
               .build());
       previousCommit = commit;
     }
@@ -78,5 +80,81 @@ public class ExtractFromSource<COMMIT> {
 
   public COMMIT getLastSyncCommit(Instant lastSyncTime) {
     return sourceClient.getCommitAtInstant(lastSyncTime);
+  }
+
+  private OneDataFiles syncChanges(OneDataFiles currentState, OneDataFilesDiff filesDiff) {
+    Map<String, List<OneDataFile>> addedFilesByPartition =
+        filesDiff.getFilesAdded().stream()
+            .collect(Collectors.groupingBy(OneDataFile::getPartitionPath));
+    Map<String, List<OneDataFile>> removedFilesByPartition =
+        filesDiff.getFilesRemoved().stream()
+            .collect(Collectors.groupingBy(OneDataFile::getPartitionPath));
+    // update existing partitions
+    OneDataFiles result =
+        syncChanges(currentState, addedFilesByPartition, removedFilesByPartition, true);
+    // add new partitions
+    Set<String> existingPartitions =
+        result.getFiles().stream().map(OneDataFile::getPartitionPath).collect(Collectors.toSet());
+    List<OneDataFiles> newPartitions =
+        addedFilesByPartition.entrySet().stream()
+            .filter(entry -> !existingPartitions.contains(entry.getKey()))
+            .map(
+                entry ->
+                    OneDataFiles.collectionBuilder()
+                        .files(entry.getValue())
+                        .partitionPath(entry.getKey())
+                        .build())
+            .collect(Collectors.toList());
+    if (newPartitions.isEmpty()) {
+      return result;
+    } else {
+      List<OneDataFile> allFiles = new ArrayList<>(result.getFiles());
+      allFiles.addAll(newPartitions);
+      return result.toBuilder().files(allFiles).build();
+    }
+  }
+
+  private OneDataFiles syncChanges(
+      OneDataFiles oneDataFiles,
+      Map<String, List<OneDataFile>> addedFilesByPartition,
+      Map<String, List<OneDataFile>> removedFilesByPartition,
+      boolean isTopLevel) {
+    if (addedFilesByPartition.isEmpty() && removedFilesByPartition.isEmpty()) {
+      return oneDataFiles;
+    }
+
+    String partitionPath = oneDataFiles.getPartitionPath();
+    List<OneDataFile> newFileList;
+    if (addedFilesByPartition.containsKey(partitionPath)
+        || removedFilesByPartition.containsKey(partitionPath)) {
+      newFileList = new ArrayList<>(oneDataFiles.getFiles());
+      newFileList.removeAll(
+          removedFilesByPartition.getOrDefault(partitionPath, Collections.emptyList()));
+      newFileList.addAll(
+          addedFilesByPartition.getOrDefault(partitionPath, Collections.emptyList()));
+    } else {
+      newFileList =
+          oneDataFiles.getFiles().stream()
+              .map(
+                  file -> {
+                    if (file instanceof OneDataFiles) {
+                      return syncChanges(
+                          (OneDataFiles) file,
+                          addedFilesByPartition,
+                          removedFilesByPartition,
+                          false);
+                    } else {
+                      return file;
+                    }
+                  })
+              .filter(Objects::nonNull)
+              .collect(Collectors.toList());
+    }
+    // Do not return null if this is the top level, at the top level an empty list represents an
+    // empty table
+    if (newFileList.isEmpty() && !isTopLevel) {
+      return null;
+    }
+    return oneDataFiles.toBuilder().files(newFileList).build();
   }
 }
