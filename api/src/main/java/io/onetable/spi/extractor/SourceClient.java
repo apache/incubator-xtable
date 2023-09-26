@@ -75,7 +75,20 @@ public interface SourceClient<COMMIT> {
   OneDataFiles getFilesForAffectedPartitions(
       COMMIT startCommit, COMMIT endCommit, OneTable tableDefinition, OneDataFiles existingFiles);
 
-  OneDataFilesDiff getFilesDiffForAffectedPartitions(COMMIT startCommit, COMMIT endCommit, OneTable tableDefinition);
+  /**
+   * Extracts a {@link OneDataFilesDiff} that contains all the {@link
+   * io.onetable.model.storage.OneDataFile} added or removed by updates that happened after the
+   * provided `afterCommit` up to and including the `untilCommit`.
+   *
+   * @param startCommit limit the changes to commits that are strictly after (and not including)
+   *     this commit
+   * @param endCommit limit the changes to commits up to and including this commit * @param
+   * @param tableDefinition the OneTable definition of the table defining the schema, partition
+   *     fields, etc. to use when converting into the OneTable format.
+   * @return a list of files grouped by partition
+   */
+  OneDataFilesDiff getFilesDiffForAffectedPartitions(
+      COMMIT startCommit, COMMIT endCommit, OneTable tableDefinition);
 
   /**
    * Get all the commit times that occurred after the provided commit from oldest to newest.

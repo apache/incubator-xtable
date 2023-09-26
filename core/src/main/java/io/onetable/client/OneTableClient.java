@@ -76,7 +76,8 @@ public class OneTableClient {
    *
    * @param config A per table level config containing tableBasePath, partitionFieldSpecConfig,
    *     targetTableFormats and syncMode
-   * @param sourceClientProvider A provider for the source client instance, {@link SourceClientProvider#init(Configuration, Map)} must be called before calling this method.
+   * @param sourceClientProvider A provider for the source client instance, {@link
+   *     SourceClientProvider#init(Configuration, Map)} must be called before calling this method.
    * @return Returns a map containing the table format, and it's sync result. Run sync for a table
    *     with the provided per table level configuration.
    */

@@ -18,6 +18,9 @@
  
 package io.onetable.hudi;
 
+import static org.apache.hudi.common.table.timeline.HoodieTimeline.GREATER_THAN;
+import static org.apache.hudi.common.table.timeline.HoodieTimeline.LESSER_THAN_OR_EQUALS;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,7 +33,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import io.onetable.model.storage.OneDataFilesDiff;
 import lombok.Builder;
 import lombok.Value;
 
@@ -60,9 +62,7 @@ import io.onetable.exception.OneIOException;
 import io.onetable.model.OneTable;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
-
-import static org.apache.hudi.common.table.timeline.HoodieTimeline.GREATER_THAN;
-import static org.apache.hudi.common.table.timeline.HoodieTimeline.LESSER_THAN_OR_EQUALS;
+import io.onetable.model.storage.OneDataFilesDiff;
 
 /** Extracts all the files for Hudi table represented by {@link OneTable}. */
 public class HudiDataFileExtractor implements AutoCloseable {
@@ -103,7 +103,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
     return getOneDataFilesForPartitions(allPartitionPaths, timelineForInstant, table, null);
   }
 
-  public OneDataFilesDiff getDiffBetweenCommits(HoodieInstant startCommit, HoodieInstant endCommit, OneTable table) {
+  public OneDataFilesDiff getDiffBetweenCommits(
+      HoodieInstant startCommit, HoodieInstant endCommit, OneTable table) {
     HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
     HoodieTimeline timelineForInstant =
         activeTimeline.findInstantsInRange(startCommit.getTimestamp(), endCommit.getTimestamp());
@@ -127,46 +128,72 @@ public class HudiDataFileExtractor implements AutoCloseable {
                 .filter(
                     instant ->
                         instant
-                            .getTimestamp()
-                            .compareTo(lastWriteInstantBeforeStartCommit.get().getTimestamp())
+                                .getTimestamp()
+                                .compareTo(lastWriteInstantBeforeStartCommit.get().getTimestamp())
                             >= 0);
       } else {
         timelineForInstant = activeTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp());
       }
     }
-    HoodieTableFileSystemView fsView = new HoodieMetadataFileSystemView(localEngineContext, metaClient, activeTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp()),
-        HoodieMetadataConfig.newBuilder().enable(true).build());
+    HoodieTableFileSystemView fsView =
+        new HoodieMetadataFileSystemView(
+            localEngineContext,
+            metaClient,
+            activeTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp()),
+            HoodieMetadataConfig.newBuilder().enable(true).build());
 
-    List<Pair<List<PartitionInfo>, List<PartitionInfo>>> allInfo = timelineForInstant.getInstants().stream().map(instant -> getAddedAndRemovedPartitionInfo(activeTimeline, instant, fsView, startCommit, endCommit)).collect(Collectors.toList());
-    List<PartitionInfo> added = allInfo.stream().flatMap(pair -> pair.getLeft().stream()).collect(Collectors.toList());
-    List<PartitionInfo> removed = allInfo.stream().flatMap(pair -> pair.getRight().stream()).collect(Collectors.toList());
+    List<Pair<List<PartitionInfo>, List<PartitionInfo>>> allInfo =
+        timelineForInstant.getInstants().stream()
+            .map(
+                instant ->
+                    getAddedAndRemovedPartitionInfo(
+                        activeTimeline, instant, fsView, startCommit, endCommit))
+            .collect(Collectors.toList());
+    List<PartitionInfo> added =
+        allInfo.stream().flatMap(pair -> pair.getLeft().stream()).collect(Collectors.toList());
+    List<PartitionInfo> removed =
+        allInfo.stream().flatMap(pair -> pair.getRight().stream()).collect(Collectors.toList());
     int parallelism = Math.min(DEFAULT_PARALLELISM, added.size());
 
     HudiPartitionDataFileExtractor statsExtractor =
-        new HudiPartitionDataFileExtractor(metaClient, table, partitionValuesExtractor, timelineForInstant);
+        new HudiPartitionDataFileExtractor(
+            metaClient, table, partitionValuesExtractor, timelineForInstant);
     List<OneDataFile> filesAdded = localEngineContext.map(added, statsExtractor, parallelism);
-    List<OneDataFile> extractedFilesAdded = filesAdded.stream().flatMap(oneDataFile -> {
-      if (oneDataFile instanceof OneDataFiles) {
-        return ((OneDataFiles) oneDataFile).getFiles().stream();
-      } else {
-        return Stream.of(oneDataFile);
-      }
-    }).collect(Collectors.toList());
+    List<OneDataFile> extractedFilesAdded =
+        filesAdded.stream()
+            .flatMap(
+                oneDataFile -> {
+                  if (oneDataFile instanceof OneDataFiles) {
+                    return ((OneDataFiles) oneDataFile).getFiles().stream();
+                  } else {
+                    return Stream.of(oneDataFile);
+                  }
+                })
+            .collect(Collectors.toList());
     List<OneDataFile> filesRemoved = localEngineContext.map(removed, statsExtractor, parallelism);
-    List<OneDataFile> extractedFilesRemoved = filesRemoved.stream().flatMap(oneDataFile -> {
-      if (oneDataFile instanceof OneDataFiles) {
-        return ((OneDataFiles) oneDataFile).getFiles().stream();
-      } else {
-        return Stream.of(oneDataFile);
-      }
-    }).collect(Collectors.toList());
+    List<OneDataFile> extractedFilesRemoved =
+        filesRemoved.stream()
+            .flatMap(
+                oneDataFile -> {
+                  if (oneDataFile instanceof OneDataFiles) {
+                    return ((OneDataFiles) oneDataFile).getFiles().stream();
+                  } else {
+                    return Stream.of(oneDataFile);
+                  }
+                })
+            .collect(Collectors.toList());
     return OneDataFilesDiff.builder()
         .filesAdded(extractedFilesAdded)
         .filesRemoved(extractedFilesRemoved)
         .build();
   }
 
-  private Pair<List<PartitionInfo>, List<PartitionInfo>> getAddedAndRemovedPartitionInfo(HoodieTimeline timeline, HoodieInstant instant, HoodieTableFileSystemView fsView, HoodieInstant startCommit, HoodieInstant endCommit) {
+  private Pair<List<PartitionInfo>, List<PartitionInfo>> getAddedAndRemovedPartitionInfo(
+      HoodieTimeline timeline,
+      HoodieInstant instant,
+      HoodieTableFileSystemView fsView,
+      HoodieInstant startCommit,
+      HoodieInstant endCommit) {
     try {
       List<PartitionInfo> addedFiles = new ArrayList<>();
       List<PartitionInfo> removedFiles = new ArrayList<>();
@@ -174,24 +201,41 @@ public class HudiDataFileExtractor implements AutoCloseable {
         case HoodieTimeline.COMMIT_ACTION:
         case HoodieTimeline.DELTA_COMMIT_ACTION:
           HoodieCommitMetadata commitMetadata =
-              HoodieCommitMetadata.fromBytes(timeline.getInstantDetails(instant).get(), HoodieCommitMetadata.class);
-          commitMetadata.getPartitionToWriteStats().forEach((partitionPath, writeStats) -> {
-            Set<String> affectedFileGroupIds = writeStats.stream().map(HoodieWriteStat::getFileId).collect(Collectors.toSet());
-            Pair<Optional<PartitionInfo>, Optional<PartitionInfo>> addedAndRemovedFiles = getUpdatesToPartition(fsView, startCommit, endCommit, partitionPath, affectedFileGroupIds);
-            addedAndRemovedFiles.getLeft().ifPresent(addedFiles::add);
-            addedAndRemovedFiles.getRight().ifPresent(removedFiles::add);
-          });
+              HoodieCommitMetadata.fromBytes(
+                  timeline.getInstantDetails(instant).get(), HoodieCommitMetadata.class);
+          commitMetadata
+              .getPartitionToWriteStats()
+              .forEach(
+                  (partitionPath, writeStats) -> {
+                    Set<String> affectedFileGroupIds =
+                        writeStats.stream()
+                            .map(HoodieWriteStat::getFileId)
+                            .collect(Collectors.toSet());
+                    Pair<Optional<PartitionInfo>, Optional<PartitionInfo>> addedAndRemovedFiles =
+                        getUpdatesToPartition(
+                            fsView, startCommit, endCommit, partitionPath, affectedFileGroupIds);
+                    addedAndRemovedFiles.getLeft().ifPresent(addedFiles::add);
+                    addedAndRemovedFiles.getRight().ifPresent(removedFiles::add);
+                  });
           break;
         case HoodieTimeline.REPLACE_COMMIT_ACTION:
           HoodieReplaceCommitMetadata replaceMetadata =
-              HoodieReplaceCommitMetadata.fromBytes(timeline.getInstantDetails(instant).get(), HoodieReplaceCommitMetadata.class);
-          replaceMetadata.getPartitionToReplaceFileIds().forEach((partitionPath, fileIds) -> {
-            Set<String> affectedFileGroupIds = new HashSet<>(fileIds);
-            replaceMetadata.getPartitionToWriteStats().get(partitionPath).stream().map(HoodieWriteStat::getFileId).forEach(affectedFileGroupIds::add);
-            Pair<Optional<PartitionInfo>, Optional<PartitionInfo>> addedAndRemovedFiles = getUpdatesToPartition(fsView, startCommit, endCommit, partitionPath, affectedFileGroupIds);
-            addedAndRemovedFiles.getLeft().ifPresent(addedFiles::add);
-            addedAndRemovedFiles.getRight().ifPresent(removedFiles::add);
-          });
+              HoodieReplaceCommitMetadata.fromBytes(
+                  timeline.getInstantDetails(instant).get(), HoodieReplaceCommitMetadata.class);
+          replaceMetadata
+              .getPartitionToReplaceFileIds()
+              .forEach(
+                  (partitionPath, fileIds) -> {
+                    Set<String> affectedFileGroupIds = new HashSet<>(fileIds);
+                    replaceMetadata.getPartitionToWriteStats().get(partitionPath).stream()
+                        .map(HoodieWriteStat::getFileId)
+                        .forEach(affectedFileGroupIds::add);
+                    Pair<Optional<PartitionInfo>, Optional<PartitionInfo>> addedAndRemovedFiles =
+                        getUpdatesToPartition(
+                            fsView, startCommit, endCommit, partitionPath, affectedFileGroupIds);
+                    addedAndRemovedFiles.getLeft().ifPresent(addedFiles::add);
+                    addedAndRemovedFiles.getRight().ifPresent(removedFiles::add);
+                  });
           break;
         case HoodieTimeline.SAVEPOINT_ACTION:
         case HoodieTimeline.LOG_COMPACTION_ACTION:
@@ -207,31 +251,52 @@ public class HudiDataFileExtractor implements AutoCloseable {
     }
   }
 
-  private Pair<Optional<PartitionInfo>, Optional<PartitionInfo>> getUpdatesToPartition(HoodieTableFileSystemView fsView, HoodieInstant startCommit, HoodieInstant endCommit, String partitionPath, Set<String> affectedFileGroupIds) {
+  private Pair<Optional<PartitionInfo>, Optional<PartitionInfo>> getUpdatesToPartition(
+      HoodieTableFileSystemView fsView,
+      HoodieInstant startCommit,
+      HoodieInstant endCommit,
+      String partitionPath,
+      Set<String> affectedFileGroupIds) {
     List<FileStatus> filesToAdd = new ArrayList<>();
     List<FileStatus> filesToRemove = new ArrayList<>();
-    Stream<HoodieFileGroup> fileGroups = Stream.concat(fsView.getAllFileGroups(partitionPath), fsView.getReplacedFileGroupsBeforeOrOn(endCommit.getTimestamp(), partitionPath));
-    fileGroups.filter(fileGroup -> affectedFileGroupIds.contains(fileGroup.getFileGroupId().getFileId())).forEach(fileGroup -> {
-      List<HoodieBaseFile> baseFiles = fileGroup.getAllBaseFiles().collect(Collectors.toList());
-      if (HoodieTimeline.compareTimestamps(baseFiles.get(0).getCommitTime(), GREATER_THAN, startCommit.getTimestamp())) {
-        filesToAdd.add(baseFiles.get(0).getFileStatus());
-      }
-      for (HoodieBaseFile baseFile : baseFiles) {
-        if (HoodieTimeline.compareTimestamps(baseFile.getCommitTime(), LESSER_THAN_OR_EQUALS, startCommit.getTimestamp())) {
-          filesToRemove.add(baseFile.getFileStatus());
-          break;
-        }
-      }
-    });
-    Optional<PartitionInfo> added = filesToAdd.isEmpty() ? Optional.empty() : Optional.of(PartitionInfo.builder()
-        .partitionPath(partitionPath)
-        .fileStatuses(filesToAdd.toArray(new FileStatus[0]))
-        .build());
-    Optional<PartitionInfo> removed = filesToRemove.isEmpty() ? Optional.empty() : Optional.of(
-      PartitionInfo.builder()
-          .partitionPath(partitionPath)
-          .fileStatuses(filesToRemove.toArray(new FileStatus[0]))
-          .build());
+    Stream<HoodieFileGroup> fileGroups =
+        Stream.concat(
+            fsView.getAllFileGroups(partitionPath),
+            fsView.getReplacedFileGroupsBeforeOrOn(endCommit.getTimestamp(), partitionPath));
+    fileGroups
+        .filter(fileGroup -> affectedFileGroupIds.contains(fileGroup.getFileGroupId().getFileId()))
+        .forEach(
+            fileGroup -> {
+              List<HoodieBaseFile> baseFiles =
+                  fileGroup.getAllBaseFiles().collect(Collectors.toList());
+              if (HoodieTimeline.compareTimestamps(
+                  baseFiles.get(0).getCommitTime(), GREATER_THAN, startCommit.getTimestamp())) {
+                filesToAdd.add(baseFiles.get(0).getFileStatus());
+              }
+              for (HoodieBaseFile baseFile : baseFiles) {
+                if (HoodieTimeline.compareTimestamps(
+                    baseFile.getCommitTime(), LESSER_THAN_OR_EQUALS, startCommit.getTimestamp())) {
+                  filesToRemove.add(baseFile.getFileStatus());
+                  break;
+                }
+              }
+            });
+    Optional<PartitionInfo> added =
+        filesToAdd.isEmpty()
+            ? Optional.empty()
+            : Optional.of(
+                PartitionInfo.builder()
+                    .partitionPath(partitionPath)
+                    .fileStatuses(filesToAdd.toArray(new FileStatus[0]))
+                    .build());
+    Optional<PartitionInfo> removed =
+        filesToRemove.isEmpty()
+            ? Optional.empty()
+            : Optional.of(
+                PartitionInfo.builder()
+                    .partitionPath(partitionPath)
+                    .fileStatuses(filesToRemove.toArray(new FileStatus[0]))
+                    .build());
     return Pair.of(added, removed);
   }
 

@@ -40,8 +40,6 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import io.onetable.client.SourceClientProvider;
-import io.onetable.hudi.HudiSourceClientProvider;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 
@@ -80,7 +78,9 @@ import com.google.common.collect.ImmutableList;
 
 import io.onetable.client.OneTableClient;
 import io.onetable.client.PerTableConfig;
+import io.onetable.client.SourceClientProvider;
 import io.onetable.exception.SchemaExtractorException;
+import io.onetable.hudi.HudiSourceClientProvider;
 import io.onetable.hudi.HudiSourceConfig;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
@@ -572,7 +572,9 @@ public class ITOneTableClient {
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 50);
       table.rollback(
           table.getActiveTimeline().getCommitsTimeline().lastInstant().get().getTimestamp());
-      assertThrows(SchemaExtractorException.class, () -> oneTableClient.sync(perTableConfig, hudiSourceClientProvider));
+      assertThrows(
+          SchemaExtractorException.class,
+          () -> oneTableClient.sync(perTableConfig, hudiSourceClientProvider));
     }
   }
 
@@ -747,7 +749,9 @@ public class ITOneTableClient {
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
 
-      assertThrows(IllegalArgumentException.class, () -> oneTableClient.sync(perTableConfig, hudiSourceClientProvider));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> oneTableClient.sync(perTableConfig, hudiSourceClientProvider));
     }
   }
 
@@ -870,7 +874,8 @@ public class ITOneTableClient {
       OneTableClient oneTableClient) {
     if (tableType == HoodieTableType.MERGE_ON_READ) {
       // sync once before compaction and assert no failures
-      Map<TableFormat, SyncResult> syncResults = oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      Map<TableFormat, SyncResult> syncResults =
+          oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       assertNoSyncFailures(syncResults);
 
       table.compact();
