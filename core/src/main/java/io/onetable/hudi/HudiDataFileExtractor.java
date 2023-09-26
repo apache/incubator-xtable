@@ -29,14 +29,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import lombok.Builder;
 import lombok.Value;
 
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 
 import org.apache.hudi.common.config.HoodieMetadataConfig;
@@ -149,6 +147,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
                     getAddedAndRemovedPartitionInfo(
                         activeTimeline, instant, fsView, startCommit, endCommit))
             .collect(Collectors.toList());
+    fsView.close();
+
     List<PartitionInfo> added =
         allInfo.stream().flatMap(pair -> pair.getLeft().stream()).collect(Collectors.toList());
     List<PartitionInfo> removed =
@@ -257,8 +257,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieInstant endCommit,
       String partitionPath,
       Set<String> affectedFileGroupIds) {
-    List<FileStatus> filesToAdd = new ArrayList<>();
-    List<FileStatus> filesToRemove = new ArrayList<>();
+    List<HoodieBaseFile> filesToAdd = new ArrayList<>();
+    List<HoodieBaseFile> filesToRemove = new ArrayList<>();
     Stream<HoodieFileGroup> fileGroups =
         Stream.concat(
             fsView.getAllFileGroups(partitionPath),
@@ -271,12 +271,12 @@ public class HudiDataFileExtractor implements AutoCloseable {
                   fileGroup.getAllBaseFiles().collect(Collectors.toList());
               if (HoodieTimeline.compareTimestamps(
                   baseFiles.get(0).getCommitTime(), GREATER_THAN, startCommit.getTimestamp())) {
-                filesToAdd.add(baseFiles.get(0).getFileStatus());
+                filesToAdd.add(baseFiles.get(0));
               }
               for (HoodieBaseFile baseFile : baseFiles) {
                 if (HoodieTimeline.compareTimestamps(
                     baseFile.getCommitTime(), LESSER_THAN_OR_EQUALS, startCommit.getTimestamp())) {
-                  filesToRemove.add(baseFile.getFileStatus());
+                  filesToRemove.add(baseFile);
                   break;
                 }
               }
@@ -285,17 +285,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
         filesToAdd.isEmpty()
             ? Optional.empty()
             : Optional.of(
-                PartitionInfo.builder()
-                    .partitionPath(partitionPath)
-                    .fileStatuses(filesToAdd.toArray(new FileStatus[0]))
-                    .build());
+                PartitionInfo.builder().partitionPath(partitionPath).baseFiles(filesToAdd).build());
     Optional<PartitionInfo> removed =
         filesToRemove.isEmpty()
             ? Optional.empty()
             : Optional.of(
                 PartitionInfo.builder()
                     .partitionPath(partitionPath)
-                    .fileStatuses(filesToRemove.toArray(new FileStatus[0]))
+                    .baseFiles(filesToRemove)
                     .build());
     return Pair.of(added, removed);
   }
@@ -349,41 +346,27 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieTimeline timeline,
       OneTable table,
       OneDataFiles existingFileDetails) {
-    List<PartitionInfo> partitionInfoList;
-    try {
-      Map<String, String> fullToPartialPartitionPath =
-          partitionPaths.stream()
-              .collect(
-                  Collectors.toMap(
-                      partitionPath ->
-                          partitionPath.isEmpty()
-                              ? basePath.toString()
-                              : new Path(basePath, partitionPath).toString(),
-                      Function.identity()));
-      Map<String, FileStatus[]> partitionFileStatusMap =
-          tableMetadata.getAllFilesInPartitions(
-              new ArrayList<>(fullToPartialPartitionPath.keySet()));
-      Map<String, OneDataFiles> existingFileDetailsPerPartition =
-          getFilesByPartition(existingFileDetails);
-      partitionInfoList =
-          partitionFileStatusMap.entrySet().stream()
-              .map(
-                  partitionAndFileStatuses -> {
-                    String partialPartitionPath =
-                        fullToPartialPartitionPath.get(partitionAndFileStatuses.getKey());
-                    return PartitionInfo.builder()
-                        .partitionPath(partialPartitionPath)
-                        .fileStatuses(partitionAndFileStatuses.getValue())
-                        .existingFileDetails(
-                            existingFileDetailsPerPartition.get(partialPartitionPath))
-                        .build();
-                  })
-              .collect(Collectors.toList());
-    } catch (IOException e) {
-      throw new OneIOException("failed to get partition paths from table metadata", e);
-    }
-    int parallelism = Math.min(DEFAULT_PARALLELISM, partitionInfoList.size());
 
+    HoodieTableFileSystemView fsView =
+        new HoodieMetadataFileSystemView(
+            localEngineContext,
+            metaClient,
+            timeline,
+            HoodieMetadataConfig.newBuilder().enable(true).build());
+
+    List<PartitionInfo> partitionInfoList =
+        partitionPaths.stream()
+            .map(
+                partitionPath ->
+                    PartitionInfo.builder()
+                        .partitionPath(partitionPath)
+                        .baseFiles(
+                            fsView.getLatestBaseFiles(partitionPath).collect(Collectors.toList()))
+                        .build())
+            .collect(Collectors.toList());
+    fsView.close();
+
+    int parallelism = Math.min(DEFAULT_PARALLELISM, partitionInfoList.size());
     HudiPartitionDataFileExtractor statsExtractor =
         new HudiPartitionDataFileExtractor(metaClient, table, partitionValuesExtractor, timeline);
     return localEngineContext.map(partitionInfoList, statsExtractor, parallelism);
@@ -411,7 +394,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
   @Value
   public static class PartitionInfo {
     String partitionPath;
-    FileStatus[] fileStatuses;
+    List<HoodieBaseFile> baseFiles;
     OneDataFiles existingFileDetails;
   }
 }

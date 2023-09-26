@@ -32,7 +32,6 @@ import org.apache.hudi.common.function.SerializableFunction;
 import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
-import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.exception.HoodieIOException;
 
 import io.onetable.exception.NotSupportedException;
@@ -76,9 +75,6 @@ public class HudiPartitionDataFileExtractor
         partitionValuesExtractor.extractPartitionValues(
             table.getPartitioningFields(), partitionInfo.getPartitionPath());
 
-    HoodieTableFileSystemView fsView =
-        new HoodieTableFileSystemView(metaClient, timeline, partitionInfo.getFileStatuses());
-
     SchemaVersion version = new SchemaVersion(1, null);
 
     // Avoid looking up file/column stats if the state is already tracked in OneTable
@@ -88,9 +84,7 @@ public class HudiPartitionDataFileExtractor
             : partitionInfo.getExistingFileDetails().getFiles().stream()
                 .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
     List<OneDataFile> partitionFiles =
-        fsView
-            .getAllFileGroups()
-            .map(fg -> fg.getLatestDataFile().get())
+        partitionInfo.getBaseFiles().stream()
             .parallel()
             .map(
                 hoodieBaseFile -> {
@@ -131,7 +125,6 @@ public class HudiPartitionDataFileExtractor
                       .build();
                 })
             .collect(Collectors.toList());
-    fsView.close();
     return OneDataFiles.collectionBuilder()
         .partitionPath(partitionInfo.getPartitionPath())
         .files(partitionFiles)
