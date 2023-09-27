@@ -31,7 +31,6 @@ import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.function.SerializableFunction;
 import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.exception.HoodieIOException;
 
 import io.onetable.exception.NotSupportedException;
@@ -52,20 +51,17 @@ public class HudiPartitionDataFileExtractor
   private final HoodieTableMetaClient metaClient;
   private final OneTable table;
   private final HudiPartitionValuesExtractor partitionValuesExtractor;
-  private final HoodieTimeline timeline;
 
   public HudiPartitionDataFileExtractor(
       HoodieTableMetaClient metaClient,
       OneTable table,
-      HudiPartitionValuesExtractor partitionValuesExtractor,
-      HoodieTimeline timeline) {
+      HudiPartitionValuesExtractor partitionValuesExtractor) {
     this.metaClient = metaClient;
     if (metaClient.getTableConfig().getBaseFileFormat() != HoodieFileFormat.PARQUET) {
       throw new NotSupportedException("File formats other than Parquet are not yet supported");
     }
     this.table = table;
     this.partitionValuesExtractor = partitionValuesExtractor;
-    this.timeline = timeline;
   }
 
   @Override

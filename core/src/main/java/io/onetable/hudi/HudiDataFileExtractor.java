@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -54,10 +53,8 @@ import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
-import org.apache.hudi.common.table.timeline.TimelineUtils;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
-import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 import org.apache.hudi.metadata.HoodieTableMetadata;
@@ -70,7 +67,6 @@ import io.onetable.model.storage.OneDataFilesDiff;
 
 /** Extracts all the files for Hudi table represented by {@link OneTable}. */
 public class HudiDataFileExtractor implements AutoCloseable {
-  private static final List<String> EMPTY_PARTITION_LIST = Collections.singletonList("");
   private static final int DEFAULT_PARALLELISM = 20;
 
   private final HoodieTableMetadata tableMetadata;
@@ -104,7 +100,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
     } catch (IOException ex) {
       throw new OneIOException("Unable to read partition paths from Hudi Metadata", ex);
     }
-    return getOneDataFilesForPartitions(allPartitionPaths, timelineForInstant, table, null);
+    return getOneDataFilesForPartitions(allPartitionPaths, timelineForInstant, table);
   }
 
   public OneDataFilesDiff getDiffBetweenCommits(
@@ -135,8 +131,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
     int parallelism = Math.min(DEFAULT_PARALLELISM, added.size());
 
     HudiPartitionDataFileExtractor statsExtractor =
-        new HudiPartitionDataFileExtractor(
-            metaClient, table, partitionValuesExtractor, timelineForInstant);
+        new HudiPartitionDataFileExtractor(metaClient, table, partitionValuesExtractor);
     List<OneDataFile> filesAdded = localEngineContext.map(added, statsExtractor, parallelism);
     List<OneDataFile> extractedFilesAdded =
         filesAdded.stream()
@@ -341,55 +336,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
     return Pair.of(added, removed);
   }
 
-  public List<OneDataFile> getOneDataFilesForAffectedPartitions(
-      HoodieInstant startCommit,
-      HoodieInstant endCommit,
-      OneTable table,
-      OneDataFiles oneDataFiles) {
-    HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
-    HoodieTimeline timelineForInstant =
-        activeTimeline.findInstantsInRange(startCommit.getTimestamp(), endCommit.getTimestamp());
-    if (timelineForInstant.getWriteTimeline().countInstants() == 0) {
-      // HoodieTableFileSystemView returns a view of files using the write timeline only.
-      // If there are no write commits between start and end - these are either savepoint, rollback,
-      // restore and clean commits.
-      // In such cases, we sync the commits from lastWriteInstantBeforeStart...start...end.
-      Option<HoodieInstant> lastWriteInstantBeforeStartCommit =
-          activeTimeline
-              .findInstantsBeforeOrEquals(startCommit.getTimestamp())
-              .getWriteTimeline()
-              .lastInstant();
-      if (lastWriteInstantBeforeStartCommit.isPresent()) {
-        timelineForInstant =
-            activeTimeline
-                .findInstantsBeforeOrEquals(endCommit.getTimestamp())
-                .filter(
-                    instant ->
-                        instant
-                                .getTimestamp()
-                                .compareTo(lastWriteInstantBeforeStartCommit.get().getTimestamp())
-                            >= 0);
-      } else {
-        timelineForInstant = activeTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp());
-      }
-    }
-    List<String> affectedPartitions;
-    // TimelineUtils.getAffectedPartitions does not work for unpartitioned tables, so we handle that
-    // case directly
-    if (table.getPartitioningFields().isEmpty()) {
-      affectedPartitions = EMPTY_PARTITION_LIST;
-    } else {
-      affectedPartitions = TimelineUtils.getAffectedPartitions(timelineForInstant);
-    }
-    return getOneDataFilesForPartitions(
-        affectedPartitions, timelineForInstant, table, oneDataFiles);
-  }
-
   private List<OneDataFile> getOneDataFilesForPartitions(
-      List<String> partitionPaths,
-      HoodieTimeline timeline,
-      OneTable table,
-      OneDataFiles existingFileDetails) {
+      List<String> partitionPaths, HoodieTimeline timeline, OneTable table) {
 
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
@@ -412,16 +360,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
     int parallelism = Math.min(DEFAULT_PARALLELISM, partitionInfoList.size());
     HudiPartitionDataFileExtractor statsExtractor =
-        new HudiPartitionDataFileExtractor(metaClient, table, partitionValuesExtractor, timeline);
+        new HudiPartitionDataFileExtractor(metaClient, table, partitionValuesExtractor);
     return localEngineContext.map(partitionInfoList, statsExtractor, parallelism);
-  }
-
-  private Map<String, OneDataFiles> getFilesByPartition(OneDataFiles files) {
-    if (files == null) {
-      return Collections.emptyMap();
-    }
-    return files.getFiles().stream()
-        .collect(Collectors.toMap(OneDataFile::getPartitionPath, file -> (OneDataFiles) file));
   }
 
   @Override
