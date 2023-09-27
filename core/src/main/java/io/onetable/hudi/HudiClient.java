@@ -87,7 +87,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public OneDataFilesDiff getFilesDiffForAffectedPartitions(
+  public OneDataFilesDiff getFilesDiffBetweenCommits(
       HoodieInstant startCommit, HoodieInstant endCommit, OneTable table) {
     return dataFileExtractor.getDiffBetweenCommits(startCommit, endCommit, table);
   }

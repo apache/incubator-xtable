@@ -71,7 +71,7 @@ public interface SourceClient<COMMIT> {
    *     fields, etc. to use when converting into the OneTable format.
    * @return a list of files grouped by partition
    */
-  OneDataFilesDiff getFilesDiffForAffectedPartitions(
+  OneDataFilesDiff getFilesDiffBetweenCommits(
       COMMIT startCommit, COMMIT endCommit, OneTable tableDefinition);
 
   /**

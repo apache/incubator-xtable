@@ -65,7 +65,7 @@ public class ExtractFromSource<COMMIT> {
     for (COMMIT commit : commitList) {
       OneTable tableState = sourceClient.getTable(commit);
       OneDataFilesDiff filesDiff =
-          sourceClient.getFilesDiffForAffectedPartitions(previousCommit, commit, tableState);
+          sourceClient.getFilesDiffBetweenCommits(previousCommit, commit, tableState);
       // track updates to the state of the files in the table in memory
       latestFileState = syncChanges(latestFileState, filesDiff);
       tableChangeList.add(

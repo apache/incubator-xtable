@@ -101,7 +101,7 @@ public class TestExtractFromSource {
     OneDataFile newFile1 = getOneDataFile(partition1, "file4.parquet");
     OneTable tableAtFirstInstant =
         OneTable.builder().latestCommitTime(Instant.now().minus(1, ChronoUnit.DAYS)).build();
-    when(mockSourceClient.getFilesDiffForAffectedPartitions(
+    when(mockSourceClient.getFilesDiffBetweenCommits(
             lastCommitSynced, firstCommitToSync, tableAtFirstInstant))
         .thenReturn(
             OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build());
@@ -149,7 +149,7 @@ public class TestExtractFromSource {
                         .build()))
             .build();
     OneTable tableAtSecondInstant = OneTable.builder().latestCommitTime(Instant.now()).build();
-    when(mockSourceClient.getFilesDiffForAffectedPartitions(
+    when(mockSourceClient.getFilesDiffBetweenCommits(
             firstCommitToSync, secondCommitToSync, tableAtSecondInstant))
         .thenReturn(
             OneDataFilesDiff.builder()
