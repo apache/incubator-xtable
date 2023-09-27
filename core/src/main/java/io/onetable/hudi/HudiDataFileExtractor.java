@@ -22,6 +22,8 @@ import static org.apache.hudi.common.table.timeline.HoodieTimeline.GREATER_THAN;
 import static org.apache.hudi.common.table.timeline.HoodieTimeline.LESSER_THAN_OR_EQUALS;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -37,7 +39,9 @@ import lombok.Value;
 
 import org.apache.hadoop.fs.Path;
 
+import org.apache.hudi.avro.model.HoodieRestoreMetadata;
 import org.apache.hudi.avro.model.HoodieRollbackMetadata;
+import org.apache.hudi.avro.model.HoodieRollbackPartitionMetadata;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieLocalEngineContext;
 import org.apache.hudi.common.model.HoodieBaseFile;
@@ -202,7 +206,9 @@ public class HudiDataFileExtractor implements AutoCloseable {
               .forEach(
                   (partitionPath, fileIds) -> {
                     Set<String> affectedFileGroupIds = new HashSet<>(fileIds);
-                    replaceMetadata.getPartitionToWriteStats().getOrDefault(partitionPath, Collections.emptyList())
+                    replaceMetadata
+                        .getPartitionToWriteStats()
+                        .getOrDefault(partitionPath, Collections.emptyList())
                         .stream()
                         .map(HoodieWriteStat::getFileId)
                         .forEach(affectedFileGroupIds::add);
@@ -213,19 +219,38 @@ public class HudiDataFileExtractor implements AutoCloseable {
                     addedAndRemovedFiles.getRight().ifPresent(removedFiles::add);
                   });
           break;
+        case HoodieTimeline.ROLLBACK_ACTION:
+          HoodieRollbackMetadata rollbackMetadata =
+              TimelineMetadataUtils.deserializeAvroMetadata(
+                  timeline.getInstantDetails(instant).get(), HoodieRollbackMetadata.class);
+          rollbackMetadata
+              .getPartitionMetadata()
+              .forEach(
+                  (partition, metadata) -> handleRollbackAction(removedFiles, partition, metadata));
+          break;
+        case HoodieTimeline.RESTORE_ACTION:
+          HoodieRestoreMetadata restoreMetadata =
+              TimelineMetadataUtils.deserializeAvroMetadata(
+                  timeline.getInstantDetails(instant).get(), HoodieRestoreMetadata.class);
+          restoreMetadata
+              .getHoodieRestoreMetadata()
+              .forEach(
+                  (key, rollbackMetadataList) ->
+                      rollbackMetadataList.forEach(
+                          rollbackMeta ->
+                              rollbackMeta
+                                  .getPartitionMetadata()
+                                  .forEach(
+                                      (partition, metadata) ->
+                                          handleRollbackAction(
+                                              removedFiles, partition, metadata))));
+          break;
         case HoodieTimeline.SAVEPOINT_ACTION:
         case HoodieTimeline.LOG_COMPACTION_ACTION:
         case HoodieTimeline.CLEAN_ACTION:
-          break;
-        case HoodieTimeline.ROLLBACK_ACTION:
-          HoodieRollbackMetadata rollbackMetadata =
-              TimelineMetadataUtils.deserializeAvroMetadata(timeline.getInstantDetails(instant).get(), HoodieRollbackMetadata.class);
-          rollbackMetadata.getPartitionMetadata().forEach((partition, metadata) ->
-            removedFiles.add(PartitionInfo.builder()
-                .partitionPath(partition)
-                .baseFiles(metadata.getSuccessDeleteFiles().stream().map(HoodieBaseFile::new).collect(Collectors.toList()))
-                .deletes(true)
-                .build()));
+        case HoodieTimeline.INDEXING_ACTION:
+        case HoodieTimeline.SCHEMA_COMMIT_ACTION:
+          // these do not impact the base files
           break;
         default:
           throw new OneIOException("Unexpected commit type " + instant.getAction());
@@ -234,6 +259,35 @@ public class HudiDataFileExtractor implements AutoCloseable {
     } catch (IOException ex) {
       throw new OneIOException("Unable to read commit metadata for commit " + instant, ex);
     }
+  }
+
+  private void handleRollbackAction(
+      List<PartitionInfo> removedFiles,
+      String partition,
+      HoodieRollbackPartitionMetadata metadata) {
+    List<String> deletedPaths = metadata.getSuccessDeleteFiles();
+    List<HoodieBaseFile> baseFiles =
+        deletedPaths.stream()
+            .map(
+                path -> {
+                  try {
+                    URI basePathUri = basePath.toUri();
+                    if (path.startsWith(basePathUri.getScheme())) {
+                      return path;
+                    }
+                    return new URI(basePathUri.getScheme(), path, null).toString();
+                  } catch (URISyntaxException e) {
+                    throw new OneIOException("Unable to parse path " + path, e);
+                  }
+                })
+            .map(HoodieBaseFile::new)
+            .collect(Collectors.toList());
+    removedFiles.add(
+        PartitionInfo.builder()
+            .partitionPath(partition)
+            .baseFiles(baseFiles)
+            .deletes(true)
+            .build());
   }
 
   private Pair<Optional<PartitionInfo>, Optional<PartitionInfo>> getUpdatesToPartition(
@@ -270,7 +324,11 @@ public class HudiDataFileExtractor implements AutoCloseable {
         filesToAdd.isEmpty()
             ? Optional.empty()
             : Optional.of(
-                PartitionInfo.builder().partitionPath(partitionPath).baseFiles(filesToAdd).deletes(false).build());
+                PartitionInfo.builder()
+                    .partitionPath(partitionPath)
+                    .baseFiles(filesToAdd)
+                    .deletes(false)
+                    .build());
     Optional<PartitionInfo> removed =
         filesToRemove.isEmpty()
             ? Optional.empty()

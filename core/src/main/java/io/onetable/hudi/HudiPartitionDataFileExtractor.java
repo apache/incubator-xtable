@@ -121,7 +121,10 @@ public class HudiPartitionDataFileExtractor
                       .fileSizeBytes(Math.max(0, hoodieBaseFile.getFileSize()))
                       .recordCount(rowCount)
                       .columnStats(columnStatMap)
-                      .lastModified(hoodieBaseFile.getFileStatus() == null ? 0L : hoodieBaseFile.getFileStatus().getModificationTime())
+                      .lastModified(
+                          hoodieBaseFile.getFileStatus() == null
+                              ? 0L
+                              : hoodieBaseFile.getFileStatus().getModificationTime())
                       .build();
                 })
             .collect(Collectors.toList());
