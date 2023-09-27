@@ -114,20 +114,23 @@ public class HudiDataFileExtractor implements AutoCloseable {
             metaClient,
             activeTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp()),
             HoodieMetadataConfig.newBuilder().enable(true).build());
-
-    List<Pair<List<PartitionInfo>, List<PartitionInfo>>> allInfo =
-        timelineForInstant.getInstants().stream()
-            .map(
-                instant ->
-                    getAddedAndRemovedPartitionInfo(
-                        activeTimeline, instant, fsView, startCommit, endCommit))
-            .collect(Collectors.toList());
-    fsView.close();
+    List<AddedAndRemovedPartitionInfo> allInfo;
+    try {
+      allInfo =
+          timelineForInstant.getInstants().stream()
+              .map(
+                  instant ->
+                      getAddedAndRemovedPartitionInfo(
+                          activeTimeline, instant, fsView, startCommit, endCommit))
+              .collect(Collectors.toList());
+    } finally {
+      fsView.close();
+    }
 
     List<PartitionInfo> added =
-        allInfo.stream().flatMap(pair -> pair.getLeft().stream()).collect(Collectors.toList());
+        allInfo.stream().flatMap(info -> info.getAdded().stream()).collect(Collectors.toList());
     List<PartitionInfo> removed =
-        allInfo.stream().flatMap(pair -> pair.getRight().stream()).collect(Collectors.toList());
+        allInfo.stream().flatMap(info -> info.getRemoved().stream()).collect(Collectors.toList());
     int parallelism = Math.min(DEFAULT_PARALLELISM, added.size());
 
     HudiPartitionDataFileExtractor statsExtractor =
@@ -162,7 +165,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
         .build();
   }
 
-  private Pair<List<PartitionInfo>, List<PartitionInfo>> getAddedAndRemovedPartitionInfo(
+  private AddedAndRemovedPartitionInfo getAddedAndRemovedPartitionInfo(
       HoodieTimeline timeline,
       HoodieInstant instant,
       HoodieTableFileSystemView fsView,
@@ -181,13 +184,13 @@ public class HudiDataFileExtractor implements AutoCloseable {
               .getPartitionToWriteStats()
               .forEach(
                   (partitionPath, writeStats) -> {
-                    Set<String> affectedFileGroupIds =
+                    Set<String> affectedFileIds =
                         writeStats.stream()
                             .map(HoodieWriteStat::getFileId)
                             .collect(Collectors.toSet());
                     Pair<Optional<PartitionInfo>, Optional<PartitionInfo>> addedAndRemovedFiles =
                         getUpdatesToPartition(
-                            fsView, startCommit, endCommit, partitionPath, affectedFileGroupIds);
+                            fsView, startCommit, endCommit, partitionPath, affectedFileIds);
                     addedAndRemovedFiles.getLeft().ifPresent(addedFiles::add);
                     addedAndRemovedFiles.getRight().ifPresent(removedFiles::add);
                   });
@@ -200,16 +203,16 @@ public class HudiDataFileExtractor implements AutoCloseable {
               .getPartitionToReplaceFileIds()
               .forEach(
                   (partitionPath, fileIds) -> {
-                    Set<String> affectedFileGroupIds = new HashSet<>(fileIds);
+                    Set<String> affectedFileIds = new HashSet<>(fileIds);
                     replaceMetadata
                         .getPartitionToWriteStats()
                         .getOrDefault(partitionPath, Collections.emptyList())
                         .stream()
                         .map(HoodieWriteStat::getFileId)
-                        .forEach(affectedFileGroupIds::add);
+                        .forEach(affectedFileIds::add);
                     Pair<Optional<PartitionInfo>, Optional<PartitionInfo>> addedAndRemovedFiles =
                         getUpdatesToPartition(
-                            fsView, startCommit, endCommit, partitionPath, affectedFileGroupIds);
+                            fsView, startCommit, endCommit, partitionPath, affectedFileIds);
                     addedAndRemovedFiles.getLeft().ifPresent(addedFiles::add);
                     addedAndRemovedFiles.getRight().ifPresent(removedFiles::add);
                   });
@@ -250,7 +253,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
         default:
           throw new OneIOException("Unexpected commit type " + instant.getAction());
       }
-      return Pair.of(addedFiles, removedFiles);
+      return AddedAndRemovedPartitionInfo.builder().added(addedFiles).removed(removedFiles).build();
     } catch (IOException ex) {
       throw new OneIOException("Unable to read commit metadata for commit " + instant, ex);
     }
@@ -290,7 +293,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieInstant startCommit,
       HoodieInstant endCommit,
       String partitionPath,
-      Set<String> affectedFileGroupIds) {
+      Set<String> affectedFileIds) {
     List<HoodieBaseFile> filesToAdd = new ArrayList<>();
     List<HoodieBaseFile> filesToRemove = new ArrayList<>();
     Stream<HoodieFileGroup> fileGroups =
@@ -298,7 +301,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
             fsView.getAllFileGroups(partitionPath),
             fsView.getReplacedFileGroupsBeforeOrOn(endCommit.getTimestamp(), partitionPath));
     fileGroups
-        .filter(fileGroup -> affectedFileGroupIds.contains(fileGroup.getFileGroupId().getFileId()))
+        .filter(fileGroup -> affectedFileIds.contains(fileGroup.getFileGroupId().getFileId()))
         .forEach(
             fileGroup -> {
               List<HoodieBaseFile> baseFiles =
@@ -346,17 +349,21 @@ public class HudiDataFileExtractor implements AutoCloseable {
             timeline,
             HoodieMetadataConfig.newBuilder().enable(true).build());
 
-    List<PartitionInfo> partitionInfoList =
-        partitionPaths.stream()
-            .map(
-                partitionPath ->
-                    PartitionInfo.builder()
-                        .partitionPath(partitionPath)
-                        .baseFiles(
-                            fsView.getLatestBaseFiles(partitionPath).collect(Collectors.toList()))
-                        .build())
-            .collect(Collectors.toList());
-    fsView.close();
+    List<PartitionInfo> partitionInfoList;
+    try {
+      partitionInfoList =
+          partitionPaths.stream()
+              .map(
+                  partitionPath ->
+                      PartitionInfo.builder()
+                          .partitionPath(partitionPath)
+                          .baseFiles(
+                              fsView.getLatestBaseFiles(partitionPath).collect(Collectors.toList()))
+                          .build())
+              .collect(Collectors.toList());
+    } finally {
+      fsView.close();
+    }
 
     int parallelism = Math.min(DEFAULT_PARALLELISM, partitionInfoList.size());
     HudiPartitionDataFileExtractor statsExtractor =
@@ -381,5 +388,12 @@ public class HudiDataFileExtractor implements AutoCloseable {
     List<HoodieBaseFile> baseFiles;
     OneDataFiles existingFileDetails;
     boolean deletes;
+  }
+
+  @Builder
+  @Value
+  private static class AddedAndRemovedPartitionInfo {
+    List<PartitionInfo> added;
+    List<PartitionInfo> removed;
   }
 }
