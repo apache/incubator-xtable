@@ -37,6 +37,7 @@ import lombok.Value;
 
 import org.apache.hadoop.fs.Path;
 
+import org.apache.hudi.avro.model.HoodieRollbackMetadata;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieLocalEngineContext;
 import org.apache.hudi.common.model.HoodieBaseFile;
@@ -48,6 +49,7 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
 import org.apache.hudi.common.table.timeline.TimelineUtils;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
@@ -106,33 +108,6 @@ public class HudiDataFileExtractor implements AutoCloseable {
     HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
     HoodieTimeline timelineForInstant =
         activeTimeline.findInstantsInRange(startCommit.getTimestamp(), endCommit.getTimestamp());
-    if (timelineForInstant.getWriteTimeline().countInstants() == 0) {
-      return OneDataFilesDiff.builder().build();
-    }
-    if (timelineForInstant.getWriteTimeline().countInstants() == 0) {
-      // HoodieTableFileSystemView returns a view of files using the write timeline only.
-      // If there are no write commits between start and end - these are either savepoint, rollback,
-      // restore and clean commits.
-      // In such cases, we sync the commits from lastWriteInstantBeforeStart...start...end.
-      Option<HoodieInstant> lastWriteInstantBeforeStartCommit =
-          activeTimeline
-              .findInstantsBeforeOrEquals(startCommit.getTimestamp())
-              .getWriteTimeline()
-              .lastInstant();
-      if (lastWriteInstantBeforeStartCommit.isPresent()) {
-        timelineForInstant =
-            activeTimeline
-                .findInstantsBeforeOrEquals(endCommit.getTimestamp())
-                .filter(
-                    instant ->
-                        instant
-                                .getTimestamp()
-                                .compareTo(lastWriteInstantBeforeStartCommit.get().getTimestamp())
-                            >= 0);
-      } else {
-        timelineForInstant = activeTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp());
-      }
-    }
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             localEngineContext,
@@ -241,7 +216,16 @@ public class HudiDataFileExtractor implements AutoCloseable {
         case HoodieTimeline.SAVEPOINT_ACTION:
         case HoodieTimeline.LOG_COMPACTION_ACTION:
         case HoodieTimeline.CLEAN_ACTION:
+          break;
         case HoodieTimeline.ROLLBACK_ACTION:
+          HoodieRollbackMetadata rollbackMetadata =
+              TimelineMetadataUtils.deserializeAvroMetadata(timeline.getInstantDetails(instant).get(), HoodieRollbackMetadata.class);
+          rollbackMetadata.getPartitionMetadata().forEach((partition, metadata) ->
+            removedFiles.add(PartitionInfo.builder()
+                .partitionPath(partition)
+                .baseFiles(metadata.getSuccessDeleteFiles().stream().map(HoodieBaseFile::new).collect(Collectors.toList()))
+                .deletes(true)
+                .build()));
           break;
         default:
           throw new OneIOException("Unexpected commit type " + instant.getAction());
@@ -286,7 +270,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
         filesToAdd.isEmpty()
             ? Optional.empty()
             : Optional.of(
-                PartitionInfo.builder().partitionPath(partitionPath).baseFiles(filesToAdd).build());
+                PartitionInfo.builder().partitionPath(partitionPath).baseFiles(filesToAdd).deletes(false).build());
     Optional<PartitionInfo> removed =
         filesToRemove.isEmpty()
             ? Optional.empty()
@@ -294,6 +278,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                 PartitionInfo.builder()
                     .partitionPath(partitionPath)
                     .baseFiles(filesToRemove)
+                    .deletes(true)
                     .build());
     return Pair.of(added, removed);
   }
@@ -397,5 +382,6 @@ public class HudiDataFileExtractor implements AutoCloseable {
     String partitionPath;
     List<HoodieBaseFile> baseFiles;
     OneDataFiles existingFileDetails;
+    boolean deletes;
   }
 }
