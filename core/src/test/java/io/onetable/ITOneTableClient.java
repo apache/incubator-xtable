@@ -23,11 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -233,21 +229,6 @@ public class ITOneTableClient {
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
-    }
-  }
-
-  private void moveCommitFiles(String basePath, String targetFolder, List<String> commitFiles)
-      throws IOException {
-    // convert to local paths.
-    basePath = basePath.replace("file://", "");
-    targetFolder = targetFolder.replace("file://", "");
-    for (String commitFile : commitFiles) {
-        Path sourcePath = new File(basePath, commitFile).toPath();
-        Path targetPath = new File(targetFolder, commitFile).toPath();
-
-        if (Files.exists(sourcePath)) {
-            Files.move(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
-        }
     }
   }
 
