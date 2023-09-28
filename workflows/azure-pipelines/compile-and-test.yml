@@ -11,6 +11,7 @@ steps:
     inputs:
       mavenPomFile: 'pom.xml'
       options: $(MAVEN_OPTS)
+      mavenOptions: '-Xmx3072m'
       javaHomeOption: 'JDKVersion'
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
