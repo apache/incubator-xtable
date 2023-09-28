@@ -23,7 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -40,9 +44,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import io.onetable.client.SourceClientProvider;
-import io.onetable.hudi.HudiSourceClientProvider;
 import lombok.AllArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.Value;
 
 import org.apache.avro.Schema;
@@ -80,7 +83,9 @@ import com.google.common.collect.ImmutableList;
 
 import io.onetable.client.OneTableClient;
 import io.onetable.client.PerTableConfig;
+import io.onetable.client.SourceClientProvider;
 import io.onetable.exception.SchemaExtractorException;
+import io.onetable.hudi.HudiSourceClientProvider;
 import io.onetable.hudi.HudiSourceConfig;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
@@ -187,6 +192,66 @@ public class ITOneTableClient {
 
       syncWithCompactionIfRequired(tableType, table, perTableConfig, oneTableClient);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 200);
+    }
+  }
+
+  @SneakyThrows
+  @Test
+  public void testConcurrentWritesInSource() {
+    List<TableFormat> targetTableFormats = Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA);
+    SyncMode syncMode = SyncMode.FULL;
+    HoodieTableType sourceTableType = HoodieTableType.COPY_ON_WRITE;
+    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
+    String tableName = getTableName();
+    try (TestHudiTable table =
+        TestHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), sourceTableType)) {
+      // commit time 1 starts first but ends 2nd.
+      // commit time 2 starts second but ends 1st.
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit2 = table.generateRecords(50);
+      String commitInstant1 = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+      moveCommitFiles(table.getBasePath() + ".hoodie/", table.getBasePath() + ".hoodie/.temp",
+          Arrays.asList(commitInstant1 + ".commit.requested", commitInstant1 + ".inflight",
+              commitInstant1 + ".commit"));
+      String commitInstant2 = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit2, commitInstant2, true);
+
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(targetTableFormats)
+              .tableBasePath(table.getBasePath())
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
+                      .build())
+              .syncMode(syncMode)
+              .build();
+      OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 50);
+      // move commit files for first commit back
+      moveCommitFiles(table.getBasePath() + ".hoodie/.temp", table.getBasePath() + ".hoodie/",
+          Arrays.asList(commitInstant1 + ".commit.requested", commitInstant1 + ".inflight",
+              commitInstant1 + ".commit"));
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
+    }
+  }
+
+  private void moveCommitFiles(String basePath, String targetFolder, List<String> commitFiles)
+      throws IOException {
+    // convert to local paths.
+    basePath = basePath.replace("file://", "");
+    targetFolder = targetFolder.replace("file://", "");
+    for (String commitFile : commitFiles) {
+        Path sourcePath = new File(basePath, commitFile).toPath();
+        Path targetPath = new File(targetFolder, commitFile).toPath();
+
+        if (Files.exists(sourcePath)) {
+            Files.move(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
   }
 
@@ -572,7 +637,9 @@ public class ITOneTableClient {
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 50);
       table.rollback(
           table.getActiveTimeline().getCommitsTimeline().lastInstant().get().getTimestamp());
-      assertThrows(SchemaExtractorException.class, () -> oneTableClient.sync(perTableConfig, hudiSourceClientProvider));
+      assertThrows(
+          SchemaExtractorException.class,
+          () -> oneTableClient.sync(perTableConfig, hudiSourceClientProvider));
     }
   }
 
@@ -747,7 +814,9 @@ public class ITOneTableClient {
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
 
-      assertThrows(IllegalArgumentException.class, () -> oneTableClient.sync(perTableConfig, hudiSourceClientProvider));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> oneTableClient.sync(perTableConfig, hudiSourceClientProvider));
     }
   }
 
@@ -870,7 +939,8 @@ public class ITOneTableClient {
       OneTableClient oneTableClient) {
     if (tableType == HoodieTableType.MERGE_ON_READ) {
       // sync once before compaction and assert no failures
-      Map<TableFormat, SyncResult> syncResults = oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      Map<TableFormat, SyncResult> syncResults =
+          oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       assertNoSyncFailures(syncResults);
 
       table.compact();

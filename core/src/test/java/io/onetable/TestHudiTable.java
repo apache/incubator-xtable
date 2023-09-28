@@ -432,6 +432,51 @@ public class TestHudiTable implements Closeable {
     return insertRecords(checkForNoErrors, inserts);
   }
 
+  public List<HoodieRecord<HoodieAvroPayload>> generateRecords(int numRecords) {
+    Instant currentTime = Instant.now().truncatedTo(ChronoUnit.DAYS);
+    List<Instant> startTimeWindows =
+        Arrays.asList(
+            currentTime.minus(2, ChronoUnit.DAYS),
+            currentTime.minus(3, ChronoUnit.DAYS),
+            currentTime.minus(4, ChronoUnit.DAYS));
+    List<Instant> endTimeWindows =
+        Arrays.asList(
+            currentTime.minus(1, ChronoUnit.DAYS),
+            currentTime.minus(2, ChronoUnit.DAYS),
+            currentTime.minus(3, ChronoUnit.DAYS));
+    List<HoodieRecord<HoodieAvroPayload>> inserts =
+        IntStream.range(0, numRecords)
+            .mapToObj(
+                index ->
+                    getRecord(
+                        schema,
+                        UUID.randomUUID().toString(),
+                        startTimeWindows.get(index % 3),
+                        endTimeWindows.get(index % 3),
+                        null,
+                        null))
+            .collect(Collectors.toList());
+    return inserts;
+  }
+
+  public String startCommit() {
+     String instant = getStartCommitInstant();
+     writeClient.startCommitWithTime(instant);
+     return instant;
+  }
+
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
+                            List<HoodieRecord<HoodieAvroPayload>> inserts,
+                            String commitInstant,
+                            boolean checkForNoErrors) {
+    JavaRDD<HoodieRecord<HoodieAvroPayload>> writeRecords = jsc.parallelize(inserts, 1);
+    JavaRDD<WriteStatus> result = writeClient.bulkInsert(writeRecords, commitInstant);
+    if (checkForNoErrors) {
+      assertNoWriteErrors(result.collect());
+    }
+    return inserts;
+  }
+
   private List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
     JavaRDD<HoodieRecord<HoodieAvroPayload>> writeRecords = jsc.parallelize(inserts, 1);
