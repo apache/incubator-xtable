@@ -10,7 +10,7 @@ steps:
   - task: Maven@4
     inputs:
       mavenPomFile: 'pom.xml'
-      mavenOptions: '-Xmx3072m $(MAVEN_OPTS)'
+      mavenOptions: '-Xmx3072m -ntp -B -T 2 $(MAVEN_OPTS)'
       javaHomeOption: 'JDKVersion'
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
