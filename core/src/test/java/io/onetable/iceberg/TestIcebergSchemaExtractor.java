@@ -392,15 +392,15 @@ public class TestIcebergSchemaExtractor {
             Types.NestedField.required(17, "requiredDate", Types.DateType.get()),
             Types.NestedField.optional(18, "optionalDate", Types.DateType.get()),
             Types.NestedField.required(
-                19, "requiredTimestampMillis", Types.TimestampType.withoutZone()),
+                19, "requiredTimestampMillis", Types.TimestampType.withZone()),
             Types.NestedField.optional(
-                20, "optionalTimestampMillis", Types.TimestampType.withoutZone()),
+                20, "optionalTimestampMillis", Types.TimestampType.withZone()),
             Types.NestedField.required(21, "requiredTimestampNtzMillis", Types.LongType.get()),
             Types.NestedField.optional(22, "optionalTimestampNtzMillis", Types.LongType.get()),
             Types.NestedField.required(
-                23, "requiredTimestampMicros", Types.TimestampType.withoutZone()),
+                23, "requiredTimestampMicros", Types.TimestampType.withZone()),
             Types.NestedField.optional(
-                24, "optionalTimestampMicros", Types.TimestampType.withoutZone()),
+                24, "optionalTimestampMicros", Types.TimestampType.withZone()),
             Types.NestedField.required(25, "requiredTimestampNtzMicros", Types.LongType.get()),
             Types.NestedField.optional(26, "optionalTimestampNtzMicros", Types.LongType.get()),
             Types.NestedField.required(27, "requiredFixed", Types.FixedType.ofLength(fixedSize)),
