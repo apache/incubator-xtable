@@ -21,7 +21,6 @@ package io.onetable.model;
 import lombok.Builder;
 import lombok.Value;
 
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 
 /**
@@ -34,8 +33,6 @@ import io.onetable.model.storage.OneDataFilesDiff;
 public class TableChange {
   // Change in files since the last commit in the source format
   OneDataFilesDiff filesDiff;
-  // New set of files after apply filesDiff in this TableChange.
-  OneDataFiles dataFilesAfterDiff;
   // OneTable state at the specified instant
   OneTable currentTableState;
 }

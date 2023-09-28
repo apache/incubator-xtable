@@ -33,7 +33,6 @@ import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.TableChange;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.sync.SyncMode;
 import io.onetable.model.sync.SyncResult;
 
@@ -57,7 +56,6 @@ public class TableFormatSync {
           SyncMode.FULL,
           oneTable,
           client -> client.syncFilesForSnapshot(snapshot.getDataFiles()),
-          snapshot.getDataFiles(),
           startTime);
     } catch (Exception e) {
       LOG.error("Failed to sync snapshot", e);
@@ -81,7 +79,6 @@ public class TableFormatSync {
                 SyncMode.INCREMENTAL,
                 change.getCurrentTableState(),
                 client -> client.syncFilesForDiff(change.getFilesDiff()),
-                change.getDataFilesAfterDiff(),
                 startTime));
       } catch (Exception e) {
         // Fallback to a sync where table changes are from changes.getInstant() to latest, write a
@@ -100,11 +97,7 @@ public class TableFormatSync {
   }
 
   private SyncResult getSyncResult(
-      SyncMode mode,
-      OneTable tableState,
-      SyncFiles fileSyncMethod,
-      OneDataFiles dataFiles,
-      Instant startTime) {
+      SyncMode mode, OneTable tableState, SyncFiles fileSyncMethod, Instant startTime) {
     // initialize the sync
     client.beginSync(tableState);
     // sync schema updates
@@ -125,7 +118,6 @@ public class TableFormatSync {
         .syncStartTime(startTime)
         .syncDuration(Duration.between(startTime, Instant.now()))
         .lastInstantSynced(tableState.getLatestCommitTime())
-        .lastSyncedDataFiles(dataFiles)
         .build();
   }
 
