@@ -211,10 +211,7 @@ public class ITOneTableClient {
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit2 = table.generateRecords(50);
       String commitInstant1 = table.startCommit();
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
-      moveCommitFiles(table.getBasePath() + ".hoodie/", table.getBasePath() + ".hoodie/.temp",
-          Arrays.asList(commitInstant1 + ".commit.requested", commitInstant1 + ".inflight",
-              commitInstant1 + ".commit"));
+
       String commitInstant2 = table.startCommit();
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit2, commitInstant2, true);
 
@@ -231,11 +228,10 @@ public class ITOneTableClient {
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 50);
-      // move commit files for first commit back
-      moveCommitFiles(table.getBasePath() + ".hoodie/.temp", table.getBasePath() + ".hoodie/",
-          Arrays.asList(commitInstant1 + ".commit.requested", commitInstant1 + ".inflight",
-              commitInstant1 + ".commit"));
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
     }
   }

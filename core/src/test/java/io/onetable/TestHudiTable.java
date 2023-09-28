@@ -18,6 +18,11 @@
  
 package io.onetable;
 
+import static org.apache.hudi.common.config.LockConfiguration.FILESYSTEM_LOCK_EXPIRE_PROP_KEY;
+import static org.apache.hudi.common.config.LockConfiguration.FILESYSTEM_LOCK_PATH_PROP_KEY;
+import static org.apache.hudi.common.config.LockConfiguration.LOCK_ACQUIRE_NUM_RETRIES_PROP_KEY;
+import static org.apache.hudi.common.config.LockConfiguration.LOCK_ACQUIRE_RETRY_WAIT_TIME_IN_MILLIS_PROP_KEY;
+import static org.apache.hudi.common.config.LockConfiguration.LOCK_ACQUIRE_WAIT_TIMEOUT_MS_PROP_KEY;
 import static org.apache.hudi.keygen.constant.KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -52,6 +57,12 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.LocalFileSystem;
+import org.apache.hudi.client.transaction.lock.FileSystemBasedLockProvider;
+import org.apache.hudi.common.config.LockConfiguration;
+import org.apache.hudi.common.model.HoodieFailedWritesCleaningPolicy;
+import org.apache.hudi.common.model.WriteConcurrencyMode;
+import org.apache.hudi.common.table.marker.MarkerType;
+import org.apache.hudi.config.HoodieLockConfig;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.junit.jupiter.api.Assertions;
@@ -461,11 +472,22 @@ public class TestHudiTable implements Closeable {
 
   public String startCommit() {
      String instant = getStartCommitInstant();
-     writeClient.startCommitWithTime(instant);
      return instant;
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
+                            List<HoodieRecord<HoodieAvroPayload>> inserts,
+                            String commitInstant,
+                            boolean checkForNoErrors) {
+    JavaRDD<HoodieRecord<HoodieAvroPayload>> writeRecords = jsc.parallelize(inserts, 1);
+    JavaRDD<WriteStatus> result = writeClient.bulkInsert(writeRecords, commitInstant);
+    if (checkForNoErrors) {
+      assertNoWriteErrors(result.collect());
+    }
+    return inserts;
+  }
+
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStartedWithClient1(
                             List<HoodieRecord<HoodieAvroPayload>> inserts,
                             String commitInstant,
                             boolean checkForNoErrors) {
@@ -588,10 +610,19 @@ public class TestHudiTable implements Closeable {
             .retainCommits(1)
             .withMaxCommitsBeforeCleaning(1)
             .withAutoClean(false)
+            .withFailedWritesCleaningPolicy(HoodieFailedWritesCleaningPolicy.NEVER)
             .build();
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
-    HoodieWriteConfig writeConfig =
+    Properties localLockProperties = new Properties();
+    localLockProperties.setProperty(FILESYSTEM_LOCK_PATH_PROP_KEY, basePath + "/.hoodie/.locks");
+    localLockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_WAIT_TIMEOUT_MS_PROP_KEY, "3000");
+    localLockProperties.setProperty(FILESYSTEM_LOCK_EXPIRE_PROP_KEY, "1");
+    localLockProperties.setProperty(LOCK_ACQUIRE_WAIT_TIMEOUT_MS_PROP_KEY, "1000");
+    localLockProperties.setProperty(LOCK_ACQUIRE_RETRY_WAIT_TIME_IN_MILLIS_PROP_KEY, "1000");
+    localLockProperties.setProperty(LOCK_ACQUIRE_NUM_RETRIES_PROP_KEY, "3");
+    localLockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_WAIT_TIMEOUT_MS_PROP_KEY, "3000");
+    HoodieWriteConfig writeConfig1 =
         HoodieWriteConfig.newBuilder()
             .withProperties(keyGenProperties)
             .withPath(this.basePath)
@@ -601,9 +632,13 @@ public class TestHudiTable implements Closeable {
             .withClusteringConfig(clusteringConfig)
             .withCleanConfig(cleanConfig)
             .withArchivalConfig(archivalConfig)
-            .build();
+            .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
+            .withMarkersType(MarkerType.DIRECT.name())
+            .withLockConfig(HoodieLockConfig.newBuilder()
+                .withLockProvider(FileSystemBasedLockProvider.class)
+              .build()).withProperties(localLockProperties).build();
     HoodieEngineContext context = new HoodieSparkEngineContext(jsc);
-    return new SparkRDDWriteClient<>(context, writeConfig);
+    return new SparkRDDWriteClient<>(context, writeConfig1);
   }
 
   private HoodieTableMetaClient initMetaClient(
