@@ -31,8 +31,6 @@ import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.function.SerializableFunction;
 import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.common.table.timeline.HoodieTimeline;
-import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.exception.HoodieIOException;
 
 import io.onetable.exception.NotSupportedException;
@@ -53,20 +51,17 @@ public class HudiPartitionDataFileExtractor
   private final HoodieTableMetaClient metaClient;
   private final OneTable table;
   private final HudiPartitionValuesExtractor partitionValuesExtractor;
-  private final HoodieTimeline timeline;
 
   public HudiPartitionDataFileExtractor(
       HoodieTableMetaClient metaClient,
       OneTable table,
-      HudiPartitionValuesExtractor partitionValuesExtractor,
-      HoodieTimeline timeline) {
+      HudiPartitionValuesExtractor partitionValuesExtractor) {
     this.metaClient = metaClient;
     if (metaClient.getTableConfig().getBaseFileFormat() != HoodieFileFormat.PARQUET) {
       throw new NotSupportedException("File formats other than Parquet are not yet supported");
     }
     this.table = table;
     this.partitionValuesExtractor = partitionValuesExtractor;
-    this.timeline = timeline;
   }
 
   @Override
@@ -75,9 +70,6 @@ public class HudiPartitionDataFileExtractor
     Map<OnePartitionField, Range> partitionValues =
         partitionValuesExtractor.extractPartitionValues(
             table.getPartitioningFields(), partitionInfo.getPartitionPath());
-
-    HoodieTableFileSystemView fsView =
-        new HoodieTableFileSystemView(metaClient, timeline, partitionInfo.getFileStatuses());
 
     SchemaVersion version = new SchemaVersion(1, null);
 
@@ -88,34 +80,33 @@ public class HudiPartitionDataFileExtractor
             : partitionInfo.getExistingFileDetails().getFiles().stream()
                 .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
     List<OneDataFile> partitionFiles =
-        fsView
-            .getLatestBaseFiles()
+        partitionInfo.getBaseFiles().stream()
             .parallel()
             .map(
                 hoodieBaseFile -> {
                   if (pathToExistingFileDetails.containsKey(hoodieBaseFile.getPath())) {
                     return pathToExistingFileDetails.get(hoodieBaseFile.getPath());
                   }
-                  long rowCount;
-                  Map<OneField, ColumnStat> columnStatMap;
-                  try {
-                    HudiFileStats hudiFileStats =
-                        HudiFileStatsExtractor.getInstance()
-                            .computeColumnStatsForFile(
-                                hoodieBaseFile.getFileStatus().getPath(),
-                                metaClient.getHadoopConf(),
-                                table.getReadSchema());
-                    rowCount = hudiFileStats.getRowCount();
-                    columnStatMap = hudiFileStats.getColumnStats();
-                  } catch (HoodieIOException ex) {
-                    // This should only happen when referencing a commit that has files cleaned by
-                    // Hudi's cleaner
-                    LOG.error(
-                        "Unable to get rowCount or columns stats for file: "
-                            + hoodieBaseFile.getPath(),
-                        ex);
-                    rowCount = -1L;
-                    columnStatMap = Collections.emptyMap();
+                  long rowCount = 0L;
+                  Map<OneField, ColumnStat> columnStatMap = Collections.emptyMap();
+                  if (!partitionInfo.isDeletes()) {
+                    try {
+                      HudiFileStats hudiFileStats =
+                          HudiFileStatsExtractor.getInstance()
+                              .computeColumnStatsForFile(
+                                  hoodieBaseFile.getFileStatus().getPath(),
+                                  metaClient.getHadoopConf(),
+                                  table.getReadSchema());
+                      rowCount = hudiFileStats.getRowCount();
+                      columnStatMap = hudiFileStats.getColumnStats();
+                    } catch (HoodieIOException ex) {
+                      // This should only happen when referencing a commit that has files cleaned by
+                      // Hudi's cleaner
+                      LOG.error(
+                          "Unable to get rowCount or columns stats for file: "
+                              + hoodieBaseFile.getPath(),
+                          ex);
+                    }
                   }
                   return OneDataFile.builder()
                       .schemaVersion(version)
@@ -123,14 +114,16 @@ public class HudiPartitionDataFileExtractor
                       .fileFormat(getFileFormat(FSUtils.getFileExtension(hoodieBaseFile.getPath())))
                       .partitionPath(partitionInfo.getPartitionPath())
                       .partitionValues(partitionValues)
-                      .fileSizeBytes(hoodieBaseFile.getFileSize())
+                      .fileSizeBytes(Math.max(0, hoodieBaseFile.getFileSize()))
                       .recordCount(rowCount)
                       .columnStats(columnStatMap)
-                      .lastModified(hoodieBaseFile.getFileStatus().getModificationTime())
+                      .lastModified(
+                          hoodieBaseFile.getFileStatus() == null
+                              ? 0L
+                              : hoodieBaseFile.getFileStatus().getModificationTime())
                       .build();
                 })
             .collect(Collectors.toList());
-    fsView.close();
     return OneDataFiles.collectionBuilder()
         .partitionPath(partitionInfo.getPartitionPath())
         .files(partitionFiles)

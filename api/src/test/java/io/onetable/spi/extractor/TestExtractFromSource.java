@@ -99,20 +99,12 @@ public class TestExtractFromSource {
 
     // drop a file and add a file in an existing partition
     OneDataFile newFile1 = getOneDataFile(partition1, "file4.parquet");
-    OneDataFiles firstDiff =
-        OneDataFiles.collectionBuilder()
-            .files(
-                Collections.singletonList(
-                    OneDataFiles.collectionBuilder()
-                        .files(Arrays.asList(initialFile1, newFile1))
-                        .partitionPath(partition1)
-                        .build()))
-            .build();
     OneTable tableAtFirstInstant =
         OneTable.builder().latestCommitTime(Instant.now().minus(1, ChronoUnit.DAYS)).build();
-    when(mockSourceClient.getFilesForAffectedPartitions(
-            lastCommitSynced, firstCommitToSync, tableAtFirstInstant, initialFiles))
-        .thenReturn(firstDiff);
+    when(mockSourceClient.getFilesDiffBetweenCommits(
+            lastCommitSynced, firstCommitToSync, tableAtFirstInstant))
+        .thenReturn(
+            OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build());
     when(mockSourceClient.getTable(firstCommitToSync)).thenReturn(tableAtFirstInstant);
     OneDataFilesDiff expectedFirstFileDiff =
         OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build();
@@ -157,12 +149,13 @@ public class TestExtractFromSource {
                         .build()))
             .build();
     OneTable tableAtSecondInstant = OneTable.builder().latestCommitTime(Instant.now()).build();
-    when(mockSourceClient.getFilesForAffectedPartitions(
-            firstCommitToSync,
-            secondCommitToSync,
-            tableAtSecondInstant,
-            expectedFirstFullDataFiles))
-        .thenReturn(secondDiff);
+    when(mockSourceClient.getFilesDiffBetweenCommits(
+            firstCommitToSync, secondCommitToSync, tableAtSecondInstant))
+        .thenReturn(
+            OneDataFilesDiff.builder()
+                .filesAdded(Arrays.asList(newFile2, newFile3))
+                .filesRemoved(Arrays.asList(initialFile3, newFile1))
+                .build());
     when(mockSourceClient.getTable(secondCommitToSync)).thenReturn(tableAtSecondInstant);
     OneDataFilesDiff expectedSecondFileDiff =
         OneDataFilesDiff.builder()

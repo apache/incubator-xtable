@@ -64,22 +64,8 @@ public class ExtractFromSource<COMMIT> {
     OneDataFiles latestFileState = lastSyncedDataFiles;
     for (COMMIT commit : commitList) {
       OneTable tableState = sourceClient.getTable(commit);
-      OneDataFiles filesForAffectedPartitions =
-          sourceClient.getFilesForAffectedPartitions(
-              previousCommit, commit, tableState, latestFileState);
-      Set<String> affectedPartitions =
-          filesForAffectedPartitions.getFiles().stream()
-              .map(OneDataFile::getPartitionPath)
-              .collect(Collectors.toSet());
-      OneDataFiles latestDataFilesInAffectedPartitions =
-          OneDataFiles.collectionBuilder()
-              .files(
-                  latestFileState.getFiles().stream()
-                      .filter(f -> affectedPartitions.contains(f.getPartitionPath()))
-                      .collect(Collectors.toList()))
-              .build();
       OneDataFilesDiff filesDiff =
-          latestDataFilesInAffectedPartitions.diff(filesForAffectedPartitions);
+          sourceClient.getFilesDiffBetweenCommits(previousCommit, commit, tableState);
       // track updates to the state of the files in the table in memory
       latestFileState = syncChanges(latestFileState, filesDiff);
       tableChangeList.add(
