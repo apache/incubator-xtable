@@ -109,7 +109,7 @@ public class IcebergSchemaExtractor {
       case DATE:
         return Types.DateType.get();
       case TIMESTAMP:
-        return Types.TimestampType.withoutZone();
+        return Types.TimestampType.withZone();
       case DOUBLE:
         return Types.DoubleType.get();
       case DECIMAL:

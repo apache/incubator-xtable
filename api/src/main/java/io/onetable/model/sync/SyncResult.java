@@ -24,8 +24,6 @@ import java.time.Instant;
 import lombok.Builder;
 import lombok.Value;
 
-import io.onetable.model.storage.OneDataFiles;
-
 /**
  * Result of a sync operation
  *
@@ -44,8 +42,6 @@ public class SyncResult {
   SyncStatus status;
   // The Sync Mode recommended for the next sync (Usually filled on an error)
   SyncMode recommendedSyncMode;
-  // The data files synced as part of this sync operation.
-  OneDataFiles lastSyncedDataFiles;
 
   public enum SyncStatusCode {
     SUCCESS,
