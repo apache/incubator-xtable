@@ -4,6 +4,10 @@ trigger:
 pr:
 - main
 
+variables:
+  MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
+  MAVEN_OPTS: '-Dmaven.repo.local=$(MAVEN_CACHE_FOLDER) -ntp -B -T 2'
+
 stages:
 - stage: build
   jobs:
