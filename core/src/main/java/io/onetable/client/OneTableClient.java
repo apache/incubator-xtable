@@ -18,10 +18,8 @@
  
 package io.onetable.client;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,16 +34,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
-import io.onetable.exception.OneIOException;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 import io.onetable.model.sync.SyncResult;
-import io.onetable.persistence.OneTableState;
-import io.onetable.persistence.OneTableStateStorage;
 import io.onetable.spi.extractor.ExtractFromSource;
 import io.onetable.spi.extractor.SourceClient;
 import io.onetable.spi.sync.TableFormatSync;
@@ -63,12 +57,9 @@ import io.onetable.spi.sync.TableFormatSync;
 public class OneTableClient {
   private static final Logger LOG = LogManager.getLogger(OneTableClient.class);
   private final Configuration conf;
-  private final OneTableStateStorage storage;
 
   public OneTableClient(Configuration conf) {
     this.conf = conf;
-    // Disable writing archive until there is a clear purpose for it
-    this.storage = new OneTableStateStorage(conf, false);
   }
 
   /**
@@ -90,8 +81,6 @@ public class OneTableClient {
     SourceClient<COMMIT> sourceClient = sourceClientProvider.getSourceClientInstance(config);
     ExtractFromSource<COMMIT> source = ExtractFromSource.of(sourceClient);
 
-    Optional<OneTableState> currentState = getSyncState(config.getTableBasePath());
-
     SyncResultForTableFormats result;
     Map<TableFormat, TableFormatSync> syncClientByFormat =
         config.getTargetTableFormats().stream()
@@ -101,59 +90,33 @@ public class OneTableClient {
                     tableFormat ->
                         TableFormatClientFactory.createForFormat(tableFormat, config, conf)));
     if (config.getSyncMode() == SyncMode.FULL) {
-      result = syncSnapshot(syncClientByFormat, source, currentState);
+      result = syncSnapshot(syncClientByFormat, source);
     } else {
-      result = syncIncrementalChanges(syncClientByFormat, source, currentState);
+      result = syncIncrementalChanges(syncClientByFormat, source);
     }
-    OneTableState newState =
-        OneTableState.builder()
-            .table(result.getSyncedTable())
-            .lastSyncResult(result.getLastSyncResult())
-            .lastSuccessfulSyncResult(result.getLastSuccessfulSyncResult())
-            .tableFormatsToSync(config.getTargetTableFormats())
-            .build();
-    persistOneTableState(newState);
     LOG.info(
         "OneTable Sync is successful for the following formats " + config.getTargetTableFormats());
-    return newState.getLastSyncResult();
+    return result.getLastSyncResult();
   }
 
   private <COMMIT> SyncResultForTableFormats syncSnapshot(
-      Map<TableFormat, TableFormatSync> syncClientByFormat,
-      ExtractFromSource<COMMIT> source,
-      Optional<OneTableState> currentState) {
+      Map<TableFormat, TableFormatSync> syncClientByFormat, ExtractFromSource<COMMIT> source) {
     Map<TableFormat, SyncResult> syncResultsByFormat = new HashMap<>();
-    Map<TableFormat, SyncResult> lastSuccessfulSyncResultMap =
-        currentState.map(OneTableState::getLastSuccessfulSyncResult).orElseGet(HashMap::new);
     OneSnapshot snapshot = source.extractSnapshot();
     syncClientByFormat.forEach(
         (tableFormat, tableFormatSync) -> {
           SyncResult syncResult = tableFormatSync.syncSnapshot(snapshot);
           syncResultsByFormat.put(tableFormat, syncResult);
-          if (syncResult.getStatus().getStatusCode().equals(SyncResult.SyncStatusCode.SUCCESS)) {
-            lastSuccessfulSyncResultMap.put(tableFormat, syncResult);
-          }
         });
     return SyncResultForTableFormats.builder()
         .lastSyncResult(syncResultsByFormat)
-        .lastSuccessfulSyncResult(lastSuccessfulSyncResultMap)
         .syncedTable(snapshot.getTable())
         .build();
   }
 
   private <COMMIT> SyncResultForTableFormats syncIncrementalChanges(
-      Map<TableFormat, TableFormatSync> syncClientByFormat,
-      ExtractFromSource<COMMIT> source,
-      Optional<OneTableState> currentStateOptional) {
-    if (!currentStateOptional.isPresent()) {
-      // Fallback to snapshot if current state doesn't exist or corrupted.
-      return syncSnapshot(syncClientByFormat, source, currentStateOptional);
-    }
-    OneTableState currentState = currentStateOptional.get();
-    Map<TableFormat, SyncResult> syncResultsByFormat =
-        new HashMap<>(currentState.getLastSuccessfulSyncResult());
-    Map<TableFormat, SyncResult> lastSuccessfulSyncResultMap =
-        currentState.getLastSuccessfulSyncResult();
+      Map<TableFormat, TableFormatSync> syncClientByFormat, ExtractFromSource<COMMIT> source) {
+    Map<TableFormat, SyncResult> syncResultsByFormat = new HashMap<>();
     OneTable syncedTable = null;
     // State for each TableFormat
     Map<TableFormat, Optional<Instant>> lastSyncInstantByFormat =
@@ -165,18 +128,15 @@ public class OneTableClient {
     // Fallback to snapshot sync if lastSyncInstant doesn't exist or no longer present in the
     // active timeline.
     Map<TableFormat, SyncMode> requiredSyncModeByFormat =
-        getRequiredSyncModes(
-            source, currentState, syncClientByFormat.keySet(), lastSyncInstantByFormat);
+        getRequiredSyncModes(source, syncClientByFormat.keySet(), lastSyncInstantByFormat);
     Map<TableFormat, TableFormatSync> formatsForIncrementalSync =
         getFormatsForSyncMode(syncClientByFormat, requiredSyncModeByFormat, SyncMode.INCREMENTAL);
     Map<TableFormat, TableFormatSync> formatsForFullSync =
         getFormatsForSyncMode(syncClientByFormat, requiredSyncModeByFormat, SyncMode.FULL);
 
     if (!formatsForFullSync.isEmpty()) {
-      SyncResultForTableFormats result =
-          syncSnapshot(formatsForFullSync, source, Optional.of(currentState));
+      SyncResultForTableFormats result = syncSnapshot(formatsForFullSync, source);
       syncResultsByFormat.putAll(result.getLastSyncResult());
-      syncResultsByFormat.putAll(result.getLastSuccessfulSyncResult());
       syncedTable = result.getSyncedTable();
     }
 
@@ -188,12 +148,7 @@ public class OneTableClient {
                   .filter(entry -> formatsForIncrementalSync.containsKey(entry.getKey()))
                   .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
       List<TableChange> allTableChanges =
-          source.extractTableChanges(
-              currentState
-                  .getLastSuccessfulSyncResult()
-                  .get(mostOutOfSync.getKey())
-                  .getLastSyncedDataFiles(),
-              mostOutOfSync.getValue().get());
+          source.extractTableChanges(mostOutOfSync.getValue().get());
       for (Map.Entry<TableFormat, TableFormatSync> entry : formatsForIncrementalSync.entrySet()) {
         TableFormat tableFormat = entry.getKey();
         TableFormatSync tableFormatSync = entry.getValue();
@@ -212,25 +167,16 @@ public class OneTableClient {
         syncedTable = tableChanges.get(tableChanges.size() - 1).getCurrentTableState();
         SyncResult latestSyncResult = syncResultList.get(syncResultList.size() - 1);
         syncResultsByFormat.put(tableFormat, latestSyncResult);
-        Optional<SyncResult> latestSuccessfulSyncResult =
-            syncResultList.stream()
-                .filter(
-                    s -> s.getStatus().getStatusCode().equals(SyncResult.SyncStatusCode.SUCCESS))
-                .max(Comparator.comparing(SyncResult::getLastInstantSynced));
-        latestSuccessfulSyncResult.ifPresent(
-            syncResult -> lastSuccessfulSyncResultMap.put(tableFormat, syncResult));
       }
     }
     return SyncResultForTableFormats.builder()
         .lastSyncResult(syncResultsByFormat)
-        .lastSuccessfulSyncResult(lastSuccessfulSyncResultMap)
         .syncedTable(syncedTable)
         .build();
   }
 
   private <COMMIT> Map<TableFormat, SyncMode> getRequiredSyncModes(
       ExtractFromSource<COMMIT> source,
-      OneTableState currentState,
       Collection<TableFormat> tableFormats,
       Map<TableFormat, Optional<Instant>> lastSyncInstantByFormat) {
     return tableFormats.stream()
@@ -238,13 +184,8 @@ public class OneTableClient {
             Collectors.toMap(
                 Function.identity(),
                 format -> {
-                  SyncResult lastSyncResult =
-                      currentState.getLastSuccessfulSyncResult().get(format);
-                  OneDataFiles lastSyncedDataFiles =
-                      lastSyncResult == null ? null : lastSyncResult.getLastSyncedDataFiles();
                   Optional<Instant> lastSyncInstant = lastSyncInstantByFormat.get(format);
-                  return lastSyncedDataFiles != null
-                          && checkIfLastSyncInstantExists(source, lastSyncInstant)
+                  return checkIfLastSyncInstantExists(source, lastSyncInstant)
                       ? SyncMode.INCREMENTAL
                       : SyncMode.FULL;
                 }));
@@ -275,22 +216,6 @@ public class OneTableClient {
     return mostOutOfSync;
   }
 
-  private void persistOneTableState(OneTableState state) {
-    try {
-      storage.write(state);
-    } catch (IOException e) {
-      throw new OneIOException("Failed to persist sync result", e);
-    }
-  }
-
-  private Optional<OneTableState> getSyncState(String tableBasePath) {
-    try {
-      return storage.read(tableBasePath);
-    } catch (IOException e) {
-      throw new OneIOException("Failed to get one table state", e);
-    }
-  }
-
   private <COMMIT> boolean checkIfLastSyncInstantExists(
       ExtractFromSource<COMMIT> source, Optional<Instant> lastSyncInstant) {
     if (!lastSyncInstant.isPresent()) {
@@ -309,7 +234,6 @@ public class OneTableClient {
   @Builder
   private static class SyncResultForTableFormats {
     Map<TableFormat, SyncResult> lastSyncResult;
-    Map<TableFormat, SyncResult> lastSuccessfulSyncResult;
     OneTable syncedTable;
   }
 }

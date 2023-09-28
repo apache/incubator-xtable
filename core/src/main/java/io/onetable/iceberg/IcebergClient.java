@@ -197,6 +197,9 @@ public class IcebergClient implements TargetClient {
 
   @Override
   public Optional<OneTableMetadata> getTableMetadata() {
+    if (table == null) {
+      return Optional.empty();
+    }
     return OneTableMetadata.fromMap(table.properties());
   }
 }
