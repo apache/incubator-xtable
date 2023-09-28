@@ -44,7 +44,7 @@ import io.onetable.spi.OneTableSnapshotVisitor;
  * @since 0.1
  */
 @Getter
-@Builder
+@Builder(toBuilder = true)
 @EqualsAndHashCode
 @ToString
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")

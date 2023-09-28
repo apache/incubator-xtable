@@ -28,11 +28,18 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.onetable.model.schema.OneField;
+import io.onetable.model.schema.OnePartitionField;
+import io.onetable.model.schema.SchemaVersion;
+import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.Range;
+import io.onetable.model.storage.FileFormat;
 import lombok.Builder;
 import lombok.Value;
 
@@ -42,9 +49,12 @@ import org.apache.hudi.avro.model.HoodieRestoreMetadata;
 import org.apache.hudi.avro.model.HoodieRollbackMetadata;
 import org.apache.hudi.avro.model.HoodieRollbackPartitionMetadata;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
+import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.engine.HoodieLocalEngineContext;
+import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
+import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.model.HoodieFileGroup;
 import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
 import org.apache.hudi.common.model.HoodieWriteStat;
@@ -56,6 +66,7 @@ import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.collection.Pair;
+import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 
@@ -64,14 +75,17 @@ import io.onetable.model.OneTable;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
 /** Extracts all the files for Hudi table represented by {@link OneTable}. */
 public class HudiDataFileExtractor implements AutoCloseable {
+  private static final Logger LOG = LogManager.getLogger(HudiDataFileExtractor.class);
   private static final int DEFAULT_PARALLELISM = 20;
 
   private final HoodieTableMetadata tableMetadata;
   private final HoodieTableMetaClient metaClient;
-  private final HoodieLocalEngineContext localEngineContext;
+  private final HoodieEngineContext localEngineContext;
   private final HudiPartitionValuesExtractor partitionValuesExtractor;
   private final Path basePath;
 
@@ -127,14 +141,15 @@ public class HudiDataFileExtractor implements AutoCloseable {
       fsView.close();
     }
 
-    List<PartitionInfo> added =
+    List<OneDataFile> filesAdded =
         allInfo.stream().flatMap(info -> info.getAdded().stream()).collect(Collectors.toList());
-    List<PartitionInfo> removed =
+    List<OneDataFile> filesRemoved =
         allInfo.stream().flatMap(info -> info.getRemoved().stream()).collect(Collectors.toList());
     int parallelism = Math.min(DEFAULT_PARALLELISM, added.size());
 
     HudiPartitionDataFileExtractor statsExtractor =
         new HudiPartitionDataFileExtractor(metaClient, table, partitionValuesExtractor);
+
     List<OneDataFile> filesAdded = localEngineContext.map(added, statsExtractor, parallelism);
     List<OneDataFile> extractedFilesAdded =
         filesAdded.stream()
@@ -147,21 +162,9 @@ public class HudiDataFileExtractor implements AutoCloseable {
                   }
                 })
             .collect(Collectors.toList());
-    List<OneDataFile> filesRemoved = localEngineContext.map(removed, statsExtractor, parallelism);
-    List<OneDataFile> extractedFilesRemoved =
-        filesRemoved.stream()
-            .flatMap(
-                oneDataFile -> {
-                  if (oneDataFile instanceof OneDataFiles) {
-                    return ((OneDataFiles) oneDataFile).getFiles().stream();
-                  } else {
-                    return Stream.of(oneDataFile);
-                  }
-                })
-            .collect(Collectors.toList());
     return OneDataFilesDiff.builder()
         .filesAdded(extractedFilesAdded)
-        .filesRemoved(extractedFilesRemoved)
+        .filesRemoved(filesRemoved)
         .build();
   }
 
@@ -393,7 +396,38 @@ public class HudiDataFileExtractor implements AutoCloseable {
   @Builder
   @Value
   private static class AddedAndRemovedPartitionInfo {
-    List<PartitionInfo> added;
-    List<PartitionInfo> removed;
+    List<OneDataFile> added;
+    List<OneDataFile> removed;
+  }
+
+  private OneDataFile buildFile(String partitionPath, Map<OnePartitionField, Range> partitionValues, HoodieBaseFile hoodieBaseFile) {
+    SchemaVersion version = new SchemaVersion(1, null); // TODO make constant?
+    long rowCount = 0L;
+    Map<OneField, ColumnStat> columnStatMap = Collections.emptyMap();
+    return OneDataFile.builder()
+        .schemaVersion(version)
+        .physicalPath(hoodieBaseFile.getPath())
+        .fileFormat(getFileFormat(FSUtils.getFileExtension(hoodieBaseFile.getPath())))
+        .partitionPath(partitionPath)
+        .partitionValues(partitionValues)
+        .fileSizeBytes(Math.max(0, hoodieBaseFile.getFileSize()))
+        .recordCount(rowCount)
+        .columnStats(columnStatMap)
+        .lastModified(
+            hoodieBaseFile.getFileStatus() == null
+                ? 0L
+                : hoodieBaseFile.getFileStatus().getModificationTime())
+        .build();
+
+  }
+
+  private FileFormat getFileFormat(String extension) {
+    if (HoodieFileFormat.PARQUET.getFileExtension().equals(extension)) {
+      return FileFormat.APACHE_PARQUET;
+    } else if (HoodieFileFormat.ORC.getFileExtension().equals(extension)) {
+      return FileFormat.APACHE_ORC;
+    } else {
+      throw new UnsupportedOperationException("Unknown Hudi Fileformat " + extension);
+    }
   }
 }
