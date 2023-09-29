@@ -525,8 +525,7 @@ public class TestHudiTable implements Closeable {
   }
 
   public String onlyScheduleCompaction() {
-    String instant = writeClient.scheduleCompaction(Option.empty()).get();
-    return instant;
+    return writeClient.scheduleCompaction(Option.empty()).get();
   }
 
   public void completeScheduledCompaction(String instant) {
