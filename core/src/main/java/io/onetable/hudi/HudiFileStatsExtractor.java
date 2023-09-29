@@ -27,9 +27,9 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import lombok.AccessLevel;
-import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -43,27 +43,43 @@ import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
+import io.onetable.model.storage.OneDataFile;
 
 /** Responsible for Column stats extraction for Hudi. */
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor
 public class HudiFileStatsExtractor {
-  private static final String DOT = ".";
 
-  private static final HudiFileStatsExtractor INSTANCE = new HudiFileStatsExtractor();
   private static final ParquetUtils UTILS = new ParquetUtils();
 
-  public static HudiFileStatsExtractor getInstance() {
-    return INSTANCE;
-  }
+  private final Configuration conf;
 
-  public HudiFileStats computeColumnStatsForFile(
-      Path filePath, Configuration conf, OneSchema schema) {
-    Map<String, OneField> nameFieldMap =
+  /**
+   * Adds column stats and row count information to the provided stream of files.
+   *
+   * @param files a stream of files that require column stats and row count information
+   * @param schema the schema of the files (assumed to be the same for all files in stream)
+   * @return a stream of files with column stats and row count information
+   */
+  public Stream<OneDataFile> addStatsToFiles(Stream<OneDataFile> files, OneSchema schema) {
+    final Map<String, OneField> nameFieldMap =
         getAllFields(schema).stream()
             .collect(
                 Collectors.toMap(
                     field -> HudiSchemaExtractor.convertFromOneTablePath(field.getPath()),
                     Function.identity()));
+    return files.map(
+        file -> {
+          HudiFileStats fileStats =
+              computeColumnStatsForFile(new Path(file.getPhysicalPath()), nameFieldMap);
+          return file.toBuilder()
+              .columnStats(fileStats.getColumnStats())
+              .recordCount(fileStats.getRowCount())
+              .build();
+        });
+  }
+
+  private HudiFileStats computeColumnStatsForFile(
+      Path filePath, Map<String, OneField> nameFieldMap) {
     List<HoodieColumnRangeMetadata<Comparable>> columnRanges =
         UTILS.readRangeFromParquetMetadata(conf, filePath, new ArrayList<>(nameFieldMap.keySet()));
     Map<OneField, ColumnStat> columnStatMap =
