@@ -33,6 +33,7 @@ import java.util.List;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
 
 import io.onetable.exception.OneIOException;
 import io.onetable.model.OneTable;
@@ -93,18 +94,18 @@ public class HudiClient implements SourceClient<HoodieInstant> {
     return dataFileExtractor.getDiffBetweenCommits(startCommit, endCommit, table);
   }
 
+  private HoodieTimeline getCompletedCommits() {
+    return metaClient.getActiveTimeline().filterCompletedInstants();
+  }
+
   @Override
   public List<HoodieInstant> getCommits(HoodieInstant afterCommit) {
-    return metaClient
-        .getActiveTimeline()
-        .findInstantsAfter(afterCommit.getTimestamp())
-        .getInstants();
+    return getCompletedCommits().findInstantsAfter(afterCommit.getTimestamp()).getInstants();
   }
 
   @Override
   public HoodieInstant getLatestCommit() {
-    return metaClient
-        .getActiveTimeline()
+    return getCompletedCommits()
         .lastInstant()
         .orElseThrow(
             () -> new OneIOException("Unable to read latest commit from Hudi source table"));
@@ -112,8 +113,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
 
   @Override
   public HoodieInstant getCommitAtInstant(Instant instant) {
-    return metaClient
-        .getActiveTimeline()
+    return getCompletedCommits()
         .findInstantsBeforeOrEquals(MILLIS_INSTANT_TIME_FORMATTER.format(instant))
         .lastInstant()
         .get();
