@@ -58,7 +58,6 @@ import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
-import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 
@@ -180,7 +179,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                         writeStats.stream()
                             .map(HoodieWriteStat::getFileId)
                             .collect(Collectors.toSet());
-                    Pair<List<OneDataFile>, List<OneDataFile>> addedAndRemovedFiles =
+                    AddedAndRemovedFiles addedAndRemovedFiles =
                         getUpdatesToPartition(
                             fsView,
                             startCommit,
@@ -188,8 +187,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
                             partitionPath,
                             affectedFileIds,
                             partitioningFields);
-                    addedFiles.addAll(addedAndRemovedFiles.getLeft());
-                    removedFiles.addAll(addedAndRemovedFiles.getRight());
+                    addedFiles.addAll(addedAndRemovedFiles.getAdded());
+                    removedFiles.addAll(addedAndRemovedFiles.getRemoved());
                   });
           break;
         case HoodieTimeline.REPLACE_COMMIT_ACTION:
@@ -207,7 +206,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                         .stream()
                         .map(HoodieWriteStat::getFileId)
                         .forEach(affectedFileIds::add);
-                    Pair<List<OneDataFile>, List<OneDataFile>> addedAndRemovedFiles =
+                    AddedAndRemovedFiles addedAndRemovedFiles =
                         getUpdatesToPartition(
                             fsView,
                             startCommit,
@@ -215,8 +214,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
                             partitionPath,
                             affectedFileIds,
                             partitioningFields);
-                    addedFiles.addAll(addedAndRemovedFiles.getLeft());
-                    removedFiles.addAll(addedAndRemovedFiles.getRight());
+                    addedFiles.addAll(addedAndRemovedFiles.getAdded());
+                    removedFiles.addAll(addedAndRemovedFiles.getRemoved());
                   });
           break;
         case HoodieTimeline.ROLLBACK_ACTION:
@@ -289,7 +288,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
         .collect(Collectors.toList());
   }
 
-  private Pair<List<OneDataFile>, List<OneDataFile>> getUpdatesToPartition(
+  private AddedAndRemovedFiles getUpdatesToPartition(
       HoodieTableFileSystemView fsView,
       HoodieInstant startCommit,
       HoodieInstant endCommit,
@@ -324,7 +323,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                 }
               }
             });
-    return Pair.of(filesToAdd, filesToRemove);
+    return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
   }
 
   private List<OneDataFile> getOneDataFilesForPartitions(
