@@ -155,13 +155,13 @@ public class ITOneTableClient {
         Stream.of(Arguments.of(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))));
   }
 
-  @Test
-  public void testUpsertData() {
-    // TODO(vamshigv): Remove this after
-    List<TableFormat> targetTableFormats = Arrays.asList(TableFormat.ICEBERG);
-    SyncMode syncMode = SyncMode.INCREMENTAL;
-    HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
-    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
+  @ParameterizedTest
+  @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
+  public void testUpsertData(
+      List<TableFormat> targetTableFormats,
+      SyncMode syncMode,
+      HoodieTableType tableType,
+      PartitionConfig partitionConfig) {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
@@ -194,7 +194,8 @@ public class ITOneTableClient {
   @SneakyThrows
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
-  public void testConcurrentInsertWritesInSource(List<TableFormat> targetTableFormats,
+  public void testConcurrentInsertWritesInSource(
+      List<TableFormat> targetTableFormats,
       SyncMode syncMode,
       HoodieTableType tableType,
       PartitionConfig partitionConfig) {
