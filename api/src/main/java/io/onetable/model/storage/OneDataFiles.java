@@ -53,7 +53,7 @@ import io.onetable.spi.OneTableSnapshotVisitor;
 public class OneDataFiles extends OneDataFile {
   @Singular List<OneDataFile> files;
 
-  @Builder(builderMethodName = "collectionBuilder", toBuilder = true)
+  @Builder(builderMethodName = "collectionBuilder")
   public OneDataFiles(
       SchemaVersion schemaVersion,
       String physicalPath,
