@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
@@ -47,7 +48,10 @@ import org.junit.jupiter.api.io.TempDir;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
+import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.storage.FileFormat;
+import io.onetable.model.storage.OneDataFile;
 
 public class TestHudiFileStatsExtractor {
   private static final Schema AVRO_SCHEMA =
@@ -130,11 +134,25 @@ public class TestHudiFileStatsExtractor {
                         .build()))
             .build();
 
-    HudiFileStats fileStats =
-        fileStatsExtractor.computeColumnStatsForFile(
-            new org.apache.hadoop.fs.Path(file.toString()), schema);
-    assertEquals(2, fileStats.getRowCount());
-    Map<OneField, ColumnStat> columnStats = fileStats.getColumnStats();
+    OneDataFile inputFile =
+        OneDataFile.builder()
+            .physicalPath(file.toString())
+            .schemaVersion(new SchemaVersion(1, null))
+            .columnStats(Collections.emptyMap())
+            .fileFormat(FileFormat.APACHE_PARQUET)
+            .lastModified(1234L)
+            .fileSizeBytes(4321L)
+            .recordCount(0)
+            .build();
+
+    List<OneDataFile> output =
+        fileStatsExtractor
+            .addStatsToFiles(Stream.of(inputFile), schema)
+            .collect(Collectors.toList());
+    assertEquals(1, output.size());
+    OneDataFile fileWithStats = output.get(0);
+    assertEquals(2, fileWithStats.getRecordCount());
+    Map<OneField, ColumnStat> columnStats = fileWithStats.getColumnStats();
 
     assertEquals(8, columnStats.size());
 
