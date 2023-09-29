@@ -60,6 +60,7 @@ public class TestHudiFileStatsExtractor {
   @Test
   public void columnStatsTest(@TempDir Path tempDir) throws IOException {
     Configuration configuration = new Configuration();
+    HudiFileStatsExtractor fileStatsExtractor = new HudiFileStatsExtractor(configuration);
     Path file = tempDir.resolve("tmp.parquet");
     try (ParquetWriter<GenericRecord> writer =
         AvroParquetWriter.<GenericRecord>builder(
@@ -130,9 +131,8 @@ public class TestHudiFileStatsExtractor {
             .build();
 
     HudiFileStats fileStats =
-        HudiFileStatsExtractor.getInstance()
-            .computeColumnStatsForFile(
-                new org.apache.hadoop.fs.Path(file.toString()), configuration, schema);
+        fileStatsExtractor.computeColumnStatsForFile(
+            new org.apache.hadoop.fs.Path(file.toString()), schema);
     assertEquals(2, fileStats.getRowCount());
     Map<OneField, ColumnStat> columnStats = fileStats.getColumnStats();
 
