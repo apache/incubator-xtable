@@ -57,6 +57,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.LocalFileSystem;
+import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.junit.jupiter.api.Assertions;
@@ -101,7 +102,6 @@ public class TestHudiTable implements Closeable {
   // A list of values for the level field which serves as a basic field to partition on for tests
   private static final List<String> LEVEL_VALUES = Arrays.asList("INFO", "WARN", "ERROR");
   private static final String RECORD_KEY_FIELD_NAME = "key";
-
   private static final Schema BASIC_SCHEMA;
 
   static {
@@ -448,8 +448,7 @@ public class TestHudiTable implements Closeable {
   }
 
   public String startCommit() {
-    String instant = getStartCommitInstant();
-    return instant;
+    return getStartCommitInstant();
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
@@ -531,6 +530,15 @@ public class TestHudiTable implements Closeable {
     writeClient.compact(instant);
   }
 
+  public String onlyScheduleCompaction() {
+    String instant = writeClient.scheduleCompaction(Option.empty()).get();
+    return instant;
+  }
+
+  public void completeScheduledCompaction(String instant) {
+    writeClient.compact(instant);
+  }
+
   public void cluster() {
     String instant = writeClient.scheduleClustering(Option.empty()).get();
     writeClient.cluster(instant, true);
@@ -579,13 +587,9 @@ public class TestHudiTable implements Closeable {
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
     Properties lockProperties = new Properties();
-    lockProperties.setProperty(FILESYSTEM_LOCK_PATH_PROP_KEY, basePath + "/.hoodie/.locks");
     lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_WAIT_TIMEOUT_MS_PROP_KEY, "3000");
-    lockProperties.setProperty(FILESYSTEM_LOCK_EXPIRE_PROP_KEY, "1");
-    lockProperties.setProperty(LOCK_ACQUIRE_WAIT_TIMEOUT_MS_PROP_KEY, "1000");
-    lockProperties.setProperty(LOCK_ACQUIRE_RETRY_WAIT_TIME_IN_MILLIS_PROP_KEY, "1000");
-    lockProperties.setProperty(LOCK_ACQUIRE_NUM_RETRIES_PROP_KEY, "3");
-    lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_WAIT_TIMEOUT_MS_PROP_KEY, "3000");
+    lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_CLIENT_RETRY_WAIT_TIME_IN_MILLIS_PROP_KEY, "3000");
+    lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_CLIENT_NUM_RETRIES_PROP_KEY, "20");
     HoodieWriteConfig writeConfig =
         HoodieWriteConfig.newBuilder()
             .withProperties(keyGenProperties)
@@ -598,10 +602,9 @@ public class TestHudiTable implements Closeable {
             .withArchivalConfig(archivalConfig)
             .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
             .withMarkersType(MarkerType.DIRECT.name())
-            .withLockConfig(
-                HoodieLockConfig.newBuilder()
-                    .withLockProvider(FileSystemBasedLockProvider.class)
-                    .build())
+            .withLockConfig(HoodieLockConfig.newBuilder()
+              .withLockProvider(InProcessLockProvider.class)
+              .build())
             .withProperties(lockProperties)
             .build();
     HoodieEngineContext context = new HoodieSparkEngineContext(jsc);

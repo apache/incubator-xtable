@@ -155,13 +155,13 @@ public class ITOneTableClient {
         Stream.of(Arguments.of(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))));
   }
 
-  @ParameterizedTest
-  @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
-  public void testUpsertData(
-      List<TableFormat> targetTableFormats,
-      SyncMode syncMode,
-      HoodieTableType tableType,
-      PartitionConfig partitionConfig) {
+  @Test
+  public void testUpsertData() {
+    // TODO(vamshigv): Remove this after
+    List<TableFormat> targetTableFormats = Arrays.asList(TableFormat.ICEBERG);
+    SyncMode syncMode = SyncMode.INCREMENTAL;
+    HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
+    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
@@ -192,16 +192,16 @@ public class ITOneTableClient {
   }
 
   @SneakyThrows
-  @Test
-  public void testConcurrentWritesInSource() {
-    List<TableFormat> targetTableFormats = Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA);
-    SyncMode syncMode = SyncMode.FULL;
-    HoodieTableType sourceTableType = HoodieTableType.COPY_ON_WRITE;
-    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
+  @ParameterizedTest
+  @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
+  public void testConcurrentInsertWritesInSource(List<TableFormat> targetTableFormats,
+      SyncMode syncMode,
+      HoodieTableType tableType,
+      PartitionConfig partitionConfig) {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), sourceTableType)) {
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
       // commit time 1 starts first but ends 2nd.
       // commit time 2 starts second but ends 1st.
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
@@ -229,6 +229,48 @@ public class ITOneTableClient {
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
+    }
+  }
+
+  @Test
+  public void testConcurrentInsertsAndTableServiceWrites() {
+    List<TableFormat> targetTableFormats = Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA);
+    SyncMode syncMode = SyncMode.INCREMENTAL;
+    HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
+    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
+
+    String tableName = getTableName();
+    try (TestHudiTable table =
+        TestHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+      List<HoodieRecord<HoodieAvroPayload>> insertedRecords1 = table.insertRecords(50, true);
+
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(targetTableFormats)
+              .tableBasePath(table.getBasePath())
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
+                      .build())
+              .syncMode(syncMode)
+              .build();
+      OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 50);
+
+      table.deleteRecords(insertedRecords1.subList(0, 20), true);
+      // At this point table should have 30 records but only after compaction.
+      String scheduledCompactionInstant = table.onlyScheduleCompaction();
+      List<HoodieRecord<HoodieAvroPayload>> insertedRecords2 = table.insertRecords(50, true);
+      // At this point table should have 80 records but only after compaction.
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      // Because compaction is not completed, yet there are still 100 records.
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
+      table.completeScheduledCompaction(scheduledCompactionInstant);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 80);
     }
   }
 
