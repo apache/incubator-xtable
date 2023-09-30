@@ -91,6 +91,15 @@ public interface SourceClient<COMMIT> {
   COMMIT getLatestCommit();
 
   /**
+   * Get all the pending commits that occurred before the provided commit.
+   *
+   * @param beforeCommit only return commits that are strictly before (and not including) that are
+   *     pending.
+   * @return List of pending commits before the provided commit from oldest to newest commit.
+   */
+  List<Instant> getPendingCommitsBeforeCommit(COMMIT beforeCommit);
+
+  /**
    * Gets the last commit made at or before the provided instant from the source table.
    *
    * @param instant point in time

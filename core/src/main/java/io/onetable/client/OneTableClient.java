@@ -34,6 +34,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
+import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
@@ -124,11 +125,21 @@ public class OneTableClient {
             .collect(
                 Collectors.toMap(
                     Map.Entry::getKey, entry -> entry.getValue().getLastSyncInstant()));
+    Map<TableFormat, Optional<List<Instant>>> pendingInstantsToConsiderForNextSyncByFormat =
+        syncClientByFormat.entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    Map.Entry::getKey,
+                    entry -> entry.getValue().getPendingInstantsToConsiderForNextSync()));
 
     // Fallback to snapshot sync if lastSyncInstant doesn't exist or no longer present in the
     // active timeline.
     Map<TableFormat, SyncMode> requiredSyncModeByFormat =
-        getRequiredSyncModes(source, syncClientByFormat.keySet(), lastSyncInstantByFormat);
+        getRequiredSyncModes(
+            source,
+            syncClientByFormat.keySet(),
+            lastSyncInstantByFormat,
+            pendingInstantsToConsiderForNextSyncByFormat);
     Map<TableFormat, TableFormatSync> formatsForIncrementalSync =
         getFormatsForSyncMode(syncClientByFormat, requiredSyncModeByFormat, SyncMode.INCREMENTAL);
     Map<TableFormat, TableFormatSync> formatsForFullSync =
@@ -147,14 +158,14 @@ public class OneTableClient {
               lastSyncInstantByFormat.entrySet().stream()
                   .filter(entry -> formatsForIncrementalSync.containsKey(entry.getKey()))
                   .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
-      List<TableChange> allTableChanges =
+      IncrementalTableChanges incrementalTableChanges =
           source.extractTableChanges(mostOutOfSync.getValue().get());
       for (Map.Entry<TableFormat, TableFormatSync> entry : formatsForIncrementalSync.entrySet()) {
         TableFormat tableFormat = entry.getKey();
         TableFormatSync tableFormatSync = entry.getValue();
         // extract the changes that happened since this format was last synced
-        List<TableChange> tableChanges =
-            allTableChanges.stream()
+        List<TableChange> filteredTableChanges =
+            incrementalTableChanges.getTableChanges().stream()
                 .filter(
                     change ->
                         change
@@ -162,9 +173,16 @@ public class OneTableClient {
                             .getLatestCommitTime()
                             .isAfter(lastSyncInstantByFormat.get(tableFormat).get()))
                 .collect(Collectors.toList());
-        List<SyncResult> syncResultList = tableFormatSync.syncChanges(tableChanges);
+        IncrementalTableChanges tableFormatIncrementalChanges =
+            IncrementalTableChanges.builder()
+                .tableChanges(filteredTableChanges)
+                .pendingCommits(incrementalTableChanges.getPendingCommits())
+                .build();
+        List<SyncResult> syncResultList =
+            tableFormatSync.syncChanges(tableFormatIncrementalChanges);
 
-        syncedTable = tableChanges.get(tableChanges.size() - 1).getCurrentTableState();
+        syncedTable =
+            filteredTableChanges.get(filteredTableChanges.size() - 1).getCurrentTableState();
         SyncResult latestSyncResult = syncResultList.get(syncResultList.size() - 1);
         syncResultsByFormat.put(tableFormat, latestSyncResult);
       }
@@ -178,17 +196,36 @@ public class OneTableClient {
   private <COMMIT> Map<TableFormat, SyncMode> getRequiredSyncModes(
       ExtractFromSource<COMMIT> source,
       Collection<TableFormat> tableFormats,
-      Map<TableFormat, Optional<Instant>> lastSyncInstantByFormat) {
+      Map<TableFormat, Optional<Instant>> lastSyncInstantByFormat,
+      Map<TableFormat, Optional<List<Instant>>> pendingInstantsToConsiderForNextSyncByFormat) {
     return tableFormats.stream()
         .collect(
             Collectors.toMap(
                 Function.identity(),
                 format -> {
                   Optional<Instant> lastSyncInstant = lastSyncInstantByFormat.get(format);
-                  return checkIfLastSyncInstantExists(source, lastSyncInstant)
+                  Optional<List<Instant>> pendingInstantsToConsiderForNextSync =
+                      pendingInstantsToConsiderForNextSyncByFormat.get(format);
+                  return isIncrementalSyncSufficient(
+                          source, lastSyncInstant, pendingInstantsToConsiderForNextSync)
                       ? SyncMode.INCREMENTAL
                       : SyncMode.FULL;
                 }));
+  }
+
+  private <COMMIT> boolean isIncrementalSyncSufficient(
+      ExtractFromSource<COMMIT> source,
+      Optional<Instant> lastSyncInstant,
+      Optional<List<Instant>> pendingInstants) {
+    if (!doesInstantExists(source, lastSyncInstant)) {
+      return false;
+    }
+    if (pendingInstants.isPresent()
+        && !pendingInstants.get().isEmpty()
+        && isInstantCleanedup(source, pendingInstants.get().get(0))) {
+      return false;
+    }
+    return true;
   }
 
   private Map<TableFormat, TableFormatSync> getFormatsForSyncMode(
@@ -216,9 +253,9 @@ public class OneTableClient {
     return mostOutOfSync;
   }
 
-  private <COMMIT> boolean checkIfLastSyncInstantExists(
-      ExtractFromSource<COMMIT> source, Optional<Instant> lastSyncInstant) {
-    if (!lastSyncInstant.isPresent()) {
+  private <COMMIT> boolean doesInstantExists(
+      ExtractFromSource<COMMIT> source, Optional<Instant> instantToCheck) {
+    if (!instantToCheck.isPresent()) {
       return false;
     }
 
@@ -228,6 +265,15 @@ public class OneTableClient {
     //    return HudiClient.parseFromInstantTime(lastSyncHoodieInstant.getTimestamp())
     //        .equals(lastSyncInstant.get());
     return true;
+  }
+
+  private <COMMIT> boolean isInstantCleanedup(
+      ExtractFromSource<COMMIT> source, Instant instantToCheck) {
+    // TODO This check is not generic and should be moved to HudiClient
+    // Should check if the earliest instant in source is less than or equal to instantToCheck
+    // and if so return false else return true
+    // TODO hardcoding the return value to false for now
+    return false;
   }
 
   @Value

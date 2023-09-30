@@ -16,52 +16,19 @@
  * limitations under the License.
  */
  
-package io.onetable.model.sync;
+package io.onetable.model;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
 import lombok.Builder;
 import lombok.Value;
 
-/**
- * Result of a sync operation
- *
- * @since 0.1
- */
+/** Captures Incremental table changes. */
 @Value
 @Builder
-public class SyncResult {
-  // Mode used for the sync
-  SyncMode mode;
-  Instant lastInstantSynced;
-  Instant syncStartTime;
-  // Duration
-  Duration syncDuration;
-  // Status of the sync
-  SyncStatus status;
-  // The Sync Mode recommended for the next sync (Usually filled on an error)
-  SyncMode recommendedSyncMode;
+public class IncrementalTableChanges {
+  List<TableChange> tableChanges;
+  // pending commits before latest commit(write) on the table.
   List<Instant> pendingCommits;
-
-  public enum SyncStatusCode {
-    SUCCESS,
-    ABORTED,
-    ERROR
-  }
-
-  /** Represents the status of a Sync operation. */
-  @Value
-  @Builder
-  public static class SyncStatus {
-    // Status code
-    SyncStatusCode statusCode;
-    // error Message if any
-    String errorMessage;
-    // Readable description of the error
-    String errorDescription;
-    // Can the client retry for this type of error (Transient error=true, persistent error=false)
-    boolean canRetryOnFailure;
-  }
 }

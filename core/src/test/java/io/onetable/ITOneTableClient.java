@@ -262,13 +262,26 @@ public class ITOneTableClient {
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 50);
 
       table.deleteRecords(insertedRecords1.subList(0, 20), true);
+      // table.upsertRecords(insertedRecords1.subList(0, 20), true);
       // At this point table should have 30 records but only after compaction.
       String scheduledCompactionInstant = table.onlyScheduleCompaction();
-      List<HoodieRecord<HoodieAvroPayload>> insertedRecords2 = table.insertRecords(50, true);
-      // At this point table should have 80 records but only after compaction.
+      table.insertRecords(50, true);
+
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-      // Because compaction is not completed, yet there are still 100 records.
-      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
+      Map<String, String> sourceHudiOptions =
+          new HashMap() {
+            {
+              put("hoodie.datasource.query.type", "read_optimized");
+            }
+          };
+      // Because compaction is not completed yet and read optimized query, there are 100 records.
+      checkDatasetEquivalence(
+          TableFormat.HUDI,
+          sourceHudiOptions,
+          targetTableFormats,
+          Collections.emptyMap(),
+          table.getBasePath(),
+          100);
       table.completeScheduledCompaction(scheduledCompactionInstant);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 80);

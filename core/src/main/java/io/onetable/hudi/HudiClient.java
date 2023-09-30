@@ -30,6 +30,7 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoField;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
@@ -109,6 +110,18 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         .lastInstant()
         .orElseThrow(
             () -> new OneIOException("Unable to read latest commit from Hudi source table"));
+  }
+
+  @Override
+  public List<Instant> getPendingCommitsBeforeCommit(HoodieInstant instant) {
+    return metaClient
+        .getActiveTimeline()
+        .filterInflightsAndRequested()
+        .findInstantsBefore(instant.getTimestamp())
+        .getInstants()
+        .stream()
+        .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
+        .collect(Collectors.toList());
   }
 
   @Override

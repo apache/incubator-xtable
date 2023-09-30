@@ -19,7 +19,6 @@
 package io.onetable.hudi;
 
 import static org.apache.hudi.common.table.timeline.HoodieTimeline.GREATER_THAN;
-import static org.apache.hudi.common.table.timeline.HoodieTimeline.LESSER_THAN_OR_EQUALS;
 
 import java.io.IOException;
 import java.net.URI;
@@ -52,7 +51,6 @@ import org.apache.hudi.common.model.HoodieFileGroup;
 import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
 import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
@@ -116,14 +114,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
   public OneDataFilesDiff getDiffBetweenCommits(
       HoodieInstant startCommit, HoodieInstant endCommit, OneTable table) {
-    HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
+    HoodieTimeline hoodieTimeline = metaClient.getActiveTimeline().filterCompletedInstants();
     HoodieTimeline timelineForInstant =
-        activeTimeline.findInstantsInRange(startCommit.getTimestamp(), endCommit.getTimestamp());
+        hoodieTimeline.findInstantsInRange(startCommit.getTimestamp(), endCommit.getTimestamp());
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             engineContext,
             metaClient,
-            activeTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp()),
+            hoodieTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp()),
             HoodieMetadataConfig.newBuilder().enable(true).build());
     List<AddedAndRemovedFiles> allInfo;
     try {
@@ -132,7 +130,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
               .map(
                   instant ->
                       getAddedAndRemovedPartitionInfo(
-                          activeTimeline,
+                          hoodieTimeline,
                           instant,
                           fsView,
                           startCommit,
@@ -309,17 +307,19 @@ public class HudiDataFileExtractor implements AutoCloseable {
             fileGroup -> {
               List<HoodieBaseFile> baseFiles =
                   fileGroup.getAllBaseFiles().collect(Collectors.toList());
+              boolean newBaseFileAdded = false;
               if (HoodieTimeline.compareTimestamps(
                   baseFiles.get(0).getCommitTime(), GREATER_THAN, startCommit.getTimestamp())) {
                 filesToAdd.add(
                     buildFileWithoutStats(partitionPath, partitionValues, baseFiles.get(0)));
+                newBaseFileAdded = true;
               }
-              for (HoodieBaseFile baseFile : baseFiles) {
-                if (HoodieTimeline.compareTimestamps(
-                    baseFile.getCommitTime(), LESSER_THAN_OR_EQUALS, startCommit.getTimestamp())) {
+              if (newBaseFileAdded) {
+                // if a new base file was added, then all the older base files are removed
+                // TODO(vamshigv): Verify how clustering is affected.
+                for (int i = 1; i < baseFiles.size(); i++) {
                   filesToRemove.add(
-                      buildFileWithoutStats(partitionPath, partitionValues, baseFile));
-                  break;
+                      buildFileWithoutStats(partitionPath, partitionValues, baseFiles.get(i)));
                 }
               }
             });

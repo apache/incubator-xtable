@@ -19,9 +19,13 @@
 package io.onetable.model;
 
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import lombok.AllArgsConstructor;
 import lombok.Value;
@@ -34,20 +38,63 @@ public class OneTableMetadata {
    * lastInstantSynced in the table metadata/properties
    */
   private static final String ONETABLE_LAST_INSTANT_SYNCED_PROP = "ONETABLE_LAST_INSTANT_SYNCED";
+  /**
+   * Property name for the list of instants to consider during the next sync. This list may include
+   * out-of-order instants that could be missed without explicit tracking.
+   */
+  private static final String ONETABLE_INSTANTS_TO_CONSIDER_FOR_NEXT_SYNC_PROP =
+      "ONETABLE_INSTANTS_TO_CONSIDER_FOR_NEXT_SYNC";
 
   Instant lastInstantSynced;
+  List<Instant> instantsToConsiderForNextSync;
 
   public Map<String, String> asMap() {
     Map<String, String> map = new HashMap<>();
     map.put(ONETABLE_LAST_INSTANT_SYNCED_PROP, lastInstantSynced.toString());
+    map.put(
+        ONETABLE_INSTANTS_TO_CONSIDER_FOR_NEXT_SYNC_PROP,
+        convertInstantsToConsiderForNextSyncToString());
     return map;
   }
 
   public static Optional<OneTableMetadata> fromMap(Map<String, String> properties) {
-    if (properties != null && properties.containsKey(ONETABLE_LAST_INSTANT_SYNCED_PROP)) {
+    if (properties != null) {
+      Instant lastInstantSynced = null;
+      List<Instant> instantsToConsiderForNextSync = null;
+      if (properties.containsKey(ONETABLE_LAST_INSTANT_SYNCED_PROP)) {
+        lastInstantSynced = Instant.parse(properties.get(ONETABLE_LAST_INSTANT_SYNCED_PROP));
+      }
+      if (properties.containsKey(ONETABLE_INSTANTS_TO_CONSIDER_FOR_NEXT_SYNC_PROP)) {
+        instantsToConsiderForNextSync =
+            convertStringToInstantsToConsiderForNextSync(
+                properties.get(ONETABLE_INSTANTS_TO_CONSIDER_FOR_NEXT_SYNC_PROP));
+      }
       return Optional.ofNullable(
-          OneTableMetadata.of(Instant.parse(properties.get(ONETABLE_LAST_INSTANT_SYNCED_PROP))));
+          OneTableMetadata.of(lastInstantSynced, instantsToConsiderForNextSync));
     }
     return Optional.empty();
+  }
+
+  private String convertInstantsToConsiderForNextSyncToString() {
+    if (instantsToConsiderForNextSync == null || instantsToConsiderForNextSync.isEmpty()) {
+      return "";
+    }
+    Collections.sort(instantsToConsiderForNextSync);
+    return instantsToConsiderForNextSync.stream()
+        .map(Instant::toString)
+        .collect(Collectors.joining(","));
+  }
+
+  private static List<Instant> convertStringToInstantsToConsiderForNextSync(
+      String instantsToConsiderForNextSync) {
+    if (instantsToConsiderForNextSync == null || instantsToConsiderForNextSync.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<Instant> instantsList =
+        Arrays.stream(instantsToConsiderForNextSync.split(","))
+            .map(String::trim)
+            .map(Instant::parse)
+            .collect(Collectors.toList());
+    return instantsList;
   }
 }

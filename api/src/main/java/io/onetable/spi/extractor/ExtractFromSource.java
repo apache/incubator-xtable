@@ -25,6 +25,7 @@ import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 
+import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
@@ -41,6 +42,10 @@ public class ExtractFromSource<COMMIT> {
     OneTable table = sourceClient.getTable(latestCommitInSource);
     SchemaCatalog schemaCatalog = sourceClient.getSchemaCatalog(table, latestCommitInSource);
     OneDataFiles dataFiles = sourceClient.getFilesForAllPartitions(latestCommitInSource, table);
+    List<Instant> pendingCommits = sourceClient.getPendingCommitsBeforeCommit(latestCommitInSource);
+    if (pendingCommits != null && !pendingCommits.isEmpty()) {
+      table = table.builder().pendingCommits(pendingCommits).build();
+    }
     return OneSnapshot.builder()
         .schemaCatalog(schemaCatalog)
         .table(table)
@@ -48,7 +53,7 @@ public class ExtractFromSource<COMMIT> {
         .build();
   }
 
-  public List<TableChange> extractTableChanges(@NonNull Instant lastSyncTime) {
+  public IncrementalTableChanges extractTableChanges(@NonNull Instant lastSyncTime) {
     COMMIT lastCommitSynced = sourceClient.getCommitAtInstant(lastSyncTime);
     // List of files in partitions which have been affected.
     List<COMMIT> commitList = sourceClient.getCommits(lastCommitSynced);
@@ -62,7 +67,11 @@ public class ExtractFromSource<COMMIT> {
           TableChange.builder().filesDiff(filesDiff).currentTableState(tableState).build());
       previousCommit = commit;
     }
-    return tableChangeList;
+    List<Instant> pendingCommits = sourceClient.getPendingCommitsBeforeCommit(previousCommit);
+    return IncrementalTableChanges.builder()
+        .tableChanges(tableChangeList)
+        .pendingCommits(pendingCommits)
+        .build();
   }
 
   public COMMIT getLastSyncCommit(Instant lastSyncTime) {

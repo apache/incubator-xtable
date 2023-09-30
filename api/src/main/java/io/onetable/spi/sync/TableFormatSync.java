@@ -29,6 +29,7 @@ import lombok.AllArgsConstructor;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
+import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
@@ -69,9 +70,9 @@ public class TableFormatSync {
    * @param changes the changes from the source table format that need to be applied
    * @return the results of trying to sync each change
    */
-  public List<SyncResult> syncChanges(List<TableChange> changes) {
+  public List<SyncResult> syncChanges(IncrementalTableChanges changes) {
     List<SyncResult> results = new ArrayList<>();
-    for (TableChange change : changes) {
+    for (TableChange change : changes.getTableChanges()) {
       Instant startTime = Instant.now();
       try {
         results.add(
@@ -96,6 +97,10 @@ public class TableFormatSync {
     return client.getTableMetadata().map(OneTableMetadata::getLastInstantSynced);
   }
 
+  public Optional<List<Instant>> getPendingInstantsToConsiderForNextSync() {
+    return client.getTableMetadata().map(OneTableMetadata::getInstantsToConsiderForNextSync);
+  }
+
   private SyncResult getSyncResult(
       SyncMode mode, OneTable tableState, SyncFiles fileSyncMethod, Instant startTime) {
     // initialize the sync
@@ -107,7 +112,8 @@ public class TableFormatSync {
     // Update the files in the target table
     fileSyncMethod.sync(client);
     // Persist the latest commit time in table properties for incremental syncs.
-    OneTableMetadata latestState = OneTableMetadata.of(tableState.getLatestCommitTime());
+    OneTableMetadata latestState =
+        OneTableMetadata.of(tableState.getLatestCommitTime(), tableState.getPendingCommits());
     client.syncMetadata(latestState);
     client.completeSync();
 
@@ -118,6 +124,7 @@ public class TableFormatSync {
         .syncStartTime(startTime)
         .syncDuration(Duration.between(startTime, Instant.now()))
         .lastInstantSynced(tableState.getLatestCommitTime())
+        .pendingCommits(tableState.getPendingCommits())
         .build();
   }
 

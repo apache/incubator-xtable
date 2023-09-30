@@ -51,4 +51,6 @@ public class OneTable {
   List<OnePartitionField> partitioningFields;
   // latest commit(write) on the table.
   Instant latestCommitTime;
+  // pending commits before latest commit(write) on the table.
+  List<Instant> pendingCommits;
 }
