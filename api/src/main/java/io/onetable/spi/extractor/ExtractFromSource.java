@@ -53,6 +53,9 @@ public class ExtractFromSource<COMMIT> {
         .build();
   }
 
+  // TODO(vamshigv): This needs change as instants to consider pending commits.
+  // has different meaning compared to lastSyncTime where former should not be
+  // excluded while later should be.
   public IncrementalTableChanges extractTableChanges(@NonNull Instant lastSyncTime) {
     COMMIT lastCommitSynced = sourceClient.getCommitAtInstant(lastSyncTime);
     // List of files in partitions which have been affected.
@@ -62,7 +65,8 @@ public class ExtractFromSource<COMMIT> {
     for (COMMIT commit : commitList) {
       OneTable tableState = sourceClient.getTable(commit);
       OneDataFilesDiff filesDiff =
-          sourceClient.getFilesDiffBetweenCommits(previousCommit, commit, tableState);
+          sourceClient.getFilesDiffBetweenCommits(
+              commit.equals(previousCommit) ? null : previousCommit, commit, tableState);
       tableChangeList.add(
           TableChange.builder().filesDiff(filesDiff).currentTableState(tableState).build());
       previousCommit = commit;

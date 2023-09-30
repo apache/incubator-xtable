@@ -75,13 +75,13 @@ public interface SourceClient<COMMIT> {
       COMMIT startCommit, COMMIT endCommit, OneTable tableDefinition);
 
   /**
-   * Get all the commit times that occurred after the provided commit from oldest to newest.
+   * Get all the commit times that occurred on or after the provided commit from oldest to newest.
    *
-   * @param afterCommit only return commits that are strictly after (and not including) this commit
-   * @return list of commit times after the provided commit time, sorted from oldest to newest
+   * @param onOrAfterCommit only return commits that are on or after this commit
+   * @return list of commit times on or after the provided commit time, sorted from oldest to newest
    *     commit
    */
-  List<COMMIT> getCommits(COMMIT afterCommit);
+  List<COMMIT> getCommits(COMMIT onOrAfterCommit);
 
   /**
    * Get the latest completed commit in the source table.
