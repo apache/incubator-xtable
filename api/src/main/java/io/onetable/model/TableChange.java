@@ -29,7 +29,7 @@ import io.onetable.model.storage.OneDataFilesDiff;
  * @since 0.1
  */
 @Value
-@Builder
+@Builder(toBuilder = true)
 public class TableChange {
   // Change in files since the last commit in the source format
   OneDataFilesDiff filesDiff;

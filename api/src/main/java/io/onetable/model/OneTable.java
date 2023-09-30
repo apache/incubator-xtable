@@ -35,7 +35,7 @@ import io.onetable.model.storage.TableFormat;
  * @since 0.1
  */
 @Value
-@Builder
+@Builder(toBuilder = true)
 public class OneTable {
   // name of the table
   String name;

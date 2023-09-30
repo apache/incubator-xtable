@@ -21,9 +21,11 @@ package io.onetable.client;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -152,32 +154,56 @@ public class OneTableClient {
     }
 
     if (!formatsForIncrementalSync.isEmpty()) {
-      Map.Entry<TableFormat, Optional<Instant>> mostOutOfSync =
+      Optional<Instant> mostOutOfSyncInstant =
           getMostOutOfSyncInstant(
               // Filter to formats using incremental sync
               lastSyncInstantByFormat.entrySet().stream()
                   .filter(entry -> formatsForIncrementalSync.containsKey(entry.getKey()))
-                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)),
+              pendingInstantsToConsiderForNextSyncByFormat);
       IncrementalTableChanges incrementalTableChanges =
-          source.extractTableChanges(mostOutOfSync.getValue().get());
+          source.extractTableChanges(mostOutOfSyncInstant.get());
       for (Map.Entry<TableFormat, TableFormatSync> entry : formatsForIncrementalSync.entrySet()) {
         TableFormat tableFormat = entry.getKey();
         TableFormatSync tableFormatSync = entry.getValue();
+        Optional<List<Instant>> pendingSyncsByFormat =
+            pendingInstantsToConsiderForNextSyncByFormat.getOrDefault(
+                tableFormat, Optional.empty());
+        Set<Instant> pendingInstantsSet = new HashSet<>();
+        if (pendingSyncsByFormat.isPresent() && pendingSyncsByFormat.get() != null) {
+          pendingInstantsSet.addAll(pendingSyncsByFormat.get());
+        }
         // extract the changes that happened since this format was last synced
         List<TableChange> filteredTableChanges =
             incrementalTableChanges.getTableChanges().stream()
                 .filter(
                     change ->
                         change
-                            .getCurrentTableState()
-                            .getLatestCommitTime()
-                            .isAfter(lastSyncInstantByFormat.get(tableFormat).get()))
+                                .getCurrentTableState()
+                                .getLatestCommitTime()
+                                .isAfter(lastSyncInstantByFormat.get(tableFormat).get())
+                            || pendingInstantsSet.contains(
+                                change.getCurrentTableState().getLatestCommitTime()))
                 .collect(Collectors.toList());
         IncrementalTableChanges tableFormatIncrementalChanges =
             IncrementalTableChanges.builder()
                 .tableChanges(filteredTableChanges)
                 .pendingCommits(incrementalTableChanges.getPendingCommits())
                 .build();
+        // Assign the pending commits to the last table state.
+        if (incrementalTableChanges.getPendingCommits() != null
+            && !incrementalTableChanges.getPendingCommits().isEmpty()) {
+          // TODO: Applies the table change to the last state.
+          int lastIdx = filteredTableChanges.size() - 1;
+          TableChange lastTableChange = filteredTableChanges.get(lastIdx);
+          OneTable lastUpdatedTableState =
+              lastTableChange.getCurrentTableState().toBuilder()
+                  .pendingCommits(incrementalTableChanges.getPendingCommits())
+                  .build();
+          lastTableChange =
+              lastTableChange.toBuilder().currentTableState(lastUpdatedTableState).build();
+          filteredTableChanges.set(lastIdx, lastTableChange);
+        }
         List<SyncResult> syncResultList =
             tableFormatSync.syncChanges(tableFormatIncrementalChanges);
 
@@ -237,20 +263,35 @@ public class OneTableClient {
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  private Map.Entry<TableFormat, Optional<Instant>> getMostOutOfSyncInstant(
-      Map<TableFormat, Optional<Instant>> lastSyncInstantByFormat) {
-    Map.Entry<TableFormat, Optional<Instant>> mostOutOfSync = null;
+  private Optional<Instant> getMostOutOfSyncInstant(
+      Map<TableFormat, Optional<Instant>> lastSyncInstantByFormat,
+      Map<TableFormat, Optional<List<Instant>>> pendingInstantsToConsiderByFormat) {
+    Optional<Instant> mostOutOfSyncInstant = null;
     for (Map.Entry<TableFormat, Optional<Instant>> lastSyncInstant :
         lastSyncInstantByFormat.entrySet()) {
-      if (mostOutOfSync == null && lastSyncInstant.getValue().isPresent()) {
-        mostOutOfSync = lastSyncInstant;
-      } else if (mostOutOfSync != null
+      if (mostOutOfSyncInstant == null && lastSyncInstant.getValue().isPresent()) {
+        mostOutOfSyncInstant = lastSyncInstant.getValue();
+      } else if (mostOutOfSyncInstant != null
           && lastSyncInstant.getValue().isPresent()
-          && lastSyncInstant.getValue().get().isBefore(mostOutOfSync.getValue().get())) {
-        mostOutOfSync = lastSyncInstant;
+          && lastSyncInstant.getValue().get().isBefore(mostOutOfSyncInstant.get())) {
+        mostOutOfSyncInstant = lastSyncInstant.getValue();
       }
     }
-    return mostOutOfSync;
+    for (Map.Entry<TableFormat, Optional<List<Instant>>> pendingInstantsToConsider :
+        pendingInstantsToConsiderByFormat.entrySet()) {
+      if (pendingInstantsToConsider.getValue().isPresent()
+          && !pendingInstantsToConsider.getValue().get().isEmpty()
+          && (mostOutOfSyncInstant == null
+              || pendingInstantsToConsider
+                  .getValue()
+                  .get()
+                  .get(0)
+                  .isBefore(mostOutOfSyncInstant.get()))) {
+        mostOutOfSyncInstant =
+            Optional.ofNullable(pendingInstantsToConsider.getValue().get().get(0));
+      }
+    }
+    return mostOutOfSyncInstant;
   }
 
   private <COMMIT> boolean doesInstantExists(

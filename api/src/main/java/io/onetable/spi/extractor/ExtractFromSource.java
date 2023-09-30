@@ -44,7 +44,7 @@ public class ExtractFromSource<COMMIT> {
     OneDataFiles dataFiles = sourceClient.getFilesForAllPartitions(latestCommitInSource, table);
     List<Instant> pendingCommits = sourceClient.getPendingCommitsBeforeCommit(latestCommitInSource);
     if (pendingCommits != null && !pendingCommits.isEmpty()) {
-      table = table.builder().pendingCommits(pendingCommits).build();
+      table = table.toBuilder().pendingCommits(pendingCommits).build();
     }
     return OneSnapshot.builder()
         .schemaCatalog(schemaCatalog)

@@ -282,6 +282,7 @@ public class ITOneTableClient {
           Collections.emptyMap(),
           table.getBasePath(),
           100);
+
       table.completeScheduledCompaction(scheduledCompactionInstant);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 80);
