@@ -56,7 +56,6 @@ import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
-import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 import org.apache.hudi.metadata.HoodieTableMetadata;
@@ -91,12 +90,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
     HoodieMetadataConfig metadataConfig = HoodieMetadataConfig.newBuilder().enable(true).build();
     this.basePath = metaClient.getBasePathV2();
     this.tableMetadata =
-        HoodieTableMetadata.create(
-            engineContext,
-            metadataConfig,
-            basePath.toString(),
-            FileSystemViewStorageConfig.SPILLABLE_DIR.defaultValue(),
-            true);
+        HoodieTableMetadata.create(engineContext, metadataConfig, basePath.toString(), true);
     this.metaClient = metaClient;
     this.partitionValuesExtractor = hudiPartitionValuesExtractor;
     this.fileStatsExtractor = hudiFileStatsExtractor;

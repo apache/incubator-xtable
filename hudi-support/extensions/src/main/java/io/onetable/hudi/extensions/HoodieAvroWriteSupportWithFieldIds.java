@@ -19,6 +19,7 @@
 package io.onetable.hudi.extensions;
 
 import java.util.List;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 import org.apache.avro.Schema;
@@ -46,7 +47,11 @@ public class HoodieAvroWriteSupportWithFieldIds extends HoodieAvroWriteSupport {
 
   public HoodieAvroWriteSupportWithFieldIds(
       MessageType schema, Schema avroSchema, Option<BloomFilter> bloomFilterOpt) {
-    super(addFieldIdsToParquetSchema(schema, avroSchema), avroSchema, bloomFilterOpt);
+    super(
+        addFieldIdsToParquetSchema(schema, avroSchema),
+        avroSchema,
+        bloomFilterOpt,
+        new Properties());
   }
 
   private static MessageType addFieldIdsToParquetSchema(MessageType messageType, Schema schema) {
