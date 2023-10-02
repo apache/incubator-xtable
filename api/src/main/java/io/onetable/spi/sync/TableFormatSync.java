@@ -97,8 +97,11 @@ public class TableFormatSync {
     return client.getTableMetadata().map(OneTableMetadata::getLastInstantSynced);
   }
 
-  public Optional<List<Instant>> getPendingInstantsToConsiderForNextSync() {
-    return client.getTableMetadata().map(OneTableMetadata::getInstantsToConsiderForNextSync);
+  public List<Instant> getPendingInstantsToConsiderForNextSync() {
+    return client
+        .getTableMetadata()
+        .map(OneTableMetadata::getInstantsToConsiderForNextSync)
+        .orElseGet(ArrayList::new);
   }
 
   private SyncResult getSyncResult(

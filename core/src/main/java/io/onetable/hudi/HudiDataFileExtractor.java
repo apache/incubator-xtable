@@ -124,12 +124,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
             HoodieMetadataConfig.newBuilder().enable(true).build());
     List<AddedAndRemovedFiles> allInfo;
     try {
+      // TODO(vamshigv): cleanup.
+      HoodieTimeline finalHoodieTimeline = hoodieTimeline;
       allInfo =
           timelineForInstant.getInstants().stream()
               .map(
                   instant ->
                       getAddedAndRemovedPartitionInfo(
-                          hoodieTimeline,
+                          finalHoodieTimeline,
                           instant,
                           fsView,
                           startCommit,

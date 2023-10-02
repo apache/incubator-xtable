@@ -19,6 +19,7 @@
 package io.onetable.model;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 
 import lombok.Builder;
@@ -30,5 +31,5 @@ import lombok.Value;
 public class IncrementalTableChanges {
   List<TableChange> tableChanges;
   // pending commits before latest commit(write) on the table.
-  List<Instant> pendingCommits;
+  @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
 }

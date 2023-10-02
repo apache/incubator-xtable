@@ -42,8 +42,8 @@ public class OneTableMetadata {
    * Property name for the list of instants to consider during the next sync. This list may include
    * out-of-order instants that could be missed without explicit tracking.
    */
-  private static final String ONETABLE_INSTANTS_TO_CONSIDER_FOR_NEXT_SYNC_PROP =
-      "ONETABLE_INSTANTS_TO_CONSIDER_FOR_NEXT_SYNC";
+  private static final String INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP =
+      "INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC";
 
   Instant lastInstantSynced;
   List<Instant> instantsToConsiderForNextSync;
@@ -52,7 +52,7 @@ public class OneTableMetadata {
     Map<String, String> map = new HashMap<>();
     map.put(ONETABLE_LAST_INSTANT_SYNCED_PROP, lastInstantSynced.toString());
     map.put(
-        ONETABLE_INSTANTS_TO_CONSIDER_FOR_NEXT_SYNC_PROP,
+        INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP,
         convertInstantsToConsiderForNextSyncToString());
     return map;
   }
@@ -64,10 +64,10 @@ public class OneTableMetadata {
       if (properties.containsKey(ONETABLE_LAST_INSTANT_SYNCED_PROP)) {
         lastInstantSynced = Instant.parse(properties.get(ONETABLE_LAST_INSTANT_SYNCED_PROP));
       }
-      if (properties.containsKey(ONETABLE_INSTANTS_TO_CONSIDER_FOR_NEXT_SYNC_PROP)) {
+      if (properties.containsKey(INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP)) {
         instantsToConsiderForNextSync =
             convertStringToInstantsToConsiderForNextSync(
-                properties.get(ONETABLE_INSTANTS_TO_CONSIDER_FOR_NEXT_SYNC_PROP));
+                properties.get(INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP));
       }
       return Optional.ofNullable(
           OneTableMetadata.of(lastInstantSynced, instantsToConsiderForNextSync));
