@@ -22,7 +22,7 @@
         <log4j.version>2.17.2</log4j.version>
         <junit.version>5.9.0</junit.version>
         <lombok.version>1.18.24</lombok.version>
-        <hudi.version>0.13.1</hudi.version>
+        <hudi.version>0.14.0</hudi.version>
         <parquet.version>1.12.2</parquet.version>
         <scala.version>2.12.10</scala.version>
         <scala.version.prefix>2.12</scala.version.prefix>
