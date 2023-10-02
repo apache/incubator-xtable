@@ -61,6 +61,8 @@ import org.apache.hudi.client.HoodieWriteResult;
 import org.apache.hudi.client.SparkRDDWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieSparkEngineContext;
+import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
+import org.apache.hudi.common.config.LockConfiguration;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.fs.FSUtils;
@@ -72,7 +74,9 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
+import org.apache.hudi.common.model.WriteConcurrencyMode;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.marker.MarkerType;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.util.Option;
@@ -80,6 +84,7 @@ import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieCleanConfig;
 import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieCompactionConfig;
+import org.apache.hudi.config.HoodieLockConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.KeyGenerator;
@@ -91,7 +96,6 @@ public class TestHudiTable implements Closeable {
   // A list of values for the level field which serves as a basic field to partition on for tests
   private static final List<String> LEVEL_VALUES = Arrays.asList("INFO", "WARN", "ERROR");
   private static final String RECORD_KEY_FIELD_NAME = "key";
-
   private static final Schema BASIC_SCHEMA;
 
   static {
@@ -387,6 +391,30 @@ public class TestHudiTable implements Closeable {
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, boolean checkForNoErrors) {
+    List<HoodieRecord<HoodieAvroPayload>> inserts = generateRecords(numRecords);
+    return insertRecords(checkForNoErrors, inserts);
+  }
+
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
+      int numRecords, Object partitionValue, boolean checkForNoErrors) {
+    Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
+    Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
+    List<HoodieRecord<HoodieAvroPayload>> inserts =
+        IntStream.range(0, numRecords)
+            .mapToObj(
+                index ->
+                    getRecord(
+                        schema,
+                        UUID.randomUUID().toString(),
+                        startTimeWindow,
+                        endTimeWindow,
+                        null,
+                        partitionValue))
+            .collect(Collectors.toList());
+    return insertRecords(checkForNoErrors, inserts);
+  }
+
+  public List<HoodieRecord<HoodieAvroPayload>> generateRecords(int numRecords) {
     Instant currentTime = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<Instant> startTimeWindows =
         Arrays.asList(
@@ -410,37 +438,29 @@ public class TestHudiTable implements Closeable {
                         null,
                         null))
             .collect(Collectors.toList());
-    return insertRecords(checkForNoErrors, inserts);
+    return inserts;
   }
 
-  public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
-      int numRecords, Object partitionValue, boolean checkForNoErrors) {
-    Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
-    Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
-    List<HoodieRecord<HoodieAvroPayload>> inserts =
-        IntStream.range(0, numRecords)
-            .mapToObj(
-                index ->
-                    getRecord(
-                        schema,
-                        UUID.randomUUID().toString(),
-                        startTimeWindow,
-                        endTimeWindow,
-                        null,
-                        partitionValue))
-            .collect(Collectors.toList());
-    return insertRecords(checkForNoErrors, inserts);
+  public String startCommit() {
+    return getStartCommitInstant();
   }
 
-  private List<HoodieRecord<HoodieAvroPayload>> insertRecords(
-      boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
+      List<HoodieRecord<HoodieAvroPayload>> inserts,
+      String commitInstant,
+      boolean checkForNoErrors) {
     JavaRDD<HoodieRecord<HoodieAvroPayload>> writeRecords = jsc.parallelize(inserts, 1);
-    String instant = getStartCommitInstant();
-    JavaRDD<WriteStatus> result = writeClient.bulkInsert(writeRecords, instant);
+    JavaRDD<WriteStatus> result = writeClient.bulkInsert(writeRecords, commitInstant);
     if (checkForNoErrors) {
       assertNoWriteErrors(result.collect());
     }
     return inserts;
+  }
+
+  private List<HoodieRecord<HoodieAvroPayload>> insertRecords(
+      boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
+    String instant = getStartCommitInstant();
+    return insertRecordsWithCommitAlreadyStarted(inserts, instant, checkForNoErrors);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
@@ -498,6 +518,14 @@ public class TestHudiTable implements Closeable {
     writeClient.compact(instant);
   }
 
+  public String onlyScheduleCompaction() {
+    return writeClient.scheduleCompaction(Option.empty()).get();
+  }
+
+  public void completeScheduledCompaction(String instant) {
+    writeClient.compact(instant);
+  }
+
   public void cluster() {
     String instant = writeClient.scheduleClustering(Option.empty()).get();
     writeClient.cluster(instant, true);
@@ -545,6 +573,11 @@ public class TestHudiTable implements Closeable {
             .build();
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
+    Properties lockProperties = new Properties();
+    lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_WAIT_TIMEOUT_MS_PROP_KEY, "3000");
+    lockProperties.setProperty(
+        LockConfiguration.LOCK_ACQUIRE_CLIENT_RETRY_WAIT_TIME_IN_MILLIS_PROP_KEY, "3000");
+    lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_CLIENT_NUM_RETRIES_PROP_KEY, "20");
     HoodieWriteConfig writeConfig =
         HoodieWriteConfig.newBuilder()
             .withProperties(keyGenProperties)
@@ -555,6 +588,11 @@ public class TestHudiTable implements Closeable {
             .withClusteringConfig(clusteringConfig)
             .withCleanConfig(cleanConfig)
             .withArchivalConfig(archivalConfig)
+            .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
+            .withMarkersType(MarkerType.DIRECT.name())
+            .withLockConfig(
+                HoodieLockConfig.newBuilder().withLockProvider(InProcessLockProvider.class).build())
+            .withProperties(lockProperties)
             .build();
     HoodieEngineContext context = new HoodieSparkEngineContext(jsc);
     return new SparkRDDWriteClient<>(context, writeConfig);
