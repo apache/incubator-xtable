@@ -38,6 +38,7 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import io.onetable.model.IncrementalTableChanges;
+import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
@@ -155,15 +156,15 @@ public class OneTableClient {
     }
 
     if (!formatsForIncrementalSync.isEmpty()) {
-      Optional<Instant> mostOutOfSyncInstant =
-          getMostOutOfSyncInstant(
+      InstantsForIncrementalSync instantsForIncrementalSync =
+          getMostOutOfSyncCommitAndPendingCommits(
               // Filter to formats using incremental sync
               lastSyncInstantByFormat.entrySet().stream()
                   .filter(entry -> formatsForIncrementalSync.containsKey(entry.getKey()))
                   .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)),
               pendingInstantsToConsiderForNextSyncByFormat);
       IncrementalTableChanges incrementalTableChanges =
-          source.extractTableChanges(mostOutOfSyncInstant.get());
+          source.extractTableChanges(instantsForIncrementalSync);
       for (Map.Entry<TableFormat, TableFormatSync> entry : formatsForIncrementalSync.entrySet()) {
         TableFormat tableFormat = entry.getKey();
         TableFormatSync tableFormatSync = entry.getValue();
@@ -264,33 +265,35 @@ public class OneTableClient {
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  private Optional<Instant> getMostOutOfSyncInstant(
+  private InstantsForIncrementalSync getMostOutOfSyncCommitAndPendingCommits(
       Map<TableFormat, Optional<Instant>> lastSyncInstantByFormat,
       Map<TableFormat, List<Instant>> pendingInstantsToConsiderByFormat) {
-    Optional<Instant> mostOutOfSyncInstant = Optional.empty();
+    Optional<Instant> mostOutOfSyncCommit = Optional.empty();
     for (Map.Entry<TableFormat, Optional<Instant>> lastSyncInstant :
         lastSyncInstantByFormat.entrySet()) {
-      if (mostOutOfSyncInstant == null && lastSyncInstant.getValue().isPresent()) {
-        mostOutOfSyncInstant = lastSyncInstant.getValue();
-      } else if (mostOutOfSyncInstant != null
+      if (!mostOutOfSyncCommit.isPresent() && lastSyncInstant.getValue().isPresent()) {
+        mostOutOfSyncCommit = lastSyncInstant.getValue();
+      } else if (mostOutOfSyncCommit.isPresent()
           && lastSyncInstant.getValue().isPresent()
-          && lastSyncInstant.getValue().get().isBefore(mostOutOfSyncInstant.get())) {
-        mostOutOfSyncInstant = lastSyncInstant.getValue();
+          && lastSyncInstant.getValue().get().isBefore(mostOutOfSyncCommit.get())) {
+        mostOutOfSyncCommit = lastSyncInstant.getValue();
       }
     }
+    Set<Instant> allPendingInstantsSet = new HashSet<>();
     for (Map.Entry<TableFormat, List<Instant>> pendingInstantsToConsider :
         pendingInstantsToConsiderByFormat.entrySet()) {
       if (pendingInstantsToConsider.getValue() != null
-          && !pendingInstantsToConsider.getValue().isEmpty()
-          && (mostOutOfSyncInstant == null
-              || pendingInstantsToConsider
-                  .getValue()
-                  .get(0)
-                  .isBefore(mostOutOfSyncInstant.get()))) {
-        mostOutOfSyncInstant = Optional.ofNullable(pendingInstantsToConsider.getValue().get(0));
+          && !pendingInstantsToConsider.getValue().isEmpty()) {
+        allPendingInstantsSet.addAll(pendingInstantsToConsider.getValue());
       }
     }
-    return mostOutOfSyncInstant;
+    // sort the instants in ascending order
+    List<Instant> allPendingInstants =
+        allPendingInstantsSet.stream().sorted().collect(Collectors.toList());
+    return InstantsForIncrementalSync.builder()
+        .lastSyncInstant(mostOutOfSyncCommit)
+        .pendingCommits(allPendingInstants)
+        .build();
   }
 
   private <COMMIT> boolean doesInstantExists(

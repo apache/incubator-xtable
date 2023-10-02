@@ -69,16 +69,17 @@ public interface SourceClient<COMMIT> {
    * @param endCommit limit the changes to commits up to and including this commit * @param
    * @param tableDefinition the OneTable definition of the table defining the schema, partition
    *     fields, etc. to use when converting into the OneTable format.
+   * @param includeStart whether to include the start commit in the diff.
    * @return a list of files grouped by partition
    */
   OneDataFilesDiff getFilesDiffBetweenCommits(
-      COMMIT startCommit, COMMIT endCommit, OneTable tableDefinition);
+      COMMIT startCommit, COMMIT endCommit, OneTable tableDefinition, boolean includeStart);
 
   /**
    * Get all the commit times that occurred on or after the provided commit from oldest to newest.
    *
-   * @param onOrAfterCommit only return commits that are on or after this commit
-   * @return list of commit times on or after the provided commit time, sorted from oldest to newest
+   * @param onOrAfterCommit only return commits that are after (and not including) this commit
+   * @return list of commit times after the provided commit time, sorted from oldest to newest
    *     commit
    */
   List<COMMIT> getCommits(COMMIT onOrAfterCommit);

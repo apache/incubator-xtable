@@ -27,6 +27,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -34,6 +35,7 @@ import lombok.ToString;
 
 import org.junit.jupiter.api.Test;
 
+import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
@@ -102,7 +104,7 @@ public class TestExtractFromSource {
     OneTable tableAtFirstInstant =
         OneTable.builder().latestCommitTime(Instant.now().minus(1, ChronoUnit.DAYS)).build();
     when(mockSourceClient.getFilesDiffBetweenCommits(
-            lastCommitSynced, firstCommitToSync, tableAtFirstInstant))
+            lastCommitSynced, firstCommitToSync, tableAtFirstInstant, false))
         .thenReturn(
             OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build());
     when(mockSourceClient.getTable(firstCommitToSync)).thenReturn(tableAtFirstInstant);
@@ -136,7 +138,7 @@ public class TestExtractFromSource {
             .build();
     OneTable tableAtSecondInstant = OneTable.builder().latestCommitTime(Instant.now()).build();
     when(mockSourceClient.getFilesDiffBetweenCommits(
-            firstCommitToSync, secondCommitToSync, tableAtSecondInstant))
+            firstCommitToSync, secondCommitToSync, tableAtSecondInstant, false))
         .thenReturn(
             OneDataFilesDiff.builder()
                 .filesAdded(Arrays.asList(newFile2, newFile3))
@@ -155,8 +157,11 @@ public class TestExtractFromSource {
             .build();
 
     List<TableChange> expected = Arrays.asList(expectedFirstTableChange, expectedSecondTableChange);
+    InstantsForIncrementalSync instantsForIncrementalSync =
+        InstantsForIncrementalSync.builder().lastSyncInstant(Optional.of(lastSyncTime)).build();
     assertEquals(
-        expected, ExtractFromSource.of(mockSourceClient).extractTableChanges(lastSyncTime));
+        expected,
+        ExtractFromSource.of(mockSourceClient).extractTableChanges(instantsForIncrementalSync));
   }
 
   private OneDataFile getOneDataFile(String partitionPath, String physicalPath) {

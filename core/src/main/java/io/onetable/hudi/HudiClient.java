@@ -92,9 +92,8 @@ public class HudiClient implements SourceClient<HoodieInstant> {
 
   @Override
   public OneDataFilesDiff getFilesDiffBetweenCommits(
-      HoodieInstant startCommit, HoodieInstant endCommit, OneTable table) {
-    // TODO(vamshigv): cleanup `includeStart`.
-    return dataFileExtractor.getDiffBetweenCommits(startCommit, endCommit, table, true);
+      HoodieInstant startCommit, HoodieInstant endCommit, OneTable table, boolean includeStart) {
+    return dataFileExtractor.getDiffBetweenCommits(startCommit, endCommit, table, includeStart);
   }
 
   private HoodieTimeline getCompletedCommits() {

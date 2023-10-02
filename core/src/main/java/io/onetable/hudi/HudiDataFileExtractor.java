@@ -18,7 +18,7 @@
  
 package io.onetable.hudi;
 
-import static org.apache.hudi.common.table.timeline.HoodieTimeline.GREATER_THAN;
+import static org.apache.hudi.common.table.timeline.HoodieTimeline.GREATER_THAN_OR_EQUALS;
 
 import java.io.IOException;
 import java.net.URI;
@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -51,6 +52,7 @@ import org.apache.hudi.common.model.HoodieFileGroup;
 import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
 import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
@@ -108,35 +110,39 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
   public OneDataFilesDiff getDiffBetweenCommits(
       HoodieInstant startCommit, HoodieInstant endCommit, OneTable table, boolean includeStart) {
-    HoodieTimeline hoodieTimeline = metaClient.getActiveTimeline().filterCompletedInstants();
+    HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
+    HoodieTimeline timelineForInstant;
     if (includeStart) {
-      hoodieTimeline = hoodieTimeline.findInstantsBeforeOrEquals(startCommit.getTimestamp());
+      timelineForInstant =
+          activeTimeline
+              .filterCompletedInstants()
+              .findInstantsInClosedRange(startCommit.getTimestamp(), endCommit.getTimestamp());
     } else {
-      hoodieTimeline = hoodieTimeline.findInstantsAfter(startCommit.getTimestamp());
+      timelineForInstant =
+          activeTimeline
+              .filterCompletedInstants()
+              .findInstantsInRange(startCommit.getTimestamp(), endCommit.getTimestamp());
     }
-    HoodieTimeline timelineForInstant =
-        hoodieTimeline.findInstantsInRange(startCommit.getTimestamp(), endCommit.getTimestamp());
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             engineContext,
             metaClient,
-            hoodieTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp()),
+            activeTimeline.findInstantsBeforeOrEquals(endCommit.getTimestamp()),
             HoodieMetadataConfig.newBuilder().enable(true).build());
     List<AddedAndRemovedFiles> allInfo;
     try {
-      // TODO(vamshigv): cleanup.
-      HoodieTimeline finalHoodieTimeline = hoodieTimeline;
       allInfo =
           timelineForInstant.getInstants().stream()
               .map(
                   instant ->
                       getAddedAndRemovedPartitionInfo(
-                          finalHoodieTimeline,
+                          activeTimeline,
                           instant,
                           fsView,
                           startCommit,
                           endCommit,
-                          table.getPartitioningFields()))
+                          table.getPartitioningFields(),
+                          includeStart))
               .collect(Collectors.toList());
     } finally {
       fsView.close();
@@ -160,7 +166,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieTableFileSystemView fsView,
       HoodieInstant startCommit,
       HoodieInstant endCommit,
-      List<OnePartitionField> partitioningFields) {
+      List<OnePartitionField> partitioningFields,
+      boolean includeStart) {
     try {
       List<OneDataFile> addedFiles = new ArrayList<>();
       List<OneDataFile> removedFiles = new ArrayList<>();
@@ -185,7 +192,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
                             endCommit,
                             partitionPath,
                             affectedFileIds,
-                            partitioningFields);
+                            partitioningFields,
+                            includeStart);
                     addedFiles.addAll(addedAndRemovedFiles.getAdded());
                     removedFiles.addAll(addedAndRemovedFiles.getRemoved());
                   });
@@ -212,7 +220,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
                             endCommit,
                             partitionPath,
                             affectedFileIds,
-                            partitioningFields);
+                            partitioningFields,
+                            includeStart);
                     addedFiles.addAll(addedAndRemovedFiles.getAdded());
                     removedFiles.addAll(addedAndRemovedFiles.getRemoved());
                   });
@@ -293,7 +302,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieInstant endCommit,
       String partitionPath,
       Set<String> affectedFileIds,
-      List<OnePartitionField> partitioningFields) {
+      List<OnePartitionField> partitioningFields,
+      boolean includeStart) {
     List<OneDataFile> filesToAdd = new ArrayList<>();
     List<OneDataFile> filesToRemove = new ArrayList<>();
     Map<OnePartitionField, Range> partitionValues =
@@ -302,6 +312,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
         Stream.concat(
             fsView.getAllFileGroups(partitionPath),
             fsView.getReplacedFileGroupsBeforeOrOn(endCommit.getTimestamp(), partitionPath));
+    BiPredicate<String, String> commitTimePredicate =
+        includeStart ? GREATER_THAN_OR_EQUALS : HoodieTimeline.GREATER_THAN;
     fileGroups
         .filter(fileGroup -> affectedFileIds.contains(fileGroup.getFileGroupId().getFileId()))
         .forEach(
@@ -310,7 +322,9 @@ public class HudiDataFileExtractor implements AutoCloseable {
                   fileGroup.getAllBaseFiles().collect(Collectors.toList());
               boolean newBaseFileAdded = false;
               if (HoodieTimeline.compareTimestamps(
-                  baseFiles.get(0).getCommitTime(), GREATER_THAN, startCommit.getTimestamp())) {
+                  baseFiles.get(0).getCommitTime(),
+                  commitTimePredicate,
+                  startCommit.getTimestamp())) {
                 filesToAdd.add(
                     buildFileWithoutStats(partitionPath, partitionValues, baseFiles.get(0)));
                 newBaseFileAdded = true;

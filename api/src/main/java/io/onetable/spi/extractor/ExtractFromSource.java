@@ -21,11 +21,12 @@ package io.onetable.spi.extractor;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import lombok.AllArgsConstructor;
-import lombok.NonNull;
 
 import io.onetable.model.IncrementalTableChanges;
+import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
@@ -53,28 +54,44 @@ public class ExtractFromSource<COMMIT> {
         .build();
   }
 
-  // TODO(vamshigv): This needs change as instants to consider pending commits.
-  // has different meaning compared to lastSyncTime where former should not be
-  // excluded while later should be.
-  public IncrementalTableChanges extractTableChanges(@NonNull Instant lastSyncTime) {
-    COMMIT lastCommitSynced = sourceClient.getCommitAtInstant(lastSyncTime);
+  public IncrementalTableChanges extractTableChanges(
+      InstantsForIncrementalSync instantsForIncrementalSync) {
+    Optional<Instant> lastSyncInstant = instantsForIncrementalSync.getLastSyncInstant();
+    List<Instant> pendingCommits = instantsForIncrementalSync.getPendingCommits();
+    boolean includeStart;
+    Instant instantToConsiderForStart;
+    if (pendingCommits == null
+        || pendingCommits.isEmpty()
+        || pendingCommits.get(0).isAfter(lastSyncInstant.get())) {
+      includeStart = false;
+      instantToConsiderForStart = lastSyncInstant.get();
+    } else {
+      includeStart = true;
+      instantToConsiderForStart = pendingCommits.get(0);
+    }
+    COMMIT lastCommitSynced = sourceClient.getCommitAtInstant(instantToConsiderForStart);
     // List of files in partitions which have been affected.
     List<COMMIT> commitList = sourceClient.getCommits(lastCommitSynced);
     List<TableChange> tableChangeList = new ArrayList<>();
     COMMIT previousCommit = lastCommitSynced;
     for (COMMIT commit : commitList) {
+      if (previousCommit.equals(commit) && !includeStart) {
+        previousCommit = commit;
+        continue;
+      }
       OneTable tableState = sourceClient.getTable(commit);
       OneDataFilesDiff filesDiff =
           sourceClient.getFilesDiffBetweenCommits(
-              commit.equals(previousCommit) ? null : previousCommit, commit, tableState);
+              previousCommit, commit, tableState, previousCommit.equals(commit) && includeStart);
       tableChangeList.add(
           TableChange.builder().filesDiff(filesDiff).currentTableState(tableState).build());
       previousCommit = commit;
     }
-    List<Instant> pendingCommits = sourceClient.getPendingCommitsBeforeCommit(previousCommit);
+    List<Instant> pendingCommitsForNextSync =
+        sourceClient.getPendingCommitsBeforeCommit(previousCommit);
     return IncrementalTableChanges.builder()
         .tableChanges(tableChangeList)
-        .pendingCommits(pendingCommits)
+        .pendingCommits(pendingCommitsForNextSync)
         .build();
   }
 
