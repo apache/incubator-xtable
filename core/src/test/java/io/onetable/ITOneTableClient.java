@@ -56,6 +56,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -141,6 +142,10 @@ public class ITOneTableClient {
     }
   }
 
+  private static Stream<Arguments> testCasesWithPartitioningAndSyncModes() {
+    return addBasicPartitionCases(testCasesWithSyncModes());
+  }
+
   private static Stream<Arguments> testCasesWithPartitioningAndTableTypesAndSyncModes() {
     return addBasicPartitionCases(testCasesWithTableTypesAndSyncModes());
   }
@@ -187,6 +192,110 @@ public class ITOneTableClient {
 
       syncWithCompactionIfRequired(tableType, table, perTableConfig, oneTableClient);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 200);
+    }
+  }
+
+  @Disabled("Enable after subsequent implementation")
+  @ParameterizedTest
+  @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
+  public void testConcurrentInsertWritesInSource(
+      List<TableFormat> targetTableFormats,
+      SyncMode syncMode,
+      HoodieTableType tableType,
+      PartitionConfig partitionConfig) {
+    String tableName = getTableName();
+    try (TestHudiTable table =
+        TestHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+      // commit time 1 starts first but ends 2nd.
+      // commit time 2 starts second but ends 1st.
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit2 = table.generateRecords(50);
+      String commitInstant1 = table.startCommit();
+
+      String commitInstant2 = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit2, commitInstant2, true);
+
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(targetTableFormats)
+              .tableBasePath(table.getBasePath())
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
+                      .build())
+              .syncMode(syncMode)
+              .build();
+      OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 50);
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
+    }
+  }
+
+  @Disabled("Enable after subsequent implementation")
+  @ParameterizedTest
+  @MethodSource("testCasesWithPartitioningAndSyncModes")
+  public void testConcurrentInsertsAndTableServiceWrites(
+      List<TableFormat> targetTableFormats, SyncMode syncMode, PartitionConfig partitionConfig) {
+    HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
+
+    String tableName = getTableName();
+    try (TestHudiTable table =
+        TestHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+      List<HoodieRecord<HoodieAvroPayload>> insertedRecords1 = table.insertRecords(50, true);
+
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(targetTableFormats)
+              .tableBasePath(table.getBasePath())
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
+                      .build())
+              .syncMode(syncMode)
+              .build();
+      OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 50);
+
+      table.deleteRecords(insertedRecords1.subList(0, 20), true);
+      // At this point table should have 30 records but only after compaction.
+      String scheduledCompactionInstant = table.onlyScheduleCompaction();
+
+      table.insertRecords(50, true);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      Map<String, String> sourceHudiOptions =
+          Collections.singletonMap("hoodie.datasource.query.type", "read_optimized");
+      // Because compaction is not completed yet and read optimized query, there are 100 records.
+      checkDatasetEquivalence(
+          TableFormat.HUDI,
+          sourceHudiOptions,
+          targetTableFormats,
+          Collections.emptyMap(),
+          table.getBasePath(),
+          100);
+
+      table.insertRecords(50, true);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      // Because compaction is not completed yet and read optimized query, there are 150 records.
+      checkDatasetEquivalence(
+          TableFormat.HUDI,
+          sourceHudiOptions,
+          targetTableFormats,
+          Collections.emptyMap(),
+          table.getBasePath(),
+          150);
+
+      table.completeScheduledCompaction(scheduledCompactionInstant);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 130);
     }
   }
 
