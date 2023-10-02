@@ -46,12 +46,11 @@ import io.onetable.hudi.idtracking.models.IdMapping;
 public class HoodieAvroWriteSupportWithFieldIds extends HoodieAvroWriteSupport {
 
   public HoodieAvroWriteSupportWithFieldIds(
-      MessageType schema, Schema avroSchema, Option<BloomFilter> bloomFilterOpt) {
-    super(
-        addFieldIdsToParquetSchema(schema, avroSchema),
-        avroSchema,
-        bloomFilterOpt,
-        new Properties());
+      MessageType schema,
+      Schema avroSchema,
+      Option<BloomFilter> bloomFilterOpt,
+      Properties properties) {
+    super(addFieldIdsToParquetSchema(schema, avroSchema), avroSchema, bloomFilterOpt, properties);
   }
 
   private static MessageType addFieldIdsToParquetSchema(MessageType messageType, Schema schema) {
