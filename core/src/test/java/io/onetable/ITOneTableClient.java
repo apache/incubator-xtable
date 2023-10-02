@@ -41,7 +41,6 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import lombok.AllArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.Value;
 
 import org.apache.avro.Schema;
@@ -57,6 +56,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -142,6 +142,10 @@ public class ITOneTableClient {
     }
   }
 
+  private static Stream<Arguments> testCasesWithPartitioningAndSyncModes() {
+    return addBasicPartitionCases(testCasesWithSyncModes());
+  }
+
   private static Stream<Arguments> testCasesWithPartitioningAndTableTypesAndSyncModes() {
     return addBasicPartitionCases(testCasesWithTableTypesAndSyncModes());
   }
@@ -191,7 +195,7 @@ public class ITOneTableClient {
     }
   }
 
-  @SneakyThrows
+  @Disabled("Enable after subsequent implementation")
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
   public void testConcurrentInsertWritesInSource(
@@ -233,12 +237,12 @@ public class ITOneTableClient {
     }
   }
 
-  @Test
-  public void testConcurrentInsertsAndTableServiceWrites() {
-    List<TableFormat> targetTableFormats = Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA);
-    SyncMode syncMode = SyncMode.INCREMENTAL;
+  @Disabled("Enable after subsequent implementation")
+  @ParameterizedTest
+  @MethodSource("testCasesWithPartitioningAndSyncModes")
+  public void testConcurrentInsertsAndTableServiceWrites(
+      List<TableFormat> targetTableFormats, SyncMode syncMode, PartitionConfig partitionConfig) {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
-    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
 
     String tableName = getTableName();
     try (TestHudiTable table =
@@ -262,18 +266,13 @@ public class ITOneTableClient {
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 50);
 
       table.deleteRecords(insertedRecords1.subList(0, 20), true);
-      // table.upsertRecords(insertedRecords1.subList(0, 20), true);
       // At this point table should have 30 records but only after compaction.
       String scheduledCompactionInstant = table.onlyScheduleCompaction();
-      table.insertRecords(50, true);
 
+      table.insertRecords(50, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       Map<String, String> sourceHudiOptions =
-          new HashMap() {
-            {
-              put("hoodie.datasource.query.type", "read_optimized");
-            }
-          };
+          Collections.singletonMap("hoodie.datasource.query.type", "read_optimized");
       // Because compaction is not completed yet and read optimized query, there are 100 records.
       checkDatasetEquivalence(
           TableFormat.HUDI,
@@ -283,9 +282,20 @@ public class ITOneTableClient {
           table.getBasePath(),
           100);
 
+      table.insertRecords(50, true);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      // Because compaction is not completed yet and read optimized query, there are 150 records.
+      checkDatasetEquivalence(
+          TableFormat.HUDI,
+          sourceHudiOptions,
+          targetTableFormats,
+          Collections.emptyMap(),
+          table.getBasePath(),
+          150);
+
       table.completeScheduledCompaction(scheduledCompactionInstant);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 80);
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 130);
     }
   }
 

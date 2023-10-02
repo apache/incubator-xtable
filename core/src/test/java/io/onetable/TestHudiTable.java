@@ -459,13 +459,8 @@ public class TestHudiTable implements Closeable {
 
   private List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
-    JavaRDD<HoodieRecord<HoodieAvroPayload>> writeRecords = jsc.parallelize(inserts, 1);
     String instant = getStartCommitInstant();
-    JavaRDD<WriteStatus> result = writeClient.bulkInsert(writeRecords, instant);
-    if (checkForNoErrors) {
-      assertNoWriteErrors(result.collect());
-    }
-    return inserts;
+    return insertRecordsWithCommitAlreadyStarted(inserts, instant, checkForNoErrors);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
