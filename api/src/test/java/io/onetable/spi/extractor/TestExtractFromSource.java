@@ -35,14 +35,31 @@ import org.junit.jupiter.api.Test;
 
 import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.InstantsForIncrementalSync;
+import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
+import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 
 public class TestExtractFromSource {
   private final SourceClient<TestCommit> mockSourceClient = mock(SourceClient.class);
+
+  @Test
+  public void extractSnapshot() {
+    OneTable table = OneTable.builder().latestCommitTime(Instant.now()).build();
+    SchemaCatalog schemaCatalog = new SchemaCatalog(Collections.emptyMap());
+    OneDataFiles dataFiles = OneDataFiles.collectionBuilder().build();
+    OneSnapshot oneSnapshot =
+        OneSnapshot.builder()
+            .schemaCatalog(schemaCatalog)
+            .table(table)
+            .dataFiles(dataFiles)
+            .build();
+    when(mockSourceClient.getCurrentFileState()).thenReturn(oneSnapshot);
+    assertEquals(oneSnapshot, ExtractFromSource.of(mockSourceClient).extractSnapshot());
+  }
 
   @Test
   public void extractTableChanges() {
