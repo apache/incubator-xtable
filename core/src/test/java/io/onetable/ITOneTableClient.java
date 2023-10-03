@@ -299,6 +299,29 @@ public class ITOneTableClient {
     }
   }
 
+  @Test
+  public void testClusteringAndCompactionOverlap() {
+    HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
+    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
+
+    String tableName = getTableName();
+    try (TestHudiTable table =
+        TestHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+      String tableBasePath = table.getBasePath();
+      List<HoodieRecord<HoodieAvroPayload>> insertedRecords = table.insertRecords(50, true);
+      assertEquals(50, getRowsInHudiTable(tableBasePath));
+      table.deleteRecords(insertedRecords.subList(0, 20), true);
+      assertEquals(30, getRowsInHudiTable(tableBasePath));
+      String clusteringInstant = table.planClustering();
+      table.compact();
+      assertEquals(30, getRowsInHudiTable(tableBasePath));
+      table.completePlannedClustering(clusteringInstant);
+      assertEquals(30, getRowsInHudiTable(tableBasePath));
+    }
+  }
+
+
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
   public void testDeleteData(
@@ -1119,6 +1142,18 @@ public class ITOneTableClient {
                   "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
                   sourceFormat, format));
         });
+  }
+
+  private int getRowsInHudiTable(String basePath) {
+    List<Row> sourceRows =
+        sparkSession
+            .read()
+            .options(Collections.emptyMap())
+            .format("hudi")
+            .load(basePath)
+            .orderBy("_hoodie_record_key")
+            .collectAsList();
+    return sourceRows.size();
   }
 
   private Set<String> getFieldNamesRemovingGeneratedColumns(StructType schema) {

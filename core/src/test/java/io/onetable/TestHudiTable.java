@@ -531,6 +531,14 @@ public class TestHudiTable implements Closeable {
     writeClient.cluster(instant, true);
   }
 
+  public String planClustering() {
+    return writeClient.scheduleClustering(Option.empty()).get();
+  }
+
+  public void completePlannedClustering(String instant) {
+    writeClient.cluster(instant, true);
+  }
+
   public void rollback(String commitInstant) {
     writeClient.rollback(commitInstant);
   }
