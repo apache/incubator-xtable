@@ -45,7 +45,6 @@ import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
 import io.onetable.model.exception.OneParseException;
 import io.onetable.model.schema.SchemaCatalog;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.spi.extractor.SourceClient;
 
 public class HudiClient implements SourceClient<HoodieInstant> {
@@ -84,13 +83,6 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   @Override
   public SchemaCatalog getSchemaCatalog(OneTable table, HoodieInstant commit) {
     return HudiSchemaCatalogExtractor.catalogWithTableSchema(table);
-  }
-
-  @Override
-  public OneDataFiles getFilesForAllPartitions(HoodieInstant commit, OneTable tableDefinition) {
-    return OneDataFiles.collectionBuilder()
-        .files(dataFileExtractor.getOneDataFiles(commit, tableDefinition))
-        .build();
   }
 
   @Override

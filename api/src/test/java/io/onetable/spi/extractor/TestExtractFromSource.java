@@ -26,8 +26,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -35,38 +33,16 @@ import lombok.ToString;
 
 import org.junit.jupiter.api.Test;
 
+import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.InstantsForIncrementalSync;
-import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
-import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 
 public class TestExtractFromSource {
   private final SourceClient<TestCommit> mockSourceClient = mock(SourceClient.class);
-
-  @Test
-  public void extractSnapshot() {
-    TestCommit latestCommit = TestCommit.of("latest");
-    when(mockSourceClient.getLatestCommit()).thenReturn(latestCommit);
-    OneTable table = OneTable.builder().latestCommitTime(Instant.now()).build();
-    when(mockSourceClient.getTable(latestCommit)).thenReturn(table);
-    SchemaCatalog schemaCatalog = new SchemaCatalog(Collections.emptyMap());
-    when(mockSourceClient.getSchemaCatalog(table, latestCommit)).thenReturn(schemaCatalog);
-    OneDataFiles dataFiles = OneDataFiles.collectionBuilder().build();
-    when(mockSourceClient.getFilesForAllPartitions(latestCommit, table)).thenReturn(dataFiles);
-
-    OneSnapshot expected =
-        OneSnapshot.builder()
-            .schemaCatalog(schemaCatalog)
-            .table(table)
-            .dataFiles(dataFiles)
-            .build();
-
-    assertEquals(expected, ExtractFromSource.of(mockSourceClient).extractSnapshot());
-  }
 
   @Test
   public void extractTableChanges() {
@@ -102,17 +78,19 @@ public class TestExtractFromSource {
     OneDataFile newFile1 = getOneDataFile(partition1, "file4.parquet");
     OneTable tableAtFirstInstant =
         OneTable.builder().latestCommitTime(Instant.now().minus(1, ChronoUnit.DAYS)).build();
-    when(mockSourceClient.getFilesDiffBetweenCommits(
-            lastCommitSynced, firstCommitToSync, tableAtFirstInstant, false))
-        .thenReturn(
-            OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build());
-    when(mockSourceClient.getTable(firstCommitToSync)).thenReturn(tableAtFirstInstant);
-    OneDataFilesDiff expectedFirstFileDiff =
-        OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build();
+    TableChange tableChangeToReturnAtFirstInstant =
+        TableChange.builder()
+            .currentTableState(tableAtFirstInstant)
+            .filesDiff(
+                OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
+            .build();
+    when(mockSourceClient.getFilesDiffBetweenCommits(lastCommitSynced, firstCommitToSync, false))
+        .thenReturn(tableChangeToReturnAtFirstInstant);
     TableChange expectedFirstTableChange =
         TableChange.builder()
             .currentTableState(tableAtFirstInstant)
-            .filesDiff(expectedFirstFileDiff)
+            .filesDiff(
+                OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
             .build();
 
     // add new file in a new partition, remove file from existing partition, remove partition
@@ -136,28 +114,33 @@ public class TestExtractFromSource {
                         .build()))
             .build();
     OneTable tableAtSecondInstant = OneTable.builder().latestCommitTime(Instant.now()).build();
-    when(mockSourceClient.getFilesDiffBetweenCommits(
-            firstCommitToSync, secondCommitToSync, tableAtSecondInstant, false))
-        .thenReturn(
-            OneDataFilesDiff.builder()
-                .filesAdded(Arrays.asList(newFile2, newFile3))
-                .filesRemoved(Arrays.asList(initialFile3, newFile1))
-                .build());
-    when(mockSourceClient.getTable(secondCommitToSync)).thenReturn(tableAtSecondInstant);
-    OneDataFilesDiff expectedSecondFileDiff =
-        OneDataFilesDiff.builder()
-            .filesAdded(Arrays.asList(newFile2, newFile3))
-            .filesRemoved(Arrays.asList(newFile1, initialFile3))
+    TableChange tableChangeToReturnAtSecondInstant =
+        TableChange.builder()
+            .currentTableState(tableAtSecondInstant)
+            .filesDiff(
+                OneDataFilesDiff.builder()
+                    .filesAdded(Arrays.asList(newFile2, newFile3))
+                    .filesRemoved(Arrays.asList(initialFile3, newFile1))
+                    .build())
             .build();
+    when(mockSourceClient.getFilesDiffBetweenCommits(firstCommitToSync, secondCommitToSync, false))
+        .thenReturn(tableChangeToReturnAtSecondInstant);
     TableChange expectedSecondTableChange =
         TableChange.builder()
             .currentTableState(tableAtSecondInstant)
-            .filesDiff(expectedSecondFileDiff)
+            .filesDiff(
+                OneDataFilesDiff.builder()
+                    .filesAdded(Arrays.asList(newFile2, newFile3))
+                    .filesRemoved(Arrays.asList(initialFile3, newFile1))
+                    .build())
             .build();
 
-    List<TableChange> expected = Arrays.asList(expectedFirstTableChange, expectedSecondTableChange);
+    IncrementalTableChanges expected =
+        IncrementalTableChanges.builder()
+            .tableChanges(Arrays.asList(expectedFirstTableChange, expectedSecondTableChange))
+            .build();
     InstantsForIncrementalSync instantsForIncrementalSync =
-        InstantsForIncrementalSync.builder().lastSyncInstant(Optional.of(lastSyncTime)).build();
+        InstantsForIncrementalSync.builder().lastSyncInstant(lastSyncTime).build();
     assertEquals(
         expected,
         ExtractFromSource.of(mockSourceClient).extractTableChanges(instantsForIncrementalSync));

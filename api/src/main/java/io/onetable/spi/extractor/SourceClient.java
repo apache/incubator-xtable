@@ -25,7 +25,6 @@ import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
 import io.onetable.model.schema.SchemaCatalog;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 
 /**
@@ -50,17 +49,6 @@ public interface SourceClient<COMMIT> {
    * @return the schema catalog
    */
   SchemaCatalog getSchemaCatalog(OneTable table, COMMIT commit);
-
-  @Deprecated // use getCurrentFileState instead
-  /**
-   * Extracts all of the {@link OneDataFiles} for the table, grouped by partition.
-   *
-   * @param commit the commit to consider for reading the files
-   * @param tableDefinition the OneTable definition of the table defining the schema, partitioning
-   *     fields, etc. to use when converting into the OneTable format.
-   * @return a list of files grouped by partition
-   */
-  OneDataFiles getFilesForAllPartitions(COMMIT commit, OneTable tableDefinition);
 
   /**
    * Extracts the {@link OneSnapshot} as of current time of invocation.

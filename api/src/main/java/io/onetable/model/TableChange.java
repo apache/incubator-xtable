@@ -19,6 +19,7 @@
 package io.onetable.model;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 
 import lombok.Builder;
@@ -39,5 +40,5 @@ public class TableChange {
   // OneTable state at the specified instant
   OneTable currentTableState;
   // pending commits before end commit while computing diff.
-  List<Instant> pendingCommits;
+  @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
 }

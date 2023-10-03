@@ -99,19 +99,6 @@ public class HudiDataFileExtractor implements AutoCloseable {
     this.fileStatsExtractor = hudiFileStatsExtractor;
   }
 
-  @Deprecated
-  public List<OneDataFile> getOneDataFiles(HoodieInstant commit, OneTable table) {
-    HoodieTimeline timelineForInstant =
-        metaClient.getActiveTimeline().findInstantsBeforeOrEquals(commit.getTimestamp());
-    List<String> allPartitionPaths;
-    try {
-      allPartitionPaths = tableMetadata.getAllPartitionPaths();
-    } catch (IOException ex) {
-      throw new OneIOException("Unable to read partition paths from Hudi Metadata", ex);
-    }
-    return getOneDataFilesForPartitions(allPartitionPaths, timelineForInstant, table);
-  }
-
   public OneDataFiles getFilesCurrentState(HoodieTimeline timeline, OneTable table) {
     List<String> allPartitionPaths;
     try {
