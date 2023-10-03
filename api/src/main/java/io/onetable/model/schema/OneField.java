@@ -23,8 +23,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 /**
  * Represents logical information about an entry in the Schema.
  *
@@ -48,7 +46,6 @@ public class OneField {
    *
    * @return fully qualified path of the field.
    */
-  @JsonIgnore
   public String getPath() {
     if (parentPath == null || parentPath.isEmpty()) {
       return name;
