@@ -55,6 +55,8 @@ import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.DefaultSnapshotVisitor;
 
+import static io.onetable.hudi.HudiSchemaExtractor.convertFromOneTablePath;
+
 @AllArgsConstructor(staticName = "of")
 public class BaseFileUpdatesExtractor {
   private final HoodieEngineContext engineContext;
@@ -168,6 +170,7 @@ public class BaseFileUpdatesExtractor {
     WriteStatus writeStatus = new WriteStatus();
     String fileId = getFileId(file);
     String filePath = file.getPhysicalPath().substring(tableBasePath.length());
+    String fileName = new Path(file.getPhysicalPath()).getName();
     writeStatus.setFileId(fileId);
     writeStatus.setPartitionPath(file.getPartitionPath());
     HoodieDeltaWriteStat writeStat = new HoodieDeltaWriteStat();
@@ -178,21 +181,21 @@ public class BaseFileUpdatesExtractor {
     writeStat.setNumWrites(file.getRecordCount());
     writeStat.setTotalWriteBytes(file.getFileSizeBytes());
     writeStat.setFileSizeInBytes(file.getFileSizeBytes());
-    writeStat.putRecordsStats(convertColStats(filePath, file.getColumnStats()));
+    writeStat.putRecordsStats(convertColStats(fileName, file.getColumnStats()));
     writeStatus.setStat(writeStat);
     return writeStatus;
   }
 
   private Map<String, HoodieColumnRangeMetadata<Comparable>> convertColStats(
-      String filePath, Map<OneField, ColumnStat> columnStatMap) {
+      String fileName, Map<OneField, ColumnStat> columnStatMap) {
     return columnStatMap.entrySet().stream()
         .map(
             entry -> {
               OneField field = entry.getKey();
               ColumnStat columnStat = entry.getValue();
               return HoodieColumnRangeMetadata.<Comparable>create(
-                  filePath,
-                  field.getName(),
+                  fileName,
+                  convertFromOneTablePath(field.getPath()),
                   (Comparable) columnStat.getRange().getMinValue(),
                   (Comparable) columnStat.getRange().getMaxValue(),
                   columnStat.getNumNulls(),
