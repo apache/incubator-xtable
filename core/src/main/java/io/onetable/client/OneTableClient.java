@@ -77,7 +77,7 @@ public class OneTableClient {
    * @return Returns a map containing the table format, and it's sync result. Run sync for a table
    *     with the provided per table level configuration.
    */
-  public <COMMIT extends Comparable<COMMIT>> Map<TableFormat, SyncResult> sync(
+  public <COMMIT> Map<TableFormat, SyncResult> sync(
       PerTableConfig config, SourceClientProvider<COMMIT> sourceClientProvider) {
     if (config.getTargetTableFormats().isEmpty()) {
       throw new IllegalArgumentException("Please provide at-least one format to sync");
@@ -104,7 +104,7 @@ public class OneTableClient {
     return result.getLastSyncResult();
   }
 
-  private <COMMIT extends Comparable<COMMIT>> SyncResultForTableFormats syncSnapshot(
+  private <COMMIT> SyncResultForTableFormats syncSnapshot(
       Map<TableFormat, TableFormatSync> syncClientByFormat, ExtractFromSource<COMMIT> source) {
     Map<TableFormat, SyncResult> syncResultsByFormat = new HashMap<>();
     OneSnapshot snapshot = source.extractSnapshot();
@@ -119,7 +119,7 @@ public class OneTableClient {
         .build();
   }
 
-  private <COMMIT extends Comparable<COMMIT>> SyncResultForTableFormats syncIncrementalChanges(
+  private <COMMIT> SyncResultForTableFormats syncIncrementalChanges(
       Map<TableFormat, TableFormatSync> syncClientByFormat, ExtractFromSource<COMMIT> source) {
     Map<TableFormat, SyncResult> syncResultsByFormat = new HashMap<>();
     OneTable syncedTable = null;
@@ -221,7 +221,7 @@ public class OneTableClient {
         .build();
   }
 
-  private <COMMIT extends Comparable<COMMIT>> Map<TableFormat, SyncMode> getRequiredSyncModes(
+  private <COMMIT> Map<TableFormat, SyncMode> getRequiredSyncModes(
       ExtractFromSource<COMMIT> source,
       Collection<TableFormat> tableFormats,
       Map<TableFormat, Optional<Instant>> lastSyncInstantByFormat,
@@ -241,7 +241,7 @@ public class OneTableClient {
                 }));
   }
 
-  private <COMMIT extends Comparable<COMMIT>> boolean isIncrementalSyncSufficient(
+  private <COMMIT> boolean isIncrementalSyncSufficient(
       ExtractFromSource<COMMIT> source,
       Optional<Instant> lastSyncInstant,
       List<Instant> pendingInstants) {
@@ -296,7 +296,7 @@ public class OneTableClient {
         .build();
   }
 
-  private <COMMIT extends Comparable<COMMIT>> boolean doesInstantExists(
+  private <COMMIT> boolean doesInstantExists(
       ExtractFromSource<COMMIT> source, Optional<Instant> instantToCheck) {
     if (!instantToCheck.isPresent()) {
       return false;
@@ -310,7 +310,7 @@ public class OneTableClient {
     return true;
   }
 
-  private <COMMIT extends Comparable<COMMIT>> boolean isInstantCleanedup(
+  private <COMMIT> boolean isInstantCleanedup(
       ExtractFromSource<COMMIT> source, Instant instantToCheck) {
     // TODO This check is not generic and should be moved to HudiClient
     // Should check if the earliest instant in source is less than or equal to instantToCheck

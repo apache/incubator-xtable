@@ -21,6 +21,7 @@ package io.onetable.hudi;
 import static org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator.MILLIS_INSTANT_TIMESTAMP_FORMAT_LENGTH;
 import static org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator.SECS_INSTANT_ID_LENGTH;
 import static org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator.SECS_INSTANT_TIMESTAMP_FORMAT;
+import static org.apache.hudi.common.table.timeline.HoodieTimeline.GREATER_THAN;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -192,6 +193,12 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         .map(instantHoodieInstantMap::get)
         .filter(hoodieInstant -> hoodieInstant != null)
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public boolean isGreaterThan(HoodieInstant commit1, HoodieInstant commit2) {
+    return HoodieTimeline.compareTimestamps(
+        commit1.getTimestamp(), GREATER_THAN, commit2.getTimestamp());
   }
 
   /**

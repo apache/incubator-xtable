@@ -33,7 +33,7 @@ import io.onetable.model.storage.OneDataFilesDiff;
  * source system. The client uses {@link Instant} to represent the point in time a commit was made
  * to be as generic as possible across source table formats.
  */
-public interface SourceClient<COMMIT extends Comparable<COMMIT>> {
+public interface SourceClient<COMMIT> {
   /**
    * Extracts the {@link OneTable} definition as of the provided commit.
    *
@@ -101,4 +101,13 @@ public interface SourceClient<COMMIT extends Comparable<COMMIT>> {
   COMMIT getCommitAtInstant(Instant instant);
 
   List<COMMIT> getCommitsForInstants(List<Instant> instants);
+
+  /**
+   * Return true if first arg is greater than second arg.
+   *
+   * @param commit1
+   * @param commit2
+   * @return
+   */
+  boolean isGreaterThan(COMMIT commit1, COMMIT commit2);
 }

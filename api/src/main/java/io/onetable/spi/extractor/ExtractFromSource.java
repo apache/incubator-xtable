@@ -30,7 +30,7 @@ import io.onetable.model.OneSnapshot;
 import io.onetable.model.TableChange;
 
 @AllArgsConstructor(staticName = "of")
-public class ExtractFromSource<COMMIT extends Comparable<COMMIT>> {
+public class ExtractFromSource<COMMIT> {
   private final SourceClient<COMMIT> sourceClient;
 
   public OneSnapshot extractSnapshot() {
@@ -88,7 +88,7 @@ public class ExtractFromSource<COMMIT extends Comparable<COMMIT>> {
     // the first commit in the commit list.
     int lastIndexToRemove = -1;
     for (int i = pendingCommits.size() - 1; i >= 0; i--) {
-      if (pendingCommits.get(i).compareTo(commitList.get(0)) > 0) {
+      if (sourceClient.isGreaterThan(pendingCommits.get(i), commitList.get(0))) {
         lastIndexToRemove = i;
       } else {
         break;

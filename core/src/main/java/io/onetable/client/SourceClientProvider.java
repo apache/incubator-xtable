@@ -29,7 +29,7 @@ import io.onetable.spi.extractor.SourceClient;
  * format. The provider can create a new instance of the client for each table format or reuse the
  * same instance.
  */
-public abstract class SourceClientProvider<COMMIT extends Comparable<COMMIT>> {
+public abstract class SourceClientProvider<COMMIT> {
   /** The Hadoop configuration to use when reading from the source table. */
   protected Configuration hadoopConf;
 
