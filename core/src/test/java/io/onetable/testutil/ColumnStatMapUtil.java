@@ -1,17 +1,36 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+ 
 package io.onetable.testutil;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
-import lombok.AccessLevel;
-import lombok.NoArgsConstructor;
-
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ColumnStatMapUtil {
@@ -153,11 +172,26 @@ public class ColumnStatMapUtil {
             .build();
 
     ColumnStat longColumnStats =
-        ColumnStat.builder().numNulls(4).range(Range.vector(10L, 20L)).numValues(5).totalSize(123).build();
+        ColumnStat.builder()
+            .numNulls(4)
+            .range(Range.vector(10L, 20L))
+            .numValues(5)
+            .totalSize(123)
+            .build();
     ColumnStat stringColumnStats =
-        ColumnStat.builder().numNulls(1).range(Range.vector("a", "c")).numValues(6).totalSize(500).build();
+        ColumnStat.builder()
+            .numNulls(1)
+            .range(Range.vector("a", "c"))
+            .numValues(6)
+            .totalSize(500)
+            .build();
     ColumnStat nullStringColumnStats =
-        ColumnStat.builder().numNulls(3).range(Range.vector(null, null)).numValues(3).totalSize(0).build();
+        ColumnStat.builder()
+            .numNulls(3)
+            .range(Range.vector(null, null))
+            .numValues(3)
+            .totalSize(0)
+            .build();
     ColumnStat timeStampColumnStats =
         ColumnStat.builder()
             .numNulls(105)
@@ -180,22 +214,49 @@ public class ColumnStatMapUtil {
             .totalSize(400)
             .build();
     ColumnStat dateColumnStats =
-        ColumnStat.builder().numNulls(250).range(Range.vector(18181, 18547))
+        ColumnStat.builder()
+            .numNulls(250)
+            .range(Range.vector(18181, 18547))
             .numValues(300)
             .totalSize(12345)
             .build();
     ColumnStat ignoredColumnStats =
         ColumnStat.builder().numNulls(0).range(Range.scalar("IGNORED")).build();
     ColumnStat arrayLongElementColumnStats =
-        ColumnStat.builder().numNulls(2).range(Range.vector(50L, 100L)).build();
+        ColumnStat.builder()
+            .numNulls(2)
+            .range(Range.vector(50L, 100L))
+            .numValues(5)
+            .totalSize(1234)
+            .build();
     ColumnStat mapKeyStringColumnStats =
-        ColumnStat.builder().numNulls(3).range(Range.vector("key1", "key2")).build();
+        ColumnStat.builder()
+            .numNulls(3)
+            .range(Range.vector("key1", "key2"))
+            .numValues(5)
+            .totalSize(1234)
+            .build();
     ColumnStat mapValueLongColumnStats =
-        ColumnStat.builder().numNulls(3).range(Range.vector(200L, 300L)).build();
+        ColumnStat.builder()
+            .numNulls(3)
+            .range(Range.vector(200L, 300L))
+            .numValues(5)
+            .totalSize(1234)
+            .build();
     ColumnStat nestedArrayStringElementColumnStats =
-        ColumnStat.builder().numNulls(7).range(Range.vector("nested1", "nested2")).build();
+        ColumnStat.builder()
+            .numNulls(7)
+            .range(Range.vector("nested1", "nested2"))
+            .numValues(15)
+            .totalSize(1234)
+            .build();
     ColumnStat nestedLongColumnStats =
-        ColumnStat.builder().numNulls(4).range(Range.vector(500L, 600L)).build();
+        ColumnStat.builder()
+            .numNulls(4)
+            .range(Range.vector(500L, 600L))
+            .numValues(5)
+            .totalSize(1234)
+            .build();
 
     Map<OneField, ColumnStat> columnStatMap = new HashMap<>();
     columnStatMap.put(longField, longColumnStats);
@@ -216,5 +277,4 @@ public class ColumnStatMapUtil {
     columnStatMap.put(nestedLongField, nestedLongColumnStats);
     return columnStatMap;
   }
-
 }

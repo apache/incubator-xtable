@@ -21,8 +21,6 @@ package io.onetable.delta;
 import static io.onetable.testutil.ColumnStatMapUtil.getColumnStatMap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,17 +28,13 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.onetable.model.schema.OneField;
-import io.onetable.model.schema.OneSchema;
-import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
-import io.onetable.model.stat.Range;
 
 public class TestDeltaStatsExtractor {
 

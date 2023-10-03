@@ -18,6 +18,8 @@
  
 package io.onetable.hudi;
 
+import static io.onetable.hudi.HudiSchemaExtractor.convertFromOneTablePath;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -50,13 +52,12 @@ import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
 import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
+import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.DefaultSnapshotVisitor;
-
-import static io.onetable.hudi.HudiSchemaExtractor.convertFromOneTablePath;
 
 @AllArgsConstructor(staticName = "of")
 public class BaseFileUpdatesExtractor {
@@ -104,7 +105,7 @@ public class BaseFileUpdatesExtractor {
                                 OneDataFile snapshotFile =
                                     snapshotPathsForPartition.remove(baseFilePath);
                                 // if snapshotFile was not found, it means this file was deleted
-                                return snapshotFile == null ? null : baseFile.getFileId();
+                                return snapshotFile == null ? baseFile.getFileId() : null;
                               })
                           .filter(Objects::nonNull)
                           .collect(Collectors.toList());
@@ -117,11 +118,13 @@ public class BaseFileUpdatesExtractor {
                                       metaClient.getBasePathV2().toString(), commit, snapshotFile))
                           .collect(Collectors.toList());
                   return ReplaceMetadata.of(
-                      Collections.singletonMap(file.getPartitionPath(), fileIdsToRemove),
+                      fileIdsToRemove.isEmpty()
+                          ? Collections.emptyMap()
+                          : Collections.singletonMap(file.getPartitionPath(), fileIdsToRemove),
                       writeStatuses);
                 })
             .reduce(ReplaceMetadata::combine)
-            .orElseGet(ReplaceMetadata::createEmptyInstance);
+            .orElse(ReplaceMetadata.EMPTY);
     // treat any partitions not present in the snapshot as dropped
     Optional<ReplaceMetadata> droppedPartitions =
         partitions.stream()
@@ -171,8 +174,8 @@ public class BaseFileUpdatesExtractor {
   private WriteStatus toWriteStatus(String tableBasePath, String commitTime, OneDataFile file) {
     WriteStatus writeStatus = new WriteStatus();
     String fileId = getFileId(file);
-    String filePath = file.getPhysicalPath().substring(tableBasePath.length());
-    String fileName = filePath.substring(file.getPartitionPath().length());
+    String filePath = file.getPhysicalPath().substring(tableBasePath.length() + 1);
+    String fileName = filePath.substring(file.getPartitionPath().length() + 1);
     writeStatus.setFileId(fileId);
     writeStatus.setPartitionPath(file.getPartitionPath());
     HoodieDeltaWriteStat writeStat = new HoodieDeltaWriteStat();
@@ -191,6 +194,8 @@ public class BaseFileUpdatesExtractor {
   private Map<String, HoodieColumnRangeMetadata<Comparable>> convertColStats(
       String fileName, Map<OneField, ColumnStat> columnStatMap) {
     return columnStatMap.entrySet().stream()
+        .filter(
+            entry -> !OneType.NON_SCALAR_TYPES.contains(entry.getKey().getSchema().getDataType()))
         .map(
             entry -> {
               OneField field = entry.getKey();
@@ -212,18 +217,18 @@ public class BaseFileUpdatesExtractor {
   @AllArgsConstructor(staticName = "of")
   @Value
   public static class ReplaceMetadata {
+    private static final ReplaceMetadata EMPTY =
+        ReplaceMetadata.of(Collections.emptyMap(), Collections.emptyList());
     Map<String, List<String>> partitionToReplacedFileIds;
     List<WriteStatus> writeStatuses;
 
     private ReplaceMetadata combine(ReplaceMetadata other) {
+      Map<String, List<String>> partitionToReplacedFileIds =
+          new HashMap<>(this.partitionToReplacedFileIds);
       partitionToReplacedFileIds.putAll(other.partitionToReplacedFileIds);
+      List<WriteStatus> writeStatuses = new ArrayList<>(this.writeStatuses);
       writeStatuses.addAll(other.writeStatuses);
-      return this;
-    }
-
-    private static ReplaceMetadata createEmptyInstance() {
-      // does not use Collections.emptyMap() or Collections.emptyList() (which are immutable) so the combine function can be called on this instance without failing
-      return ReplaceMetadata.of(new HashMap<>(), new ArrayList<>());
+      return ReplaceMetadata.of(partitionToReplacedFileIds, writeStatuses);
     }
   }
 }
