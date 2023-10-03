@@ -79,6 +79,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
   private final HoodieEngineContext engineContext;
   private final HudiPartitionValuesExtractor partitionValuesExtractor;
   private final HudiFileStatsExtractor fileStatsExtractor;
+  private final HoodieMetadataConfig metadataConfig;
   private final Path basePath;
 
   public HudiDataFileExtractor(
@@ -86,7 +87,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HudiPartitionValuesExtractor hudiPartitionValuesExtractor,
       HudiFileStatsExtractor hudiFileStatsExtractor) {
     this.engineContext = new HoodieLocalEngineContext(metaClient.getHadoopConf());
-    HoodieMetadataConfig metadataConfig = HoodieMetadataConfig.newBuilder().enable(true).build();
+    metadataConfig =
+        HoodieMetadataConfig.newBuilder()
+            .enable(metaClient.getTableConfig().isMetadataTableAvailable())
+            .build();
     this.basePath = metaClient.getBasePathV2();
     this.tableMetadata =
         HoodieTableMetadata.create(engineContext, metadataConfig, basePath.toString(), true);
@@ -129,10 +133,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieTimeline visibleTimeline) {
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
-            engineContext,
-            metaClient,
-            visibleTimeline,
-            HoodieMetadataConfig.newBuilder().enable(true).build());
+            engineContext, metaClient, visibleTimeline, metadataConfig);
     List<AddedAndRemovedFiles> allInfo;
     try {
       allInfo =
@@ -358,11 +359,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
       List<String> partitionPaths, HoodieTimeline timeline, OneTable table) {
 
     HoodieTableFileSystemView fsView =
-        new HoodieMetadataFileSystemView(
-            engineContext,
-            metaClient,
-            timeline,
-            HoodieMetadataConfig.newBuilder().enable(true).build());
+        new HoodieMetadataFileSystemView(engineContext, metaClient, timeline, metadataConfig);
 
     try {
       Stream<OneDataFile> filesWithoutStats =
