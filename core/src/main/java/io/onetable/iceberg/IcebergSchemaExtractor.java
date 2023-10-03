@@ -78,7 +78,7 @@ public class IcebergSchemaExtractor {
       nestedFields.add(
           Types.NestedField.of(
               ids.get(i),
-              field.getSchema().getIsNullable(),
+              field.getSchema().isNullable(),
               field.getName(),
               convertFieldType(field, fieldIdTracker),
               field.getSchema().getComment()));
@@ -135,7 +135,7 @@ public class IcebergSchemaExtractor {
         int keyId = key.getFieldId() == null ? fieldIdTracker.incrementAndGet() : key.getFieldId();
         int valueId =
             value.getFieldId() == null ? fieldIdTracker.incrementAndGet() : value.getFieldId();
-        if (field.getSchema().getIsNullable()) {
+        if (field.getSchema().isNullable()) {
           return Types.MapType.ofOptional(
               keyId,
               valueId,
@@ -158,7 +158,7 @@ public class IcebergSchemaExtractor {
                 .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
         int elementId =
             element.getFieldId() == null ? fieldIdTracker.incrementAndGet() : element.getFieldId();
-        if (field.getSchema().getIsNullable()) {
+        if (field.getSchema().isNullable()) {
           return Types.ListType.ofOptional(elementId, convertFieldType(element, fieldIdTracker));
         } else {
           return Types.ListType.ofRequired(elementId, convertFieldType(element, fieldIdTracker));
