@@ -21,11 +21,13 @@ package io.onetable.spi.extractor;
 import java.time.Instant;
 import java.util.List;
 
+import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
 import io.onetable.model.schema.SchemaCatalog;
-import io.onetable.model.storage.OneDataFilesDiff;
+
+;
 
 /**
  * A client that provides the major functionality for extracting the state at a given instant in a
@@ -58,44 +60,19 @@ public interface SourceClient<COMMIT> {
   OneSnapshot getCurrentFileState();
 
   /**
-   * Extracts a {@link OneDataFilesDiff} that contains all the {@link
-   * io.onetable.model.storage.OneDataFile} added or removed by updates that happened after the
-   * provided `afterCommit` up to and including the `untilCommit`.
+   * Extracts a {@link TableChange} for the provided commit.
    *
-   * @param startCommit limit the changes to commits that are strictly after (and not including)
-   *     this commit
-   * @param endCommit limit the changes to commits up to and including this commit * @param
-   * @param includeStart whether to include the start commit in the diff.
-   * @return a list of files grouped by partition
+   * @param commit commit to capture changes for.
+   * @return {@link TableChange}
    */
-  TableChange getFilesDiffBetweenCommits(
-      COMMIT startCommit, COMMIT endCommit, boolean includeStart);
+  TableChange getFilesDiffForCommit(COMMIT commit);
 
   /**
-   * Get all the commit times that occurred on or after the provided commit from oldest to newest.
+   * Retrieves a list of COMMITS to process next based on the provided {@link
+   * InstantsForIncrementalSync}.
    *
-   * @param afterCommit only return commits that are after (and not including) this commit
-   * @return list of commit times after the provided commit time, sorted from oldest to newest
-   *     commit
+   * @param instantsForIncrementalSync The input to determine the next commits to process.
+   * @return A list of COMMITS to process next.
    */
-  List<COMMIT> getCommits(COMMIT afterCommit);
-
-  /**
-   * Gets the last commit made at or before the provided instant from the source table.
-   *
-   * @param instant point in time
-   * @return the commit at or before the provided instant
-   */
-  COMMIT getCommitAtInstant(Instant instant);
-
-  List<COMMIT> getCommitsForInstants(List<Instant> instants);
-
-  /**
-   * Return true if first arg is greater than second arg.
-   *
-   * @param commit1
-   * @param commit2
-   * @return
-   */
-  boolean isGreaterThan(COMMIT commit1, COMMIT commit2);
+  List<COMMIT> getNextCommitsToProcess(InstantsForIncrementalSync instantsForIncrementalSync);
 }

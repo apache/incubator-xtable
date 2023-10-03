@@ -19,6 +19,7 @@
 package io.onetable.hudi;
 
 import static org.apache.hudi.common.table.timeline.HoodieTimeline.GREATER_THAN_OR_EQUALS;
+import static org.apache.hudi.common.table.timeline.HoodieTimeline.LESSER_THAN;
 
 import java.io.IOException;
 import java.net.URI;
@@ -29,7 +30,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -111,11 +111,9 @@ public class HudiDataFileExtractor implements AutoCloseable {
         .build();
   }
 
-  public OneDataFilesDiff getDiffBetweenCommits(
-      HoodieInstant startCommit,
-      HoodieInstant endCommit,
+  public OneDataFilesDiff getDiffForCommit(
+      HoodieInstant hoodieInstantForDiff,
       OneTable table,
-      boolean includeStart,
       HoodieTimeline timelineForInstant,
       HoodieTimeline visibleTimeline) {
     HoodieTableFileSystemView fsView =
@@ -131,10 +129,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
                           visibleTimeline,
                           instant,
                           fsView,
-                          startCommit,
-                          endCommit,
-                          table.getPartitioningFields(),
-                          includeStart))
+                          hoodieInstantForDiff,
+                          table.getPartitioningFields()))
               .collect(Collectors.toList());
     } finally {
       fsView.close();
@@ -156,10 +152,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieTimeline timeline,
       HoodieInstant instant,
       HoodieTableFileSystemView fsView,
-      HoodieInstant startCommit,
-      HoodieInstant endCommit,
-      List<OnePartitionField> partitioningFields,
-      boolean includeStart) {
+      HoodieInstant instantToConsider,
+      List<OnePartitionField> partitioningFields) {
     try {
       List<OneDataFile> addedFiles = new ArrayList<>();
       List<OneDataFile> removedFiles = new ArrayList<>();
@@ -180,12 +174,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
                     AddedAndRemovedFiles addedAndRemovedFiles =
                         getUpdatesToPartition(
                             fsView,
-                            startCommit,
-                            endCommit,
+                            instantToConsider,
                             partitionPath,
                             affectedFileIds,
-                            partitioningFields,
-                            includeStart);
+                            partitioningFields);
                     addedFiles.addAll(addedAndRemovedFiles.getAdded());
                     removedFiles.addAll(addedAndRemovedFiles.getRemoved());
                   });
@@ -208,12 +200,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
                     AddedAndRemovedFiles addedAndRemovedFiles =
                         getUpdatesToPartition(
                             fsView,
-                            startCommit,
-                            endCommit,
+                            instantToConsider,
                             partitionPath,
                             affectedFileIds,
-                            partitioningFields,
-                            includeStart);
+                            partitioningFields);
                     addedFiles.addAll(addedAndRemovedFiles.getAdded());
                     removedFiles.addAll(addedAndRemovedFiles.getRemoved());
                   });
@@ -290,12 +280,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
   private AddedAndRemovedFiles getUpdatesToPartition(
       HoodieTableFileSystemView fsView,
-      HoodieInstant startCommit,
-      HoodieInstant endCommit,
+      HoodieInstant instantToConsider,
       String partitionPath,
       Set<String> affectedFileIds,
-      List<OnePartitionField> partitioningFields,
-      boolean includeStart) {
+      List<OnePartitionField> partitioningFields) {
     List<OneDataFile> filesToAdd = new ArrayList<>();
     List<OneDataFile> filesToRemove = new ArrayList<>();
     Map<OnePartitionField, Range> partitionValues =
@@ -303,11 +291,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
     Stream<HoodieFileGroup> fileGroups =
         Stream.concat(
             fsView.getAllFileGroups(partitionPath),
-            fsView.getReplacedFileGroupsBeforeOrOn(endCommit.getTimestamp(), partitionPath));
-    BiPredicate<String, String> commitTimePredicateForAdd =
-        includeStart ? GREATER_THAN_OR_EQUALS : HoodieTimeline.GREATER_THAN;
-    BiPredicate<String, String> commitTimePredicateForRemove =
-        includeStart ? HoodieTimeline.LESSER_THAN : HoodieTimeline.LESSER_THAN_OR_EQUALS;
+            fsView.getReplacedFileGroupsBeforeOrOn(
+                instantToConsider.getTimestamp(), partitionPath));
     fileGroups
         .filter(fileGroup -> affectedFileIds.contains(fileGroup.getFileGroupId().getFileId()))
         .forEach(
@@ -317,8 +302,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
               boolean newBaseFileAdded = false;
               if (HoodieTimeline.compareTimestamps(
                   baseFiles.get(0).getCommitTime(),
-                  commitTimePredicateForAdd,
-                  startCommit.getTimestamp())) {
+                  GREATER_THAN_OR_EQUALS,
+                  instantToConsider.getTimestamp())) {
                 filesToAdd.add(
                     buildFileWithoutStats(partitionPath, partitionValues, baseFiles.get(0)));
                 newBaseFileAdded = true;
@@ -332,8 +317,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
                         baseFile ->
                             HoodieTimeline.compareTimestamps(
                                 baseFile.getCommitTime(),
-                                commitTimePredicateForRemove,
-                                startCommit.getTimestamp()))
+                                LESSER_THAN,
+                                instantToConsider.getTimestamp()))
                     .map(
                         baseFile -> buildFileWithoutStats(partitionPath, partitionValues, baseFile))
                     .forEach(filesToRemove::add);
