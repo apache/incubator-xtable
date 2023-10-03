@@ -204,6 +204,15 @@ public class TestHudiTable implements Closeable {
         this.partitionFieldNames = Collections.emptyList();
       } else {
         keyGenProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
+        if (partitionConfig.contains("timestamp")) {
+          keyGenProperties.put("hoodie.deltastreamer.keygen.timebased.timestamp.type", "SCALAR");
+          keyGenProperties.put(
+              "hoodie.deltastreamer.keygen.timebased.timestamp.scalar.time.unit", "MICROSECONDS");
+          keyGenProperties.put(
+              "hoodie.deltastreamer.keygen.timebased.output.dateformat", "yyyy/MM/dd");
+          keyGenProperties.put("hoodie.deltastreamer.keygen.timebased.input.timezone", "UTC");
+          keyGenProperties.put("hoodie.deltastreamer.keygen.timebased.output.timezone", "UTC");
+        }
         this.keyGenerator = new CustomKeyGenerator(keyGenProperties);
         this.partitionFieldNames =
             Arrays.stream(partitionConfig.split(","))

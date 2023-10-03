@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -742,10 +743,32 @@ public class ITOneTableClient {
   }
 
   private static Stream<Arguments> provideArgsForPartitionTesting() {
+    String timestampFilter =
+        String.format(
+            "timestamp_micros_nullable_field < timestamp_millis(%s)",
+            Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
     String levelFilter = "level = 'INFO'";
+    String nestedLevelFilter = "nested_record.level = 'INFO'";
     String severityFilter = "severity = 1";
+    String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
     return addSyncModeCases(
         Stream.of(
+            Arguments.of(
+                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd",
+                "timestamp_micros_nullable_field:TIMESTAMP",
+                timestampFilter),
+            Arguments.of(
+                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+                "level:VALUE",
+                "level:SIMPLE",
+                levelFilter),
+            Arguments.of(
+                // Delta Lake does not currently support nested partition columns
+                Arrays.asList(TableFormat.ICEBERG),
+                "nested_record.level:VALUE",
+                "nested_record.level:SIMPLE",
+                nestedLevelFilter),
             Arguments.of(
                 Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
                 "level:VALUE",
@@ -755,7 +778,12 @@ public class ITOneTableClient {
                 Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
                 "severity:VALUE",
                 "severity:SIMPLE",
-                severityFilter)));
+                severityFilter),
+            Arguments.of(
+                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
+                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
+                timestampAndLevelFilter)));
   }
 
   @ParameterizedTest
