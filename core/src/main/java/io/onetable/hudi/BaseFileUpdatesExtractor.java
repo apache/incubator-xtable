@@ -31,6 +31,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import lombok.AllArgsConstructor;
+import lombok.NonNull;
 import lombok.Value;
 
 import org.apache.hadoop.fs.Path;
@@ -146,7 +147,7 @@ public class BaseFileUpdatesExtractor {
    * @param commit The current commit started by the Hudi client
    * @return The information needed to create a "replace" commit for the Hudi table
    */
-  ReplaceMetadata convertDiff(OneDataFilesDiff oneDataFilesDiff, String commit) {
+  ReplaceMetadata convertDiff(@NonNull OneDataFilesDiff oneDataFilesDiff, @NonNull String commit) {
     // For all removed files, group by partition and extract the file id
     Map<String, List<String>> partitionToReplacedFileIds =
         oneDataFilesDiff.getFilesRemoved().stream()
@@ -163,6 +164,7 @@ public class BaseFileUpdatesExtractor {
   }
 
   private String getFileId(OneDataFile file) {
+    // TODO is there a way to avoid relying on hadoop path here?
     return new Path(file.getPhysicalPath()).getName();
   }
 
@@ -170,7 +172,7 @@ public class BaseFileUpdatesExtractor {
     WriteStatus writeStatus = new WriteStatus();
     String fileId = getFileId(file);
     String filePath = file.getPhysicalPath().substring(tableBasePath.length());
-    String fileName = new Path(file.getPhysicalPath()).getName();
+    String fileName = filePath.substring(file.getPartitionPath().length());
     writeStatus.setFileId(fileId);
     writeStatus.setPartitionPath(file.getPartitionPath());
     HoodieDeltaWriteStat writeStat = new HoodieDeltaWriteStat();
@@ -220,8 +222,7 @@ public class BaseFileUpdatesExtractor {
     }
 
     private static ReplaceMetadata createEmptyInstance() {
-      // does not use Collections.emptyMap() or Collections.emptyList() so the combine function can
-      // be called on this instance without failing
+      // does not use Collections.emptyMap() or Collections.emptyList() (which are immutable) so the combine function can be called on this instance without failing
       return ReplaceMetadata.of(new HashMap<>(), new ArrayList<>());
     }
   }

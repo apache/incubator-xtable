@@ -18,6 +18,7 @@
  
 package io.onetable.model.storage;
 
+import java.util.Collections;
 import java.util.Map;
 
 import lombok.Builder;
@@ -63,7 +64,8 @@ public class OneDataFile {
   // partition ranges for the data file
   @JsonSerialize(keyUsing = SerDe.OnePartitionFieldKeySerializer.class)
   @JsonDeserialize(keyUsing = SerDe.OnePartitionFieldKeyDeserializer.class)
-  protected final Map<OnePartitionField, Range> partitionValues;
+  @Builder.Default
+  protected final Map<OnePartitionField, Range> partitionValues = Collections.emptyMap();
   // Partition path
   protected final String partitionPath;
   protected final long fileSizeBytes;
@@ -71,7 +73,8 @@ public class OneDataFile {
   // column stats for each column in the data file
   @JsonSerialize(keyUsing = SerDe.OneFieldKeySerializer.class)
   @JsonDeserialize(keyUsing = SerDe.OneFieldKeyDeserializer.class)
-  protected final Map<OneField, ColumnStat> columnStats;
+  @Builder.Default
+  protected final Map<OneField, ColumnStat> columnStats = Collections.emptyMap();
   // last modified time in millis since epoch
   protected final long lastModified;
 
