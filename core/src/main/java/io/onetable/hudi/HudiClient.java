@@ -29,20 +29,22 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoField;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 
 import io.onetable.exception.OneIOException;
+import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
+import io.onetable.model.TableChange;
 import io.onetable.model.exception.OneParseException;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.storage.OneDataFiles;
-import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.extractor.SourceClient;
 
 public class HudiClient implements SourceClient<HoodieInstant> {
@@ -91,9 +93,74 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public OneDataFilesDiff getFilesDiffBetweenCommits(
-      HoodieInstant startCommit, HoodieInstant endCommit, OneTable table, boolean includeStart) {
-    return dataFileExtractor.getDiffBetweenCommits(startCommit, endCommit, table, includeStart);
+  public OneSnapshot getCurrentFileState() {
+    HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
+    HoodieTimeline completedTimeline = activeTimeline.filterCompletedInstants();
+    // get latest commit
+    HoodieInstant latestCommit =
+        completedTimeline
+            .lastInstant()
+            .orElseThrow(
+                () -> new OneIOException("Unable to read latest commit from Hudi source table"));
+    List<HoodieInstant> pendingInstants =
+        activeTimeline
+            .filterInflightsAndRequested()
+            .findInstantsBefore(latestCommit.getTimestamp())
+            .getInstants()
+            .stream()
+            .collect(Collectors.toList());
+    OneTable table =
+        getTable(latestCommit).toBuilder()
+            .latestCommitTime(parseFromInstantTime(latestCommit.getTimestamp()))
+            .pendingCommits(
+                pendingInstants.stream()
+                    .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
+                    .collect(Collectors.toList()))
+            .build();
+    return OneSnapshot.builder()
+        .table(table)
+        .schemaCatalog(getSchemaCatalog(table, latestCommit))
+        .dataFiles(dataFileExtractor.getFilesCurrentState(completedTimeline, table))
+        .build();
+  }
+
+  @Override
+  public TableChange getFilesDiffBetweenCommits(
+      HoodieInstant startCommit, HoodieInstant endCommit, boolean includeStart) {
+    HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
+    HoodieTimeline completedTimeline = activeTimeline.filterCompletedInstants();
+    HoodieTimeline visibleTimeline =
+        activeTimeline
+            .filterCompletedInstants()
+            .findInstantsBeforeOrEquals(endCommit.getTimestamp());
+    HoodieTimeline timelineForInstant;
+    if (includeStart) {
+      timelineForInstant =
+          completedTimeline.findInstantsInClosedRange(
+              startCommit.getTimestamp(), endCommit.getTimestamp());
+    } else {
+      timelineForInstant =
+          completedTimeline.findInstantsInRange(
+              startCommit.getTimestamp(), endCommit.getTimestamp());
+    }
+    OneTable table = getTable(endCommit);
+    List<HoodieInstant> pendingInstants =
+        activeTimeline
+            .filterInflightsAndRequested()
+            .findInstantsBefore(endCommit.getTimestamp())
+            .getInstants()
+            .stream()
+            .collect(Collectors.toList());
+    return TableChange.builder()
+        .currentTableState(table)
+        .pendingCommits(
+            pendingInstants.stream()
+                .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
+                .collect(Collectors.toList()))
+        .filesDiff(
+            dataFileExtractor.getDiffBetweenCommits(
+                startCommit, endCommit, table, includeStart, timelineForInstant, visibleTimeline))
+        .build();
   }
 
   private HoodieTimeline getCompletedCommits() {
@@ -102,31 +169,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
 
   @Override
   public List<HoodieInstant> getCommits(HoodieInstant commitInstant) {
-    HoodieTimeline timeline = getCompletedCommits();
-    List<HoodieInstant> instants = new ArrayList<>();
-    instants.add(commitInstant);
-    instants.addAll(timeline.findInstantsAfter(commitInstant.getTimestamp()).getInstants());
-    return instants;
-  }
-
-  @Override
-  public HoodieInstant getLatestCommit() {
-    return getCompletedCommits()
-        .lastInstant()
-        .orElseThrow(
-            () -> new OneIOException("Unable to read latest commit from Hudi source table"));
-  }
-
-  @Override
-  public List<Instant> getPendingCommitsBeforeCommit(HoodieInstant instant) {
-    return metaClient
-        .getActiveTimeline()
-        .filterInflightsAndRequested()
-        .findInstantsBefore(instant.getTimestamp())
-        .getInstants()
-        .stream()
-        .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
-        .collect(Collectors.toList());
+    return getCompletedCommits().findInstantsAfter(commitInstant.getTimestamp()).getInstants();
   }
 
   @Override
@@ -135,6 +178,20 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         .findInstantsBeforeOrEquals(MILLIS_INSTANT_TIME_FORMATTER.format(instant))
         .lastInstant()
         .get();
+  }
+
+  @Override
+  public List<HoodieInstant> getCommitsForInstants(List<Instant> instants) {
+    Map<Instant, HoodieInstant> instantHoodieInstantMap =
+        getCompletedCommits().getInstants().stream()
+            .collect(
+                Collectors.toMap(
+                    hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()),
+                    hoodieInstant -> hoodieInstant));
+    return instants.stream()
+        .map(instantHoodieInstantMap::get)
+        .filter(hoodieInstant -> hoodieInstant != null)
+        .collect(Collectors.toList());
   }
 
   /**

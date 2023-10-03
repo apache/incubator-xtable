@@ -45,7 +45,6 @@ import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 
 public class TestExtractFromSource {
-
   private final SourceClient<TestCommit> mockSourceClient = mock(SourceClient.class);
 
   @Test

@@ -18,6 +18,9 @@
  
 package io.onetable.model;
 
+import java.time.Instant;
+import java.util.List;
+
 import lombok.Builder;
 import lombok.Value;
 
@@ -35,4 +38,6 @@ public class TableChange {
   OneDataFilesDiff filesDiff;
   // OneTable state at the specified instant
   OneTable currentTableState;
+  // pending commits before end commit while computing diff.
+  List<Instant> pendingCommits;
 }

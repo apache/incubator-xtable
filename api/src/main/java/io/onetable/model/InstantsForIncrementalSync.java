@@ -21,7 +21,6 @@ package io.onetable.model;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 import lombok.Builder;
 import lombok.Value;
@@ -30,7 +29,7 @@ import lombok.Value;
 @Value
 @Builder
 public class InstantsForIncrementalSync {
-  Optional<Instant> lastSyncInstant;
+  Instant lastSyncInstant;
   // pending commits that are not yet synced and to be considered for next incremental sync.
   @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
 }

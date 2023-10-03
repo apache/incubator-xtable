@@ -21,7 +21,9 @@ package io.onetable.spi.extractor;
 import java.time.Instant;
 import java.util.List;
 
+import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
+import io.onetable.model.TableChange;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
@@ -31,7 +33,7 @@ import io.onetable.model.storage.OneDataFilesDiff;
  * source system. The client uses {@link Instant} to represent the point in time a commit was made
  * to be as generic as possible across source table formats.
  */
-public interface SourceClient<COMMIT> {
+public interface SourceClient<COMMIT extends Comparable<COMMIT>> {
   /**
    * Extracts the {@link OneTable} definition as of the provided commit.
    *
@@ -49,6 +51,7 @@ public interface SourceClient<COMMIT> {
    */
   SchemaCatalog getSchemaCatalog(OneTable table, COMMIT commit);
 
+  @Deprecated // use getCurrentFileState instead
   /**
    * Extracts all of the {@link OneDataFiles} for the table, grouped by partition.
    *
@@ -60,6 +63,13 @@ public interface SourceClient<COMMIT> {
   OneDataFiles getFilesForAllPartitions(COMMIT commit, OneTable tableDefinition);
 
   /**
+   * Extracts the {@link OneSnapshot} as of current time of invocation.
+   *
+   * @return the current file state.
+   */
+  OneSnapshot getCurrentFileState();
+
+  /**
    * Extracts a {@link OneDataFilesDiff} that contains all the {@link
    * io.onetable.model.storage.OneDataFile} added or removed by updates that happened after the
    * provided `afterCommit` up to and including the `untilCommit`.
@@ -67,38 +77,20 @@ public interface SourceClient<COMMIT> {
    * @param startCommit limit the changes to commits that are strictly after (and not including)
    *     this commit
    * @param endCommit limit the changes to commits up to and including this commit * @param
-   * @param tableDefinition the OneTable definition of the table defining the schema, partition
-   *     fields, etc. to use when converting into the OneTable format.
    * @param includeStart whether to include the start commit in the diff.
    * @return a list of files grouped by partition
    */
-  OneDataFilesDiff getFilesDiffBetweenCommits(
-      COMMIT startCommit, COMMIT endCommit, OneTable tableDefinition, boolean includeStart);
+  TableChange getFilesDiffBetweenCommits(
+      COMMIT startCommit, COMMIT endCommit, boolean includeStart);
 
   /**
    * Get all the commit times that occurred on or after the provided commit from oldest to newest.
    *
-   * @param onOrAfterCommit only return commits that are after (and not including) this commit
+   * @param afterCommit only return commits that are after (and not including) this commit
    * @return list of commit times after the provided commit time, sorted from oldest to newest
    *     commit
    */
-  List<COMMIT> getCommits(COMMIT onOrAfterCommit);
-
-  /**
-   * Get the latest completed commit in the source table.
-   *
-   * @return the latest completed commit
-   */
-  COMMIT getLatestCommit();
-
-  /**
-   * Get all the pending commits that occurred before the provided commit.
-   *
-   * @param beforeCommit only return commits that are strictly before (and not including) that are
-   *     pending.
-   * @return List of pending commits before the provided commit from oldest to newest commit.
-   */
-  List<Instant> getPendingCommitsBeforeCommit(COMMIT beforeCommit);
+  List<COMMIT> getCommits(COMMIT afterCommit);
 
   /**
    * Gets the last commit made at or before the provided instant from the source table.
@@ -107,4 +99,6 @@ public interface SourceClient<COMMIT> {
    * @return the commit at or before the provided instant
    */
   COMMIT getCommitAtInstant(Instant instant);
+
+  List<COMMIT> getCommitsForInstants(List<Instant> instants);
 }
