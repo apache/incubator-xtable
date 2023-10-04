@@ -408,7 +408,7 @@ public class AvroSchemaConverter {
   }
 
   private static Schema finalizeSchema(Schema targetSchema, OneSchema inputSchema) {
-    if (inputSchema.getIsNullable()) {
+    if (inputSchema.isNullable()) {
       return Schema.createUnion(Schema.create(Schema.Type.NULL), targetSchema);
     }
     return targetSchema;

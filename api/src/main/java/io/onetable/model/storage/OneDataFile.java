@@ -25,12 +25,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.JsonTypeName;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.SchemaVersion;
@@ -47,12 +41,6 @@ import io.onetable.spi.OneTableSnapshotVisitor;
 @Builder(toBuilder = true)
 @EqualsAndHashCode
 @ToString
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
-@JsonSubTypes({
-  @JsonSubTypes.Type(value = OneDataFile.class, name = "single"),
-  @JsonSubTypes.Type(value = OneDataFiles.class, name = "group")
-})
-@JsonTypeName("single")
 public class OneDataFile {
   // written schema version
   protected final SchemaVersion schemaVersion;
@@ -61,16 +49,12 @@ public class OneDataFile {
   // file format
   protected final FileFormat fileFormat;
   // partition ranges for the data file
-  @JsonSerialize(keyUsing = SerDe.OnePartitionFieldKeySerializer.class)
-  @JsonDeserialize(keyUsing = SerDe.OnePartitionFieldKeyDeserializer.class)
   protected final Map<OnePartitionField, Range> partitionValues;
   // Partition path
   protected final String partitionPath;
   protected final long fileSizeBytes;
   protected final long recordCount;
   // column stats for each column in the data file
-  @JsonSerialize(keyUsing = SerDe.OneFieldKeySerializer.class)
-  @JsonDeserialize(keyUsing = SerDe.OneFieldKeyDeserializer.class)
   protected final Map<OneField, ColumnStat> columnStats;
   // last modified time in millis since epoch
   protected final long lastModified;
