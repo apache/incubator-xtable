@@ -19,5 +19,5 @@ tableFormatsClients:
         spark.master: local[2]
         spark.app.name: onetableclient
     ICEBERG:
-      sourceClientProviderClass: io.onetable.iceberg.IcebergSourceClient
+      sourceClientProviderClass: io.onetable.iceberg.IcebergSourceClientProvider
       targetClientProviderClass: io.onetable.iceberg.IcebergTargetClient

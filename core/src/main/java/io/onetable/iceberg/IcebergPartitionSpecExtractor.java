@@ -18,6 +18,7 @@
  
 package io.onetable.iceberg;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import lombok.AccessLevel;
@@ -37,8 +38,7 @@ public class IcebergPartitionSpecExtractor {
     return INSTANCE;
   }
 
-  public PartitionSpec toPartitionSpec(
-      List<OnePartitionField> partitionFields, Schema tableSchema) {
+  public PartitionSpec toIceberg(List<OnePartitionField> partitionFields, Schema tableSchema) {
     if (partitionFields == null || partitionFields.isEmpty()) {
       return PartitionSpec.unpartitioned();
     }
@@ -67,5 +67,22 @@ public class IcebergPartitionSpecExtractor {
       }
     }
     return partitionSpecBuilder.build();
+  }
+
+  public List<OnePartitionField> fromIceberg(PartitionSpec iceSpec, Schema iceSchema) {
+    List<OnePartitionField> irPartitionFields = new ArrayList<>();
+
+    if (iceSpec == null || iceSpec.fields().isEmpty()) {
+      return irPartitionFields;
+    }
+
+    // TODO tests
+    //    for (PartitionField iceField : iceSpec.fields()) {
+    //      OnePartitionField oneField = OnePartitionField.builder()
+    //          .sourceField(OneField.builder().build())
+    //          .build();
+    //    }
+
+    return irPartitionFields;
   }
 }

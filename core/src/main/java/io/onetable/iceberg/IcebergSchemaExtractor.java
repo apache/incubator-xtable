@@ -34,6 +34,8 @@ import io.onetable.exception.NotSupportedException;
 import io.onetable.exception.SchemaExtractorException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
+import io.onetable.model.schema.OneSchema.OneSchemaBuilder;
+import io.onetable.model.schema.OneType;
 
 /**
  * Schema extractor for Iceberg which converts canonical representation of the schema{@link
@@ -54,6 +56,24 @@ public class IcebergSchemaExtractor {
     // if field IDs are not assigned in the source, just use an incrementing integer
     AtomicInteger fieldIdTracker = new AtomicInteger(0);
     return new Schema(convertFields(oneSchema, fieldIdTracker));
+  }
+
+  public OneSchema fromIceberg(Schema iceSchema) {
+    OneSchemaBuilder irSchemaBuilder = OneSchema.builder();
+
+    List<OneField> fields = iceSchema.columns().stream()
+            .map(
+                    iceField ->
+                            OneField.builder().name(iceField.name()).fieldId(iceField.fieldId()).build())
+            .collect(Collectors.toList());
+    irSchemaBuilder.fields(fields);
+//        .forEach(irSchemaBuilder::field);
+
+    return irSchemaBuilder.build();
+  }
+
+  private OneType fromIceberg(Type type) {
+    return null;
   }
 
   static String convertFromOneTablePath(String path) {
