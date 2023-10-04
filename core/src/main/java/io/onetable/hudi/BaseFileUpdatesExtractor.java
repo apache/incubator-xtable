@@ -101,7 +101,7 @@ public class BaseFileUpdatesExtractor {
                   partitionPathsToDrop.remove(file.getPartitionPath());
                   // create a map of file path to the data file, any entries not in the hudi table
                   // will be added
-                  Map<String, OneDataFile> snapshotPathsForPartition =
+                  Map<String, OneDataFile> physicalPathToFile =
                       DefaultSnapshotVisitor.extractDataFilePaths(
                           OneDataFiles.collectionBuilder()
                               .files(Collections.singletonList(file))
@@ -114,8 +114,7 @@ public class BaseFileUpdatesExtractor {
                                 String baseFilePath = baseFile.getPath();
                                 // remove the file from the map, if it was present, so it is not
                                 // added to the commit since it is already present in the Hudi table
-                                OneDataFile snapshotFile =
-                                    snapshotPathsForPartition.remove(baseFilePath);
+                                OneDataFile snapshotFile = physicalPathToFile.remove(baseFilePath);
                                 // if snapshotFile was not found, it means this file was deleted in
                                 // the source and needs to be removed from the Hudi table
                                 return snapshotFile == null ? baseFile.getFileId() : null;
@@ -124,7 +123,7 @@ public class BaseFileUpdatesExtractor {
                           .collect(Collectors.toList());
                   // for the remaining entries in the map, add the files to the commit
                   List<WriteStatus> writeStatuses =
-                      snapshotPathsForPartition.values().stream()
+                      physicalPathToFile.values().stream()
                           .map(
                               snapshotFile ->
                                   toWriteStatus(
