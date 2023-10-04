@@ -129,6 +129,7 @@ public class OneTableClient {
             .collect(
                 Collectors.toMap(
                     Map.Entry::getKey, entry -> entry.getValue().getLastSyncInstant()));
+    // TODO: Simplify consolidation of storing lastInstant and pendingInstants together.
     Map<TableFormat, List<Instant>> pendingInstantsToConsiderForNextSyncByFormat =
         syncClientByFormat.entrySet().stream()
             .collect(
