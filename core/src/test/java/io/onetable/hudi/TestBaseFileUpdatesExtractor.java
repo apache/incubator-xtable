@@ -99,7 +99,10 @@ public class TestBaseFileUpdatesExtractor {
             partitionPath1,
             String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName3),
             getColumnStatMap());
-    String fileName4 = "file4.parquet";
+    // create file that matches hudi format to mimic that a file create by hudi is now being removed
+    // by another system
+    String fileIdForFile4 = "d1cf0980-445c-4c74-bdeb-b7e5d18779f5-0";
+    String fileName4 = fileIdForFile4 + "_0-1116-142216_20231003013807542.parquet";
     OneDataFile removedFile2 =
         createFile(
             partitionPath1,
@@ -124,7 +127,8 @@ public class TestBaseFileUpdatesExtractor {
 
     // validate removed files
     Map<String, List<String>> expectedPartitionToReplacedFileIds = new HashMap<>();
-    expectedPartitionToReplacedFileIds.put(partitionPath1, Arrays.asList(fileName3, fileName4));
+    expectedPartitionToReplacedFileIds.put(
+        partitionPath1, Arrays.asList(fileName3, fileIdForFile4));
     expectedPartitionToReplacedFileIds.put(partitionPath2, Collections.singletonList(fileName5));
     assertEquals(
         expectedPartitionToReplacedFileIds, replaceMetadata.getPartitionToReplacedFileIds());

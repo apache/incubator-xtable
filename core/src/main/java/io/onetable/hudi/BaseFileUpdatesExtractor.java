@@ -30,6 +30,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import lombok.AllArgsConstructor;
@@ -61,6 +62,9 @@ import io.onetable.spi.DefaultSnapshotVisitor;
 
 @AllArgsConstructor(staticName = "of")
 public class BaseFileUpdatesExtractor {
+  private static final Pattern HUDI_BASE_FILE_PATTERN =
+      Pattern.compile(
+          "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9]_[0-9a-fA-F-]+_[0-9]+\\.");
   private final HoodieEngineContext engineContext;
   private final String tableBasePath;
 
@@ -82,7 +86,8 @@ public class BaseFileUpdatesExtractor {
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             engineContext, metaClient, metaClient.getActiveTimeline(), metadataConfig);
-    // Track the partitions that are not present in the snapshot, so the files for those partitions can be dropped
+    // Track the partitions that are not present in the snapshot, so the files for those partitions
+    // can be dropped
     Set<String> partitionPathsToDrop =
         new HashSet<>(
             FSUtils.getAllPartitionPaths(
@@ -91,9 +96,11 @@ public class BaseFileUpdatesExtractor {
         snapshotFiles.getFiles().stream()
             .map(
                 file -> {
-                  // remove the partition from the set of partitions to drop since it is present in the snapshot
+                  // remove the partition from the set of partitions to drop since it is present in
+                  // the snapshot
                   partitionPathsToDrop.remove(file.getPartitionPath());
-                  // create a map of file path to the data file, any entries not in the hudi table will be added
+                  // create a map of file path to the data file, any entries not in the hudi table
+                  // will be added
                   Map<String, OneDataFile> snapshotPathsForPartition =
                       DefaultSnapshotVisitor.extractDataFilePaths(
                           OneDataFiles.collectionBuilder()
@@ -105,10 +112,12 @@ public class BaseFileUpdatesExtractor {
                           .map(
                               baseFile -> {
                                 String baseFilePath = baseFile.getPath();
-                                // remove the file from the map, if it was present, so it is not added to the commit since it is already present in the Hudi table
+                                // remove the file from the map, if it was present, so it is not
+                                // added to the commit since it is already present in the Hudi table
                                 OneDataFile snapshotFile =
                                     snapshotPathsForPartition.remove(baseFilePath);
-                                // if snapshotFile was not found, it means this file was deleted in the source and needs to be removed from the Hudi table
+                                // if snapshotFile was not found, it means this file was deleted in
+                                // the source and needs to be removed from the Hudi table
                                 return snapshotFile == null ? baseFile.getFileId() : null;
                               })
                           .filter(Objects::nonNull)
@@ -171,8 +180,23 @@ public class BaseFileUpdatesExtractor {
   }
 
   private String getFileId(OneDataFile file) {
-    // TODO is there a way to avoid relying on hadoop path here?
-    return new Path(file.getPhysicalPath()).getName();
+    String fileName = new Path(file.getPhysicalPath()).getName();
+    // if file was created by Hudi use original fileId, otherwise use the file name as IDs
+    if (isFileCreatedByHudiWriter(fileName)) {
+      return FSUtils.getFileId(fileName);
+    }
+    return fileName;
+  }
+
+  /**
+   * Checks if the file was created by Hudi. Assumes Hudi is creating files with the default fileId
+   * length and format
+   *
+   * @param fileName the file name
+   * @return true if the file was created by Hudi, false otherwise
+   */
+  private boolean isFileCreatedByHudiWriter(String fileName) {
+    return HUDI_BASE_FILE_PATTERN.matcher(fileName).find();
   }
 
   private WriteStatus toWriteStatus(String tableBasePath, String commitTime, OneDataFile file) {
