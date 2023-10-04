@@ -18,8 +18,11 @@
  
 package io.onetable.hudi;
 
+import static io.onetable.hudi.HudiTestUtil.SCHEMA_VERSION;
+import static io.onetable.hudi.HudiTestUtil.createWriteStatus;
+import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
+import static io.onetable.hudi.HudiTestUtil.initTableAndGetMetaClient;
 import static io.onetable.testutil.ColumnStatMapUtil.getColumnStatMap;
-import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
@@ -28,7 +31,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -39,23 +41,17 @@ import org.junit.jupiter.api.io.TempDir;
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
-import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
-import org.apache.hudi.common.model.HoodieDeltaWriteStat;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
-import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.common.util.Option;
-import org.apache.hudi.config.HoodieArchivalConfig;
-import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 
 import io.onetable.model.schema.OneField;
-import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
@@ -64,7 +60,6 @@ import io.onetable.model.storage.OneDataFilesDiff;
 
 public class TestBaseFileUpdatesExtractor {
   @TempDir public static java.nio.file.Path tempDir;
-  private static final SchemaVersion SCHEMA_VERSION = new SchemaVersion(1, "");
   private static final String COMMIT_TIME = "20231003013807542";
   private static final long FILE_SIZE = 100L;
   private static final long RECORD_COUNT = 200L;
@@ -136,9 +131,8 @@ public class TestBaseFileUpdatesExtractor {
     // validate added files
     List<WriteStatus> expectedWriteStatuses =
         Arrays.asList(
-            getExpectedWriteStatus(fileName1, partitionPath1, COMMIT_TIME, Collections.emptyMap()),
-            getExpectedWriteStatus(
-                fileName2, partitionPath2, COMMIT_TIME, getExpectedColumnStats(fileName2)));
+            getExpectedWriteStatus(fileName1, partitionPath1, Collections.emptyMap()),
+            getExpectedWriteStatus(fileName2, partitionPath2, getExpectedColumnStats(fileName2)));
     assertWriteStatusesEquivalent(expectedWriteStatuses, replaceMetadata.getWriteStatuses());
   }
 
@@ -199,16 +193,14 @@ public class TestBaseFileUpdatesExtractor {
 
     List<WriteStatus> expectedWriteStatuses =
         Arrays.asList(
-            getExpectedWriteStatus(fileName1, partitionPath1, COMMIT_TIME, Collections.emptyMap()),
-            getExpectedWriteStatus(
-                fileName2, partitionPath1, COMMIT_TIME, getExpectedColumnStats(fileName2)),
-            getExpectedWriteStatus(
-                fileName3, partitionPath2, COMMIT_TIME, getExpectedColumnStats(fileName3)));
+            getExpectedWriteStatus(fileName1, partitionPath1, Collections.emptyMap()),
+            getExpectedWriteStatus(fileName2, partitionPath1, getExpectedColumnStats(fileName2)),
+            getExpectedWriteStatus(fileName3, partitionPath2, getExpectedColumnStats(fileName3)));
     assertWriteStatusesEquivalent(expectedWriteStatuses, replaceMetadata.getWriteStatuses());
   }
 
   @Test
-  void extractSnapshotChanges_existingPartitionedTargetTable() throws IOException {
+  void extractSnapshotChanges_existingPartitionedTargetTable() {
     String tableBasePath = tempDir.resolve(UUID.randomUUID().toString()).toString();
     HoodieTableMetaClient setupMetaClient =
         initTableAndGetMetaClient(tableBasePath, "partition_field");
@@ -224,12 +216,9 @@ public class TestBaseFileUpdatesExtractor {
 
     List<WriteStatus> initialWriteStatuses =
         Arrays.asList(
-            getExpectedWriteStatus(
-                existingFileName1, partitionPath1, COMMIT_TIME, Collections.emptyMap()),
-            getExpectedWriteStatus(
-                existingFileName2, partitionPath2, COMMIT_TIME, Collections.emptyMap()),
-            getExpectedWriteStatus(
-                existingFileName3, partitionPath2, COMMIT_TIME, Collections.emptyMap()));
+            getExpectedWriteStatus(existingFileName1, partitionPath1, Collections.emptyMap()),
+            getExpectedWriteStatus(existingFileName2, partitionPath2, Collections.emptyMap()),
+            getExpectedWriteStatus(existingFileName3, partitionPath2, Collections.emptyMap()));
     try (HoodieJavaWriteClient<?> writeClient = new HoodieJavaWriteClient<>(CONTEXT, writeConfig)) {
       String initialInstant =
           writeClient.startCommit(HoodieTimeline.REPLACE_COMMIT_ACTION, setupMetaClient);
@@ -300,14 +289,13 @@ public class TestBaseFileUpdatesExtractor {
     List<WriteStatus> expectedWriteStatuses =
         Arrays.asList(
             getExpectedWriteStatus(
-                newFileName1, partitionPath2, COMMIT_TIME, getExpectedColumnStats(newFileName1)),
-            getExpectedWriteStatus(
-                newFileName2, partitionPath3, COMMIT_TIME, Collections.emptyMap()));
+                newFileName1, partitionPath2, getExpectedColumnStats(newFileName1)),
+            getExpectedWriteStatus(newFileName2, partitionPath3, Collections.emptyMap()));
     assertWriteStatusesEquivalent(expectedWriteStatuses, replaceMetadata.getWriteStatuses());
   }
 
   @Test
-  void extractSnapshotChanges_existingNonPartitionedTargetTable() throws IOException {
+  void extractSnapshotChanges_existingNonPartitionedTargetTable() {
     String tableBasePath = tempDir.resolve(UUID.randomUUID().toString()).toString();
     HoodieTableMetaClient setupMetaClient = initTableAndGetMetaClient(tableBasePath, "");
     HoodieWriteConfig writeConfig = getHoodieWriteConfig(setupMetaClient);
@@ -318,8 +306,8 @@ public class TestBaseFileUpdatesExtractor {
 
     List<WriteStatus> initialWriteStatuses =
         Arrays.asList(
-            getExpectedWriteStatus(existingFileName1, "", COMMIT_TIME, Collections.emptyMap()),
-            getExpectedWriteStatus(existingFileName2, "", COMMIT_TIME, Collections.emptyMap()));
+            getExpectedWriteStatus(existingFileName1, "", Collections.emptyMap()),
+            getExpectedWriteStatus(existingFileName2, "", Collections.emptyMap()));
     try (HoodieJavaWriteClient<?> writeClient = new HoodieJavaWriteClient<>(CONTEXT, writeConfig)) {
       String initialInstant =
           writeClient.startCommit(HoodieTimeline.REPLACE_COMMIT_ACTION, setupMetaClient);
@@ -370,19 +358,8 @@ public class TestBaseFileUpdatesExtractor {
     // validate added files
     List<WriteStatus> expectedWriteStatuses =
         Collections.singletonList(
-            getExpectedWriteStatus(
-                newFileName1, "", COMMIT_TIME, getExpectedColumnStats(newFileName1)));
+            getExpectedWriteStatus(newFileName1, "", getExpectedColumnStats(newFileName1)));
     assertWriteStatusesEquivalent(expectedWriteStatuses, replaceMetadata.getWriteStatuses());
-  }
-
-  private static HoodieTableMetaClient initTableAndGetMetaClient(
-      String tableBasePath, String partitionFields) throws IOException {
-    return HoodieTableMetaClient.withPropertyBuilder()
-        .setTableType(HoodieTableType.COPY_ON_WRITE)
-        .setTableName("test_table")
-        .setPayloadClass(HoodieAvroPayload.class)
-        .setPartitionFields(partitionFields)
-        .initTable(new Configuration(), tableBasePath);
   }
 
   private static void assertWriteStatusesEquivalent(
@@ -410,24 +387,9 @@ public class TestBaseFileUpdatesExtractor {
   private WriteStatus getExpectedWriteStatus(
       String fileName,
       String partitionPath,
-      String commitTime,
       Map<String, HoodieColumnRangeMetadata<Comparable>> recordStats) {
-    WriteStatus writeStatus = new WriteStatus();
-    writeStatus.setFileId(fileName);
-    writeStatus.setPartitionPath(partitionPath);
-    HoodieDeltaWriteStat writeStat = new HoodieDeltaWriteStat();
-    writeStat.setFileId(fileName);
-    writeStat.setPartitionPath(partitionPath);
-    writeStat.setPath(
-        ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
-            partitionPath.isEmpty() ? fileName : String.format("%s/%s", partitionPath, fileName),
-            commitTime));
-    writeStat.setNumWrites(RECORD_COUNT);
-    writeStat.setFileSizeInBytes(FILE_SIZE);
-    writeStat.setTotalWriteBytes(FILE_SIZE);
-    writeStat.putRecordsStats(recordStats);
-    writeStatus.setStat(writeStat);
-    return writeStatus;
+    return createWriteStatus(
+        fileName, partitionPath, COMMIT_TIME, RECORD_COUNT, FILE_SIZE, recordStats);
   }
 
   /**
@@ -503,24 +465,5 @@ public class TestBaseFileUpdatesExtractor {
         HoodieColumnRangeMetadata.<Comparable>create(
             fileName, "nested_struct_field.nested_long_field", 500L, 600L, 4, 5, 1234, -1L));
     return columnStats;
-  }
-
-  private static HoodieWriteConfig getHoodieWriteConfig(HoodieTableMetaClient metaClient) {
-    Properties properties = new Properties();
-    properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
-    return HoodieWriteConfig.newBuilder()
-        .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(INMEMORY).build())
-        .withPath(metaClient.getBasePathV2().toString())
-        .withEmbeddedTimelineServerEnabled(false)
-        .withMetadataConfig(
-            HoodieMetadataConfig.newBuilder()
-                .withMaxNumDeltaCommitsBeforeCompaction(2)
-                .enable(true)
-                .withMetadataIndexColumnStats(true)
-                .withProperties(properties)
-                .build())
-        .withArchivalConfig(HoodieArchivalConfig.newBuilder().archiveCommitsWith(1, 2).build())
-        .withTableServicesEnabled(true)
-        .build();
   }
 }
