@@ -169,7 +169,7 @@
   }, {
     "id" : 34,
     "name" : "cs_sold_date_sk",
-    "required" : false,
+    "required" : true,
     "type" : "int"
   } ]
 }

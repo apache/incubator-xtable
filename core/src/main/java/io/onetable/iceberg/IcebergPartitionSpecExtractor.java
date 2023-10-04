@@ -24,9 +24,11 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 
+import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 
 /** Partition spec builder and extractor for Iceberg. */
@@ -69,19 +71,20 @@ public class IcebergPartitionSpecExtractor {
     return partitionSpecBuilder.build();
   }
 
-  public List<OnePartitionField> fromIceberg(PartitionSpec iceSpec, Schema iceSchema) {
+  public List<OnePartitionField> fromIceberg(PartitionSpec iceSpec) {
     List<OnePartitionField> irPartitionFields = new ArrayList<>();
 
     if (iceSpec == null || iceSpec.fields().isEmpty()) {
       return irPartitionFields;
     }
 
-    // TODO tests
-    //    for (PartitionField iceField : iceSpec.fields()) {
-    //      OnePartitionField oneField = OnePartitionField.builder()
-    //          .sourceField(OneField.builder().build())
-    //          .build();
-    //    }
+    for (PartitionField iceField : iceSpec.fields()) {
+      OneField irField =
+          OneField.builder().name(iceField.name()).fieldId(iceField.sourceId()).build();
+
+      OnePartitionField partitionField = OnePartitionField.builder().sourceField(irField).build();
+      irPartitionFields.add(partitionField);
+    }
 
     return irPartitionFields;
   }

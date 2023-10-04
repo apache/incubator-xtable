@@ -22,7 +22,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -41,9 +43,11 @@ import org.apache.iceberg.data.parquet.GenericParquetWriter;
 import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.io.DataWriter;
 import org.apache.iceberg.parquet.Parquet;
+import org.apache.iceberg.types.Types;
 
 import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneTable;
+import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.TableFormat;
 
@@ -95,13 +99,36 @@ class TestIcebergSourceClient {
 
     Assertions.assertEquals(34, oneTable.getReadSchema().getFields().size());
     validateSchema(oneTable.getReadSchema(), catalogSales.schema());
-    // TODO validate schema fields using round trip to iceberg
 
-    // TODO fix this, there is 1 partition field
-    Assertions.assertEquals(0, oneTable.getPartitioningFields().size());
+    Assertions.assertEquals(1, oneTable.getPartitioningFields().size());
+    OneField partitionField = oneTable.getPartitioningFields().get(0).getSourceField();
+    Assertions.assertEquals("cs_sold_date_sk", partitionField.getName());
+    Assertions.assertEquals(34, partitionField.getFieldId());
+    // TODO transform type is not implemented yet
   }
 
-  private void validateSchema(OneSchema readSchema, Schema schema) {}
+  private void validateSchema(OneSchema readSchema, Schema expectedSchema) {
+    IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
+    Schema result = schemaExtractor.toIceberg(readSchema);
+
+    Assertions.assertEquals(result.columns().size(), expectedSchema.columns().size());
+
+    Map<String, Types.NestedField> columnMap =
+        result.columns().stream().collect(Collectors.toMap(Types.NestedField::name, f -> f));
+
+    for (Types.NestedField expectedField : expectedSchema.columns()) {
+      Types.NestedField column = columnMap.get(expectedField.name());
+      Assertions.assertNotNull(column);
+      Assertions.assertEquals(expectedField.fieldId(), column.fieldId());
+      Assertions.assertEquals(expectedField.type(), column.type());
+      Assertions.assertEquals(expectedField.isOptional(), column.isOptional());
+
+      // TODO: fix this
+      //      Assertions.assertEquals(expectedField.doc(), column.doc());
+      //      Assertions.assertEquals(expectedField.getOrdinal(), column.getOrdinal());
+      //      Assertions.assertEquals(expectedField.getTransform(), column.getTransform());
+    }
+  }
 
   private Table createTestTableWithData() throws IOException {
     String csPath = String.join("", System.getProperty("java.io.tmpdir"), "catalog_sales");

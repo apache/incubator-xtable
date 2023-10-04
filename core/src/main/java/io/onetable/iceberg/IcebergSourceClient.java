@@ -59,8 +59,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   public OneTable getTable(Snapshot snapshot) {
     // TODO select snapshot specific partition spec
     IcebergPartitionSpecExtractor partitionExtractor = IcebergPartitionSpecExtractor.getInstance();
-    List<OnePartitionField> irPartitionFields =
-        partitionExtractor.fromIceberg(sourceTable.spec(), sourceTable.schema());
+    List<OnePartitionField> irPartitionFields = partitionExtractor.fromIceberg(sourceTable.spec());
 
     Schema iceSchema = sourceTable.schemas().get(snapshot.schemaId());
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
@@ -73,7 +72,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         .partitioningFields(irPartitionFields)
         .latestCommitTime(Instant.ofEpochMilli(sourceTable.currentSnapshot().timestampMillis()))
         .readSchema(irSchema)
-        //        .layoutStrategy(dataLayoutStrategy)
+        // .layoutStrategy(dataLayoutStrategy)
         .build();
   }
 
