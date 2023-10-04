@@ -28,10 +28,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Singular;
 import lombok.Value;
 
-import com.fasterxml.jackson.annotation.JsonTypeName;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.SchemaVersion;
@@ -49,7 +45,6 @@ import io.onetable.spi.OneTableSnapshotVisitor;
  */
 @Value
 @EqualsAndHashCode(callSuper = true)
-@JsonTypeName("group")
 public class OneDataFiles extends OneDataFile {
   @Singular List<OneDataFile> files;
 
@@ -58,13 +53,9 @@ public class OneDataFiles extends OneDataFile {
       SchemaVersion schemaVersion,
       String physicalPath,
       FileFormat fileFormat,
-      @JsonSerialize(keyUsing = SerDe.OnePartitionFieldKeySerializer.class)
-          @JsonDeserialize(keyUsing = SerDe.OnePartitionFieldKeyDeserializer.class)
-          Map<OnePartitionField, Range> partitionValues,
+      Map<OnePartitionField, Range> partitionValues,
       String partitionPath,
-      @JsonSerialize(keyUsing = SerDe.OneFieldKeySerializer.class)
-          @JsonDeserialize(keyUsing = SerDe.OneFieldKeyDeserializer.class)
-          Map<OneField, ColumnStat> columnStats,
+      Map<OneField, ColumnStat> columnStats,
       List<OneDataFile> files) {
     super(
         schemaVersion,

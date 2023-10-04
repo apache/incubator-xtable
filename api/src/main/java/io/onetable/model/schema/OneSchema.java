@@ -19,7 +19,6 @@
 package io.onetable.model.schema;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,8 +28,6 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-
-import com.fasterxml.jackson.annotation.JsonCreator;
 
 /**
  * OneSchema represents a schema which could be a composite containing multiple {@link OneField} or
@@ -52,45 +49,9 @@ public class OneSchema {
   // User readable comment for this field
   private final String comment;
   // Indicates if values of this field can be `null` values.
-  private final Boolean isNullable;
+  private final boolean isNullable;
   private final List<OneField> fields;
   private final Map<MetadataKey, Object> metadata;
-
-  @JsonCreator
-  OneSchema(
-      String name,
-      OneType dataType,
-      String comment,
-      Boolean isNullable,
-      List<OneField> fields,
-      Map<MetadataKey, Object> metadata) {
-    this.name = name;
-    this.dataType = dataType;
-    this.comment = comment;
-    this.isNullable = isNullable;
-    this.fields = fields;
-    // If a map value is one of the MetadataValue enums, then parse the object into the enum.
-    // This is required to properly parse the value from json without adding the overhead of type
-    // information in the json output.
-    this.metadata = parseMetadataValues(metadata);
-  }
-
-  private Map<MetadataKey, Object> parseMetadataValues(Map<MetadataKey, Object> metadata) {
-    if (metadata == null) {
-      return Collections.emptyMap();
-    }
-    return metadata.entrySet().stream()
-        .collect(
-            Collectors.toMap(
-                Map.Entry::getKey,
-                entry -> {
-                  if (METADATA_VALUES.contains(entry.getValue().toString())) {
-                    return MetadataValue.valueOf(entry.getValue().toString());
-                  } else {
-                    return entry.getValue();
-                  }
-                }));
-  }
 
   public static OneSchemaBuilder builderFrom(OneSchema field) {
     return field.toBuilder();
