@@ -82,7 +82,8 @@ public class BaseFileUpdatesExtractor {
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             engineContext, metaClient, metaClient.getActiveTimeline(), metadataConfig);
-    Set<String> partitions =
+    // Track the partitions that are not present in the snapshot, so the files for those partitions can be dropped
+    Set<String> partitionPathsToDrop =
         new HashSet<>(
             FSUtils.getAllPartitionPaths(
                 engineContext, metadataConfig, metaClient.getBasePathV2().toString()));
@@ -90,7 +91,9 @@ public class BaseFileUpdatesExtractor {
         snapshotFiles.getFiles().stream()
             .map(
                 file -> {
-                  partitions.remove(file.getPartitionPath());
+                  // remove the partition from the set of partitions to drop since it is present in the snapshot
+                  partitionPathsToDrop.remove(file.getPartitionPath());
+                  // create a map of file path to the data file, any entries not in the hudi table will be added
                   Map<String, OneDataFile> snapshotPathsForPartition =
                       DefaultSnapshotVisitor.extractDataFilePaths(
                           OneDataFiles.collectionBuilder()
@@ -98,13 +101,14 @@ public class BaseFileUpdatesExtractor {
                               .build());
                   List<String> fileIdsToRemove =
                       fsView
-                          .getAllBaseFiles(file.getPartitionPath())
+                          .getLatestBaseFiles(file.getPartitionPath())
                           .map(
                               baseFile -> {
                                 String baseFilePath = baseFile.getPath();
+                                // remove the file from the map, if it was present, so it is not added to the commit since it is already present in the Hudi table
                                 OneDataFile snapshotFile =
                                     snapshotPathsForPartition.remove(baseFilePath);
-                                // if snapshotFile was not found, it means this file was deleted
+                                // if snapshotFile was not found, it means this file was deleted in the source and needs to be removed from the Hudi table
                                 return snapshotFile == null ? baseFile.getFileId() : null;
                               })
                           .filter(Objects::nonNull)
@@ -127,12 +131,12 @@ public class BaseFileUpdatesExtractor {
             .orElse(ReplaceMetadata.EMPTY);
     // treat any partitions not present in the snapshot as dropped
     Optional<ReplaceMetadata> droppedPartitions =
-        partitions.stream()
+        partitionPathsToDrop.stream()
             .map(
                 partition -> {
                   List<String> fileIdsToRemove =
                       fsView
-                          .getAllBaseFiles(partition)
+                          .getLatestBaseFiles(partition)
                           .map(HoodieBaseFile::getFileId)
                           .collect(Collectors.toList());
                   return ReplaceMetadata.of(
