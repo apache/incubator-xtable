@@ -199,6 +199,7 @@ public class TestHudiTable implements Closeable {
       // Add key generator
       TypedProperties keyGenProperties = new TypedProperties();
       keyGenProperties.put(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key(), RECORD_KEY_FIELD_NAME);
+      keyGenProperties.put("hoodie.datasource.write.row.writer.enable", "true");
       if (partitionConfig == null) {
         this.keyGenerator = new NonpartitionedKeyGenerator(keyGenProperties);
         this.partitionFieldNames = Collections.emptyList();
