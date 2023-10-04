@@ -34,7 +34,7 @@ public class ExtractFromSource<COMMIT> {
   private final SourceClient<COMMIT> sourceClient;
 
   public OneSnapshot extractSnapshot() {
-    return sourceClient.getCurrentFileState();
+    return sourceClient.getCurrentSnapshot();
   }
 
   public IncrementalTableChanges extractTableChanges(
@@ -45,7 +45,7 @@ public class ExtractFromSource<COMMIT> {
     List<TableChange> tableChangeList = new ArrayList<>();
     List<Instant> pendingCommitsForNextSync = new ArrayList<>();
     for (COMMIT commit : commitsToProcess) {
-      TableChange tableChange = sourceClient.getFilesDiffForCommit(commit);
+      TableChange tableChange = sourceClient.getTableChangeForCommit(commit);
       pendingCommitsForNextSync.addAll(tableChange.getPendingCommits());
       tableChangeList.add(tableChange);
     }

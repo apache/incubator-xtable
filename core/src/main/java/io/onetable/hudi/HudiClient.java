@@ -87,7 +87,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public OneSnapshot getCurrentFileState() {
+  public OneSnapshot getCurrentSnapshot() {
     HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
     HoodieTimeline completedTimeline = activeTimeline.filterCompletedInstants();
     // get latest commit
@@ -119,7 +119,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public TableChange getFilesDiffForCommit(HoodieInstant hoodieInstantForDiff) {
+  public TableChange getTableChangeForCommit(HoodieInstant hoodieInstantForDiff) {
     HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
     HoodieTimeline visibleTimeline =
         activeTimeline

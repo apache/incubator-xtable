@@ -248,12 +248,9 @@ public class OneTableClient {
     if (!doesInstantExists(source, lastSyncInstant)) {
       return false;
     }
-    if (pendingInstants != null
-        && !pendingInstants.isEmpty()
-        && isInstantCleanedup(source, pendingInstants.get(0))) {
-      return false;
-    }
-    return true;
+    return pendingInstants == null
+        || pendingInstants.isEmpty()
+        || doesInstantExists(source, Optional.ofNullable(pendingInstants.get(0)));
   }
 
   private Map<TableFormat, TableFormatSync> getFormatsForSyncMode(
@@ -308,15 +305,6 @@ public class OneTableClient {
     //    return HudiClient.parseFromInstantTime(lastSyncHoodieInstant.getTimestamp())
     //        .equals(lastSyncInstant.get());
     return true;
-  }
-
-  private <COMMIT> boolean isInstantCleanedup(
-      ExtractFromSource<COMMIT> source, Instant instantToCheck) {
-    // TODO This check is not generic and should be moved to HudiClient
-    // Should check if the earliest instant in source is less than or equal to instantToCheck
-    // and if so return false else return true
-    // TODO hardcoding the return value to false for now
-    return false;
   }
 
   @Value

@@ -25,7 +25,10 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Value;
 
-/** Instants to consider for incremental sync. */
+/**
+ * Instants to consider for incremental sync. Also tracking pending commits to account for commits
+ * that are started earlier than the last sync instant but not yet completed during the last sync.
+ */
 @Value
 @Builder
 public class InstantsForIncrementalSync {

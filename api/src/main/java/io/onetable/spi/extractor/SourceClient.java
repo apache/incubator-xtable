@@ -27,8 +27,6 @@ import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
 import io.onetable.model.schema.SchemaCatalog;
 
-;
-
 /**
  * A client that provides the major functionality for extracting the state at a given instant in a
  * source system. The client uses {@link Instant} to represent the point in time a commit was made
@@ -55,9 +53,9 @@ public interface SourceClient<COMMIT> {
   /**
    * Extracts the {@link OneSnapshot} as of current time of invocation.
    *
-   * @return the current file state.
+   * @return the current snapshot.
    */
-  OneSnapshot getCurrentFileState();
+  OneSnapshot getCurrentSnapshot();
 
   /**
    * Extracts a {@link TableChange} for the provided commit.
@@ -65,7 +63,7 @@ public interface SourceClient<COMMIT> {
    * @param commit commit to capture changes for.
    * @return {@link TableChange}
    */
-  TableChange getFilesDiffForCommit(COMMIT commit);
+  TableChange getTableChangeForCommit(COMMIT commit);
 
   /**
    * Retrieves a list of COMMITS to process next based on the provided {@link

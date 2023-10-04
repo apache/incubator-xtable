@@ -57,7 +57,7 @@ public class TestExtractFromSource {
             .table(table)
             .dataFiles(dataFiles)
             .build();
-    when(mockSourceClient.getCurrentFileState()).thenReturn(oneSnapshot);
+    when(mockSourceClient.getCurrentSnapshot()).thenReturn(oneSnapshot);
     assertEquals(oneSnapshot, ExtractFromSource.of(mockSourceClient).extractSnapshot());
   }
 
@@ -89,7 +89,7 @@ public class TestExtractFromSource {
             .filesDiff(
                 OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
             .build();
-    when(mockSourceClient.getFilesDiffForCommit(firstCommitToSync))
+    when(mockSourceClient.getTableChangeForCommit(firstCommitToSync))
         .thenReturn(tableChangeToReturnAtFirstInstant);
     TableChange expectedFirstTableChange =
         TableChange.builder()
@@ -112,7 +112,7 @@ public class TestExtractFromSource {
                     .filesRemoved(Arrays.asList(initialFile3, newFile1))
                     .build())
             .build();
-    when(mockSourceClient.getFilesDiffForCommit(secondCommitToSync))
+    when(mockSourceClient.getTableChangeForCommit(secondCommitToSync))
         .thenReturn(tableChangeToReturnAtSecondInstant);
     TableChange expectedSecondTableChange =
         TableChange.builder()
