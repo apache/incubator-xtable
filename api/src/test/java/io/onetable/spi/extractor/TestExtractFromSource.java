@@ -33,6 +33,7 @@ import lombok.ToString;
 
 import org.junit.jupiter.api.Test;
 
+import io.onetable.model.CommitsProcessState;
 import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
@@ -66,18 +67,20 @@ public class TestExtractFromSource {
     String partition1 = "partition1";
     String partition2 = "partition2";
     String partition3 = "partition3";
-    OneDataFile initialFile1 = getOneDataFile(partition1, "file1.parquet");
     OneDataFile initialFile2 = getOneDataFile(partition1, "file2.parquet");
     OneDataFile initialFile3 = getOneDataFile(partition2, "file3.parquet");
 
     Instant lastSyncTime = Instant.now().minus(2, ChronoUnit.DAYS);
-    TestCommit lastCommitSynced = TestCommit.of("last_sync");
     TestCommit firstCommitToSync = TestCommit.of("first_commit");
     TestCommit secondCommitToSync = TestCommit.of("second_commit");
     InstantsForIncrementalSync instantsForIncrementalSync =
         InstantsForIncrementalSync.builder().lastSyncInstant(lastSyncTime).build();
-    when(mockSourceClient.getNextCommitsToProcess(instantsForIncrementalSync))
-        .thenReturn(Arrays.asList(firstCommitToSync, secondCommitToSync));
+    CommitsProcessState<TestCommit> commitsProcessStateToReturn =
+        CommitsProcessState.<TestCommit>builder()
+            .commitsToProcess(Arrays.asList(firstCommitToSync, secondCommitToSync))
+            .build();
+    when(mockSourceClient.getCommitsProcessState(instantsForIncrementalSync))
+        .thenReturn(commitsProcessStateToReturn);
 
     // drop a file and add a file in an existing partition
     OneDataFile newFile1 = getOneDataFile(partition1, "file4.parquet");
