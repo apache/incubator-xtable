@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 import lombok.Getter;
@@ -92,7 +93,11 @@ public class HudiTargetClient implements TargetClient {
     // create meta client if table already exists
     try {
       this.metaClient =
-          HoodieTableMetaClient.builder().setBasePath(basePath).setConf(configuration).build();
+          HoodieTableMetaClient.builder()
+              .setBasePath(basePath)
+              .setConf(configuration)
+              .setLoadActiveTimelineOnLoad(false)
+              .build();
     } catch (TableNotFoundException ex) {
       log.info("Hudi table does not exist, will be created on first sync");
     }
@@ -105,6 +110,9 @@ public class HudiTargetClient implements TargetClient {
           .setTableName(table.getName())
           .setPayloadClass(HoodieAvroPayload.class)
           .setRecordKeyFields("") // TODO
+          .setPopulateMetaFields(
+              false) // other formats will not populate meta fields, so we disable it for
+          // consistency
           .setPartitionFields(
               table.getPartitioningFields().stream()
                   .map(OnePartitionField::getSourceField)
@@ -163,15 +171,14 @@ public class HudiTargetClient implements TargetClient {
   public void beginSync(OneTable table) {
     if (metaClient == null) {
       metaClient = initializeHudiTable(table);
+    } else {
+      // make sure meta client has up-to-date view of the timeline
+      metaClient.reloadActiveTimeline();
     }
-    HoodieJavaWriteClient<?> writeClient =
-        new HoodieJavaWriteClient<>(
-            new HoodieJavaEngineContext(new Configuration()), getWriteConfig());
     String instant = convertInstantToCommit(table.getLatestCommitTime());
-    writeClient.startCommitWithTime(instant, HoodieTimeline.REPLACE_COMMIT_ACTION);
     this.commitState =
         new CommitState(
-            writeClient, instant, avroSchemaConverter.fromOneSchema(table.getReadSchema()));
+            metaClient, instant, avroSchemaConverter.fromOneSchema(table.getReadSchema()));
   }
 
   static String convertInstantToCommit(Instant instant) {
@@ -181,24 +188,15 @@ public class HudiTargetClient implements TargetClient {
 
   @Override
   public void completeSync() {
-    metaClient
-        .getActiveTimeline()
-        .transitionReplaceRequestedToInflight(
-            new HoodieInstant(
-                HoodieInstant.State.REQUESTED,
-                HoodieTimeline.REPLACE_COMMIT_ACTION,
-                commitState.getInstantTime()),
-            Option.empty());
     commitState.commit();
     commitState = null;
-    metaClient.reloadActiveTimeline();
   }
 
   @Override
   public Optional<OneTableMetadata> getTableMetadata() {
     if (metaClient != null) {
       return metaClient
-          .getActiveTimeline()
+          .reloadActiveTimeline()
           .getCommitsTimeline()
           .filterCompletedInstants()
           .lastInstant()
@@ -227,15 +225,15 @@ public class HudiTargetClient implements TargetClient {
   }
 
   private static class CommitState {
-    private final HoodieJavaWriteClient<?> writeClient;
+    private final HoodieTableMetaClient metaClient;
     @Getter private final String instantTime;
     private List<WriteStatus> writeStatuses;
     @Setter private Schema schema;
     @Setter private OneTableMetadata oneTableMetadata;
     private Map<String, List<String>> partitionToReplacedFileIds;
 
-    CommitState(HoodieJavaWriteClient<?> writeClient, String instantTime, Schema initialSchema) {
-      this.writeClient = writeClient;
+    CommitState(HoodieTableMetaClient metaClient, String instantTime, Schema initialSchema) {
+      this.metaClient = metaClient;
       this.instantTime = instantTime;
       this.schema = initialSchema;
       this.writeStatuses = Collections.emptyList();
@@ -252,30 +250,46 @@ public class HudiTargetClient implements TargetClient {
     }
 
     public void commit() {
-      try {
+      try (HoodieJavaWriteClient<?> writeClient =
+          new HoodieJavaWriteClient<>(
+              new HoodieJavaEngineContext(new Configuration()), getWriteConfig(schema))) {
+        writeClient.startCommitWithTime(instantTime, HoodieTimeline.REPLACE_COMMIT_ACTION);
+        metaClient
+            .getActiveTimeline()
+            .transitionReplaceRequestedToInflight(
+                new HoodieInstant(
+                    HoodieInstant.State.REQUESTED,
+                    HoodieTimeline.REPLACE_COMMIT_ACTION,
+                    instantTime),
+                Option.empty());
         writeClient.commit(
             instantTime,
             writeStatuses,
             getExtraMetadata(),
             HoodieTimeline.REPLACE_COMMIT_ACTION,
             partitionToReplacedFileIds);
-      } finally {
-        writeClient.close();
       }
     }
 
     private Option<Map<String, String>> getExtraMetadata() {
       Map<String, String> extraMetadata = new HashMap<>(oneTableMetadata.asMap());
-      extraMetadata.put(HoodieCommitMetadata.SCHEMA_KEY, schema.toString());
       return Option.of(extraMetadata);
     }
-  }
 
-  private HoodieWriteConfig getWriteConfig() {
-    return HoodieWriteConfig.newBuilder()
-        .withPath(metaClient.getBasePathV2().toString())
-        .withEmbeddedTimelineServerEnabled(false)
-        .withMetadataConfig(HoodieMetadataConfig.newBuilder().enable(true).build())
-        .build();
+    private HoodieWriteConfig getWriteConfig(Schema schema) {
+      Properties properties = new Properties();
+      properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
+      return HoodieWriteConfig.newBuilder()
+          .withPath(metaClient.getBasePathV2().toString())
+          .withEmbeddedTimelineServerEnabled(false)
+          .withSchema(schema.toString())
+          .withMetadataConfig(
+              HoodieMetadataConfig.newBuilder()
+                  .enable(true)
+                  .withProperties(properties)
+                  .withMetadataIndexColumnStats(true)
+                  .build())
+          .build();
+    }
   }
 }

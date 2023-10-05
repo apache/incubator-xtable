@@ -49,14 +49,13 @@ import org.apache.hudi.avro.model.StringWrapper;
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
-import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieFileGroup;
+import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
-import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.Option;
@@ -85,8 +84,6 @@ import io.onetable.model.storage.TableFormat;
 
 // TODO split into an IT and unit test
 public class TestHudiTargetClient {
-  public static final HoodieMetadataConfig METADATA_CONFIG =
-      HoodieMetadataConfig.newBuilder().enable(true).build();
   @TempDir public static java.nio.file.Path tempDir;
   private static final Configuration CONFIGURATION = new Configuration();
   private static final HoodieEngineContext CONTEXT = new HoodieJavaEngineContext(CONFIGURATION);
@@ -94,6 +91,7 @@ public class TestHudiTargetClient {
   private static final String TABLE_NAME = "test_table";
   private static final String FIELD_1 = "id";
   private static final String FIELD_2 = "partition_field";
+  private static final String FIELD_3 = "content";
   private static final long FILE_SIZE = 100L;
   private static final long RECORD_COUNT = 200L;
   private static final long LAST_MODIFIED = System.currentTimeMillis();
@@ -102,38 +100,18 @@ public class TestHudiTargetClient {
 
   private static final OneField PARTITION_FIELD =
       OneField.builder().name(FIELD_2).schema(STRING_SCHEMA).build();
+  private static final String TEST_SCHEMA_NAME = "test_schema";
   private static final OneSchema SCHEMA =
       OneSchema.builder()
-          .name("test_schema")
+          .name(TEST_SCHEMA_NAME)
           .dataType(OneType.RECORD)
           .fields(
               Arrays.asList(
-                  OneField.builder().name(FIELD_1).schema(STRING_SCHEMA).build(), PARTITION_FIELD))
+                  OneField.builder().name(FIELD_1).schema(STRING_SCHEMA).build(),
+                  PARTITION_FIELD,
+                  OneField.builder().name(FIELD_3).schema(STRING_SCHEMA).build()))
           .build();
   private final String tableBasePath = tempDir.resolve(UUID.randomUUID().toString()).toString();
-
-  private final OneTable initialState =
-      OneTable.builder()
-          .basePath(tableBasePath)
-          .name(TABLE_NAME)
-          .latestCommitTime(Instant.now())
-          .tableFormat(TableFormat.ICEBERG)
-          .layoutStrategy(DataLayoutStrategy.HIVE_STYLE_PARTITION)
-          .readSchema(SCHEMA)
-          .partitioningFields(
-              Collections.singletonList(
-                  OnePartitionField.builder()
-                      .sourceField(PARTITION_FIELD)
-                      .transformType(PartitionTransformType.VALUE)
-                      .build()))
-          .build();
-
-  private final HudiTargetClient targetClient =
-      new HudiTargetClient(
-          tableBasePath,
-          CONFIGURATION,
-          BaseFileUpdatesExtractor.of(new HoodieJavaEngineContext(CONFIGURATION), tableBasePath),
-          AvroSchemaConverter.getInstance());
 
   @Test
   void syncForExistingTable() {
@@ -141,7 +119,14 @@ public class TestHudiTargetClient {
     String commitTime = "20231003013807542";
     String existingFileName1 = "existing_file_1.parquet";
     HoodieTableMetaClient setupMetaClient = initTableAndGetMetaClient(tableBasePath, FIELD_2);
-    HoodieWriteConfig writeConfig = getHoodieWriteConfig(setupMetaClient);
+    // initialize the table with only 2 of the 3 fields
+    Schema initialSchema =
+        SchemaBuilder.record(TEST_SCHEMA_NAME)
+            .fields()
+            .requiredString(FIELD_1)
+            .requiredString(FIELD_2)
+            .endRecord();
+    HoodieWriteConfig writeConfig = getHoodieWriteConfig(setupMetaClient, initialSchema);
     List<WriteStatus> initialWriteStatuses =
         Collections.singletonList(
             createWriteStatus(
@@ -186,6 +171,8 @@ public class TestHudiTargetClient {
             .fileRemoved(fileToRemove)
             .build();
     // perform sync
+    HudiTargetClient targetClient = getTargetClient();
+    OneTable initialState = getState();
     targetClient.beginSync(initialState);
     targetClient.syncFilesForDiff(dataFilesDiff);
     targetClient.syncSchema(SCHEMA);
@@ -194,14 +181,16 @@ public class TestHudiTargetClient {
     targetClient.completeSync();
 
     Instant syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
-    String instantTime = HoodieInstantTimeGenerator.getInstantFromTemporalAccessor(syncedInstant);
+    String instantTime = HudiTargetClient.convertInstantToCommit(syncedInstant);
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(metaClient, instantTime, partitionPath, filePath, fileName);
     HoodieBackedTableMetadata hoodieBackedTableMetadata =
-        new HoodieBackedTableMetadata(CONTEXT, METADATA_CONFIG, tableBasePath, true);
+        new HoodieBackedTableMetadata(
+            CONTEXT, writeConfig.getMetadataConfig(), tableBasePath, true);
     assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
-    assertSchema(metaClient);
+    // include meta fields since the table was created with meta fields enabled
+    assertSchema(metaClient, true);
   }
 
   @Test
@@ -219,6 +208,8 @@ public class TestHudiTargetClient {
                         .build()))
             .build();
     // sync snapshot and metadata
+    OneTable initialState = getState();
+    HudiTargetClient targetClient = getTargetClient();
     targetClient.beginSync(initialState);
     targetClient.syncFilesForSnapshot(snapshot);
     OneTableMetadata latestState = OneTableMetadata.of(initialState.getLatestCommitTime());
@@ -231,21 +222,23 @@ public class TestHudiTargetClient {
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(metaClient, instantTime, partitionPath, filePath, fileName);
     HoodieBackedTableMetadata hoodieBackedTableMetadata =
-        new HoodieBackedTableMetadata(CONTEXT, METADATA_CONFIG, tableBasePath, true);
+        new HoodieBackedTableMetadata(
+            CONTEXT, getHoodieWriteConfig(metaClient).getMetadataConfig(), tableBasePath, true);
     assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
-    assertSchema(metaClient);
+    assertSchema(metaClient, false);
   }
 
   // TODO move to unit test
   @Test
   void getTableMetadataWhenMetadataDoesNotExist() {
-    assertEquals(Optional.empty(), targetClient.getTableMetadata());
+    assertEquals(Optional.empty(), getTargetClient().getTableMetadata());
   }
 
   // TODO move to unit test
   @Test
   void updateToPartitionSpecThrowsException() {
-    targetClient.beginSync(initialState);
+    HudiTargetClient targetClient = getTargetClient();
+    targetClient.beginSync(getState());
     assertThrows(
         NotSupportedException.class,
         () ->
@@ -259,15 +252,37 @@ public class TestHudiTargetClient {
   }
 
   @SneakyThrows
-  private void assertSchema(HoodieTableMetaClient metaClient) {
+  private void assertSchema(HoodieTableMetaClient metaClient, boolean includeMetaFields) {
     TableSchemaResolver tableSchemaResolver = new TableSchemaResolver(metaClient);
     Schema actual = tableSchemaResolver.getTableAvroSchema();
-    Schema expected =
-        SchemaBuilder.record("testRecord")
-            .fields()
-            .requiredString(FIELD_1)
-            .requiredString(FIELD_2)
-            .endRecord();
+    Schema expected;
+    if (includeMetaFields) {
+      expected =
+          SchemaBuilder.record(TEST_SCHEMA_NAME)
+              .fields()
+              .optionalString(
+                  HoodieRecord.HoodieMetadataField.COMMIT_TIME_METADATA_FIELD.getFieldName())
+              .optionalString(
+                  HoodieRecord.HoodieMetadataField.COMMIT_SEQNO_METADATA_FIELD.getFieldName())
+              .optionalString(
+                  HoodieRecord.HoodieMetadataField.RECORD_KEY_METADATA_FIELD.getFieldName())
+              .optionalString(
+                  HoodieRecord.HoodieMetadataField.PARTITION_PATH_METADATA_FIELD.getFieldName())
+              .optionalString(
+                  HoodieRecord.HoodieMetadataField.FILENAME_METADATA_FIELD.getFieldName())
+              .requiredString(FIELD_1)
+              .requiredString(FIELD_2)
+              .requiredString(FIELD_3)
+              .endRecord();
+    } else {
+      expected =
+          SchemaBuilder.record(TEST_SCHEMA_NAME)
+              .fields()
+              .requiredString(FIELD_1)
+              .requiredString(FIELD_2)
+              .requiredString(FIELD_3)
+              .endRecord();
+    }
     assertEquals(expected, actual);
   }
 
@@ -279,7 +294,10 @@ public class TestHudiTargetClient {
       String fileId) {
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
-            CONTEXT, metaClient, metaClient.reloadActiveTimeline(), METADATA_CONFIG);
+            CONTEXT,
+            metaClient,
+            metaClient.reloadActiveTimeline(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig());
     List<HoodieFileGroup> fileGroups =
         fsView.getAllFileGroups(partitionPath).collect(Collectors.toList());
     assertEquals(1, fileGroups.size());
@@ -299,33 +317,45 @@ public class TestHudiTargetClient {
 
   private void assertColStats(
       HoodieBackedTableMetadata hoodieBackedTableMetadata, String partitionPath, String fileName) {
-    Map<Pair<String, String>, HoodieMetadataColumnStats> field1ColStats =
-        hoodieBackedTableMetadata.getColumnStats(
-            Collections.singletonList(Pair.of(partitionPath, fileName)), FIELD_1);
-    assertEquals(1, field1ColStats.size());
-    HoodieMetadataColumnStats column1stats = field1ColStats.get(Pair.of(partitionPath, fileName));
-    assertEquals(FIELD_1, column1stats.getColumnName());
-    assertEquals(fileName, column1stats.getFileName());
-    assertEquals(new StringWrapper("id1"), column1stats.getMinValue());
-    assertEquals(new StringWrapper("id2"), column1stats.getMaxValue());
-    assertEquals(2, column1stats.getValueCount());
-    assertEquals(0, column1stats.getNullCount());
-    assertEquals(5, column1stats.getTotalSize());
-    assertEquals(-1, column1stats.getTotalUncompressedSize());
+    assertColStatsForField(
+        hoodieBackedTableMetadata, partitionPath, fileName, FIELD_1, "id1", "id2", 2, 0, 5);
+    assertColStatsForField(
+        hoodieBackedTableMetadata, partitionPath, fileName, FIELD_2, "a", "b", 3, 1, 10);
+    assertColStatsForField(
+        hoodieBackedTableMetadata,
+        partitionPath,
+        fileName,
+        FIELD_3,
+        "content1",
+        "content2",
+        2,
+        0,
+        5);
+  }
 
-    Map<Pair<String, String>, HoodieMetadataColumnStats> field2ColStats =
+  private void assertColStatsForField(
+      HoodieBackedTableMetadata hoodieBackedTableMetadata,
+      String partitionPath,
+      String fileName,
+      String fieldName,
+      String minValue,
+      String maxValue,
+      int valueCount,
+      int nullCount,
+      int totalSize) {
+    Map<Pair<String, String>, HoodieMetadataColumnStats> fieldColStats =
         hoodieBackedTableMetadata.getColumnStats(
-            Collections.singletonList(Pair.of(partitionPath, fileName)), FIELD_2);
-    assertEquals(1, field2ColStats.size());
-    HoodieMetadataColumnStats column2stats = field2ColStats.get(Pair.of(partitionPath, fileName));
-    assertEquals(FIELD_2, column2stats.getColumnName());
-    assertEquals(fileName, column2stats.getFileName());
-    assertEquals(new StringWrapper("a"), column2stats.getMinValue());
-    assertEquals(new StringWrapper("b"), column2stats.getMaxValue());
-    assertEquals(3, column2stats.getValueCount());
-    assertEquals(1, column2stats.getNullCount());
-    assertEquals(10, column2stats.getTotalSize());
-    assertEquals(-1, column2stats.getTotalUncompressedSize());
+            Collections.singletonList(Pair.of(partitionPath, fileName)), fieldName);
+    assertEquals(1, fieldColStats.size());
+    HoodieMetadataColumnStats columnStats = fieldColStats.get(Pair.of(partitionPath, fileName));
+    assertEquals(fieldName, columnStats.getColumnName());
+    assertEquals(fileName, columnStats.getFileName());
+    assertEquals(new StringWrapper(minValue), columnStats.getMinValue());
+    assertEquals(new StringWrapper(maxValue), columnStats.getMaxValue());
+    assertEquals(valueCount, columnStats.getValueCount());
+    assertEquals(nullCount, columnStats.getNullCount());
+    assertEquals(totalSize, columnStats.getTotalSize());
+    assertEquals(-1, columnStats.getTotalUncompressedSize());
   }
 
   private OneDataFile getTestFile(String partitionPath, String fileName) {
@@ -346,6 +376,14 @@ public class TestHudiTargetClient {
             .numValues(3)
             .totalSize(10)
             .build());
+    columnStats.put(
+        SCHEMA.getFields().get(2),
+        ColumnStat.builder()
+            .range(Range.vector("content1", "content2"))
+            .numNulls(0)
+            .numValues(2)
+            .totalSize(5)
+            .build());
     return OneDataFile.builder()
         .schemaVersion(SCHEMA_VERSION)
         .partitionPath(partitionPath)
@@ -356,5 +394,30 @@ public class TestHudiTargetClient {
         .recordCount(RECORD_COUNT)
         .columnStats(columnStats)
         .build();
+  }
+
+  private OneTable getState() {
+    return OneTable.builder()
+        .basePath(tableBasePath)
+        .name(TABLE_NAME)
+        .latestCommitTime(Instant.now())
+        .tableFormat(TableFormat.ICEBERG)
+        .layoutStrategy(DataLayoutStrategy.HIVE_STYLE_PARTITION)
+        .readSchema(SCHEMA)
+        .partitioningFields(
+            Collections.singletonList(
+                OnePartitionField.builder()
+                    .sourceField(PARTITION_FIELD)
+                    .transformType(PartitionTransformType.VALUE)
+                    .build()))
+        .build();
+  }
+
+  private HudiTargetClient getTargetClient() {
+    return new HudiTargetClient(
+        tableBasePath,
+        CONFIGURATION,
+        BaseFileUpdatesExtractor.of(new HoodieJavaEngineContext(CONFIGURATION), tableBasePath),
+        AvroSchemaConverter.getInstance());
   }
 }
