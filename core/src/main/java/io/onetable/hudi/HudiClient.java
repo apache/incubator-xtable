@@ -109,18 +109,15 @@ public class HudiClient implements SourceClient<HoodieInstant> {
             .getInstants()
             .stream()
             .collect(Collectors.toList());
-    OneTable table =
-        getTable(latestCommit).toBuilder()
-            .latestCommitTime(parseFromInstantTime(latestCommit.getTimestamp()))
-            .pendingCommits(
-                pendingInstants.stream()
-                    .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
-                    .collect(Collectors.toList()))
-            .build();
+    OneTable table = getTable(latestCommit);
     return OneSnapshot.builder()
         .table(table)
         .schemaCatalog(getSchemaCatalog(table, latestCommit))
         .dataFiles(dataFileExtractor.getFilesCurrentState(completedTimeline, table))
+        .pendingCommits(
+            pendingInstants.stream()
+                .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
+                .collect(Collectors.toList()))
         .build();
   }
 

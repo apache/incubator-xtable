@@ -58,7 +58,8 @@ public class TableFormatSync {
           SyncMode.FULL,
           oneTable,
           client -> client.syncFilesForSnapshot(snapshot.getDataFiles()),
-          startTime);
+          startTime,
+          snapshot.getPendingCommits());
     } catch (Exception e) {
       LOG.error("Failed to sync snapshot", e);
       return buildResultForError(SyncMode.FULL, startTime, e);
@@ -81,7 +82,8 @@ public class TableFormatSync {
                 SyncMode.INCREMENTAL,
                 change.getCurrentTableState(),
                 client -> client.syncFilesForDiff(change.getFilesDiff()),
-                startTime));
+                startTime,
+                changes.getPendingCommits()));
       } catch (Exception e) {
         // Fallback to a sync where table changes are from changes.getInstant() to latest, write a
         // test case for this.
@@ -106,7 +108,11 @@ public class TableFormatSync {
   }
 
   private SyncResult getSyncResult(
-      SyncMode mode, OneTable tableState, SyncFiles fileSyncMethod, Instant startTime) {
+      SyncMode mode,
+      OneTable tableState,
+      SyncFiles fileSyncMethod,
+      Instant startTime,
+      List<Instant> pendingCommits) {
     // initialize the sync
     client.beginSync(tableState);
     // sync schema updates
@@ -117,7 +123,7 @@ public class TableFormatSync {
     fileSyncMethod.sync(client);
     // Persist the latest commit time in table properties for incremental syncs.
     OneTableMetadata latestState =
-        OneTableMetadata.of(tableState.getLatestCommitTime(), tableState.getPendingCommits());
+        OneTableMetadata.of(tableState.getLatestCommitTime(), pendingCommits);
     client.syncMetadata(latestState);
     client.completeSync();
 

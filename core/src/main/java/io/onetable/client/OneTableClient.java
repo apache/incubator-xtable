@@ -190,20 +190,6 @@ public class OneTableClient {
                 .tableChanges(filteredTableChanges)
                 .pendingCommits(incrementalTableChanges.getPendingCommits())
                 .build();
-        // Assign the pending commits to the last table state.
-        if (tableFormatIncrementalChanges.getPendingCommits() != null
-            && !tableFormatIncrementalChanges.getPendingCommits().isEmpty()) {
-          // TODO: Applies the table change to the last state.
-          int lastIdx = filteredTableChanges.size() - 1;
-          TableChange lastTableChange = filteredTableChanges.get(lastIdx);
-          OneTable lastUpdatedTableState =
-              lastTableChange.getCurrentTableState().toBuilder()
-                  .pendingCommits(incrementalTableChanges.getPendingCommits())
-                  .build();
-          lastTableChange =
-              lastTableChange.toBuilder().currentTableState(lastUpdatedTableState).build();
-          filteredTableChanges.set(lastIdx, lastTableChange);
-        }
         List<SyncResult> syncResultList =
             tableFormatSync.syncChanges(tableFormatIncrementalChanges);
 
