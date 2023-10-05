@@ -18,6 +18,7 @@
  
 package io.onetable;
 
+import static io.onetable.hudi.HudiTableUtils.getTableName;
 import static java.util.stream.Collectors.groupingBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -33,7 +34,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -1126,10 +1126,6 @@ public class ITOneTableClient {
         .map(StructField::name)
         .filter(name -> !name.startsWith("onetable_partition_col_"))
         .collect(Collectors.toSet());
-  }
-
-  private String getTableName() {
-    return "test-" + UUID.randomUUID();
   }
 
   private void assertNoSyncFailures(Map<TableFormat, SyncResult> results) {

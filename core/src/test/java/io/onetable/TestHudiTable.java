@@ -52,6 +52,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.LocalFileSystem;
+import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.util.CommitUtils;
 import org.apache.spark.api.java.JavaRDD;
@@ -92,6 +93,7 @@ import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.KeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
+import scala.Tuple2;
 
 public class TestHudiTable implements Closeable {
   private static final Random RANDOM = new Random();
@@ -114,7 +116,8 @@ public class TestHudiTable implements Closeable {
   private final String basePath;
   private final JavaSparkContext jsc;
   private final HoodieTableMetaClient metaClient;
-  private final SparkRDDWriteClient<HoodieAvroPayload> writeClient;
+  private final SparkRDDWriteClient<HoodieAvroPayload> wrieClient;
+  private final HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
   private final KeyGenerator keyGenerator;
   private final Schema schema;
   private final List<String> partitionFieldNames;
@@ -215,7 +218,8 @@ public class TestHudiTable implements Closeable {
       // init Hoodie dataset and metaclient
       this.metaClient = initMetaClient(jsc, hoodieTableType, keyGenProperties);
       // init write client
-      this.writeClient = initSparkWriteClient(schema.toString(), keyGenProperties);
+      this.wrieClient = initSparkWriteClient(schema.toString(), keyGenProperties);
+      this.javaWriteClient = initJavaWriteClient(schema.toString(), keyGenProperties);
     } catch (IOException ex) {
       throw new UncheckedIOException("Unable to initialize TestHudiTable", ex);
     }
@@ -450,17 +454,20 @@ public class TestHudiTable implements Closeable {
   public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
       List<HoodieRecord<HoodieAvroPayload>> inserts,
       String commitInstant,
-      boolean checkForNoErrors) {
-    JavaRDD<HoodieRecord<HoodieAvroPayload>> writeRecords = jsc.parallelize(inserts, 1);
-    JavaRDD<WriteStatus> result = writeClient.bulkInsert(writeRecords, commitInstant);
-    if (checkForNoErrors) {
-      assertNoWriteErrors(result.collect());
+      boolean checkForNoErrors,
+      boolean useSparkWriteClient) {
+    if (useSparkWriteClient) {
+      List<WriteStatus> result = bulkInsertWithSparkClient(inserts, commitInstant);
+      assertNoWriteErrors(result);
+      return inserts;
     }
+    List<WriteStatus> result = bulkInsertWithJavaClient(inserts, commitInstant);
+    assertNoWriteErrors(result);
     return inserts;
   }
 
   private List<HoodieRecord<HoodieAvroPayload>> insertRecords(
-      boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
+      boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts, boolean ) {
     String instant = getStartCommitInstant();
     return insertRecordsWithCommitAlreadyStarted(inserts, instant, checkForNoErrors);
   }
@@ -606,6 +613,45 @@ public class TestHudiTable implements Closeable {
     return new SparkRDDWriteClient<>(context, writeConfig);
   }
 
+  private HoodieJavaWriteClient<HoodieAvroPayload> initJavaWriteClient(String schema,
+                                                                       TypedProperties keyGenProperties) {
+    HoodieCompactionConfig compactionConfig =
+        HoodieCompactionConfig.newBuilder().withMaxNumDeltaCommitsBeforeCompaction(1).build();
+    HoodieClusteringConfig clusteringConfig =
+        HoodieClusteringConfig.newBuilder().withClusteringSortColumns("long_field").build();
+    HoodieCleanConfig cleanConfig =
+        HoodieCleanConfig.newBuilder()
+            .retainCommits(1)
+            .withMaxCommitsBeforeCleaning(1)
+            .withAutoClean(false)
+            .build();
+    HoodieArchivalConfig archivalConfig =
+        HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
+    Properties lockProperties = new Properties();
+    lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_WAIT_TIMEOUT_MS_PROP_KEY, "3000");
+    lockProperties.setProperty(
+        LockConfiguration.LOCK_ACQUIRE_CLIENT_RETRY_WAIT_TIME_IN_MILLIS_PROP_KEY, "3000");
+    lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_CLIENT_NUM_RETRIES_PROP_KEY, "20");
+    HoodieWriteConfig writeConfig =
+        HoodieWriteConfig.newBuilder()
+            .withProperties(keyGenProperties)
+            .withPath(this.basePath)
+            .withSchema(schema)
+            .withKeyGenerator(keyGenerator.getClass().getCanonicalName())
+            .withCompactionConfig(compactionConfig)
+            .withClusteringConfig(clusteringConfig)
+            .withCleanConfig(cleanConfig)
+            .withArchivalConfig(archivalConfig)
+            .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
+            .withMarkersType(MarkerType.DIRECT.name())
+            .withLockConfig(
+                HoodieLockConfig.newBuilder().withLockProvider(InProcessLockProvider.class).build())
+            .withProperties(lockProperties)
+            .build();
+    HoodieEngineContext context = new HoodieSparkEngineContext(jsc);
+    return new HoodieJavaWriteClient<>(context, writeConfig);
+  }
+
   private HoodieTableMetaClient initMetaClient(
       JavaSparkContext jsc, HoodieTableType hoodieTableType, TypedProperties keyGenProperties)
       throws IOException {
@@ -653,6 +699,18 @@ public class TestHudiTable implements Closeable {
     if (this.writeClient != null) {
       this.writeClient.close();
     }
+  }
+
+  private List<WriteStatus> bulkInsertWithSparkClient(List<HoodieRecord<HoodieAvroPayload>> inserts,
+                                                 String commitInstant) {
+    JavaRDD<HoodieRecord<HoodieAvroPayload>> writeRecords = jsc.parallelize(inserts, 1);
+    JavaRDD<WriteStatus> result = wrieClient.bulkInsert(writeRecords, commitInstant);
+    return result.collect();
+  }
+
+  private List<WriteStatus> bulkInsertWithJavaClient(List<HoodieRecord<HoodieAvroPayload>> inserts,
+                                                String commitInstant) {
+    return javaWriteClient.bulkInsert(inserts, commitInstant);
   }
 
   private static Schema addSchemaEvolutionFieldsToBase(Schema schema) {

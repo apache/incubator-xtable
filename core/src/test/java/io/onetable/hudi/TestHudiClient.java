@@ -18,13 +18,56 @@
  
 package io.onetable.hudi;
 
+import static io.onetable.hudi.HudiTableUtils.getTableName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.onetable.TestHudiTable;
+import io.onetable.client.OneTableClient;
+import io.onetable.client.PerTableConfig;
+import io.onetable.model.storage.TableFormat;
+import java.nio.file.Path;
 import java.time.Instant;
 
+import java.util.List;
+import org.apache.hudi.common.model.HoodieAvroPayload;
+import org.apache.hudi.common.model.HoodieRecord;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class TestHudiClient {
+
+  @TempDir
+  public static Path tempDir;
+
+  @Test
+  public void insertAndUpsertData() {
+    String tableName = getTableName();
+    try (TestHudiTable table =
+        TestHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+      List<HoodieRecord<HoodieAvroPayload>> insertedRecords = table.insertRecords(100, true);
+
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(targetTableFormats)
+              .tableBasePath(table.getBasePath())
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
+                      .build())
+              .syncMode(syncMode)
+              .build();
+      OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
+
+      table.insertRecords(100, true);
+      table.upsertRecords(insertedRecords.subList(0, 20), true);
+
+      syncWithCompactionIfRequired(tableType, table, perTableConfig, oneTableClient);
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 200);
+  }
 
   @Test
   public void testParseCommitTimeToInstant() {
