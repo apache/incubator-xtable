@@ -32,7 +32,6 @@ import java.util.List;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -61,7 +60,6 @@ import io.onetable.model.storage.OneDataFilesDiff;
 public class TestHudiTargetClient {
   private static final Instant COMMIT_TIME = Instant.ofEpochMilli(1696534687433L);
   private static final String COMMIT = "20231005143807433";
-  private static final Configuration CONFIGURATION = new Configuration();
   private static final String BASE_PATH = "test-base-path";
 
   private final BaseFileUpdatesExtractor mockBaseFileUpdatesExtractor =
@@ -78,7 +76,6 @@ public class TestHudiTargetClient {
     hudiTargetClient =
         new HudiTargetClient(
             BASE_PATH,
-            CONFIGURATION,
             mockBaseFileUpdatesExtractor,
             mockAvroSchemaConverter,
             mockHudiTableManager,
