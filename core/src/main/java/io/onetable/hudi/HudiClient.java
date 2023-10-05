@@ -164,6 +164,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
     pendingInstantsToProcessNext.addAll(commitsPair.getPendingCommits());
     // combine updatedPendingHoodieInstants and commitsAfterLastInstant and sort and return.
     commitsToProcessNext.addAll(commitsPair.getCompletedCommits());
+    Collections.sort(commitsToProcessNext, HoodieInstant.COMPARATOR);
     return CurrentCommitState.<HoodieInstant>builder()
         .commitsToProcess(commitsToProcessNext)
         .pendingInstants(pendingInstantsToProcessNext)

@@ -172,10 +172,7 @@ public class OneTableClient {
         List<Instant> pendingSyncsByFormat =
             pendingInstantsToConsiderForNextSyncByFormat.getOrDefault(
                 tableFormat, Collections.emptyList());
-        Set<Instant> pendingInstantsSet = new HashSet<>();
-        if (pendingSyncsByFormat != null && !pendingSyncsByFormat.isEmpty()) {
-          pendingInstantsSet.addAll(pendingSyncsByFormat);
-        }
+        Set<Instant> pendingInstantsSet = new HashSet<>(pendingSyncsByFormat);
         // extract the changes that happened since this format was last synced
         List<TableChange> filteredTableChanges =
             incrementalTableChanges.getTableChanges().stream()
@@ -266,28 +263,18 @@ public class OneTableClient {
   private InstantsForIncrementalSync getMostOutOfSyncCommitAndPendingCommits(
       Map<TableFormat, Optional<Instant>> lastSyncInstantByFormat,
       Map<TableFormat, List<Instant>> pendingInstantsToConsiderByFormat) {
-    Optional<Instant> mostOutOfSyncCommit = Optional.empty();
-    for (Map.Entry<TableFormat, Optional<Instant>> lastSyncInstant :
-        lastSyncInstantByFormat.entrySet()) {
-      if (!mostOutOfSyncCommit.isPresent() && lastSyncInstant.getValue().isPresent()) {
-        mostOutOfSyncCommit = lastSyncInstant.getValue();
-      } else if (mostOutOfSyncCommit.isPresent()
-          && lastSyncInstant.getValue().isPresent()
-          && lastSyncInstant.getValue().get().isBefore(mostOutOfSyncCommit.get())) {
-        mostOutOfSyncCommit = lastSyncInstant.getValue();
-      }
-    }
-    Set<Instant> allPendingInstantsSet = new HashSet<>();
-    for (Map.Entry<TableFormat, List<Instant>> pendingInstantsToConsider :
-        pendingInstantsToConsiderByFormat.entrySet()) {
-      if (pendingInstantsToConsider.getValue() != null
-          && !pendingInstantsToConsider.getValue().isEmpty()) {
-        allPendingInstantsSet.addAll(pendingInstantsToConsider.getValue());
-      }
-    }
-    // sort the instants in ascending order
+    Optional<Instant> mostOutOfSyncCommit =
+        lastSyncInstantByFormat.values().stream()
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .sorted()
+            .findFirst();
     List<Instant> allPendingInstants =
-        allPendingInstantsSet.stream().sorted().collect(Collectors.toList());
+        pendingInstantsToConsiderByFormat.values().stream()
+            .flatMap(Collection::stream)
+            .distinct()
+            .sorted()
+            .collect(Collectors.toList());
     return InstantsForIncrementalSync.builder()
         .lastSyncInstant(mostOutOfSyncCommit.get())
         .pendingCommits(allPendingInstants)
