@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -42,17 +43,14 @@ import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
-import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
-import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
-import org.apache.hudi.exception.TableNotFoundException;
 
 import io.onetable.avro.AvroSchemaConverter;
 import io.onetable.client.PerTableConfig;
@@ -71,7 +69,11 @@ import io.onetable.spi.sync.TargetClient;
 public class HudiTargetClient implements TargetClient {
   private final BaseFileUpdatesExtractor baseFileUpdatesExtractor;
   private final AvroSchemaConverter avroSchemaConverter;
+  private final HudiTableManager hudiTableManager;
+  private final CommitStateCreator commitStateCreator;
   private HoodieTableMetaClient metaClient;
+
+  @Getter(value = AccessLevel.PACKAGE)
   private CommitState commitState;
 
   public HudiTargetClient(PerTableConfig perTableConfig, Configuration configuration) {
@@ -80,48 +82,29 @@ public class HudiTargetClient implements TargetClient {
         configuration,
         BaseFileUpdatesExtractor.of(
             new HoodieJavaEngineContext(configuration), perTableConfig.getTableBasePath()),
-        AvroSchemaConverter.getInstance());
+        AvroSchemaConverter.getInstance(),
+        HudiTableManager.getInstance(),
+        CommitState::new);
   }
 
   HudiTargetClient(
       String basePath,
       Configuration configuration,
       BaseFileUpdatesExtractor baseFileUpdatesExtractor,
-      AvroSchemaConverter avroSchemaConverter) {
+      AvroSchemaConverter avroSchemaConverter,
+      HudiTableManager hudiTableManager,
+      CommitStateCreator commitStateCreator) {
     this.baseFileUpdatesExtractor = baseFileUpdatesExtractor;
     this.avroSchemaConverter = avroSchemaConverter;
+    this.hudiTableManager = hudiTableManager;
     // create meta client if table already exists
-    try {
-      this.metaClient =
-          HoodieTableMetaClient.builder()
-              .setBasePath(basePath)
-              .setConf(configuration)
-              .setLoadActiveTimelineOnLoad(false)
-              .build();
-    } catch (TableNotFoundException ex) {
-      log.info("Hudi table does not exist, will be created on first sync");
-    }
+    this.metaClient = hudiTableManager.loadTableIfExists(basePath, configuration);
+    this.commitStateCreator = commitStateCreator;
   }
 
-  private HoodieTableMetaClient initializeHudiTable(OneTable table) {
-    try {
-      return HoodieTableMetaClient.withPropertyBuilder()
-          .setTableType(HoodieTableType.COPY_ON_WRITE)
-          .setTableName(table.getName())
-          .setPayloadClass(HoodieAvroPayload.class)
-          .setRecordKeyFields("") // TODO
-          .setPopulateMetaFields(
-              false) // other formats will not populate meta fields, so we disable it for
-          // consistency
-          .setPartitionFields(
-              table.getPartitioningFields().stream()
-                  .map(OnePartitionField::getSourceField)
-                  .map(OneField::getPath)
-                  .collect(Collectors.joining(",")))
-          .initTable(new Configuration(), table.getBasePath());
-    } catch (IOException ex) {
-      throw new OneIOException("Unable to initialize Hudi table", ex);
-    }
+  @FunctionalInterface
+  interface CommitStateCreator {
+    CommitState create(HoodieTableMetaClient metaClient, String instantTime);
   }
 
   @Override
@@ -170,15 +153,13 @@ public class HudiTargetClient implements TargetClient {
   @Override
   public void beginSync(OneTable table) {
     if (metaClient == null) {
-      metaClient = initializeHudiTable(table);
+      metaClient = hudiTableManager.initializeHudiTable(table);
     } else {
       // make sure meta client has up-to-date view of the timeline
       metaClient.reloadActiveTimeline();
     }
     String instant = convertInstantToCommit(table.getLatestCommitTime());
-    this.commitState =
-        new CommitState(
-            metaClient, instant, avroSchemaConverter.fromOneSchema(table.getReadSchema()));
+    this.commitState = commitStateCreator.create(metaClient, instant);
   }
 
   static String convertInstantToCommit(Instant instant) {
@@ -224,7 +205,7 @@ public class HudiTargetClient implements TargetClient {
     return Optional.empty();
   }
 
-  private static class CommitState {
+  static class CommitState {
     private final HoodieTableMetaClient metaClient;
     @Getter private final String instantTime;
     private List<WriteStatus> writeStatuses;
@@ -232,10 +213,10 @@ public class HudiTargetClient implements TargetClient {
     @Setter private OneTableMetadata oneTableMetadata;
     private Map<String, List<String>> partitionToReplacedFileIds;
 
-    CommitState(HoodieTableMetaClient metaClient, String instantTime, Schema initialSchema) {
+    CommitState(HoodieTableMetaClient metaClient, String instantTime) {
       this.metaClient = metaClient;
       this.instantTime = instantTime;
-      this.schema = initialSchema;
+      this.schema = null;
       this.writeStatuses = Collections.emptyList();
       this.oneTableMetadata = null;
       this.partitionToReplacedFileIds = Collections.emptyMap();
