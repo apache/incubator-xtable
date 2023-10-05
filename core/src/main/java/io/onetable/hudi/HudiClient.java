@@ -45,7 +45,7 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 
 import io.onetable.exception.OneIOException;
-import io.onetable.model.CommitsProcessState;
+import io.onetable.model.CurrentCommitState;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
@@ -146,7 +146,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public CommitsProcessState<HoodieInstant> getCommitsProcessState(
+  public CurrentCommitState<HoodieInstant> getCommitsProcessState(
       InstantsForIncrementalSync instantsForIncrementalSync) {
     Instant lastSyncInstant = instantsForIncrementalSync.getLastSyncInstant();
     List<Instant> lastPendingInstants = instantsForIncrementalSync.getPendingCommits();
@@ -164,7 +164,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
     pendingInstantsToProcessNext.addAll(commitsPair.getPendingCommits());
     // combine updatedPendingHoodieInstants and commitsAfterLastInstant and sort and return.
     commitsToProcessNext.addAll(commitsPair.getCompletedCommits());
-    return CommitsProcessState.<HoodieInstant>builder()
+    return CurrentCommitState.<HoodieInstant>builder()
         .commitsToProcess(commitsToProcessNext)
         .pendingInstants(pendingInstantsToProcessNext)
         .build();

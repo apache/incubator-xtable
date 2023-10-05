@@ -20,7 +20,6 @@ package io.onetable.model.sync;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 
 import lombok.Builder;
 import lombok.Value;
@@ -43,7 +42,6 @@ public class SyncResult {
   SyncStatus status;
   // The Sync Mode recommended for the next sync (Usually filled on an error)
   SyncMode recommendedSyncMode;
-  List<Instant> pendingCommits;
 
   public enum SyncStatusCode {
     SUCCESS,

@@ -33,7 +33,7 @@ import lombok.ToString;
 
 import org.junit.jupiter.api.Test;
 
-import io.onetable.model.CommitsProcessState;
+import io.onetable.model.CurrentCommitState;
 import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
@@ -75,12 +75,12 @@ public class TestExtractFromSource {
     TestCommit secondCommitToSync = TestCommit.of("second_commit");
     InstantsForIncrementalSync instantsForIncrementalSync =
         InstantsForIncrementalSync.builder().lastSyncInstant(lastSyncTime).build();
-    CommitsProcessState<TestCommit> commitsProcessStateToReturn =
-        CommitsProcessState.<TestCommit>builder()
+    CurrentCommitState<TestCommit> currentCommitStateToReturn =
+        CurrentCommitState.<TestCommit>builder()
             .commitsToProcess(Arrays.asList(firstCommitToSync, secondCommitToSync))
             .build();
     when(mockSourceClient.getCommitsProcessState(instantsForIncrementalSync))
-        .thenReturn(commitsProcessStateToReturn);
+        .thenReturn(currentCommitStateToReturn);
 
     // drop a file and add a file in an existing partition
     OneDataFile newFile1 = getOneDataFile(partition1, "file4.parquet");

@@ -128,7 +128,6 @@ public class TableFormatSync {
         .syncStartTime(startTime)
         .syncDuration(Duration.between(startTime, Instant.now()))
         .lastInstantSynced(tableState.getLatestCommitTime())
-        .pendingCommits(tableState.getPendingCommits())
         .build();
   }
 

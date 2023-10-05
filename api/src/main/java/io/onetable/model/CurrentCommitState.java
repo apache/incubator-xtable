@@ -28,7 +28,7 @@ import lombok.Value;
 /** Captures commits that are ready for processing now while tracking pending commits. */
 @Value
 @Builder
-public class CommitsProcessState<COMMIT> {
+public class CurrentCommitState<COMMIT> {
   @Builder.Default List<COMMIT> commitsToProcess = Collections.emptyList();
   @Builder.Default List<Instant> pendingInstants = Collections.emptyList();
 }
