@@ -72,6 +72,6 @@ public interface SourceClient<COMMIT> {
    * @param instantsForIncrementalSync The input to determine the next commits to process.
    * @return {@link CurrentCommitState} to process.
    */
-  CurrentCommitState<COMMIT> getCommitsProcessState(
+  CurrentCommitState<COMMIT> getCurrentCommitState(
       InstantsForIncrementalSync instantsForIncrementalSync);
 }

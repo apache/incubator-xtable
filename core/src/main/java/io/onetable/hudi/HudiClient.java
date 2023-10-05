@@ -146,7 +146,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public CurrentCommitState<HoodieInstant> getCommitsProcessState(
+  public CurrentCommitState<HoodieInstant> getCurrentCommitState(
       InstantsForIncrementalSync instantsForIncrementalSync) {
     Instant lastSyncInstant = instantsForIncrementalSync.getLastSyncInstant();
     List<Instant> lastPendingInstants = instantsForIncrementalSync.getPendingCommits();

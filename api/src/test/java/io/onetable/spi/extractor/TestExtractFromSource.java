@@ -79,7 +79,7 @@ public class TestExtractFromSource {
         CurrentCommitState.<TestCommit>builder()
             .commitsToProcess(Arrays.asList(firstCommitToSync, secondCommitToSync))
             .build();
-    when(mockSourceClient.getCommitsProcessState(instantsForIncrementalSync))
+    when(mockSourceClient.getCurrentCommitState(instantsForIncrementalSync))
         .thenReturn(currentCommitStateToReturn);
 
     // drop a file and add a file in an existing partition

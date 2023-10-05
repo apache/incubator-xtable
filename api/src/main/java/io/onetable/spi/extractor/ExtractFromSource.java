@@ -40,7 +40,7 @@ public class ExtractFromSource<COMMIT> {
   public IncrementalTableChanges extractTableChanges(
       InstantsForIncrementalSync instantsForIncrementalSync) {
     CurrentCommitState<COMMIT> currentCommitState =
-        sourceClient.getCommitsProcessState(instantsForIncrementalSync);
+        sourceClient.getCurrentCommitState(instantsForIncrementalSync);
     // No overlap between updatedPendingCommits and commitList, process separately.
     List<TableChange> tableChangeList = new ArrayList<>();
     for (COMMIT commit : currentCommitState.getCommitsToProcess()) {
