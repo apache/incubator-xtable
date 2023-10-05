@@ -32,7 +32,6 @@ import java.util.List;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.commons.lang3.tuple.Pair;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -61,6 +60,8 @@ public class TestHudiTargetClient {
   private static final Instant COMMIT_TIME = Instant.ofEpochMilli(1696534687433L);
   private static final String COMMIT = "20231005143807433";
   private static final String BASE_PATH = "test-base-path";
+  private static final OneTable TABLE =
+      OneTable.builder().name("table").basePath(BASE_PATH).latestCommitTime(COMMIT_TIME).build();
 
   private final BaseFileUpdatesExtractor mockBaseFileUpdatesExtractor =
       mock(BaseFileUpdatesExtractor.class);
@@ -68,48 +69,48 @@ public class TestHudiTargetClient {
   private final HudiTableManager mockHudiTableManager = mock(HudiTableManager.class);
   private final HudiTargetClient.CommitStateCreator mockCommitStateCreator =
       mock(HudiTargetClient.CommitStateCreator.class);
-  private HudiTargetClient hudiTargetClient;
 
-  @BeforeEach
-  void setUp() {
-    when(mockHudiTableManager.loadTableIfExists(BASE_PATH)).thenReturn(null);
-    hudiTargetClient =
-        new HudiTargetClient(
-            BASE_PATH,
-            mockBaseFileUpdatesExtractor,
-            mockAvroSchemaConverter,
-            mockHudiTableManager,
-            mockCommitStateCreator);
+  private HudiTargetClient getTargetClient(HoodieTableMetaClient mockMetaClient) {
+    when(mockHudiTableManager.loadTableIfExists(BASE_PATH)).thenReturn(mockMetaClient);
+    return new HudiTargetClient(
+        BASE_PATH,
+        mockBaseFileUpdatesExtractor,
+        mockAvroSchemaConverter,
+        mockHudiTableManager,
+        mockCommitStateCreator);
   }
 
   @Test
   void getTableMetadataWithoutTableInitialized() {
-    assertFalse(hudiTargetClient.getTableMetadata().isPresent());
+    assertFalse(getTargetClient(null).getTableMetadata().isPresent());
   }
 
   @Test
   void syncSchema() {
-    HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync().getLeft();
+    HudiTargetClient targetClient = getTargetClient(null);
+    HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();
     OneSchema input = OneSchema.builder().name("schema").dataType(OneType.RECORD).build();
     Schema converted = SchemaBuilder.record("record").fields().requiredInt("field").endRecord();
     when(mockAvroSchemaConverter.fromOneSchema(input)).thenReturn(converted);
-    hudiTargetClient.syncSchema(input);
+    targetClient.syncSchema(input);
     // validate that schema is set in commitState
     verify(mockCommitState).setSchema(converted);
   }
 
   @Test
   void syncMetadata() {
-    HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync().getLeft();
+    HudiTargetClient targetClient = getTargetClient(null);
+    HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();
     OneTableMetadata metadata = OneTableMetadata.of(COMMIT_TIME);
-    hudiTargetClient.syncMetadata(metadata);
+    targetClient.syncMetadata(metadata);
     // validate that metadata is set in commitState
     verify(mockCommitState).setOneTableMetadata(metadata);
   }
 
   @Test
   void syncPartitionSpecSucceedsWithoutChanges() {
-    HoodieTableMetaClient mockMetaClient = initMocksForBeginSync().getRight();
+    HudiTargetClient targetClient = getTargetClient(null);
+    HoodieTableMetaClient mockMetaClient = initMocksForBeginSync(targetClient).getRight();
     String field1 = "field1";
     String field2 = "field2";
     List<OnePartitionField> inputPartitionFields =
@@ -125,13 +126,14 @@ public class TestHudiTargetClient {
     HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.getPartitionFields()).thenReturn(Option.of(new String[] {field1, field2}));
-    hudiTargetClient.syncPartitionSpec(inputPartitionFields);
+    targetClient.syncPartitionSpec(inputPartitionFields);
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"", "field1", "field2,field1"})
   void syncPartitionSpecFailsWithChanges(String partitionFields) {
-    HoodieTableMetaClient mockMetaClient = initMocksForBeginSync().getRight();
+    HudiTargetClient targetClient = getTargetClient(null);
+    HoodieTableMetaClient mockMetaClient = initMocksForBeginSync(targetClient).getRight();
     String field1 = "field1";
     String field2 = "field2";
     List<OnePartitionField> inputPartitionFields =
@@ -150,13 +152,13 @@ public class TestHudiTargetClient {
         partitionFields.isEmpty() ? Option.empty() : Option.of(partitionFields.split(","));
     when(mockTableConfig.getPartitionFields()).thenReturn(existingPartitionFields);
     assertThrows(
-        NotSupportedException.class,
-        () -> hudiTargetClient.syncPartitionSpec(inputPartitionFields));
+        NotSupportedException.class, () -> targetClient.syncPartitionSpec(inputPartitionFields));
   }
 
   @Test
   void syncFilesForDiff() {
-    HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync().getLeft();
+    HudiTargetClient targetClient = getTargetClient(null);
+    HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();
     String instant = "commit";
     OneDataFilesDiff input = OneDataFilesDiff.builder().build();
     BaseFileUpdatesExtractor.ReplaceMetadata output =
@@ -165,14 +167,16 @@ public class TestHudiTargetClient {
     when(mockCommitState.getInstantTime()).thenReturn(instant);
     when(mockBaseFileUpdatesExtractor.convertDiff(input, instant)).thenReturn(output);
 
-    hudiTargetClient.syncFilesForDiff(input);
+    targetClient.syncFilesForDiff(input);
     // validate that replace metadata is set in commitState
     verify(mockCommitState).setReplaceMetadata(output);
   }
 
   @Test
   void syncFilesForSnapshot() {
-    Pair<HudiTargetClient.CommitState, HoodieTableMetaClient> mocks = initMocksForBeginSync();
+    HudiTargetClient targetClient = getTargetClient(null);
+    Pair<HudiTargetClient.CommitState, HoodieTableMetaClient> mocks =
+        initMocksForBeginSync(targetClient);
     HudiTargetClient.CommitState mockCommitState = mocks.getLeft();
     HoodieTableMetaClient mockMetaClient = mocks.getRight();
     String instant = "commit";
@@ -184,20 +188,30 @@ public class TestHudiTargetClient {
     when(mockBaseFileUpdatesExtractor.extractSnapshotChanges(input, mockMetaClient, instant))
         .thenReturn(output);
 
-    hudiTargetClient.syncFilesForSnapshot(input);
+    targetClient.syncFilesForSnapshot(input);
     // validate that replace metadata is set in commitState
     verify(mockCommitState).setReplaceMetadata(output);
   }
 
-  private Pair<HudiTargetClient.CommitState, HoodieTableMetaClient> initMocksForBeginSync() {
-    OneTable table =
-        OneTable.builder().name("table").basePath(BASE_PATH).latestCommitTime(COMMIT_TIME).build();
-
+  @Test
+  void beginSyncForExistingTable() {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
-    when(mockHudiTableManager.initializeHudiTable(table)).thenReturn(mockMetaClient);
+    HudiTargetClient targetClient = getTargetClient(mockMetaClient);
+
+    targetClient.beginSync(TABLE);
+    // verify meta client timeline refreshed
+    verify(mockMetaClient).reloadActiveTimeline();
+    // verify existing meta client is used to create commit state
+    verify(mockCommitStateCreator).create(mockMetaClient, COMMIT);
+  }
+
+  private Pair<HudiTargetClient.CommitState, HoodieTableMetaClient> initMocksForBeginSync(
+      HudiTargetClient targetClient) {
+    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
+    when(mockHudiTableManager.initializeHudiTable(TABLE)).thenReturn(mockMetaClient);
     HudiTargetClient.CommitState mockCommitState = mock(HudiTargetClient.CommitState.class);
     when(mockCommitStateCreator.create(mockMetaClient, COMMIT)).thenReturn(mockCommitState);
-    hudiTargetClient.beginSync(table);
+    targetClient.beginSync(TABLE);
     return Pair.of(mockCommitState, mockMetaClient);
   }
 }
