@@ -105,6 +105,7 @@ public class TestHudiTargetClient {
   private static final OneSchema SCHEMA =
       OneSchema.builder()
           .name("test_schema")
+          .dataType(OneType.RECORD)
           .fields(
               Arrays.asList(
                   OneField.builder().name(FIELD_1).schema(STRING_SCHEMA).build(), PARTITION_FIELD))
@@ -225,7 +226,7 @@ public class TestHudiTargetClient {
     targetClient.completeSync();
 
     Instant syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
-    String instantTime = HoodieInstantTimeGenerator.getInstantFromTemporalAccessor(syncedInstant);
+    String instantTime = HudiTargetClient.convertInstantToCommit(syncedInstant);
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(metaClient, instantTime, partitionPath, filePath, fileName);
@@ -235,11 +236,13 @@ public class TestHudiTargetClient {
     assertSchema(metaClient);
   }
 
+  // TODO move to unit test
   @Test
   void getTableMetadataWhenMetadataDoesNotExist() {
     assertEquals(Optional.empty(), targetClient.getTableMetadata());
   }
 
+  // TODO move to unit test
   @Test
   void updateToPartitionSpecThrowsException() {
     targetClient.beginSync(initialState);

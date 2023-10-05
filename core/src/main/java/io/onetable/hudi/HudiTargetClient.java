@@ -19,6 +19,9 @@
 package io.onetable.hudi;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,6 +43,7 @@ import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
+import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
@@ -163,10 +167,16 @@ public class HudiTargetClient implements TargetClient {
     HoodieJavaWriteClient<?> writeClient =
         new HoodieJavaWriteClient<>(
             new HoodieJavaEngineContext(new Configuration()), getWriteConfig());
-    String instant =
-        HoodieInstantTimeGenerator.getInstantFromTemporalAccessor(table.getLatestCommitTime());
+    String instant = convertInstantToCommit(table.getLatestCommitTime());
     writeClient.startCommitWithTime(instant, HoodieTimeline.REPLACE_COMMIT_ACTION);
-    this.commitState = new CommitState(writeClient, instant);
+    this.commitState =
+        new CommitState(
+            writeClient, instant, avroSchemaConverter.fromOneSchema(table.getReadSchema()));
+  }
+
+  static String convertInstantToCommit(Instant instant) {
+    LocalDateTime instantTime = instant.atZone(ZoneId.systemDefault()).toLocalDateTime();
+    return HoodieInstantTimeGenerator.getInstantFromTemporalAccessor(instantTime);
   }
 
   @Override
@@ -181,10 +191,38 @@ public class HudiTargetClient implements TargetClient {
             Option.empty());
     commitState.commit();
     commitState = null;
+    metaClient.reloadActiveTimeline();
   }
 
   @Override
   public Optional<OneTableMetadata> getTableMetadata() {
+    if (metaClient != null) {
+      return metaClient
+          .getActiveTimeline()
+          .getCommitsTimeline()
+          .filterCompletedInstants()
+          .lastInstant()
+          .toJavaOptional()
+          .map(
+              instant -> {
+                try {
+                  if (instant.getAction().equals(HoodieTimeline.REPLACE_COMMIT_ACTION)) {
+                    return HoodieReplaceCommitMetadata.fromBytes(
+                            metaClient.getActiveTimeline().getInstantDetails(instant).get(),
+                            HoodieReplaceCommitMetadata.class)
+                        .getExtraMetadata();
+                  } else {
+                    return HoodieCommitMetadata.fromBytes(
+                            metaClient.getActiveTimeline().getInstantDetails(instant).get(),
+                            HoodieCommitMetadata.class)
+                        .getExtraMetadata();
+                  }
+                } catch (IOException ex) {
+                  throw new OneIOException("Unable to read Hudi commit metadata", ex);
+                }
+              })
+          .flatMap(OneTableMetadata::fromMap);
+    }
     return Optional.empty();
   }
 
@@ -196,10 +234,10 @@ public class HudiTargetClient implements TargetClient {
     @Setter private OneTableMetadata oneTableMetadata;
     private Map<String, List<String>> partitionToReplacedFileIds;
 
-    CommitState(HoodieJavaWriteClient<?> writeClient, String instantTime) {
+    CommitState(HoodieJavaWriteClient<?> writeClient, String instantTime, Schema initialSchema) {
       this.writeClient = writeClient;
       this.instantTime = instantTime;
-      this.schema = null;
+      this.schema = initialSchema;
       this.writeStatuses = Collections.emptyList();
       this.oneTableMetadata = null;
       this.partitionToReplacedFileIds = Collections.emptyMap();
