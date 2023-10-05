@@ -74,7 +74,7 @@ public class TestHudiTargetClient {
 
   @BeforeEach
   void setUp() {
-    when(mockHudiTableManager.loadTableIfExists(BASE_PATH, CONFIGURATION)).thenReturn(null);
+    when(mockHudiTableManager.loadTableIfExists(BASE_PATH)).thenReturn(null);
     hudiTargetClient =
         new HudiTargetClient(
             BASE_PATH,

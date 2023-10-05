@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.hadoop.conf.Configuration;
@@ -39,22 +40,17 @@ import io.onetable.model.schema.OnePartitionField;
 
 /** A class used to create or read Hudi tables. */
 @Slf4j
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@RequiredArgsConstructor(staticName = "of")
 class HudiTableManager {
-  private static final HudiTableManager INSTANCE = new HudiTableManager();
-
-  public static HudiTableManager getInstance() {
-    return INSTANCE;
-  }
+  private final Configuration configuration;
 
   /**
    * Loads the meta client for the table at the base path if it exists
    *
    * @param basePath the path for the table
-   * @param configuration the hadoop configuration
    * @return {@link HoodieTableMetaClient} if table exists, otherwise null
    */
-  HoodieTableMetaClient loadTableIfExists(String basePath, Configuration configuration) {
+  HoodieTableMetaClient loadTableIfExists(String basePath) {
     try {
       return HoodieTableMetaClient.builder()
           .setBasePath(basePath)
@@ -87,7 +83,7 @@ class HudiTableManager {
                   .map(OnePartitionField::getSourceField)
                   .map(OneField::getPath)
                   .collect(Collectors.joining(",")))
-          .initTable(new Configuration(), table.getBasePath());
+          .initTable(configuration, table.getBasePath());
     } catch (IOException ex) {
       throw new OneIOException("Unable to initialize Hudi table", ex);
     }

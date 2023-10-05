@@ -25,6 +25,7 @@ import static io.onetable.hudi.HudiTestUtil.initTableAndGetMetaClient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -84,7 +85,7 @@ import io.onetable.model.storage.TableFormat;
  * to disk.
  */
 public class ITHudiTargetClient {
-  @TempDir public static java.nio.file.Path tempDir;
+  @TempDir public static Path tempDir;
   private static final Configuration CONFIGURATION = new Configuration();
   private static final HoodieEngineContext CONTEXT = new HoodieJavaEngineContext(CONFIGURATION);
 

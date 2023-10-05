@@ -83,7 +83,7 @@ public class HudiTargetClient implements TargetClient {
         BaseFileUpdatesExtractor.of(
             new HoodieJavaEngineContext(configuration), perTableConfig.getTableBasePath()),
         AvroSchemaConverter.getInstance(),
-        HudiTableManager.getInstance(),
+        HudiTableManager.of(configuration),
         CommitState::new);
   }
 
@@ -98,7 +98,7 @@ public class HudiTargetClient implements TargetClient {
     this.avroSchemaConverter = avroSchemaConverter;
     this.hudiTableManager = hudiTableManager;
     // create meta client if table already exists
-    this.metaClient = hudiTableManager.loadTableIfExists(basePath, configuration);
+    this.metaClient = hudiTableManager.loadTableIfExists(basePath);
     this.commitStateCreator = commitStateCreator;
   }
 
