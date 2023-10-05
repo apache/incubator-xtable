@@ -52,6 +52,8 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.LocalFileSystem;
+import org.apache.hudi.common.model.WriteOperationType;
+import org.apache.hudi.common.util.CommitUtils;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.junit.jupiter.api.Assertions;
@@ -506,8 +508,10 @@ public class TestHudiTable implements Closeable {
     return deletes;
   }
 
-  public void deletePartition(String partition) {
-    String instant = getStartCommitInstant();
+  public void deletePartition(String partition, HoodieTableType tableType) {
+    String actionType = CommitUtils.getCommitActionType(
+        WriteOperationType.DELETE_PARTITION, tableType);
+    String instant = getStartCommitOfActionType(actionType);
     HoodieWriteResult result =
         writeClient.deletePartitions(Collections.singletonList(partition), instant);
     assertNoWriteErrors(result.getWriteStatuses().collect());
@@ -551,6 +555,10 @@ public class TestHudiTable implements Closeable {
 
   private String getStartCommitInstant() {
     return writeClient.startCommit(metaClient.getCommitActionType(), metaClient);
+  }
+
+  private String getStartCommitOfActionType(String actionType) {
+    return writeClient.startCommit(actionType, metaClient);
   }
 
   public String getBasePath() {
