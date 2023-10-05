@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -106,24 +105,25 @@ public class BaseFileUpdatesExtractor {
                           OneDataFiles.collectionBuilder()
                               .files(Collections.singletonList(file))
                               .build());
-                  List<String> fileIdsToRemove =
+                  List<HoodieBaseFile> baseFiles =
                       fsView
                           .getLatestBaseFiles(file.getPartitionPath())
-                          .map(
-                              baseFile -> {
-                                String baseFilePath = baseFile.getPath();
-                                // remove the file from the map, if it was present, so it is not
-                                // added to the commit since it is already present in the Hudi table
-                                OneDataFile snapshotFile = physicalPathToFile.remove(baseFilePath);
-                                // if snapshotFile was not found, it means this file was deleted in
-                                // the source and needs to be removed from the Hudi table
-                                return snapshotFile == null ? baseFile.getFileId() : null;
-                              })
-                          .filter(Objects::nonNull)
                           .collect(Collectors.toList());
-                  // for the remaining entries in the map, add the files to the commit
+                  Set<String> existingPaths =
+                      baseFiles.stream().map(HoodieBaseFile::getPath).collect(Collectors.toSet());
+                  // Mark fileIds for removal if the file paths are no longer present in the
+                  // snapshot
+                  List<String> fileIdsToRemove =
+                      baseFiles.stream()
+                          .filter(baseFile -> !physicalPathToFile.containsKey(baseFile.getPath()))
+                          .map(HoodieBaseFile::getFileId)
+                          .collect(Collectors.toList());
+                  // for any entries in the map that are not in the set of existing paths, create a
+                  // write status to add them to the Hudi table
                   List<WriteStatus> writeStatuses =
-                      physicalPathToFile.values().stream()
+                      physicalPathToFile.entrySet().stream()
+                          .filter(entry -> !existingPaths.contains(entry.getKey()))
+                          .map(Map.Entry::getValue)
                           .map(
                               snapshotFile ->
                                   toWriteStatus(
