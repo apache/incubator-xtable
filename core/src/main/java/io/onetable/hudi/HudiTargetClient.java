@@ -31,7 +31,6 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
-import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -50,7 +49,6 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.Option;
-import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.config.HoodieWriteConfig;
 
 import io.onetable.avro.AvroSchemaConverter;
@@ -73,9 +71,6 @@ public class HudiTargetClient implements TargetClient {
   private final HudiTableManager hudiTableManager;
   private final CommitStateCreator commitStateCreator;
   private HoodieTableMetaClient metaClient;
-
-  @VisibleForTesting
-  @Getter(value = AccessLevel.PACKAGE)
   private CommitState commitState;
 
   public HudiTargetClient(PerTableConfig perTableConfig, Configuration configuration) {

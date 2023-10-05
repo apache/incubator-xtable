@@ -108,6 +108,15 @@ public class TestHudiTargetClient {
   }
 
   @Test
+  void completeSync() {
+    HudiTargetClient targetClient = getTargetClient(null);
+    HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();
+    targetClient.completeSync();
+    // validate that commit is called
+    verify(mockCommitState).commit();
+  }
+
+  @Test
   void syncPartitionSpecSucceedsWithoutChanges() {
     HudiTargetClient targetClient = getTargetClient(null);
     HoodieTableMetaClient mockMetaClient = initMocksForBeginSync(targetClient).getRight();
