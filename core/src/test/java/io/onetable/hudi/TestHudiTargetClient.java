@@ -57,8 +57,8 @@ import io.onetable.model.storage.OneDataFilesDiff;
  * {@link ITHudiTargetClient}.
  */
 public class TestHudiTargetClient {
-  private static final Instant COMMIT_TIME = Instant.ofEpochMilli(1696534687433L);
-  private static final String COMMIT = "20231005143807433";
+  private static final Instant COMMIT_TIME = Instant.ofEpochMilli(1598644800000L);
+  private static final String COMMIT = "20200828200000000";
   private static final String BASE_PATH = "test-base-path";
   private static final OneTable TABLE =
       OneTable.builder().name("table").basePath(BASE_PATH).latestCommitTime(COMMIT_TIME).build();

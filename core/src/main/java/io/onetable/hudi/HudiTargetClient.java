@@ -66,6 +66,7 @@ import io.onetable.spi.sync.TargetClient;
 
 @Slf4j
 public class HudiTargetClient implements TargetClient {
+  private static final ZoneId UTC = ZoneId.of("UTC");
   private final BaseFileUpdatesExtractor baseFileUpdatesExtractor;
   private final AvroSchemaConverter avroSchemaConverter;
   private final HudiTableManager hudiTableManager;
@@ -158,7 +159,7 @@ public class HudiTargetClient implements TargetClient {
   }
 
   static String convertInstantToCommit(Instant instant) {
-    LocalDateTime instantTime = instant.atZone(ZoneId.systemDefault()).toLocalDateTime();
+    LocalDateTime instantTime = instant.atZone(UTC).toLocalDateTime();
     return HoodieInstantTimeGenerator.getInstantFromTemporalAccessor(instantTime);
   }
 
