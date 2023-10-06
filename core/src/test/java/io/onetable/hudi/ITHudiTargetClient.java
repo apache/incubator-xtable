@@ -177,7 +177,8 @@ public class ITHudiTargetClient {
     targetClient.beginSync(initialState);
     targetClient.syncFilesForDiff(dataFilesDiff);
     targetClient.syncSchema(SCHEMA);
-    OneTableMetadata latestState = OneTableMetadata.of(initialState.getLatestCommitTime());
+    OneTableMetadata latestState =
+        OneTableMetadata.of(initialState.getLatestCommitTime(), Collections.emptyList());
     targetClient.syncMetadata(latestState);
     targetClient.completeSync();
 
@@ -213,7 +214,8 @@ public class ITHudiTargetClient {
     HudiTargetClient targetClient = getTargetClient();
     targetClient.beginSync(initialState);
     targetClient.syncFilesForSnapshot(snapshot);
-    OneTableMetadata latestState = OneTableMetadata.of(initialState.getLatestCommitTime());
+    OneTableMetadata latestState =
+        OneTableMetadata.of(initialState.getLatestCommitTime(), Collections.emptyList());
     targetClient.syncMetadata(latestState);
     targetClient.completeSync();
 

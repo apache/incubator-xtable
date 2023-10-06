@@ -101,7 +101,7 @@ public class TestHudiTargetClient {
   void syncMetadata() {
     HudiTargetClient targetClient = getTargetClient(null);
     HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();
-    OneTableMetadata metadata = OneTableMetadata.of(COMMIT_TIME);
+    OneTableMetadata metadata = OneTableMetadata.of(COMMIT_TIME, Collections.emptyList());
     targetClient.syncMetadata(metadata);
     // validate that metadata is set in commitState
     verify(mockCommitState).setOneTableMetadata(metadata);
