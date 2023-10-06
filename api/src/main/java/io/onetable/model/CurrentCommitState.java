@@ -25,7 +25,14 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Value;
 
-/** Captures commits that are ready for processing now while tracking pending commits. */
+/**
+ * Represents the current state of commits that are ready for immediate processing and syncing,
+ * while also tracking pending commits intended for future incremental syncs.
+ *
+ * <p>'commitsToProcess' captures commits that are should be processed and synced in the current
+ * round. 'pendingInstants' tracks instants that are pending and should be considered for future
+ * incremental syncs.
+ */
 @Value
 @Builder
 public class CurrentCommitState<COMMIT> {

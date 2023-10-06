@@ -51,16 +51,16 @@ public interface SourceClient<COMMIT> {
   SchemaCatalog getSchemaCatalog(OneTable table, COMMIT commit);
 
   /**
-   * Extracts the {@link OneSnapshot} as of current time of invocation.
+   * Extracts the {@link OneSnapshot} as of latest state.
    *
-   * @return the current snapshot.
+   * @return {@link OneSnapshot} representing the current snapshot.
    */
   OneSnapshot getCurrentSnapshot();
 
   /**
    * Extracts a {@link TableChange} for the provided commit.
    *
-   * @param commit commit to capture changes for.
+   * @param commit commit to capture table changes for.
    * @return {@link TableChange}
    */
   TableChange getTableChangeForCommit(COMMIT commit);

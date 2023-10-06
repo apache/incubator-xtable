@@ -32,7 +32,9 @@ import io.onetable.spi.OneTableSnapshotVisitor;
 /**
  * Snapshot represents the view of the table at a specific point in time. Snapshot captures all the
  * required information (schemas, table metadata, files etc) which can be used by a query engine to
- * query the table as of {@link #version}
+ * query the table as of {@link #version}. Additionally, it also captures the pending instants
+ * before the last completed instant on the table. This can be useful for subsequent incremental
+ * processing.
  *
  * @since 0.1
  */

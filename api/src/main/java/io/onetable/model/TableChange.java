@@ -24,14 +24,14 @@ import lombok.Value;
 import io.onetable.model.storage.OneDataFilesDiff;
 
 /**
- * Captures a single commit/change done to the table at {@link #currentTableState#instant}.
+ * Captures a change in the single commit/instant done on the table.
  *
  * @since 0.1
  */
 @Value
 @Builder(toBuilder = true)
 public class TableChange {
-  // Change in files since the last commit in the source format
+  // Change in files at the specified instant
   OneDataFilesDiff filesDiff;
   // OneTable state at the specified instant
   OneTable currentTableState;
