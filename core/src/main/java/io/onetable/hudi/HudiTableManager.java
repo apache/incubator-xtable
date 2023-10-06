@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
@@ -37,7 +37,7 @@ import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 
 /** A class used to create or read Hudi tables. */
-@Slf4j
+@Log4j2
 @RequiredArgsConstructor(staticName = "of")
 class HudiTableManager {
   private final Configuration configuration;
