@@ -52,8 +52,6 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.LocalFileSystem;
-import org.apache.hudi.common.model.WriteOperationType;
-import org.apache.hudi.common.util.CommitUtils;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.junit.jupiter.api.Assertions;
@@ -77,10 +75,12 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.model.WriteConcurrencyMode;
+import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.marker.MarkerType;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.util.CommitUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieCleanConfig;
@@ -509,8 +509,8 @@ public class TestHudiTable implements Closeable {
   }
 
   public void deletePartition(String partition, HoodieTableType tableType) {
-    String actionType = CommitUtils.getCommitActionType(
-        WriteOperationType.DELETE_PARTITION, tableType);
+    String actionType =
+        CommitUtils.getCommitActionType(WriteOperationType.DELETE_PARTITION, tableType);
     String instant = getStartCommitOfActionType(actionType);
     HoodieWriteResult result =
         writeClient.deletePartitions(Collections.singletonList(partition), instant);

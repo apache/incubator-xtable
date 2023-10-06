@@ -153,7 +153,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         getCompletedAndPendingCommitsForInstants(lastPendingInstants);
     // Remove pending commits from completed commits to avoid duplicate processing.
     List<HoodieInstant> commitsToProcessNext =
-        removeCommitsFromPendingCommits(
+        removeOverlappingCommits(
             lastPendingHoodieInstantsCommitsPair.getCompletedCommits(),
             commitsPair.getCompletedCommits());
     List<Instant> pendingInstantsToProcessNext = new ArrayList<>();
@@ -250,8 +250,14 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   private List<HoodieInstant> getCommitsForInstants(List<Instant> instants) {
+    if (instants == null || instants.isEmpty()) {
+      return Collections.emptyList();
+    }
+    // Savepoint commits are not processed and commit time can overlap with other actions, hence
+    // filtering.
     Map<Instant, HoodieInstant> instantHoodieInstantMap =
         metaClient.getActiveTimeline().getInstants().stream()
+            .filter(instant -> !HoodieTimeline.SAVEPOINT_ACTION.equals(instant.getAction()))
             .collect(
                 Collectors.toMap(
                     hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()),
@@ -262,7 +268,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         .collect(Collectors.toList());
   }
 
-  private List<HoodieInstant> removeCommitsFromPendingCommits(
+  private List<HoodieInstant> removeOverlappingCommits(
       List<HoodieInstant> pendingCommits, List<HoodieInstant> commitList) {
     // If pending commits is null or empty, or if commit list is null or empty,
     // return the same pending commits.

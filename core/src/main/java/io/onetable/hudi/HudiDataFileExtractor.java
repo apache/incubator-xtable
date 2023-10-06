@@ -186,23 +186,26 @@ public class HudiDataFileExtractor implements AutoCloseable {
           HoodieReplaceCommitMetadata replaceMetadata =
               HoodieReplaceCommitMetadata.fromBytes(
                   timeline.getInstantDetails(instant).get(), HoodieReplaceCommitMetadata.class);
+
           replaceMetadata
               .getPartitionToReplaceFileIds()
               .forEach(
                   (partitionPath, fileIds) -> {
-                    Set<String> affectedFileIds = new HashSet<>(fileIds);
-                    replaceMetadata
-                        .getPartitionToWriteStats()
-                        .getOrDefault(partitionPath, Collections.emptyList())
-                        .stream()
-                        .map(HoodieWriteStat::getFileId)
-                        .forEach(affectedFileIds::add);
+                    Set<String> replacedFileIdsByPartition = new HashSet<>(fileIds);
+                    Set<String> newFileIds =
+                        replaceMetadata
+                            .getPartitionToWriteStats()
+                            .getOrDefault(partitionPath, Collections.emptyList())
+                            .stream()
+                            .map(HoodieWriteStat::getFileId)
+                            .collect(Collectors.toSet());
                     AddedAndRemovedFiles addedAndRemovedFiles =
-                        getUpdatesToPartition(
+                        getUpdatesToPartitionForReplaceCommit(
                             fsView,
                             instantToConsider,
                             partitionPath,
-                            affectedFileIds,
+                            replacedFileIdsByPartition,
+                            newFileIds,
                             partitioningFields);
                     addedFiles.addAll(addedAndRemovedFiles.getAdded());
                     removedFiles.addAll(addedAndRemovedFiles.getRemoved());
@@ -324,6 +327,36 @@ public class HudiDataFileExtractor implements AutoCloseable {
                     .forEach(filesToRemove::add);
               }
             });
+    return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
+  }
+
+  private AddedAndRemovedFiles getUpdatesToPartitionForReplaceCommit(
+      HoodieTableFileSystemView fsView,
+      HoodieInstant instantToConsider,
+      String partitionPath,
+      Set<String> replacedFileIds,
+      Set<String> newFileIds,
+      List<OnePartitionField> partitioningFields) {
+    List<OneDataFile> filesToAdd = new ArrayList<>();
+    List<OneDataFile> filesToRemove = new ArrayList<>();
+    Map<OnePartitionField, Range> partitionValues =
+        partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
+    Stream<HoodieFileGroup> fileGroups =
+        Stream.concat(
+            fsView.getAllFileGroups(partitionPath),
+            fsView.getReplacedFileGroupsBeforeOrOn(
+                instantToConsider.getTimestamp(), partitionPath));
+    fileGroups.forEach(
+        fileGroup -> {
+          List<HoodieBaseFile> baseFiles = fileGroup.getAllBaseFiles().collect(Collectors.toList());
+          String fileId = fileGroup.getFileGroupId().getFileId();
+          if (newFileIds.contains(fileId)) {
+            filesToAdd.add(buildFileWithoutStats(partitionPath, partitionValues, baseFiles.get(0)));
+          } else if (replacedFileIds.contains(fileId)) {
+            filesToRemove.add(
+                buildFileWithoutStats(partitionPath, partitionValues, baseFiles.get(0)));
+          }
+        });
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
   }
 
