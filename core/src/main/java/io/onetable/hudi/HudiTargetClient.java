@@ -44,6 +44,7 @@ import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
@@ -225,6 +226,14 @@ public class HudiTargetClient implements TargetClient {
     }
 
     public void commit() {
+      if (schema == null) {
+        try {
+          // reuse existing table schema if no schema is provided as part of this commit
+          schema = new TableSchemaResolver(metaClient).getTableAvroSchema();
+        } catch (Exception ex) {
+          throw new OneIOException("Unable to read Hudi table schema", ex);
+        }
+      }
       try (HoodieJavaWriteClient<?> writeClient =
           new HoodieJavaWriteClient<>(
               new HoodieJavaEngineContext(new Configuration()), getWriteConfig(schema))) {

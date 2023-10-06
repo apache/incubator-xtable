@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,6 +41,7 @@ import lombok.SneakyThrows;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.hadoop.conf.Configuration;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -173,7 +175,7 @@ public class ITHudiTargetClient {
             .build();
     // perform sync
     HudiTargetClient targetClient = getTargetClient();
-    OneTable initialState = getState();
+    OneTable initialState = getState(Instant.now());
     targetClient.beginSync(initialState);
     targetClient.syncFilesForDiff(dataFilesDiff);
     targetClient.syncSchema(SCHEMA);
@@ -211,7 +213,7 @@ public class ITHudiTargetClient {
                         .build()))
             .build();
     // sync snapshot and metadata
-    OneTable initialState = getState();
+    OneTable initialState = getState(Instant.now());
     HudiTargetClient targetClient = getTargetClient();
     targetClient.beginSync(initialState);
     targetClient.syncFilesForSnapshot(snapshot);
@@ -232,6 +234,97 @@ public class ITHudiTargetClient {
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
     }
     assertSchema(metaClient, false);
+  }
+
+  @Test
+  void archiveTimelineAndCleanMetadataTableAfterMultipleCommits() {
+    String partitionPath = "partition_path";
+    String fileName1 = "file_1.parquet";
+    String filePath1 = partitionPath + "/" + fileName1;
+    OneDataFiles snapshot =
+        OneDataFiles.collectionBuilder()
+            .files(
+                Collections.singletonList(
+                    OneDataFiles.collectionBuilder()
+                        .partitionPath(partitionPath)
+                        .files(Collections.singletonList(getTestFile(partitionPath, fileName1)))
+                        .build()))
+            .build();
+    // sync snapshot and metadata
+    OneTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));
+    HudiTargetClient targetClient = getTargetClient();
+    targetClient.beginSync(initialState);
+    targetClient.syncFilesForSnapshot(snapshot);
+    OneTableMetadata latestState =
+        OneTableMetadata.of(initialState.getLatestCommitTime(), Collections.emptyList());
+    targetClient.syncMetadata(latestState);
+    targetClient.syncSchema(initialState.getReadSchema());
+    targetClient.completeSync();
+
+    Instant syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
+    String instantTime = HudiTargetClient.convertInstantToCommit(syncedInstant);
+    HoodieTableMetaClient metaClient =
+        HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
+    assertFileGroupCorrectness(metaClient, instantTime, partitionPath, filePath1, fileName1);
+    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+        new HoodieBackedTableMetadata(
+            CONTEXT, getHoodieWriteConfig(metaClient).getMetadataConfig(), tableBasePath, true)) {
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
+    }
+
+    // create a new commit that removes fileName1 and adds fileName2
+    String fileName2 = "file_2.parquet";
+    String filePath2 = partitionPath + "/" + fileName2;
+    OneDataFilesDiff dataFilesDiff =
+        OneDataFilesDiff.builder()
+            .fileAdded(getTestFile(partitionPath, fileName2))
+            .fileRemoved(getTestFile(partitionPath, fileName1))
+            .build();
+    OneTable state2 = getState(Instant.now().minus(12, ChronoUnit.HOURS));
+    targetClient.beginSync(state2);
+    targetClient.syncFilesForDiff(dataFilesDiff);
+    latestState = OneTableMetadata.of(state2.getLatestCommitTime(), Collections.emptyList());
+    targetClient.syncMetadata(latestState);
+    targetClient.completeSync();
+
+    syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
+    String instantTime2 = HudiTargetClient.convertInstantToCommit(syncedInstant);
+    assertFileGroupCorrectness(metaClient, instantTime2, partitionPath, filePath2, fileName2);
+    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+        new HoodieBackedTableMetadata(
+            CONTEXT, getHoodieWriteConfig(metaClient).getMetadataConfig(), tableBasePath, true)) {
+      // the metadata for fileName1 should still be present until the cleaner kicks in
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
+      // new file stats should be present
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName2);
+    }
+
+    // create a new commit that adds a file but will also trigger cleanup of fileName1
+    String fileName3 = "file_3.parquet";
+    String filePath3 = partitionPath + "/" + fileName2;
+    OneDataFilesDiff dataFilesDiff2 =
+        OneDataFilesDiff.builder().fileAdded(getTestFile(partitionPath, fileName3)).build();
+    OneTable state3 = getState(Instant.now());
+    targetClient.beginSync(state3);
+    targetClient.syncFilesForDiff(dataFilesDiff2);
+    latestState = OneTableMetadata.of(state2.getLatestCommitTime(), Collections.emptyList());
+    targetClient.syncMetadata(latestState);
+    targetClient.completeSync();
+
+    syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
+    String instantTime3 = HudiTargetClient.convertInstantToCommit(syncedInstant);
+    assertFileGroupCorrectness(metaClient, instantTime3, partitionPath, filePath2, fileName2, 2);
+    assertFileGroupCorrectness(metaClient, instantTime3, partitionPath, filePath3, fileName3, 2);
+    // col stats should be cleaned up for fileName1 but present for fileName2 and fileName3
+    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+        new HoodieBackedTableMetadata(
+            CONTEXT, getHoodieWriteConfig(metaClient).getMetadataConfig(), tableBasePath, true)) {
+      assertEmptyColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName2);
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName3);
+    }
+    // the first commit to the timeline should be archived
+    assertEquals(1, metaClient.getActiveTimeline().reload().getCommitsTimeline().countInstants());
   }
 
   @SneakyThrows
@@ -275,6 +368,16 @@ public class ITHudiTargetClient {
       String partitionPath,
       String filePath,
       String fileId) {
+    assertFileGroupCorrectness(metaClient, instantTime, partitionPath, filePath, fileId, 1);
+  }
+
+  private void assertFileGroupCorrectness(
+      HoodieTableMetaClient metaClient,
+      String instantTime,
+      String partitionPath,
+      String filePath,
+      String fileId,
+      int expectedFileGroupSize) {
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             CONTEXT,
@@ -283,7 +386,7 @@ public class ITHudiTargetClient {
             getHoodieWriteConfig(metaClient).getMetadataConfig());
     List<HoodieFileGroup> fileGroups =
         fsView.getAllFileGroups(partitionPath).collect(Collectors.toList());
-    assertEquals(1, fileGroups.size());
+    assertEquals(expectedFileGroupSize, fileGroups.size());
     Option<HoodieFileGroup> fileGroupOption =
         Option.fromJavaOptional(
             fileGroups.stream()
@@ -296,6 +399,22 @@ public class ITHudiTargetClient {
     HoodieBaseFile baseFile = fileGroup.getAllBaseFiles().findFirst().get();
     assertEquals(instantTime, baseFile.getCommitTime());
     assertEquals(metaClient.getBasePathV2().toString() + "/" + filePath, baseFile.getPath());
+  }
+
+  private void assertEmptyColStats(
+      HoodieBackedTableMetadata hoodieBackedTableMetadata, String partitionPath, String fileName) {
+    Assertions.assertTrue(
+        hoodieBackedTableMetadata
+            .getColumnStats(Collections.singletonList(Pair.of(partitionPath, fileName)), FIELD_1)
+            .isEmpty());
+    Assertions.assertTrue(
+        hoodieBackedTableMetadata
+            .getColumnStats(Collections.singletonList(Pair.of(partitionPath, fileName)), FIELD_2)
+            .isEmpty());
+    Assertions.assertTrue(
+        hoodieBackedTableMetadata
+            .getColumnStats(Collections.singletonList(Pair.of(partitionPath, fileName)), FIELD_3)
+            .isEmpty());
   }
 
   private void assertColStats(
@@ -379,11 +498,11 @@ public class ITHudiTargetClient {
         .build();
   }
 
-  private OneTable getState() {
+  private OneTable getState(Instant lastCommitTime) {
     return OneTable.builder()
         .basePath(tableBasePath)
         .name(TABLE_NAME)
-        .latestCommitTime(Instant.now())
+        .latestCommitTime(lastCommitTime)
         .tableFormat(TableFormat.ICEBERG)
         .layoutStrategy(DataLayoutStrategy.HIVE_STYLE_PARTITION)
         .readSchema(SCHEMA)
