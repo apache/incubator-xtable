@@ -216,6 +216,7 @@ public class ITHudiTargetClient {
     targetClient.syncFilesForSnapshot(snapshot);
     OneTableMetadata latestState =
         OneTableMetadata.of(initialState.getLatestCommitTime(), Collections.emptyList());
+    targetClient.syncSchema(initialState.getReadSchema());
     targetClient.syncMetadata(latestState);
     targetClient.completeSync();
 
@@ -395,6 +396,11 @@ public class ITHudiTargetClient {
 
   private HudiTargetClient getTargetClient() {
     return new HudiTargetClient(
-        PerTableConfig.builder().tableBasePath(tableBasePath).build(), CONFIGURATION);
+        PerTableConfig.builder()
+            .tableBasePath(tableBasePath)
+            .targetTableFormats(Collections.singletonList(TableFormat.HUDI))
+            .tableName("test_table")
+            .build(),
+        CONFIGURATION);
   }
 }

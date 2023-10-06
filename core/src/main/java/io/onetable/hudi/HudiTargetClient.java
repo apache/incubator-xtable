@@ -259,7 +259,7 @@ public class HudiTargetClient implements TargetClient {
       return HoodieWriteConfig.newBuilder()
           .withPath(metaClient.getBasePathV2().toString())
           .withEmbeddedTimelineServerEnabled(false)
-          .withSchema(schema.toString())
+          .withSchema(schema == null ? "" : schema.toString())
           .withMetadataConfig(
               HoodieMetadataConfig.newBuilder()
                   .enable(true)
