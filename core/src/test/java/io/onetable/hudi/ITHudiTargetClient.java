@@ -301,19 +301,19 @@ public class ITHudiTargetClient {
 
     // create a new commit that adds a file but will also trigger cleanup of fileName1
     String fileName3 = "file_3.parquet";
-    String filePath3 = partitionPath + "/" + fileName2;
+    String filePath3 = partitionPath + "/" + fileName3;
     OneDataFilesDiff dataFilesDiff2 =
         OneDataFilesDiff.builder().fileAdded(getTestFile(partitionPath, fileName3)).build();
     OneTable state3 = getState(Instant.now());
     targetClient.beginSync(state3);
     targetClient.syncFilesForDiff(dataFilesDiff2);
-    latestState = OneTableMetadata.of(state2.getLatestCommitTime(), Collections.emptyList());
+    latestState = OneTableMetadata.of(state3.getLatestCommitTime(), Collections.emptyList());
     targetClient.syncMetadata(latestState);
     targetClient.completeSync();
 
     syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
     String instantTime3 = HudiTargetClient.convertInstantToCommit(syncedInstant);
-    assertFileGroupCorrectness(metaClient, instantTime3, partitionPath, filePath2, fileName2, 2);
+    assertFileGroupCorrectness(metaClient, instantTime2, partitionPath, filePath2, fileName2, 2);
     assertFileGroupCorrectness(metaClient, instantTime3, partitionPath, filePath3, fileName3, 2);
     // col stats should be cleaned up for fileName1 but present for fileName2 and fileName3
     try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
@@ -521,6 +521,7 @@ public class ITHudiTargetClient {
             .tableBasePath(tableBasePath)
             .targetTableFormats(Collections.singletonList(TableFormat.HUDI))
             .tableName("test_table")
+            .targetMetadataRetentionInHours(20)
             .build(),
         CONFIGURATION);
   }

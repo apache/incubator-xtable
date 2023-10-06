@@ -57,6 +57,7 @@ import io.onetable.model.storage.OneDataFilesDiff;
  * {@link ITHudiTargetClient}.
  */
 public class TestHudiTargetClient {
+  private static final int RETENTION_IN_HOURS = 1;
   private static final Instant COMMIT_TIME = Instant.ofEpochMilli(1598644800000L);
   private static final String COMMIT = "20200828200000000";
   private static final String BASE_PATH = "test-base-path";
@@ -74,6 +75,7 @@ public class TestHudiTargetClient {
     when(mockHudiTableManager.loadTableIfExists(BASE_PATH)).thenReturn(mockMetaClient);
     return new HudiTargetClient(
         BASE_PATH,
+        RETENTION_IN_HOURS,
         mockBaseFileUpdatesExtractor,
         mockAvroSchemaConverter,
         mockHudiTableManager,
@@ -211,7 +213,7 @@ public class TestHudiTargetClient {
     // verify meta client timeline refreshed
     verify(mockMetaClient).reloadActiveTimeline();
     // verify existing meta client is used to create commit state
-    verify(mockCommitStateCreator).create(mockMetaClient, COMMIT);
+    verify(mockCommitStateCreator).create(mockMetaClient, COMMIT, RETENTION_IN_HOURS);
   }
 
   private Pair<HudiTargetClient.CommitState, HoodieTableMetaClient> initMocksForBeginSync(
@@ -219,7 +221,8 @@ public class TestHudiTargetClient {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     when(mockHudiTableManager.initializeHudiTable(TABLE)).thenReturn(mockMetaClient);
     HudiTargetClient.CommitState mockCommitState = mock(HudiTargetClient.CommitState.class);
-    when(mockCommitStateCreator.create(mockMetaClient, COMMIT)).thenReturn(mockCommitState);
+    when(mockCommitStateCreator.create(mockMetaClient, COMMIT, RETENTION_IN_HOURS))
+        .thenReturn(mockCommitState);
     targetClient.beginSync(TABLE);
     return Pair.of(mockCommitState, mockMetaClient);
   }
