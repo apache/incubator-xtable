@@ -75,10 +75,12 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.model.WriteConcurrencyMode;
+import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.marker.MarkerType;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.util.CommitUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieCleanConfig;
@@ -506,8 +508,10 @@ public class TestHudiTable implements Closeable {
     return deletes;
   }
 
-  public void deletePartition(String partition) {
-    String instant = getStartCommitInstant();
+  public void deletePartition(String partition, HoodieTableType tableType) {
+    String actionType =
+        CommitUtils.getCommitActionType(WriteOperationType.DELETE_PARTITION, tableType);
+    String instant = getStartCommitOfActionType(actionType);
     HoodieWriteResult result =
         writeClient.deletePartitions(Collections.singletonList(partition), instant);
     assertNoWriteErrors(result.getWriteStatuses().collect());
@@ -551,6 +555,10 @@ public class TestHudiTable implements Closeable {
 
   private String getStartCommitInstant() {
     return writeClient.startCommit(metaClient.getCommitActionType(), metaClient);
+  }
+
+  private String getStartCommitOfActionType(String actionType) {
+    return writeClient.startCommit(actionType, metaClient);
   }
 
   public String getBasePath() {

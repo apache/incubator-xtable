@@ -18,6 +18,10 @@
  
 package io.onetable.model;
 
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+
 import lombok.Builder;
 import lombok.Value;
 
@@ -43,6 +47,8 @@ public class OneSnapshot {
   SchemaCatalog schemaCatalog;
   // List of data file groupings
   OneDataFiles dataFiles;
+  // pending commits before latest commit on the table.
+  @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
 
   public void acceptVisitor(OneTableSnapshotVisitor defaultDataFileVisitor) {
     defaultDataFileVisitor.visit(this);

@@ -19,12 +19,13 @@
 package io.onetable.spi.extractor;
 
 import java.time.Instant;
-import java.util.List;
 
+import io.onetable.model.CurrentCommitState;
+import io.onetable.model.InstantsForIncrementalSync;
+import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
+import io.onetable.model.TableChange;
 import io.onetable.model.schema.SchemaCatalog;
-import io.onetable.model.storage.OneDataFiles;
-import io.onetable.model.storage.OneDataFilesDiff;
 
 /**
  * A client that provides the major functionality for extracting the state at a given instant in a
@@ -50,51 +51,27 @@ public interface SourceClient<COMMIT> {
   SchemaCatalog getSchemaCatalog(OneTable table, COMMIT commit);
 
   /**
-   * Extracts all of the {@link OneDataFiles} for the table, grouped by partition.
+   * Extracts the {@link OneSnapshot} as of current time of invocation.
    *
-   * @param commit the commit to consider for reading the files
-   * @param tableDefinition the OneTable definition of the table defining the schema, partitioning
-   *     fields, etc. to use when converting into the OneTable format.
-   * @return a list of files grouped by partition
+   * @return the current snapshot.
    */
-  OneDataFiles getFilesForAllPartitions(COMMIT commit, OneTable tableDefinition);
+  OneSnapshot getCurrentSnapshot();
 
   /**
-   * Extracts a {@link OneDataFilesDiff} that contains all the {@link
-   * io.onetable.model.storage.OneDataFile} added or removed by updates that happened after the
-   * provided `afterCommit` up to and including the `untilCommit`.
+   * Extracts a {@link TableChange} for the provided commit.
    *
-   * @param startCommit limit the changes to commits that are strictly after (and not including)
-   *     this commit
-   * @param endCommit limit the changes to commits up to and including this commit * @param
-   * @param tableDefinition the OneTable definition of the table defining the schema, partition
-   *     fields, etc. to use when converting into the OneTable format.
-   * @return a list of files grouped by partition
+   * @param commit commit to capture changes for.
+   * @return {@link TableChange}
    */
-  OneDataFilesDiff getFilesDiffBetweenCommits(
-      COMMIT startCommit, COMMIT endCommit, OneTable tableDefinition);
+  TableChange getTableChangeForCommit(COMMIT commit);
 
   /**
-   * Get all the commit times that occurred after the provided commit from oldest to newest.
+   * Retrieves {@link CurrentCommitState} to process based on the provided {@link
+   * InstantsForIncrementalSync}.
    *
-   * @param afterCommit only return commits that are strictly after (and not including) this commit
-   * @return list of commit times after the provided commit time, sorted from oldest to newest
-   *     commit
+   * @param instantsForIncrementalSync The input to determine the next commits to process.
+   * @return {@link CurrentCommitState} to process.
    */
-  List<COMMIT> getCommits(COMMIT afterCommit);
-
-  /**
-   * Get the latest completed commit in the source table.
-   *
-   * @return the latest completed commit
-   */
-  COMMIT getLatestCommit();
-
-  /**
-   * Gets the last commit made at or before the provided instant from the source table.
-   *
-   * @param instant point in time
-   * @return the commit at or before the provided instant
-   */
-  COMMIT getCommitAtInstant(Instant instant);
+  CurrentCommitState<COMMIT> getCurrentCommitState(
+      InstantsForIncrementalSync instantsForIncrementalSync);
 }

@@ -56,7 +56,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -195,7 +194,6 @@ public class ITOneTableClient {
     }
   }
 
-  @Disabled("Enable after subsequent implementation")
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
   public void testConcurrentInsertWritesInSource(
@@ -237,7 +235,6 @@ public class ITOneTableClient {
     }
   }
 
-  @Disabled("Enable after subsequent implementation")
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndSyncModes")
   public void testConcurrentInsertsAndTableServiceWrites(
@@ -388,7 +385,7 @@ public class ITOneTableClient {
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
 
-      table.deletePartition(partitionToDelete);
+      table.deletePartition(partitionToDelete, tableType);
 
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
