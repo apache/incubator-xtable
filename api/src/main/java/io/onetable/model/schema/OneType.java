@@ -18,6 +18,10 @@
  
 package io.onetable.model.schema;
 
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
 import lombok.Getter;
 import lombok.ToString;
 
@@ -52,4 +56,15 @@ public enum OneType {
   OneType() {
     this.name = this.name().toLowerCase();
   }
+
+  public static final Set<OneType> NON_SCALAR_TYPES =
+      Collections.unmodifiableSet(
+          new HashSet<OneType>() {
+            {
+              add(RECORD);
+              add(ARRAY);
+              add(MAP);
+              add(UNION);
+            }
+          });
 }

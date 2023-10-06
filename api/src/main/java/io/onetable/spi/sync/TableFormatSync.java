@@ -21,6 +21,7 @@ package io.onetable.spi.sync;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,6 +30,7 @@ import lombok.AllArgsConstructor;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
+import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
@@ -56,7 +58,8 @@ public class TableFormatSync {
           SyncMode.FULL,
           oneTable,
           client -> client.syncFilesForSnapshot(snapshot.getDataFiles()),
-          startTime);
+          startTime,
+          snapshot.getPendingCommits());
     } catch (Exception e) {
       LOG.error("Failed to sync snapshot", e);
       return buildResultForError(SyncMode.FULL, startTime, e);
@@ -69,9 +72,9 @@ public class TableFormatSync {
    * @param changes the changes from the source table format that need to be applied
    * @return the results of trying to sync each change
    */
-  public List<SyncResult> syncChanges(List<TableChange> changes) {
+  public List<SyncResult> syncChanges(IncrementalTableChanges changes) {
     List<SyncResult> results = new ArrayList<>();
-    for (TableChange change : changes) {
+    for (TableChange change : changes.getTableChanges()) {
       Instant startTime = Instant.now();
       try {
         results.add(
@@ -79,7 +82,8 @@ public class TableFormatSync {
                 SyncMode.INCREMENTAL,
                 change.getCurrentTableState(),
                 client -> client.syncFilesForDiff(change.getFilesDiff()),
-                startTime));
+                startTime,
+                changes.getPendingCommits()));
       } catch (Exception e) {
         // Fallback to a sync where table changes are from changes.getInstant() to latest, write a
         // test case for this.
@@ -96,8 +100,19 @@ public class TableFormatSync {
     return client.getTableMetadata().map(OneTableMetadata::getLastInstantSynced);
   }
 
+  public List<Instant> getPendingInstantsToConsiderForNextSync() {
+    return client
+        .getTableMetadata()
+        .map(OneTableMetadata::getInstantsToConsiderForNextSync)
+        .orElse(Collections.emptyList());
+  }
+
   private SyncResult getSyncResult(
-      SyncMode mode, OneTable tableState, SyncFiles fileSyncMethod, Instant startTime) {
+      SyncMode mode,
+      OneTable tableState,
+      SyncFiles fileSyncMethod,
+      Instant startTime,
+      List<Instant> pendingCommits) {
     // initialize the sync
     client.beginSync(tableState);
     // sync schema updates
@@ -107,7 +122,8 @@ public class TableFormatSync {
     // Update the files in the target table
     fileSyncMethod.sync(client);
     // Persist the latest commit time in table properties for incremental syncs.
-    OneTableMetadata latestState = OneTableMetadata.of(tableState.getLatestCommitTime());
+    OneTableMetadata latestState =
+        OneTableMetadata.of(tableState.getLatestCommitTime(), pendingCommits);
     client.syncMetadata(latestState);
     client.completeSync();
 
