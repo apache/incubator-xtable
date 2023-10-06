@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 
 import lombok.Getter;
 import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
@@ -64,7 +63,6 @@ import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.sync.TargetClient;
 
-@Slf4j
 public class HudiTargetClient implements TargetClient {
   private static final ZoneId UTC = ZoneId.of("UTC");
   private final BaseFileUpdatesExtractor baseFileUpdatesExtractor;
