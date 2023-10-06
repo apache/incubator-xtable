@@ -30,8 +30,8 @@ import lombok.Value;
  * while also tracking pending commits intended for future incremental syncs.
  *
  * <p>'commitsToProcess' captures commits that are should be processed and synced in the current
- * round. 'pendingInstants' tracks instants that are pending and should be considered for future
- * incremental syncs.
+ * round. 'pendingInstants' tracks instants that are pending at the start of the sync process and
+ * should be considered for future incremental syncs.
  */
 @Value
 @Builder

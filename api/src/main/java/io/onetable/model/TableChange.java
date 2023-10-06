@@ -24,7 +24,7 @@ import lombok.Value;
 import io.onetable.model.storage.OneDataFilesDiff;
 
 /**
- * Captures a change in the single commit/instant done on the table.
+ * Captures the changes in a single commit/instant from the source table.
  *
  * @since 0.1
  */
