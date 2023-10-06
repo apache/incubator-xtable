@@ -187,10 +187,11 @@ public class ITHudiTargetClient {
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(metaClient, instantTime, partitionPath, filePath, fileName);
-    HoodieBackedTableMetadata hoodieBackedTableMetadata =
+    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
         new HoodieBackedTableMetadata(
-            CONTEXT, writeConfig.getMetadataConfig(), tableBasePath, true);
-    assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
+            CONTEXT, writeConfig.getMetadataConfig(), tableBasePath, true)) {
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
+    }
     // include meta fields since the table was created with meta fields enabled
     assertSchema(metaClient, true);
   }
@@ -225,10 +226,11 @@ public class ITHudiTargetClient {
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(metaClient, instantTime, partitionPath, filePath, fileName);
-    HoodieBackedTableMetadata hoodieBackedTableMetadata =
+    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
         new HoodieBackedTableMetadata(
-            CONTEXT, getHoodieWriteConfig(metaClient).getMetadataConfig(), tableBasePath, true);
-    assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
+            CONTEXT, getHoodieWriteConfig(metaClient).getMetadataConfig(), tableBasePath, true)) {
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
+    }
     assertSchema(metaClient, false);
   }
 
