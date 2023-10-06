@@ -26,8 +26,23 @@ import lombok.Builder;
 import lombok.Value;
 
 /**
- * Instants to consider for incremental sync. Also tracking pending commits to account for commits
- * that are started earlier than the last sync instant but not yet completed during the last sync.
+ * Instants to consider for incremental sync. Along with lastSyncInstant, pendingCommits are also
+ * captured to account for commits that are started earlier than the last sync instant but not yet
+ * completed during the last sync.
+ *
+ * <p>Example Scenario:
+ *
+ * <p>Suppose we have a table with a history of commits: - t1 (completed) - t2 (in-progress) - t3
+ * (completed) - t4 (completed)
+ *
+ * <p>When performing the first sync, we sync t1, t3, and t4, while tracking t2 as pending.
+ *
+ * <p>Now, if the table's state has evolved to: - t1 (completed) - t2 (completed) - t3 (completed) -
+ * t4 (completed) - t5 (completed) - t6 (completed) - t7 (in-progress)
+ *
+ * <p>For the next incremental sync, we provide the lastSyncInstant as t4 and pendingCommits as
+ * [t2]. This means we'll sync t2, t5, and t6. We do not track t7 because it doesn't come before the
+ * lastSyncInstant.
  */
 @Value
 @Builder
