@@ -31,12 +31,10 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.hadoop.HadoopTables;
 
 import io.onetable.client.PerTableConfig;
-import io.onetable.model.OneTable;
+import io.onetable.model.*;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.SchemaCatalog;
-import io.onetable.model.storage.OneDataFiles;
-import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.extractor.SourceClient;
 
@@ -82,28 +80,18 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   }
 
   @Override
-  public OneDataFiles getFilesForAllPartitions(Snapshot snapshot, OneTable tableDefinition) {
+  public OneSnapshot getCurrentSnapshot() {
     return null;
   }
 
   @Override
-  public OneDataFilesDiff getFilesDiffBetweenCommits(
-      Snapshot startCommit, Snapshot endCommit, OneTable tableDefinition) {
+  public TableChange getTableChangeForCommit(Snapshot snapshot) {
     return null;
   }
 
   @Override
-  public List<Snapshot> getCommits(Snapshot afterCommit) {
-    return null;
-  }
-
-  @Override
-  public Snapshot getLatestCommit() {
-    return null;
-  }
-
-  @Override
-  public Snapshot getCommitAtInstant(Instant instant) {
+  public CurrentCommitState<Snapshot> getCurrentCommitState(
+      InstantsForIncrementalSync instantsForIncrementalSync) {
     return null;
   }
 }
