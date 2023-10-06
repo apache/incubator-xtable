@@ -65,6 +65,7 @@ import io.onetable.spi.sync.TargetClient;
 
 public class HudiTargetClient implements TargetClient {
   private static final ZoneId UTC = ZoneId.of("UTC");
+
   private final BaseFileUpdatesExtractor baseFileUpdatesExtractor;
   private final AvroSchemaConverter avroSchemaConverter;
   private final HudiTableManager hudiTableManager;
@@ -92,7 +93,7 @@ public class HudiTargetClient implements TargetClient {
     this.avroSchemaConverter = avroSchemaConverter;
     this.hudiTableManager = hudiTableManager;
     // create meta client if table already exists
-    this.metaClient = hudiTableManager.loadTableIfExists(basePath);
+    this.metaClient = hudiTableManager.loadTableMetaClientIfExists(basePath);
     this.commitStateCreator = commitStateCreator;
   }
 

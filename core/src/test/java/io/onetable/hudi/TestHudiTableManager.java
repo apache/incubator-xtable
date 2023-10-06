@@ -90,7 +90,7 @@ public class TestHudiTableManager {
   @Test
   void loadExistingTable() {
     HudiTestUtil.initTableAndGetMetaClient(tableBasePath, "timestamp");
-    HoodieTableMetaClient metaClient = tableManager.loadTableIfExists(tableBasePath);
+    HoodieTableMetaClient metaClient = tableManager.loadTableMetaClientIfExists(tableBasePath);
     assertTrue(metaClient.getTableConfig().populateMetaFields());
     assertEquals(
         Collections.singletonList("timestamp"),

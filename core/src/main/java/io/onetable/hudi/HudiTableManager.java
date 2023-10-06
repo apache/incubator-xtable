@@ -36,7 +36,7 @@ import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 
-/** A class used to create or read Hudi tables. */
+/** A class used to initialize new Hudi tables and load the metadata of existing tables. */
 @Log4j2
 @RequiredArgsConstructor(staticName = "of")
 class HudiTableManager {
@@ -48,7 +48,7 @@ class HudiTableManager {
    * @param basePath the path for the table
    * @return {@link HoodieTableMetaClient} if table exists, otherwise null
    */
-  HoodieTableMetaClient loadTableIfExists(String basePath) {
+  HoodieTableMetaClient loadTableMetaClientIfExists(String basePath) {
     try {
       return HoodieTableMetaClient.builder()
           .setBasePath(basePath)
