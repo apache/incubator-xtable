@@ -521,7 +521,7 @@ public class ITHudiTargetClient {
             .tableBasePath(tableBasePath)
             .targetTableFormats(Collections.singletonList(TableFormat.HUDI))
             .tableName("test_table")
-            .targetMetadataRetentionInHours(20)
+            .targetMetadataRetentionInHours(1)
             .build(),
         CONFIGURATION);
   }
