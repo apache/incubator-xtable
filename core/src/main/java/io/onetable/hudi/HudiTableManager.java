@@ -19,6 +19,7 @@
 package io.onetable.hudi;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import lombok.RequiredArgsConstructor;
@@ -48,16 +49,17 @@ class HudiTableManager {
    * @param basePath the path for the table
    * @return {@link HoodieTableMetaClient} if table exists, otherwise null
    */
-  HoodieTableMetaClient loadTableMetaClientIfExists(String basePath) {
+  Optional<HoodieTableMetaClient> loadTableMetaClientIfExists(String basePath) {
     try {
-      return HoodieTableMetaClient.builder()
-          .setBasePath(basePath)
-          .setConf(configuration)
-          .setLoadActiveTimelineOnLoad(false)
-          .build();
+      return Optional.of(
+          HoodieTableMetaClient.builder()
+              .setBasePath(basePath)
+              .setConf(configuration)
+              .setLoadActiveTimelineOnLoad(false)
+              .build());
     } catch (TableNotFoundException ex) {
       log.info("Hudi table does not exist, will be created on first sync");
-      return null;
+      return Optional.empty();
     }
   }
 

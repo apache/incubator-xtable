@@ -70,7 +70,7 @@ public class HudiTargetClient implements TargetClient {
   private final AvroSchemaConverter avroSchemaConverter;
   private final HudiTableManager hudiTableManager;
   private final CommitStateCreator commitStateCreator;
-  private HoodieTableMetaClient metaClient;
+  private Optional<HoodieTableMetaClient> metaClient;
   private CommitState commitState;
 
   public HudiTargetClient(PerTableConfig perTableConfig, Configuration configuration) {
@@ -110,7 +110,7 @@ public class HudiTargetClient implements TargetClient {
   @Override
   public void syncPartitionSpec(List<OnePartitionField> partitionSpec) {
     List<String> existingPartitionFields =
-        metaClient
+        getMetaClient()
             .getTableConfig()
             .getPartitionFields()
             .map(Arrays::asList)
@@ -121,7 +121,7 @@ public class HudiTargetClient implements TargetClient {
             .map(OneField::getPath)
             .collect(Collectors.toList());
     if (!existingPartitionFields.equals(newPartitionFields)) {
-      throw new NotSupportedException("Partition spec changes are not supported for Hudi targets");
+      throw new NotSupportedException("Partition spec cannot be changed after creating Hudi table");
     }
   }
 
@@ -134,7 +134,7 @@ public class HudiTargetClient implements TargetClient {
   public void syncFilesForSnapshot(OneDataFiles snapshotFiles) {
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         baseFileUpdatesExtractor.extractSnapshotChanges(
-            snapshotFiles, metaClient, commitState.getInstantTime());
+            snapshotFiles, getMetaClient(), commitState.getInstantTime());
     commitState.setReplaceMetadata(replaceMetadata);
   }
 
@@ -147,14 +147,14 @@ public class HudiTargetClient implements TargetClient {
 
   @Override
   public void beginSync(OneTable table) {
-    if (metaClient == null) {
-      metaClient = hudiTableManager.initializeHudiTable(table);
+    if (!metaClient.isPresent()) {
+      metaClient = Optional.of(hudiTableManager.initializeHudiTable(table));
     } else {
       // make sure meta client has up-to-date view of the timeline
-      metaClient.reloadActiveTimeline();
+      getMetaClient().reloadActiveTimeline();
     }
     String instant = convertInstantToCommit(table.getLatestCommitTime());
-    this.commitState = commitStateCreator.create(metaClient, instant);
+    this.commitState = commitStateCreator.create(getMetaClient(), instant);
   }
 
   static String convertInstantToCommit(Instant instant) {
@@ -170,34 +170,38 @@ public class HudiTargetClient implements TargetClient {
 
   @Override
   public Optional<OneTableMetadata> getTableMetadata() {
-    if (metaClient != null) {
-      return metaClient
-          .reloadActiveTimeline()
-          .getCommitsTimeline()
-          .filterCompletedInstants()
-          .lastInstant()
-          .toJavaOptional()
-          .map(
-              instant -> {
-                try {
-                  if (instant.getAction().equals(HoodieTimeline.REPLACE_COMMIT_ACTION)) {
-                    return HoodieReplaceCommitMetadata.fromBytes(
-                            metaClient.getActiveTimeline().getInstantDetails(instant).get(),
-                            HoodieReplaceCommitMetadata.class)
-                        .getExtraMetadata();
-                  } else {
-                    return HoodieCommitMetadata.fromBytes(
-                            metaClient.getActiveTimeline().getInstantDetails(instant).get(),
-                            HoodieCommitMetadata.class)
-                        .getExtraMetadata();
-                  }
-                } catch (IOException ex) {
-                  throw new OneIOException("Unable to read Hudi commit metadata", ex);
-                }
-              })
-          .flatMap(OneTableMetadata::fromMap);
-    }
-    return Optional.empty();
+    return metaClient.flatMap(
+        client ->
+            client
+                .reloadActiveTimeline()
+                .getCommitsTimeline()
+                .filterCompletedInstants()
+                .lastInstant()
+                .toJavaOptional()
+                .map(
+                    instant -> {
+                      try {
+                        if (instant.getAction().equals(HoodieTimeline.REPLACE_COMMIT_ACTION)) {
+                          return HoodieReplaceCommitMetadata.fromBytes(
+                                  client.getActiveTimeline().getInstantDetails(instant).get(),
+                                  HoodieReplaceCommitMetadata.class)
+                              .getExtraMetadata();
+                        } else {
+                          return HoodieCommitMetadata.fromBytes(
+                                  client.getActiveTimeline().getInstantDetails(instant).get(),
+                                  HoodieCommitMetadata.class)
+                              .getExtraMetadata();
+                        }
+                      } catch (IOException ex) {
+                        throw new OneIOException("Unable to read Hudi commit metadata", ex);
+                      }
+                    })
+                .flatMap(OneTableMetadata::fromMap));
+  }
+
+  private HoodieTableMetaClient getMetaClient() {
+    return metaClient.orElseThrow(
+        () -> new IllegalStateException("beginSync must be called before calling this method"));
   }
 
   static class CommitState {

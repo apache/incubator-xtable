@@ -119,7 +119,8 @@ public class ITHudiTargetClient {
     String partitionPath = "partition_path";
     String commitTime = "20231003013807542";
     String existingFileName1 = "existing_file_1.parquet";
-    HoodieTableMetaClient setupMetaClient = initTableAndGetMetaClient(tableBasePath, PARTITION_FIELD_NAME);
+    HoodieTableMetaClient setupMetaClient =
+        initTableAndGetMetaClient(tableBasePath, PARTITION_FIELD_NAME);
     // initialize the table with only 2 of the 3 fields
     Schema initialSchema =
         SchemaBuilder.record(TEST_SCHEMA_NAME)
@@ -303,7 +304,15 @@ public class ITHudiTargetClient {
     assertColStatsForField(
         hoodieBackedTableMetadata, partitionPath, fileName, KEY_FIELD_NAME, "id1", "id2", 2, 0, 5);
     assertColStatsForField(
-        hoodieBackedTableMetadata, partitionPath, fileName, PARTITION_FIELD_NAME, "a", "b", 3, 1, 10);
+        hoodieBackedTableMetadata,
+        partitionPath,
+        fileName,
+        PARTITION_FIELD_NAME,
+        "a",
+        "b",
+        3,
+        1,
+        10);
     assertColStatsForField(
         hoodieBackedTableMetadata,
         partitionPath,

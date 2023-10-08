@@ -90,12 +90,18 @@ public class TestHudiTableManager {
   @Test
   void loadExistingTable() {
     HudiTestUtil.initTableAndGetMetaClient(tableBasePath, "timestamp");
-    HoodieTableMetaClient metaClient = tableManager.loadTableMetaClientIfExists(tableBasePath);
+    HoodieTableMetaClient metaClient =
+        tableManager.loadTableMetaClientIfExists(tableBasePath).get();
     assertTrue(metaClient.getTableConfig().populateMetaFields());
     assertEquals(
         Collections.singletonList("timestamp"),
         Arrays.asList(metaClient.getTableConfig().getPartitionFields().get()));
     assertEquals(tableBasePath, metaClient.getBasePath());
     assertEquals("test_table", metaClient.getTableConfig().getTableName());
+  }
+
+  @Test
+  void loadTableThatDoesNotExist() {
+    assertFalse(tableManager.loadTableMetaClientIfExists(tableBasePath).isPresent());
   }
 }
