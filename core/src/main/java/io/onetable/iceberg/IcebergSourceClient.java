@@ -21,9 +21,9 @@ package io.onetable.iceberg;
 import java.time.Instant;
 import java.util.List;
 
+import lombok.extern.log4j.Log4j2;
+
 import org.apache.hadoop.conf.Configuration;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
@@ -38,9 +38,8 @@ import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.extractor.SourceClient;
 
+@Log4j2
 public class IcebergSourceClient implements SourceClient<Snapshot> {
-  private static final Logger LOG = LogManager.getLogger(IcebergSourceClient.class);
-
   private final Configuration hadoopConf;
   private final PerTableConfig sourceTableConfig;
   private final Table sourceTable;
@@ -55,13 +54,14 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   @Override
   public OneTable getTable(Snapshot snapshot) {
-    // TODO select snapshot specific partition spec
-    IcebergPartitionSpecExtractor partitionExtractor = IcebergPartitionSpecExtractor.getInstance();
-    List<OnePartitionField> irPartitionFields = partitionExtractor.fromIceberg(sourceTable.spec());
-
     Schema iceSchema = sourceTable.schemas().get(snapshot.schemaId());
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     OneSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
+
+    // TODO select snapshot specific partition spec
+    IcebergPartitionSpecExtractor partitionExtractor = IcebergPartitionSpecExtractor.getInstance();
+    List<OnePartitionField> irPartitionFields =
+        partitionExtractor.fromIceberg(sourceTable.spec(), irSchema);
 
     return OneTable.builder()
         .tableFormat(TableFormat.ICEBERG)

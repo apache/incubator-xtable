@@ -20,6 +20,7 @@ package io.onetable.iceberg;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Map;
@@ -77,7 +78,8 @@ class TestIcebergSourceClient {
 
   @Test
   void getTableTest() throws IOException {
-    Table catalogSales = createTestTableWithData();
+    Path workingDir = Paths.get(System.getProperty("java.io.tmpdir"), UUID.randomUUID().toString());
+    Table catalogSales = createTestTableWithData(workingDir.toString());
     PerTableConfig sourceTableConfig =
         PerTableConfig.builder()
             .tableName(catalogSales.name())
@@ -105,6 +107,9 @@ class TestIcebergSourceClient {
     Assertions.assertEquals("cs_sold_date_sk", partitionField.getName());
     Assertions.assertEquals(34, partitionField.getFieldId());
     // TODO transform type is not implemented yet
+
+    // cleanup test data
+    FileUtils.deleteDirectory(workingDir.toFile());
   }
 
   private void validateSchema(OneSchema readSchema, Schema expectedSchema) {
@@ -130,12 +135,11 @@ class TestIcebergSourceClient {
     }
   }
 
-  private Table createTestTableWithData() throws IOException {
-    String csPath = String.join("", System.getProperty("java.io.tmpdir"), "catalog_sales");
-    FileUtils.deleteDirectory(Paths.get(csPath).toFile());
+  private Table createTestTableWithData(String workingDir) throws IOException {
+    String csPath = Paths.get(workingDir, "catalog_sales").toString();
     Table catalogSales = tables.create(csSchema, csPartitionSpec, csPath);
 
-    String dataFilePath = String.join("/data/", csPath, UUID.randomUUID() + ".parquet");
+    String dataFilePath = String.join("/", csPath, "data", UUID.randomUUID() + ".parquet");
     DataWriter<GenericRecord> dataWriter =
         Parquet.writeData(catalogSales.io().newOutputFile(dataFilePath))
             .schema(csSchema)

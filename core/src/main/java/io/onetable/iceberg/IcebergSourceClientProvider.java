@@ -18,9 +18,6 @@
  
 package io.onetable.iceberg;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
-
 import org.apache.iceberg.Snapshot;
 
 import io.onetable.client.PerTableConfig;
@@ -28,9 +25,6 @@ import io.onetable.client.SourceClientProvider;
 
 /** A concrete implementation of {@link SourceClientProvider} for Hudi table format. */
 public class IcebergSourceClientProvider extends SourceClientProvider<Snapshot> {
-
-  private static final Logger LOG = LogManager.getLogger(IcebergSourceClientProvider.class);
-
   @Override
   public IcebergSourceClient getSourceClientInstance(PerTableConfig sourceTableConfig) {
     return new IcebergSourceClient(hadoopConf, sourceTableConfig);

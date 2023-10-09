@@ -19,6 +19,7 @@
 package io.onetable.iceberg;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import lombok.AccessLevel;
@@ -30,6 +31,8 @@ import org.apache.iceberg.Schema;
 
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
+import io.onetable.model.schema.OneSchema;
+import io.onetable.schema.SchemaFieldFinder;
 
 /** Partition spec builder and extractor for Iceberg. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -71,17 +74,14 @@ public class IcebergPartitionSpecExtractor {
     return partitionSpecBuilder.build();
   }
 
-  public List<OnePartitionField> fromIceberg(PartitionSpec iceSpec) {
-    List<OnePartitionField> irPartitionFields = new ArrayList<>();
-
-    if (iceSpec == null || iceSpec.fields().isEmpty()) {
-      return irPartitionFields;
+  public List<OnePartitionField> fromIceberg(PartitionSpec iceSpec, OneSchema irSchema) {
+    if (iceSpec.isUnpartitioned()) {
+      return Collections.emptyList();
     }
 
+    List<OnePartitionField> irPartitionFields = new ArrayList<>();
     for (PartitionField iceField : iceSpec.fields()) {
-      OneField irField =
-          OneField.builder().name(iceField.name()).fieldId(iceField.sourceId()).build();
-
+      OneField irField = SchemaFieldFinder.getInstance().findFieldByPath(irSchema, iceField.name());
       OnePartitionField partitionField = OnePartitionField.builder().sourceField(irField).build();
       irPartitionFields.add(partitionField);
     }
