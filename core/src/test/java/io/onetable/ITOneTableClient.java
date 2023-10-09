@@ -90,6 +90,7 @@ public class ITOneTableClient {
   @TempDir public static Path tempDir;
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
+  private static final boolean USE_SPARK_CLIENT_FOR_TABLE = true;
 
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;
@@ -168,7 +169,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       List<HoodieRecord<HoodieAvroPayload>> insertedRecords = table.insertRecords(100, true);
 
       PerTableConfig perTableConfig =
@@ -204,7 +210,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       // commit time 1 starts first but ends 2nd.
       // commit time 2 starts second but ends 1st.
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
@@ -244,7 +255,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       List<HoodieRecord<HoodieAvroPayload>> insertedRecords1 = table.insertRecords(50, true);
 
       PerTableConfig perTableConfig =
@@ -306,7 +322,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       List<HoodieRecord<HoodieAvroPayload>> insertedRecords = table.insertRecords(50, true);
 
       PerTableConfig perTableConfig =
@@ -337,7 +358,8 @@ public class ITOneTableClient {
       List<TableFormat> targetTableFormats, SyncMode syncMode, HoodieTableType tableType) {
     String tableName = getTableName();
     try (TestHudiTable table =
-        TestHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+        TestHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, "level:SIMPLE", tableType, USE_SPARK_CLIENT_FOR_TABLE)) {
       table.insertRecords(10, "INFO", true);
 
       PerTableConfig perTableConfig =
@@ -366,7 +388,8 @@ public class ITOneTableClient {
       List<TableFormat> targetTableFormats, SyncMode syncMode, HoodieTableType tableType) {
     String tableName = getTableName();
     try (TestHudiTable table =
-        TestHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+        TestHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, "level:SIMPLE", tableType, USE_SPARK_CLIENT_FOR_TABLE)) {
       List<HoodieRecord<HoodieAvroPayload>> insertedRecords = table.insertRecords(100, true);
       Map<String, List<HoodieRecord>> recordsByPartition =
           insertedRecords.stream().collect(groupingBy(HoodieRecord::getPartitionPath));
@@ -408,7 +431,12 @@ public class ITOneTableClient {
     List<HoodieRecord<HoodieAvroPayload>> insertedRecords;
     try (TestHudiTable tableWithInitialSchema =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -427,7 +455,12 @@ public class ITOneTableClient {
     }
     try (TestHudiTable tableWithUpdatedSchema =
         TestHudiTable.withAdditionalColumns(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -462,13 +495,23 @@ public class ITOneTableClient {
     // evolve the schema before the first sync
     try (TestHudiTable tableWithInitialSchema =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       insertedRecords = tableWithInitialSchema.insertRecords(50, true);
     }
     Schema previousSchema = null;
     try (TestHudiTable tableWithUpdatedSchema =
         TestHudiTable.withAdditionalColumns(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -489,7 +532,13 @@ public class ITOneTableClient {
     // Add one more column and sync
     try (TestHudiTable tableWithUpdatedSchema =
         TestHudiTable.withAdditionalTopLevelField(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, previousSchema)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            previousSchema,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -518,7 +567,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       List<HoodieRecord<HoodieAvroPayload>> insertedRecords = table.insertRecords(50, true);
 
       PerTableConfig perTableConfig =
@@ -559,7 +613,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       List<HoodieRecord<HoodieAvroPayload>> insertedRecords = table.insertRecords(50, true);
 
       PerTableConfig perTableConfig =
@@ -599,7 +658,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       table.insertRecords(50, true);
 
       PerTableConfig perTableConfig =
@@ -642,7 +706,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       table.insertRecords(50, true);
 
       PerTableConfig perTableConfig =
@@ -690,7 +759,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, null, HoodieTableType.COPY_ON_WRITE)) {
+            tableName,
+            tempDir,
+            jsc,
+            null,
+            HoodieTableType.COPY_ON_WRITE,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       table.insertRecords(50, true);
 
       PerTableConfig perTableConfig =
@@ -766,7 +840,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, hudiPartitionConfig, HoodieTableType.COPY_ON_WRITE)) {
+            tableName,
+            tempDir,
+            jsc,
+            hudiPartitionConfig,
+            HoodieTableType.COPY_ON_WRITE,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -796,7 +875,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, null, HoodieTableType.COPY_ON_WRITE)) {
+            tableName,
+            tempDir,
+            jsc,
+            null,
+            HoodieTableType.COPY_ON_WRITE,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       table.insertRecords(100, true);
 
       PerTableConfig perTableConfigIceberg =
@@ -844,7 +928,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, "level:SIMPLE", HoodieTableType.COPY_ON_WRITE)) {
+            tableName,
+            tempDir,
+            jsc,
+            "level:SIMPLE",
+            HoodieTableType.COPY_ON_WRITE,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       table.insertRecords(100, true);
 
       PerTableConfig perTableConfig =
@@ -866,7 +955,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, null, HoodieTableType.COPY_ON_WRITE)) {
+            tableName,
+            tempDir,
+            jsc,
+            null,
+            HoodieTableType.COPY_ON_WRITE,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       PerTableConfig singleTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -931,7 +1025,12 @@ public class ITOneTableClient {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, null, HoodieTableType.COPY_ON_WRITE)) {
+            tableName,
+            tempDir,
+            jsc,
+            null,
+            HoodieTableType.COPY_ON_WRITE,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
