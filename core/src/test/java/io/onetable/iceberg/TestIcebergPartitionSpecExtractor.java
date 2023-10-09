@@ -22,11 +22,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import io.onetable.exception.NotSupportedException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.transforms.Transforms;
 import org.apache.iceberg.types.Types;
 
 import io.onetable.model.schema.OneField;
@@ -182,5 +184,118 @@ public class TestIcebergPartitionSpecExtractor {
     PartitionSpec expected =
         PartitionSpec.builderFor(icebergSchema).identity("data.nested").build();
     Assertions.assertEquals(expected, actual);
+  }
+
+  @Test
+  public void testFromIcebergUnPartitioned() {
+    IcebergPartitionSpecExtractor extractor = IcebergPartitionSpecExtractor.getInstance();
+    extractor.fromIceberg(PartitionSpec.unpartitioned(), null);
+  }
+
+  @Test
+  public void testFromIcebergSingleColumn() {
+    IcebergPartitionSpecExtractor extractor = IcebergPartitionSpecExtractor.getInstance();
+
+    Schema iceSchema =
+        new Schema(
+            Types.NestedField.required(0, "data_int", Types.IntegerType.get()),
+            Types.NestedField.required(1, "key_string", Types.StringType.get()));
+    PartitionSpec icePartitionSpec =
+        PartitionSpec.builderFor(iceSchema).identity("key_string").build();
+
+    OneSchema irSchema =
+        OneSchema.builder()
+            .name("test_schema")
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("data_int")
+                        .schema(OneSchema.builder().dataType(OneType.INT).build())
+                        .build(),
+                    OneField.builder()
+                        .name("key_string")
+                        .fieldId(1)
+                        .schema(OneSchema.builder().dataType(OneType.STRING).build())
+                        .build()))
+            .build();
+
+    List<OnePartitionField> irPartitionSpec = extractor.fromIceberg(icePartitionSpec, irSchema);
+    Assertions.assertEquals(1, irPartitionSpec.size());
+    OneField sourceField = irPartitionSpec.get(0).getSourceField();
+    Assertions.assertEquals("key_string", sourceField.getName());
+    Assertions.assertEquals(1, sourceField.getFieldId());
+    Assertions.assertEquals(OneType.STRING, sourceField.getSchema().getDataType());
+  }
+
+  @Test
+  public void testFromIcebergMultiColumn() {
+    IcebergPartitionSpecExtractor extractor = IcebergPartitionSpecExtractor.getInstance();
+
+    Schema iceSchema =
+        new Schema(
+            Types.NestedField.required(0, "key_time", Types.DateType.get()),
+            Types.NestedField.required(1, "key_string", Types.StringType.get()));
+    PartitionSpec icePartitionSpec =
+        PartitionSpec.builderFor(iceSchema)
+            .identity("key_string")
+            .year("key_time", "key_year")
+            .build();
+
+    OneSchema irSchema =
+        OneSchema.builder()
+            .name("test_schema")
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("key_time")
+                        .fieldId(10)
+                        .schema(OneSchema.builder().dataType(OneType.INT).build())
+                        .build(),
+                    OneField.builder()
+                        .name("key_year") // hidden iceberg partition column
+                        .fieldId(100)
+                        .schema(OneSchema.builder().dataType(OneType.INT).build())
+                        .build(),
+                    OneField.builder()
+                        .name("key_string")
+                        .fieldId(11)
+                        .schema(OneSchema.builder().dataType(OneType.STRING).build())
+                        .build()))
+            .build();
+
+    List<OnePartitionField> irPartitionSpec = extractor.fromIceberg(icePartitionSpec, irSchema);
+    Assertions.assertEquals(2, irPartitionSpec.size());
+
+    OneField sourceField = irPartitionSpec.get(0).getSourceField();
+    Assertions.assertEquals("key_string", sourceField.getName());
+    Assertions.assertEquals(11, sourceField.getFieldId());
+    Assertions.assertEquals(OneType.STRING, sourceField.getSchema().getDataType());
+    Assertions.assertEquals(
+        PartitionTransformType.VALUE, irPartitionSpec.get(0).getTransformType());
+
+    sourceField = irPartitionSpec.get(1).getSourceField();
+    Assertions.assertEquals("key_year", sourceField.getName());
+    Assertions.assertEquals(100, sourceField.getFieldId());
+    Assertions.assertEquals(OneType.INT, sourceField.getSchema().getDataType());
+    Assertions.assertEquals(PartitionTransformType.YEAR, irPartitionSpec.get(1).getTransformType());
+  }
+
+  @Test
+  public void fromIcebergTransformType() {
+    IcebergPartitionSpecExtractor extractor = IcebergPartitionSpecExtractor.getInstance();
+    Assertions.assertEquals(
+        PartitionTransformType.YEAR, extractor.fromIcebergTransform(Transforms.year()));
+    Assertions.assertEquals(
+        PartitionTransformType.MONTH, extractor.fromIcebergTransform(Transforms.month()));
+    Assertions.assertEquals(
+        PartitionTransformType.DAY, extractor.fromIcebergTransform(Transforms.day()));
+    Assertions.assertEquals(
+        PartitionTransformType.HOUR, extractor.fromIcebergTransform(Transforms.hour()));
+    Assertions.assertEquals(
+        PartitionTransformType.VALUE, extractor.fromIcebergTransform(Transforms.identity()));
+
+    Assertions.assertThrows(NotSupportedException.class, () -> {
+      extractor.fromIcebergTransform(Transforms.bucket(10));
+    });
   }
 }

@@ -28,10 +28,13 @@ import lombok.NoArgsConstructor;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.transforms.Transform;
 
+import io.onetable.exception.NotSupportedException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
+import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.schema.SchemaFieldFinder;
 
 /** Partition spec builder and extractor for Iceberg. */
@@ -74,6 +77,34 @@ public class IcebergPartitionSpecExtractor {
     return partitionSpecBuilder.build();
   }
 
+  public PartitionTransformType fromIcebergTransform(Transform<?, ?> transform) {
+    if (transform.isIdentity()) {
+      return PartitionTransformType.VALUE;
+    }
+
+    String transformName = transform.toString();
+    switch (transformName) {
+      case "year":
+        return PartitionTransformType.YEAR;
+      case "month":
+        return PartitionTransformType.MONTH;
+      case "day":
+        return PartitionTransformType.DAY;
+      case "hour":
+        return PartitionTransformType.HOUR;
+    }
+
+    if (transform.isVoid()) {
+      throw new NotSupportedException(transformName);
+    }
+
+    if (transformName.startsWith("bucket")) {
+      throw new NotSupportedException(transformName);
+    }
+
+    throw new NotSupportedException(transform.toString());
+  }
+
   public List<OnePartitionField> fromIceberg(PartitionSpec iceSpec, OneSchema irSchema) {
     if (iceSpec.isUnpartitioned()) {
       return Collections.emptyList();
@@ -82,8 +113,12 @@ public class IcebergPartitionSpecExtractor {
     List<OnePartitionField> irPartitionFields = new ArrayList<>();
     for (PartitionField iceField : iceSpec.fields()) {
       OneField irField = SchemaFieldFinder.getInstance().findFieldByPath(irSchema, iceField.name());
-      OnePartitionField partitionField = OnePartitionField.builder().sourceField(irField).build();
-      irPartitionFields.add(partitionField);
+      OnePartitionField irPartitionField =
+          OnePartitionField.builder()
+              .sourceField(irField)
+              .transformType(fromIcebergTransform(iceField.transform()))
+              .build();
+      irPartitionFields.add(irPartitionField);
     }
 
     return irPartitionFields;
