@@ -360,7 +360,6 @@ public class ITOneTableClient {
     }
   }
 
-  // TODO(vamshigv): Incremental tests failing for both COW and MOR with clustering handling (2).
   @ParameterizedTest
   @MethodSource("testCasesWithTableTypesAndSyncModes")
   public void testDeletePartition(
@@ -550,7 +549,6 @@ public class ITOneTableClient {
     }
   }
 
-  // TODO(vamshigv): Incremental failing with row count mismatch (expected 100, actual 200) (4)
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
   public void testClusteringEvent(
@@ -591,7 +589,6 @@ public class ITOneTableClient {
     }
   }
 
-  // TODO(vamshigv): Incremental failing with duplicate key (4).
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
   public void testSavepointRestoreEvent(
