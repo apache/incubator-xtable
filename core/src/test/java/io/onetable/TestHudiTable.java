@@ -51,6 +51,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -61,6 +62,7 @@ import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.HoodieWriteResult;
 import org.apache.hudi.client.SparkRDDWriteClient;
 import org.apache.hudi.client.WriteStatus;
+import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.client.common.HoodieSparkEngineContext;
 import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
 import org.apache.hudi.common.config.LockConfiguration;
@@ -229,14 +231,15 @@ public class TestHudiTable implements Closeable {
                 .collect(Collectors.toList());
       }
       // init Hoodie dataset and metaclient
-      this.metaClient = initMetaClient(jsc, hoodieTableType, keyGenProperties);
       this.tableUsesSparkClient = tableUsesSparkClient;
       // init write clients
       if (tableUsesSparkClient) {
         this.sparkWriteClient = initSparkWriteClient(schema.toString(), keyGenProperties);
+        this.metaClient = initMetaClient(jsc, hoodieTableType, keyGenProperties);
         this.javaWriteClient = null;
       } else {
         this.sparkWriteClient = null;
+        this.metaClient = initMetaClient(hoodieTableType, keyGenProperties);
         this.javaWriteClient = initJavaWriteClient(schema.toString(), keyGenProperties);
       }
     } catch (IOException ex) {
@@ -492,38 +495,49 @@ public class TestHudiTable implements Closeable {
     return insertRecordsWithCommitAlreadyStarted(inserts, instant, checkForNoErrors);
   }
 
-  public List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
-      List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors) {
+  private List<HoodieRecord<HoodieAvroPayload>> generateUpdatesForRecords(
+      List<HoodieRecord<HoodieAvroPayload>> records) {
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
-    List<HoodieRecord<HoodieAvroPayload>> updates =
-        records.stream()
-            .map(
-                existingRecord -> {
-                  try {
-                    return getRecord(
-                        schema,
-                        existingRecord.getRecordKey(),
-                        startTimeWindow,
-                        endTimeWindow,
-                        (GenericRecord) (existingRecord.getData()).getInsertValue(schema).get(),
-                        null);
-                  } catch (IOException ex) {
-                    throw new UncheckedIOException(ex);
-                  }
-                })
-            .collect(Collectors.toList());
-    String instant = getStartCommitInstant();
+    return records.stream()
+        .map(
+            existingRecord -> {
+              try {
+                return getRecord(
+                    schema,
+                    existingRecord.getRecordKey(),
+                    startTimeWindow,
+                    endTimeWindow,
+                    (GenericRecord) (existingRecord.getData()).getInsertValue(schema).get(),
+                    null);
+              } catch (IOException ex) {
+                throw new UncheckedIOException(ex);
+              }
+            })
+        .collect(Collectors.toList());
+  }
+
+  public List<HoodieRecord<HoodieAvroPayload>> upsertRecordsWithCommitAlreadyStarted(
+      List<HoodieRecord<HoodieAvroPayload>> records,
+      String commitInstant,
+      boolean checkForNoErrors) {
+    List<HoodieRecord<HoodieAvroPayload>> updates = generateUpdatesForRecords(records);
     List<WriteStatus> result;
     if (tableUsesSparkClient) {
-      result = upsertWithSparkClient(updates, instant);
+      result = upsertWithSparkClient(updates, commitInstant);
     } else {
-      result = upsertWithJavaClient(updates, instant);
+      result = upsertWithJavaClient(updates, commitInstant);
     }
     if (checkForNoErrors) {
       assertNoWriteErrors(result);
     }
     return updates;
+  }
+
+  public List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
+      List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors) {
+    String instant = getStartCommitInstant();
+    return upsertRecordsWithCommitAlreadyStarted(records, instant, checkForNoErrors);
   }
 
   public List<HoodieKey> deleteRecords(
@@ -680,6 +694,8 @@ public class TestHudiTable implements Closeable {
 
   private HoodieJavaWriteClient<HoodieAvroPayload> initJavaWriteClient(
       String schema, TypedProperties keyGenProperties) {
+    // TODO(vamshigv): consolidate usage in java client code path.
+    Configuration conf = new Configuration();
     HoodieCompactionConfig compactionConfig =
         HoodieCompactionConfig.newBuilder().withMaxNumDeltaCommitsBeforeCompaction(1).build();
     HoodieClusteringConfig clusteringConfig =
@@ -713,7 +729,7 @@ public class TestHudiTable implements Closeable {
                 HoodieLockConfig.newBuilder().withLockProvider(InProcessLockProvider.class).build())
             .withProperties(lockProperties)
             .build();
-    HoodieEngineContext context = new HoodieSparkEngineContext(jsc);
+    HoodieEngineContext context = new HoodieJavaEngineContext(conf);
     return new HoodieJavaWriteClient<>(context, writeConfig);
   }
 
@@ -739,6 +755,29 @@ public class TestHudiTable implements Closeable {
             .build();
     return HoodieTableMetaClient.initTableAndGetMetaClient(
         jsc.hadoopConfiguration(), this.basePath, properties);
+  }
+
+  private HoodieTableMetaClient initMetaClient(
+      HoodieTableType hoodieTableType, TypedProperties keyGenProperties) throws IOException {
+    Configuration conf = new Configuration();
+    LocalFileSystem fs = (LocalFileSystem) FSUtils.getFs(this.basePath, conf);
+    // Enforce checksun such that fs.open() is consistent to DFS
+    fs.setVerifyChecksum(true);
+    fs.mkdirs(new org.apache.hadoop.fs.Path(this.basePath));
+
+    Properties properties =
+        HoodieTableMetaClient.withPropertyBuilder()
+            .fromProperties(keyGenProperties)
+            .setTableName(tableName)
+            .setTableType(hoodieTableType)
+            .setKeyGeneratorClassProp(keyGenerator.getClass().getCanonicalName())
+            .setPartitionFields(String.join(",", partitionFieldNames))
+            .setRecordKeyFields(RECORD_KEY_FIELD_NAME)
+            .setPayloadClass(OverwriteWithLatestAvroPayload.class)
+            .setCommitTimezone(HoodieTimelineTimeZone.UTC)
+            .setBaseFileFormat(HoodieFileFormat.PARQUET.toString())
+            .build();
+    return HoodieTableMetaClient.initTableAndGetMetaClient(conf, this.basePath, properties);
   }
 
   // Create the base path and store it for reference

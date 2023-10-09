@@ -18,7 +18,8 @@
  
 package io.onetable;
 
-import static io.onetable.hudi.HudiTableUtils.getTableName;
+import static io.onetable.hudi.HudiTestUtil.PartitionConfig;
+import static io.onetable.hudi.HudiTestUtil.getTableName;
 import static java.util.stream.Collectors.groupingBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -39,9 +40,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-
-import lombok.AllArgsConstructor;
-import lombok.Value;
 
 import org.apache.avro.Schema;
 import org.apache.spark.SparkConf;
@@ -1265,12 +1263,5 @@ public class ITOneTableClient {
           return Stream.of(
               Arguments.arguments(unpartitionedArgs), Arguments.arguments(partitionedArgs));
         });
-  }
-
-  @Value
-  @AllArgsConstructor(staticName = "of")
-  private static class PartitionConfig {
-    String hudiConfig;
-    String oneTableConfig;
   }
 }

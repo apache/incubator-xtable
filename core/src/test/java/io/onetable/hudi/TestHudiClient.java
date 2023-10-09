@@ -22,45 +22,78 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 
+import lombok.SneakyThrows;
+
+import org.apache.hadoop.conf.Configuration;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import org.apache.hudi.common.model.HoodieAvroPayload;
+import org.apache.hudi.common.model.HoodieRecord;
+import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.table.HoodieTableMetaClient;
+
+import io.onetable.TestHudiTable;
+import io.onetable.model.OneSnapshot;
+
 public class TestHudiClient {
 
-  @TempDir public static Path tempDir;
+  private static final boolean USE_SPARK_CLIENT_FOR_TABLE = false;
 
-  /*
+  @TempDir public static Path tempDir;
+  private HudiClient hudiClient;
+
+  @BeforeEach
+  @SneakyThrows
+  public void setup() {}
+
+  /**
+   * All tests to write. Combinations to test (MOR, COW), (Full Sync, Incremental Sync), (No
+   * Partition & Partition). 1. Insert and upserts 2. Add Partition. 3. Delete Partition. 4. Add
+   * Columns. 5. Table services (clean, cluster, savepoint & restore, rollback, compaction).
+   */
   @Test
+  @SneakyThrows
   public void insertAndUpsertData() {
-    String tableName = getTableName();
+    String tableName = "some_table_name";
+    HudiTestUtil.PartitionConfig partitionConfig =
+        HudiTestUtil.PartitionConfig.of("level:SIMPLE", "level:VALUE");
+    HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, null, partitionConfig.getHudiConfig(), tableType)) {
-      List<HoodieRecord<HoodieAvroPayload>> insertedRecords = table.insertRecords(100, true);
+            tableName,
+            tempDir,
+            null,
+            partitionConfig.getHudiConfig(),
+            tableType,
+            USE_SPARK_CLIENT_FOR_TABLE)) {
+      HoodieTableMetaClient hoodieTableMetaClient =
+          HoodieTableMetaClient.withPropertyBuilder()
+              .setTableType(HoodieTableType.MERGE_ON_READ)
+              .setTableName(tableName + "_v1")
+              .setPayloadClass(HoodieAvroPayload.class)
+              .setPartitionFields("level")
+              .initTable(new Configuration(), table.getBasePath());
+      HudiSourcePartitionSpecExtractor partitionSpecExtractor =
+          new ConfigurationBasedPartitionSpecExtractor(
+              HudiSourceConfig.builder().partitionFieldSpecConfig("level:VALUE").build());
+      hudiClient = new HudiClient(hoodieTableMetaClient, partitionSpecExtractor);
 
-      PerTableConfig perTableConfig =
-          PerTableConfig.builder()
-              .tableName(tableName)
-              .targetTableFormats(targetTableFormats)
-              .tableBasePath(table.getBasePath())
-              .hudiSourceConfig(
-                  HudiSourceConfig.builder()
-                      .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
-                      .build())
-              .syncMode(syncMode)
-              .build();
-      OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
-
-      table.insertRecords(100, true);
-      table.upsertRecords(insertedRecords.subList(0, 20), true);
-
-      syncWithCompactionIfRequired(tableType, table, perTableConfig, oneTableClient);
-      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 200);
+      String commitInstant1 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+      // TODO(vamshigv): many small files created, fix it.
+      // TODO(vamshigv): path not set correctly fix it.
+      OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
+      String commitInstant2 = table.startCommit();
+      table.upsertRecordsWithCommitAlreadyStarted(
+          insertsForCommit1.subList(0, 20), commitInstant2, true);
+      OneSnapshot oneSnapshot1 = hudiClient.getCurrentSnapshot();
+    }
   }
-   */
 
   @Test
   public void testParseCommitTimeToInstant() {
