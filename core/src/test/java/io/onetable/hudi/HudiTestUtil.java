@@ -27,6 +27,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
 
+import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.client.WriteStatus;
@@ -59,9 +60,14 @@ public class HudiTestUtil {
   }
 
   static HoodieWriteConfig getHoodieWriteConfig(HoodieTableMetaClient metaClient) {
+    return getHoodieWriteConfig(metaClient, null);
+  }
+
+  static HoodieWriteConfig getHoodieWriteConfig(HoodieTableMetaClient metaClient, Schema schema) {
     Properties properties = new Properties();
     properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
     return HoodieWriteConfig.newBuilder()
+        .withSchema(schema == null ? "" : schema.toString())
         .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(INMEMORY).build())
         .withPath(metaClient.getBasePathV2().toString())
         .withEmbeddedTimelineServerEnabled(false)
