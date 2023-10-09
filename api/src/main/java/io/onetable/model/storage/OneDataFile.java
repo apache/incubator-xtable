@@ -18,6 +18,7 @@
  
 package io.onetable.model.storage;
 
+import java.util.Collections;
 import java.util.Map;
 
 import lombok.Builder;
@@ -49,13 +50,15 @@ public class OneDataFile {
   // file format
   protected final FileFormat fileFormat;
   // partition ranges for the data file
-  protected final Map<OnePartitionField, Range> partitionValues;
-  // Partition path
+  @Builder.Default
+  protected final Map<OnePartitionField, Range> partitionValues =
+      Collections.emptyMap(); // Partition path
+
   protected final String partitionPath;
   protected final long fileSizeBytes;
   protected final long recordCount;
   // column stats for each column in the data file
-  protected final Map<OneField, ColumnStat> columnStats;
+  @Builder.Default protected final Map<OneField, ColumnStat> columnStats = Collections.emptyMap();
   // last modified time in millis since epoch
   protected final long lastModified;
 

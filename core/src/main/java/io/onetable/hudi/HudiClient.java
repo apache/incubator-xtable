@@ -37,12 +37,16 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import lombok.Builder;
+import lombok.NonNull;
 import lombok.Value;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
+
+import com.google.common.collect.Iterators;
+import com.google.common.collect.PeekingIterator;
 
 import io.onetable.exception.OneIOException;
 import io.onetable.model.CurrentCommitState;
@@ -106,9 +110,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         activeTimeline
             .filterInflightsAndRequested()
             .findInstantsBefore(latestCommit.getTimestamp())
-            .getInstants()
-            .stream()
-            .collect(Collectors.toList());
+            .getInstants();
     OneTable table = getTable(latestCommit);
     return OneSnapshot.builder()
         .table(table)
@@ -151,17 +153,14 @@ public class HudiClient implements SourceClient<HoodieInstant> {
     CommitsPair commitsPair = getCompletedAndPendingCommitsAfterInstant(lastInstantSynced);
     CommitsPair lastPendingHoodieInstantsCommitsPair =
         getCompletedAndPendingCommitsForInstants(lastPendingInstants);
-    // Remove pending commits from completed commits to avoid duplicate processing.
     List<HoodieInstant> commitsToProcessNext =
-        removeCommitsFromPendingCommits(
+        mergeAndDedupLists(
             lastPendingHoodieInstantsCommitsPair.getCompletedCommits(),
             commitsPair.getCompletedCommits());
-    List<Instant> pendingInstantsToProcessNext = new ArrayList<>();
-    pendingInstantsToProcessNext.addAll(lastPendingHoodieInstantsCommitsPair.getPendingCommits());
-    pendingInstantsToProcessNext.addAll(commitsPair.getPendingCommits());
-    // combine updatedPendingHoodieInstants and commitsAfterLastInstant and sort and return.
-    commitsToProcessNext.addAll(commitsPair.getCompletedCommits());
-    Collections.sort(commitsToProcessNext, HoodieInstant.COMPARATOR);
+    List<Instant> pendingInstantsToProcessNext =
+        mergeAndDedupLists(
+            lastPendingHoodieInstantsCommitsPair.getPendingCommits(),
+            commitsPair.getPendingCommits());
     return CurrentCommitState.<HoodieInstant>builder()
         .commitsToProcess(commitsToProcessNext)
         .pendingInstants(pendingInstantsToProcessNext)
@@ -250,8 +249,14 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   private List<HoodieInstant> getCommitsForInstants(List<Instant> instants) {
+    if (instants == null || instants.isEmpty()) {
+      return Collections.emptyList();
+    }
+    // Savepoint commits are not processed and commit time can overlap with other actions, hence
+    // filtering.
     Map<Instant, HoodieInstant> instantHoodieInstantMap =
         metaClient.getActiveTimeline().getInstants().stream()
+            .filter(instant -> !HoodieTimeline.SAVEPOINT_ACTION.equals(instant.getAction()))
             .collect(
                 Collectors.toMap(
                     hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()),
@@ -262,34 +267,40 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         .collect(Collectors.toList());
   }
 
-  private List<HoodieInstant> removeCommitsFromPendingCommits(
-      List<HoodieInstant> pendingCommits, List<HoodieInstant> commitList) {
-    // If pending commits is null or empty, or if commit list is null or empty,
-    // return the same pending commits.
-    if (pendingCommits == null
-        || pendingCommits.isEmpty()
-        || commitList == null
-        || commitList.isEmpty()) {
-      return pendingCommits;
-    }
-
-    // Remove until the last commit in the pending commits list that is less than or equal to
-    // the first commit in the commit list.
-    int lastIndexToRemove = -1;
-    for (int i = pendingCommits.size() - 1; i >= 0; i--) {
-      if (pendingCommits.get(i).compareTo(commitList.get(0)) > 0) {
-        lastIndexToRemove = i;
+  /**
+   * Merges commits from two lists and returns new list of sorted commits by eliminating duplicates.
+   *
+   * @param list1 First sorted input list of commits
+   * @param list2 Second sorted input list of commits.
+   * @return merged list of commits in sorted order.
+   */
+  private <T extends Comparable<T>> List<T> mergeAndDedupLists(
+      @NonNull List<T> list1, @NonNull List<T> list2) {
+    List<T> mergedList = new ArrayList<>();
+    PeekingIterator<T> itr1 = Iterators.peekingIterator(list1.iterator());
+    PeekingIterator<T> itr2 = Iterators.peekingIterator(list2.iterator());
+    while (itr1.hasNext() || itr2.hasNext()) {
+      if (!itr2.hasNext()) {
+        mergedList.add(itr1.next());
+      } else if (!itr1.hasNext()) {
+        mergedList.add(itr2.next());
       } else {
-        break;
+        T element1 = itr1.peek();
+        T element2 = itr2.peek();
+        if (element1.compareTo(element2) < 0) {
+          mergedList.add(element1);
+          itr1.next();
+        } else if (element1.compareTo(element2) > 0) {
+          mergedList.add(element2);
+          itr2.next();
+        } else {
+          mergedList.add(element1);
+          itr1.next();
+          itr2.next();
+        }
       }
     }
-
-    // If there is no overlap between pending commits and commit list,
-    // return the same pending commits.
-    if (lastIndexToRemove == -1) {
-      return pendingCommits;
-    }
-    return pendingCommits.subList(0, lastIndexToRemove);
+    return mergedList;
   }
 
   private static boolean isSecondGranularity(String instant) {
