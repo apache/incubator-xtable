@@ -417,15 +417,18 @@ public class ITHudiTargetClient {
       HoodieBackedTableMetadata hoodieBackedTableMetadata, String partitionPath, String fileName) {
     Assertions.assertTrue(
         hoodieBackedTableMetadata
-            .getColumnStats(Collections.singletonList(Pair.of(partitionPath, fileName)), FIELD_1)
+            .getColumnStats(
+                Collections.singletonList(Pair.of(partitionPath, fileName)), KEY_FIELD_NAME)
             .isEmpty());
     Assertions.assertTrue(
         hoodieBackedTableMetadata
-            .getColumnStats(Collections.singletonList(Pair.of(partitionPath, fileName)), FIELD_2)
+            .getColumnStats(
+                Collections.singletonList(Pair.of(partitionPath, fileName)), PARTITION_FIELD_NAME)
             .isEmpty());
     Assertions.assertTrue(
         hoodieBackedTableMetadata
-            .getColumnStats(Collections.singletonList(Pair.of(partitionPath, fileName)), FIELD_3)
+            .getColumnStats(
+                Collections.singletonList(Pair.of(partitionPath, fileName)), OTHER_FIELD_NAME)
             .isEmpty());
   }
 
@@ -518,16 +521,11 @@ public class ITHudiTargetClient {
         .build();
   }
 
-  private OneTable getState(Instant lastCommitTime) {
+  private OneTable getState(Instant latestCommitTime) {
     return OneTable.builder()
         .basePath(tableBasePath)
         .name(TABLE_NAME)
-        .latestCommitTime(lastCommitTime)
-  private OneTable getState() {
-    return OneTable.builder()
-        .basePath(tableBasePath)
-        .name(TABLE_NAME)
-        .latestCommitTime(Instant.now())
+        .latestCommitTime(latestCommitTime)
         .tableFormat(TableFormat.ICEBERG)
         .layoutStrategy(DataLayoutStrategy.HIVE_STYLE_PARTITION)
         .readSchema(SCHEMA)

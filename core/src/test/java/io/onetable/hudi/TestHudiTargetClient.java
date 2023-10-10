@@ -74,7 +74,8 @@ public class TestHudiTargetClient {
       mock(HudiTargetClient.CommitStateCreator.class);
 
   private HudiTargetClient getTargetClient(HoodieTableMetaClient mockMetaClient) {
-    when(mockHudiTableManager.loadTableMetaClientIfExists(BASE_PATH)).thenReturn(Optional.ofNullable(mockMetaClient));
+    when(mockHudiTableManager.loadTableMetaClientIfExists(BASE_PATH))
+        .thenReturn(Optional.ofNullable(mockMetaClient));
     return new HudiTargetClient(
         BASE_PATH,
         RETENTION_IN_HOURS,
