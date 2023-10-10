@@ -18,7 +18,11 @@
  
 package io.onetable.hudi;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import javax.inject.Singleton;
 
@@ -27,13 +31,16 @@ import org.apache.avro.Schema;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.util.Option;
 
 import io.onetable.exception.SchemaExtractorException;
 import io.onetable.model.OneTable;
+import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.TableFormat;
+import io.onetable.schema.SchemaFieldFinder;
 import io.onetable.spi.extractor.SourcePartitionSpecExtractor;
 
 /** Extracts {@link OneTable} a canonical representation of table at a point in time for Hudi. */
@@ -63,6 +70,7 @@ public class HudiTableExtractor {
           e);
     }
     List<OnePartitionField> partitionFields = partitionSpecExtractor.spec(canonicalSchema);
+    Set<OneField> recordKeyFields = getRecordKeyFields(metaClient, canonicalSchema);
     DataLayoutStrategy dataLayoutStrategy =
         partitionFields.size() > 0
             ? DataLayoutStrategy.DIR_HIERARCHY_PARTITION_VALUES
@@ -73,8 +81,20 @@ public class HudiTableExtractor {
         .name(metaClient.getTableConfig().getTableName())
         .layoutStrategy(dataLayoutStrategy)
         .partitioningFields(partitionFields)
+        .recordKeyFields(recordKeyFields)
         .readSchema(canonicalSchema)
         .latestCommitTime(HudiClient.parseFromInstantTime(commit.getTimestamp()))
         .build();
+  }
+
+  private Set<OneField> getRecordKeyFields(
+      HoodieTableMetaClient metaClient, OneSchema canonicalSchema) {
+    Option<String[]> recordKeyFieldNames = metaClient.getTableConfig().getRecordKeyFields();
+    if (!recordKeyFieldNames.isPresent()) {
+      return Collections.emptySet();
+    }
+    return Arrays.stream(recordKeyFieldNames.get())
+        .map(name -> SchemaFieldFinder.getInstance().findFieldByPath(canonicalSchema, name))
+        .collect(Collectors.toSet());
   }
 }

@@ -20,10 +20,12 @@ package io.onetable.iceberg;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -42,6 +44,7 @@ import org.apache.iceberg.mapping.NameMappingParser;
 import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
+import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.OneDataFiles;
@@ -115,7 +118,8 @@ public class IcebergClient implements TargetClient {
       HadoopTables tables = new HadoopTables(configuration);
       boolean doesIcebergTableExist = tables.exists(basePath);
       if (!doesIcebergTableExist) {
-        Schema schema = schemaExtractor.toIceberg(oneTable.getReadSchema());
+        Schema schema =
+            schemaExtractor.toIceberg(oneTable.getReadSchema(), oneTable.getRecordKeyFields());
         PartitionSpec partitionSpec =
             partitionSpecExtractor.toPartitionSpec(oneTable.getPartitioningFields(), schema);
         Map<String, String> properties = new HashMap<>();
@@ -131,7 +135,12 @@ public class IcebergClient implements TargetClient {
 
   @Override
   public void syncSchema(OneSchema schema) {
-    Schema latestSchema = schemaExtractor.toIceberg(schema);
+    syncSchema(schema, Collections.emptySet());
+  }
+
+  @Override
+  public void syncSchema(OneSchema schema, Set<OneField> recordKeyFields) {
+    Schema latestSchema = schemaExtractor.toIceberg(schema, recordKeyFields);
     schemaSync.sync(transaction.table().schema(), latestSchema, transaction);
   }
 

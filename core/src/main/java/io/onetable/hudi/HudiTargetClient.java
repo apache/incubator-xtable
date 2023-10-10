@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import lombok.Getter;
@@ -104,6 +105,11 @@ public class HudiTargetClient implements TargetClient {
 
   @Override
   public void syncSchema(OneSchema schema) {
+    syncSchema(schema, Collections.emptySet());
+  }
+
+  @Override
+  public void syncSchema(OneSchema schema, Set<OneField> recordKeyFields) {
     commitState.setSchema(avroSchemaConverter.fromOneSchema(schema));
   }
 

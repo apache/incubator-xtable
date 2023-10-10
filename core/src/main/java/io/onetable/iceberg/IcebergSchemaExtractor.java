@@ -19,7 +19,10 @@
 package io.onetable.iceberg;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -51,9 +54,29 @@ public class IcebergSchemaExtractor {
   }
 
   public Schema toIceberg(OneSchema oneSchema) {
+    return toIceberg(oneSchema, Collections.emptySet());
+  }
+
+  public Schema toIceberg(OneSchema oneSchema, Set<OneField> recordKeyFields) {
     // if field IDs are not assigned in the source, just use an incrementing integer
     AtomicInteger fieldIdTracker = new AtomicInteger(0);
-    return new Schema(convertFields(oneSchema, fieldIdTracker));
+    List<Types.NestedField> nestedFields = convertFields(oneSchema, fieldIdTracker);
+    if (recordKeyFields.isEmpty()) {
+      return new Schema(nestedFields);
+    }
+    // Find field in iceberg schema that matches each of the record key path and collect ids.
+    Schema partialSchema = new Schema(nestedFields);
+    Set<Integer> recordKeyIds =
+        recordKeyFields.stream()
+            .map(keyField -> partialSchema.findField(convertFromOneTablePath(keyField.getPath())))
+            .filter(Objects::nonNull)
+            .map(Types.NestedField::fieldId)
+            .collect(Collectors.toSet());
+    if (recordKeyFields.size() != recordKeyIds.size()) {
+      // TODO(vamshigv): should it instead be best effort ?
+      throw new SchemaExtractorException("Mismatches in converting record key fields");
+    }
+    return new Schema(nestedFields, recordKeyIds);
   }
 
   static String convertFromOneTablePath(String path) {
