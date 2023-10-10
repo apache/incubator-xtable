@@ -77,7 +77,7 @@ public class IcebergPartitionSpecExtractor {
     return partitionSpecBuilder.build();
   }
 
-  public PartitionTransformType fromIcebergTransform(Transform<?, ?> transform) {
+  PartitionTransformType fromIcebergTransform(Transform<?, ?> transform) {
     if (transform.isIdentity()) {
       return PartitionTransformType.VALUE;
     }

@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import io.onetable.exception.NotSupportedException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -31,6 +30,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.transforms.Transforms;
 import org.apache.iceberg.types.Types;
 
+import io.onetable.exception.NotSupportedException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
@@ -189,7 +189,8 @@ public class TestIcebergPartitionSpecExtractor {
   @Test
   public void testFromIcebergUnPartitioned() {
     IcebergPartitionSpecExtractor extractor = IcebergPartitionSpecExtractor.getInstance();
-    extractor.fromIceberg(PartitionSpec.unpartitioned(), null);
+    List<OnePartitionField> fields = extractor.fromIceberg(PartitionSpec.unpartitioned(), null);
+    Assertions.assertEquals(0, fields.size());
   }
 
   @Test
@@ -225,6 +226,8 @@ public class TestIcebergPartitionSpecExtractor {
     Assertions.assertEquals("key_string", sourceField.getName());
     Assertions.assertEquals(1, sourceField.getFieldId());
     Assertions.assertEquals(OneType.STRING, sourceField.getSchema().getDataType());
+    Assertions.assertEquals(
+        PartitionTransformType.VALUE, irPartitionSpec.get(0).getTransformType());
   }
 
   @Test
@@ -294,8 +297,7 @@ public class TestIcebergPartitionSpecExtractor {
     Assertions.assertEquals(
         PartitionTransformType.VALUE, extractor.fromIcebergTransform(Transforms.identity()));
 
-    Assertions.assertThrows(NotSupportedException.class, () -> {
-      extractor.fromIcebergTransform(Transforms.bucket(10));
-    });
+    Assertions.assertThrows(
+        NotSupportedException.class, () -> extractor.fromIcebergTransform(Transforms.bucket(10)));
   }
 }

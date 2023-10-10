@@ -50,6 +50,7 @@ import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
+import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.storage.TableFormat;
 
 class TestIcebergSourceClient {
@@ -99,14 +100,15 @@ class TestIcebergSourceClient {
         snapshot.timestampMillis(), oneTable.getLatestCommitTime().toEpochMilli());
     Assertions.assertNotNull(oneTable.getReadSchema());
 
-    Assertions.assertEquals(34, oneTable.getReadSchema().getFields().size());
+    Assertions.assertEquals(7, oneTable.getReadSchema().getFields().size());
     validateSchema(oneTable.getReadSchema(), catalogSales.schema());
 
     Assertions.assertEquals(1, oneTable.getPartitioningFields().size());
     OneField partitionField = oneTable.getPartitioningFields().get(0).getSourceField();
     Assertions.assertEquals("cs_sold_date_sk", partitionField.getName());
-    Assertions.assertEquals(34, partitionField.getFieldId());
-    // TODO transform type is not implemented yet
+    Assertions.assertEquals(7, partitionField.getFieldId());
+    Assertions.assertEquals(
+        PartitionTransformType.VALUE, oneTable.getPartitioningFields().get(0).getTransformType());
 
     // cleanup test data
     FileUtils.deleteDirectory(workingDir.toFile());

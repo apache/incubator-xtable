@@ -13,161 +13,26 @@
     "type" : "int"
   }, {
     "id" : 3,
-    "name" : "cs_bill_customer_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 4,
-    "name" : "cs_bill_cdemo_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 5,
-    "name" : "cs_bill_hdemo_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 6,
-    "name" : "cs_bill_addr_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 7,
-    "name" : "cs_ship_customer_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 8,
-    "name" : "cs_ship_cdemo_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 9,
-    "name" : "cs_ship_hdemo_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 10,
-    "name" : "cs_ship_addr_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 11,
-    "name" : "cs_call_center_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 12,
-    "name" : "cs_catalog_page_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 13,
-    "name" : "cs_ship_mode_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 14,
-    "name" : "cs_warehouse_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 15,
-    "name" : "cs_item_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 16,
-    "name" : "cs_promo_sk",
-    "required" : false,
-    "type" : "int"
-  }, {
-    "id" : 17,
     "name" : "cs_order_number",
     "required" : false,
     "type" : "long"
   }, {
-    "id" : 18,
+    "id" : 4,
     "name" : "cs_quantity",
     "required" : false,
     "type" : "int"
   }, {
-    "id" : 19,
+    "id" : 5,
     "name" : "cs_wholesale_cost",
     "required" : false,
     "type" : "decimal(7, 2)"
   }, {
-    "id" : 20,
+    "id" : 6,
     "name" : "cs_list_price",
     "required" : false,
     "type" : "decimal(7, 2)"
   }, {
-    "id" : 21,
-    "name" : "cs_sales_price",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 22,
-    "name" : "cs_ext_discount_amt",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 23,
-    "name" : "cs_ext_sales_price",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 24,
-    "name" : "cs_ext_wholesale_cost",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 25,
-    "name" : "cs_ext_list_price",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 26,
-    "name" : "cs_ext_tax",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 27,
-    "name" : "cs_coupon_amt",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 28,
-    "name" : "cs_ext_ship_cost",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 29,
-    "name" : "cs_net_paid",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 30,
-    "name" : "cs_net_paid_inc_tax",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 31,
-    "name" : "cs_net_paid_inc_ship",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 32,
-    "name" : "cs_net_paid_inc_ship_tax",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 33,
-    "name" : "cs_net_profit",
-    "required" : false,
-    "type" : "decimal(7, 2)"
-  }, {
-    "id" : 34,
+    "id" : 7,
     "name" : "cs_sold_date_sk",
     "required" : true,
     "type" : "int"
