@@ -41,6 +41,7 @@ import lombok.SneakyThrows;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.hadoop.conf.Configuration;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -81,6 +82,8 @@ import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.TableFormat;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * A suite of functional tests that assert that the metadata for the hudi table is properly written
@@ -166,7 +169,7 @@ public class ITHudiTargetClient {
             .schemaVersion(SCHEMA_VERSION)
             .build();
     String fileName = "file_1.parquet";
-    String filePath = partitionPath + "/" + fileName;
+    String filePath = getFilePath(partitionPath, fileName);
 
     OneDataFilesDiff dataFilesDiff =
         OneDataFilesDiff.builder()
@@ -202,7 +205,7 @@ public class ITHudiTargetClient {
   void syncForNewTable() {
     String partitionPath = "partition_path";
     String fileName = "file_1.parquet";
-    String filePath = partitionPath + "/" + fileName;
+    String filePath = getFilePath(partitionPath, fileName);
     OneDataFiles snapshot =
         OneDataFiles.collectionBuilder()
             .files(
@@ -236,11 +239,11 @@ public class ITHudiTargetClient {
     assertSchema(metaClient, false);
   }
 
-  @Test
-  void archiveTimelineAndCleanMetadataTableAfterMultipleCommits() {
-    String partitionPath = "partition_path";
+  @ParameterizedTest
+  @ValueSource(strings = {"partition_path", ""})
+  void archiveTimelineAndCleanMetadataTableAfterMultipleCommits(String partitionPath) {
     String fileName1 = "file_1.parquet";
-    String filePath1 = partitionPath + "/" + fileName1;
+    String filePath1 = getFilePath(partitionPath, fileName1);
     OneDataFiles snapshot =
         OneDataFiles.collectionBuilder()
             .files(
@@ -274,7 +277,7 @@ public class ITHudiTargetClient {
 
     // create a new commit that removes fileName1 and adds fileName2
     String fileName2 = "file_2.parquet";
-    String filePath2 = partitionPath + "/" + fileName2;
+    String filePath2 = getFilePath(partitionPath, fileName2);
     OneDataFilesDiff dataFilesDiff =
         OneDataFilesDiff.builder()
             .fileAdded(getTestFile(partitionPath, fileName2))
@@ -301,7 +304,7 @@ public class ITHudiTargetClient {
 
     // create a new commit that adds a file but will also trigger cleanup of fileName1
     String fileName3 = "file_3.parquet";
-    String filePath3 = partitionPath + "/" + fileName3;
+    String filePath3 = getFilePath(partitionPath, fileName3);
     OneDataFilesDiff dataFilesDiff2 =
         OneDataFilesDiff.builder().fileAdded(getTestFile(partitionPath, fileName3)).build();
     OneTable state3 = getState(Instant.now());
@@ -326,6 +329,13 @@ public class ITHudiTargetClient {
     // the first commit to the timeline should be archived
     assertEquals(
         1, metaClient.getArchivedTimeline().reload().filterCompletedInstants().countInstants());
+  }
+
+  private static String getFilePath(String partitionPath, String fileName) {
+    if (partitionPath.isEmpty()) {
+      return fileName;
+    }
+    return partitionPath + "/" + fileName;
   }
 
   @SneakyThrows
@@ -379,7 +389,6 @@ public class ITHudiTargetClient {
       String filePath,
       String fileId,
       int expectedFileGroupSize) {
-    // TODO reuse between assertions for efficiency
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             CONTEXT,
