@@ -18,11 +18,11 @@
  
 package io.onetable.hudi;
 
+import static io.onetable.hudi.HudiInstantUtils.convertInstantToCommit;
+import static io.onetable.hudi.HudiInstantUtils.parseFromInstantTime;
 import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
@@ -66,7 +66,6 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
-import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
@@ -220,11 +219,6 @@ public class HudiTargetClient implements TargetClient {
         commitStateCreator.create(
             getMetaClient(), instant, timelineRetentionInHours, maxNumDeltaCommitsBeforeCompaction);
   }
-  // TODO make util class for this and reverse calculation?
-  static String convertInstantToCommit(Instant instant) {
-    LocalDateTime instantTime = instant.atZone(UTC).toLocalDateTime();
-    return HoodieInstantTimeGenerator.getInstantFromTemporalAccessor(instantTime);
-  }
 
   @Override
   public void completeSync() {
@@ -351,8 +345,7 @@ public class HudiTargetClient implements TargetClient {
     private InstantsToArchiveAndRetain getInstantsToArchiveAndRetain() {
       String commitCutoff =
           convertInstantToCommit(
-              HudiClient.parseFromInstantTime(instantTime)
-                  .minus(timelineRetentionInHours, ChronoUnit.HOURS));
+              parseFromInstantTime(instantTime).minus(timelineRetentionInHours, ChronoUnit.HOURS));
       HoodieTimeline activeTimeline = metaClient.getActiveTimeline();
       List<HoodieInstant> instantsToArchive =
           activeTimeline.findInstantsBeforeOrEquals(commitCutoff).getInstants();
@@ -415,8 +408,7 @@ public class HudiTargetClient implements TargetClient {
         return;
       }
       String cleanTime =
-          convertInstantToCommit(
-              HudiClient.parseFromInstantTime(instantTime).plus(1, ChronoUnit.SECONDS));
+          convertInstantToCommit(parseFromInstantTime(instantTime).plus(1, ChronoUnit.SECONDS));
       HoodieTableFileSystemView fsView =
           new HoodieMetadataFileSystemView(
               engineContext,

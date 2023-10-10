@@ -18,17 +18,10 @@
  
 package io.onetable.hudi;
 
-import static org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator.MILLIS_INSTANT_TIMESTAMP_FORMAT_LENGTH;
-import static org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator.SECS_INSTANT_ID_LENGTH;
-import static org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator.SECS_INSTANT_TIMESTAMP_FORMAT;
+import static io.onetable.hudi.HudiInstantUtils.convertInstantToCommit;
+import static io.onetable.hudi.HudiInstantUtils.parseFromInstantTime;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
-import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -54,20 +47,11 @@ import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
-import io.onetable.model.exception.OneParseException;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.spi.extractor.SourceClient;
 
 public class HudiClient implements SourceClient<HoodieInstant> {
-  private static final ZoneId ZONE_ID = ZoneId.of("UTC");
-  // Unfortunately millisecond format is not parsable as is
-  // https://bugs.openjdk.java.net/browse/JDK-8031085. hence have to do appendValue()
-  private static final DateTimeFormatter MILLIS_INSTANT_TIME_FORMATTER =
-      new DateTimeFormatterBuilder()
-          .appendPattern(SECS_INSTANT_TIMESTAMP_FORMAT)
-          .appendValue(ChronoField.MILLI_OF_SECOND, 3)
-          .toFormatter()
-          .withZone(ZONE_ID);
+
   private final HoodieTableMetaClient metaClient;
   private final HudiTableExtractor tableExtractor;
   private final HudiDataFileExtractor dataFileExtractor;
@@ -184,30 +168,6 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         .build();
   }
 
-  /**
-   * Copied mostly from {@link
-   * org.apache.hudi.common.table.timeline.HoodieActiveTimeline#parseDateFromInstantTime(String)}
-   * but forces the timestamp to use UTC unlike the Hudi code.
-   *
-   * @param timestamp input commit timestamp
-   * @return timestamp parsed as Instant
-   */
-  public static Instant parseFromInstantTime(String timestamp) {
-    try {
-      String timestampInMillis = timestamp;
-      if (isSecondGranularity(timestamp)) {
-        timestampInMillis = timestamp + "999";
-      } else if (timestamp.length() > MILLIS_INSTANT_TIMESTAMP_FORMAT_LENGTH) {
-        timestampInMillis = timestamp.substring(0, MILLIS_INSTANT_TIMESTAMP_FORMAT_LENGTH);
-      }
-
-      LocalDateTime dt = LocalDateTime.parse(timestampInMillis, MILLIS_INSTANT_TIME_FORMATTER);
-      return dt.atZone(ZONE_ID).toInstant();
-    } catch (DateTimeParseException ex) {
-      throw new OneParseException("Unable to parse date from commit timestamp: " + timestamp, ex);
-    }
-  }
-
   private HoodieTimeline getCompletedCommits() {
     return metaClient.getActiveTimeline().filterCompletedInstants();
   }
@@ -243,7 +203,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
 
   private HoodieInstant getCommitAtInstant(Instant instant) {
     return getCompletedCommits()
-        .findInstantsBeforeOrEquals(MILLIS_INSTANT_TIME_FORMATTER.format(instant))
+        .findInstantsBeforeOrEquals(convertInstantToCommit(instant))
         .lastInstant()
         .get();
   }
@@ -301,10 +261,6 @@ public class HudiClient implements SourceClient<HoodieInstant> {
       }
     }
     return mergedList;
-  }
-
-  private static boolean isSecondGranularity(String instant) {
-    return instant.length() == SECS_INSTANT_ID_LENGTH;
   }
 
   @Value

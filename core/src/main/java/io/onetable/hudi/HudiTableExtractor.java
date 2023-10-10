@@ -18,6 +18,8 @@
  
 package io.onetable.hudi;
 
+import static io.onetable.hudi.HudiInstantUtils.parseFromInstantTime;
+
 import java.util.List;
 
 import javax.inject.Singleton;
@@ -74,7 +76,7 @@ public class HudiTableExtractor {
         .layoutStrategy(dataLayoutStrategy)
         .partitioningFields(partitionFields)
         .readSchema(canonicalSchema)
-        .latestCommitTime(HudiClient.parseFromInstantTime(commit.getTimestamp()))
+        .latestCommitTime(parseFromInstantTime(commit.getTimestamp()))
         .build();
   }
 }

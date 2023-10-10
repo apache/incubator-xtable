@@ -188,7 +188,7 @@ public class ITHudiTargetClient {
     targetClient.completeSync();
 
     Instant syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
-    String instantTime = HudiTargetClient.convertInstantToCommit(syncedInstant);
+    String instantTime = HudiInstantUtils.convertInstantToCommit(syncedInstant);
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(metaClient, instantTime, partitionPath, filePath, fileName);
@@ -227,7 +227,7 @@ public class ITHudiTargetClient {
     targetClient.completeSync();
 
     Instant syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
-    String instantTime = HudiTargetClient.convertInstantToCommit(syncedInstant);
+    String instantTime = HudiInstantUtils.convertInstantToCommit(syncedInstant);
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(metaClient, instantTime, partitionPath, filePath, fileName);
@@ -265,7 +265,7 @@ public class ITHudiTargetClient {
     targetClient.completeSync();
 
     Instant syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
-    String instantTime = HudiTargetClient.convertInstantToCommit(syncedInstant);
+    String instantTime = HudiInstantUtils.convertInstantToCommit(syncedInstant);
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(metaClient, instantTime, partitionPath, filePath1, fileName1);
@@ -291,7 +291,7 @@ public class ITHudiTargetClient {
     targetClient.completeSync();
 
     syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
-    String instantTime2 = HudiTargetClient.convertInstantToCommit(syncedInstant);
+    String instantTime2 = HudiInstantUtils.convertInstantToCommit(syncedInstant);
     assertFileGroupCorrectness(metaClient, instantTime2, partitionPath, filePath2, fileName2);
     try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
         new HoodieBackedTableMetadata(
@@ -315,7 +315,7 @@ public class ITHudiTargetClient {
     targetClient.completeSync();
 
     syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
-    String instantTime3 = HudiTargetClient.convertInstantToCommit(syncedInstant);
+    String instantTime3 = HudiInstantUtils.convertInstantToCommit(syncedInstant);
     assertFileGroupCorrectness(metaClient, instantTime2, partitionPath, filePath2, fileName2, 2);
     assertFileGroupCorrectness(metaClient, instantTime3, partitionPath, filePath3, fileName3, 2);
     // col stats should be cleaned up for fileName1 but present for fileName2 and fileName3
