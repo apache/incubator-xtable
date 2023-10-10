@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -73,7 +74,7 @@ public class TestHudiTargetClient {
       mock(HudiTargetClient.CommitStateCreator.class);
 
   private HudiTargetClient getTargetClient(HoodieTableMetaClient mockMetaClient) {
-    when(mockHudiTableManager.loadTableIfExists(BASE_PATH)).thenReturn(mockMetaClient);
+    when(mockHudiTableManager.loadTableMetaClientIfExists(BASE_PATH)).thenReturn(Optional.ofNullable(mockMetaClient));
     return new HudiTargetClient(
         BASE_PATH,
         RETENTION_IN_HOURS,

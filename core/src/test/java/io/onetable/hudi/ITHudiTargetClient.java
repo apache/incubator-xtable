@@ -94,9 +94,9 @@ public class ITHudiTargetClient {
   private static final HoodieEngineContext CONTEXT = new HoodieJavaEngineContext(CONFIGURATION);
 
   private static final String TABLE_NAME = "test_table";
-  private static final String FIELD_1 = "id";
-  private static final String FIELD_2 = "partition_field";
-  private static final String FIELD_3 = "content";
+  private static final String KEY_FIELD_NAME = "id";
+  private static final String PARTITION_FIELD_NAME = "partition_field";
+  private static final String OTHER_FIELD_NAME = "content";
   private static final long FILE_SIZE = 100L;
   private static final long RECORD_COUNT = 200L;
   private static final long LAST_MODIFIED = System.currentTimeMillis();
@@ -104,7 +104,7 @@ public class ITHudiTargetClient {
       OneSchema.builder().name("string").dataType(OneType.STRING).isNullable(false).build();
 
   private static final OneField PARTITION_FIELD =
-      OneField.builder().name(FIELD_2).schema(STRING_SCHEMA).build();
+      OneField.builder().name(PARTITION_FIELD_NAME).schema(STRING_SCHEMA).build();
   private static final String TEST_SCHEMA_NAME = "test_schema";
   private static final OneSchema SCHEMA =
       OneSchema.builder()
@@ -112,9 +112,9 @@ public class ITHudiTargetClient {
           .dataType(OneType.RECORD)
           .fields(
               Arrays.asList(
-                  OneField.builder().name(FIELD_1).schema(STRING_SCHEMA).build(),
+                  OneField.builder().name(KEY_FIELD_NAME).schema(STRING_SCHEMA).build(),
                   PARTITION_FIELD,
-                  OneField.builder().name(FIELD_3).schema(STRING_SCHEMA).build()))
+                  OneField.builder().name(OTHER_FIELD_NAME).schema(STRING_SCHEMA).build()))
           .build();
   private final String tableBasePath = tempDir.resolve(UUID.randomUUID().toString()).toString();
 
@@ -123,13 +123,14 @@ public class ITHudiTargetClient {
     String partitionPath = "partition_path";
     String commitTime = "20231003013807542";
     String existingFileName1 = "existing_file_1.parquet";
-    HoodieTableMetaClient setupMetaClient = initTableAndGetMetaClient(tableBasePath, FIELD_2);
+    HoodieTableMetaClient setupMetaClient =
+        initTableAndGetMetaClient(tableBasePath, PARTITION_FIELD_NAME);
     // initialize the table with only 2 of the 3 fields
     Schema initialSchema =
         SchemaBuilder.record(TEST_SCHEMA_NAME)
             .fields()
-            .requiredString(FIELD_1)
-            .requiredString(FIELD_2)
+            .requiredString(KEY_FIELD_NAME)
+            .requiredString(PARTITION_FIELD_NAME)
             .endRecord();
     HoodieWriteConfig writeConfig = getHoodieWriteConfig(setupMetaClient, initialSchema);
     List<WriteStatus> initialWriteStatuses =
@@ -356,17 +357,17 @@ public class ITHudiTargetClient {
                   HoodieRecord.HoodieMetadataField.PARTITION_PATH_METADATA_FIELD.getFieldName())
               .optionalString(
                   HoodieRecord.HoodieMetadataField.FILENAME_METADATA_FIELD.getFieldName())
-              .requiredString(FIELD_1)
-              .requiredString(FIELD_2)
-              .requiredString(FIELD_3)
+              .requiredString(KEY_FIELD_NAME)
+              .requiredString(PARTITION_FIELD_NAME)
+              .requiredString(OTHER_FIELD_NAME)
               .endRecord();
     } else {
       expected =
           SchemaBuilder.record(TEST_SCHEMA_NAME)
               .fields()
-              .requiredString(FIELD_1)
-              .requiredString(FIELD_2)
-              .requiredString(FIELD_3)
+              .requiredString(KEY_FIELD_NAME)
+              .requiredString(PARTITION_FIELD_NAME)
+              .requiredString(OTHER_FIELD_NAME)
               .endRecord();
     }
     assertEquals(expected, actual);
@@ -431,14 +432,22 @@ public class ITHudiTargetClient {
   private void assertColStats(
       HoodieBackedTableMetadata hoodieBackedTableMetadata, String partitionPath, String fileName) {
     assertColStatsForField(
-        hoodieBackedTableMetadata, partitionPath, fileName, FIELD_1, "id1", "id2", 2, 0, 5);
-    assertColStatsForField(
-        hoodieBackedTableMetadata, partitionPath, fileName, FIELD_2, "a", "b", 3, 1, 10);
+        hoodieBackedTableMetadata, partitionPath, fileName, KEY_FIELD_NAME, "id1", "id2", 2, 0, 5);
     assertColStatsForField(
         hoodieBackedTableMetadata,
         partitionPath,
         fileName,
-        FIELD_3,
+        PARTITION_FIELD_NAME,
+        "a",
+        "b",
+        3,
+        1,
+        10);
+    assertColStatsForField(
+        hoodieBackedTableMetadata,
+        partitionPath,
+        fileName,
+        OTHER_FIELD_NAME,
         "content1",
         "content2",
         2,
@@ -514,6 +523,11 @@ public class ITHudiTargetClient {
         .basePath(tableBasePath)
         .name(TABLE_NAME)
         .latestCommitTime(lastCommitTime)
+  private OneTable getState() {
+    return OneTable.builder()
+        .basePath(tableBasePath)
+        .name(TABLE_NAME)
+        .latestCommitTime(Instant.now())
         .tableFormat(TableFormat.ICEBERG)
         .layoutStrategy(DataLayoutStrategy.HIVE_STYLE_PARTITION)
         .readSchema(SCHEMA)
