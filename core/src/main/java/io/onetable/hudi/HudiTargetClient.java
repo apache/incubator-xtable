@@ -108,34 +108,35 @@ public class HudiTargetClient implements TargetClient {
   @Override
   public void syncSchema(OneSchema schema) {
     if (metaClient.isPresent()) {
-      Option<String[]> recordKeyFields = metaClient.get().getTableConfig().getRecordKeyFields();
-      if (recordKeyFields.isPresent()) {
-        List<String> existingHudiRecordKeys =
-            Arrays.stream(recordKeyFields.get()).collect(Collectors.toList());
-        List<String> schemaFieldsList =
-            schema.getRecordKeyFields().stream()
-                .map(OneField::getPath)
-                .collect(Collectors.toList());
-        if (!schemaFieldsList.equals(existingHudiRecordKeys)) {
-          Set<String> newKeys =
-              schemaFieldsList.stream()
-                  .filter(k -> !existingHudiRecordKeys.contains(k))
-                  .collect(Collectors.toSet());
-          Set<String> removedKeys =
-              existingHudiRecordKeys.stream()
-                  .filter(k -> !schemaFieldsList.contains(k))
-                  .collect(Collectors.toSet());
-          log.error(
-              String.format(
-                  "Record key fields cannot be changed after creating Hudi table. "
-                      + "New keys: %s, Removed keys: %s",
-                  newKeys, removedKeys));
-          throw new NotSupportedException(
-              "Record key fields cannot be changed after creating Hudi table");
-        }
-      }
+      validateRecordKeysAreNotModified(schema);
     }
     commitState.setSchema(avroSchemaConverter.fromOneSchema(schema));
+  }
+
+  private void validateRecordKeysAreNotModified(OneSchema schema) {
+    Option<String[]> recordKeyFields = getMetaClient().getTableConfig().getRecordKeyFields();
+    if (recordKeyFields.isPresent()) {
+      List<String> existingHudiRecordKeys = Arrays.asList(recordKeyFields.get());
+      List<String> schemaFieldsList =
+          schema.getRecordKeyFields().stream().map(OneField::getPath).collect(Collectors.toList());
+      if (!schemaFieldsList.equals(existingHudiRecordKeys)) {
+        Set<String> newKeys =
+            schemaFieldsList.stream()
+                .filter(k -> !existingHudiRecordKeys.contains(k))
+                .collect(Collectors.toSet());
+        Set<String> removedKeys =
+            existingHudiRecordKeys.stream()
+                .filter(k -> !schemaFieldsList.contains(k))
+                .collect(Collectors.toSet());
+        log.error(
+            String.format(
+                "Record key fields cannot be changed after creating Hudi table. "
+                    + "New keys: %s, Removed keys: %s",
+                newKeys, removedKeys));
+        throw new NotSupportedException(
+            "Record key fields cannot be changed after creating Hudi table");
+      }
+    }
   }
 
   @Override
