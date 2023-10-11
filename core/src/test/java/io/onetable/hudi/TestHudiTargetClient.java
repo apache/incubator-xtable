@@ -106,6 +106,25 @@ public class TestHudiTargetClient {
   }
 
   @Test
+  void syncSchemaWithRecordKeyChanged() {
+    HudiTargetClient targetClient = getTargetClient(null);
+    initMocksForBeginSync(targetClient);
+    List<OneField> recordKeyFields =
+        Arrays.asList(
+            OneField.builder().name("record_key_field").build(),
+            OneField.builder().name("record_key_field2").build());
+    OneSchema input =
+        OneSchema.builder()
+            .name("schema")
+            .dataType(OneType.RECORD)
+            .recordKeyFields(recordKeyFields)
+            .build();
+    Schema converted = SchemaBuilder.record("record").fields().requiredInt("field").endRecord();
+    when(mockAvroSchemaConverter.fromOneSchema(input)).thenReturn(converted);
+    assertThrows(NotSupportedException.class, () -> targetClient.syncSchema(input));
+  }
+
+  @Test
   void syncMetadata() {
     HudiTargetClient targetClient = getTargetClient(null);
     HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();

@@ -77,7 +77,8 @@ public class IcebergSchemaExtractor {
               .filter(path -> partialSchema.findField(convertFromOneTablePath(path)) == null)
               .collect(Collectors.toList());
       log.error("Missing field IDs for record key field paths: " + missingFieldPaths);
-      throw new SchemaExtractorException("Mismatches in converting record key fields");
+      throw new SchemaExtractorException(
+          String.format("Mismatches in converting record key fields: %", missingFieldPaths));
     }
     return new Schema(nestedFields, recordKeyIds);
   }
