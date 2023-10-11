@@ -42,6 +42,7 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 import lombok.Value;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
@@ -95,6 +96,7 @@ import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.sync.TargetClient;
 
+@Log4j2
 public class HudiTargetClient implements TargetClient {
   private static final ZoneId UTC = ZoneId.of("UTC");
 
@@ -165,7 +167,36 @@ public class HudiTargetClient implements TargetClient {
 
   @Override
   public void syncSchema(OneSchema schema) {
+    if (metaClient.isPresent()) {
+      validateRecordKeysAreNotModified(schema);
+    }
     commitState.setSchema(avroSchemaConverter.fromOneSchema(schema));
+  }
+
+  private void validateRecordKeysAreNotModified(OneSchema schema) {
+    Option<String[]> recordKeyFields = getMetaClient().getTableConfig().getRecordKeyFields();
+    if (recordKeyFields.isPresent()) {
+      List<String> existingHudiRecordKeys = Arrays.asList(recordKeyFields.get());
+      List<String> schemaFieldsList =
+          schema.getRecordKeyFields().stream().map(OneField::getPath).collect(Collectors.toList());
+      if (!schemaFieldsList.equals(existingHudiRecordKeys)) {
+        Set<String> newKeys =
+            schemaFieldsList.stream()
+                .filter(k -> !existingHudiRecordKeys.contains(k))
+                .collect(Collectors.toSet());
+        Set<String> removedKeys =
+            existingHudiRecordKeys.stream()
+                .filter(k -> !schemaFieldsList.contains(k))
+                .collect(Collectors.toSet());
+        log.error(
+            String.format(
+                "Record key fields cannot be changed after creating Hudi table. "
+                    + "New keys: %s, Removed keys: %s",
+                newKeys, removedKeys));
+        throw new NotSupportedException(
+            "Record key fields cannot be changed after creating Hudi table");
+      }
+    }
   }
 
   @Override
