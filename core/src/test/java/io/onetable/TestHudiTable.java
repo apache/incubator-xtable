@@ -45,6 +45,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import lombok.SneakyThrows;
+
 import org.apache.avro.LogicalType;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
@@ -651,8 +653,8 @@ public class TestHudiTable implements Closeable {
     return basePath;
   }
 
-  private SparkRDDWriteClient<HoodieAvroPayload> initSparkWriteClient(
-      String schema, TypedProperties keyGenProperties) {
+  private HoodieWriteConfig generateWriteConfig(
+      String schemaStr, TypedProperties keyGenProperties) {
     // allow for compaction and cleaning after a single commit for testing different timeline
     // scenarios
     HoodieCompactionConfig compactionConfig =
@@ -672,74 +674,45 @@ public class TestHudiTable implements Closeable {
     lockProperties.setProperty(
         LockConfiguration.LOCK_ACQUIRE_CLIENT_RETRY_WAIT_TIME_IN_MILLIS_PROP_KEY, "3000");
     lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_CLIENT_NUM_RETRIES_PROP_KEY, "20");
-    HoodieWriteConfig writeConfig =
-        HoodieWriteConfig.newBuilder()
-            .withProperties(keyGenProperties)
-            .withPath(this.basePath)
-            .withSchema(schema)
-            .withKeyGenerator(keyGenerator.getClass().getCanonicalName())
-            .withCompactionConfig(compactionConfig)
-            .withClusteringConfig(clusteringConfig)
-            .withCleanConfig(cleanConfig)
-            .withArchivalConfig(archivalConfig)
-            .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
-            .withMarkersType(MarkerType.DIRECT.name())
-            .withLockConfig(
-                HoodieLockConfig.newBuilder().withLockProvider(InProcessLockProvider.class).build())
-            .withProperties(lockProperties)
-            .build();
+    return HoodieWriteConfig.newBuilder()
+        .withProperties(keyGenProperties)
+        .withPath(this.basePath)
+        .withSchema(schemaStr)
+        .withKeyGenerator(keyGenerator.getClass().getCanonicalName())
+        .withCompactionConfig(compactionConfig)
+        .withClusteringConfig(clusteringConfig)
+        .withCleanConfig(cleanConfig)
+        .withArchivalConfig(archivalConfig)
+        .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
+        .withMarkersType(MarkerType.DIRECT.name())
+        .withLockConfig(
+            HoodieLockConfig.newBuilder().withLockProvider(InProcessLockProvider.class).build())
+        .withProperties(lockProperties)
+        .build();
+  }
+
+  private SparkRDDWriteClient<HoodieAvroPayload> initSparkWriteClient(
+      String schema, TypedProperties keyGenProperties) {
+    HoodieWriteConfig writeConfig = generateWriteConfig(schema, keyGenProperties);
     HoodieEngineContext context = new HoodieSparkEngineContext(jsc);
     return new SparkRDDWriteClient<>(context, writeConfig);
   }
 
   private HoodieJavaWriteClient<HoodieAvroPayload> initJavaWriteClient(
       String schema, TypedProperties keyGenProperties) {
-    // TODO(vamshigv): consolidate usage in java client code path.
+    HoodieWriteConfig writeConfig = generateWriteConfig(schema, keyGenProperties);
     Configuration conf = new Configuration();
-    HoodieCompactionConfig compactionConfig =
-        HoodieCompactionConfig.newBuilder().withMaxNumDeltaCommitsBeforeCompaction(1).build();
-    HoodieClusteringConfig clusteringConfig =
-        HoodieClusteringConfig.newBuilder().withClusteringSortColumns("long_field").build();
-    HoodieCleanConfig cleanConfig =
-        HoodieCleanConfig.newBuilder()
-            .retainCommits(1)
-            .withMaxCommitsBeforeCleaning(1)
-            .withAutoClean(false)
-            .build();
-    HoodieArchivalConfig archivalConfig =
-        HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
-    Properties lockProperties = new Properties();
-    lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_WAIT_TIMEOUT_MS_PROP_KEY, "3000");
-    lockProperties.setProperty(
-        LockConfiguration.LOCK_ACQUIRE_CLIENT_RETRY_WAIT_TIME_IN_MILLIS_PROP_KEY, "3000");
-    lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_CLIENT_NUM_RETRIES_PROP_KEY, "20");
-    HoodieWriteConfig writeConfig =
-        HoodieWriteConfig.newBuilder()
-            .withProperties(keyGenProperties)
-            .withPath(this.basePath)
-            .withSchema(schema)
-            .withKeyGenerator(keyGenerator.getClass().getCanonicalName())
-            .withCompactionConfig(compactionConfig)
-            .withClusteringConfig(clusteringConfig)
-            .withCleanConfig(cleanConfig)
-            .withArchivalConfig(archivalConfig)
-            .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
-            .withMarkersType(MarkerType.DIRECT.name())
-            .withLockConfig(
-                HoodieLockConfig.newBuilder().withLockProvider(InProcessLockProvider.class).build())
-            .withProperties(lockProperties)
-            .build();
     HoodieEngineContext context = new HoodieJavaEngineContext(conf);
     return new HoodieJavaWriteClient<>(context, writeConfig);
   }
 
-  private HoodieTableMetaClient initMetaClient(
-      JavaSparkContext jsc, HoodieTableType hoodieTableType, TypedProperties keyGenProperties)
-      throws IOException {
-    LocalFileSystem fs = (LocalFileSystem) FSUtils.getFs(this.basePath, jsc.hadoopConfiguration());
-    // Enforce checksun such that fs.open() is consistent to DFS
+  @SneakyThrows
+  private HoodieTableMetaClient getMetaClient(
+      TypedProperties keyGenProperties, HoodieTableType hoodieTableType, Configuration conf) {
+    LocalFileSystem fs = (LocalFileSystem) FSUtils.getFs(basePath, conf);
+    // Enforce checksum such that fs.open() is consistent to DFS
     fs.setVerifyChecksum(true);
-    fs.mkdirs(new org.apache.hadoop.fs.Path(this.basePath));
+    fs.mkdirs(new org.apache.hadoop.fs.Path(basePath));
 
     Properties properties =
         HoodieTableMetaClient.withPropertyBuilder()
@@ -758,26 +731,13 @@ public class TestHudiTable implements Closeable {
   }
 
   private HoodieTableMetaClient initMetaClient(
-      HoodieTableType hoodieTableType, TypedProperties keyGenProperties) throws IOException {
-    Configuration conf = new Configuration();
-    LocalFileSystem fs = (LocalFileSystem) FSUtils.getFs(this.basePath, conf);
-    // Enforce checksun such that fs.open() is consistent to DFS
-    fs.setVerifyChecksum(true);
-    fs.mkdirs(new org.apache.hadoop.fs.Path(this.basePath));
+      JavaSparkContext jsc, HoodieTableType hoodieTableType, TypedProperties keyGenProperties) {
+    return getMetaClient(keyGenProperties, hoodieTableType, jsc.hadoopConfiguration());
+  }
 
-    Properties properties =
-        HoodieTableMetaClient.withPropertyBuilder()
-            .fromProperties(keyGenProperties)
-            .setTableName(tableName)
-            .setTableType(hoodieTableType)
-            .setKeyGeneratorClassProp(keyGenerator.getClass().getCanonicalName())
-            .setPartitionFields(String.join(",", partitionFieldNames))
-            .setRecordKeyFields(RECORD_KEY_FIELD_NAME)
-            .setPayloadClass(OverwriteWithLatestAvroPayload.class)
-            .setCommitTimezone(HoodieTimelineTimeZone.UTC)
-            .setBaseFileFormat(HoodieFileFormat.PARQUET.toString())
-            .build();
-    return HoodieTableMetaClient.initTableAndGetMetaClient(conf, this.basePath, properties);
+  private HoodieTableMetaClient initMetaClient(
+      HoodieTableType hoodieTableType, TypedProperties keyGenProperties) throws IOException {
+    return getMetaClient(keyGenProperties, hoodieTableType, new Configuration());
   }
 
   // Create the base path and store it for reference
