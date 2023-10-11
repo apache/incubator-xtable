@@ -28,6 +28,9 @@ import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
+
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
@@ -43,6 +46,7 @@ import io.onetable.model.schema.OneSchema;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class IcebergSchemaExtractor {
+  private static final Logger LOG = LogManager.getLogger(IcebergSchemaExtractor.class);
   private static final IcebergSchemaExtractor INSTANCE = new IcebergSchemaExtractor();
   private static final String MAP_KEY_FIELD_NAME = "key";
   private static final String MAP_VALUE_FIELD_NAME = "value";
@@ -69,6 +73,13 @@ public class IcebergSchemaExtractor {
             .map(Types.NestedField::fieldId)
             .collect(Collectors.toSet());
     if (recordKeyFields.size() != recordKeyIds.size()) {
+      Set<Integer> missingIds =
+          recordKeyFields.stream()
+              .map(keyField -> partialSchema.findField(convertFromOneTablePath(keyField.getPath())))
+              .filter(Objects::isNull)
+              .map(Types.NestedField::fieldId)
+              .collect(Collectors.toSet());
+      LOG.error("Missing field IDs for record key fields: " + missingIds);
       throw new SchemaExtractorException("Mismatches in converting record key fields");
     }
     return new Schema(nestedFields, recordKeyIds);
