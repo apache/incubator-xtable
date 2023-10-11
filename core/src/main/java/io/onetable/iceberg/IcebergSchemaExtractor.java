@@ -216,7 +216,7 @@ public class IcebergSchemaExtractor {
    * @param type Iceberg type
    * @return Internal representation of Iceberg type
    */
-  public OneType fromIcebergType(Type type) {
+  OneType fromIcebergType(Type type) {
     switch (type.typeId()) {
         // TODO ENUM type is not supported in Iceberg
       case STRING:
