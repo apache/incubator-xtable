@@ -18,8 +18,7 @@
  
 package io.onetable.hudi;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -121,7 +120,11 @@ public class TestHudiTargetClient {
             .build();
     Schema converted = SchemaBuilder.record("record").fields().requiredInt("field").endRecord();
     when(mockAvroSchemaConverter.fromOneSchema(input)).thenReturn(converted);
-    assertThrows(NotSupportedException.class, () -> targetClient.syncSchema(input));
+    Exception thrownException =
+        assertThrows(NotSupportedException.class, () -> targetClient.syncSchema(input));
+    assertEquals(
+        "Record key fields cannot be changed after creating Hudi table",
+        thrownException.getMessage());
   }
 
   @Test
