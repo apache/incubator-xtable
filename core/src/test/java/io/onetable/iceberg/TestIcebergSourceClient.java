@@ -18,6 +18,8 @@
  
 package io.onetable.iceberg;
 
+import static org.mockito.Mockito.*;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -47,6 +49,7 @@ import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 
 import io.onetable.client.PerTableConfig;
+import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
@@ -109,6 +112,35 @@ class TestIcebergSourceClient {
     Assertions.assertEquals(7, partitionField.getFieldId());
     Assertions.assertEquals(
         PartitionTransformType.VALUE, oneTable.getPartitioningFields().get(0).getTransformType());
+
+    // cleanup test data
+    FileUtils.deleteDirectory(workingDir.toFile());
+  }
+
+  @Test
+  public void testGetCurrentSnapshot() throws IOException {
+    Path workingDir = Paths.get(System.getProperty("java.io.tmpdir"), UUID.randomUUID().toString());
+    Table catalogSales = createTestTableWithData(workingDir.toString());
+    Snapshot iceCurrentSnapshot = catalogSales.currentSnapshot();
+
+    PerTableConfig sourceTableConfig =
+        PerTableConfig.builder()
+            .tableName(catalogSales.name())
+            .tableBasePath(catalogSales.location())
+            .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
+            .build();
+
+    IcebergSourceClient client = clientProvider.getSourceClientInstance(sourceTableConfig);
+    IcebergSourceClient spyClient = spy(client);
+
+    OneSnapshot oneSnapshot = spyClient.getCurrentSnapshot();
+    Assertions.assertNotNull(oneSnapshot);
+    Assertions.assertEquals(
+        String.valueOf(iceCurrentSnapshot.snapshotId()), oneSnapshot.getVersion());
+    Assertions.assertNotNull(oneSnapshot.getTable());
+    verify(spyClient, times(1)).getTable(iceCurrentSnapshot);
+
+    // TODO schema catalog test
 
     // cleanup test data
     FileUtils.deleteDirectory(workingDir.toFile());

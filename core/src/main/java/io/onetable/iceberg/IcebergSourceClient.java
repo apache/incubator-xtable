@@ -19,7 +19,9 @@
 package io.onetable.iceberg;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -35,6 +37,7 @@ import io.onetable.model.*;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.SchemaCatalog;
+import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.extractor.SourceClient;
 
@@ -76,12 +79,25 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   @Override
   public SchemaCatalog getSchemaCatalog(OneTable table, Snapshot snapshot) {
-    return null;
+    Integer iceSchemaId = snapshot.schemaId();
+    Schema iceSchema = sourceTable.schemas().get(iceSchemaId);
+    IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
+    OneSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
+    Map<SchemaVersion, OneSchema> catalog =
+        Collections.singletonMap(new SchemaVersion(iceSchemaId, ""), irSchema);
+    return SchemaCatalog.builder().schemas(catalog).build();
   }
 
   @Override
   public OneSnapshot getCurrentSnapshot() {
-    return null;
+    Snapshot currentSnapshot = sourceTable.currentSnapshot();
+
+    OneTable irTable = getTable(currentSnapshot);
+    return OneSnapshot.builder()
+        .version(String.valueOf(currentSnapshot.snapshotId()))
+        .table(irTable)
+        .schemaCatalog(getSchemaCatalog(irTable, currentSnapshot))
+        .build();
   }
 
   @Override
