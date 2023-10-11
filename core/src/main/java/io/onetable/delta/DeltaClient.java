@@ -20,12 +20,10 @@ package io.onetable.delta;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -55,7 +53,6 @@ import io.onetable.client.PerTableConfig;
 import io.onetable.exception.NotSupportedException;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
-import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.OneDataFiles;
@@ -117,11 +114,6 @@ public class DeltaClient implements TargetClient {
 
   @Override
   public void syncSchema(OneSchema schema) {
-    syncSchema(schema, Collections.emptySet());
-  }
-
-  @Override
-  public void syncSchema(OneSchema schema, Set<OneField> recordKeyFields) {
     StructType latestSchema = schemaExtractor.schema(schema);
     transactionState.setLatestSchema(latestSchema);
   }

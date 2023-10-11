@@ -37,6 +37,8 @@ import lombok.Setter;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
@@ -65,6 +67,7 @@ import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.sync.TargetClient;
 
 public class HudiTargetClient implements TargetClient {
+  private static final Logger LOG = LogManager.getLogger(HudiTargetClient.class);
   private static final ZoneId UTC = ZoneId.of("UTC");
 
   private final BaseFileUpdatesExtractor baseFileUpdatesExtractor;
@@ -105,11 +108,32 @@ public class HudiTargetClient implements TargetClient {
 
   @Override
   public void syncSchema(OneSchema schema) {
-    syncSchema(schema, Collections.emptySet());
-  }
-
-  @Override
-  public void syncSchema(OneSchema schema, Set<OneField> recordKeyFields) {
+    if (metaClient.isPresent()) {
+      Option<String[]> recordKeyFields = metaClient.get().getTableConfig().getRecordKeyFields();
+      if (recordKeyFields.isPresent()) {
+        Set<String> existingHudiRecordKeys =
+            Arrays.stream(recordKeyFields.get()).collect(Collectors.toSet());
+        Set<String> schemaFieldsSet =
+            schema.getRecordKeyFields().stream().map(OneField::getPath).collect(Collectors.toSet());
+        if (!schemaFieldsSet.equals(existingHudiRecordKeys)) {
+          Set<String> newKeys =
+              schemaFieldsSet.stream()
+                  .filter(k -> !existingHudiRecordKeys.contains(k))
+                  .collect(Collectors.toSet());
+          Set<String> removedKeys =
+              existingHudiRecordKeys.stream()
+                  .filter(k -> !schemaFieldsSet.contains(k))
+                  .collect(Collectors.toSet());
+          LOG.error(
+              String.format(
+                  "Record key fields cannot be changed after creating Hudi table. "
+                      + "New keys: %s, Removed keys: %s",
+                  newKeys, removedKeys));
+          throw new NotSupportedException(
+              "Record key fields cannot be changed after creating Hudi table");
+        }
+      }
+    }
     commitState.setSchema(avroSchemaConverter.fromOneSchema(schema));
   }
 

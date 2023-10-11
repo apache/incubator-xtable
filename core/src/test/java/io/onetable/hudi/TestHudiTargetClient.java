@@ -91,7 +91,13 @@ public class TestHudiTargetClient {
   void syncSchema() {
     HudiTargetClient targetClient = getTargetClient(null);
     HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();
-    OneSchema input = OneSchema.builder().name("schema").dataType(OneType.RECORD).build();
+    OneSchema input =
+        OneSchema.builder()
+            .name("schema")
+            .dataType(OneType.RECORD)
+            .recordKeyFields(
+                Collections.singleton(OneField.builder().name("record_key_field").build()))
+            .build();
     Schema converted = SchemaBuilder.record("record").fields().requiredInt("field").endRecord();
     when(mockAvroSchemaConverter.fromOneSchema(input)).thenReturn(converted);
     targetClient.syncSchema(input);
@@ -219,6 +225,10 @@ public class TestHudiTargetClient {
   private Pair<HudiTargetClient.CommitState, HoodieTableMetaClient> initMocksForBeginSync(
       HudiTargetClient targetClient) {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
+    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
+    when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
+    when(mockTableConfig.getRecordKeyFields())
+        .thenReturn(Option.of(new String[] {"record_key_field"}));
     when(mockHudiTableManager.initializeHudiTable(TABLE)).thenReturn(mockMetaClient);
     HudiTargetClient.CommitState mockCommitState = mock(HudiTargetClient.CommitState.class);
     when(mockCommitStateCreator.create(mockMetaClient, COMMIT)).thenReturn(mockCommitState);

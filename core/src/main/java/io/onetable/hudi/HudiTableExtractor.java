@@ -71,6 +71,9 @@ public class HudiTableExtractor {
     }
     List<OnePartitionField> partitionFields = partitionSpecExtractor.spec(canonicalSchema);
     Set<OneField> recordKeyFields = getRecordKeyFields(metaClient, canonicalSchema);
+    if (!recordKeyFields.isEmpty()) {
+      canonicalSchema = canonicalSchema.toBuilder().recordKeyFields(recordKeyFields).build();
+    }
     DataLayoutStrategy dataLayoutStrategy =
         partitionFields.size() > 0
             ? DataLayoutStrategy.DIR_HIERARCHY_PARTITION_VALUES
@@ -81,7 +84,6 @@ public class HudiTableExtractor {
         .name(metaClient.getTableConfig().getTableName())
         .layoutStrategy(dataLayoutStrategy)
         .partitioningFields(partitionFields)
-        .recordKeyFields(recordKeyFields)
         .readSchema(canonicalSchema)
         .latestCommitTime(HudiClient.parseFromInstantTime(commit.getTimestamp()))
         .build();

@@ -37,6 +37,7 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
+import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.storage.TableFormat;
 
@@ -53,6 +54,16 @@ public class TestHudiTableManager {
     String tableName = "testing_123";
     String field1 = "field1";
     String field2 = "field2";
+    String recordKeyField = "path1.path2";
+    OneSchema tableSchema =
+        OneSchema.builder()
+            .fields(
+                Arrays.asList(
+                    OneField.builder().name(field1).build(),
+                    OneField.builder().name(field2).build(),
+                    OneField.builder().name(recordKeyField).build()))
+            .recordKeyFields(Collections.singleton(OneField.builder().name(recordKeyField).build()))
+            .build();
     List<OnePartitionField> inputPartitionFields =
         Arrays.asList(
             OnePartitionField.builder()
@@ -67,6 +78,7 @@ public class TestHudiTableManager {
         OneTable.builder()
             .name(tableName)
             .partitioningFields(inputPartitionFields)
+            .readSchema(tableSchema)
             .basePath(tableBasePath)
             .tableFormat(TableFormat.ICEBERG)
             .build();
@@ -83,6 +95,9 @@ public class TestHudiTableManager {
     assertEquals(
         Arrays.asList(field1, field2),
         Arrays.asList(metaClient.getTableConfig().getPartitionFields().get()));
+    assertEquals(
+        Arrays.asList(recordKeyField),
+        Arrays.asList(metaClient.getTableConfig().getRecordKeyFields().get()));
     assertEquals(tableBasePath, metaClient.getBasePath());
     assertEquals(tableName, metaClient.getTableConfig().getTableName());
   }

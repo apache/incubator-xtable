@@ -116,7 +116,7 @@ public class TableFormatSync {
     // initialize the sync
     client.beginSync(tableState);
     // sync schema updates
-    client.syncSchema(tableState.getReadSchema(), tableState.getRecordKeyFields());
+    client.syncSchema(tableState.getReadSchema());
     // sync partition updates
     client.syncPartitionSpec(tableState.getPartitioningFields());
     // Update the files in the target table

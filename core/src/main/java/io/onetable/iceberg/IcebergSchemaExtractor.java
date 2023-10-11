@@ -19,7 +19,6 @@
 package io.onetable.iceberg;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -54,13 +53,10 @@ public class IcebergSchemaExtractor {
   }
 
   public Schema toIceberg(OneSchema oneSchema) {
-    return toIceberg(oneSchema, Collections.emptySet());
-  }
-
-  public Schema toIceberg(OneSchema oneSchema, Set<OneField> recordKeyFields) {
     // if field IDs are not assigned in the source, just use an incrementing integer
     AtomicInteger fieldIdTracker = new AtomicInteger(0);
     List<Types.NestedField> nestedFields = convertFields(oneSchema, fieldIdTracker);
+    Set<OneField> recordKeyFields = oneSchema.getRecordKeyFields();
     if (recordKeyFields.isEmpty()) {
       return new Schema(nestedFields);
     }
@@ -73,7 +69,6 @@ public class IcebergSchemaExtractor {
             .map(Types.NestedField::fieldId)
             .collect(Collectors.toSet());
     if (recordKeyFields.size() != recordKeyIds.size()) {
-      // TODO(vamshigv): should it instead be best effort ?
       throw new SchemaExtractorException("Mismatches in converting record key fields");
     }
     return new Schema(nestedFields, recordKeyIds);

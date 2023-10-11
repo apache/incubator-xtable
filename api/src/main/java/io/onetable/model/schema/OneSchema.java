@@ -19,6 +19,7 @@
 package io.onetable.model.schema;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,6 +52,8 @@ public class OneSchema {
   // Indicates if values of this field can be `null` values.
   private final boolean isNullable;
   private final List<OneField> fields;
+  // record keys for the table if exists.
+  @Builder.Default Set<OneField> recordKeyFields = Collections.emptySet();
   private final Map<MetadataKey, Object> metadata;
 
   public static OneSchemaBuilder builderFrom(OneSchema field) {

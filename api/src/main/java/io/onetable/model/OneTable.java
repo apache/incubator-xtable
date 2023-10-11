@@ -19,14 +19,11 @@
 package io.onetable.model;
 
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 
 import lombok.Builder;
 import lombok.Value;
 
-import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.DataLayoutStrategy;
@@ -52,8 +49,6 @@ public class OneTable {
   String basePath;
   // Partitioning fields if table is partitioned
   List<OnePartitionField> partitioningFields;
-  // record keys for the table if exists.
-  @Builder.Default Set<OneField> recordKeyFields = Collections.emptySet();
   // latest commit(write) on the table.
   Instant latestCommitTime;
 }

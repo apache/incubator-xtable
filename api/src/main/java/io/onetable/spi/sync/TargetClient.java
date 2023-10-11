@@ -20,11 +20,9 @@ package io.onetable.spi.sync;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
-import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.OneDataFiles;
@@ -39,14 +37,6 @@ public interface TargetClient {
    * @param schema the current schema
    */
   void syncSchema(OneSchema schema);
-
-  /**
-   * Syncs the current schema state along with record key fields.
-   *
-   * @param schema the current schema.
-   * @param recordKeyFields the record key fields.
-   */
-  void syncSchema(OneSchema schema, Set<OneField> recordKeyFields);
 
   /**
    * Syncs the current partition spec.
