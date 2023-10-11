@@ -18,10 +18,10 @@
  
 package io.onetable.hudi;
 
-import java.util.Arrays;
-import java.util.Collections;
 import static io.onetable.hudi.HudiInstantUtils.parseFromInstantTime;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
