@@ -27,8 +27,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieTableType;
@@ -44,7 +42,6 @@ import io.onetable.model.schema.OnePartitionField;
 @Log4j2
 @RequiredArgsConstructor(staticName = "of")
 class HudiTableManager {
-  private static final Logger LOG = LogManager.getLogger(HudiTableManager.class);
   private final Configuration configuration;
 
   /**
@@ -80,13 +77,8 @@ class HudiTableManager {
           table.getReadSchema().getRecordKeyFields().stream()
               .map(OneField::getName)
               .collect(Collectors.toList());
-      // TODO(vamshigv): Verify this assumption.
-      if (!recordKeys.isEmpty() && recordKeys.size() > 1) {
-        LOG.error(String.format("Hudi does not support composite record keys: %s", recordKeys));
-        throw new UnsupportedOperationException("Hudi does not support composite record keys");
-      }
       if (!recordKeys.isEmpty()) {
-        recordKeyField = recordKeys.get(0);
+        recordKeyField = String.join(",", recordKeys);
       }
     }
     try {

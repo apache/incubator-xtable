@@ -32,10 +32,9 @@ import java.util.stream.Collectors;
 
 import lombok.Builder;
 import lombok.Value;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
 
 import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.InstantsForIncrementalSync;
@@ -59,8 +58,8 @@ import io.onetable.spi.sync.TableFormatSync;
  *   <li>3. Storing the sync results generated in step
  * </ul>
  */
+@Log4j2
 public class OneTableClient {
-  private static final Logger LOG = LogManager.getLogger(OneTableClient.class);
   private final Configuration conf;
 
   public OneTableClient(Configuration conf) {
@@ -99,7 +98,7 @@ public class OneTableClient {
     } else {
       result = syncIncrementalChanges(syncClientByFormat, source);
     }
-    LOG.info(
+    log.info(
         "OneTable Sync is successful for the following formats " + config.getTargetTableFormats());
     return result.getLastSyncResult();
   }

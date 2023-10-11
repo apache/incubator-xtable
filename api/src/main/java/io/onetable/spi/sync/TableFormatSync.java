@@ -26,9 +26,7 @@ import java.util.List;
 import java.util.Optional;
 
 import lombok.AllArgsConstructor;
-
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import lombok.extern.log4j.Log4j2;
 
 import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.OneSnapshot;
@@ -39,9 +37,9 @@ import io.onetable.model.sync.SyncMode;
 import io.onetable.model.sync.SyncResult;
 
 /** Provides the functionality to sync from the OneTable format to the target format. */
+@Log4j2
 @AllArgsConstructor(staticName = "of")
 public class TableFormatSync {
-  private static final Logger LOG = LogManager.getLogger(TableFormatSync.class);
   private final TargetClient client;
 
   /**
@@ -61,7 +59,7 @@ public class TableFormatSync {
           startTime,
           snapshot.getPendingCommits());
     } catch (Exception e) {
-      LOG.error("Failed to sync snapshot", e);
+      log.error("Failed to sync snapshot", e);
       return buildResultForError(SyncMode.FULL, startTime, e);
     }
   }
@@ -88,7 +86,7 @@ public class TableFormatSync {
         // Fallback to a sync where table changes are from changes.getInstant() to latest, write a
         // test case for this.
         // (OR) Progress with empty col stats to mirror the timeline.
-        LOG.error("Failed to sync table changes", e);
+        log.error("Failed to sync table changes", e);
         results.add(buildResultForError(SyncMode.INCREMENTAL, startTime, e));
         break;
       }

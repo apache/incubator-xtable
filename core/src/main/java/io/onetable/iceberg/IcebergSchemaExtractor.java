@@ -27,9 +27,7 @@ import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Type;
@@ -44,9 +42,9 @@ import io.onetable.model.schema.OneSchema;
  * Schema extractor for Iceberg which converts canonical representation of the schema{@link
  * OneSchema} to Iceberg's schema representation {@link Schema}
  */
+@Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class IcebergSchemaExtractor {
-  private static final Logger LOG = LogManager.getLogger(IcebergSchemaExtractor.class);
   private static final IcebergSchemaExtractor INSTANCE = new IcebergSchemaExtractor();
   private static final String MAP_KEY_FIELD_NAME = "key";
   private static final String MAP_VALUE_FIELD_NAME = "value";
@@ -60,7 +58,7 @@ public class IcebergSchemaExtractor {
     // if field IDs are not assigned in the source, just use an incrementing integer
     AtomicInteger fieldIdTracker = new AtomicInteger(0);
     List<Types.NestedField> nestedFields = convertFields(oneSchema, fieldIdTracker);
-    Set<OneField> recordKeyFields = oneSchema.getRecordKeyFields();
+    List<OneField> recordKeyFields = oneSchema.getRecordKeyFields();
     if (recordKeyFields.isEmpty()) {
       return new Schema(nestedFields);
     }
@@ -73,13 +71,12 @@ public class IcebergSchemaExtractor {
             .map(Types.NestedField::fieldId)
             .collect(Collectors.toSet());
     if (recordKeyFields.size() != recordKeyIds.size()) {
-      Set<Integer> missingIds =
+      List<String> missingFieldPaths =
           recordKeyFields.stream()
-              .map(keyField -> partialSchema.findField(convertFromOneTablePath(keyField.getPath())))
-              .filter(Objects::isNull)
-              .map(Types.NestedField::fieldId)
-              .collect(Collectors.toSet());
-      LOG.error("Missing field IDs for record key fields: " + missingIds);
+              .map(OneField::getPath)
+              .filter(path -> partialSchema.findField(convertFromOneTablePath(path)) == null)
+              .collect(Collectors.toList());
+      log.error("Missing field IDs for record key field paths: " + missingFieldPaths);
       throw new SchemaExtractorException("Mismatches in converting record key fields");
     }
     return new Schema(nestedFields, recordKeyIds);

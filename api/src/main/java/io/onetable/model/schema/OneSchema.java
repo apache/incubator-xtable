@@ -52,8 +52,9 @@ public class OneSchema {
   // Indicates if values of this field can be `null` values.
   private final boolean isNullable;
   private final List<OneField> fields;
-  // record keys for the table if exists.
-  @Builder.Default Set<OneField> recordKeyFields = Collections.emptySet();
+  // In formats like Hudi, ordering of fields is important, so we use a list to preserve
+  // the order of record keys for the table, if they exist.
+  @Builder.Default List<OneField> recordKeyFields = Collections.emptyList();
   private final Map<MetadataKey, Object> metadata;
 
   public static OneSchemaBuilder builderFrom(OneSchema field) {

@@ -18,11 +18,11 @@
  
 package io.onetable.hudi.extensions;
 
+import lombok.extern.log4j.Log4j2;
+
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import org.apache.hudi.callback.HoodieClientInitCallback;
 import org.apache.hudi.client.BaseHoodieClient;
@@ -43,8 +43,8 @@ import io.onetable.hudi.idtracking.IdTracker;
  * the parquet file making them compatible with Iceberg readers that do not support the default
  * field id mapping.
  */
+@Log4j2
 public class AddFieldIdsClientInitCallback implements HoodieClientInitCallback {
-  private static final Logger LOG = LogManager.getLogger(AddFieldIdsClientInitCallback.class);
   private final IdTracker idTracker;
 
   public AddFieldIdsClientInitCallback() {
@@ -75,7 +75,7 @@ public class AddFieldIdsClientInitCallback implements HoodieClientInitCallback {
             currentSchema = Option.of(new TableSchemaResolver(metaClient).getTableAvroSchema());
           }
         } catch (Exception ex) {
-          LOG.warn("Unable to fetch current schema for fieldIds", ex);
+          log.warn("Unable to fetch current schema for fieldIds", ex);
         }
         if (config.getSchema() != null) {
           Schema schema = new Schema.Parser().parse(config.getSchema());

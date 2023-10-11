@@ -96,7 +96,7 @@ public class TestHudiTargetClient {
             .name("schema")
             .dataType(OneType.RECORD)
             .recordKeyFields(
-                Collections.singleton(OneField.builder().name("record_key_field").build()))
+                Collections.singletonList(OneField.builder().name("record_key_field").build()))
             .build();
     Schema converted = SchemaBuilder.record("record").fields().requiredInt("field").endRecord();
     when(mockAvroSchemaConverter.fromOneSchema(input)).thenReturn(converted);

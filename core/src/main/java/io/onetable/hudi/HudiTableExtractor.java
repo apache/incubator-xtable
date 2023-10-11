@@ -21,7 +21,6 @@ package io.onetable.hudi;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.inject.Singleton;
@@ -70,7 +69,7 @@ public class HudiTableExtractor {
           e);
     }
     List<OnePartitionField> partitionFields = partitionSpecExtractor.spec(canonicalSchema);
-    Set<OneField> recordKeyFields = getRecordKeyFields(metaClient, canonicalSchema);
+    List<OneField> recordKeyFields = getRecordKeyFields(metaClient, canonicalSchema);
     if (!recordKeyFields.isEmpty()) {
       canonicalSchema = canonicalSchema.toBuilder().recordKeyFields(recordKeyFields).build();
     }
@@ -89,14 +88,14 @@ public class HudiTableExtractor {
         .build();
   }
 
-  private Set<OneField> getRecordKeyFields(
+  private List<OneField> getRecordKeyFields(
       HoodieTableMetaClient metaClient, OneSchema canonicalSchema) {
     Option<String[]> recordKeyFieldNames = metaClient.getTableConfig().getRecordKeyFields();
     if (!recordKeyFieldNames.isPresent()) {
-      return Collections.emptySet();
+      return Collections.emptyList();
     }
     return Arrays.stream(recordKeyFieldNames.get())
         .map(name -> SchemaFieldFinder.getInstance().findFieldByPath(canonicalSchema, name))
-        .collect(Collectors.toSet());
+        .collect(Collectors.toList());
   }
 }

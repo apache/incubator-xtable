@@ -62,7 +62,8 @@ public class TestHudiTableManager {
                     OneField.builder().name(field1).build(),
                     OneField.builder().name(field2).build(),
                     OneField.builder().name(recordKeyField).build()))
-            .recordKeyFields(Collections.singleton(OneField.builder().name(recordKeyField).build()))
+            .recordKeyFields(
+                Collections.singletonList(OneField.builder().name(recordKeyField).build()))
             .build();
     List<OnePartitionField> inputPartitionFields =
         Arrays.asList(
