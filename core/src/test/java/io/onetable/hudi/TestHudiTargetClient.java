@@ -18,8 +18,7 @@
  
 package io.onetable.hudi;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -91,12 +90,41 @@ public class TestHudiTargetClient {
   void syncSchema() {
     HudiTargetClient targetClient = getTargetClient(null);
     HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();
-    OneSchema input = OneSchema.builder().name("schema").dataType(OneType.RECORD).build();
+    OneSchema input =
+        OneSchema.builder()
+            .name("schema")
+            .dataType(OneType.RECORD)
+            .recordKeyFields(
+                Collections.singletonList(OneField.builder().name("record_key_field").build()))
+            .build();
     Schema converted = SchemaBuilder.record("record").fields().requiredInt("field").endRecord();
     when(mockAvroSchemaConverter.fromOneSchema(input)).thenReturn(converted);
     targetClient.syncSchema(input);
     // validate that schema is set in commitState
     verify(mockCommitState).setSchema(converted);
+  }
+
+  @Test
+  void syncSchemaWithRecordKeyChanged() {
+    HudiTargetClient targetClient = getTargetClient(null);
+    initMocksForBeginSync(targetClient);
+    List<OneField> recordKeyFields =
+        Arrays.asList(
+            OneField.builder().name("record_key_field").build(),
+            OneField.builder().name("record_key_field2").build());
+    OneSchema input =
+        OneSchema.builder()
+            .name("schema")
+            .dataType(OneType.RECORD)
+            .recordKeyFields(recordKeyFields)
+            .build();
+    Schema converted = SchemaBuilder.record("record").fields().requiredInt("field").endRecord();
+    when(mockAvroSchemaConverter.fromOneSchema(input)).thenReturn(converted);
+    Exception thrownException =
+        assertThrows(NotSupportedException.class, () -> targetClient.syncSchema(input));
+    assertEquals(
+        "Record key fields cannot be changed after creating Hudi table",
+        thrownException.getMessage());
   }
 
   @Test
@@ -219,6 +247,10 @@ public class TestHudiTargetClient {
   private Pair<HudiTargetClient.CommitState, HoodieTableMetaClient> initMocksForBeginSync(
       HudiTargetClient targetClient) {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
+    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
+    when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
+    when(mockTableConfig.getRecordKeyFields())
+        .thenReturn(Option.of(new String[] {"record_key_field"}));
     when(mockHudiTableManager.initializeHudiTable(TABLE)).thenReturn(mockMetaClient);
     HudiTargetClient.CommitState mockCommitState = mock(HudiTargetClient.CommitState.class);
     when(mockCommitStateCreator.create(mockMetaClient, COMMIT)).thenReturn(mockCommitState);
