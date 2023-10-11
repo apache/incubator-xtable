@@ -19,6 +19,7 @@
 package io.onetable.model.schema;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,6 +52,14 @@ public class OneSchema {
   // Indicates if values of this field can be `null` values.
   private final boolean isNullable;
   private final List<OneField> fields;
+  // Record keys uniquely identify a record in a table.
+  // Hudi Ref: https://hudi.apache.org/docs/key_generation/
+  // Iceberg Ref:
+  // https://iceberg.apache.org/javadoc/latest/org/apache/iceberg/Schema.html#identifierFieldIds
+  // Delta Ref: https://docs.databricks.com/en/tables/constraints.html
+  // In formats like Hudi, ordering of fields is important, so we use a list to preserve
+  // the order of record keys for the table, if they exist.
+  @Builder.Default List<OneField> recordKeyFields = Collections.emptyList();
   private final Map<MetadataKey, Object> metadata;
 
   public static OneSchemaBuilder builderFrom(OneSchema field) {

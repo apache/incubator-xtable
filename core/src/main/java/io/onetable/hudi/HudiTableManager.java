@@ -19,6 +19,7 @@
 package io.onetable.hudi;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -70,12 +71,22 @@ class HudiTableManager {
    * @return {@link HoodieTableMetaClient} for the table that was created
    */
   HoodieTableMetaClient initializeHudiTable(OneTable table) {
+    String recordKeyField = "";
+    if (table.getReadSchema() != null) {
+      List<String> recordKeys =
+          table.getReadSchema().getRecordKeyFields().stream()
+              .map(OneField::getName)
+              .collect(Collectors.toList());
+      if (!recordKeys.isEmpty()) {
+        recordKeyField = String.join(",", recordKeys);
+      }
+    }
     try {
       return HoodieTableMetaClient.withPropertyBuilder()
           .setTableType(HoodieTableType.COPY_ON_WRITE)
           .setTableName(table.getName())
           .setPayloadClass(HoodieAvroPayload.class)
-          .setRecordKeyFields("") // TODO
+          .setRecordKeyFields(recordKeyField)
           // other formats will not populate meta fields, so we disable it for consistency
           .setPopulateMetaFields(false)
           .setPartitionFields(
