@@ -200,9 +200,9 @@ public class ITOneTableClient {
       HoodieTableType tableType,
       PartitionConfig partitionConfig) {
     String tableName = getTableName();
-    try (TestSparkHudiTable table =
-        TestSparkHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
       // commit time 1 starts first but ends 2nd.
       // commit time 2 starts second but ends 1st.
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
@@ -240,9 +240,9 @@ public class ITOneTableClient {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
 
     String tableName = getTableName();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
       List<HoodieRecord<HoodieAvroPayload>> insertedRecords1 = table.insertRecords(50, true);
 
       PerTableConfig perTableConfig =
@@ -424,9 +424,9 @@ public class ITOneTableClient {
       checkDatasetEquivalence(
           TableFormat.HUDI, targetTableFormats, tableWithInitialSchema.getBasePath(), 50);
     }
-    try (TestJavaHudiTable tableWithUpdatedSchema =
-        TestJavaHudiTable.withAdditionalColumns(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable tableWithUpdatedSchema =
+        TestSparkHudiTable.withAdditionalColumns(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -596,9 +596,9 @@ public class ITOneTableClient {
       HoodieTableType tableType,
       PartitionConfig partitionConfig) {
     String tableName = getTableName();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
       table.insertRecords(50, true);
 
       PerTableConfig perTableConfig =
@@ -763,9 +763,9 @@ public class ITOneTableClient {
       String filter,
       SyncMode syncMode) {
     String tableName = getTableName();
-    try (TestSparkHudiTable table =
-        TestSparkHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, hudiPartitionConfig, HoodieTableType.COPY_ON_WRITE)) {
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, hudiPartitionConfig, HoodieTableType.COPY_ON_WRITE)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -974,7 +974,7 @@ public class ITOneTableClient {
 
   private void syncWithCompactionIfRequired(
       HoodieTableType tableType,
-      TestJavaHudiTable table,
+      TestAbstractHudiTable table,
       PerTableConfig perTableConfig,
       OneTableClient oneTableClient) {
     if (tableType == HoodieTableType.MERGE_ON_READ) {
