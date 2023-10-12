@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package io.onetable.delta;
 
 import java.util.Arrays;
@@ -23,13 +23,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import io.onetable.model.schema.OneField;
-import io.onetable.model.schema.OneSchema;
-import io.onetable.model.schema.OneType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import io.onetable.model.schema.OneField;
+import io.onetable.model.schema.OneSchema;
+import io.onetable.model.schema.OneType;
 
 public class TestDeltaSchemaExtractor {
 
@@ -242,8 +243,12 @@ public class TestDeltaSchemaExtractor {
             .add("requiredDecimal", DataTypes.createDecimalType(10, 2), false)
             .add("optionalDecimal", DataTypes.createDecimalType(10, 2), true);
 
-    Assertions.assertEquals(structRepresentation, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
-    Assertions.assertEquals(oneSchemaRepresentation, DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
+    Assertions.assertEquals(
+        structRepresentation,
+        DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
+    Assertions.assertEquals(
+        oneSchemaRepresentation,
+        DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
   }
 
   @Test
@@ -308,8 +313,12 @@ public class TestDeltaSchemaExtractor {
             .add("requiredFixed", DataTypes.ByteType, false)
             .add("optionalFixed", DataTypes.ByteType, true);
 
-    Assertions.assertEquals(structRepresentation, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentationOriginal));
-    Assertions.assertEquals(oneSchemaRepresentationAfterRoundTrip, DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
+    Assertions.assertEquals(
+        structRepresentation,
+        DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentationOriginal));
+    Assertions.assertEquals(
+        oneSchemaRepresentationAfterRoundTrip,
+        DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
   }
 
   @Test
@@ -380,9 +389,15 @@ public class TestDeltaSchemaExtractor {
             .add("requiredTimestampNtz", DataTypes.LongType, false)
             .add("optionalTimestampNtz", DataTypes.LongType, true);
 
-    Assertions.assertEquals(structRepresentationTimestamp, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentationTimestamp));
-    Assertions.assertEquals(oneSchemaRepresentationTimestamp, DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentationTimestamp));
-    Assertions.assertEquals(structRepresentationTimestampNtz, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentationTimestampNtz));
+    Assertions.assertEquals(
+        structRepresentationTimestamp,
+        DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentationTimestamp));
+    Assertions.assertEquals(
+        oneSchemaRepresentationTimestamp,
+        DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentationTimestamp));
+    Assertions.assertEquals(
+        structRepresentationTimestampNtz,
+        DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentationTimestampNtz));
   }
 
   @Test
@@ -427,7 +442,9 @@ public class TestDeltaSchemaExtractor {
             .add("requiredEnum", DataTypes.StringType, false)
             .add("optionalEnum", DataTypes.StringType, true);
 
-    Assertions.assertEquals(structRepresentation, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
+    Assertions.assertEquals(
+        structRepresentation,
+        DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
   }
 
   @Test
@@ -534,11 +551,18 @@ public class TestDeltaSchemaExtractor {
             .add("optionalString", DataTypes.StringType, true);
     StructType structRepresentation =
         new StructType()
-            .add("intMap", DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType, false), false)
+            .add(
+                "intMap",
+                DataTypes.createMapType(DataTypes.StringType, DataTypes.IntegerType, false),
+                false)
             .add("recordMap", DataTypes.createMapType(DataTypes.IntegerType, mapElement, true));
 
-    Assertions.assertEquals(structRepresentation, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
-    Assertions.assertEquals(oneSchemaRepresentation, DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
+    Assertions.assertEquals(
+        structRepresentation,
+        DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
+    Assertions.assertEquals(
+        oneSchemaRepresentation,
+        DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
   }
 
   @Test
@@ -627,8 +651,12 @@ public class TestDeltaSchemaExtractor {
             .add("intList", DataTypes.createArrayType(DataTypes.IntegerType, false), false)
             .add("recordList", DataTypes.createArrayType(elementSchema, true), true);
 
-    Assertions.assertEquals(structRepresentation, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
-    Assertions.assertEquals(oneSchemaRepresentation, DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
+    Assertions.assertEquals(
+        structRepresentation,
+        DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
+    Assertions.assertEquals(
+        oneSchemaRepresentation,
+        DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
   }
 
   @Test
@@ -712,7 +740,11 @@ public class TestDeltaSchemaExtractor {
                         new StructType().add("doublyNestedString", DataTypes.StringType, true),
                         false),
                 true);
-    Assertions.assertEquals(structRepresentation, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
-    Assertions.assertEquals(oneSchemaRepresentation, DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
+    Assertions.assertEquals(
+        structRepresentation,
+        DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
+    Assertions.assertEquals(
+        oneSchemaRepresentation,
+        DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
   }
 }
