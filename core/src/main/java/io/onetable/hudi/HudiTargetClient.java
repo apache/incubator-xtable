@@ -23,7 +23,6 @@ import static io.onetable.hudi.HudiInstantUtils.parseFromInstantTime;
 import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
 
 import java.io.IOException;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,13 +34,9 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import lombok.Builder;
 import lombok.Getter;
-import lombok.NonNull;
 import lombok.Setter;
-import lombok.Value;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.avro.Schema;
@@ -51,34 +46,35 @@ import org.apache.hudi.avro.model.HoodieActionInstant;
 import org.apache.hudi.avro.model.HoodieCleanFileInfo;
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.avro.model.HoodieCleanerPlan;
-import org.apache.hudi.client.BaseHoodieWriteClient;
 import org.apache.hudi.client.HoodieJavaWriteClient;
+import org.apache.hudi.client.HoodieTimelineArchiver;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.common.HoodieCleanStat;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
+import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieFileGroup;
 import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
-import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
-import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
+import org.apache.hudi.common.table.view.TableFileSystemView;
 import org.apache.hudi.common.util.CleanerUtils;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieCleanConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
-import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 import org.apache.hudi.metadata.HoodieTableMetadataWriter;
+import org.apache.hudi.table.HoodieJavaTable;
 import org.apache.hudi.table.action.clean.CleanPlanner;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -98,8 +94,6 @@ import io.onetable.spi.sync.TargetClient;
 
 @Log4j2
 public class HudiTargetClient implements TargetClient {
-  private static final ZoneId UTC = ZoneId.of("UTC");
-
   private final BaseFileUpdatesExtractor baseFileUpdatesExtractor;
   private final AvroSchemaConverter avroSchemaConverter;
   private final HudiTableManager hudiTableManager;
@@ -294,7 +288,7 @@ public class HudiTargetClient implements TargetClient {
   }
 
   static class CommitState {
-    private final HoodieTableMetaClient metaClient;
+    private HoodieTableMetaClient metaClient;
     @Getter private final String instantTime;
     private final int timelineRetentionInHours;
     private final int maxNumDeltaCommitsBeforeCompaction;
@@ -335,12 +329,12 @@ public class HudiTargetClient implements TargetClient {
           throw new OneIOException("Unable to read Hudi table schema", ex);
         }
       }
-      InstantsToArchiveAndRetain instantsToArchiveAndRetain = getInstantsToArchiveAndRetain();
       HoodieWriteConfig writeConfig =
           getWriteConfig(
               schema,
-              instantsToArchiveAndRetain.getNumInstantsToRetain(),
-              maxNumDeltaCommitsBeforeCompaction);
+              getNumInstantsToRetain(),
+              maxNumDeltaCommitsBeforeCompaction,
+              timelineRetentionInHours);
       HoodieEngineContext engineContext = new HoodieJavaEngineContext(metaClient.getHadoopConf());
       try (HoodieJavaWriteClient<?> writeClient =
           new HoodieJavaWriteClient<>(engineContext, writeConfig)) {
@@ -359,134 +353,113 @@ public class HudiTargetClient implements TargetClient {
             getExtraMetadata(),
             HoodieTimeline.REPLACE_COMMIT_ACTION,
             partitionToReplacedFileIds);
-        if (instantsToArchiveAndRetain.canRunCleanAndArchive()) {
-          // clean up old commits and archive them
-          HoodieInstant completedReplaceCommitInstant =
-              new HoodieInstant(
-                  HoodieInstant.State.COMPLETED, HoodieTimeline.REPLACE_COMMIT_ACTION, instantTime);
-          cleanAndArchive(
-              engineContext,
-              writeClient,
-              instantsToArchiveAndRetain,
-              completedReplaceCommitInstant);
+        // if the metaclient was created before the table's first commit, we need to reload it to
+        // pick up the metadata table context
+        if (!metaClient.getTableConfig().isMetadataTableAvailable()) {
+          metaClient = HoodieTableMetaClient.reload(metaClient);
         }
+        HoodieJavaTable<?> table =
+            HoodieJavaTable.create(writeClient.getConfig(), engineContext, metaClient);
+        // clean up old commits and archive them
+        markInstantsAsCleaned(table, writeClient.getConfig(), engineContext);
+        runArchiver(table, writeClient.getConfig(), engineContext);
       }
     }
 
-    private InstantsToArchiveAndRetain getInstantsToArchiveAndRetain() {
+    private int getNumInstantsToRetain() {
       String commitCutoff =
           convertInstantToCommit(
               parseFromInstantTime(instantTime).minus(timelineRetentionInHours, ChronoUnit.HOURS));
-      HoodieTimeline activeTimeline = metaClient.getActiveTimeline();
-      List<HoodieInstant> instantsToArchive =
-          activeTimeline.findInstantsBeforeOrEquals(commitCutoff).getInstants();
-      List<HoodieInstant> instantsAfterCutoff =
-          activeTimeline.findInstantsAfter(commitCutoff).getInstants();
-      return InstantsToArchiveAndRetain.builder()
-          .instantsToArchive(instantsToArchive)
-          .lastInstantToRetain(
-              instantsAfterCutoff.isEmpty()
-                  ? Optional.empty()
-                  : Optional.of(instantsAfterCutoff.get(0)))
-          .numInstantsToRetain(instantsAfterCutoff.size())
-          .build();
+      // count number of completed commits after the cutoff
+      return metaClient
+          .getActiveTimeline()
+          .filterCompletedInstants()
+          .findInstantsAfter(commitCutoff)
+          .countInstants();
     }
 
-    @Builder
-    @Value
-    private static class InstantsToArchiveAndRetain {
-      @NonNull List<HoodieInstant> instantsToArchive;
-      @NonNull Optional<HoodieInstant> lastInstantToRetain;
-      int numInstantsToRetain;
-
-      boolean canRunCleanAndArchive() {
-        return !instantsToArchive.isEmpty();
-      }
-    }
-
-    private void cleanAndArchive(
-        HoodieEngineContext engineContext,
-        BaseHoodieWriteClient<?, ?, ?, ?> writeClient,
-        InstantsToArchiveAndRetain instantsToArchiveAndRetain,
-        HoodieInstant completedReplaceCommit) {
-      HoodieInstant earliestInstantToRetain =
-          instantsToArchiveAndRetain.getLastInstantToRetain().orElse(completedReplaceCommit);
-      List<HoodieInstant> replaceCommitsToCleanAndArchive =
-          instantsToArchiveAndRetain.getInstantsToArchive().stream()
-              .filter(instant -> instant.getAction().equals(HoodieTimeline.REPLACE_COMMIT_ACTION))
-              .collect(Collectors.toList());
-      HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
-      // find all removed file groups in replace commits from before the earliestInstantToRetain
-      Set<String> affectedPartitions =
-          replaceCommitsToCleanAndArchive.stream()
-              .map(
-                  replaceCommit -> {
-                    try {
-                      return HoodieReplaceCommitMetadata.fromBytes(
-                          activeTimeline.getInstantDetails(replaceCommit).get(),
-                          HoodieReplaceCommitMetadata.class);
-                    } catch (IOException ex) {
-                      throw new OneIOException("Unable to read Hudi commit metadata", ex);
-                    }
-                  })
-              .flatMap(
-                  metadata ->
-                      Stream.concat(
-                          metadata.getPartitionToReplaceFileIds().keySet().stream(),
-                          metadata.getPartitionToWriteStats().keySet().stream()))
-              .collect(Collectors.toSet());
-      if (affectedPartitions.isEmpty()) {
+    private void markInstantsAsCleaned(
+        HoodieJavaTable<?> table,
+        HoodieWriteConfig writeConfig,
+        HoodieEngineContext engineContext) {
+      CleanPlanner<?, ?, ?, ?> planner = new CleanPlanner<>(engineContext, table, writeConfig);
+      Option<HoodieInstant> earliestInstant = planner.getEarliestCommitToRetain();
+      // since we're retaining based on time, we should exit early if earliestInstant is empty
+      if (!earliestInstant.isPresent()) {
         return;
       }
+      List<String> partitionsToClean;
+      try {
+        partitionsToClean = planner.getPartitionPathsToClean(earliestInstant);
+      } catch (IOException ex) {
+        throw new OneIOException("Unable to get partitions to clean", ex);
+      }
+      if (partitionsToClean.isEmpty()) {
+        return;
+      }
+
+      HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
+      TableFileSystemView fsView = table.getHoodieView();
+      Map<String, List<HoodieCleanFileInfo>> cleanInfoPerPartition =
+          partitionsToClean.stream()
+              .map(
+                  partition ->
+                      Pair.of(partition, planner.getDeletePaths(partition, earliestInstant)))
+              .filter(deletePaths -> !deletePaths.getValue().getValue().isEmpty())
+              .collect(
+                  Collectors.toMap(
+                      Pair::getKey,
+                      deletePathsForPartition -> {
+                        String partition = deletePathsForPartition.getKey();
+                        // we need to manipulate the path to properly clean from the metadata table,
+                        // so we map the file path to the base file
+                        Map<String, HoodieBaseFile> baseFilesByPath =
+                            fsView
+                                .getAllReplacedFileGroups(partition)
+                                .flatMap(HoodieFileGroup::getAllBaseFiles)
+                                .collect(
+                                    Collectors.toMap(HoodieBaseFile::getPath, Function.identity()));
+                        return deletePathsForPartition.getValue().getValue().stream()
+                            .map(
+                                cleanFileInfo -> {
+                                  HoodieBaseFile baseFile =
+                                      baseFilesByPath.get(cleanFileInfo.getFilePath());
+                                  return new HoodieCleanFileInfo(
+                                      ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
+                                          baseFile.getFileName(), baseFile.getCommitTime()),
+                                      false);
+                                })
+                            .collect(Collectors.toList());
+                      }));
+      // there is nothing to clean, so exit early
+      if (cleanInfoPerPartition.isEmpty()) {
+        return;
+      }
+      // create a clean instant write after this latest commit
       String cleanTime =
           convertInstantToCommit(parseFromInstantTime(instantTime).plus(1, ChronoUnit.SECONDS));
-      HoodieTableFileSystemView fsView =
-          new HoodieMetadataFileSystemView(
-              engineContext,
-              metaClient,
-              activeTimeline,
-              writeClient.getConfig().getMetadataConfig());
+      // create a metadata table writer in order to mark files as deleted in the table
+      // the deleted entries are cleaned up in the metadata table during compaction to control the
+      // growth of the table
       try (HoodieTableMetadataWriter hoodieTableMetadataWriter =
-          (HoodieTableMetadataWriter)
-              writeClient
-                  .initTable(WriteOperationType.UPSERT, Option.of(cleanTime))
-                  .getMetadataWriter(cleanTime)
-                  .get()) {
-        // find all file paths for the removed file groups
-        Map<String, List<HoodieCleanFileInfo>> filePathsToCleanPerPartition =
-            affectedPartitions.stream()
-                .collect(
-                    Collectors.toMap(
-                        Function.identity(),
-                        partitionPath ->
-                            fsView
-                                .getReplacedFileGroupsBeforeOrOn(
-                                    earliestInstantToRetain.getTimestamp(), partitionPath)
-                                .flatMap(HoodieFileGroup::getAllBaseFiles)
-                                .map(
-                                    baseFile ->
-                                        new HoodieCleanFileInfo(
-                                            ExternalFilePathUtil
-                                                .appendCommitTimeAndExternalFileMarker(
-                                                    baseFile.getFileName(),
-                                                    baseFile.getCommitTime()),
-                                            false))
-                                .collect(Collectors.toList())));
-        if (filePathsToCleanPerPartition.isEmpty()) {
-          return;
-        }
+          table.getMetadataWriter(cleanTime).get()) {
         HoodieCleanerPlan cleanerPlan =
             new HoodieCleanerPlan(
-                new HoodieActionInstant(
-                    earliestInstantToRetain.getTimestamp(),
-                    earliestInstantToRetain.getAction(),
-                    earliestInstantToRetain.getState().name()),
+                earliestInstant
+                    .map(
+                        earliestInstantToRetain ->
+                            new HoodieActionInstant(
+                                earliestInstantToRetain.getTimestamp(),
+                                earliestInstantToRetain.getAction(),
+                                earliestInstantToRetain.getState().name()))
+                    .orElse(null),
                 instantTime,
-                writeClient.getConfig().getCleanerPolicy().name(),
+                writeConfig.getCleanerPolicy().name(),
                 Collections.emptyMap(),
                 CleanPlanner.LATEST_CLEAN_PLAN_VERSION,
-                filePathsToCleanPerPartition,
+                cleanInfoPerPartition,
                 Collections.emptyList());
+        // create a clean instant and mark it as requested with the clean plan
         HoodieInstant requestedCleanInstant =
             new HoodieInstant(
                 HoodieInstant.State.REQUESTED, HoodieTimeline.CLEAN_ACTION, cleanTime);
@@ -496,7 +469,7 @@ public class HudiTargetClient implements TargetClient {
             activeTimeline.transitionCleanRequestedToInflight(
                 requestedCleanInstant, Option.empty());
         List<HoodieCleanStat> cleanStats =
-            filePathsToCleanPerPartition.entrySet().stream()
+            cleanInfoPerPartition.entrySet().stream()
                 .map(
                     entry -> {
                       String partitionPath = entry.getKey();
@@ -510,22 +483,32 @@ public class HudiTargetClient implements TargetClient {
                           deletePaths,
                           deletePaths,
                           Collections.emptyList(),
-                          earliestInstantToRetain.getTimestamp(),
+                          earliestInstant.get().getTimestamp(),
                           instantTime);
                     })
                 .collect(Collectors.toList());
         HoodieCleanMetadata cleanMetadata =
             CleanerUtils.convertCleanMetadata(cleanTime, Option.empty(), cleanStats);
-
+        // update the metadata table with the clean metadata so the files' metadata are marked for
+        // deletion
+        hoodieTableMetadataWriter.performTableServices(Option.empty());
         hoodieTableMetadataWriter.update(cleanMetadata, cleanTime);
+        // mark the commit as complete on the table timeline
         activeTimeline.transitionCleanInflightToComplete(
             inflightClean, TimelineMetadataUtils.serializeCleanMetadata(cleanMetadata));
-        // trigger archiver manually
-        writeClient.archive();
       } catch (Exception ex) {
-        throw new OneIOException("Unable to clean and/or archive Hudi timeline", ex);
-      } finally {
-        fsView.close();
+        throw new OneIOException("Unable to clean Hudi timeline", ex);
+      }
+    }
+
+    private void runArchiver(
+        HoodieJavaTable<?> table, HoodieWriteConfig config, HoodieEngineContext engineContext) {
+      // trigger archiver manually
+      try {
+        HoodieTimelineArchiver archiver = new HoodieTimelineArchiver(config, table);
+        archiver.archiveIfRequired(engineContext, true);
+      } catch (IOException ex) {
+        throw new OneIOException("Unable to archive Hudi timeline", ex);
       }
     }
 
@@ -535,7 +518,10 @@ public class HudiTargetClient implements TargetClient {
     }
 
     private HoodieWriteConfig getWriteConfig(
-        Schema schema, int numCommitsToKeep, int maxNumDeltaCommitsBeforeCompaction) {
+        Schema schema,
+        int numCommitsToKeep,
+        int maxNumDeltaCommitsBeforeCompaction,
+        int timelineRetentionInHours) {
       Properties properties = new Properties();
       properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
       return HoodieWriteConfig.newBuilder()
@@ -552,8 +538,8 @@ public class HudiTargetClient implements TargetClient {
                   .build())
           .withCleanConfig(
               HoodieCleanConfig.newBuilder()
-                  // set this to avoid warnings but clean plan is manually generated
-                  .retainCommits(Math.max(0, numCommitsToKeep - 2))
+                  .withCleanerPolicy(HoodieCleaningPolicy.KEEP_LATEST_BY_HOURS)
+                  .cleanerNumHoursRetained(timelineRetentionInHours)
                   .withAutoClean(false)
                   .build())
           .withMetadataConfig(

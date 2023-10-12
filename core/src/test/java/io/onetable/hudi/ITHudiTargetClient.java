@@ -83,6 +83,7 @@ import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.TableFormat;
+import io.onetable.spi.sync.TargetClient;
 
 /**
  * A suite of functional tests that assert that the metadata for the hudi table is properly written
@@ -264,8 +265,7 @@ public class ITHudiTargetClient {
     targetClient.syncSchema(initialState.getReadSchema());
     targetClient.completeSync();
 
-    Instant syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
-    String instantTime = HudiInstantUtils.convertInstantToCommit(syncedInstant);
+    String instantTime = getLastSyncInstant(targetClient);
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(metaClient, instantTime, partitionPath, filePath1, fileName1);
@@ -278,20 +278,13 @@ public class ITHudiTargetClient {
     // create a new commit that removes fileName1 and adds fileName2
     String fileName2 = "file_2.parquet";
     String filePath2 = getFilePath(partitionPath, fileName2);
-    OneDataFilesDiff dataFilesDiff =
-        OneDataFilesDiff.builder()
-            .fileAdded(getTestFile(partitionPath, fileName2))
-            .fileRemoved(getTestFile(partitionPath, fileName1))
-            .build();
-    OneTable state2 = getState(Instant.now().minus(12, ChronoUnit.HOURS));
-    targetClient.beginSync(state2);
-    targetClient.syncFilesForDiff(dataFilesDiff);
-    latestState = OneTableMetadata.of(state2.getLatestCommitTime(), Collections.emptyList());
-    targetClient.syncMetadata(latestState);
-    targetClient.completeSync();
+    incrementalSync(
+        targetClient,
+        Collections.singletonList(getTestFile(partitionPath, fileName2)),
+        Collections.singletonList(getTestFile(partitionPath, fileName1)),
+        Instant.now().minus(12, ChronoUnit.HOURS));
 
-    syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
-    String instantTime2 = HudiInstantUtils.convertInstantToCommit(syncedInstant);
+    String instantTime2 = getLastSyncInstant(targetClient);
     assertFileGroupCorrectness(metaClient, instantTime2, partitionPath, filePath2, fileName2);
     try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
         new HoodieBackedTableMetadata(
@@ -302,33 +295,61 @@ public class ITHudiTargetClient {
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName2);
     }
 
-    // create a new commit that adds a file but will also trigger cleanup of fileName1
+    // create a new commit that removes fileName2 and adds fileName3
     String fileName3 = "file_3.parquet";
     String filePath3 = getFilePath(partitionPath, fileName3);
-    OneDataFilesDiff dataFilesDiff2 =
-        OneDataFilesDiff.builder().fileAdded(getTestFile(partitionPath, fileName3)).build();
-    OneTable state3 = getState(Instant.now());
-    targetClient.beginSync(state3);
-    targetClient.syncFilesForDiff(dataFilesDiff2);
-    latestState = OneTableMetadata.of(state3.getLatestCommitTime(), Collections.emptyList());
-    targetClient.syncMetadata(latestState);
-    targetClient.completeSync();
+    incrementalSync(
+        targetClient,
+        Collections.singletonList(getTestFile(partitionPath, fileName3)),
+        Collections.singletonList(getTestFile(partitionPath, fileName2)),
+        Instant.now().minus(8, ChronoUnit.HOURS));
+    String instantTime3 = getLastSyncInstant(targetClient);
 
-    syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
-    String instantTime3 = HudiInstantUtils.convertInstantToCommit(syncedInstant);
-    assertFileGroupCorrectness(metaClient, instantTime2, partitionPath, filePath2, fileName2, 2);
+    // create a commit that just adds fileName4
+    String fileName4 = "file_4.parquet";
+    String filePath4 = getFilePath(partitionPath, fileName4);
+    incrementalSync(
+        targetClient,
+        Collections.singletonList(getTestFile(partitionPath, fileName4)),
+        Collections.emptyList(),
+        Instant.now());
+
+    String instantTime4 = getLastSyncInstant(targetClient);
     assertFileGroupCorrectness(metaClient, instantTime3, partitionPath, filePath3, fileName3, 2);
+    assertFileGroupCorrectness(metaClient, instantTime4, partitionPath, filePath4, fileName4, 2);
     // col stats should be cleaned up for fileName1 but present for fileName2 and fileName3
     try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
         new HoodieBackedTableMetadata(
             CONTEXT, getHoodieWriteConfig(metaClient).getMetadataConfig(), tableBasePath, true)) {
       // assertEmptyColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
-      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName2);
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName3);
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName4);
     }
     // the first commit to the timeline should be archived
     assertEquals(
-        1, metaClient.getArchivedTimeline().reload().filterCompletedInstants().countInstants());
+        2, metaClient.getArchivedTimeline().reload().filterCompletedInstants().countInstants());
+  }
+
+  private static String getLastSyncInstant(HudiTargetClient targetClient) {
+    Instant syncedInstant = targetClient.getTableMetadata().get().getLastInstantSynced();
+    return HudiInstantUtils.convertInstantToCommit(syncedInstant);
+  }
+
+  private OneTableMetadata incrementalSync(
+      TargetClient targetClient,
+      List<OneDataFile> filesToAdd,
+      List<OneDataFile> filesToRemove,
+      Instant commitStart) {
+    OneDataFilesDiff dataFilesDiff2 =
+        OneDataFilesDiff.builder().filesAdded(filesToAdd).filesRemoved(filesToRemove).build();
+    OneTable state3 = getState(commitStart);
+    targetClient.beginSync(state3);
+    targetClient.syncFilesForDiff(dataFilesDiff2);
+    OneTableMetadata latestState =
+        OneTableMetadata.of(state3.getLatestCommitTime(), Collections.emptyList());
+    targetClient.syncMetadata(latestState);
+    targetClient.completeSync();
+    return latestState;
   }
 
   private static String getFilePath(String partitionPath, String fileName) {
@@ -544,7 +565,7 @@ public class ITHudiTargetClient {
             .tableBasePath(tableBasePath)
             .targetTableFormats(Collections.singletonList(TableFormat.HUDI))
             .tableName("test_table")
-            .targetMetadataRetentionInHours(14)
+            .targetMetadataRetentionInHours(4)
             .build(),
         CONFIGURATION,
         3);
