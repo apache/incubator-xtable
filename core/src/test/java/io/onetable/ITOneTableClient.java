@@ -333,12 +333,12 @@ public class ITOneTableClient {
   }
 
   @ParameterizedTest
-  @MethodSource("testCasesWithTableTypesAndSyncModes")
-  public void testAddPartition(
-      List<TableFormat> targetTableFormats, SyncMode syncMode, HoodieTableType tableType) {
+  @MethodSource("testCasesWithSyncModes")
+  public void testAddPartition(List<TableFormat> targetTableFormats, SyncMode syncMode) {
     String tableName = getTableName();
     try (TestHudiTable table =
-        TestHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+        TestHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, "level:SIMPLE", HoodieTableType.COPY_ON_WRITE)) {
       table.insertRecords(10, "INFO", true);
 
       PerTableConfig perTableConfig =
@@ -398,18 +398,19 @@ public class ITOneTableClient {
   }
 
   @ParameterizedTest
-  @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
+  @MethodSource("testCasesWithPartitioningAndSyncModes")
   public void testAddColumns(
-      List<TableFormat> targetTableFormats,
-      SyncMode syncMode,
-      HoodieTableType tableType,
-      PartitionConfig partitionConfig) {
+      List<TableFormat> targetTableFormats, SyncMode syncMode, PartitionConfig partitionConfig) {
     String tableName = getTableName();
     OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
     List<HoodieRecord<HoodieAvroPayload>> insertedRecords;
     try (TestHudiTable tableWithInitialSchema =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            HoodieTableType.COPY_ON_WRITE)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -428,7 +429,11 @@ public class ITOneTableClient {
     }
     try (TestHudiTable tableWithUpdatedSchema =
         TestHudiTable.withAdditionalColumns(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            HoodieTableType.COPY_ON_WRITE)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -443,33 +448,36 @@ public class ITOneTableClient {
 
       tableWithUpdatedSchema.insertRecords(50, true);
       tableWithUpdatedSchema.deleteRecords(insertedRecords.subList(0, 20), true);
-      syncWithCompactionIfRequired(
-          tableType, tableWithUpdatedSchema, perTableConfig, oneTableClient);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 80);
     }
   }
 
   @ParameterizedTest
-  @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
+  @MethodSource("testCasesWithPartitioningAndSyncModes")
   public void testAddColumnsBeforeInitialSync(
-      List<TableFormat> targetTableFormats,
-      SyncMode syncMode,
-      HoodieTableType tableType,
-      PartitionConfig partitionConfig) {
+      List<TableFormat> targetTableFormats, SyncMode syncMode, PartitionConfig partitionConfig) {
     String tableName = getTableName();
     OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-    List<HoodieRecord<HoodieAvroPayload>> insertedRecords;
     // evolve the schema before the first sync
     try (TestHudiTable tableWithInitialSchema =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
-      insertedRecords = tableWithInitialSchema.insertRecords(50, true);
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            HoodieTableType.COPY_ON_WRITE)) {
+      tableWithInitialSchema.insertRecords(50, true);
     }
     Schema previousSchema = null;
     try (TestHudiTable tableWithUpdatedSchema =
         TestHudiTable.withAdditionalColumns(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            HoodieTableType.COPY_ON_WRITE)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -490,7 +498,12 @@ public class ITOneTableClient {
     // Add one more column and sync
     try (TestHudiTable tableWithUpdatedSchema =
         TestHudiTable.withAdditionalTopLevelField(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, previousSchema)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            HoodieTableType.COPY_ON_WRITE,
+            previousSchema)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -510,16 +523,17 @@ public class ITOneTableClient {
   }
 
   @ParameterizedTest
-  @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
+  @MethodSource("testCasesWithPartitioningAndSyncModes")
   public void testCleanEvent(
-      List<TableFormat> targetTableFormats,
-      SyncMode syncMode,
-      HoodieTableType tableType,
-      PartitionConfig partitionConfig) {
+      List<TableFormat> targetTableFormats, SyncMode syncMode, PartitionConfig partitionConfig) {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            HoodieTableType.COPY_ON_WRITE)) {
       List<HoodieRecord<HoodieAvroPayload>> insertedRecords = table.insertRecords(50, true);
 
       PerTableConfig perTableConfig =
@@ -537,9 +551,6 @@ public class ITOneTableClient {
       // sync once to establish initial OneTable state
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       table.upsertRecords(insertedRecords.subList(0, 20), true);
-      if (tableType == HoodieTableType.MERGE_ON_READ) {
-        table.compact();
-      }
       table.insertRecords(50, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
@@ -551,16 +562,17 @@ public class ITOneTableClient {
   }
 
   @ParameterizedTest
-  @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
+  @MethodSource("testCasesWithPartitioningAndSyncModes")
   public void testClusteringEvent(
-      List<TableFormat> targetTableFormats,
-      SyncMode syncMode,
-      HoodieTableType tableType,
-      PartitionConfig partitionConfig) {
+      List<TableFormat> targetTableFormats, SyncMode syncMode, PartitionConfig partitionConfig) {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+            tableName,
+            tempDir,
+            jsc,
+            partitionConfig.getHudiConfig(),
+            HoodieTableType.COPY_ON_WRITE)) {
       List<HoodieRecord<HoodieAvroPayload>> insertedRecords = table.insertRecords(50, true);
 
       PerTableConfig perTableConfig =
@@ -580,9 +592,6 @@ public class ITOneTableClient {
 
       table.upsertRecords(insertedRecords.subList(0, 20), true);
       table.insertRecords(50, true);
-      if (tableType == HoodieTableType.MERGE_ON_READ) {
-        table.compact();
-      }
       table.cluster();
 
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
@@ -748,34 +757,33 @@ public class ITOneTableClient {
     String nestedLevelFilter = "nested_record.level = 'INFO'";
     String severityFilter = "severity = 1";
     String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
-    return
-        Stream.of(
-            Arguments.of(
-                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-                "level:VALUE",
-                "level:SIMPLE",
-                levelFilter),
-            Arguments.of(
-                // Delta Lake does not currently support nested partition columns
-                Arrays.asList(TableFormat.ICEBERG),
-                "nested_record.level:VALUE",
-                "nested_record.level:SIMPLE",
-                nestedLevelFilter),
-            Arguments.of(
-                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-                "level:VALUE",
-                "level:SIMPLE",
-                levelFilter),
-            Arguments.of(
-                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-                "severity:VALUE",
-                "severity:SIMPLE",
-                severityFilter),
-            Arguments.of(
-                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
-                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-                timestampAndLevelFilter));
+    return Stream.of(
+        Arguments.of(
+            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+            "level:VALUE",
+            "level:SIMPLE",
+            levelFilter),
+        Arguments.of(
+            // Delta Lake does not currently support nested partition columns
+            Arrays.asList(TableFormat.ICEBERG),
+            "nested_record.level:VALUE",
+            "nested_record.level:SIMPLE",
+            nestedLevelFilter),
+        Arguments.of(
+            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+            "level:VALUE",
+            "level:SIMPLE",
+            levelFilter),
+        Arguments.of(
+            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+            "severity:VALUE",
+            "severity:SIMPLE",
+            severityFilter),
+        Arguments.of(
+            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+            "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
+            "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
+            timestampAndLevelFilter));
   }
 
   @ParameterizedTest

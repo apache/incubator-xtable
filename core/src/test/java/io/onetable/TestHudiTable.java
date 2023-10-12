@@ -94,7 +94,6 @@ import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.KeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.keygen.SimpleKeyGenerator;
-import org.apache.hudi.keygen.TimestampBasedKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 
 public class TestHudiTable implements Closeable {
@@ -220,14 +219,16 @@ public class TestHudiTable implements Closeable {
         }
         String[] partitionFieldConfigs = partitionConfig.split(",");
         if (partitionFieldConfigs.length == 1 && !partitionFieldConfigs[0].contains(".")) {
-          keyGenProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionFieldConfigs[0].split(":")[0]);
+          keyGenProperties.put(
+              PARTITIONPATH_FIELD_NAME.key(), partitionFieldConfigs[0].split(":")[0]);
           if (partitionFieldConfigs[0].contains(".")) { // nested field
             this.keyGenerator = new CustomAvroKeyGenerator(keyGenProperties);
           } else if (partitionFieldConfigs[0].contains("SIMPLE")) { // top level field
             this.keyGenerator = new SimpleKeyGenerator(keyGenProperties);
           } else { // top level timestamp field
             keyGenProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
-            this.keyGenerator = new CustomKeyGenerator(keyGenProperties);          }
+            this.keyGenerator = new CustomKeyGenerator(keyGenProperties);
+          }
         } else {
           keyGenProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
           this.keyGenerator = new CustomKeyGenerator(keyGenProperties);
@@ -604,7 +605,8 @@ public class TestHudiTable implements Closeable {
             .withMaxCommitsBeforeCleaning(1)
             .withAutoClean(false)
             .build();
-    HoodieStorageConfig storageConfig = HoodieStorageConfig.newBuilder().parquetCompressionCodec("UNCOMPRESSED").build();
+    HoodieStorageConfig storageConfig =
+        HoodieStorageConfig.newBuilder().parquetCompressionCodec("UNCOMPRESSED").build();
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
     Properties lockProperties = new Properties();
