@@ -189,7 +189,7 @@ public class TestIcebergPartitionSpecExtractor {
   @Test
   public void testFromIcebergUnPartitioned() {
     IcebergPartitionSpecExtractor extractor = IcebergPartitionSpecExtractor.getInstance();
-    List<OnePartitionField> fields = extractor.fromIceberg(PartitionSpec.unpartitioned(), null);
+    List<OnePartitionField> fields = extractor.fromIceberg(PartitionSpec.unpartitioned(), null, null);
     Assertions.assertEquals(0, fields.size());
   }
 
@@ -220,7 +220,7 @@ public class TestIcebergPartitionSpecExtractor {
                         .build()))
             .build();
 
-    List<OnePartitionField> irPartitionSpec = extractor.fromIceberg(icePartitionSpec, irSchema);
+    List<OnePartitionField> irPartitionSpec = extractor.fromIceberg(icePartitionSpec, iceSchema, irSchema);
     Assertions.assertEquals(1, irPartitionSpec.size());
     OneField sourceField = irPartitionSpec.get(0).getSourceField();
     Assertions.assertEquals("key_string", sourceField.getName());
@@ -236,12 +236,12 @@ public class TestIcebergPartitionSpecExtractor {
 
     Schema iceSchema =
         new Schema(
-            Types.NestedField.required(0, "key_time", Types.DateType.get()),
+            Types.NestedField.required(0, "key_year", Types.DateType.get()),
             Types.NestedField.required(1, "key_string", Types.StringType.get()));
     PartitionSpec icePartitionSpec =
         PartitionSpec.builderFor(iceSchema)
             .identity("key_string")
-            .year("key_time", "key_year")
+            .year("key_year")
             .build();
 
     OneSchema irSchema =
@@ -250,14 +250,9 @@ public class TestIcebergPartitionSpecExtractor {
             .fields(
                 Arrays.asList(
                     OneField.builder()
-                        .name("key_time")
+                        .name("key_year")
                         .fieldId(10)
-                        .schema(OneSchema.builder().dataType(OneType.INT).build())
-                        .build(),
-                    OneField.builder()
-                        .name("key_year") // hidden iceberg partition column
-                        .fieldId(100)
-                        .schema(OneSchema.builder().dataType(OneType.INT).build())
+                        .schema(OneSchema.builder().dataType(OneType.DATE).build())
                         .build(),
                     OneField.builder()
                         .name("key_string")
@@ -266,7 +261,7 @@ public class TestIcebergPartitionSpecExtractor {
                         .build()))
             .build();
 
-    List<OnePartitionField> irPartitionSpec = extractor.fromIceberg(icePartitionSpec, irSchema);
+    List<OnePartitionField> irPartitionSpec = extractor.fromIceberg(icePartitionSpec, iceSchema, irSchema);
     Assertions.assertEquals(2, irPartitionSpec.size());
 
     OneField sourceField = irPartitionSpec.get(0).getSourceField();
@@ -278,8 +273,8 @@ public class TestIcebergPartitionSpecExtractor {
 
     sourceField = irPartitionSpec.get(1).getSourceField();
     Assertions.assertEquals("key_year", sourceField.getName());
-    Assertions.assertEquals(100, sourceField.getFieldId());
-    Assertions.assertEquals(OneType.INT, sourceField.getSchema().getDataType());
+    Assertions.assertEquals(10, sourceField.getFieldId());
+    Assertions.assertEquals(OneType.DATE, sourceField.getSchema().getDataType());
     Assertions.assertEquals(PartitionTransformType.YEAR, irPartitionSpec.get(1).getTransformType());
   }
 

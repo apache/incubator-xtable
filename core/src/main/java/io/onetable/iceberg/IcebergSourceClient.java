@@ -61,7 +61,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     // TODO select snapshot specific partition spec
     IcebergPartitionSpecExtractor partitionExtractor = IcebergPartitionSpecExtractor.getInstance();
     List<OnePartitionField> irPartitionFields =
-        partitionExtractor.fromIceberg(sourceTable.spec(), irSchema);
+        partitionExtractor.fromIceberg(sourceTable.spec(), iceSchema, irSchema);
 
     return OneTable.builder()
         .tableFormat(TableFormat.ICEBERG)
