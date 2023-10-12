@@ -87,7 +87,7 @@ class TestRunSync {
         "io.onetable.iceberg.IcebergTargetClient",
         tfClients.get("ICEBERG").getTargetClientProviderClass());
     Assertions.assertEquals(
-        "io.onetable.iceberg.IcebergSourceClient",
+        "io.onetable.iceberg.IcebergSourceClientProvider",
         tfClients.get("ICEBERG").getSourceClientProviderClass());
   }
 

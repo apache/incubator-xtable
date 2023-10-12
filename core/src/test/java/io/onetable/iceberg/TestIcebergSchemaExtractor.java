@@ -18,16 +18,16 @@
  
 package io.onetable.iceberg;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
+import io.onetable.exception.NotSupportedException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
@@ -864,5 +864,90 @@ public class TestIcebergSchemaExtractor {
 
     Schema actual = IcebergSchemaExtractor.getInstance().toIceberg(oneSchemaRepresentation);
     Assertions.assertTrue(expectedSchema.sameSchema(actual));
+  }
+
+  /** Test that the schema extractor correctly maps Iceberg types to OneTable types. */
+  @Test
+  public void fromIcebergType() {
+    IcebergSchemaExtractor extractor = IcebergSchemaExtractor.getInstance();
+    Assertions.assertEquals(OneType.STRING, extractor.fromIcebergType(Types.StringType.get()));
+    Assertions.assertEquals(OneType.INT, extractor.fromIcebergType(Types.IntegerType.get()));
+    Assertions.assertEquals(OneType.LONG, extractor.fromIcebergType(Types.LongType.get()));
+    Assertions.assertEquals(OneType.BYTES, extractor.fromIcebergType(Types.BinaryType.get()));
+    Assertions.assertEquals(OneType.BOOLEAN, extractor.fromIcebergType(Types.BooleanType.get()));
+    Assertions.assertEquals(OneType.FLOAT, extractor.fromIcebergType(Types.FloatType.get()));
+    Assertions.assertEquals(OneType.DATE, extractor.fromIcebergType(Types.DateType.get()));
+    Assertions.assertEquals(
+        OneType.TIMESTAMP, extractor.fromIcebergType(Types.TimestampType.withZone()));
+    Assertions.assertEquals(OneType.DOUBLE, extractor.fromIcebergType(Types.DoubleType.get()));
+    Assertions.assertEquals(OneType.DECIMAL, extractor.fromIcebergType(Types.DecimalType.of(1, 1)));
+
+    // the iceberg types below have not been implemented yet
+    Assertions.assertThrows(
+        NotSupportedException.class, () -> extractor.fromIcebergType(Types.FixedType.ofLength(1)));
+    Assertions.assertThrows(
+        NotSupportedException.class,
+        () -> extractor.fromIcebergType(Types.ListType.ofRequired(1, Types.StringType.get())));
+    Assertions.assertThrows(
+        NotSupportedException.class,
+        () ->
+            extractor.fromIcebergType(
+                Types.MapType.ofRequired(1, 2, Types.StringType.get(), Types.StringType.get())));
+    Assertions.assertThrows(
+        NotSupportedException.class,
+        () ->
+            extractor.fromIcebergType(
+                Types.StructType.of(
+                    Types.NestedField.required(1, "test", Types.StringType.get()))));
+  }
+
+  /**
+   * Test that the schema extractor correctly builds {@link OneSchema} with valid fields from
+   * Iceberg schema.
+   */
+  @Test
+  public void fromIceberg() {
+    List<Type.PrimitiveType> iceTypes =
+        Arrays.asList(
+            Types.StringType.get(),
+            Types.IntegerType.get(),
+            Types.LongType.get(),
+            Types.BinaryType.get(),
+            Types.BooleanType.get(),
+            Types.FloatType.get(),
+            Types.DateType.get(),
+            Types.TimestampType.withZone(),
+            Types.DoubleType.get(),
+            Types.DecimalType.of(1, 1));
+
+    List<Types.NestedField> nestedFields = new ArrayList<>();
+    for (int i = 0; i < iceTypes.size(); i++) {
+      String fieldName = "test" + i;
+      String doc = "doc" + i;
+      nestedFields.add(Types.NestedField.of(i, true, fieldName, iceTypes.get(i), doc));
+    }
+
+    Schema iceSchema = new Schema(333, nestedFields);
+
+    IcebergSchemaExtractor extractor = IcebergSchemaExtractor.getInstance();
+    OneSchema irSchema = extractor.fromIceberg(iceSchema);
+
+    // TODO schema id is missing in oneschema
+    // Assertions.assertEquals(irSchema.getId(), iceSchema.schemaId());
+
+    Assertions.assertEquals(irSchema.getFields().size(), iceTypes.size());
+    for (int i = 0; i < iceTypes.size(); i++) {
+      OneField irField = irSchema.getFields().get(i);
+      Types.NestedField iceField = nestedFields.get(i);
+
+      Assertions.assertEquals(irField.getName(), iceField.name());
+      Assertions.assertEquals(irField.getFieldId(), iceField.fieldId());
+      Assertions.assertEquals(irField.getSchema().isNullable(), iceField.isOptional());
+      Assertions.assertEquals(
+          extractor.fromIcebergType(iceField.type()), irField.getSchema().getDataType());
+
+      // TODO doc is missing in oneschema
+      // Assertions.assertEquals(irField.getSchema().getDoc(), iceField.doc());
+    }
   }
 }
