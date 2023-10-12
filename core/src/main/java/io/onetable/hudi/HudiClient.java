@@ -29,18 +29,33 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoField;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import lombok.Builder;
+import lombok.NonNull;
+import lombok.Value;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 
+import com.google.common.collect.Iterators;
+import com.google.common.collect.PeekingIterator;
+
 import io.onetable.exception.OneIOException;
+import io.onetable.model.CurrentCommitState;
+import io.onetable.model.InstantsForIncrementalSync;
+import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
+import io.onetable.model.TableChange;
 import io.onetable.model.exception.OneParseException;
 import io.onetable.model.schema.SchemaCatalog;
-import io.onetable.model.storage.OneDataFiles;
-import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.extractor.SourceClient;
 
 public class HudiClient implements SourceClient<HoodieInstant> {
@@ -82,41 +97,91 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public OneDataFiles getFilesForAllPartitions(HoodieInstant commit, OneTable tableDefinition) {
-    return OneDataFiles.collectionBuilder()
-        .files(dataFileExtractor.getOneDataFiles(commit, tableDefinition))
+  public OneSnapshot getCurrentSnapshot() {
+    HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
+    HoodieTimeline completedTimeline = activeTimeline.filterCompletedInstants();
+    // get latest commit
+    HoodieInstant latestCommit =
+        completedTimeline
+            .lastInstant()
+            .orElseThrow(
+                () -> new OneIOException("Unable to read latest commit from Hudi source table"));
+    List<HoodieInstant> pendingInstants =
+        activeTimeline
+            .filterInflightsAndRequested()
+            .findInstantsBefore(latestCommit.getTimestamp())
+            .getInstants();
+    OneTable table = getTable(latestCommit);
+    return OneSnapshot.builder()
+        .table(table)
+        .schemaCatalog(getSchemaCatalog(table, latestCommit))
+        .dataFiles(dataFileExtractor.getFilesCurrentState(completedTimeline, table))
+        .pendingCommits(
+            pendingInstants.stream()
+                .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
+                .collect(Collectors.toList()))
         .build();
   }
 
   @Override
-  public OneDataFilesDiff getFilesDiffBetweenCommits(
-      HoodieInstant startCommit, HoodieInstant endCommit, OneTable table) {
-    return dataFileExtractor.getDiffBetweenCommits(startCommit, endCommit, table);
-  }
-
-  private HoodieTimeline getCompletedCommits() {
-    return metaClient.getActiveTimeline().filterCompletedInstants();
+  public TableChange getTableChangeForCommit(HoodieInstant hoodieInstantForDiff) {
+    HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
+    HoodieTimeline visibleTimeline =
+        activeTimeline
+            .filterCompletedInstants()
+            .findInstantsBeforeOrEquals(hoodieInstantForDiff.getTimestamp());
+    HoodieTimeline timelineForInstant =
+        activeTimeline
+            .filterCompletedInstants()
+            .findInstantsInClosedRange(
+                hoodieInstantForDiff.getTimestamp(), hoodieInstantForDiff.getTimestamp());
+    OneTable table = getTable(hoodieInstantForDiff);
+    return TableChange.builder()
+        .currentTableState(table)
+        .filesDiff(
+            dataFileExtractor.getDiffForCommit(
+                hoodieInstantForDiff, table, timelineForInstant, visibleTimeline))
+        .build();
   }
 
   @Override
-  public List<HoodieInstant> getCommits(HoodieInstant afterCommit) {
-    return getCompletedCommits().findInstantsAfter(afterCommit.getTimestamp()).getInstants();
+  public CurrentCommitState<HoodieInstant> getCurrentCommitState(
+      InstantsForIncrementalSync instantsForIncrementalSync) {
+    Instant lastSyncInstant = instantsForIncrementalSync.getLastSyncInstant();
+    List<Instant> lastPendingInstants = instantsForIncrementalSync.getPendingCommits();
+    HoodieInstant lastInstantSynced = getCommitAtInstant(lastSyncInstant);
+    CommitsPair commitsPair = getCompletedAndPendingCommitsAfterInstant(lastInstantSynced);
+    CommitsPair lastPendingHoodieInstantsCommitsPair =
+        getCompletedAndPendingCommitsForInstants(lastPendingInstants);
+    List<HoodieInstant> commitsToProcessNext =
+        mergeAndDedupLists(
+            lastPendingHoodieInstantsCommitsPair.getCompletedCommits(),
+            commitsPair.getCompletedCommits());
+    List<Instant> pendingInstantsToProcessNext =
+        mergeAndDedupLists(
+            lastPendingHoodieInstantsCommitsPair.getPendingCommits(),
+            commitsPair.getPendingCommits());
+    return CurrentCommitState.<HoodieInstant>builder()
+        .commitsToProcess(commitsToProcessNext)
+        .pendingInstants(pendingInstantsToProcessNext)
+        .build();
   }
 
-  @Override
-  public HoodieInstant getLatestCommit() {
-    return getCompletedCommits()
-        .lastInstant()
-        .orElseThrow(
-            () -> new OneIOException("Unable to read latest commit from Hudi source table"));
-  }
-
-  @Override
-  public HoodieInstant getCommitAtInstant(Instant instant) {
-    return getCompletedCommits()
-        .findInstantsBeforeOrEquals(MILLIS_INSTANT_TIME_FORMATTER.format(instant))
-        .lastInstant()
-        .get();
+  private CommitsPair getCompletedAndPendingCommitsForInstants(List<Instant> lastPendingInstants) {
+    List<HoodieInstant> lastPendingHoodieInstants = getCommitsForInstants(lastPendingInstants);
+    List<HoodieInstant> lastPendingHoodieInstantsCompleted =
+        lastPendingHoodieInstants.stream()
+            .filter(HoodieInstant::isCompleted)
+            .collect(Collectors.toList());
+    List<Instant> lastPendingHoodieInstantsStillPending =
+        lastPendingHoodieInstants.stream()
+            .filter(hoodieInstant -> hoodieInstant.isInflight() || hoodieInstant.isRequested())
+            .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
+            .collect(Collectors.toList());
+    return CommitsPair.builder()
+        .completedCommits(lastPendingHoodieInstantsCompleted)
+        .pendingCommits(lastPendingHoodieInstantsStillPending)
+        .build();
   }
 
   /**
@@ -143,7 +208,109 @@ public class HudiClient implements SourceClient<HoodieInstant> {
     }
   }
 
+  private HoodieTimeline getCompletedCommits() {
+    return metaClient.getActiveTimeline().filterCompletedInstants();
+  }
+
+  private CommitsPair getCompletedAndPendingCommitsAfterInstant(HoodieInstant commitInstant) {
+    List<HoodieInstant> allInstants =
+        metaClient
+            .getActiveTimeline()
+            .findInstantsAfter(commitInstant.getTimestamp())
+            .getInstants();
+    // collect the completed instants & inflight instants from all the instants.
+    List<HoodieInstant> completedInstants =
+        allInstants.stream().filter(HoodieInstant::isCompleted).collect(Collectors.toList());
+    // Nothing to sync as there are only pending commits.
+    if (completedInstants.isEmpty()) {
+      return CommitsPair.builder().completedCommits(completedInstants).build();
+    }
+    // remove from pending instants that are larger than the last completed instant.
+    List<Instant> pendingInstants =
+        allInstants.stream()
+            .filter(hoodieInstant -> hoodieInstant.isInflight() || hoodieInstant.isRequested())
+            .filter(
+                hoodieInstant ->
+                    hoodieInstant.compareTo(completedInstants.get(completedInstants.size() - 1))
+                        <= 0)
+            .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
+            .collect(Collectors.toList());
+    return CommitsPair.builder()
+        .completedCommits(completedInstants)
+        .pendingCommits(pendingInstants)
+        .build();
+  }
+
+  private HoodieInstant getCommitAtInstant(Instant instant) {
+    return getCompletedCommits()
+        .findInstantsBeforeOrEquals(MILLIS_INSTANT_TIME_FORMATTER.format(instant))
+        .lastInstant()
+        .get();
+  }
+
+  private List<HoodieInstant> getCommitsForInstants(List<Instant> instants) {
+    if (instants == null || instants.isEmpty()) {
+      return Collections.emptyList();
+    }
+    // Savepoint commits are not processed and commit time can overlap with other actions, hence
+    // filtering.
+    Map<Instant, HoodieInstant> instantHoodieInstantMap =
+        metaClient.getActiveTimeline().getInstants().stream()
+            .filter(instant -> !HoodieTimeline.SAVEPOINT_ACTION.equals(instant.getAction()))
+            .collect(
+                Collectors.toMap(
+                    hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()),
+                    hoodieInstant -> hoodieInstant));
+    return instants.stream()
+        .map(instantHoodieInstantMap::get)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Merges commits from two lists and returns new list of sorted commits by eliminating duplicates.
+   *
+   * @param list1 First sorted input list of commits
+   * @param list2 Second sorted input list of commits.
+   * @return merged list of commits in sorted order.
+   */
+  private <T extends Comparable<T>> List<T> mergeAndDedupLists(
+      @NonNull List<T> list1, @NonNull List<T> list2) {
+    List<T> mergedList = new ArrayList<>();
+    PeekingIterator<T> itr1 = Iterators.peekingIterator(list1.iterator());
+    PeekingIterator<T> itr2 = Iterators.peekingIterator(list2.iterator());
+    while (itr1.hasNext() || itr2.hasNext()) {
+      if (!itr2.hasNext()) {
+        mergedList.add(itr1.next());
+      } else if (!itr1.hasNext()) {
+        mergedList.add(itr2.next());
+      } else {
+        T element1 = itr1.peek();
+        T element2 = itr2.peek();
+        if (element1.compareTo(element2) < 0) {
+          mergedList.add(element1);
+          itr1.next();
+        } else if (element1.compareTo(element2) > 0) {
+          mergedList.add(element2);
+          itr2.next();
+        } else {
+          mergedList.add(element1);
+          itr1.next();
+          itr2.next();
+        }
+      }
+    }
+    return mergedList;
+  }
+
   private static boolean isSecondGranularity(String instant) {
     return instant.length() == SECS_INSTANT_ID_LENGTH;
+  }
+
+  @Value
+  @Builder
+  private static class CommitsPair {
+    @Builder.Default List<HoodieInstant> completedCommits = Collections.emptyList();
+    @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
   }
 }

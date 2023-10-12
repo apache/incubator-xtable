@@ -18,9 +18,7 @@
  
 package io.onetable.spi.extractor;
 
-import java.util.List;
-
-import io.onetable.model.TableChange;
+import io.onetable.model.IncrementalTableChanges;
 
 /**
  * Use the source {@link CLIENT} to extract the canonical representation of delta changes since the
@@ -30,5 +28,5 @@ import io.onetable.model.TableChange;
  * @param <INSTANT> Instant from which changes needs to be extracted.
  */
 public interface ChangesExtractor<CLIENT, INSTANT> {
-  List<TableChange> changes(CLIENT client, INSTANT sinceSnapshotInstant);
+  IncrementalTableChanges changes(CLIENT client, INSTANT sinceSnapshotInstant);
 }

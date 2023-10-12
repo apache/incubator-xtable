@@ -18,21 +18,18 @@
  
 package io.onetable.model;
 
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+
 import lombok.Builder;
 import lombok.Value;
 
-import io.onetable.model.storage.OneDataFilesDiff;
-
-/**
- * Captures the changes in a single commit/instant from the source table.
- *
- * @since 0.1
- */
+/** Captures Incremental table changes. */
 @Value
-@Builder(toBuilder = true)
-public class TableChange {
-  // Change in files at the specified instant
-  OneDataFilesDiff filesDiff;
-  // OneTable state at the specified instant
-  OneTable currentTableState;
+@Builder
+public class IncrementalTableChanges {
+  List<TableChange> tableChanges;
+  // pending commits before latest commit(write) on the table.
+  @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
 }

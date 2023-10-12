@@ -18,21 +18,24 @@
  
 package io.onetable.model;
 
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+
 import lombok.Builder;
 import lombok.Value;
 
-import io.onetable.model.storage.OneDataFilesDiff;
-
 /**
- * Captures the changes in a single commit/instant from the source table.
+ * Represents the current state of commits that are ready for immediate processing and syncing,
+ * while also tracking pending commits intended for future incremental syncs.
  *
- * @since 0.1
+ * <p>'commitsToProcess' captures commits that are should be processed and synced in the current
+ * round. 'pendingInstants' tracks instants that are pending at the start of the sync process and
+ * should be considered for future incremental syncs.
  */
 @Value
-@Builder(toBuilder = true)
-public class TableChange {
-  // Change in files at the specified instant
-  OneDataFilesDiff filesDiff;
-  // OneTable state at the specified instant
-  OneTable currentTableState;
+@Builder
+public class CurrentCommitState<COMMIT> {
+  @Builder.Default List<COMMIT> commitsToProcess = Collections.emptyList();
+  @Builder.Default List<Instant> pendingInstants = Collections.emptyList();
 }

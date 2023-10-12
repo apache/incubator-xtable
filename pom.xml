@@ -180,7 +180,6 @@
                 <groupId>org.apache.hudi</groupId>
                 <artifactId>hudi-java-client</artifactId>
                 <version>${hudi.version}</version>
-                <scope>test</scope>
             </dependency>
 
             <!-- Iceberg -->

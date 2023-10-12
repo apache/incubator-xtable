@@ -20,11 +20,14 @@ package io.onetable.iceberg;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Type;
@@ -39,6 +42,7 @@ import io.onetable.model.schema.OneSchema;
  * Schema extractor for Iceberg which converts canonical representation of the schema{@link
  * OneSchema} to Iceberg's schema representation {@link Schema}
  */
+@Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class IcebergSchemaExtractor {
   private static final IcebergSchemaExtractor INSTANCE = new IcebergSchemaExtractor();
@@ -53,7 +57,30 @@ public class IcebergSchemaExtractor {
   public Schema toIceberg(OneSchema oneSchema) {
     // if field IDs are not assigned in the source, just use an incrementing integer
     AtomicInteger fieldIdTracker = new AtomicInteger(0);
-    return new Schema(convertFields(oneSchema, fieldIdTracker));
+    List<Types.NestedField> nestedFields = convertFields(oneSchema, fieldIdTracker);
+    List<OneField> recordKeyFields = oneSchema.getRecordKeyFields();
+    if (recordKeyFields.isEmpty()) {
+      return new Schema(nestedFields);
+    }
+    // Find field in iceberg schema that matches each of the record key path and collect ids.
+    Schema partialSchema = new Schema(nestedFields);
+    Set<Integer> recordKeyIds =
+        recordKeyFields.stream()
+            .map(keyField -> partialSchema.findField(convertFromOneTablePath(keyField.getPath())))
+            .filter(Objects::nonNull)
+            .map(Types.NestedField::fieldId)
+            .collect(Collectors.toSet());
+    if (recordKeyFields.size() != recordKeyIds.size()) {
+      List<String> missingFieldPaths =
+          recordKeyFields.stream()
+              .map(OneField::getPath)
+              .filter(path -> partialSchema.findField(convertFromOneTablePath(path)) == null)
+              .collect(Collectors.toList());
+      log.error("Missing field IDs for record key field paths: " + missingFieldPaths);
+      throw new SchemaExtractorException(
+          String.format("Mismatches in converting record key fields: %", missingFieldPaths));
+    }
+    return new Schema(nestedFields, recordKeyIds);
   }
 
   static String convertFromOneTablePath(String path) {
@@ -78,7 +105,7 @@ public class IcebergSchemaExtractor {
       nestedFields.add(
           Types.NestedField.of(
               ids.get(i),
-              field.getSchema().getIsNullable(),
+              field.getSchema().isNullable(),
               field.getName(),
               convertFieldType(field, fieldIdTracker),
               field.getSchema().getComment()));
@@ -135,7 +162,7 @@ public class IcebergSchemaExtractor {
         int keyId = key.getFieldId() == null ? fieldIdTracker.incrementAndGet() : key.getFieldId();
         int valueId =
             value.getFieldId() == null ? fieldIdTracker.incrementAndGet() : value.getFieldId();
-        if (field.getSchema().getIsNullable()) {
+        if (field.getSchema().isNullable()) {
           return Types.MapType.ofOptional(
               keyId,
               valueId,
@@ -158,7 +185,7 @@ public class IcebergSchemaExtractor {
                 .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
         int elementId =
             element.getFieldId() == null ? fieldIdTracker.incrementAndGet() : element.getFieldId();
-        if (field.getSchema().getIsNullable()) {
+        if (field.getSchema().isNullable()) {
           return Types.ListType.ofOptional(elementId, convertFieldType(element, fieldIdTracker));
         } else {
           return Types.ListType.ofRequired(elementId, convertFieldType(element, fieldIdTracker));

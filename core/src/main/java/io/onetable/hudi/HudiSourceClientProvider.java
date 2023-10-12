@@ -18,8 +18,7 @@
  
 package io.onetable.hudi;
 
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -29,9 +28,8 @@ import io.onetable.client.PerTableConfig;
 import io.onetable.client.SourceClientProvider;
 
 /** A concrete implementation of {@link SourceClientProvider} for Hudi table format. */
+@Log4j2
 public class HudiSourceClientProvider extends SourceClientProvider<HoodieInstant> {
-
-  private static final Logger LOG = LogManager.getLogger(HudiSourceClientProvider.class);
 
   @Override
   public HudiClient getSourceClientInstance(PerTableConfig sourceTableConfig) {
@@ -43,7 +41,7 @@ public class HudiSourceClientProvider extends SourceClientProvider<HoodieInstant
             .setLoadActiveTimelineOnLoad(true)
             .build();
     if (!metaClient.getTableConfig().getTableType().equals(HoodieTableType.COPY_ON_WRITE)) {
-      LOG.warn("Source table is Merge On Read. Only base files will be synced");
+      log.warn("Source table is Merge On Read. Only base files will be synced");
     }
 
     final HudiSourcePartitionSpecExtractor sourcePartitionSpecExtractor =
