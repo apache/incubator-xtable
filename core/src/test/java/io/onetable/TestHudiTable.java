@@ -62,6 +62,7 @@ import org.apache.hudi.client.SparkRDDWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieSparkEngineContext;
 import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
+import org.apache.hudi.common.config.HoodieStorageConfig;
 import org.apache.hudi.common.config.LockConfiguration;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
@@ -86,9 +87,12 @@ import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieCompactionConfig;
 import org.apache.hudi.config.HoodieLockConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.keygen.CustomAvroKeyGenerator;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.KeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
+import org.apache.hudi.keygen.SimpleKeyGenerator;
+import org.apache.hudi.keygen.TimestampBasedKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 
 public class TestHudiTable implements Closeable {
@@ -203,7 +207,6 @@ public class TestHudiTable implements Closeable {
         this.keyGenerator = new NonpartitionedKeyGenerator(keyGenProperties);
         this.partitionFieldNames = Collections.emptyList();
       } else {
-        keyGenProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
         if (partitionConfig.contains("timestamp")) {
           keyGenProperties.put("hoodie.deltastreamer.keygen.timebased.timestamp.type", "SCALAR");
           keyGenProperties.put(
@@ -213,9 +216,22 @@ public class TestHudiTable implements Closeable {
           keyGenProperties.put("hoodie.deltastreamer.keygen.timebased.input.timezone", "UTC");
           keyGenProperties.put("hoodie.deltastreamer.keygen.timebased.output.timezone", "UTC");
         }
-        this.keyGenerator = new CustomKeyGenerator(keyGenProperties);
+        String[] partitionFieldConfigs = partitionConfig.split(",");
+        if (partitionFieldConfigs.length == 1 && !partitionFieldConfigs[0].contains(".")) {
+          keyGenProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionFieldConfigs[0].split(":")[0]);
+          if (partitionFieldConfigs[0].contains(".")) { // nested field
+            this.keyGenerator = new CustomAvroKeyGenerator(keyGenProperties);
+          } else if (partitionFieldConfigs[0].contains("SIMPLE")) { // top level field
+            this.keyGenerator = new SimpleKeyGenerator(keyGenProperties);
+          } else { // top level timestamp field
+            keyGenProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
+            this.keyGenerator = new CustomKeyGenerator(keyGenProperties);          }
+        } else {
+          keyGenProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
+          this.keyGenerator = new CustomKeyGenerator(keyGenProperties);
+        }
         this.partitionFieldNames =
-            Arrays.stream(partitionConfig.split(","))
+            Arrays.stream(partitionFieldConfigs)
                 .map(config -> config.split(":")[0])
                 .collect(Collectors.toList());
       }
@@ -580,6 +596,7 @@ public class TestHudiTable implements Closeable {
             .withMaxCommitsBeforeCleaning(1)
             .withAutoClean(false)
             .build();
+    HoodieStorageConfig storageConfig = HoodieStorageConfig.newBuilder().parquetCompressionCodec("UNCOMPRESSED").build();
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
     Properties lockProperties = new Properties();
@@ -597,6 +614,7 @@ public class TestHudiTable implements Closeable {
             .withClusteringConfig(clusteringConfig)
             .withCleanConfig(cleanConfig)
             .withArchivalConfig(archivalConfig)
+            .withStorageConfig(storageConfig)
             .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
             .withMarkersType(MarkerType.DIRECT.name())
             .withLockConfig(

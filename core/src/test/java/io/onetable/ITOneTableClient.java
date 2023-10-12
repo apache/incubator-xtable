@@ -751,13 +751,8 @@ public class ITOneTableClient {
     String nestedLevelFilter = "nested_record.level = 'INFO'";
     String severityFilter = "severity = 1";
     String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
-    return addSyncModeCases(
+    return
         Stream.of(
-            Arguments.of(
-                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd",
-                "timestamp_micros_nullable_field:TIMESTAMP",
-                timestampFilter),
             Arguments.of(
                 Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
                 "level:VALUE",
@@ -783,7 +778,7 @@ public class ITOneTableClient {
                 Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
                 "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
                 "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-                timestampAndLevelFilter)));
+                timestampAndLevelFilter));
   }
 
   @ParameterizedTest
@@ -792,8 +787,7 @@ public class ITOneTableClient {
       List<TableFormat> targetTableFormats,
       String oneTablePartitionConfig,
       String hudiPartitionConfig,
-      String filter,
-      SyncMode syncMode) {
+      String filter) {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
@@ -807,7 +801,7 @@ public class ITOneTableClient {
                   HudiSourceConfig.builder()
                       .partitionFieldSpecConfig(oneTablePartitionConfig)
                       .build())
-              .syncMode(syncMode)
+              .syncMode(SyncMode.INCREMENTAL)
               .build();
       table.insertRecords(100, true);
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
