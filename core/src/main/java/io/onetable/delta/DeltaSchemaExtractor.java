@@ -50,7 +50,7 @@ import io.onetable.model.schema.OneType;
  *   <li>Delta schemas are represented as Spark StructTypes which do not have enums so the enum
  *       types are lost when converting from Onetable to Delta Lake representations
  *   <li>Delta does not have a fixed length byte array option so {@link OneType#FIXED} is simply
- *       translated to a {@link org.apache.spark.sql.types.ByteType}
+ *       translated to a {@link org.apache.spark.sql.types.BinaryType}
  *   <li>Similarly, {@link OneType#TIMESTAMP_NTZ} is translated to a long in Delta Lake
  * </ul>
  */
@@ -88,7 +88,7 @@ public class DeltaSchemaExtractor {
         return DataTypes.LongType;
       case BYTES:
       case FIXED:
-        return DataTypes.ByteType;
+        return DataTypes.BinaryType;
       case BOOLEAN:
         return DataTypes.BooleanType;
       case FLOAT:
@@ -165,8 +165,7 @@ public class DeltaSchemaExtractor {
       case "double":
         type = OneType.DOUBLE;
         break;
-      case "byte":
-      case "fixed":
+      case "binary":
         type = OneType.BYTES;
         break;
       case "long":

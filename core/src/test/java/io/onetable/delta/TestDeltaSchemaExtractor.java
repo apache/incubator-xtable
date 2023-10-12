@@ -165,7 +165,7 @@ public class TestDeltaSchemaExtractor {
                         .name("requiredBytes")
                         .schema(
                             OneSchema.builder()
-                                .name("byte")
+                                .name("binary")
                                 .dataType(OneType.BYTES)
                                 .isNullable(false)
                                 .build())
@@ -174,7 +174,7 @@ public class TestDeltaSchemaExtractor {
                         .name("optionalBytes")
                         .schema(
                             OneSchema.builder()
-                                .name("byte")
+                                .name("binary")
                                 .dataType(OneType.BYTES)
                                 .isNullable(true)
                                 .build())
@@ -236,8 +236,8 @@ public class TestDeltaSchemaExtractor {
             .add("optionalFloat", DataTypes.FloatType, true)
             .add("requiredString", DataTypes.StringType, false)
             .add("optionalString", DataTypes.StringType, true)
-            .add("requiredBytes", DataTypes.ByteType, false)
-            .add("optionalBytes", DataTypes.ByteType, true)
+            .add("requiredBytes", DataTypes.BinaryType, false)
+            .add("optionalBytes", DataTypes.BinaryType, true)
             .add("requiredDate", DataTypes.DateType, false)
             .add("optionalDate", DataTypes.DateType, true)
             .add("requiredDecimal", DataTypes.createDecimalType(10, 2), false)
@@ -292,7 +292,7 @@ public class TestDeltaSchemaExtractor {
                         .name("requiredFixed")
                         .schema(
                             OneSchema.builder()
-                                .name("byte")
+                                .name("binary")
                                 .dataType(OneType.BYTES)
                                 .isNullable(false)
                                 .build())
@@ -301,7 +301,7 @@ public class TestDeltaSchemaExtractor {
                         .name("optionalFixed")
                         .schema(
                             OneSchema.builder()
-                                .name("byte")
+                                .name("binary")
                                 .dataType(OneType.BYTES)
                                 .isNullable(true)
                                 .build())
@@ -310,8 +310,8 @@ public class TestDeltaSchemaExtractor {
             .build();
     StructType structRepresentation =
         new StructType()
-            .add("requiredFixed", DataTypes.ByteType, false)
-            .add("optionalFixed", DataTypes.ByteType, true);
+            .add("requiredFixed", DataTypes.BinaryType, false)
+            .add("optionalFixed", DataTypes.BinaryType, true);
 
     Assertions.assertEquals(
         structRepresentation,
