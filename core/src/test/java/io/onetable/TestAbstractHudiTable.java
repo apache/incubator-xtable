@@ -54,8 +54,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalFileSystem;
 
-import org.apache.hudi.client.HoodieJavaWriteClient;
-import org.apache.hudi.client.SparkRDDWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
 import org.apache.hudi.common.config.LockConfiguration;
@@ -105,8 +103,6 @@ public abstract class TestAbstractHudiTable implements Closeable {
   // Base path for the table
   protected String basePath;
   protected HoodieTableMetaClient metaClient;
-  protected SparkRDDWriteClient<HoodieAvroPayload> sparkWriteClient;
-  protected HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
   protected KeyGenerator keyGenerator;
   protected Schema schema;
   protected List<String> partitionFieldNames;
@@ -213,16 +209,6 @@ public abstract class TestAbstractHudiTable implements Closeable {
                     () ->
                         assertFalse(
                             status.hasErrors(), "Errors found in write of " + status.getFileId())));
-  }
-
-  @Override
-  public void close() {
-    if (sparkWriteClient != null) {
-      sparkWriteClient.close();
-    }
-    if (javaWriteClient != null) {
-      javaWriteClient.close();
-    }
   }
 
   protected List<HoodieRecord<HoodieAvroPayload>> generateUpdatesForRecords(

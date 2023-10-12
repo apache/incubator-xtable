@@ -55,6 +55,8 @@ import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 
 public class TestJavaHudiTable extends TestAbstractHudiTable {
+  private final HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
+  private final Configuration conf;
   /**
    * Create a test table instance for general testing. The table is created with the schema defined
    * in basic_schema.avsc which contains many data types to ensure they are handled correctly.
@@ -133,6 +135,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
                 .map(config -> config.split(":")[0])
                 .collect(Collectors.toList());
       }
+      this.conf = new Configuration();
+      this.conf.set("parquet.avro.write-old-list-structure", "false");
       this.metaClient = initMetaClient(hoodieTableType, keyGenProperties);
       this.javaWriteClient = initJavaWriteClient(schema.toString(), keyGenProperties);
     } catch (IOException ex) {
@@ -265,15 +269,21 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     return insertRecords(checkForNoErrors, inserts);
   }
 
+  @Override
+  public void close() {
+    if (javaWriteClient != null) {
+      javaWriteClient.close();
+    }
+  }
+
   private HoodieTableMetaClient initMetaClient(
       HoodieTableType hoodieTableType, TypedProperties keyGenProperties) throws IOException {
-    return getMetaClient(keyGenProperties, hoodieTableType, new Configuration());
+    return getMetaClient(keyGenProperties, hoodieTableType, conf);
   }
 
   private HoodieJavaWriteClient<HoodieAvroPayload> initJavaWriteClient(
       String schema, TypedProperties keyGenProperties) {
     HoodieWriteConfig writeConfig = generateWriteConfig(schema, keyGenProperties);
-    Configuration conf = new Configuration();
     HoodieEngineContext context = new HoodieJavaEngineContext(conf);
     return new HoodieJavaWriteClient<>(context, writeConfig);
   }

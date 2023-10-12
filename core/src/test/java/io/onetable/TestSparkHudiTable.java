@@ -296,6 +296,13 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
     return insertRecords(checkForNoErrors, inserts);
   }
 
+  @Override
+  public void close() {
+    if (sparkWriteClient != null) {
+      sparkWriteClient.close();
+    }
+  }
+
   private SparkRDDWriteClient<HoodieAvroPayload> initSparkWriteClient(
       String schema, TypedProperties keyGenProperties) {
     HoodieWriteConfig writeConfig = generateWriteConfig(schema, keyGenProperties);
