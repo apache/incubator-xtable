@@ -25,7 +25,6 @@ import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-import org.apache.avro.LogicalTypes;
 import org.apache.spark.sql.types.ArrayType;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
@@ -42,9 +41,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import scala.Option;
-
-/** Extracts the {@link StructType} schema of the target Delta table from {@link OneSchema}. */
+/**
+ * Converts between Delta and OneTable schemas.
+ * </p>
+ * Some items to be aware of:
+ * <ul>
+ *   <li>Delta schemas are represented as Spark StructTypes which do not have enums so the enum types are lost when converting from Onetable to Delta Lake representations</li>
+ *   <li>Delta does not have a fixed length byte array option so {@link OneType#FIXED} is simply translated to a {@link org.apache.spark.sql.types.ByteType}</li>
+ *   <li>Similarly, {@link OneType#TIMESTAMP_NTZ} is translated to a long in Delta Lake</li>
+ * </ul>
+ */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaSchemaExtractor {
   private static final DeltaSchemaExtractor INSTANCE = new DeltaSchemaExtractor();
@@ -134,7 +140,11 @@ public class DeltaSchemaExtractor {
     Map<OneSchema.MetadataKey, Object> metadata = null;
     List<OneField> fields = null;
     OneType type;
-    switch (dataType.typeName()) {
+    String typeName = dataType.typeName();
+    // trims parameters to type name for matching
+    int openParenIndex = typeName.indexOf("(");
+    String trimmedTypeName = openParenIndex > 0 ? typeName.substring(0, openParenIndex) : typeName;
+    switch (trimmedTypeName) {
       case "integer":
         type = OneType.INT;
         break;
@@ -225,7 +235,7 @@ public class DeltaSchemaExtractor {
         throw new NotSupportedException("Unsupported type: " + dataType.typeName());
     }
     return OneSchema.builder()
-        .name(dataType.typeName())
+        .name(trimmedTypeName)
         .dataType(type)
         .comment(comment)
         .isNullable(nullable)

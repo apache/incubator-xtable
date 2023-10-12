@@ -35,11 +35,6 @@ public class TestDeltaSchemaExtractor {
 
   @Test
   public void testPrimitiveTypes() {
-    Map<OneSchema.MetadataKey, Object> requiredEnumMetadata = new HashMap<>();
-    requiredEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
-    Map<OneSchema.MetadataKey, Object> optionalEnumMetadata = new HashMap<>();
-    optionalEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
-
     Map<OneSchema.MetadataKey, Object> decimalMetadata = new HashMap<>();
     decimalMetadata.put(OneSchema.MetadataKey.DECIMAL_PRECISION, 10);
     decimalMetadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, 2);
@@ -185,27 +180,6 @@ public class TestDeltaSchemaExtractor {
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
                     OneField.builder()
-                        .name("requiredEnum")
-                        .schema(
-                            OneSchema.builder()
-                                .name("REQUIRED_ENUM")
-                                .dataType(OneType.ENUM)
-                                .isNullable(false)
-                                .metadata(requiredEnumMetadata)
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("optionalEnum")
-                        .schema(
-                            OneSchema.builder()
-                                .name("OPTIONAL_ENUM")
-                                .dataType(OneType.ENUM)
-                                .isNullable(true)
-                                .metadata(optionalEnumMetadata)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
-                    OneField.builder()
                         .name("requiredDate")
                         .schema(
                             OneSchema.builder()
@@ -220,63 +194,6 @@ public class TestDeltaSchemaExtractor {
                             OneSchema.builder()
                                 .name("date")
                                 .dataType(OneType.DATE)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
-                    OneField.builder()
-                        .name("requiredTimestamp")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .isNullable(false)
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("optionalTimestamp")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
-                    OneField.builder()
-                        .name("requiredTimestampNtz")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestampNtz")
-                                .dataType(OneType.TIMESTAMP_NTZ)
-                                .isNullable(false)
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("optionalTimestampNtz")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestampNtz")
-                                .dataType(OneType.TIMESTAMP_NTZ)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
-                    OneField.builder()
-                        .name("requiredFixed")
-                        .schema(
-                            OneSchema.builder()
-                                .name("fixed")
-                                .dataType(OneType.FIXED)
-                                .isNullable(false)
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("optionalFixed")
-                        .schema(
-                            OneSchema.builder()
-                                .name("fixed")
-                                .dataType(OneType.FIXED)
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
@@ -320,21 +237,197 @@ public class TestDeltaSchemaExtractor {
             .add("optionalString", DataTypes.StringType, true)
             .add("requiredBytes", DataTypes.ByteType, false)
             .add("optionalBytes", DataTypes.ByteType, true)
-            .add("requiredEnum", DataTypes.StringType, false)
-            .add("optionalEnum", DataTypes.StringType, true)
             .add("requiredDate", DataTypes.DateType, false)
             .add("optionalDate", DataTypes.DateType, true)
-            .add("requiredTimestamp", DataTypes.TimestampType, false)
-            .add("optionalTimestamp", DataTypes.TimestampType, true)
-            .add("requiredTimestampNtz", DataTypes.LongType, false)
-            .add("optionalTimestampNtz", DataTypes.LongType, true)
-            .add("requiredFixed", DataTypes.ByteType, false)
-            .add("optionalFixed", DataTypes.ByteType, true)
             .add("requiredDecimal", DataTypes.createDecimalType(10, 2), false)
             .add("optionalDecimal", DataTypes.createDecimalType(10, 2), true);
 
     Assertions.assertEquals(structRepresentation, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
     Assertions.assertEquals(oneSchemaRepresentation, DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
+  }
+
+  @Test
+  public void testFixedBytes() {
+    OneSchema oneSchemaRepresentationOriginal =
+        OneSchema.builder()
+            .name("struct")
+            .dataType(OneType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("requiredFixed")
+                        .schema(
+                            OneSchema.builder()
+                                .name("fixed")
+                                .dataType(OneType.FIXED)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalFixed")
+                        .schema(
+                            OneSchema.builder()
+                                .name("fixed")
+                                .dataType(OneType.FIXED)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    OneSchema oneSchemaRepresentationAfterRoundTrip =
+        OneSchema.builder()
+            .name("struct")
+            .dataType(OneType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("requiredFixed")
+                        .schema(
+                            OneSchema.builder()
+                                .name("byte")
+                                .dataType(OneType.BYTES)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalFixed")
+                        .schema(
+                            OneSchema.builder()
+                                .name("byte")
+                                .dataType(OneType.BYTES)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+    StructType structRepresentation =
+        new StructType()
+            .add("requiredFixed", DataTypes.ByteType, false)
+            .add("optionalFixed", DataTypes.ByteType, true);
+
+    Assertions.assertEquals(structRepresentation, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentationOriginal));
+    Assertions.assertEquals(oneSchemaRepresentationAfterRoundTrip, DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
+  }
+
+  @Test
+  public void testTimestamps() {
+    OneSchema oneSchemaRepresentationTimestamp =
+        OneSchema.builder()
+            .name("struct")
+            .dataType(OneType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("requiredTimestamp")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalTimestamp")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    OneSchema oneSchemaRepresentationTimestampNtz =
+        OneSchema.builder()
+            .name("struct")
+            .dataType(OneType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("requiredTimestampNtz")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestampNtz")
+                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalTimestampNtz")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestampNtz")
+                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    StructType structRepresentationTimestamp =
+        new StructType()
+            .add("requiredTimestamp", DataTypes.TimestampType, false)
+            .add("optionalTimestamp", DataTypes.TimestampType, true);
+
+    StructType structRepresentationTimestampNtz =
+        new StructType()
+            .add("requiredTimestampNtz", DataTypes.LongType, false)
+            .add("optionalTimestampNtz", DataTypes.LongType, true);
+
+    Assertions.assertEquals(structRepresentationTimestamp, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentationTimestamp));
+    Assertions.assertEquals(oneSchemaRepresentationTimestamp, DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentationTimestamp));
+    Assertions.assertEquals(structRepresentationTimestampNtz, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentationTimestampNtz));
+  }
+
+  @Test
+  public void testEnums() {
+    Map<OneSchema.MetadataKey, Object> requiredEnumMetadata = new HashMap<>();
+    requiredEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
+    Map<OneSchema.MetadataKey, Object> optionalEnumMetadata = new HashMap<>();
+    optionalEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
+
+    OneSchema oneSchemaRepresentation =
+        OneSchema.builder()
+            .name("struct")
+            .dataType(OneType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("requiredEnum")
+                        .schema(
+                            OneSchema.builder()
+                                .name("REQUIRED_ENUM")
+                                .dataType(OneType.ENUM)
+                                .isNullable(false)
+                                .metadata(requiredEnumMetadata)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalEnum")
+                        .schema(
+                            OneSchema.builder()
+                                .name("OPTIONAL_ENUM")
+                                .dataType(OneType.ENUM)
+                                .isNullable(true)
+                                .metadata(optionalEnumMetadata)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    StructType structRepresentation =
+        new StructType()
+            .add("requiredEnum", DataTypes.StringType, false)
+            .add("optionalEnum", DataTypes.StringType, true);
+
+    Assertions.assertEquals(structRepresentation, DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
   }
 
   @Test
