@@ -112,8 +112,8 @@ public class ITOneTableClient {
             .set("parquet.avro.write-old-list-structure", "false")
             // Needed for ignoring not nullable constraints on nested columns in Delta.
             .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
-            .set("spark.sql.shuffle.partitions", "4")
-            .set("spark.default.parallelism", "4")
+            .set("spark.sql.shuffle.partitions", "1")
+            .set("spark.default.parallelism", "1")
             .set("spark.sql.session.timeZone", "UTC")
             .set("spark.sql.iceberg.handle-timestamp-without-timezone", "true")
             .setMaster("local[4]");
@@ -665,7 +665,8 @@ public class ITOneTableClient {
 
   @ParameterizedTest
   @MethodSource("testCasesWithSyncModes")
-  public void testTimeTravelQueries(List<TableFormat> targetTableFormats, SyncMode syncMode) {
+  public void testTimeTravelQueries(List<TableFormat> targetTableFormats, SyncMode syncMode)
+      throws Exception {
     String tableName = getTableName();
     try (TestHudiTable table =
         TestHudiTable.forStandardSchema(
@@ -682,10 +683,12 @@ public class ITOneTableClient {
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       Instant instantAfterFirstSync = Instant.now();
+      Thread.sleep(1000);
 
       table.insertRecords(50, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       Instant instantAfterSecondSync = Instant.now();
+      Thread.sleep(1000);
 
       table.insertRecords(50, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
