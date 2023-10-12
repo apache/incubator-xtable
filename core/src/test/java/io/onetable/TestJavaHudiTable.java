@@ -33,9 +33,11 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 
+import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
@@ -43,6 +45,7 @@ import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieAvroPayload;
+import org.apache.hudi.common.model.HoodieAvroRecord;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
@@ -148,7 +151,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       List<HoodieRecord<HoodieAvroPayload>> inserts,
       String commitInstant,
       boolean checkForNoErrors) {
-    List<WriteStatus> result = javaWriteClient.bulkInsert(inserts, commitInstant);
+    List<WriteStatus> result = javaWriteClient.bulkInsert(copyRecords(inserts), commitInstant);
     if (checkForNoErrors) {
       assertNoWriteErrors(result);
     }
@@ -160,7 +163,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       String commitInstant,
       boolean checkForNoErrors) {
     List<HoodieRecord<HoodieAvroPayload>> updates = generateUpdatesForRecords(records);
-    List<WriteStatus> result = javaWriteClient.upsert(updates, commitInstant);
+    List<WriteStatus> result = javaWriteClient.upsert(copyRecords(updates), commitInstant);
     if (checkForNoErrors) {
       assertNoWriteErrors(result);
     }
@@ -274,6 +277,26 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     if (javaWriteClient != null) {
       javaWriteClient.close();
     }
+  }
+
+  // Existing records are need to create updates etc... so create a copy of the records and operate
+  // on the copy.
+  private List<HoodieRecord<HoodieAvroPayload>> copyRecords(
+      List<HoodieRecord<HoodieAvroPayload>> records) {
+    return records.stream()
+        .map(
+            hoodieRecord -> {
+              HoodieKey key = hoodieRecord.getKey();
+              byte[] payloadBytes = hoodieRecord.getData().getRecordBytes();
+              byte[] payloadBytesCopy = Arrays.copyOf(payloadBytes, payloadBytes.length);
+              try {
+                GenericRecord recordCopy = HoodieAvroUtils.bytesToAvro(payloadBytesCopy, schema);
+                return new HoodieAvroRecord<>(key, new HoodieAvroPayload(Option.of(recordCopy)));
+              } catch (IOException e) {
+                throw new RuntimeException(e);
+              }
+            })
+        .collect(Collectors.toList());
   }
 
   private HoodieTableMetaClient initMetaClient(
