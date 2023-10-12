@@ -26,6 +26,7 @@ import io.onetable.model.schema.OneType;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.avro.LogicalTypes;
+import org.apache.spark.sql.types.ArrayType;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.DecimalType;
@@ -35,6 +36,7 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -125,102 +127,110 @@ public class DeltaSchemaExtractor {
   }
 
   public OneSchema toOneSchema(StructType structType) {
-    return toOneSchema(structType, null, false);
+    return toOneSchema(structType, null, false, null);
   }
 
-  private OneSchema toOneSchema(StructType structType, String parentPath, boolean nullable) {
-    List<OneField> fields = Arrays.stream(structType.fields()).map(structField -> toOneField(structField, parentPath)).collect(Collectors.toList());
-    return OneSchema.builder()
-        .name(structType.typeName())
-        .fields(fields)
-        .dataType(OneType.RECORD)
-        .isNullable(nullable)
-        .build();
-  }
-
-  private OneField toOneField(StructField field, String parentPath) {
-    OneSchema fieldSchema;
-    String typeName = field.dataType().typeName();
-    // trims parameters to type name for matching
-    int openParenIndex = typeName.indexOf("(");
-    String trimmedTypeName = openParenIndex > 0 ? typeName.substring(0, openParenIndex) : typeName;
-    switch (trimmedTypeName) {
+  private OneSchema toOneSchema(DataType dataType, String parentPath, boolean nullable, String comment) {
+    Map<OneSchema.MetadataKey, Object> metadata = null;
+    List<OneField> fields = null;
+    OneType type;
+    switch (dataType.typeName()) {
       case "integer":
-        fieldSchema = getSingleFieldSchema(OneType.INT, field, null);
+        type = OneType.INT;
         break;
       case "string":
-        fieldSchema = getSingleFieldSchema(OneType.STRING, field, null);
+        type = OneType.STRING;
         break;
       case "boolean":
-        fieldSchema = getSingleFieldSchema(OneType.BOOLEAN, field, null);
+        type = OneType.BOOLEAN;
         break;
       case "float":
-        fieldSchema = getSingleFieldSchema(OneType.FLOAT, field, null);
+        type = OneType.FLOAT;
         break;
       case "double":
-        fieldSchema = getSingleFieldSchema(OneType.DOUBLE, field, null);
+        type = OneType.DOUBLE;
         break;
       case "byte":
       case "fixed":
-        fieldSchema = getSingleFieldSchema(OneType.BYTES, field, null);
+        type = OneType.BYTES;
         break;
       case "long":
-        fieldSchema = getSingleFieldSchema(OneType.LONG, field, null);
+        type = OneType.LONG;
         break;
       case "date":
-        fieldSchema = getSingleFieldSchema(OneType.DATE, field, null);
+        type = OneType.DATE;
         break;
       case "timestamp":
-        fieldSchema = getSingleFieldSchema(OneType.TIMESTAMP, field, null);
+        type = OneType.TIMESTAMP;
         break;
       case "struct":
-        fieldSchema = toOneSchema((StructType) field.dataType(), getFullyQualifiedPath(parentPath, field.name()), field.nullable());
+        StructType structType = (StructType) dataType;
+        fields =
+            Arrays.stream(structType.fields())
+                .map(field -> {
+                    String fieldComment = field.getComment().isDefined() ? field.getComment().get() : null;
+                    OneSchema schema = toOneSchema(field.dataType(), getFullyQualifiedPath(parentPath, field.name()), field.nullable(), fieldComment);
+                    return OneField.builder()
+                        .name(field.name())
+                        .parentPath(parentPath)
+                        .schema(schema)
+                        .defaultValue(field.nullable() ? OneField.Constants.NULL_DEFAULT_VALUE : null)
+                        .build();
+                })
+                .collect(Collectors.toList());
+        type = OneType.RECORD;
         break;
       case "decimal":
-        DecimalType decimalType = (DecimalType) field.dataType();
-        Map<OneSchema.MetadataKey, Object> metadata = new HashMap<>(2, 1.0f);
+        DecimalType decimalType = (DecimalType) dataType;
+        metadata = new HashMap<>(2, 1.0f);
         metadata.put(OneSchema.MetadataKey.DECIMAL_PRECISION, decimalType.precision());
         metadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, decimalType.scale());
-        fieldSchema = getSingleFieldSchema(OneType.DECIMAL, field, metadata);
+        type = OneType.DECIMAL;
         break;
       case "array":
+        ArrayType arrayType = (ArrayType) dataType;
+        OneSchema elementSchema =
+            toOneSchema(arrayType.elementType(), getFullyQualifiedPath(parentPath, OneField.Constants.ARRAY_ELEMENT_FIELD_NAME), arrayType.containsNull(), null);
+        OneField elementField =
+            OneField.builder()
+                .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                .parentPath(parentPath)
+                .schema(elementSchema)
+                .build();
+        type = OneType.ARRAY;
+        fields = Collections.singletonList(elementField);
+        break;
       case "map":
-//        MapType mapType = (MapType) field.dataType();
-//        OneSchema valueSchema = mapType.valueType() instanceof StructType ?
-//            toOneSchema((StructType) mapType.valueType(), getFullyQualifiedPath(parentPath, OneField.Constants.MAP_VALUE_FIELD_NAME), mapType.valueContainsNull()) :
-//            OneSchema.builder()
-//                .name(mapType.valueType().typeName())
-//                .isNullable(mapType.valueContainsNull())
-//                .dataType()
-//                .build();
-//        OneField valueField =
-//            OneField.builder()
-//                .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
-//                .parentPath(parentPath)
-//                .schema(valueSchema)
-//                .fieldId(valueMapping == null ? null : valueMapping.getId())
-//                .build();
-//        break;
+        MapType mapType = (MapType) dataType;
+        OneSchema keySchema =
+            toOneSchema(mapType.keyType(), getFullyQualifiedPath(parentPath, OneField.Constants.MAP_VALUE_FIELD_NAME), false, null);
+        OneField keyField =
+            OneField.builder()
+                .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+                .parentPath(parentPath)
+                .schema(keySchema)
+                .build();
+        OneSchema valueSchema =
+            toOneSchema(mapType.valueType(), getFullyQualifiedPath(parentPath, OneField.Constants.MAP_VALUE_FIELD_NAME), mapType.valueContainsNull(), null);
+        OneField valueField =
+            OneField.builder()
+                .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+                .parentPath(parentPath)
+                .schema(valueSchema)
+                .build();
+        type = OneType.MAP;
+        fields = Arrays.asList(keyField, valueField);
+        break;
       default:
-        throw new NotSupportedException("Unsupported type: " + field.dataType().typeName());
+        throw new NotSupportedException("Unsupported type: " + dataType.typeName());
     }
-
-    return OneField
-        .builder()
-        .parentPath(parentPath)
-        .name(field.name())
-        .schema(fieldSchema)
-        .defaultValue(field.nullable() ? OneField.Constants.NULL_DEFAULT_VALUE : null)
-        .build();
-  }
-
-  private OneSchema getSingleFieldSchema(OneType type, StructField field, Map<OneSchema.MetadataKey, Object> metadata) {
     return OneSchema.builder()
-        .name(field.dataType().typeName())
+        .name(dataType.typeName())
         .dataType(type)
-        .isNullable(field.nullable())
-        .comment(field.getComment().isDefined() ? field.getComment().get() : null)
+        .comment(comment)
+        .isNullable(nullable)
         .metadata(metadata)
+        .fields(fields)
         .build();
   }
 

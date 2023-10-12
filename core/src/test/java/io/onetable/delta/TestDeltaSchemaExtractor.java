@@ -19,6 +19,7 @@
 package io.onetable.delta;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -340,7 +341,7 @@ public class TestDeltaSchemaExtractor {
   public void testMaps() {
     OneSchema recordMapElementSchema =
         OneSchema.builder()
-            .name("element")
+            .name("struct")
             .isNullable(true)
             .fields(
                 Arrays.asList(
@@ -369,7 +370,7 @@ public class TestDeltaSchemaExtractor {
             .build();
     OneSchema oneSchemaRepresentation =
         OneSchema.builder()
-            .name("testRecord")
+            .name("struct")
             .dataType(OneType.RECORD)
             .isNullable(false)
             .fields(
@@ -388,18 +389,17 @@ public class TestDeltaSchemaExtractor {
                                             .parentPath("intMap")
                                             .schema(
                                                 OneSchema.builder()
-                                                    .name("map_key")
+                                                    .name("string")
                                                     .dataType(OneType.STRING)
                                                     .isNullable(false)
                                                     .build())
-                                            .defaultValue("")
                                             .build(),
                                         OneField.builder()
                                             .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
                                             .parentPath("intMap")
                                             .schema(
                                                 OneSchema.builder()
-                                                    .name("int")
+                                                    .name("integer")
                                                     .dataType(OneType.INT)
                                                     .isNullable(false)
                                                     .build())
@@ -420,11 +420,10 @@ public class TestDeltaSchemaExtractor {
                                             .parentPath("recordMap")
                                             .schema(
                                                 OneSchema.builder()
-                                                    .name("map_key")
+                                                    .name("integer")
                                                     .dataType(OneType.INT)
                                                     .isNullable(false)
                                                     .build())
-                                            .defaultValue("")
                                             .build(),
                                         OneField.builder()
                                             .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
@@ -453,7 +452,7 @@ public class TestDeltaSchemaExtractor {
   public void testLists() {
     OneSchema recordListElementSchema =
         OneSchema.builder()
-            .name("element")
+            .name("struct")
             .isNullable(true)
             .fields(
                 Arrays.asList(
@@ -482,7 +481,7 @@ public class TestDeltaSchemaExtractor {
             .build();
     OneSchema oneSchemaRepresentation =
         OneSchema.builder()
-            .name("testRecord")
+            .name("struct")
             .dataType(OneType.RECORD)
             .isNullable(false)
             .fields(
@@ -495,13 +494,13 @@ public class TestDeltaSchemaExtractor {
                                 .isNullable(false)
                                 .dataType(OneType.ARRAY)
                                 .fields(
-                                    Arrays.asList(
+                                    Collections.singletonList(
                                         OneField.builder()
                                             .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                                             .parentPath("intList")
                                             .schema(
                                                 OneSchema.builder()
-                                                    .name("int")
+                                                    .name("integer")
                                                     .dataType(OneType.INT)
                                                     .isNullable(false)
                                                     .build())
@@ -516,7 +515,7 @@ public class TestDeltaSchemaExtractor {
                                 .isNullable(true)
                                 .dataType(OneType.ARRAY)
                                 .fields(
-                                    Arrays.asList(
+                                    Collections.singletonList(
                                         OneField.builder()
                                             .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                                             .parentPath("recordList")
