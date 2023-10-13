@@ -18,14 +18,9 @@
  
 package io.onetable;
 
-import static org.apache.hudi.keygen.constant.KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME;
-
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -56,7 +51,6 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
-import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 
 public class TestSparkHudiTable extends TestAbstractHudiTable {
   private final JavaSparkContext jsc;
@@ -135,32 +129,11 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
       JavaSparkContext jsc,
       String partitionConfig,
       HoodieTableType hoodieTableType) {
-    try {
-      this.tableName = name;
-      this.schema = schema;
-      // Initialize base path
-      this.basePath = initBasePath(tempDir, name);
-      // initialize spark session
-      this.jsc = jsc;
-      // Add key generator
-      TypedProperties keyGenProperties = new TypedProperties();
-      keyGenProperties.put(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key(), RECORD_KEY_FIELD_NAME);
-      if (partitionConfig == null) {
-        this.keyGenerator = new NonpartitionedKeyGenerator(keyGenProperties);
-        this.partitionFieldNames = Collections.emptyList();
-      } else {
-        keyGenProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
-        this.keyGenerator = new CustomKeyGenerator(keyGenProperties);
-        this.partitionFieldNames =
-            Arrays.stream(partitionConfig.split(","))
-                .map(config -> config.split(":")[0])
-                .collect(Collectors.toList());
-      }
-      this.sparkWriteClient = initSparkWriteClient(schema.toString(), keyGenProperties);
-      this.metaClient = initMetaClient(jsc, hoodieTableType, keyGenProperties);
-    } catch (IOException ex) {
-      throw new UncheckedIOException("Unable to initialize TestSparkHudiTable", ex);
-    }
+    super(name, schema, tempDir, partitionConfig);
+    // initialize spark session
+    this.jsc = jsc;
+    this.sparkWriteClient = initSparkWriteClient(schema.toString(), typedProperties);
+    this.metaClient = initMetaClient(jsc, hoodieTableType, typedProperties);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(

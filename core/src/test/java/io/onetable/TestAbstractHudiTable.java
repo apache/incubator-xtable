@@ -18,6 +18,7 @@
  
 package io.onetable;
 
+import static org.apache.hudi.keygen.constant.KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -35,6 +36,7 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
@@ -78,7 +80,10 @@ import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieCompactionConfig;
 import org.apache.hudi.config.HoodieLockConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.KeyGenerator;
+import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
+import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 
 public abstract class TestAbstractHudiTable implements Closeable {
   protected static final String RECORD_KEY_FIELD_NAME = "key";
@@ -103,9 +108,35 @@ public abstract class TestAbstractHudiTable implements Closeable {
   // Base path for the table
   protected String basePath;
   protected HoodieTableMetaClient metaClient;
+  protected TypedProperties typedProperties;
   protected KeyGenerator keyGenerator;
   protected Schema schema;
   protected List<String> partitionFieldNames;
+
+  public TestAbstractHudiTable(String name, Schema schema, Path tempDir, String partitionConfig) {
+    try {
+      this.tableName = name;
+      this.schema = schema;
+      // Initialize base path
+      this.basePath = initBasePath(tempDir, name);
+      // Add key generator
+      this.typedProperties = new TypedProperties();
+      typedProperties.put(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key(), RECORD_KEY_FIELD_NAME);
+      if (partitionConfig == null) {
+        this.keyGenerator = new NonpartitionedKeyGenerator(typedProperties);
+        this.partitionFieldNames = Collections.emptyList();
+      } else {
+        typedProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
+        this.keyGenerator = new CustomKeyGenerator(typedProperties);
+        this.partitionFieldNames =
+            Arrays.stream(partitionConfig.split(","))
+                .map(config -> config.split(":")[0])
+                .collect(Collectors.toList());
+      }
+    } catch (IOException ex) {
+      throw new UncheckedIOException("Unable to initialize Test Hudi Table", ex);
+    }
+  }
 
   public String getBasePath() {
     return basePath;

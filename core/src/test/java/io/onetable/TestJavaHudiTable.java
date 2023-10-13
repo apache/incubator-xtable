@@ -18,15 +18,12 @@
  
 package io.onetable;
 
-import static org.apache.hudi.keygen.constant.KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -55,7 +52,6 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
-import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 
 public class TestJavaHudiTable extends TestAbstractHudiTable {
   private final HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
@@ -119,32 +115,15 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       Path tempDir,
       String partitionConfig,
       HoodieTableType hoodieTableType) {
+    super(name, schema, tempDir, partitionConfig);
+    this.conf = new Configuration();
+    this.conf.set("parquet.avro.write-old-list-structure", "false");
     try {
-      this.tableName = name;
-      this.schema = schema;
-      // Initialize base path
-      this.basePath = initBasePath(tempDir, name);
-      // Add key generator
-      TypedProperties keyGenProperties = new TypedProperties();
-      keyGenProperties.put(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key(), RECORD_KEY_FIELD_NAME);
-      if (partitionConfig == null) {
-        this.keyGenerator = new NonpartitionedKeyGenerator(keyGenProperties);
-        this.partitionFieldNames = Collections.emptyList();
-      } else {
-        keyGenProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
-        this.keyGenerator = new CustomKeyGenerator(keyGenProperties);
-        this.partitionFieldNames =
-            Arrays.stream(partitionConfig.split(","))
-                .map(config -> config.split(":")[0])
-                .collect(Collectors.toList());
-      }
-      this.conf = new Configuration();
-      this.conf.set("parquet.avro.write-old-list-structure", "false");
-      this.metaClient = initMetaClient(hoodieTableType, keyGenProperties);
-      this.javaWriteClient = initJavaWriteClient(schema.toString(), keyGenProperties);
+      this.metaClient = initMetaClient(hoodieTableType, typedProperties);
     } catch (IOException ex) {
-      throw new UncheckedIOException("Unable to initialize TestJavaHudiTable", ex);
+      throw new UncheckedIOException("Unable to initialize metaclient for TestJavaHudiTable", ex);
     }
+    this.javaWriteClient = initJavaWriteClient(schema.toString(), typedProperties);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
