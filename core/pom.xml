@@ -59,14 +59,18 @@
         </dependency>
 
         <!-- Hudi dependencies -->
-        <!-- After schema conversion is handled directly in OneTable revisit Hudi dependencies -->
         <dependency>
             <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.version.prefix}</artifactId>
+            <artifactId>hudi-common</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-java-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.version.prefix}</artifactId>
+            <scope>test</scope>
         </dependency>
 
         <!-- Iceberg dependencies -->

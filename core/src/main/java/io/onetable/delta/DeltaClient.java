@@ -114,7 +114,7 @@ public class DeltaClient implements TargetClient {
 
   @Override
   public void syncSchema(OneSchema schema) {
-    StructType latestSchema = schemaExtractor.schema(schema);
+    StructType latestSchema = schemaExtractor.fromOneSchema(schema);
     transactionState.setLatestSchema(latestSchema);
   }
 
