@@ -29,11 +29,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.PartitionSpecParser;
@@ -81,8 +81,7 @@ class TestIcebergSourceClient {
   }
 
   @Test
-  void getTableTest() throws IOException {
-    Path workingDir = Paths.get(System.getProperty("java.io.tmpdir"), UUID.randomUUID().toString());
+  void getTableTest(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestTableWithData(workingDir.toString());
     PerTableConfig sourceTableConfig =
         PerTableConfig.builder()
@@ -112,14 +111,10 @@ class TestIcebergSourceClient {
     Assertions.assertEquals(7, partitionField.getFieldId());
     Assertions.assertEquals(
         PartitionTransformType.VALUE, oneTable.getPartitioningFields().get(0).getTransformType());
-
-    // cleanup test data
-    FileUtils.deleteDirectory(workingDir.toFile());
   }
 
   @Test
-  public void testGetCurrentSnapshot() throws IOException {
-    Path workingDir = Paths.get(System.getProperty("java.io.tmpdir"), UUID.randomUUID().toString());
+  public void testGetCurrentSnapshot(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestTableWithData(workingDir.toString());
     Snapshot iceCurrentSnapshot = catalogSales.currentSnapshot();
 
@@ -141,9 +136,6 @@ class TestIcebergSourceClient {
     verify(spyClient, times(1)).getTable(iceCurrentSnapshot);
 
     // TODO schema catalog test
-
-    // cleanup test data
-    FileUtils.deleteDirectory(workingDir.toFile());
   }
 
   private void validateSchema(OneSchema readSchema, Schema expectedSchema) {
