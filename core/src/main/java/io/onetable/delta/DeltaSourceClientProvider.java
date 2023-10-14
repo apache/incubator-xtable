@@ -16,23 +16,17 @@
  * limitations under the License.
  */
  
-package io.onetable.model.schema;
+package io.onetable.delta;
 
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import org.apache.spark.sql.delta.Snapshot;
 
-/**
- * Represents logical information about a field used for partitioning.
- *
- * @since 0.1
- */
-@Value
-@Builder
-@EqualsAndHashCode
-public class OnePartitionField {
-  // Source field the partition is based on
-  OneField sourceField;
-  // An enum describing how the source data was transformed into the partition value
-  PartitionTransformType transformType;
+import io.onetable.client.PerTableConfig;
+import io.onetable.client.SourceClientProvider;
+
+/** A concrete implementation of {@link SourceClientProvider} for Delta Lake table format. */
+public class DeltaSourceClientProvider extends SourceClientProvider<Snapshot> {
+  @Override
+  public DeltaSourceClient getSourceClientInstance(PerTableConfig sourceTableConfig) {
+    return new DeltaSourceClient(sourceTableConfig, DeltaClientUtils.buildSparkSession(hadoopConf));
+  }
 }
