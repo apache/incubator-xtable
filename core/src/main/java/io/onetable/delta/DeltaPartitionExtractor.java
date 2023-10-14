@@ -20,9 +20,11 @@ package io.onetable.delta;
 
 import static io.onetable.delta.DeltaValueSerializer.getFormattedValueForPartition;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -31,12 +33,16 @@ import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 
 import io.onetable.exception.PartitionSpecException;
+import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
+import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.OneDataFile;
+import io.onetable.schema.SchemaFieldFinder;
 
 /**
  * DeltaPartitionExtractor handles extracting partition columns, also creating generated columns in
@@ -58,7 +64,73 @@ public class DeltaPartitionExtractor {
     return INSTANCE;
   }
 
-  public Map<String, StructField> getPartitionColumns(List<OnePartitionField> partitionFields) {
+  /**
+   * Extracts partition fields from delta table. Example: Given a delta table and a reference to
+   * DeltaLog, method parameters can be obtained by deltaLog = DeltaLog.forTable(spark,
+   * deltaTablePath); StructType tableSchema = deltaLog.snapshot().schema(); List<String>
+   * partitionFields = JavaConverters.seqAsJavaList(deltaLog.metadata().partitionColumns());
+   *
+   * @param tableSchema schema of the delta table.
+   * @param oneSchema canonical representation of the schema.
+   * @param partitionColumns partition columns of the delta table.
+   * @return list of canonical representation of the partition fields
+   */
+  public List<OnePartitionField> convertFromDeltaPartitionFormat(
+      StructType tableSchema, OneSchema oneSchema, List<String> partitionColumns) {
+    if (partitionColumns == null || partitionColumns.isEmpty()) {
+      return Collections.emptyList();
+    }
+    Map<String, StructField> partitionColToStructFieldMap =
+        partitionColumns.stream()
+            .collect(
+                Collectors.toMap(
+                    partitionCol -> partitionCol,
+                    partitionCol -> findFieldByPath(tableSchema, partitionCol)));
+    List<String> partitionColsNotFoundInDelta =
+        partitionColToStructFieldMap.entrySet().stream()
+            .filter(entry -> entry.getValue() == null)
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
+    // Even generated columns should be present in the schema.
+    if (!partitionColsNotFoundInDelta.isEmpty()) {
+      throw new PartitionSpecException(
+          String.format("Partition columns not found in schema: %s", partitionColsNotFoundInDelta));
+    }
+    Map<String, OneField> partitionColToFieldMap =
+        partitionColumns.stream()
+            .collect(
+                Collectors.toMap(
+                    partitionCol -> partitionCol,
+                    partitionCol ->
+                        SchemaFieldFinder.getInstance().findFieldByPath(oneSchema, partitionCol)));
+    List<String> partitionColumnsNotFoundInCanonical =
+        partitionColToStructFieldMap.entrySet().stream()
+            .filter(entry -> entry.getValue() == null)
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
+    // This check is a more of defensive one as it is unlikely to happen and should be caught by
+    // schema extractor in most cases.
+    if (!partitionColumnsNotFoundInCanonical.isEmpty()) {
+      throw new PartitionSpecException(
+          String.format(
+              "Partition columns not found in canonical schema: %s",
+              partitionColumnsNotFoundInCanonical));
+    }
+    return partitionColumns.stream()
+        .map(
+            partitionCol -> {
+              StructField partitionColStructField = partitionColToStructFieldMap.get(partitionCol);
+              OneField partitionColOneField = partitionColToFieldMap.get(partitionCol);
+              return OnePartitionField.builder()
+                  .sourceField(partitionColOneField)
+                  .transformType(getTransformType(partitionColStructField))
+                  .build();
+            })
+        .collect(Collectors.toList());
+  }
+
+  public Map<String, StructField> convertToDeltaPartitionFormat(
+      List<OnePartitionField> partitionFields) {
     if (partitionFields == null) {
       return null;
     }
@@ -165,5 +237,51 @@ public class DeltaPartitionExtractor {
     Metadata partitionFieldMetadata =
         new Metadata(ScalaUtils.convertJavaMapToScala(generatedExpressionMetadata));
     return new StructField(currPartitionColumnName, dataType, true, partitionFieldMetadata);
+  }
+
+  // Find the field in the structType by path where path can be nested with dot notation like a.b.c
+  private StructField findFieldByPath(StructType structType, String path) {
+    if (path == null || path.isEmpty()) {
+      return null;
+    }
+    StructType currStructType = structType;
+    String[] pathParts = path.split("\\.");
+    for (int i = 0; i < pathParts.length; i++) {
+      StructField[] currFields = currStructType.fields();
+      int lookupIndex = currStructType.fieldIndex(pathParts[i]);
+      if (lookupIndex < 0 || lookupIndex >= currFields.length) {
+        return null;
+      }
+      StructField currField = currFields[lookupIndex];
+      if (i == pathParts.length - 1) {
+        return currField;
+      }
+      if (!(currField.dataType() instanceof StructType)) {
+        return null;
+      }
+      currStructType = (StructType) currField.dataType();
+    }
+    return null;
+  }
+
+  private PartitionTransformType getTransformType(StructField partitionColStructField) {
+    String generatedExprCol =
+        partitionColStructField.metadata().getString(DELTA_GENERATION_EXPRESSION);
+    if (generatedExprCol == null || generatedExprCol.isEmpty()) {
+      return PartitionTransformType.VALUE;
+    }
+    // Refer https://docs.databricks.com/en/delta/generated-columns.html
+    // TODO(vamshigv): This is Rudimentary check, improve it
+    if (generatedExprCol.contains("YEAR")) {
+      return PartitionTransformType.YEAR;
+    } else if (generatedExprCol.contains("MONTH")) {
+      return PartitionTransformType.MONTH;
+    } else if (generatedExprCol.contains("DAY")) {
+      return PartitionTransformType.DAY;
+    } else if (generatedExprCol.contains("HOUR")) {
+      return PartitionTransformType.HOUR;
+    }
+    throw new PartitionSpecException(
+        String.format("Unsupported generated expression: %s", generatedExprCol));
   }
 }
