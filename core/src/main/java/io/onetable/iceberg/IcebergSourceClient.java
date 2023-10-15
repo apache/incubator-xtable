@@ -18,7 +18,9 @@
  
 package io.onetable.iceberg;
 
+import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -27,17 +29,20 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.iceberg.Schema;
-import org.apache.iceberg.Snapshot;
-import org.apache.iceberg.Table;
+import org.apache.iceberg.*;
 import org.apache.iceberg.hadoop.HadoopTables;
+import org.apache.iceberg.io.CloseableIterable;
 
 import io.onetable.client.PerTableConfig;
+import io.onetable.exception.OneIOException;
 import io.onetable.model.*;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
+import io.onetable.model.stat.Range;
+import io.onetable.model.storage.OneDataFile;
+import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.extractor.SourceClient;
 
@@ -93,10 +98,33 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     Snapshot currentSnapshot = sourceTable.currentSnapshot();
 
     OneTable irTable = getTable(currentSnapshot);
+
+    TableScan scan = sourceTable.newScan().useSnapshot(currentSnapshot.snapshotId());
+
+    IcebergPartitionValueConverter partitionValueConverter =
+        IcebergPartitionValueConverter.getInstance();
+    PartitionSpec partitionSpec = sourceTable.spec();
+    OneDataFiles oneDataFiles;
+    try (CloseableIterable<FileScanTask> files = scan.planFiles()) {
+      List<OneDataFile> irFiles = new ArrayList<>();
+      for (FileScanTask fileScanTask : files) {
+        DataFile file = fileScanTask.file();
+        Map<OnePartitionField, Range> onePartitionFieldRangeMap =
+            partitionValueConverter.toOneTable(file.partition(), partitionSpec);
+        OneDataFile irDataFile =
+            IcebergDataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap);
+        irFiles.add(irDataFile);
+      }
+      oneDataFiles = OneDataFiles.collectionBuilder().files(irFiles).build();
+    } catch (IOException e) {
+      throw new OneIOException(e.getMessage(), e);
+    }
+
     return OneSnapshot.builder()
         .version(String.valueOf(currentSnapshot.snapshotId()))
         .table(irTable)
         .schemaCatalog(getSchemaCatalog(irTable, currentSnapshot))
+        .dataFiles(oneDataFiles)
         .build();
   }
 

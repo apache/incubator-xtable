@@ -20,6 +20,7 @@ package io.onetable.iceberg;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.iceberg.CombinedScanTask;
@@ -29,6 +30,8 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.io.CloseableIterator;
 
 import io.onetable.exception.NotSupportedException;
+import io.onetable.model.schema.OnePartitionField;
+import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
@@ -65,21 +68,39 @@ public class IcebergDataFileExtractor implements PartitionedDataFileIterator {
             .map(
                 fileScanTask -> {
                   DataFile dataFile = fileScanTask.file();
-                  return OneDataFile.builder()
-                      .physicalPath(dataFile.path().toString())
-                      .fileFormat(getFileFormat(dataFile.format()))
-                      .fileSizeBytes(dataFile.fileSizeInBytes())
-                      .recordCount(dataFile.recordCount())
-                      .partitionValues(
-                          partitionValueConverter.toOneTable(dataFile.partition(), partitionSpec))
-                      .columnStats(Collections.emptyMap())
-                      .build();
+                  Map<OnePartitionField, Range> onePartitionFieldRangeMap =
+                      partitionValueConverter.toOneTable(dataFile.partition(), partitionSpec);
+                  return fromIceberg(dataFile, onePartitionFieldRangeMap);
                 })
             .collect(Collectors.toList());
     return OneDataFiles.collectionBuilder().files(files).build();
   }
 
-  private FileFormat getFileFormat(org.apache.iceberg.FileFormat format) {
+  /**
+   * Builds {@link OneDataFile} representation from Iceberg {@link DataFile}
+   *
+   * @param dataFile Iceberg data file
+   * @param partitionsInfo representation of partition fields and ranges
+   * @return corresponding OneTable data file
+   */
+  static OneDataFile fromIceberg(DataFile dataFile, Map<OnePartitionField, Range> partitionsInfo) {
+    return OneDataFile.builder()
+        .physicalPath(dataFile.path().toString())
+        .fileFormat(fromIcebergFileFormat(dataFile.format()))
+        .fileSizeBytes(dataFile.fileSizeInBytes())
+        .recordCount(dataFile.recordCount())
+        .partitionValues(partitionsInfo)
+        .columnStats(Collections.emptyMap())
+        .build();
+  }
+
+  /**
+   * Maps Iceberg file format to OneTable file format
+   *
+   * @param format Iceberg file format
+   * @return corresponding OneTable file format
+   */
+  static FileFormat fromIcebergFileFormat(org.apache.iceberg.FileFormat format) {
     switch (format) {
       case PARQUET:
         return FileFormat.APACHE_PARQUET;

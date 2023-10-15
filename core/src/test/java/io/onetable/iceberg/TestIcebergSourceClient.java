@@ -35,12 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.apache.iceberg.PartitionSpec;
-import org.apache.iceberg.PartitionSpecParser;
-import org.apache.iceberg.Schema;
-import org.apache.iceberg.SchemaParser;
-import org.apache.iceberg.Snapshot;
-import org.apache.iceberg.Table;
+import org.apache.iceberg.*;
 import org.apache.iceberg.data.GenericRecord;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
 import org.apache.iceberg.hadoop.HadoopTables;
@@ -51,9 +46,10 @@ import org.apache.iceberg.types.Types;
 import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
-import io.onetable.model.schema.OneField;
-import io.onetable.model.schema.OneSchema;
-import io.onetable.model.schema.PartitionTransformType;
+import io.onetable.model.schema.*;
+import io.onetable.model.stat.Range;
+import io.onetable.model.storage.FileFormat;
+import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.TableFormat;
 
 class TestIcebergSourceClient {
@@ -114,6 +110,36 @@ class TestIcebergSourceClient {
   }
 
   @Test
+  public void getSchemaCatalogTest(@TempDir Path workingDir) throws IOException {
+    Table catalogSales = createTestTableWithData(workingDir.toString());
+    Snapshot iceCurrentSnapshot = catalogSales.currentSnapshot();
+
+    // add extra schema to test current schema is returned
+    catalogSales.updateSchema().addColumn("new_column", Types.IntegerType.get()).commit();
+    Assertions.assertEquals(2, catalogSales.schemas().size());
+    Assertions.assertEquals(0, iceCurrentSnapshot.schemaId());
+
+    PerTableConfig sourceTableConfig =
+        PerTableConfig.builder()
+            .tableName(catalogSales.name())
+            .tableBasePath(catalogSales.location())
+            .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
+            .build();
+
+    IcebergSourceClient client = clientProvider.getSourceClientInstance(sourceTableConfig);
+    IcebergSourceClient spyClient = spy(client);
+
+    SchemaCatalog schemaCatalog = spyClient.getSchemaCatalog(null, iceCurrentSnapshot);
+    Assertions.assertNotNull(schemaCatalog);
+    Map<SchemaVersion, OneSchema> schemas = schemaCatalog.getSchemas();
+    Assertions.assertEquals(1, schemas.size());
+    SchemaVersion expectedSchemaVersion = new SchemaVersion(iceCurrentSnapshot.schemaId(), "");
+    OneSchema irSchemaOfCommit = schemas.get(expectedSchemaVersion);
+    Assertions.assertNotNull(irSchemaOfCommit);
+    validateSchema(irSchemaOfCommit, catalogSales.schemas().get(iceCurrentSnapshot.schemaId()));
+  }
+
+  @Test
   public void testGetCurrentSnapshot(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestTableWithData(workingDir.toString());
     Snapshot iceCurrentSnapshot = catalogSales.currentSnapshot();
@@ -134,8 +160,25 @@ class TestIcebergSourceClient {
         String.valueOf(iceCurrentSnapshot.snapshotId()), oneSnapshot.getVersion());
     Assertions.assertNotNull(oneSnapshot.getTable());
     verify(spyClient, times(1)).getTable(iceCurrentSnapshot);
+    verify(spyClient, times(1)).getSchemaCatalog(oneSnapshot.getTable(), iceCurrentSnapshot);
 
-    // TODO schema catalog test
+    Assertions.assertNotNull(oneSnapshot.getDataFiles());
+    Assertions.assertEquals(5, oneSnapshot.getDataFiles().getFiles().size());
+    for (OneDataFile oneDataFile : oneSnapshot.getDataFiles().getFiles()) {
+      Assertions.assertEquals(FileFormat.APACHE_PARQUET, oneDataFile.getFileFormat());
+      Assertions.assertEquals(1, oneDataFile.getRecordCount());
+      Assertions.assertEquals(1, oneDataFile.getRecordCount());
+      Assertions.assertTrue(oneDataFile.getPhysicalPath().startsWith(workingDir.toString()));
+
+      Map<OnePartitionField, Range> partitionValues = oneDataFile.getPartitionValues();
+      Assertions.assertEquals(1, partitionValues.size());
+      Map.Entry<OnePartitionField, Range> partitionEntry =
+          partitionValues.entrySet().iterator().next();
+      Assertions.assertEquals(
+          "cs_sold_date_sk", partitionEntry.getKey().getSourceField().getName());
+      // TODO generate test with column stats
+      Assertions.assertEquals(0, oneDataFile.getColumnStats().size());
+    }
   }
 
   private void validateSchema(OneSchema readSchema, Schema expectedSchema) {
@@ -165,24 +208,30 @@ class TestIcebergSourceClient {
     String csPath = Paths.get(workingDir, "catalog_sales").toString();
     Table catalogSales = tables.create(csSchema, csPartitionSpec, csPath);
 
-    String dataFilePath = String.join("/", csPath, "data", UUID.randomUUID() + ".parquet");
-    DataWriter<GenericRecord> dataWriter =
-        Parquet.writeData(catalogSales.io().newOutputFile(dataFilePath))
-            .schema(csSchema)
-            .createWriterFunc(GenericParquetWriter::buildWriter)
-            .overwrite()
-            .withSpec(PartitionSpec.unpartitioned())
-            .build();
+    AppendFiles appendFiles = catalogSales.newAppend();
 
-    try {
-      GenericRecord record = GenericRecord.create(csSchema);
-      record.setField("cs_sold_date_sk", 1);
-      dataWriter.write(record);
-    } finally {
-      dataWriter.close();
+    for (int numFile = 0; numFile < 5; numFile++) {
+      String dataFilePath = String.join("/", csPath, "data", UUID.randomUUID() + ".parquet");
+      DataWriter<GenericRecord> dataWriter =
+          Parquet.writeData(catalogSales.io().newOutputFile(dataFilePath))
+              .schema(csSchema)
+              .createWriterFunc(GenericParquetWriter::buildWriter)
+              .overwrite()
+              .withSpec(PartitionSpec.unpartitioned())
+              .build();
+
+      try {
+        GenericRecord record = GenericRecord.create(csSchema);
+        record.setField("cs_sold_date_sk", numFile);
+        dataWriter.write(record);
+      } finally {
+        dataWriter.close();
+      }
+
+      appendFiles.appendFile(dataWriter.toDataFile());
     }
+    appendFiles.commit();
 
-    catalogSales.newAppend().appendFile(dataWriter.toDataFile()).commit();
     return catalogSales;
   }
 
