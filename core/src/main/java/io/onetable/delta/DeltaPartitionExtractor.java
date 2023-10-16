@@ -265,11 +265,11 @@ public class DeltaPartitionExtractor {
   }
 
   private PartitionTransformType getTransformType(StructField partitionColStructField) {
-    String generatedExprCol =
-        partitionColStructField.metadata().getString(DELTA_GENERATION_EXPRESSION);
-    if (generatedExprCol == null || generatedExprCol.isEmpty()) {
+    if (!partitionColStructField.metadata().contains(DELTA_GENERATION_EXPRESSION)) {
       return PartitionTransformType.VALUE;
     }
+    String generatedExprCol =
+        partitionColStructField.metadata().getString(DELTA_GENERATION_EXPRESSION);
     // Refer https://docs.databricks.com/en/delta/generated-columns.html
     // TODO(vamshigv): This is Rudimentary check, improve it
     if (generatedExprCol.contains("YEAR")) {
