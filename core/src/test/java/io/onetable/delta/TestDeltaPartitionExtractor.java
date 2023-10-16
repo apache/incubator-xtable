@@ -18,10 +18,13 @@
 
 package io.onetable.delta;
 
+import io.delta.tables.DeltaTable;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
+import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import org.apache.spark.SparkConf;
 import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.Dataset;
@@ -119,9 +122,49 @@ public class TestDeltaPartitionExtractor {
         deltaPartitionExtractor.convertFromDeltaPartitionFormat(schemaStruct, oneSchema, partitionColumns);
   }
 
+  private Timestamp randomTimestamp() {
+    Random random = new Random();
+    long currentTimeMillis = System.currentTimeMillis();
+    long oneYearMillis = 365L * 24 * 60 * 60 * 1000; // One year in milliseconds
+
+    long randomTime = currentTimeMillis - (long) (random.nextDouble() * oneYearMillis);
+    return new Timestamp(randomTime);
+  }
+
   @Test
   public void testGeneratedColumnsPartitionedTable() throws Exception {
+    String tableLocation = "/tmp/randomDeltaTable/doesitwork2";
 
+    // Sample data
+    Row[] data = new Row[]{
+        RowFactory.create(1, "John", true, 123.45, randomTimestamp()),
+        RowFactory.create(2, "Alice", false, 67.89, randomTimestamp()),
+        RowFactory.create(3, "Bob", true, 42.0, randomTimestamp())
+    };
+
+    // Define schema
+    StructType schema = new StructType()
+            .add("id", DataTypes.IntegerType, false)
+            .add("name", DataTypes.StringType, true)
+            .add("isStudent", DataTypes.BooleanType, false)
+            .add("score", DataTypes.DoubleType, true)
+            .add("admitted_time", DataTypes.TimestampType, true);
+
+    Dataset<Row> sampleData = sparkSession.createDataFrame(Arrays.asList(data), schema);
+    // Create a Delta table
+    sampleData.write()
+        .format("delta")
+        .mode("append")
+        .save(tableLocation);
+    DeltaLog deltaLog = DeltaLog.forTable(sparkSession, "/tmp/randomDeltaTable/doesitwork2");
+    StructType schemaStruct = deltaLog.snapshot().metadata().schema();
+    List<String> partitionColumns =
+        JavaConverters.seqAsJavaList(deltaLog.metadata().partitionColumns());
+    DeltaPartitionExtractor deltaPartitionExtractor = DeltaPartitionExtractor.getInstance();
+    DeltaSchemaExtractor deltaSchemaExtractor = DeltaSchemaExtractor.getInstance();
+    OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(schemaStruct);
+    List<OnePartitionField> x =
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(schemaStruct, oneSchema, partitionColumns);
   }
 
   private static SparkSession buildSparkSession() {
