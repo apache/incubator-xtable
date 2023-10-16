@@ -56,7 +56,7 @@ import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 
 public class TestJavaHudiTable extends TestAbstractHudiTable {
-  private final HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
+  private HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
   private final Configuration conf;
   /**
    * Create a test table instance for general testing. The table is created with the schema defined
@@ -197,6 +197,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   public void cluster() {
     String instant = javaWriteClient.scheduleClustering(Option.empty()).get();
     javaWriteClient.cluster(instant, true);
+    // Reinitializing as clustering disables auto commit and we want to enable it back.
+    javaWriteClient = initJavaWriteClient(schema.toString(), typedProperties, null);
   }
 
   public void rollback(String commitInstant) {

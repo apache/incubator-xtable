@@ -189,7 +189,8 @@ public class TestIcebergPartitionSpecExtractor {
   @Test
   public void testFromIcebergUnPartitioned() {
     IcebergPartitionSpecExtractor extractor = IcebergPartitionSpecExtractor.getInstance();
-    List<OnePartitionField> fields = extractor.fromIceberg(PartitionSpec.unpartitioned(), null, null);
+    List<OnePartitionField> fields =
+        extractor.fromIceberg(PartitionSpec.unpartitioned(), null, null);
     Assertions.assertEquals(0, fields.size());
   }
 
@@ -220,7 +221,8 @@ public class TestIcebergPartitionSpecExtractor {
                         .build()))
             .build();
 
-    List<OnePartitionField> irPartitionSpec = extractor.fromIceberg(icePartitionSpec, iceSchema, irSchema);
+    List<OnePartitionField> irPartitionSpec =
+        extractor.fromIceberg(icePartitionSpec, iceSchema, irSchema);
     Assertions.assertEquals(1, irPartitionSpec.size());
     OneField sourceField = irPartitionSpec.get(0).getSourceField();
     Assertions.assertEquals("key_string", sourceField.getName());
@@ -239,10 +241,7 @@ public class TestIcebergPartitionSpecExtractor {
             Types.NestedField.required(0, "key_year", Types.DateType.get()),
             Types.NestedField.required(1, "key_string", Types.StringType.get()));
     PartitionSpec icePartitionSpec =
-        PartitionSpec.builderFor(iceSchema)
-            .identity("key_string")
-            .year("key_year")
-            .build();
+        PartitionSpec.builderFor(iceSchema).identity("key_string").year("key_year").build();
 
     OneSchema irSchema =
         OneSchema.builder()
@@ -261,7 +260,8 @@ public class TestIcebergPartitionSpecExtractor {
                         .build()))
             .build();
 
-    List<OnePartitionField> irPartitionSpec = extractor.fromIceberg(icePartitionSpec, iceSchema, irSchema);
+    List<OnePartitionField> irPartitionSpec =
+        extractor.fromIceberg(icePartitionSpec, iceSchema, irSchema);
     Assertions.assertEquals(2, irPartitionSpec.size());
 
     OneField sourceField = irPartitionSpec.get(0).getSourceField();
