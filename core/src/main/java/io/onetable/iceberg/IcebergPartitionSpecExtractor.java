@@ -29,6 +29,7 @@ import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.transforms.Transform;
+import org.apache.iceberg.types.Types;
 
 import io.onetable.exception.NotSupportedException;
 import io.onetable.model.schema.OneField;
@@ -36,7 +37,6 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.schema.SchemaFieldFinder;
-import org.apache.iceberg.types.Types;
 
 /** Partition spec builder and extractor for Iceberg. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -113,7 +113,8 @@ public class IcebergPartitionSpecExtractor {
    * @param iceSchema the Iceberg schema
    * @return generated internal representation of the Iceberg partition spec
    */
-  public List<OnePartitionField> fromIceberg(PartitionSpec iceSpec, Schema iceSchema, OneSchema irSchema) {
+  public List<OnePartitionField> fromIceberg(
+      PartitionSpec iceSpec, Schema iceSchema, OneSchema irSchema) {
     if (iceSpec.isUnpartitioned()) {
       return Collections.emptyList();
     }
@@ -124,7 +125,8 @@ public class IcebergPartitionSpecExtractor {
       int sourceColumnId = iceField.sourceId();
       Types.NestedField iceSchemaField = iceSchema.findField(sourceColumnId);
 
-      OneField irField = SchemaFieldFinder.getInstance().findFieldByPath(irSchema, iceSchemaField.name());
+      OneField irField =
+          SchemaFieldFinder.getInstance().findFieldByPath(irSchema, iceSchemaField.name());
       OnePartitionField irPartitionField =
           OnePartitionField.builder()
               .sourceField(irField)
