@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
@@ -49,12 +50,13 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 
 public class TestJavaHudiTable extends TestAbstractHudiTable {
-  private final HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
+  private HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
   private final Configuration conf;
   /**
    * Create a test table instance for general testing. The table is created with the schema defined
@@ -71,7 +73,18 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
    */
   public static TestJavaHudiTable forStandardSchema(
       String tableName, Path tempDir, String partitionConfig, HoodieTableType tableType) {
-    return new TestJavaHudiTable(tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType);
+    return new TestJavaHudiTable(
+        tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, null);
+  }
+
+  public static TestJavaHudiTable forStandardSchema(
+      String tableName,
+      Path tempDir,
+      String partitionConfig,
+      HoodieTableType tableType,
+      HoodieArchivalConfig archivalConfig) {
+    return new TestJavaHudiTable(
+        tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, archivalConfig);
   }
 
   /**
@@ -96,7 +109,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         addSchemaEvolutionFieldsToBase(BASIC_SCHEMA),
         tempDir,
         partitionConfig,
-        tableType);
+        tableType,
+        null);
   }
 
   public static TestJavaHudiTable withAdditionalTopLevelField(
@@ -106,7 +120,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       HoodieTableType tableType,
       Schema previousSchema) {
     return new TestJavaHudiTable(
-        tableName, addTopLevelField(previousSchema), tempDir, partitionConfig, tableType);
+        tableName, addTopLevelField(previousSchema), tempDir, partitionConfig, tableType, null);
   }
 
   private TestJavaHudiTable(
@@ -114,7 +128,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       Schema schema,
       Path tempDir,
       String partitionConfig,
-      HoodieTableType hoodieTableType) {
+      HoodieTableType hoodieTableType,
+      HoodieArchivalConfig archivalConfig) {
     super(name, schema, tempDir, partitionConfig);
     this.conf = new Configuration();
     this.conf.set("parquet.avro.write-old-list-structure", "false");
@@ -123,7 +138,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     } catch (IOException ex) {
       throw new UncheckedIOException("Unable to initialize metaclient for TestJavaHudiTable", ex);
     }
-    this.javaWriteClient = initJavaWriteClient(schema.toString(), typedProperties);
+    this.javaWriteClient = initJavaWriteClient(schema.toString(), typedProperties, archivalConfig);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
@@ -182,6 +197,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   public void cluster() {
     String instant = javaWriteClient.scheduleClustering(Option.empty()).get();
     javaWriteClient.cluster(instant, true);
+    // Reinitializing as clustering disables auto commit and we want to enable it back.
+    javaWriteClient = initJavaWriteClient(schema.toString(), typedProperties, null);
   }
 
   public void rollback(String commitInstant) {
@@ -237,18 +254,37 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<HoodieRecord<HoodieAvroPayload>> inserts =
-        IntStream.range(0, numRecords)
-            .mapToObj(
-                index ->
-                    getRecord(
-                        schema,
-                        UUID.randomUUID().toString(),
-                        startTimeWindow,
-                        endTimeWindow,
-                        null,
-                        partitionValue))
+        getHoodieRecordStream(numRecords, partitionValue, startTimeWindow, endTimeWindow)
             .collect(Collectors.toList());
     return insertRecords(checkForNoErrors, inserts);
+  }
+
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
+      int numRecords, List<Object> partitionValues, boolean checkForNoErrors) {
+    Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
+    Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
+    List<HoodieRecord<HoodieAvroPayload>> inserts =
+        partitionValues.stream()
+            .flatMap(
+                partitionValue ->
+                    getHoodieRecordStream(
+                        numRecords, partitionValue, startTimeWindow, endTimeWindow))
+            .collect(Collectors.toList());
+    return insertRecords(checkForNoErrors, inserts);
+  }
+
+  private Stream<HoodieRecord<HoodieAvroPayload>> getHoodieRecordStream(
+      int numRecords, Object partitionValue, Instant startTimeWindow, Instant endTimeWindow) {
+    return IntStream.range(0, numRecords)
+        .mapToObj(
+            index ->
+                getRecord(
+                    schema,
+                    UUID.randomUUID().toString(),
+                    startTimeWindow,
+                    endTimeWindow,
+                    null,
+                    partitionValue));
   }
 
   @Override
@@ -284,8 +320,16 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   }
 
   private HoodieJavaWriteClient<HoodieAvroPayload> initJavaWriteClient(
-      String schema, TypedProperties keyGenProperties) {
+      String schema, TypedProperties keyGenProperties, HoodieArchivalConfig archivalConfig) {
     HoodieWriteConfig writeConfig = generateWriteConfig(schema, keyGenProperties);
+    // override archival config if provided
+    if (archivalConfig != null) {
+      writeConfig =
+          HoodieWriteConfig.newBuilder()
+              .withProperties(writeConfig.getProps())
+              .withArchivalConfig(archivalConfig)
+              .build();
+    }
     HoodieEngineContext context = new HoodieJavaEngineContext(conf);
     return new HoodieJavaWriteClient<>(context, writeConfig);
   }

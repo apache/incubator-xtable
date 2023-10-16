@@ -54,7 +54,7 @@ import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 
 public class TestSparkHudiTable extends TestAbstractHudiTable {
   private final JavaSparkContext jsc;
-  private final SparkRDDWriteClient<HoodieAvroPayload> sparkWriteClient;
+  private SparkRDDWriteClient<HoodieAvroPayload> sparkWriteClient;
 
   /**
    * Create a test table instance for general testing. The table is created with the schema defined
@@ -200,6 +200,8 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
   public void cluster() {
     String instant = sparkWriteClient.scheduleClustering(Option.empty()).get();
     sparkWriteClient.cluster(instant, true);
+    // Reinitializing as clustering disables auto commit and we want to enable it back.
+    sparkWriteClient = initSparkWriteClient(schema.toString(), typedProperties);
   }
 
   public void rollback(String commitInstant) {
