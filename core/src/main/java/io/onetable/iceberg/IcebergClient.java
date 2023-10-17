@@ -117,7 +117,7 @@ public class IcebergClient implements TargetClient {
       if (!doesIcebergTableExist) {
         Schema schema = schemaExtractor.toIceberg(oneTable.getReadSchema());
         PartitionSpec partitionSpec =
-            partitionSpecExtractor.toPartitionSpec(oneTable.getPartitioningFields(), schema);
+            partitionSpecExtractor.toIceberg(oneTable.getPartitioningFields(), schema);
         Map<String, String> properties = new HashMap<>();
         properties.put(
             TableProperties.DEFAULT_NAME_MAPPING,
@@ -138,7 +138,7 @@ public class IcebergClient implements TargetClient {
   @Override
   public void syncPartitionSpec(List<OnePartitionField> partitionSpec) {
     PartitionSpec latestPartitionSpec =
-        partitionSpecExtractor.toPartitionSpec(partitionSpec, transaction.table().schema());
+        partitionSpecExtractor.toIceberg(partitionSpec, transaction.table().schema());
     partitionSpecSync.sync(table.spec(), latestPartitionSpec, transaction);
   }
 

@@ -239,7 +239,7 @@ public class TestIcebergSync {
     when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
     ArgumentCaptor<Schema> partitionSpecSchemaArgumentCaptor =
         ArgumentCaptor.forClass(Schema.class);
-    when(mockPartitionSpecExtractor.toPartitionSpec(
+    when(mockPartitionSpecExtractor.toIceberg(
             eq(null), partitionSpecSchemaArgumentCaptor.capture()))
         .thenReturn(PartitionSpec.unpartitioned())
         .thenReturn(PartitionSpec.unpartitioned())
@@ -345,7 +345,7 @@ public class TestIcebergSync {
             .day(partitionField.getSourceField().getName())
             .build();
     ArgumentCaptor<Schema> schemaArgumentCaptor = ArgumentCaptor.forClass(Schema.class);
-    when(mockPartitionSpecExtractor.toPartitionSpec(
+    when(mockPartitionSpecExtractor.toIceberg(
             eq(Collections.singletonList(partitionField)), schemaArgumentCaptor.capture()))
         .thenReturn(partitionSpec);
     mockColStatsForFile(dataFile1, 1);
@@ -401,7 +401,7 @@ public class TestIcebergSync {
             .day(partitionField.getSourceField().getName())
             .build();
     ArgumentCaptor<Schema> schemaArgumentCaptor = ArgumentCaptor.forClass(Schema.class);
-    when(mockPartitionSpecExtractor.toPartitionSpec(
+    when(mockPartitionSpecExtractor.toIceberg(
             eq(Collections.singletonList(partitionField)), schemaArgumentCaptor.capture()))
         .thenReturn(partitionSpec);
     mockColStatsForFile(dataFile1, 1);
@@ -454,7 +454,7 @@ public class TestIcebergSync {
             .identity(partitionField.getSourceField().getName())
             .build();
     ArgumentCaptor<Schema> schemaArgumentCaptor = ArgumentCaptor.forClass(Schema.class);
-    when(mockPartitionSpecExtractor.toPartitionSpec(
+    when(mockPartitionSpecExtractor.toIceberg(
             eq(Collections.singletonList(partitionField)), schemaArgumentCaptor.capture()))
         .thenReturn(partitionSpec);
     mockColStatsForFile(dataFile1, 1);
@@ -522,7 +522,7 @@ public class TestIcebergSync {
             .day(partitionField2.getSourceField().getName())
             .build();
     ArgumentCaptor<Schema> schemaArgumentCaptor = ArgumentCaptor.forClass(Schema.class);
-    when(mockPartitionSpecExtractor.toPartitionSpec(
+    when(mockPartitionSpecExtractor.toIceberg(
             eq(Arrays.asList(partitionField1, partitionField2)), schemaArgumentCaptor.capture()))
         .thenReturn(partitionSpec);
     mockColStatsForFile(dataFile1, 1);
@@ -580,7 +580,7 @@ public class TestIcebergSync {
             .identity(partitionField.getSourceField().getPath())
             .build();
     ArgumentCaptor<Schema> schemaArgumentCaptor = ArgumentCaptor.forClass(Schema.class);
-    when(mockPartitionSpecExtractor.toPartitionSpec(
+    when(mockPartitionSpecExtractor.toIceberg(
             eq(Collections.singletonList(partitionField)), schemaArgumentCaptor.capture()))
         .thenReturn(partitionSpec);
     mockColStatsForFile(dataFile1, 1);

@@ -16,8 +16,3 @@ stages:
       vmImage: 'ubuntu-latest'
     steps:
     - template: compile-and-test.yml
-  - job: macOS
-    pool:
-      vmImage: 'macos-latest'
-    steps:
-    - template: compile-and-test.yml

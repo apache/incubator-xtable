@@ -39,7 +39,7 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import io.onetable.TestHudiTable;
 import io.onetable.model.OneSnapshot;
 
-public class TestHudiClient {
+public class TestHudiInstantUtils {
 
   private static final boolean USE_SPARK_CLIENT_FOR_TABLE = false;
 
@@ -99,9 +99,19 @@ public class TestHudiClient {
   public void testParseCommitTimeToInstant() {
     assertEquals(
         Instant.parse("2023-01-20T04:43:31.843Z"),
-        HudiClient.parseFromInstantTime("20230120044331843"));
+        HudiInstantUtils.parseFromInstantTime("20230120044331843"));
     assertEquals(
         Instant.parse("2023-01-20T04:43:31.999Z"),
-        HudiClient.parseFromInstantTime("20230120044331"));
+        HudiInstantUtils.parseFromInstantTime("20230120044331"));
+  }
+
+  @Test
+  public void testInstantToCommit() {
+    assertEquals(
+        "20230120044331843",
+        HudiInstantUtils.convertInstantToCommit(Instant.parse("2023-01-20T04:43:31.843Z")));
+    assertEquals(
+        "20230120044331000",
+        HudiInstantUtils.convertInstantToCommit(Instant.parse("2023-01-20T04:43:31Z")));
   }
 }
