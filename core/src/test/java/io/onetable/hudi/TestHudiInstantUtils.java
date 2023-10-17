@@ -20,25 +20,11 @@ package io.onetable.hudi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.nio.file.Path;
 import java.time.Instant;
 
-import lombok.SneakyThrows;
-
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 public class TestHudiInstantUtils {
-
-  private static final boolean USE_SPARK_CLIENT_FOR_TABLE = false;
-
-  @TempDir public static Path tempDir;
-  private HudiClient hudiClient;
-
-  @BeforeEach
-  @SneakyThrows
-  public void setup() {}
 
   @Test
   public void testParseCommitTimeToInstant() {

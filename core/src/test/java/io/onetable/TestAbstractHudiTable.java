@@ -242,10 +242,6 @@ public abstract class TestAbstractHudiTable implements Closeable {
                             status.hasErrors(), "Errors found in write of " + status.getFileId())));
   }
 
-  public void reloadActiveTimeline() {
-    metaClient.reloadActiveTimeline();
-  }
-
   protected List<HoodieRecord<HoodieAvroPayload>> generateUpdatesForRecords(
       List<HoodieRecord<HoodieAvroPayload>> records) {
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
