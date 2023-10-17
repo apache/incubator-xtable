@@ -83,7 +83,7 @@ public class IcebergDataFileExtractor implements PartitionedDataFileIterator {
    * @param partitionsInfo representation of partition fields and ranges
    * @return corresponding OneTable data file
    */
-  static OneDataFile fromIceberg(DataFile dataFile, Map<OnePartitionField, Range> partitionsInfo) {
+  OneDataFile fromIceberg(DataFile dataFile, Map<OnePartitionField, Range> partitionsInfo) {
     return OneDataFile.builder()
         .physicalPath(dataFile.path().toString())
         .fileFormat(fromIcebergFileFormat(dataFile.format()))

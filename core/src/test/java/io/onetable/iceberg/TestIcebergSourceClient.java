@@ -161,6 +161,11 @@ class TestIcebergSourceClient {
     Assertions.assertNotNull(oneSnapshot.getTable());
     verify(spyClient, times(1)).getTable(iceCurrentSnapshot);
     verify(spyClient, times(1)).getSchemaCatalog(oneSnapshot.getTable(), iceCurrentSnapshot);
+    verify(spyClient, times(1)).getPartitionConverter();
+
+    IcebergPartitionValueConverter partitionConverter = client.getPartitionConverter();
+    Table iceTable = client.getSourceTable();
+    verify(spyClient, times(1)).getDataFileExtractor(iceTable, partitionConverter);
 
     Assertions.assertNotNull(oneSnapshot.getDataFiles());
     Assertions.assertEquals(5, oneSnapshot.getDataFiles().getFiles().size());

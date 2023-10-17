@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import lombok.*;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
@@ -47,36 +48,74 @@ import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.extractor.SourceClient;
 
 @Log4j2
+@Builder
 public class IcebergSourceClient implements SourceClient<Snapshot> {
-  private final Configuration hadoopConf;
-  private final PerTableConfig sourceTableConfig;
-  private final Table sourceTable;
+  @NonNull private final Configuration hadoopConf;
+  @NonNull private final PerTableConfig sourceTableConfig;
 
-  public IcebergSourceClient(Configuration hadoopConf, PerTableConfig sourceTableConfig) {
-    this.hadoopConf = hadoopConf;
-    this.sourceTableConfig = sourceTableConfig;
+  @Getter(lazy = true, value = AccessLevel.PACKAGE)
+  private final Table sourceTable = initSourceTable();
 
+  /**
+   * Set this field if a partition converter needs to be injected while initializing {@link
+   * IcebergSourceClient}. By default, a partition converter will be lazily initialized. This is
+   * mainly used for testing.
+   */
+  private IcebergPartitionValueConverter partitionConverter;
+
+  private Table initSourceTable() {
     HadoopTables tables = new HadoopTables(hadoopConf);
-    sourceTable = tables.load(sourceTableConfig.getTableBasePath());
+    return tables.load(sourceTableConfig.getTableBasePath());
+  }
+
+  /**
+   * Get the partition converter. If a partition converter is set, return it. Otherwise, lazily
+   * initialize a new one.
+   *
+   * @return the partition converter
+   */
+  protected IcebergPartitionValueConverter getPartitionConverter() {
+    if (partitionConverter != null) {
+      return partitionConverter;
+    }
+    synchronized (this) {
+      if (partitionConverter != null) {
+        return partitionConverter;
+      }
+      partitionConverter = IcebergPartitionValueConverter.getInstance();
+      return partitionConverter;
+    }
+  }
+
+  /**
+   * Build an instance of Iceberg data file extractor.
+   *
+   * @param iceTable the Iceberg table
+   * @return the data file extractor
+   */
+  protected IcebergDataFileExtractor getDataFileExtractor(
+      Table iceTable, IcebergPartitionValueConverter partitionConverter) {
+    return new IcebergDataFileExtractor(iceTable, partitionConverter);
   }
 
   @Override
   public OneTable getTable(Snapshot snapshot) {
-    Schema iceSchema = sourceTable.schemas().get(snapshot.schemaId());
+    Table iceTable = getSourceTable();
+    Schema iceSchema = iceTable.schemas().get(snapshot.schemaId());
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     OneSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
 
     // TODO select snapshot specific partition spec
     IcebergPartitionSpecExtractor partitionExtractor = IcebergPartitionSpecExtractor.getInstance();
     List<OnePartitionField> irPartitionFields =
-        partitionExtractor.fromIceberg(sourceTable.spec(), iceSchema, irSchema);
+        partitionExtractor.fromIceberg(iceTable.spec(), iceSchema, irSchema);
 
     return OneTable.builder()
         .tableFormat(TableFormat.ICEBERG)
-        .basePath(sourceTable.location())
-        .name(sourceTable.name())
+        .basePath(iceTable.location())
+        .name(iceTable.name())
         .partitioningFields(irPartitionFields)
-        .latestCommitTime(Instant.ofEpochMilli(sourceTable.currentSnapshot().timestampMillis()))
+        .latestCommitTime(Instant.ofEpochMilli(iceTable.currentSnapshot().timestampMillis()))
         .readSchema(irSchema)
         // .layoutStrategy(dataLayoutStrategy)
         .build();
@@ -84,8 +123,9 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   @Override
   public SchemaCatalog getSchemaCatalog(OneTable table, Snapshot snapshot) {
+    Table iceTable = getSourceTable();
     Integer iceSchemaId = snapshot.schemaId();
-    Schema iceSchema = sourceTable.schemas().get(iceSchemaId);
+    Schema iceSchema = iceTable.schemas().get(iceSchemaId);
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     OneSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
     Map<SchemaVersion, OneSchema> catalog =
@@ -95,24 +135,24 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   @Override
   public OneSnapshot getCurrentSnapshot() {
-    Snapshot currentSnapshot = sourceTable.currentSnapshot();
+    Table iceTable = getSourceTable();
+    IcebergPartitionValueConverter partitionConverter = getPartitionConverter();
+    IcebergDataFileExtractor dataFileExtractor = getDataFileExtractor(iceTable, partitionConverter);
 
+    Snapshot currentSnapshot = iceTable.currentSnapshot();
     OneTable irTable = getTable(currentSnapshot);
+    SchemaCatalog schemaCatalog = getSchemaCatalog(irTable, currentSnapshot);
 
-    TableScan scan = sourceTable.newScan().useSnapshot(currentSnapshot.snapshotId());
-
-    IcebergPartitionValueConverter partitionValueConverter =
-        IcebergPartitionValueConverter.getInstance();
-    PartitionSpec partitionSpec = sourceTable.spec();
+    TableScan scan = iceTable.newScan().useSnapshot(currentSnapshot.snapshotId());
+    PartitionSpec partitionSpec = iceTable.spec();
     OneDataFiles oneDataFiles;
     try (CloseableIterable<FileScanTask> files = scan.planFiles()) {
       List<OneDataFile> irFiles = new ArrayList<>();
       for (FileScanTask fileScanTask : files) {
         DataFile file = fileScanTask.file();
         Map<OnePartitionField, Range> onePartitionFieldRangeMap =
-            partitionValueConverter.toOneTable(file.partition(), partitionSpec);
-        OneDataFile irDataFile =
-            IcebergDataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap);
+            partitionConverter.toOneTable(file.partition(), partitionSpec);
+        OneDataFile irDataFile = dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap);
         irFiles.add(irDataFile);
       }
       oneDataFiles = OneDataFiles.collectionBuilder().files(irFiles).build();
@@ -123,7 +163,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     return OneSnapshot.builder()
         .version(String.valueOf(currentSnapshot.snapshotId()))
         .table(irTable)
-        .schemaCatalog(getSchemaCatalog(irTable, currentSnapshot))
+        .schemaCatalog(schemaCatalog)
         .dataFiles(oneDataFiles)
         .build();
   }
