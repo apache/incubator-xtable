@@ -157,7 +157,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
       }
       oneDataFiles = OneDataFiles.collectionBuilder().files(irFiles).build();
     } catch (IOException e) {
-      throw new OneIOException(e.getMessage(), e);
+      throw new OneIOException("Failed to fetch current snapshot files from Iceberg source", e);
     }
 
     return OneSnapshot.builder()
