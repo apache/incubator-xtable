@@ -18,6 +18,25 @@
  
 package io.onetable.hudi;
 
+import org.apache.hudi.avro.HoodieAvroUtils;
+import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
+import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
+import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.util.ParquetUtils;
+import org.apache.hudi.common.util.collection.Pair;
+import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.metadata.MetadataPartitionType;
+
+import io.onetable.model.schema.OneField;
+import io.onetable.model.schema.OneSchema;
+import io.onetable.model.schema.OneType;
+import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.Range;
+import io.onetable.model.storage.OneDataFile;
+import lombok.AllArgsConstructor;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.io.api.Binary;
+
 import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.util.ArrayDeque;
@@ -29,59 +48,104 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import lombok.AllArgsConstructor;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
-import org.apache.parquet.io.api.Binary;
-
-import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
-import org.apache.hudi.common.util.ParquetUtils;
-
-import io.onetable.model.schema.OneField;
-import io.onetable.model.schema.OneSchema;
-import io.onetable.model.schema.OneType;
-import io.onetable.model.stat.ColumnStat;
-import io.onetable.model.stat.Range;
-import io.onetable.model.storage.OneDataFile;
-
-/** Responsible for Column stats extraction for Hudi. */
+/**
+ * Responsible for Column stats extraction for Hudi.
+ */
 @AllArgsConstructor
 public class HudiFileStatsExtractor {
 
   private static final ParquetUtils UTILS = new ParquetUtils();
 
-  private final Configuration conf;
+  private final HoodieTableMetaClient metaClient;
 
   /**
    * Adds column stats and row count information to the provided stream of files.
    *
-   * @param files a stream of files that require column stats and row count information
-   * @param schema the schema of the files (assumed to be the same for all files in stream)
+   * @param tableMetadata the metadata table for the hudi table if it exists, otherwise null
+   * @param files         a stream of files that require column stats and row count information
+   * @param schema        the schema of the files (assumed to be the same for all files in stream)
    * @return a stream of files with column stats and row count information
    */
-  public Stream<OneDataFile> addStatsToFiles(Stream<OneDataFile> files, OneSchema schema) {
+  public Stream<OneDataFile> addStatsToFiles(
+      HoodieTableMetadata tableMetadata, Stream<OneDataFile> files, OneSchema schema) {
     final Map<String, OneField> nameFieldMap =
         getAllFields(schema).stream()
             .collect(
                 Collectors.toMap(
                     field -> HudiSchemaExtractor.convertFromOneTablePath(field.getPath()),
                     Function.identity()));
-    return files.map(
-        file -> {
-          HudiFileStats fileStats =
-              computeColumnStatsForFile(new Path(file.getPhysicalPath()), nameFieldMap);
-          return file.toBuilder()
-              .columnStats(fileStats.getColumnStats())
-              .recordCount(fileStats.getRowCount())
-              .build();
-        });
+    if (tableMetadata != null && metaClient.getTableConfig().isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS)) {
+      return computeColumnStatsFromMetadataTable(tableMetadata, files, nameFieldMap);
+    } else {
+      return files.map(
+          file -> {
+            HudiFileStats fileStats =
+                computeColumnStatsForFile(new Path(file.getPhysicalPath()), nameFieldMap);
+            return file.toBuilder()
+                .columnStats(fileStats.getColumnStats())
+                .recordCount(fileStats.getRowCount())
+                .build();
+          });
+    }
+  }
+
+  private Pair<String, String> splitPath(String partition, String path) {
+    return Pair.of(partition, new Path(path).getName());
+  }
+
+  private Stream<OneDataFile> computeColumnStatsFromMetadataTable(
+      HoodieTableMetadata tableMetadata,
+      Stream<OneDataFile> files,
+      Map<String, OneField> nameFieldMap) {
+    Map<Pair<String, String>, OneDataFile> filePathsToDataFile =
+        files.collect(
+            Collectors.toMap(
+                file -> splitPath(file.getPartitionPath(), file.getPhysicalPath()),
+                Function.identity()));
+    List<Pair<String, String>> filePaths = new ArrayList<>(filePathsToDataFile.keySet());
+    Map<Pair<String, String>, List<Pair<OneField, HoodieMetadataColumnStats>>> stats =
+        nameFieldMap.entrySet().stream()
+            .flatMap(
+                fieldNameToField -> {
+                  String fieldName = fieldNameToField.getKey();
+                  OneField field = fieldNameToField.getValue();
+                  return tableMetadata.getColumnStats(filePaths, fieldName).entrySet().stream()
+                      .map(
+                          filePairToStats ->
+                              Pair.of(
+                                  filePairToStats.getKey(),
+                                  Pair.of(field, filePairToStats.getValue())));
+                })
+            .collect(
+                Collectors.groupingBy(
+                    Map.Entry::getKey,
+                    Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
+    return filePathsToDataFile.entrySet().stream()
+        .map(
+            pathToDataFile -> {
+              Pair<String, String> filePath = pathToDataFile.getKey();
+              OneDataFile file = pathToDataFile.getValue();
+              List<Pair<OneField, HoodieMetadataColumnStats>> fileStats = stats.get(filePath);
+              Map<OneField, ColumnStat> columnStats =
+                  fileStats.stream()
+                      .collect(
+                          Collectors.toMap(
+                              Pair::getKey,
+                              pair -> getColumnStatFromHudiStat(pair.getLeft(), pair.getRight())));
+              long recordCount =
+                  columnStats.values().stream()
+                      .map(ColumnStat::getNumValues)
+                      .filter(numValues -> numValues > 0)
+                      .findFirst()
+                      .orElse(0L);
+              return file.toBuilder().columnStats(columnStats).recordCount(recordCount).build();
+            });
   }
 
   private HudiFileStats computeColumnStatsForFile(
       Path filePath, Map<String, OneField> nameFieldMap) {
     List<HoodieColumnRangeMetadata<Comparable>> columnRanges =
-        UTILS.readRangeFromParquetMetadata(conf, filePath, new ArrayList<>(nameFieldMap.keySet()));
+        UTILS.readRangeFromParquetMetadata(metaClient.getHadoopConf(), filePath, new ArrayList<>(nameFieldMap.keySet()));
     Map<OneField, ColumnStat> columnStatMap =
         columnRanges.stream()
             .collect(
@@ -97,9 +161,23 @@ public class HudiFileStatsExtractor {
       }
     }
     if (rowCount == null) {
-      rowCount = UTILS.getRowCount(conf, filePath);
+      rowCount = UTILS.getRowCount(metaClient.getHadoopConf(), filePath);
     }
     return new HudiFileStats(columnStatMap, rowCount);
+  }
+
+  private static ColumnStat getColumnStatFromHudiStat(
+      OneField field, HoodieMetadataColumnStats columnStats) {
+    if (columnStats == null) {
+      return ColumnStat.builder().build();
+    }
+    return getColumnStatFromValues(
+        HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMinValue()),
+        HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMaxValue()),
+        field,
+        columnStats.getNullCount(),
+        columnStats.getValueCount(),
+        columnStats.getTotalSize());
   }
 
   private static ColumnStat getColumnStatFromColRange(
@@ -107,8 +185,22 @@ public class HudiFileStatsExtractor {
     if (colRange == null) {
       return ColumnStat.builder().build();
     }
-    Comparable minValue = colRange.getMinValue();
-    Comparable maxValue = colRange.getMaxValue();
+    return getColumnStatFromValues(
+        colRange.getMinValue(),
+        colRange.getMaxValue(),
+        field,
+        colRange.getNullCount(),
+        colRange.getValueCount(),
+        colRange.getTotalSize());
+  }
+
+  private static ColumnStat getColumnStatFromValues(
+      Comparable minValue,
+      Comparable maxValue,
+      OneField field,
+      long nullCount,
+      long valueCount,
+      long totalSize) {
     // Special type handling
     if (minValue instanceof Date || maxValue instanceof Date) {
       minValue = minValue == null ? null : dateToDaysSinceEpoch(minValue);
@@ -126,9 +218,9 @@ public class HudiFileStatsExtractor {
     Range range = isScalar ? Range.scalar(minValue) : Range.vector(minValue, maxValue);
     return ColumnStat.builder()
         .range(range)
-        .numNulls(colRange.getNullCount())
-        .numValues(colRange.getValueCount())
-        .totalSize(colRange.getTotalSize())
+        .numNulls(nullCount)
+        .numValues(valueCount)
+        .totalSize(totalSize)
         .build();
   }
 

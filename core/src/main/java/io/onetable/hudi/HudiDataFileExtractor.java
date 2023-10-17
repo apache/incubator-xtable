@@ -58,6 +58,7 @@ import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.metadata.MetadataPartitionType;
 
 import io.onetable.exception.OneIOException;
 import io.onetable.model.OneTable;
@@ -140,7 +141,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
         allInfo.stream().flatMap(info -> info.getAdded().stream()).parallel();
     List<OneDataFile> filesAdded =
         fileStatsExtractor
-            .addStatsToFiles(filesAddedWithoutStats, table.getReadSchema())
+            .addStatsToFiles(tableMetadata, filesAddedWithoutStats, table.getReadSchema())
             .collect(Collectors.toList());
     List<OneDataFile> filesRemoved =
         allInfo.stream().flatMap(info -> info.getRemoved().stream()).collect(Collectors.toList());
@@ -382,7 +383,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
                                 buildFileWithoutStats(partitionPath, partitionValues, baseFile));
                   });
       Stream<OneDataFile> files =
-          fileStatsExtractor.addStatsToFiles(filesWithoutStats, table.getReadSchema());
+          fileStatsExtractor.addStatsToFiles(
+              tableMetadata, filesWithoutStats, table.getReadSchema());
       Map<String, List<OneDataFile>> collected =
           files.collect(Collectors.groupingBy(OneDataFile::getPartitionPath));
       return collected.entrySet().stream()

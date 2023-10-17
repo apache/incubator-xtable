@@ -67,7 +67,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
             metaClient,
             new HudiPartitionValuesExtractor(
                 sourcePartitionSpecExtractor.getPathToPartitionFieldFormat()),
-            new HudiFileStatsExtractor(metaClient.getHadoopConf()));
+            new HudiFileStatsExtractor(metaClient));
   }
 
   @Override

@@ -58,6 +58,7 @@ import org.apache.hadoop.fs.LocalFileSystem;
 
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
+import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.config.LockConfiguration;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.fs.FSUtils;
@@ -280,6 +281,10 @@ public abstract class TestAbstractHudiTable implements Closeable {
             .build();
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
+    HoodieMetadataConfig metadataConfig = HoodieMetadataConfig.newBuilder()
+        .enable(true)
+        .withMetadataIndexColumnStats(true)
+        .build();
     Properties lockProperties = new Properties();
     lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_WAIT_TIMEOUT_MS_PROP_KEY, "3000");
     lockProperties.setProperty(
@@ -294,6 +299,7 @@ public abstract class TestAbstractHudiTable implements Closeable {
         .withClusteringConfig(clusteringConfig)
         .withCleanConfig(cleanConfig)
         .withArchivalConfig(archivalConfig)
+        .withMetadataConfig(metadataConfig)
         .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
         .withMarkersType(MarkerType.DIRECT.name())
         .withLockConfig(

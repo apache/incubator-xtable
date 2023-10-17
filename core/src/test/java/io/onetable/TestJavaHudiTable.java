@@ -123,6 +123,15 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         tableName, addTopLevelField(previousSchema), tempDir, partitionConfig, tableType, null);
   }
 
+  public static TestJavaHudiTable withSchema(
+      String tableName,
+      Path tempDir,
+      String partitionConfig,
+      HoodieTableType tableType,
+      Schema schema) {
+    return new TestJavaHudiTable(tableName, schema, tempDir, partitionConfig, tableType, null);
+  }
+
   private TestJavaHudiTable(
       String name,
       Schema schema,
