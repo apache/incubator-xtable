@@ -38,6 +38,7 @@ import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
@@ -261,6 +262,11 @@ public class HudiClient implements SourceClient<HoodieInstant> {
       }
     }
     return mergedList;
+  }
+
+  @VisibleForTesting
+  void reloadTimeline() {
+    metaClient.reloadActiveTimeline();
   }
 
   @Value
