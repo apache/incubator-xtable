@@ -544,7 +544,7 @@ public abstract class TestAbstractHudiTable implements Closeable {
           case FIXED:
             if (fieldSchema.getLogicalType() != null
                 && fieldSchema.getLogicalType() instanceof LogicalTypes.Decimal) {
-              value = BigDecimal.valueOf(RANDOM.nextLong(), 2);
+              value = BigDecimal.valueOf(RANDOM.nextInt(), 2);
             } else {
               value =
                   new GenericData.Fixed(

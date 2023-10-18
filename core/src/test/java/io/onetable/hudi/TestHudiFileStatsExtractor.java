@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,6 +42,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import org.apache.avro.Conversions;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
@@ -49,7 +51,6 @@ import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.util.HadoopOutputFile;
 import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -77,7 +78,7 @@ public class TestHudiFileStatsExtractor {
   private static final Schema AVRO_SCHEMA =
       new Schema.Parser()
           .parse(
-              "{\"type\":\"record\",\"name\":\"Sample\",\"namespace\":\"test\",\"fields\":[{\"name\":\"long_field\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"key\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"nested_record\",\"type\":[\"null\",{\"type\":\"record\",\"name\":\"Nested\",\"namespace\":\"test.nested_record\",\"fields\":[{\"name\":\"nested_int\",\"type\":\"int\",\"default\":0}]}],\"default\":null},{\"name\":\"repeated_record\",\"type\":{\"type\":\"array\",\"items\":\"test.nested_record.Nested\"},\"default\":[]},{\"name\":\"map_record\",\"type\":{\"type\":\"map\",\"values\":\"test.nested_record.Nested\"},\"default\":{}},{\"name\":\"date_field\",\"type\":{\"type\":\"int\",\"logicalType\":\"date\"}},{\"name\":\"timestamp_field\",\"type\":[\"null\",{\"type\":\"long\",\"logicalType\":\"timestamp-millis\"}],\"default\":null}]}");
+              "{\"type\":\"record\",\"name\":\"Sample\",\"namespace\":\"test\",\"fields\":[{\"name\":\"long_field\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"key\",\"type\":\"string\",\"default\":\"\"},{\"name\":\"nested_record\",\"type\":[\"null\",{\"type\":\"record\",\"name\":\"Nested\",\"namespace\":\"test.nested_record\",\"fields\":[{\"name\":\"nested_int\",\"type\":\"int\",\"default\":0}]}],\"default\":null},{\"name\":\"repeated_record\",\"type\":{\"type\":\"array\",\"items\":\"test.nested_record.Nested\"},\"default\":[]},{\"name\":\"map_record\",\"type\":{\"type\":\"map\",\"values\":\"test.nested_record.Nested\"},\"default\":{}},{\"name\":\"date_field\",\"type\":{\"type\":\"int\",\"logicalType\":\"date\"}},{\"name\":\"timestamp_field\",\"type\":[\"null\",{\"type\":\"long\",\"logicalType\":\"timestamp-millis\"}],\"default\":null},{\"name\":\"decimal_field\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"decimal_field\",\"size\":10,\"logicalType\":\"decimal\",\"precision\":20,\"scale\":2}],\"default\":null}]}");
   private static final Schema NESTED_SCHEMA =
       AVRO_SCHEMA.getField("nested_record").schema().getTypes().get(1);
 
@@ -91,6 +92,7 @@ public class TestHudiFileStatsExtractor {
   private final OneField mapKeyField = getMapKeyField();
   private final OneField mapValueField = getMapValueField(nestedIntBase);
   private final OneField arrayField = getArrayField(nestedIntBase);
+  private final OneField decimalField = getDecimalField();
 
   private final OneSchema schema =
       OneSchema.builder()
@@ -113,13 +115,9 @@ public class TestHudiFileStatsExtractor {
                       .name("repeated_record")
                       .schema(
                           OneSchema.builder().fields(Collections.singletonList(arrayField)).build())
-                      .build()))
+                      .build(),
+                  decimalField))
           .build();
-
-  @BeforeEach
-  void setup() {
-    configuration.set("parquet.avro.write-old-list-structure", "false");
-  }
 
   @Test
   void columnStatsWithMetadataTable(@TempDir Path tempDir) throws Exception {
@@ -168,11 +166,14 @@ public class TestHudiFileStatsExtractor {
   @Test
   void columnStatsWithoutMetadataTable(@TempDir Path tempDir) throws IOException {
     Path file = tempDir.resolve("tmp.parquet");
+    GenericData genericData = GenericData.get();
+    genericData.addLogicalTypeConversion(new Conversions.DecimalConversion());
     try (ParquetWriter<GenericRecord> writer =
         AvroParquetWriter.<GenericRecord>builder(
                 HadoopOutputFile.fromPath(
                     new org.apache.hadoop.fs.Path(file.toUri()), configuration))
             .withSchema(AVRO_SCHEMA)
+            .withDataModel(genericData)
             .build()) {
       for (GenericRecord record : getRecords()) {
         writer.write(record);
@@ -207,7 +208,7 @@ public class TestHudiFileStatsExtractor {
     assertEquals(2, fileWithStats.getRecordCount());
     Map<OneField, ColumnStat> columnStats = fileWithStats.getColumnStats();
 
-    assertEquals(8, columnStats.size());
+    assertEquals(9, columnStats.size());
 
     ColumnStat longColumnStat = columnStats.get(longField);
     assertEquals(1, longColumnStat.getNumNulls());
@@ -262,6 +263,17 @@ public class TestHudiFileStatsExtractor {
     assertEquals(6, arrayElementColumnStat.getNumValues());
     assertEquals(1, arrayElementColumnStat.getRange().getMinValue());
     assertEquals(6, arrayElementColumnStat.getRange().getMaxValue());
+
+    ColumnStat decimalColumnStat = columnStats.get(decimalField);
+    assertEquals(1, decimalColumnStat.getNumNulls());
+    assertEquals(2, decimalColumnStat.getNumValues());
+    assertTrue(decimalColumnStat.getTotalSize() > 0);
+    assertEquals(
+        new BigDecimal("1234.56"),
+        ((BigDecimal) decimalColumnStat.getRange().getMinValue()).setScale(2));
+    assertEquals(
+        new BigDecimal("1234.56"),
+        ((BigDecimal) decimalColumnStat.getRange().getMaxValue()).setScale(2));
   }
 
   private HoodieRecord<HoodieAvroPayload> buildRecord(GenericRecord record) {
@@ -278,7 +290,8 @@ public class TestHudiFileStatsExtractor {
             Arrays.asList(1, 2, 3),
             Collections.emptyMap(),
             getDate("2019-10-12"),
-            getInstant("2019-10-12"));
+            getInstant("2019-10-12"),
+            null);
     Map<String, Integer> map = new HashMap<>();
     map.put("key1", 13);
     map.put("key2", 23);
@@ -290,8 +303,24 @@ public class TestHudiFileStatsExtractor {
             Arrays.asList(4, 5, 6),
             map,
             getDate("2020-10-12"),
-            getInstant("2020-10-12"));
+            getInstant("2020-10-12"),
+            new BigDecimal("1234.56"));
     return Arrays.asList(record1, record2);
+  }
+
+  private OneField getDecimalField() {
+    Map<OneSchema.MetadataKey, Object> metadata = new HashMap<>();
+    metadata.put(OneSchema.MetadataKey.DECIMAL_PRECISION, 20);
+    metadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, 2);
+    return OneField.builder()
+        .name("decimal_field")
+        .schema(
+            OneSchema.builder()
+                .name("decimal")
+                .dataType(OneType.DECIMAL)
+                .metadata(metadata)
+                .build())
+        .build();
   }
 
   private OneField getArrayField(OneField nestedIntBase) {
@@ -371,12 +400,14 @@ public class TestHudiFileStatsExtractor {
       List<Integer> listValues,
       Map<String, Integer> mapValues,
       Date dateValue,
-      Instant timestampValue) {
+      Instant timestampValue,
+      BigDecimal decimal) {
     GenericData.Record record = new GenericData.Record(AVRO_SCHEMA);
     record.put("long_field", longValue);
     record.put("key", stringValue);
     record.put("timestamp_field", timestampValue.toEpochMilli());
     record.put("date_field", dateValue.toLocalDate().toEpochDay());
+    record.put("decimal_field", decimal);
     if (nestedIntValue != null) {
       GenericData.Record nested = getNestedRecord(nestedIntValue);
       record.put("nested_record", nested);
