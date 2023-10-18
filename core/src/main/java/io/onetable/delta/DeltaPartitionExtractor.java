@@ -126,6 +126,7 @@ public class DeltaPartitionExtractor {
   // Partition by nested fields may not be fully supported.
   private List<OnePartitionField> getOnePartitionFields(
       Map<String, StructField> partitionColToStructFieldMap, OneSchema oneSchema) {
+    // TODO(vamshigv): Order is not preserved.
     List<String> partitionColumnsWithoutGeneratedExpr =
         partitionColToStructFieldMap.entrySet().stream()
             .filter(entry -> !entry.getValue().metadata().contains(DELTA_GENERATION_EXPRESSION))
@@ -170,7 +171,7 @@ public class DeltaPartitionExtractor {
                   return ParsedGeneratedExpr.buildFromString(expr);
                 })
             .collect(Collectors.toList());
-    // Ordering here is important.
+    // Ordering of the operation here is important.
     OnePartitionField hourOrDayorMonthOrYearPartitionField =
         getPartitionWithHourTransform(parsedGeneratedExprs, oneSchema)
             .orElseGet(
