@@ -94,13 +94,18 @@ public class ITHudiSourceClient {
       List<TableChange> allTableChanges = new ArrayList<>();
 
       String commitInstant1 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100, "INFO");
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
       String commitInstant2 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit2 = table.generateRecords(100, "WARN");
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit2, commitInstant2, true);
+      allBaseFiles.add(table.getAllLatestBaseFiles());
+
+      String commitInstant3 = table.startCommit();
       table.upsertRecordsWithCommitAlreadyStarted(
-          insertsForCommit1.subList(0, 20), commitInstant2, true);
+          insertsForCommit1.subList(0, 20), commitInstant3, true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
       if (tableType == HoodieTableType.MERGE_ON_READ) {
         table.compact();
@@ -125,46 +130,6 @@ public class ITHudiSourceClient {
         allTableChanges.add(tableChange);
       }
       validateTableChanges(allBaseFiles, allTableChanges);
-    }
-  }
-
-  @ParameterizedTest
-  @MethodSource("testsForAllPartitions")
-  public void testForAddPartition(PartitionConfig partitionConfig) {
-    String tableName = "test_table_" + UUID.randomUUID();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), HoodieTableType.MERGE_ON_READ)) {
-
-      String commitInstant1 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(10, "INFO");
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
-      List<HoodieBaseFile> baseFilesBeforeAddingPartition = table.getAllLatestBaseFiles();
-
-      String commitInstant2 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit2 = table.generateRecords(10, "WARN");
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit2, commitInstant2, true);
-      List<HoodieBaseFile> baseFilesAfterAddingPartition = table.getAllLatestBaseFiles();
-
-      HudiClient hudiClient =
-          getHudiSourceClient(
-              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
-      OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
-      validateOneSnapshot(oneSnapshot, baseFilesAfterAddingPartition);
-
-      // Get Instant for adding partition in Incremental format.
-      InstantsForIncrementalSync instantsForIncrementalSync =
-          InstantsForIncrementalSync.builder()
-              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
-              .build();
-      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
-          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
-      assertEquals(1, instantCurrentCommitState.getCommitsToProcess().size());
-      TableChange partitionAddTableChange =
-          hudiClient.getTableChangeForCommit(
-              instantCurrentCommitState.getCommitsToProcess().get(0));
-      validateTableChange(
-          baseFilesBeforeAddingPartition, baseFilesAfterAddingPartition, partitionAddTableChange);
     }
   }
 
