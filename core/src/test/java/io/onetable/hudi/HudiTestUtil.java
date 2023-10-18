@@ -22,10 +22,13 @@ import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
 
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
+import lombok.Value;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
@@ -47,6 +50,10 @@ import io.onetable.model.schema.SchemaVersion;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class HudiTestUtil {
   static final SchemaVersion SCHEMA_VERSION = new SchemaVersion(1, "");
+
+  public static String getTableName() {
+    return "test-" + UUID.randomUUID();
+  }
 
   @SneakyThrows
   static HoodieTableMetaClient initTableAndGetMetaClient(
@@ -106,5 +113,12 @@ public class HudiTestUtil {
     writeStat.putRecordsStats(recordStats);
     writeStatus.setStat(writeStat);
     return writeStatus;
+  }
+
+  @Value
+  @AllArgsConstructor(staticName = "of")
+  public static class PartitionConfig {
+    String hudiConfig;
+    String oneTableConfig;
   }
 }

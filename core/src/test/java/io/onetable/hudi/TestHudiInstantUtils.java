@@ -24,15 +24,25 @@ import java.time.Instant;
 
 import org.junit.jupiter.api.Test;
 
-public class TestHudiClient {
+public class TestHudiInstantUtils {
 
   @Test
   public void testParseCommitTimeToInstant() {
     assertEquals(
         Instant.parse("2023-01-20T04:43:31.843Z"),
-        HudiClient.parseFromInstantTime("20230120044331843"));
+        HudiInstantUtils.parseFromInstantTime("20230120044331843"));
     assertEquals(
         Instant.parse("2023-01-20T04:43:31.999Z"),
-        HudiClient.parseFromInstantTime("20230120044331"));
+        HudiInstantUtils.parseFromInstantTime("20230120044331"));
+  }
+
+  @Test
+  public void testInstantToCommit() {
+    assertEquals(
+        "20230120044331843",
+        HudiInstantUtils.convertInstantToCommit(Instant.parse("2023-01-20T04:43:31.843Z")));
+    assertEquals(
+        "20230120044331000",
+        HudiInstantUtils.convertInstantToCommit(Instant.parse("2023-01-20T04:43:31Z")));
   }
 }
