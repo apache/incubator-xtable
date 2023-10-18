@@ -51,8 +51,9 @@ public class IcebergDataFileUpdatesSync {
       Schema schema,
       PartitionSpec partitionSpec) {
     List<OneDataFile> dataFiles = new ArrayList<>();
-    try (PartitionedDataFileIterator fileIterator =
-        new IcebergDataFileExtractor(table, partitionValueConverter)) {
+    IcebergDataFileExtractor dataFileExtractor =
+        IcebergDataFileExtractor.builder().partitionValueConverter(partitionValueConverter).build();
+    try (PartitionedDataFileIterator fileIterator = dataFileExtractor.iterator(table)) {
       fileIterator.forEachRemaining(dataFiles::add);
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Iceberg data files", e);
