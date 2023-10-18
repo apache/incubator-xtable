@@ -56,46 +56,18 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   @Getter(lazy = true, value = AccessLevel.PACKAGE)
   private final Table sourceTable = initSourceTable();
 
-  /**
-   * Set this field if a partition converter needs to be injected while initializing {@link
-   * IcebergSourceClient}. By default, a partition converter will be lazily initialized. This is
-   * mainly used for testing.
-   */
-  private IcebergPartitionValueConverter partitionConverter;
+  @Builder.Default
+  private IcebergPartitionValueConverter partitionConverter =
+      IcebergPartitionValueConverter.getInstance();
+
+  @Builder.Default
+  private IcebergDataFileExtractor dataFileExtractor = IcebergDataFileExtractor.builder().build();
+
+  ;
 
   private Table initSourceTable() {
     HadoopTables tables = new HadoopTables(hadoopConf);
     return tables.load(sourceTableConfig.getTableBasePath());
-  }
-
-  /**
-   * Get the partition converter. If a partition converter is set, return it. Otherwise, lazily
-   * initialize a new one.
-   *
-   * @return the partition converter
-   */
-  protected IcebergPartitionValueConverter getPartitionConverter() {
-    if (partitionConverter != null) {
-      return partitionConverter;
-    }
-    synchronized (this) {
-      if (partitionConverter != null) {
-        return partitionConverter;
-      }
-      partitionConverter = IcebergPartitionValueConverter.getInstance();
-      return partitionConverter;
-    }
-  }
-
-  /**
-   * Build an instance of Iceberg data file extractor.
-   *
-   * @param iceTable the Iceberg table
-   * @return the data file extractor
-   */
-  protected IcebergDataFileExtractor getDataFileExtractor(
-      Table iceTable, IcebergPartitionValueConverter partitionConverter) {
-    return new IcebergDataFileExtractor(iceTable, partitionConverter);
   }
 
   @Override
@@ -136,8 +108,6 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   @Override
   public OneSnapshot getCurrentSnapshot() {
     Table iceTable = getSourceTable();
-    IcebergPartitionValueConverter partitionConverter = getPartitionConverter();
-    IcebergDataFileExtractor dataFileExtractor = getDataFileExtractor(iceTable, partitionConverter);
 
     Snapshot currentSnapshot = iceTable.currentSnapshot();
     OneTable irTable = getTable(currentSnapshot);

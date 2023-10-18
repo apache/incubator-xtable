@@ -58,10 +58,11 @@ class TestIcebergSourceClient {
   private Schema csSchema;
   private PartitionSpec csPartitionSpec;
   private IcebergSourceClientProvider clientProvider;
+  private Configuration hadoopConf;
 
   @BeforeEach
   void setUp() throws IOException {
-    Configuration hadoopConf = new Configuration();
+    hadoopConf = new Configuration();
     hadoopConf.set("fs.defaultFS", "file:///");
 
     clientProvider = new IcebergSourceClientProvider();
@@ -151,8 +152,18 @@ class TestIcebergSourceClient {
             .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
             .build();
 
-    IcebergSourceClient client = clientProvider.getSourceClientInstance(sourceTableConfig);
-    IcebergSourceClient spyClient = spy(client);
+    IcebergDataFileExtractor spyDataFileExtractor = spy(IcebergDataFileExtractor.builder().build());
+    IcebergPartitionValueConverter spyPartitionConverter =
+        spy(IcebergPartitionValueConverter.getInstance());
+
+    IcebergSourceClient spyClient =
+        spy(
+            IcebergSourceClient.builder()
+                .hadoopConf(hadoopConf)
+                .sourceTableConfig(sourceTableConfig)
+                .dataFileExtractor(spyDataFileExtractor)
+                .partitionConverter(spyPartitionConverter)
+                .build());
 
     OneSnapshot oneSnapshot = spyClient.getCurrentSnapshot();
     Assertions.assertNotNull(oneSnapshot);
@@ -161,11 +172,8 @@ class TestIcebergSourceClient {
     Assertions.assertNotNull(oneSnapshot.getTable());
     verify(spyClient, times(1)).getTable(iceCurrentSnapshot);
     verify(spyClient, times(1)).getSchemaCatalog(oneSnapshot.getTable(), iceCurrentSnapshot);
-    verify(spyClient, times(1)).getPartitionConverter();
-
-    IcebergPartitionValueConverter partitionConverter = client.getPartitionConverter();
-    Table iceTable = client.getSourceTable();
-    verify(spyClient, times(1)).getDataFileExtractor(iceTable, partitionConverter);
+    verify(spyPartitionConverter, times(5)).toOneTable(any(), any());
+    verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any());
 
     Assertions.assertNotNull(oneSnapshot.getDataFiles());
     Assertions.assertEquals(5, oneSnapshot.getDataFiles().getFiles().size());

@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import lombok.Builder;
+
 import org.apache.iceberg.CombinedScanTask;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.PartitionSpec;
@@ -38,42 +40,61 @@ import io.onetable.model.storage.OneDataFiles;
 import io.onetable.spi.extractor.PartitionedDataFileIterator;
 
 /** Extractor of data files for Iceberg */
-public class IcebergDataFileExtractor implements PartitionedDataFileIterator {
-  private final CloseableIterator<CombinedScanTask> iceScan;
-  private final IcebergPartitionValueConverter partitionValueConverter;
-  private final PartitionSpec partitionSpec;
+@Builder
+public class IcebergDataFileExtractor {
 
-  public IcebergDataFileExtractor(
-      Table iceTable, IcebergPartitionValueConverter partitionValueConverter) {
-    this.partitionSpec = iceTable.spec();
-    this.iceScan = iceTable.newScan().planTasks().iterator();
-    this.partitionValueConverter = partitionValueConverter;
+  @Builder.Default
+  private IcebergPartitionValueConverter partitionValueConverter =
+      IcebergPartitionValueConverter.getInstance();
+
+  /**
+   * Initializes an iterator for Iceberg files.
+   *
+   * @return Iceberg table file iterator
+   */
+  public PartitionedDataFileIterator iterator(Table iceTable) {
+    return new IcebergDataFileIterator(iceTable);
   }
 
-  @Override
-  public void close() throws Exception {
-    iceScan.close();
-  }
+  public class IcebergDataFileIterator implements PartitionedDataFileIterator {
+    private final Table iceTable;
+    private final CloseableIterator<CombinedScanTask> iceScan;
 
-  @Override
-  public boolean hasNext() {
-    return iceScan.hasNext();
-  }
+    private IcebergDataFileIterator(Table iceTable) {
+      this.iceTable = iceTable;
+      this.iceScan = iceTable.newScan().planTasks().iterator();
+    }
 
-  @Override
-  public OneDataFiles next() {
-    CombinedScanTask combinedScan = iceScan.next();
-    List<OneDataFile> files =
-        combinedScan.files().stream()
-            .map(
-                fileScanTask -> {
-                  DataFile dataFile = fileScanTask.file();
-                  Map<OnePartitionField, Range> onePartitionFieldRangeMap =
-                      partitionValueConverter.toOneTable(dataFile.partition(), partitionSpec);
-                  return fromIceberg(dataFile, onePartitionFieldRangeMap);
-                })
-            .collect(Collectors.toList());
-    return OneDataFiles.collectionBuilder().files(files).build();
+    @Override
+    public void close() throws Exception {
+      iceScan.close();
+    }
+
+    @Override
+    public boolean hasNext() {
+      return iceScan.hasNext();
+    }
+
+    @Override
+    public OneDataFiles next() {
+      if (iceScan == null) {
+        throw new IllegalStateException("Iterator is not initialized");
+      }
+
+      PartitionSpec partitionSpec = iceTable.spec();
+      CombinedScanTask combinedScan = iceScan.next();
+      List<OneDataFile> files =
+          combinedScan.files().stream()
+              .map(
+                  fileScanTask -> {
+                    DataFile dataFile = fileScanTask.file();
+                    Map<OnePartitionField, Range> onePartitionFieldRangeMap =
+                        partitionValueConverter.toOneTable(dataFile.partition(), partitionSpec);
+                    return fromIceberg(dataFile, onePartitionFieldRangeMap);
+                  })
+              .collect(Collectors.toList());
+      return OneDataFiles.collectionBuilder().files(files).build();
+    }
   }
 
   /**
@@ -100,7 +121,7 @@ public class IcebergDataFileExtractor implements PartitionedDataFileIterator {
    * @param format Iceberg file format
    * @return corresponding OneTable file format
    */
-  static FileFormat fromIcebergFileFormat(org.apache.iceberg.FileFormat format) {
+  FileFormat fromIcebergFileFormat(org.apache.iceberg.FileFormat format) {
     switch (format) {
       case PARQUET:
         return FileFormat.APACHE_PARQUET;
