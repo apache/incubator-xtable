@@ -222,7 +222,8 @@ class TestIcebergSourceClient {
               .schema(csSchema)
               .createWriterFunc(GenericParquetWriter::buildWriter)
               .overwrite()
-              .withSpec(PartitionSpec.unpartitioned())
+              .withSpec(csPartitionSpec)
+              .withPartition(new PartitionData(csPartitionSpec.partitionType()))
               .build();
 
       try {
