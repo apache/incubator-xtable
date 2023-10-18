@@ -18,6 +18,23 @@
  
 package io.onetable.hudi;
 
+import java.nio.ByteBuffer;
+import java.sql.Date;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import lombok.AllArgsConstructor;
+import lombok.NonNull;
+
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.io.api.Binary;
+
 import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
@@ -33,48 +50,37 @@ import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.OneDataFile;
-import lombok.AllArgsConstructor;
-import org.apache.hadoop.fs.Path;
-import org.apache.parquet.io.api.Binary;
 
-import java.nio.ByteBuffer;
-import java.sql.Date;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-/**
- * Responsible for Column stats extraction for Hudi.
- */
+/** Responsible for Column stats extraction for Hudi. */
 @AllArgsConstructor
 public class HudiFileStatsExtractor {
 
   private static final ParquetUtils UTILS = new ParquetUtils();
 
-  private final HoodieTableMetaClient metaClient;
+  @NonNull private final HoodieTableMetaClient metaClient;
 
   /**
    * Adds column stats and row count information to the provided stream of files.
    *
    * @param tableMetadata the metadata table for the hudi table if it exists, otherwise null
-   * @param files         a stream of files that require column stats and row count information
-   * @param schema        the schema of the files (assumed to be the same for all files in stream)
+   * @param files a stream of files that require column stats and row count information
+   * @param schema the schema of the files (assumed to be the same for all files in stream)
    * @return a stream of files with column stats and row count information
    */
   public Stream<OneDataFile> addStatsToFiles(
       HoodieTableMetadata tableMetadata, Stream<OneDataFile> files, OneSchema schema) {
+    boolean useMetadataTableColStats =
+        tableMetadata != null
+            && metaClient
+                .getTableConfig()
+                .isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS);
     final Map<String, OneField> nameFieldMap =
         getAllFields(schema).stream()
             .collect(
                 Collectors.toMap(
-                    field -> HudiSchemaExtractor.convertFromOneTablePath(field.getPath()),
+                    field -> getFieldNameForStats(field, useMetadataTableColStats),
                     Function.identity()));
-    if (tableMetadata != null && metaClient.getTableConfig().isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS)) {
+    if (useMetadataTableColStats) {
       return computeColumnStatsFromMetadataTable(tableMetadata, files, nameFieldMap);
     } else {
       return files.map(
@@ -102,9 +108,12 @@ public class HudiFileStatsExtractor {
             Collectors.toMap(
                 file -> splitPath(file.getPartitionPath(), file.getPhysicalPath()),
                 Function.identity()));
+    if (filePathsToDataFile.isEmpty()) {
+      return Stream.empty();
+    }
     List<Pair<String, String>> filePaths = new ArrayList<>(filePathsToDataFile.keySet());
     Map<Pair<String, String>, List<Pair<OneField, HoodieMetadataColumnStats>>> stats =
-        nameFieldMap.entrySet().stream()
+        nameFieldMap.entrySet().parallelStream()
             .flatMap(
                 fieldNameToField -> {
                   String fieldName = fieldNameToField.getKey();
@@ -133,7 +142,9 @@ public class HudiFileStatsExtractor {
                               Pair::getKey,
                               pair -> getColumnStatFromHudiStat(pair.getLeft(), pair.getRight())));
               long recordCount =
-                  columnStats.values().stream()
+                  columnStats.entrySet().stream()
+                      .filter(entry -> entry.getKey().getParentPath() == null)
+                      .map(Map.Entry::getValue)
                       .map(ColumnStat::getNumValues)
                       .filter(numValues -> numValues > 0)
                       .findFirst()
@@ -145,7 +156,8 @@ public class HudiFileStatsExtractor {
   private HudiFileStats computeColumnStatsForFile(
       Path filePath, Map<String, OneField> nameFieldMap) {
     List<HoodieColumnRangeMetadata<Comparable>> columnRanges =
-        UTILS.readRangeFromParquetMetadata(metaClient.getHadoopConf(), filePath, new ArrayList<>(nameFieldMap.keySet()));
+        UTILS.readRangeFromParquetMetadata(
+            metaClient.getHadoopConf(), filePath, new ArrayList<>(nameFieldMap.keySet()));
     Map<OneField, ColumnStat> columnStatMap =
         columnRanges.stream()
             .collect(
@@ -239,5 +251,14 @@ public class HudiFileStatsExtractor {
 
   private static int dateToDaysSinceEpoch(Object date) {
     return (int) ((Date) date).toLocalDate().toEpochDay();
+  }
+
+  private String getFieldNameForStats(OneField field, boolean isReadFromMetadataTable) {
+    String convertedDotPath = HudiSchemaExtractor.convertFromOneTablePath(field.getPath());
+    // the array field naming is different for metadata table
+    if (isReadFromMetadataTable) {
+      return convertedDotPath.replace(".array.", ".list.element.");
+    }
+    return convertedDotPath;
   }
 }

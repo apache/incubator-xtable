@@ -147,7 +147,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     } catch (IOException ex) {
       throw new UncheckedIOException("Unable to initialize metaclient for TestJavaHudiTable", ex);
     }
-    this.javaWriteClient = initJavaWriteClient(schema.toString(), typedProperties, archivalConfig);
+    this.javaWriteClient = initJavaWriteClient(schema, typedProperties, archivalConfig);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
@@ -207,7 +207,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     String instant = javaWriteClient.scheduleClustering(Option.empty()).get();
     javaWriteClient.cluster(instant, true);
     // Reinitializing as clustering disables auto commit and we want to enable it back.
-    javaWriteClient = initJavaWriteClient(schema.toString(), typedProperties, null);
+    javaWriteClient = initJavaWriteClient(schema, typedProperties, null);
   }
 
   public void rollback(String commitInstant) {
@@ -246,7 +246,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     return upsertRecordsWithCommitAlreadyStarted(records, instant, checkForNoErrors);
   }
 
-  private List<HoodieRecord<HoodieAvroPayload>> insertRecords(
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
     String instant = getStartCommitInstant();
     return insertRecordsWithCommitAlreadyStarted(inserts, instant, checkForNoErrors);
@@ -329,7 +329,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   }
 
   private HoodieJavaWriteClient<HoodieAvroPayload> initJavaWriteClient(
-      String schema, TypedProperties keyGenProperties, HoodieArchivalConfig archivalConfig) {
+      Schema schema, TypedProperties keyGenProperties, HoodieArchivalConfig archivalConfig) {
     HoodieWriteConfig writeConfig = generateWriteConfig(schema, keyGenProperties);
     // override archival config if provided
     if (archivalConfig != null) {
