@@ -19,6 +19,7 @@
 package io.onetable.hudi;
 
 import static io.onetable.hudi.HudiTestUtil.PartitionConfig;
+import static java.util.stream.Collectors.groupingBy;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Path;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -81,8 +83,6 @@ public class ITHudiSourceClient {
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
   }
 
-  // TODO(vamshigv): Following tests to add:
-  // 7. Test for Clean Table services.
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void insertAndUpsertData(HoodieTableType tableType, PartitionConfig partitionConfig) {
@@ -98,14 +98,10 @@ public class ITHudiSourceClient {
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
-      String commitInstant2 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit2 = table.generateRecords(100, "WARN");
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit2, commitInstant2, true);
+      table.insertRecords(100, "WARN", true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
-      String commitInstant3 = table.startCommit();
-      table.upsertRecordsWithCommitAlreadyStarted(
-          insertsForCommit1.subList(0, 20), commitInstant3, true);
+      table.upsertRecords(insertsForCommit1.subList(0, 20), true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
       if (tableType == HoodieTableType.MERGE_ON_READ) {
         table.compact();
@@ -134,12 +130,107 @@ public class ITHudiSourceClient {
   }
 
   @ParameterizedTest
+  @MethodSource("testsForAllTableTypes")
+  public void testsForDropPartition(HoodieTableType tableType) {
+    String tableName = "test_table_" + UUID.randomUUID();
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+      List<List<HoodieBaseFile>> allBaseFiles = new ArrayList<>();
+      List<TableChange> allTableChanges = new ArrayList<>();
+
+      String commitInstant1 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+      allBaseFiles.add(table.getAllLatestBaseFiles());
+
+      table.insertRecords(100, true);
+      allBaseFiles.add(table.getAllLatestBaseFiles());
+
+      Map<String, List<HoodieRecord>> recordsByPartition =
+          insertsForCommit1.stream().collect(groupingBy(HoodieRecord::getPartitionPath));
+      String partitionToDelete = recordsByPartition.keySet().stream().sorted().findFirst().get();
+
+      table.deletePartition(partitionToDelete, tableType);
+      allBaseFiles.add(table.getAllLatestBaseFiles());
+
+      // Insert few records for deleted partition again to make it interesting.
+      table.insertRecords(20, partitionToDelete, true);
+      allBaseFiles.add(table.getAllLatestBaseFiles());
+
+      HudiClient hudiClient =
+          getHudiSourceClient(CONFIGURATION, table.getBasePath(), "level:VALUE");
+      // Get the current snapshot
+      OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
+      validateOneSnapshot(oneSnapshot, allBaseFiles.get(allBaseFiles.size() - 1));
+      // Get changes in Incremental format.
+      InstantsForIncrementalSync instantsForIncrementalSync =
+          InstantsForIncrementalSync.builder()
+              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
+              .build();
+      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
+          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
+      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
+        TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
+        allTableChanges.add(tableChange);
+      }
+      validateTableChanges(allBaseFiles, allTableChanges);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("testsForAllTableTypes")
+  public void testsForDeletePartitionByRecords(HoodieTableType tableType) {
+    String tableName = "test_table_" + UUID.randomUUID();
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+      List<List<HoodieBaseFile>> allBaseFiles = new ArrayList<>();
+      List<TableChange> allTableChanges = new ArrayList<>();
+
+      String commitInstant1 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+      allBaseFiles.add(table.getAllLatestBaseFiles());
+
+      table.insertRecords(100, true);
+      allBaseFiles.add(table.getAllLatestBaseFiles());
+
+      Map<String, List<HoodieRecord<HoodieAvroPayload>>> recordsByPartition =
+          insertsForCommit1.stream().collect(groupingBy(HoodieRecord::getPartitionPath));
+      String selectedPartition = recordsByPartition.keySet().stream().sorted().findAny().get();
+      table.deleteRecords(recordsByPartition.get(selectedPartition), true);
+      allBaseFiles.add(table.getAllLatestBaseFiles());
+      if (tableType == HoodieTableType.MERGE_ON_READ) {
+        table.compact();
+        allBaseFiles.add(table.getAllLatestBaseFiles());
+      }
+
+      // Insert few records for deleted partition again to make it interesting.
+      table.insertRecords(20, selectedPartition, true);
+      allBaseFiles.add(table.getAllLatestBaseFiles());
+
+      HudiClient hudiClient =
+          getHudiSourceClient(CONFIGURATION, table.getBasePath(), "level:VALUE");
+      // Get the current snapshot
+      OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
+      validateOneSnapshot(oneSnapshot, allBaseFiles.get(allBaseFiles.size() - 1));
+      // Get changes in Incremental format.
+      InstantsForIncrementalSync instantsForIncrementalSync =
+          InstantsForIncrementalSync.builder()
+              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
+              .build();
+      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
+          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
+      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
+        TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
+        allTableChanges.add(tableChange);
+      }
+      validateTableChanges(allBaseFiles, allTableChanges);
+    }
+  }
+
+  @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void testsForClustering(HoodieTableType tableType, PartitionConfig partitionConfig) {
-    // TODO(vamshigv): Got exception
-    //  java.lang.ClassCastException: class org.apache.hudi.client.common.HoodieJavaEngineContext
-    //  cannot be cast to class org.apache.hudi.client.common.HoodieSparkEngineContext with java
-    // client.
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
         TestSparkHudiTable.forStandardSchema(
@@ -162,31 +253,23 @@ public class ITHudiSourceClient {
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
-      String commitInstant2 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit2 = table.generateRecords(100);
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit2, commitInstant2, true);
+      table.insertRecords(100, true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
-      String commitInstant3 = table.startCommit();
-      table.upsertRecordsWithCommitAlreadyStarted(
-          insertsForCommit1.subList(0, 20), commitInstant3, true);
+      table.upsertRecords(insertsForCommit1.subList(0, 20), true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
       if (tableType == HoodieTableType.MERGE_ON_READ) {
         table.compact();
         allBaseFiles.add(table.getAllLatestBaseFiles());
       }
 
-      String commitInstant4 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit4 = table.generateRecords(100);
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit4, commitInstant4, true);
+      table.insertRecords(100, true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
       table.cluster();
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
-      String commitInstant5 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit5 = table.generateRecords(100);
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit5, commitInstant5, true);
+      table.insertRecords(100, true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
       HudiClient hudiClient =
@@ -224,18 +307,14 @@ public class ITHudiSourceClient {
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
 
-      String commitInstant2 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit2 = table.generateRecords(50);
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit2, commitInstant2, true);
+      table.insertRecords(50, true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
       //  Restore to commitInstant2.
       table.savepointRestoreForPreviousInstant();
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
-      String commitInstant3 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit3 = table.generateRecords(50);
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit3, commitInstant3, true);
+      table.insertRecords(50, true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
       HudiClient hudiClient =
@@ -395,6 +474,11 @@ public class ITHudiSourceClient {
     PartitionConfig unPartitionedConfig = PartitionConfig.of(null, null);
     PartitionConfig partitionedConfig = PartitionConfig.of("level:SIMPLE", "level:VALUE");
     return Stream.of(Arguments.of(unPartitionedConfig), Arguments.of(partitionedConfig));
+  }
+
+  private static Stream<Arguments> testsForAllTableTypes() {
+    return Stream.of(
+        Arguments.of(HoodieTableType.COPY_ON_WRITE), Arguments.of(HoodieTableType.MERGE_ON_READ));
   }
 
   private static Stream<Arguments> testsForAllTableTypesAndPartitions() {
