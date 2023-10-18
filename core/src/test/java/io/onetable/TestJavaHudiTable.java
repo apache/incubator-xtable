@@ -18,6 +18,8 @@
  
 package io.onetable;
 
+import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -44,16 +46,19 @@ import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieAvroRecord;
+import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
+import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
 public class TestJavaHudiTable extends TestAbstractHudiTable {
   private HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
@@ -235,6 +240,16 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors) {
     String instant = getStartCommitInstant();
     return upsertRecordsWithCommitAlreadyStarted(records, instant, checkForNoErrors);
+  }
+
+  public List<HoodieBaseFile> getAllLatestBaseFiles() {
+    HoodieTableFileSystemView fsView =
+        new HoodieMetadataFileSystemView(
+            javaWriteClient.getEngineContext(),
+            metaClient,
+            metaClient.reloadActiveTimeline(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig());
+    return getAllLatestBaseFiles(fsView);
   }
 
   private List<HoodieRecord<HoodieAvroPayload>> insertRecords(

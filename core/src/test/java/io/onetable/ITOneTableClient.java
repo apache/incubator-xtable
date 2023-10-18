@@ -44,7 +44,6 @@ import java.util.stream.StreamSupport;
 import org.apache.avro.Schema;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -80,6 +79,7 @@ import io.onetable.client.SourceClientProvider;
 import io.onetable.exception.SchemaExtractorException;
 import io.onetable.hudi.HudiSourceClientProvider;
 import io.onetable.hudi.HudiSourceConfig;
+import io.onetable.hudi.HudiTestUtil;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 import io.onetable.model.sync.SyncResult;
@@ -95,25 +95,7 @@ public class ITOneTableClient {
 
   @BeforeAll
   public static void setupOnce() {
-    SparkConf sparkConf =
-        new SparkConf()
-            .setAppName("onetable-testing")
-            .set("spark.serializer", KryoSerializer.class.getName())
-            .set("spark.sql.catalog.default_iceberg", "org.apache.iceberg.spark.SparkCatalog")
-            .set("spark.sql.catalog.default_iceberg.type", "hadoop")
-            .set("spark.sql.catalog.default_iceberg.warehouse", tempDir.toString())
-            .set("spark.sql.catalog.hadoop_prod", "org.apache.iceberg.spark.SparkCatalog")
-            .set("spark.sql.catalog.hadoop_prod.type", "hadoop")
-            .set("spark.sql.catalog.hadoop_prod.warehouse", tempDir.toString())
-            .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-            .set("parquet.avro.write-old-list-structure", "false")
-            // Needed for ignoring not nullable constraints on nested columns in Delta.
-            .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
-            .set("spark.sql.shuffle.partitions", "4")
-            .set("spark.default.parallelism", "4")
-            .set("spark.sql.session.timeZone", "UTC")
-            .set("spark.sql.iceberg.handle-timestamp-without-timezone", "true")
-            .setMaster("local[4]");
+    SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
     sparkSession =
         SparkSession.builder().config(HoodieReadClient.addHoodieSupport(sparkConf)).getOrCreate();
     sparkSession
