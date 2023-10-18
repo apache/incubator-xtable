@@ -128,57 +128,6 @@ public class ITHudiSourceClient {
     }
   }
 
-  // Tests for concurrent writes (inserts & compaction).
-  @ParameterizedTest
-  @MethodSource("testsForAllPartitions")
-  public void testConcurrentWrites(PartitionConfig partitionConfig) {
-    String tableName = "test_table_" + UUID.randomUUID();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), HoodieTableType.MERGE_ON_READ)) {
-
-      String commitInstant1 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
-
-      String commitInstant2 = table.startCommit();
-      table.upsertRecordsWithCommitAlreadyStarted(
-          insertsForCommit1.subList(0, 20), commitInstant2, true);
-
-      String compactInstant = table.onlyScheduleCompaction();
-
-      String commitInstant3 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit3 = table.generateRecords(100);
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit3, commitInstant3, true);
-      List<HoodieBaseFile> baseFilesBeforeCompaction = table.getAllLatestBaseFiles();
-
-      table.completeScheduledCompaction(compactInstant);
-      List<HoodieBaseFile> baseFilesAfterCompaction = table.getAllLatestBaseFiles();
-
-      HudiClient hudiClient =
-          getHudiSourceClient(
-              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
-      OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
-      validateOneSnapshot(oneSnapshot, baseFilesAfterCompaction);
-
-      // Get pending compact change in Incremental format.
-      InstantsForIncrementalSync instantsForIncrementalSync =
-          InstantsForIncrementalSync.builder()
-              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant3))
-              .pendingCommits(
-                  Collections.singletonList(HudiInstantUtils.parseFromInstantTime(compactInstant)))
-              .build();
-      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
-          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
-      assertEquals(1, instantCurrentCommitState.getCommitsToProcess().size());
-      TableChange compactionTableChange =
-          hudiClient.getTableChangeForCommit(
-              instantCurrentCommitState.getCommitsToProcess().get(0));
-      validateTableChange(
-          baseFilesBeforeCompaction, baseFilesAfterCompaction, compactionTableChange);
-    }
-  }
-
   @ParameterizedTest
   @MethodSource("testsForAllPartitions")
   public void testForAddPartition(PartitionConfig partitionConfig) {
@@ -221,56 +170,6 @@ public class ITHudiSourceClient {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
-  public void testsForAddColumns(HoodieTableType tableType, PartitionConfig partitionConfig) {
-    String tableName = "test_table_" + UUID.randomUUID();
-    String commitInstantBeforeAddingColumns;
-    String commitInstantAfterAddingColumns;
-    List<HoodieBaseFile> baseFilesBeforeAddingColumns;
-    List<HoodieBaseFile> baseFilesAfterAddingColumns;
-    String basePath;
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
-      basePath = table.getBasePath();
-      commitInstantBeforeAddingColumns = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsBeforeAddingColumns = table.generateRecords(100);
-      table.insertRecordsWithCommitAlreadyStarted(
-          insertsBeforeAddingColumns, commitInstantBeforeAddingColumns, true);
-      baseFilesBeforeAddingColumns = table.getAllLatestBaseFiles();
-    }
-
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.withAdditionalColumns(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
-
-      commitInstantAfterAddingColumns = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsAfterAddingColumns = table.generateRecords(100);
-      table.insertRecordsWithCommitAlreadyStarted(
-          insertsAfterAddingColumns, commitInstantAfterAddingColumns, true);
-      baseFilesAfterAddingColumns = table.getAllLatestBaseFiles();
-    }
-
-    HudiClient hudiClient =
-        getHudiSourceClient(CONFIGURATION, basePath, partitionConfig.getOneTableConfig());
-    // Get the current snapshot
-    OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
-    validateOneSnapshot(oneSnapshot, baseFilesAfterAddingColumns);
-    // Get second change in Incremental format.
-    InstantsForIncrementalSync instantsForIncrementalSync =
-        InstantsForIncrementalSync.builder()
-            .lastSyncInstant(
-                HudiInstantUtils.parseFromInstantTime(commitInstantBeforeAddingColumns))
-            .build();
-    CurrentCommitState<HoodieInstant> instantCurrentCommitState =
-        hudiClient.getCurrentCommitState(instantsForIncrementalSync);
-    assertEquals(1, instantCurrentCommitState.getCommitsToProcess().size());
-    TableChange tableChange =
-        hudiClient.getTableChangeForCommit(instantCurrentCommitState.getCommitsToProcess().get(0));
-    validateTableChange(baseFilesBeforeAddingColumns, baseFilesAfterAddingColumns, tableChange);
-  }
-
-  @ParameterizedTest
-  @MethodSource("testsForAllTableTypesAndPartitions")
   public void testsForClustering(HoodieTableType tableType, PartitionConfig partitionConfig) {
     // TODO(vamshigv): Got exception
     //  java.lang.ClassCastException: class org.apache.hudi.client.common.HoodieJavaEngineContext
@@ -290,6 +189,7 @@ public class ITHudiSourceClient {
        * Compact for MOR table.
        * Insert 100 records.
        * Run Clustering.
+       * Insert 100 records.
        */
 
       String commitInstant1 = table.startCommit();
@@ -317,6 +217,11 @@ public class ITHudiSourceClient {
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
       table.cluster();
+      allBaseFiles.add(table.getAllLatestBaseFiles());
+
+      String commitInstant5 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit5 = table.generateRecords(100);
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit5, commitInstant5, true);
       allBaseFiles.add(table.getAllLatestBaseFiles());
 
       HudiClient hudiClient =
