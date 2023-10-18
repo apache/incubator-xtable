@@ -286,7 +286,8 @@ public abstract class TestAbstractHudiTable implements Closeable {
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(true)
-            .withMetadataIndexColumnStats(true)
+            .withMetadataIndexColumnStats(
+                !keyGenProperties.getString(PARTITIONPATH_FIELD_NAME.key(), "").isEmpty())
             .withColumnStatsIndexForColumns(getColumnsFromSchema(schema))
             .build();
     Properties lockProperties = new Properties();

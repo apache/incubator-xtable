@@ -49,6 +49,7 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.util.JsonUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
@@ -56,6 +57,11 @@ import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 
 public class TestJavaHudiTable extends TestAbstractHudiTable {
+  static {
+    // ensure json modules are registered before any json serialization/deserialization
+    JsonUtils.registerModules();
+  }
+
   private HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
   private final Configuration conf;
   /**

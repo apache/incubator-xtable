@@ -125,7 +125,7 @@ public class TestHudiFileStatsExtractor {
     String basePath;
     try (TestJavaHudiTable table =
         TestJavaHudiTable.withSchema(
-            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE, AVRO_SCHEMA)) {
+            tableName, tempDir, "long_field:SIMPLE", HoodieTableType.COPY_ON_WRITE, AVRO_SCHEMA)) {
       List<HoodieRecord<HoodieAvroPayload>> records =
           getRecords().stream().map(this::buildRecord).collect(Collectors.toList());
       table.insertRecords(true, records);

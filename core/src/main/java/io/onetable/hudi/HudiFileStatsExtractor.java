@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -146,7 +147,8 @@ public class HudiFileStatsExtractor {
             pathToDataFile -> {
               Pair<String, String> filePath = pathToDataFile.getKey();
               OneDataFile file = pathToDataFile.getValue();
-              List<Pair<OneField, HoodieMetadataColumnStats>> fileStats = stats.get(filePath);
+              List<Pair<OneField, HoodieMetadataColumnStats>> fileStats =
+                  stats.getOrDefault(filePath, Collections.emptyList());
               Map<OneField, ColumnStat> columnStats =
                   fileStats.stream()
                       .collect(
