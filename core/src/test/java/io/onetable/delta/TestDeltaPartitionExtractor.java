@@ -21,7 +21,6 @@ package io.onetable.delta;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -123,11 +122,9 @@ public class TestDeltaPartitionExtractor {
   public void testUnpartitionedTable() {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate"));
-    List<String> partitionColumns = Collections.emptyList();
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(
-            tableSchema, oneSchema, partitionColumns);
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, new StructType());
     assertTrue(onePartitionFields.isEmpty());
   }
 
@@ -135,7 +132,7 @@ public class TestDeltaPartitionExtractor {
   public void testSimplePartitionedTable() {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate"));
-    List<String> partitionColumns = Arrays.asList("gender");
+    StructType partitionSchema = getSchemaWithFields(Arrays.asList("gender"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> expectedOnePartitionFields =
         Arrays.asList(
@@ -148,8 +145,7 @@ public class TestDeltaPartitionExtractor {
                 .transformType(PartitionTransformType.VALUE)
                 .build());
     List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(
-            tableSchema, oneSchema, partitionColumns);
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
     assertEquals(expectedOnePartitionFields, onePartitionFields);
   }
 
@@ -157,7 +153,7 @@ public class TestDeltaPartitionExtractor {
   public void testDatePartitionedGeneratedColumnsTable() throws ParseException {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateOfBirth"));
-    List<String> partitionColumns = Arrays.asList("dateOfBirth");
+    StructType partitionSchema = getSchemaWithFields(Arrays.asList("dateOfBirth"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> expectedOnePartitionFields =
         Arrays.asList(
@@ -174,8 +170,7 @@ public class TestDeltaPartitionExtractor {
                 .transformType(PartitionTransformType.DAY)
                 .build());
     List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(
-            tableSchema, oneSchema, partitionColumns);
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
     assertEquals(expectedOnePartitionFields, onePartitionFields);
   }
 
@@ -183,7 +178,7 @@ public class TestDeltaPartitionExtractor {
   public void testDateFormatPartitionedGeneratedColumnsTable() {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateFmt"));
-    List<String> partitionColumns = Arrays.asList("dateFmt");
+    StructType partitionSchema = getSchemaWithFields(Arrays.asList("dateFmt"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> expectedOnePartitionFields =
         Arrays.asList(
@@ -202,8 +197,7 @@ public class TestDeltaPartitionExtractor {
                 .transformType(PartitionTransformType.DAY)
                 .build());
     List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(
-            tableSchema, oneSchema, partitionColumns);
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
     assertEquals(expectedOnePartitionFields, onePartitionFields);
   }
 
@@ -211,7 +205,7 @@ public class TestDeltaPartitionExtractor {
   public void yearPartitionedGeneratedColumnsTable() {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "yearOfBirth"));
-    List<String> partitionColumns = Arrays.asList("yearOfBirth");
+    StructType partitionSchema = getSchemaWithFields(Arrays.asList("yearOfBirth"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> expectedOnePartitionFields =
         Arrays.asList(
@@ -228,8 +222,7 @@ public class TestDeltaPartitionExtractor {
                 .transformType(PartitionTransformType.YEAR)
                 .build());
     List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(
-            tableSchema, oneSchema, partitionColumns);
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
     assertEquals(expectedOnePartitionFields, onePartitionFields);
   }
 
@@ -246,8 +239,9 @@ public class TestDeltaPartitionExtractor {
                 "monthOfBirth",
                 "dayOfBirth",
                 "hourOfBirth"));
-    List<String> partitionColumns =
-        Arrays.asList("yearOfBirth", "monthOfBirth", "dayOfBirth", "hourOfBirth");
+    StructType partitionSchema =
+        getSchemaWithFields(
+            Arrays.asList("yearOfBirth", "monthOfBirth", "dayOfBirth", "hourOfBirth"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> expectedOnePartitionFields =
         Arrays.asList(
@@ -264,8 +258,7 @@ public class TestDeltaPartitionExtractor {
                 .transformType(PartitionTransformType.HOUR)
                 .build());
     List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(
-            tableSchema, oneSchema, partitionColumns);
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
     assertEquals(expectedOnePartitionFields, onePartitionFields);
   }
 

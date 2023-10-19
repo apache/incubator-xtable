@@ -21,6 +21,7 @@ package io.onetable.delta;
 import static io.onetable.delta.DeltaValueSerializer.getFormattedValueForPartition;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -70,51 +71,22 @@ public class DeltaPartitionExtractor {
   }
 
   /**
-   * Extracts partition fields from delta table. Example: Given a delta table and a reference to
-   * DeltaLog, method parameters can be obtained by deltaLog = DeltaLog.forTable(spark,
-   * deltaTablePath); StructType tableSchema = deltaLog.snapshot().schema(); List<String>
-   * partitionFields = JavaConverters.seqAsJavaList(deltaLog.metadata().partitionColumns());
+   * Extracts partition fields from delta table. Partitioning by nested columns isn't supported.
+   * Example: Given a delta table and a reference to DeltaLog, method parameters can be obtained by
+   * deltaLog = DeltaLog.forTable(spark, deltaTablePath); OneSchema oneSchema =
+   * DeltaSchemaExtractor.getInstance().toOneSchema(deltaLog.snapshot().schema()); StructType
+   * partitionSchema = deltaLog.metadata().partitionSchema();
    *
-   * @param tableSchema schema of the delta table.
    * @param oneSchema canonical representation of the schema.
-   * @param partitionColumns partition columns of the delta table.
+   * @param partitionSchema partition schema of the delta table.
    * @return list of canonical representation of the partition fields
    */
   public List<OnePartitionField> convertFromDeltaPartitionFormat(
-      StructType tableSchema, OneSchema oneSchema, List<String> partitionColumns) {
-    if (partitionColumns == null || partitionColumns.isEmpty()) {
+      OneSchema oneSchema, StructType partitionSchema) {
+    if (partitionSchema.isEmpty()) {
       return Collections.emptyList();
     }
-    Map<String, StructField> partitionColToStructFieldMap =
-        partitionColumns.stream()
-            .collect(
-                Collectors.toMap(
-                    partitionCol -> partitionCol,
-                    partitionCol -> findFieldByPath(tableSchema, partitionCol)));
-    List<String> partitionColsNotFoundInDelta =
-        partitionColToStructFieldMap.entrySet().stream()
-            .filter(entry -> entry.getValue() == null)
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toList());
-    // Even generated columns should be present in the schema.
-    if (!partitionColsNotFoundInDelta.isEmpty()) {
-      throw new PartitionSpecException(
-          String.format("Partition columns not found in schema: %s", partitionColsNotFoundInDelta));
-    }
-    List<String> partitionColumnsNotFoundInCanonical =
-        partitionColToStructFieldMap.entrySet().stream()
-            .filter(entry -> entry.getValue() == null)
-            .map(Map.Entry::getKey)
-            .collect(Collectors.toList());
-    // This check is a more of defensive one as it is unlikely to happen and should be caught by
-    // schema extractor in most cases.
-    if (!partitionColumnsNotFoundInCanonical.isEmpty()) {
-      throw new PartitionSpecException(
-          String.format(
-              "Partition columns not found in canonical schema: %s",
-              partitionColumnsNotFoundInCanonical));
-    }
-    return getOnePartitionFields(partitionColToStructFieldMap, oneSchema);
+    return getOnePartitionFields(partitionSchema, oneSchema);
   }
 
   // If all of them are value process individually and return.
@@ -125,49 +97,40 @@ public class DeltaPartitionExtractor {
   // Other supports CAST(col as DATE) and DATE_FORMAT(col, 'yyyy-MM-dd')
   // Partition by nested fields may not be fully supported.
   private List<OnePartitionField> getOnePartitionFields(
-      Map<String, StructField> partitionColToStructFieldMap, OneSchema oneSchema) {
+      StructType partitionSchema, OneSchema oneSchema) {
     // TODO(vamshigv): Order is not preserved.
-    List<String> partitionColumnsWithoutGeneratedExpr =
-        partitionColToStructFieldMap.entrySet().stream()
-            .filter(entry -> !entry.getValue().metadata().contains(DELTA_GENERATION_EXPRESSION))
-            .map(Map.Entry::getKey)
+    List<StructField> partitionFieldsWithoutGeneratedExpr =
+        Arrays.stream(partitionSchema.fields())
+            .filter(structField -> !structField.metadata().contains(DELTA_GENERATION_EXPRESSION))
             .collect(Collectors.toList());
     List<OnePartitionField> valueTransformPartitionFields =
-        partitionColumnsWithoutGeneratedExpr.stream()
+        partitionFieldsWithoutGeneratedExpr.stream()
             .map(
                 partitionCol ->
                     OnePartitionField.builder()
                         .sourceField(
                             SchemaFieldFinder.getInstance()
-                                .findFieldByPath(oneSchema, partitionCol))
+                                .findFieldByPath(oneSchema, partitionCol.name()))
                         .transformType(PartitionTransformType.VALUE)
                         .build())
             .collect(Collectors.toList());
-    List<String> partitionColumnsWithGeneratedExpr =
-        partitionColToStructFieldMap.entrySet().stream()
-            .filter(entry -> entry.getValue().metadata().contains(DELTA_GENERATION_EXPRESSION))
-            .map(Map.Entry::getKey)
+    List<StructField> partitionColumnsWithGeneratedExpr =
+        Arrays.stream(partitionSchema.fields())
+            .filter(structField -> structField.metadata().contains(DELTA_GENERATION_EXPRESSION))
             .collect(Collectors.toList());
     valueTransformPartitionFields.addAll(
-        getPartitionColumnsForGeneratedExpr(
-            partitionColumnsWithGeneratedExpr, partitionColToStructFieldMap, oneSchema));
+        getPartitionColumnsForGeneratedExpr(partitionColumnsWithGeneratedExpr, oneSchema));
     return valueTransformPartitionFields;
   }
 
   private List<OnePartitionField> getPartitionColumnsForGeneratedExpr(
-      List<String> partitionColumnsWithGeneratedExpr,
-      Map<String, StructField> partitionColToStructFieldMap,
-      OneSchema oneSchema) {
+      List<StructField> partitionFieldsWithGeneratedExpr, OneSchema oneSchema) {
     List<OnePartitionField> partitionFields = new ArrayList<>();
     List<ParsedGeneratedExpr> parsedGeneratedExprs =
-        partitionColumnsWithGeneratedExpr.stream()
+        partitionFieldsWithGeneratedExpr.stream()
             .map(
-                columnName -> {
-                  String expr =
-                      partitionColToStructFieldMap
-                          .get(columnName)
-                          .metadata()
-                          .getString(DELTA_GENERATION_EXPRESSION);
+                structField -> {
+                  String expr = structField.metadata().getString(DELTA_GENERATION_EXPRESSION);
                   return ParsedGeneratedExpr.buildFromString(expr);
                 })
             .collect(Collectors.toList());
