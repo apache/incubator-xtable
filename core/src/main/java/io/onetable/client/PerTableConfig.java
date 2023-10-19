@@ -26,6 +26,7 @@ import lombok.Builder;
 import lombok.Value;
 
 import io.onetable.hudi.HudiSourceConfig;
+import io.onetable.iceberg.IcebergTargetConfig;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 
@@ -68,6 +69,11 @@ public class PerTableConfig {
 
   /** List of table formats to sync. */
   @Nonnull List<TableFormat> targetTableFormats;
+
+  /**
+   * Configuration options for the Iceberg target. Use this to set catalog and namespace details.
+   */
+  @Builder.Default IcebergTargetConfig icebergTargetConfig = IcebergTargetConfig.builder().build();
 
   /**
    * Mode of a sync. FULL is only supported right now.
