@@ -260,6 +260,61 @@ public class TestDeltaPartitionExtractor {
     assertEquals(expectedOnePartitionFields, onePartitionFields);
   }
 
+  // Test for preserving order of partition columns.
+  @Test
+  public void testCombinationOfPlainAndGeneratedColumns() {
+    StructType tableSchema =
+        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateFmt"));
+    StructType partitionSchema =
+        getSchemaWithFields(Arrays.asList("id", "dateFmt", "gender", "dateOfBirth"));
+    OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
+    List<OnePartitionField> expectedOnePartitionFields =
+        Arrays.asList(
+            OnePartitionField.builder()
+                .sourceField(
+                    OneField.builder()
+                        .name("id")
+                        .schema(OneSchema.builder().name("integer").dataType(OneType.INT).build())
+                        .build())
+                .transformType(PartitionTransformType.VALUE)
+                .build(),
+            OnePartitionField.builder()
+                .sourceField(
+                    OneField.builder()
+                        .name("birthDate")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .build())
+                        .build())
+                .transformType(PartitionTransformType.HOUR)
+                .build(),
+            OnePartitionField.builder()
+                .sourceField(
+                    OneField.builder()
+                        .name("gender")
+                        .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                        .build())
+                .transformType(PartitionTransformType.VALUE)
+                .build(),
+            OnePartitionField.builder()
+                .sourceField(
+                    OneField.builder()
+                        .name("birthDate")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .build())
+                        .build())
+                .transformType(PartitionTransformType.DAY)
+                .build());
+    List<OnePartitionField> onePartitionFields =
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
+    assertEquals(expectedOnePartitionFields, onePartitionFields);
+  }
+
   private StructType getSchemaWithFields(List<String> fields) {
     List<StructField> structFields =
         fields.stream().map(STRUCT_FIELD_MAP::get).collect(Collectors.toList());
