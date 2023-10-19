@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -75,6 +74,12 @@ public class DeltaPartitionExtractor {
   // generated & and with a name like `delta_partition_col_{transform_type}_{source_field_name}`.
   private static final String DELTA_PARTITION_COL_NAME_FORMAT = "onetable_partition_col_%s_%s";
   private static final String DELTA_GENERATION_EXPRESSION = "delta.generationExpression";
+  private static final List<ParsedGeneratedExpr.GeneratedExprType> granularities =
+      Arrays.asList(
+          ParsedGeneratedExpr.GeneratedExprType.YEAR,
+          ParsedGeneratedExpr.GeneratedExprType.MONTH,
+          ParsedGeneratedExpr.GeneratedExprType.DAY,
+          ParsedGeneratedExpr.GeneratedExprType.HOUR);
 
   public static DeltaPartitionExtractor getInstance() {
     return INSTANCE;
@@ -100,12 +105,10 @@ public class DeltaPartitionExtractor {
   }
 
   /**
-   * If all of them are value process individually and return.
-   * If they contain month they should contain year as well.
-   * If they contain day they should contain month and year as well.
-   * If they contain hour they should contain day, month and year as well.
-   * Other supports CAST(col as DATE) and DATE_FORMAT(col, 'yyyy-MM-dd').
-   * Partition by nested fields may not be fully supported.
+   * If all of them are value process individually and return. If they contain month they should
+   * contain year as well. If they contain day they should contain month and year as well. If they
+   * contain hour they should contain day, month and year as well. Other supports CAST(col as DATE)
+   * and DATE_FORMAT(col, 'yyyy-MM-dd'). Partition by nested fields may not be fully supported.
    */
   private List<OnePartitionField> getOnePartitionFields(
       StructType partitionSchema, OneSchema oneSchema) {
@@ -165,25 +168,21 @@ public class DeltaPartitionExtractor {
   }
 
   private OnePartitionField getPartitionColumnsForHourOrDayOrMonthOrYear(
-      List<ParsedGeneratedExpr> partitionFieldExprs, OneSchema oneSchema) {
-    if (partitionFieldExprs.isEmpty()) {
-      return null;
+      List<ParsedGeneratedExpr> parsedGeneratedExprs, OneSchema oneSchema) {
+    if (parsedGeneratedExprs.size() > 4) {
+      throw new IllegalStateException("Invalid partition transform");
     }
-    return getPartitionWithHourTransform(partitionFieldExprs, oneSchema)
-        .orElseGet(
-            () ->
-                getPartitionWithDayTransform(partitionFieldExprs, oneSchema)
-                    .orElseGet(
-                        () ->
-                            getPartitionWithMonthTransform(partitionFieldExprs, oneSchema)
-                                .orElseGet(
-                                    () ->
-                                        getPartitionWithYearTransform(
-                                                partitionFieldExprs, oneSchema)
-                                            .orElseThrow(
-                                                () ->
-                                                    new IllegalStateException(
-                                                        "Invalid partition transform")))));
+    validate(
+        parsedGeneratedExprs, new HashSet<>(granularities.subList(0, parsedGeneratedExprs.size())));
+
+    ParsedGeneratedExpr transform = parsedGeneratedExprs.get(0);
+    return OnePartitionField.builder()
+        .sourceField(
+            SchemaFieldFinder.getInstance().findFieldByPath(oneSchema, transform.sourceColumn))
+        .transformType(
+            parsedGeneratedExprs.get(parsedGeneratedExprs.size() - 1)
+                .internalPartitionTransformType)
+        .build();
   }
 
   // Cast has default format of yyyy-MM-dd.
@@ -203,96 +202,8 @@ public class DeltaPartitionExtractor {
         .sourceField(
             SchemaFieldFinder.getInstance()
                 .findFieldByPath(oneSchema, parsedGeneratedExpr.sourceColumn))
-        .transformType(parsedGeneratedExpr.dateFormatGranularity)
+        .transformType(parsedGeneratedExpr.internalPartitionTransformType)
         .build();
-  }
-
-  private Optional<OnePartitionField> getPartitionWithHourTransform(
-      List<ParsedGeneratedExpr> parsedGeneratedExprs, OneSchema oneSchema) {
-    if (parsedGeneratedExprs.size() != 4) {
-      return Optional.empty();
-    }
-    validate(
-        parsedGeneratedExprs,
-        new HashSet<>(
-            Arrays.asList(
-                ParsedGeneratedExpr.GeneratedExprType.HOUR,
-                ParsedGeneratedExpr.GeneratedExprType.DAY,
-                ParsedGeneratedExpr.GeneratedExprType.MONTH,
-                ParsedGeneratedExpr.GeneratedExprType.YEAR)));
-
-    ParsedGeneratedExpr hourTransform = parsedGeneratedExprs.get(0);
-    return Optional.of(
-        OnePartitionField.builder()
-            .sourceField(
-                SchemaFieldFinder.getInstance()
-                    .findFieldByPath(oneSchema, hourTransform.sourceColumn))
-            .transformType(PartitionTransformType.HOUR)
-            .build());
-  }
-
-  private Optional<OnePartitionField> getPartitionWithDayTransform(
-      List<ParsedGeneratedExpr> parsedGeneratedExprs, OneSchema oneSchema) {
-    if (parsedGeneratedExprs.size() != 3) {
-      return Optional.empty();
-    }
-    validate(
-        parsedGeneratedExprs,
-        new HashSet<>(
-            Arrays.asList(
-                ParsedGeneratedExpr.GeneratedExprType.DAY,
-                ParsedGeneratedExpr.GeneratedExprType.MONTH,
-                ParsedGeneratedExpr.GeneratedExprType.YEAR)));
-
-    ParsedGeneratedExpr dayTransform = parsedGeneratedExprs.get(0);
-    return Optional.of(
-        OnePartitionField.builder()
-            .sourceField(
-                SchemaFieldFinder.getInstance()
-                    .findFieldByPath(oneSchema, dayTransform.sourceColumn))
-            .transformType(PartitionTransformType.DAY)
-            .build());
-  }
-
-  private Optional<OnePartitionField> getPartitionWithMonthTransform(
-      List<ParsedGeneratedExpr> parsedGeneratedExprs, OneSchema oneSchema) {
-    if (parsedGeneratedExprs.size() != 2) {
-      return Optional.empty();
-    }
-    validate(
-        parsedGeneratedExprs,
-        new HashSet<>(
-            Arrays.asList(
-                ParsedGeneratedExpr.GeneratedExprType.MONTH,
-                ParsedGeneratedExpr.GeneratedExprType.YEAR)));
-
-    ParsedGeneratedExpr monthTransform = parsedGeneratedExprs.get(0);
-    return Optional.of(
-        OnePartitionField.builder()
-            .sourceField(
-                SchemaFieldFinder.getInstance()
-                    .findFieldByPath(oneSchema, monthTransform.sourceColumn))
-            .transformType(PartitionTransformType.MONTH)
-            .build());
-  }
-
-  private Optional<OnePartitionField> getPartitionWithYearTransform(
-      List<ParsedGeneratedExpr> parsedGeneratedExprs, OneSchema oneSchema) {
-    if (parsedGeneratedExprs.size() != 1) {
-      return Optional.empty();
-    }
-    validate(
-        parsedGeneratedExprs,
-        new HashSet<>(Arrays.asList(ParsedGeneratedExpr.GeneratedExprType.YEAR)));
-
-    ParsedGeneratedExpr yearTransform = parsedGeneratedExprs.get(0);
-    return Optional.of(
-        OnePartitionField.builder()
-            .sourceField(
-                SchemaFieldFinder.getInstance()
-                    .findFieldByPath(oneSchema, yearTransform.sourceColumn))
-            .transformType(PartitionTransformType.YEAR)
-            .build());
   }
 
   public Map<String, StructField> convertToDeltaPartitionFormat(
@@ -453,33 +364,38 @@ public class DeltaPartitionExtractor {
 
     String sourceColumn;
     GeneratedExprType generatedExprType;
-    PartitionTransformType dateFormatGranularity;
+    PartitionTransformType internalPartitionTransformType;
 
     private static ParsedGeneratedExpr buildFromString(String expr) {
       if (expr.contains("YEAR")) {
         return ParsedGeneratedExpr.builder()
             .generatedExprType(GeneratedExprType.YEAR)
             .sourceColumn(extractColumnName(expr, YEAR_PATTERN))
+            .internalPartitionTransformType(PartitionTransformType.YEAR)
             .build();
       } else if (expr.contains("MONTH")) {
         return ParsedGeneratedExpr.builder()
             .generatedExprType(GeneratedExprType.MONTH)
             .sourceColumn(extractColumnName(expr, MONTH_PATTERN))
+            .internalPartitionTransformType(PartitionTransformType.MONTH)
             .build();
       } else if (expr.contains("DAY")) {
         return ParsedGeneratedExpr.builder()
             .generatedExprType(GeneratedExprType.DAY)
             .sourceColumn(extractColumnName(expr, DAY_PATTERN))
+            .internalPartitionTransformType(PartitionTransformType.DAY)
             .build();
       } else if (expr.contains("HOUR")) {
         return ParsedGeneratedExpr.builder()
             .generatedExprType(GeneratedExprType.HOUR)
             .sourceColumn(extractColumnName(expr, HOUR_PATTERN))
+            .internalPartitionTransformType(PartitionTransformType.HOUR)
             .build();
       } else if (expr.contains("CAST")) {
         return ParsedGeneratedExpr.builder()
             .generatedExprType(GeneratedExprType.CAST)
             .sourceColumn(extractColumnName(expr, CAST_PATTERN))
+            .internalPartitionTransformType(PartitionTransformType.DAY)
             .build();
       } else if (expr.contains("DATE_FORMAT")) {
         if (expr.startsWith("DATE_FORMAT(") && expr.endsWith(")")) {
@@ -494,7 +410,7 @@ public class DeltaPartitionExtractor {
           return ParsedGeneratedExpr.builder()
               .generatedExprType(GeneratedExprType.DATE_FORMAT)
               .sourceColumn(expr.substring(firstParenthesisPos + 1, commaPos).trim())
-              .dateFormatGranularity(computeGranularity(dateFormatExpr))
+              .internalPartitionTransformType(computeInternalPartitionTransform(dateFormatExpr))
               .build();
         } else {
           throw new IllegalArgumentException("Could not extract values from: " + expr);
@@ -506,7 +422,7 @@ public class DeltaPartitionExtractor {
     }
 
     // Supporting granularity as per https://docs.databricks.com/en/delta/generated-columns.html
-    private static PartitionTransformType computeGranularity(String dateFormatExpr) {
+    private static PartitionTransformType computeInternalPartitionTransform(String dateFormatExpr) {
       if (DATE_FORMAT_FOR_HOUR.equals(dateFormatExpr)) {
         return PartitionTransformType.HOUR;
       } else if (DATE_FORMAT_FOR_DAY.equals(dateFormatExpr)) {

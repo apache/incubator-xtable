@@ -30,7 +30,6 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.parser.ParseException;
-import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
@@ -100,7 +99,6 @@ public class TestDeltaPartitionExtractor {
                   Metadata.fromJson("{\"delta.generationExpression\": \"HOUR(birthDate)\"}")));
         }
       };
-
 
   private final DeltaPartitionExtractor deltaPartitionExtractor =
       DeltaPartitionExtractor.getInstance();
@@ -206,6 +204,39 @@ public class TestDeltaPartitionExtractor {
                                 .build())
                         .build())
                 .transformType(PartitionTransformType.YEAR)
+                .build());
+    List<OnePartitionField> onePartitionFields =
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
+    assertEquals(expectedOnePartitionFields, onePartitionFields);
+  }
+
+  @Test
+  public void yearAndSimpleCombinedPartitionedGeneratedColumnsTable() {
+    StructType tableSchema =
+        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "yearOfBirth"));
+    StructType partitionSchema = getSchemaWithFields(Arrays.asList("yearOfBirth", "id"));
+    OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
+    List<OnePartitionField> expectedOnePartitionFields =
+        Arrays.asList(
+            OnePartitionField.builder()
+                .sourceField(
+                    OneField.builder()
+                        .name("birthDate")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .build())
+                        .build())
+                .transformType(PartitionTransformType.YEAR)
+                .build(),
+            OnePartitionField.builder()
+                .sourceField(
+                    OneField.builder()
+                        .name("id")
+                        .schema(OneSchema.builder().name("integer").dataType(OneType.INT).build())
+                        .build())
+                .transformType(PartitionTransformType.VALUE)
                 .build());
     List<OnePartitionField> onePartitionFields =
         deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
