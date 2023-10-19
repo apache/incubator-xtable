@@ -286,6 +286,8 @@ public abstract class TestAbstractHudiTable implements Closeable {
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(true)
+            // enable col stats only on un-partitioned data due to bug in Hudi
+            // https://issues.apache.org/jira/browse/HUDI-6954
             .withMetadataIndexColumnStats(
                 !keyGenProperties.getString(PARTITIONPATH_FIELD_NAME.key(), "").isEmpty())
             .withColumnStatsIndexForColumns(getColumnsFromSchema(schema))
@@ -545,7 +547,7 @@ public abstract class TestAbstractHudiTable implements Closeable {
           case FIXED:
             if (fieldSchema.getLogicalType() != null
                 && fieldSchema.getLogicalType() instanceof LogicalTypes.Decimal) {
-              value = BigDecimal.valueOf(RANDOM.nextInt(), 2);
+              value = BigDecimal.valueOf(RANDOM.nextInt(1000000), 2);
             } else {
               value =
                   new GenericData.Fixed(
