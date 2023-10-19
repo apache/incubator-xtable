@@ -20,6 +20,7 @@ package io.onetable.hudi;
 
 import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
 
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -32,6 +33,8 @@ import lombok.Value;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.spark.SparkConf;
+import org.apache.spark.serializer.KryoSerializer;
 
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
@@ -66,7 +69,7 @@ public class HudiTestUtil {
         .initTable(new Configuration(), tableBasePath);
   }
 
-  static HoodieWriteConfig getHoodieWriteConfig(HoodieTableMetaClient metaClient) {
+  public static HoodieWriteConfig getHoodieWriteConfig(HoodieTableMetaClient metaClient) {
     return getHoodieWriteConfig(metaClient, null);
   }
 
@@ -113,6 +116,27 @@ public class HudiTestUtil {
     writeStat.putRecordsStats(recordStats);
     writeStatus.setStat(writeStat);
     return writeStatus;
+  }
+
+  public static SparkConf getSparkConf(Path tempDir) {
+    return new SparkConf()
+        .setAppName("onetable-testing")
+        .set("spark.serializer", KryoSerializer.class.getName())
+        .set("spark.sql.catalog.default_iceberg", "org.apache.iceberg.spark.SparkCatalog")
+        .set("spark.sql.catalog.default_iceberg.type", "hadoop")
+        .set("spark.sql.catalog.default_iceberg.warehouse", tempDir.toString())
+        .set("spark.sql.catalog.hadoop_prod", "org.apache.iceberg.spark.SparkCatalog")
+        .set("spark.sql.catalog.hadoop_prod.type", "hadoop")
+        .set("spark.sql.catalog.hadoop_prod.warehouse", tempDir.toString())
+        .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        .set("parquet.avro.write-old-list-structure", "false")
+        // Needed for ignoring not nullable constraints on nested columns in Delta.
+        .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
+        .set("spark.sql.shuffle.partitions", "4")
+        .set("spark.default.parallelism", "4")
+        .set("spark.sql.session.timeZone", "UTC")
+        .set("spark.sql.iceberg.handle-timestamp-without-timezone", "true")
+        .setMaster("local[4]");
   }
 
   @Value

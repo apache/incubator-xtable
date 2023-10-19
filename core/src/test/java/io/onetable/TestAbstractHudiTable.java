@@ -63,6 +63,7 @@ import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieAvroRecord;
+import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
@@ -73,6 +74,7 @@ import org.apache.hudi.common.model.WriteConcurrencyMode;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.marker.MarkerType;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
+import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieCleanConfig;
@@ -172,6 +174,11 @@ public abstract class TestAbstractHudiTable implements Closeable {
       int numRecords, Object partitionValue, boolean checkForNoErrors);
 
   public List<HoodieRecord<HoodieAvroPayload>> generateRecords(int numRecords) {
+    return generateRecords(numRecords, null);
+  }
+
+  public List<HoodieRecord<HoodieAvroPayload>> generateRecords(
+      int numRecords, Object partitionValue) {
     Instant currentTime = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<Instant> startTimeWindows =
         Arrays.asList(
@@ -193,7 +200,7 @@ public abstract class TestAbstractHudiTable implements Closeable {
                         startTimeWindows.get(index % 3),
                         endTimeWindows.get(index % 3),
                         null,
-                        null))
+                        partitionValue))
             .collect(Collectors.toList());
     return inserts;
   }
@@ -231,6 +238,17 @@ public abstract class TestAbstractHudiTable implements Closeable {
   public abstract void savepointRestoreForPreviousInstant();
 
   public abstract void clean();
+
+  public abstract List<HoodieBaseFile> getAllLatestBaseFiles();
+
+  public List<HoodieBaseFile> getAllLatestBaseFiles(HoodieTableFileSystemView fsView) {
+    try {
+      fsView.loadAllPartitions();
+      return fsView.getLatestBaseFiles().collect(Collectors.toList());
+    } finally {
+      fsView.close();
+    }
+  }
 
   public static void assertNoWriteErrors(List<WriteStatus> statuses) {
     assertAll(
