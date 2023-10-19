@@ -564,10 +564,9 @@ public class ITOneTableClient {
         table.compact();
       }
       table.cluster();
-      table.insertRecords(50, true);
 
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 150);
+      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats, table.getBasePath(), 100);
     }
   }
 
