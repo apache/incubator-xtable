@@ -43,6 +43,7 @@ import org.apache.iceberg.mapping.NameMappingParser;
 public class TestIcebergTableManager {
   private static final Map<String, String> OPTIONS = Collections.singletonMap("key", "value");
   private static final TableIdentifier IDENTIFIER = TableIdentifier.of("database1", "table1");
+  private static final Configuration CONFIGURATION = new Configuration();
   private final Catalog mockCatalog = mock(Catalog.class);
 
   @Test
@@ -58,7 +59,7 @@ public class TestIcebergTableManager {
     Table mockTable = mock(Table.class);
     when(mockCatalog.loadTable(IDENTIFIER)).thenReturn(mockTable);
 
-    IcebergTableManager tableManager = IcebergTableManager.of(new Configuration());
+    IcebergTableManager tableManager = IcebergTableManager.of(CONFIGURATION);
     Table actual = tableManager.getTable(catalogConfig, IDENTIFIER, "basePath");
     assertEquals(mockTable, actual);
     verify(mockCatalog).initialize(catalogName, OPTIONS);
@@ -78,7 +79,7 @@ public class TestIcebergTableManager {
     when(mockCatalog.tableExists(IDENTIFIER)).thenReturn(true);
     when(mockCatalog.loadTable(IDENTIFIER)).thenReturn(mockTable);
 
-    IcebergTableManager tableManager = IcebergTableManager.of(new Configuration());
+    IcebergTableManager tableManager = IcebergTableManager.of(CONFIGURATION);
     Schema schema = new Schema();
     PartitionSpec partitionSpec = PartitionSpec.unpartitioned();
     Table actual =
@@ -111,7 +112,7 @@ public class TestIcebergTableManager {
                 NameMappingParser.toJson(MappingUtil.create(schema)))))
         .thenReturn(mockTable);
 
-    IcebergTableManager tableManager = IcebergTableManager.of(new Configuration());
+    IcebergTableManager tableManager = IcebergTableManager.of(CONFIGURATION);
 
     Table actual =
         tableManager.getOrCreateTable(catalogConfig, IDENTIFIER, "basePath", schema, partitionSpec);

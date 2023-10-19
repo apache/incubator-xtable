@@ -179,6 +179,7 @@ public class TestIcebergSync {
                     .tableBasePath(basePath.toString())
                     .tableName(tableName)
                     .targetMetadataRetentionInHours(1)
+                    .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
                     .build(),
                 new Configuration(),
                 mockSchemaExtractor,
