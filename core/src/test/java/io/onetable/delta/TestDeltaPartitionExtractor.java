@@ -192,9 +192,7 @@ public class TestDeltaPartitionExtractor {
                                 .dataType(OneType.TIMESTAMP)
                                 .build())
                         .build())
-                // TODO(vamshigv): This should be hour when we support date format specific
-                // transform.
-                .transformType(PartitionTransformType.DAY)
+                .transformType(PartitionTransformType.HOUR)
                 .build());
     List<OnePartitionField> onePartitionFields =
         deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);

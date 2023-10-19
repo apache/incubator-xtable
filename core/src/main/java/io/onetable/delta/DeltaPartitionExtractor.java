@@ -61,6 +61,10 @@ public class DeltaPartitionExtractor {
   private static final String CAST_FUNCTION = "CAST(%s as DATE)";
   private static final String DATE_FORMAT_FUNCTION = "DATE_FORMAT(%s, '%s')";
   private static final String YEAR_FUNCTION = "YEAR(%s)";
+  private static final String DATE_FORMAT_FOR_HOUR = "yyyy-MM-dd-HH";
+  private static final String DATE_FORMAT_FOR_DAY = "yyyy-MM-dd";
+  private static final String DATE_FORMAT_FOR_MONTH = "yyyy-MM";
+  private static final String DATE_FORMAT_FOR_YEAR = "yyyy";
   // For timestamp partition fields, actual partition column names in delta format will be of type
   // generated & and with a name like `delta_partition_col_{transform_type}_{source_field_name}`.
   private static final String DELTA_PARTITION_COL_NAME_FORMAT = "onetable_partition_col_%s_%s";
@@ -173,7 +177,6 @@ public class DeltaPartitionExtractor {
   // Cast has default format of yyyy-MM-dd.
   private OnePartitionField getPartitionWithDateTransform(
       ParsedGeneratedExpr parsedGeneratedExpr, OneSchema oneSchema) {
-    // TODO(vamshigv): Check if we can be more defensive here.
     return OnePartitionField.builder()
         .sourceField(
             SchemaFieldFinder.getInstance()
@@ -182,15 +185,13 @@ public class DeltaPartitionExtractor {
         .build();
   }
 
-  // TODO(vamshigv): Transform type should depend on the date format parsed.
   private OnePartitionField getPartitionWithDateFormatTransform(
       ParsedGeneratedExpr parsedGeneratedExpr, OneSchema oneSchema) {
-    // TODO(vamshigv): Check if we can be more defensive here.
     return OnePartitionField.builder()
         .sourceField(
             SchemaFieldFinder.getInstance()
                 .findFieldByPath(oneSchema, parsedGeneratedExpr.sourceColumn))
-        .transformType(PartitionTransformType.DAY)
+        .transformType(parsedGeneratedExpr.dateFormatGranularity)
         .build();
   }
 
@@ -250,7 +251,6 @@ public class DeltaPartitionExtractor {
           "Year transform not found or multiple year transforms found or year transform not matching with hour transform");
     }
 
-    // TODO(vamshigv): Check if we can be more defensive here.
     return Optional.of(
         OnePartitionField.builder()
             .sourceField(
@@ -301,7 +301,6 @@ public class DeltaPartitionExtractor {
           "Year transform not found or multiple year transforms found or year transform not matching with day transform");
     }
 
-    // TODO(vamshigv): Check if we can be more defensive here.
     return Optional.of(
         OnePartitionField.builder()
             .sourceField(
@@ -342,7 +341,6 @@ public class DeltaPartitionExtractor {
           "Year transform not found or multiple year transforms found or year transform not matching with month transform");
     }
 
-    // TODO(vamshigv): Check if we can be more defensive here.
     return Optional.of(
         OnePartitionField.builder()
             .sourceField(
@@ -372,7 +370,6 @@ public class DeltaPartitionExtractor {
     }
     ParsedGeneratedExpr yearTransform = yearTransforms.get(0);
 
-    // TODO(vamshigv): Check if we can be more defensive here.
     return Optional.of(
         OnePartitionField.builder()
             .sourceField(
@@ -446,13 +443,13 @@ public class DeltaPartitionExtractor {
   private String getDateFormat(PartitionTransformType transformType) {
     switch (transformType) {
       case YEAR:
-        return "yyyy";
+        return DATE_FORMAT_FOR_YEAR;
       case MONTH:
-        return "yyyy-MM";
+        return DATE_FORMAT_FOR_MONTH;
       case DAY:
-        return "yyyy-MM-dd";
+        return DATE_FORMAT_FOR_DAY;
       case HOUR:
-        return "yyyy-MM-dd-HH";
+        return DATE_FORMAT_FOR_HOUR;
       default:
         throw new PartitionSpecException("Invalid transform type");
     }
@@ -517,35 +514,8 @@ public class DeltaPartitionExtractor {
     return null;
   }
 
-  private PartitionTransformType getTransformType(StructField partitionColStructField) {
-    if (!partitionColStructField.metadata().contains(DELTA_GENERATION_EXPRESSION)) {
-      return PartitionTransformType.VALUE;
-    }
-    String generatedExprCol =
-        partitionColStructField.metadata().getString(DELTA_GENERATION_EXPRESSION);
-    // Refer https://docs.databricks.com/en/delta/generated-columns.html
-    // TODO(vamshigv): This is Rudimentary check, improve it
-    // The below logic needs correction
-    if (generatedExprCol.contains("YEAR")) {
-      return PartitionTransformType.YEAR;
-    } else if (generatedExprCol.contains("MONTH")) {
-      return PartitionTransformType.MONTH;
-    } else if (generatedExprCol.contains("DAY")) {
-      return PartitionTransformType.DAY;
-    } else if (generatedExprCol.contains("HOUR")) {
-      return PartitionTransformType.HOUR;
-    } else if (generatedExprCol.contains("CAST")) {
-      return PartitionTransformType.DAY;
-    } else if (generatedExprCol.contains("DATE_FORMAT")) {
-      return PartitionTransformType.DAY;
-    }
-    throw new PartitionSpecException(
-        String.format("Unsupported generated expression: %s", generatedExprCol));
-  }
-
   @Builder
   static class ParsedGeneratedExpr {
-
     private static final Pattern YEAR_PATTERN = Pattern.compile("YEAR\\(([^)]+)\\)");
     private static final Pattern MONTH_PATTERN = Pattern.compile("MONTH\\(([^)]+)\\)");
     private static final Pattern DAY_PATTERN = Pattern.compile("DAY\\(([^)]+)\\)");
@@ -563,7 +533,7 @@ public class DeltaPartitionExtractor {
 
     String sourceColumn;
     GeneratedExprType generatedExprType;
-    String dateFormat;
+    PartitionTransformType dateFormatGranularity;
 
     public static ParsedGeneratedExpr buildFromString(String expr) {
       if (expr.contains("YEAR")) {
@@ -592,16 +562,16 @@ public class DeltaPartitionExtractor {
             .sourceColumn(extractColumnName(expr, CAST_PATTERN))
             .build();
       } else if (expr.contains("DATE_FORMAT")) {
-        // TODO(vamshigv): Better this.
         if (expr.startsWith("DATE_FORMAT(") && expr.endsWith(")")) {
           int firstParenthesisPos = expr.indexOf("(");
           int commaPos = expr.indexOf(",");
           int lastParenthesisPos = expr.lastIndexOf(")");
+          String dateFormatExpr =
+              expr.substring(commaPos + 1, lastParenthesisPos).trim().replaceAll("^'|'$", "");
           return ParsedGeneratedExpr.builder()
               .generatedExprType(GeneratedExprType.DATE_FORMAT)
               .sourceColumn(expr.substring(firstParenthesisPos + 1, commaPos).trim())
-              .dateFormat(
-                  expr.substring(commaPos + 1, lastParenthesisPos).trim().replaceAll("^'|'$", ""))
+              .dateFormatGranularity(computeGranularity(dateFormatExpr))
               .build();
         } else {
           throw new IllegalArgumentException("Could not extract values from: " + expr);
@@ -609,6 +579,21 @@ public class DeltaPartitionExtractor {
       } else {
         throw new IllegalArgumentException(
             "Unsupported expression for generated expression: " + expr);
+      }
+    }
+
+    // Supporting granularity as per https://docs.databricks.com/en/delta/generated-columns.html
+    private static PartitionTransformType computeGranularity(String dateFormatExpr) {
+      if (DATE_FORMAT_FOR_HOUR.equals(dateFormatExpr)) {
+        return PartitionTransformType.HOUR;
+      } else if (DATE_FORMAT_FOR_DAY.equals(dateFormatExpr)) {
+        return PartitionTransformType.DAY;
+      } else if (DATE_FORMAT_FOR_MONTH.equals(dateFormatExpr)) {
+        return PartitionTransformType.MONTH;
+      } else {
+        throw new IllegalArgumentException(
+            String.format(
+                "Unsupported date format expression: %s for generated expression", dateFormatExpr));
       }
     }
 
