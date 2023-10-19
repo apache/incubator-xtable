@@ -74,7 +74,7 @@ public class DeltaPartitionExtractor {
   // generated & and with a name like `delta_partition_col_{transform_type}_{source_field_name}`.
   private static final String DELTA_PARTITION_COL_NAME_FORMAT = "onetable_partition_col_%s_%s";
   private static final String DELTA_GENERATION_EXPRESSION = "delta.generationExpression";
-  private static final List<ParsedGeneratedExpr.GeneratedExprType> granularities =
+  private static final List<ParsedGeneratedExpr.GeneratedExprType> GRANULARITIES =
       Arrays.asList(
           ParsedGeneratedExpr.GeneratedExprType.YEAR,
           ParsedGeneratedExpr.GeneratedExprType.MONTH,
@@ -173,7 +173,7 @@ public class DeltaPartitionExtractor {
       throw new IllegalStateException("Invalid partition transform");
     }
     validate(
-        parsedGeneratedExprs, new HashSet<>(granularities.subList(0, parsedGeneratedExprs.size())));
+        parsedGeneratedExprs, new HashSet<>(GRANULARITIES.subList(0, parsedGeneratedExprs.size())));
 
     ParsedGeneratedExpr transform = parsedGeneratedExprs.get(0);
     return OnePartitionField.builder()

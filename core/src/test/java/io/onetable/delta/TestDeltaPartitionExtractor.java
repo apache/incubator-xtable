@@ -24,12 +24,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
-import org.apache.spark.SparkConf;
-import org.apache.spark.serializer.KryoSerializer;
-import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.catalyst.parser.ParseException;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
@@ -136,7 +131,7 @@ public class TestDeltaPartitionExtractor {
   }
 
   @Test
-  public void testDatePartitionedGeneratedColumnsTable() throws ParseException {
+  public void testDatePartitionedGeneratedColumnsTable() {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateOfBirth"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("dateOfBirth"));
@@ -335,22 +330,6 @@ public class TestDeltaPartitionExtractor {
   }
 
   private StructType getSchemaWithFields(List<String> fields) {
-    List<StructField> structFields =
-        fields.stream().map(STRUCT_FIELD_MAP::get).collect(Collectors.toList());
-    return new StructType(structFields.toArray(new StructField[0]));
-  }
-
-  private static SparkSession buildSparkSession() {
-    SparkConf sparkConf =
-        new SparkConf()
-            .setAppName("testDeltaPartitionExtractor")
-            .set("spark.serializer", KryoSerializer.class.getName())
-            .set("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
-            .set(
-                "spark.sql.catalog.spark_catalog",
-                "org.apache.spark.sql.delta.catalog.DeltaCatalog")
-            .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
-            .set("spark.master", "local[2]");
-    return SparkSession.builder().config(sparkConf).getOrCreate();
+    return new StructType(fields.stream().map(STRUCT_FIELD_MAP::get).toArray(StructField[]::new));
   }
 }
