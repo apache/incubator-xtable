@@ -30,12 +30,11 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.parser.ParseException;
+import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import io.onetable.model.schema.OneField;
@@ -102,21 +101,10 @@ public class TestDeltaPartitionExtractor {
         }
       };
 
-  private static SparkSession sparkSession;
 
   private final DeltaPartitionExtractor deltaPartitionExtractor =
       DeltaPartitionExtractor.getInstance();
   private final DeltaSchemaExtractor deltaSchemaExtractor = DeltaSchemaExtractor.getInstance();
-
-  @BeforeAll
-  public static void setupOnce() {
-    sparkSession = buildSparkSession();
-  }
-
-  @AfterAll
-  public static void teardown() {
-    sparkSession.close();
-  }
 
   @Test
   public void testUnpartitionedTable() {

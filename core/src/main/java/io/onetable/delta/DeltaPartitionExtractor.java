@@ -99,13 +99,14 @@ public class DeltaPartitionExtractor {
     return getOnePartitionFields(partitionSchema, oneSchema);
   }
 
-  // If all of them are value process individually and return.
-  // If they contain month they should contain year as well.
-  // If they contain day they should contain month and year as well.
-  // If they contain hour they should contain day, month and year as well.
-  // The above are not enforced as these are standard and assumed. We can enforce if need be.
-  // Other supports CAST(col as DATE) and DATE_FORMAT(col, 'yyyy-MM-dd')
-  // Partition by nested fields may not be fully supported.
+  /**
+   * If all of them are value process individually and return.
+   * If they contain month they should contain year as well.
+   * If they contain day they should contain month and year as well.
+   * If they contain hour they should contain day, month and year as well.
+   * Other supports CAST(col as DATE) and DATE_FORMAT(col, 'yyyy-MM-dd').
+   * Partition by nested fields may not be fully supported.
+   */
   private List<OnePartitionField> getOnePartitionFields(
       StructType partitionSchema, OneSchema oneSchema) {
     PeekingIterator<StructField> itr =
@@ -454,7 +455,7 @@ public class DeltaPartitionExtractor {
     GeneratedExprType generatedExprType;
     PartitionTransformType dateFormatGranularity;
 
-    public static ParsedGeneratedExpr buildFromString(String expr) {
+    private static ParsedGeneratedExpr buildFromString(String expr) {
       if (expr.contains("YEAR")) {
         return ParsedGeneratedExpr.builder()
             .generatedExprType(GeneratedExprType.YEAR)
@@ -485,6 +486,9 @@ public class DeltaPartitionExtractor {
           int firstParenthesisPos = expr.indexOf("(");
           int commaPos = expr.indexOf(",");
           int lastParenthesisPos = expr.lastIndexOf(")");
+          /*
+           * from DATE_FORMAT(source_col, 'yyyy-MM-dd-HH') the code below extracts yyyy-MM-dd-HH.
+           */
           String dateFormatExpr =
               expr.substring(commaPos + 1, lastParenthesisPos).trim().replaceAll("^'|'$", "");
           return ParsedGeneratedExpr.builder()
