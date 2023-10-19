@@ -257,7 +257,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     return upsertRecordsWithCommitAlreadyStarted(records, instant, checkForNoErrors);
   }
 
-  public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
+  public List<HoodieBaseFile> getAllLatestBaseFiles() {
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             javaWriteClient.getEngineContext(),
