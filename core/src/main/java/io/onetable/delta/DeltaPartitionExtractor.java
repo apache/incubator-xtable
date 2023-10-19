@@ -24,10 +24,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -35,12 +36,16 @@ import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+
+import com.google.common.collect.Iterators;
+import com.google.common.collect.PeekingIterator;
 
 import io.onetable.exception.PartitionSpecException;
 import io.onetable.model.schema.OnePartitionField;
@@ -55,6 +60,7 @@ import io.onetable.schema.SchemaFieldFinder;
  * the certain cases. It is also responsible for PartitionValue Serialization leveraging {@link
  * DeltaValueSerializer}.
  */
+@Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaPartitionExtractor {
   private static final DeltaPartitionExtractor INSTANCE = new DeltaPartitionExtractor();
@@ -102,76 +108,81 @@ public class DeltaPartitionExtractor {
   // Partition by nested fields may not be fully supported.
   private List<OnePartitionField> getOnePartitionFields(
       StructType partitionSchema, OneSchema oneSchema) {
-    // TODO(vamshigv): Order is not preserved.
-    List<StructField> partitionFieldsWithoutGeneratedExpr =
-        Arrays.stream(partitionSchema.fields())
-            .filter(structField -> !structField.metadata().contains(DELTA_GENERATION_EXPRESSION))
-            .collect(Collectors.toList());
-    List<OnePartitionField> valueTransformPartitionFields =
-        partitionFieldsWithoutGeneratedExpr.stream()
-            .map(
-                partitionCol ->
-                    OnePartitionField.builder()
-                        .sourceField(
-                            SchemaFieldFinder.getInstance()
-                                .findFieldByPath(oneSchema, partitionCol.name()))
-                        .transformType(PartitionTransformType.VALUE)
-                        .build())
-            .collect(Collectors.toList());
-    List<StructField> partitionColumnsWithGeneratedExpr =
-        Arrays.stream(partitionSchema.fields())
-            .filter(structField -> structField.metadata().contains(DELTA_GENERATION_EXPRESSION))
-            .collect(Collectors.toList());
-    valueTransformPartitionFields.addAll(
-        getPartitionColumnsForGeneratedExpr(partitionColumnsWithGeneratedExpr, oneSchema));
-    return valueTransformPartitionFields;
+    PeekingIterator<StructField> itr =
+        Iterators.peekingIterator(Arrays.stream(partitionSchema.fields()).iterator());
+    List<OnePartitionField> partitionFields = new ArrayList<>();
+    while (itr.hasNext()) {
+      StructField currPartitionField = itr.peek();
+      if (!currPartitionField.metadata().contains(DELTA_GENERATION_EXPRESSION)) {
+        partitionFields.add(
+            OnePartitionField.builder()
+                .sourceField(
+                    SchemaFieldFinder.getInstance()
+                        .findFieldByPath(oneSchema, currPartitionField.name()))
+                .transformType(PartitionTransformType.VALUE)
+                .build());
+        itr.next(); // consume the field.
+      } else {
+        // Partition contains generated expression.
+        // if it starts with year we should consume until we hit field with no generated expression
+        // or we hit a field with generated expression that is of cast or date format.
+        String expr = currPartitionField.metadata().getString(DELTA_GENERATION_EXPRESSION);
+        ParsedGeneratedExpr parsedGeneratedExpr = ParsedGeneratedExpr.buildFromString(expr);
+        if (ParsedGeneratedExpr.GeneratedExprType.CAST == parsedGeneratedExpr.generatedExprType) {
+          partitionFields.add(getPartitionWithDateTransform(parsedGeneratedExpr, oneSchema));
+          itr.next(); // consume the field.
+        } else if (ParsedGeneratedExpr.GeneratedExprType.DATE_FORMAT
+            == parsedGeneratedExpr.generatedExprType) {
+          partitionFields.add(getPartitionWithDateFormatTransform(parsedGeneratedExpr, oneSchema));
+          itr.next(); // consume the field.
+        } else {
+          // consume until we hit field with no generated expression or genearated expression
+          // that is not of type cast or date format.
+          List<ParsedGeneratedExpr> parsedGeneratedExprs = new ArrayList<>();
+          while (itr.hasNext()
+              && currPartitionField.metadata().contains(DELTA_GENERATION_EXPRESSION)) {
+            expr = currPartitionField.metadata().getString(DELTA_GENERATION_EXPRESSION);
+            parsedGeneratedExpr = ParsedGeneratedExpr.buildFromString(expr);
+
+            if (ParsedGeneratedExpr.GeneratedExprType.CAST == parsedGeneratedExpr.generatedExprType
+                || ParsedGeneratedExpr.GeneratedExprType.DATE_FORMAT
+                    == parsedGeneratedExpr.generatedExprType) {
+              break;
+            }
+            parsedGeneratedExprs.add(parsedGeneratedExpr);
+            itr.next(); // consume the field
+            if (itr.hasNext()) {
+              currPartitionField = itr.peek();
+            }
+          }
+          partitionFields.add(
+              getPartitionColumnsForHourOrDayOrMonthOrYear(parsedGeneratedExprs, oneSchema));
+        }
+      }
+    }
+    return partitionFields;
   }
 
-  private List<OnePartitionField> getPartitionColumnsForGeneratedExpr(
-      List<StructField> partitionFieldsWithGeneratedExpr, OneSchema oneSchema) {
-    List<OnePartitionField> partitionFields = new ArrayList<>();
-    List<ParsedGeneratedExpr> parsedGeneratedExprs =
-        partitionFieldsWithGeneratedExpr.stream()
-            .map(
-                structField -> {
-                  String expr = structField.metadata().getString(DELTA_GENERATION_EXPRESSION);
-                  return ParsedGeneratedExpr.buildFromString(expr);
-                })
-            .collect(Collectors.toList());
-    // Ordering of the operation here is important.
-    OnePartitionField hourOrDayorMonthOrYearPartitionField =
-        getPartitionWithHourTransform(parsedGeneratedExprs, oneSchema)
-            .orElseGet(
-                () ->
-                    getPartitionWithDayTransform(parsedGeneratedExprs, oneSchema)
-                        .orElseGet(
-                            () ->
-                                getPartitionWithMonthTransform(parsedGeneratedExprs, oneSchema)
-                                    .orElseGet(
-                                        () ->
-                                            getPartitionWithYearTransform(
-                                                    parsedGeneratedExprs, oneSchema)
-                                                .orElse(null))));
-    if (hourOrDayorMonthOrYearPartitionField != null) {
-      partitionFields.add(hourOrDayorMonthOrYearPartitionField);
+  private OnePartitionField getPartitionColumnsForHourOrDayOrMonthOrYear(
+      List<ParsedGeneratedExpr> partitionFieldExprs, OneSchema oneSchema) {
+    if (partitionFieldExprs.isEmpty()) {
+      return null;
     }
-    // If there are any other generated expressions, they should be of type date or date format.
-    parsedGeneratedExprs.stream()
-        .map(
-            parsedGeneratedExpr -> {
-              if (parsedGeneratedExpr.generatedExprType
-                  == ParsedGeneratedExpr.GeneratedExprType.CAST) {
-                return getPartitionWithDateTransform(parsedGeneratedExpr, oneSchema);
-              } else if (parsedGeneratedExpr.generatedExprType
-                  == ParsedGeneratedExpr.GeneratedExprType.DATE_FORMAT) {
-                return getPartitionWithDateFormatTransform(parsedGeneratedExpr, oneSchema);
-              } else {
-                return null;
-              }
-            })
-        .filter(Objects::nonNull)
-        .forEach(partitionFields::add);
-    return partitionFields;
+    return getPartitionWithHourTransform(partitionFieldExprs, oneSchema)
+        .orElseGet(
+            () ->
+                getPartitionWithDayTransform(partitionFieldExprs, oneSchema)
+                    .orElseGet(
+                        () ->
+                            getPartitionWithMonthTransform(partitionFieldExprs, oneSchema)
+                                .orElseGet(
+                                    () ->
+                                        getPartitionWithYearTransform(
+                                                partitionFieldExprs, oneSchema)
+                                            .orElseThrow(
+                                                () ->
+                                                    new IllegalStateException(
+                                                        "Invalid partition transform")))));
   }
 
   // Cast has default format of yyyy-MM-dd.
@@ -197,60 +208,19 @@ public class DeltaPartitionExtractor {
 
   private Optional<OnePartitionField> getPartitionWithHourTransform(
       List<ParsedGeneratedExpr> parsedGeneratedExprs, OneSchema oneSchema) {
-    // return non-empty if contains a field with hour transform in generated expression.
-    // parse the field name and find more generated expressions for day, month and year or fail if
-    // not found.
-    if (parsedGeneratedExprs.size() < 4) {
+    if (parsedGeneratedExprs.size() != 4) {
       return Optional.empty();
     }
-    List<ParsedGeneratedExpr> hourTransforms =
-        parsedGeneratedExprs.stream()
-            .filter(expr -> expr.generatedExprType == ParsedGeneratedExpr.GeneratedExprType.HOUR)
-            .collect(Collectors.toList());
+    validate(
+        parsedGeneratedExprs,
+        new HashSet<>(
+            Arrays.asList(
+                ParsedGeneratedExpr.GeneratedExprType.HOUR,
+                ParsedGeneratedExpr.GeneratedExprType.DAY,
+                ParsedGeneratedExpr.GeneratedExprType.MONTH,
+                ParsedGeneratedExpr.GeneratedExprType.YEAR)));
 
-    if (hourTransforms.isEmpty()) {
-      return Optional.empty();
-    }
-
-    if (hourTransforms.size() > 1) {
-      throw new PartitionSpecException(
-          "Multiple hour transforms found and currently not supported");
-    }
-    ParsedGeneratedExpr hourTransform = hourTransforms.get(0);
-
-    List<ParsedGeneratedExpr> dayTransforms =
-        parsedGeneratedExprs.stream()
-            .filter(expr -> expr.generatedExprType == ParsedGeneratedExpr.GeneratedExprType.DAY)
-            .collect(Collectors.toList());
-    if (dayTransforms.isEmpty()
-        || dayTransforms.size() > 1
-        || !dayTransforms.get(0).sourceColumn.equals(hourTransform.sourceColumn)) {
-      throw new PartitionSpecException(
-          "Day transform not found or multiple day transforms found or day transform not matching with hour transform");
-    }
-
-    List<ParsedGeneratedExpr> monthTransforms =
-        parsedGeneratedExprs.stream()
-            .filter(expr -> expr.generatedExprType == ParsedGeneratedExpr.GeneratedExprType.MONTH)
-            .collect(Collectors.toList());
-    if (monthTransforms.isEmpty()
-        || monthTransforms.size() > 1
-        || !monthTransforms.get(0).sourceColumn.equals(hourTransform.sourceColumn)) {
-      throw new PartitionSpecException(
-          "Month transform not found or multiple month transforms found or month transform not matching with hour transform");
-    }
-
-    List<ParsedGeneratedExpr> yearTransforms =
-        parsedGeneratedExprs.stream()
-            .filter(expr -> expr.generatedExprType == ParsedGeneratedExpr.GeneratedExprType.YEAR)
-            .collect(Collectors.toList());
-    if (yearTransforms.isEmpty()
-        || yearTransforms.size() > 1
-        || !yearTransforms.get(0).sourceColumn.equals(hourTransform.sourceColumn)) {
-      throw new PartitionSpecException(
-          "Year transform not found or multiple year transforms found or year transform not matching with hour transform");
-    }
-
+    ParsedGeneratedExpr hourTransform = parsedGeneratedExprs.get(0);
     return Optional.of(
         OnePartitionField.builder()
             .sourceField(
@@ -262,45 +232,18 @@ public class DeltaPartitionExtractor {
 
   private Optional<OnePartitionField> getPartitionWithDayTransform(
       List<ParsedGeneratedExpr> parsedGeneratedExprs, OneSchema oneSchema) {
-    if (parsedGeneratedExprs.size() < 3) {
+    if (parsedGeneratedExprs.size() != 3) {
       return Optional.empty();
     }
-    List<ParsedGeneratedExpr> dayTransforms =
-        parsedGeneratedExprs.stream()
-            .filter(expr -> expr.generatedExprType == ParsedGeneratedExpr.GeneratedExprType.DAY)
-            .collect(Collectors.toList());
+    validate(
+        parsedGeneratedExprs,
+        new HashSet<>(
+            Arrays.asList(
+                ParsedGeneratedExpr.GeneratedExprType.DAY,
+                ParsedGeneratedExpr.GeneratedExprType.MONTH,
+                ParsedGeneratedExpr.GeneratedExprType.YEAR)));
 
-    if (dayTransforms.isEmpty()) {
-      return Optional.empty();
-    }
-
-    if (dayTransforms.size() > 1) {
-      throw new PartitionSpecException("Multiple day transforms found and currently not supported");
-    }
-    ParsedGeneratedExpr dayTransform = dayTransforms.get(0);
-
-    List<ParsedGeneratedExpr> monthTransforms =
-        parsedGeneratedExprs.stream()
-            .filter(expr -> expr.generatedExprType == ParsedGeneratedExpr.GeneratedExprType.MONTH)
-            .collect(Collectors.toList());
-    if (monthTransforms.isEmpty()
-        || monthTransforms.size() > 1
-        || !monthTransforms.get(0).sourceColumn.equals(dayTransform.sourceColumn)) {
-      throw new PartitionSpecException(
-          "Month transform not found or multiple month transforms found or month transform not matching with day transform");
-    }
-
-    List<ParsedGeneratedExpr> yearTransforms =
-        parsedGeneratedExprs.stream()
-            .filter(expr -> expr.generatedExprType == ParsedGeneratedExpr.GeneratedExprType.YEAR)
-            .collect(Collectors.toList());
-    if (yearTransforms.isEmpty()
-        || yearTransforms.size() > 1
-        || !yearTransforms.get(0).sourceColumn.equals(dayTransform.sourceColumn)) {
-      throw new PartitionSpecException(
-          "Year transform not found or multiple year transforms found or year transform not matching with day transform");
-    }
-
+    ParsedGeneratedExpr dayTransform = parsedGeneratedExprs.get(0);
     return Optional.of(
         OnePartitionField.builder()
             .sourceField(
@@ -312,35 +255,17 @@ public class DeltaPartitionExtractor {
 
   private Optional<OnePartitionField> getPartitionWithMonthTransform(
       List<ParsedGeneratedExpr> parsedGeneratedExprs, OneSchema oneSchema) {
-    if (parsedGeneratedExprs.size() < 2) {
+    if (parsedGeneratedExprs.size() != 2) {
       return Optional.empty();
     }
-    List<ParsedGeneratedExpr> monthTransforms =
-        parsedGeneratedExprs.stream()
-            .filter(expr -> expr.generatedExprType == ParsedGeneratedExpr.GeneratedExprType.MONTH)
-            .collect(Collectors.toList());
+    validate(
+        parsedGeneratedExprs,
+        new HashSet<>(
+            Arrays.asList(
+                ParsedGeneratedExpr.GeneratedExprType.MONTH,
+                ParsedGeneratedExpr.GeneratedExprType.YEAR)));
 
-    if (monthTransforms.isEmpty()) {
-      return Optional.empty();
-    }
-
-    if (monthTransforms.size() > 1) {
-      throw new PartitionSpecException(
-          "Multiple month transforms found and currently not supported");
-    }
-    ParsedGeneratedExpr monthTransform = monthTransforms.get(0);
-
-    List<ParsedGeneratedExpr> yearTransforms =
-        parsedGeneratedExprs.stream()
-            .filter(expr -> expr.generatedExprType == ParsedGeneratedExpr.GeneratedExprType.YEAR)
-            .collect(Collectors.toList());
-    if (yearTransforms.isEmpty()
-        || yearTransforms.size() > 1
-        || !yearTransforms.get(0).sourceColumn.equals(monthTransform.sourceColumn)) {
-      throw new PartitionSpecException(
-          "Year transform not found or multiple year transforms found or year transform not matching with month transform");
-    }
-
+    ParsedGeneratedExpr monthTransform = parsedGeneratedExprs.get(0);
     return Optional.of(
         OnePartitionField.builder()
             .sourceField(
@@ -352,24 +277,14 @@ public class DeltaPartitionExtractor {
 
   private Optional<OnePartitionField> getPartitionWithYearTransform(
       List<ParsedGeneratedExpr> parsedGeneratedExprs, OneSchema oneSchema) {
-    if (parsedGeneratedExprs.size() < 1) {
+    if (parsedGeneratedExprs.size() != 1) {
       return Optional.empty();
     }
-    List<ParsedGeneratedExpr> yearTransforms =
-        parsedGeneratedExprs.stream()
-            .filter(expr -> expr.generatedExprType == ParsedGeneratedExpr.GeneratedExprType.YEAR)
-            .collect(Collectors.toList());
+    validate(
+        parsedGeneratedExprs,
+        new HashSet<>(Arrays.asList(ParsedGeneratedExpr.GeneratedExprType.YEAR)));
 
-    if (yearTransforms.isEmpty()) {
-      return Optional.empty();
-    }
-
-    if (yearTransforms.size() > 1) {
-      throw new PartitionSpecException(
-          "Multiple year transforms found and currently not supported");
-    }
-    ParsedGeneratedExpr yearTransform = yearTransforms.get(0);
-
+    ParsedGeneratedExpr yearTransform = parsedGeneratedExprs.get(0);
     return Optional.of(
         OnePartitionField.builder()
             .sourceField(
@@ -489,29 +404,33 @@ public class DeltaPartitionExtractor {
     return new StructField(currPartitionColumnName, dataType, true, partitionFieldMetadata);
   }
 
-  // Find the field in the structType by path where path can be nested with dot notation like a.b.c
-  private StructField findFieldByPath(StructType structType, String path) {
-    if (path == null || path.isEmpty()) {
-      return null;
+  private void validate(
+      List<ParsedGeneratedExpr> parsedGeneratedExprs,
+      Set<ParsedGeneratedExpr.GeneratedExprType> expectedTypesToBePresent) {
+    Set<String> sourceFields =
+        parsedGeneratedExprs.stream().map(expr -> expr.sourceColumn).collect(Collectors.toSet());
+    if (sourceFields.size() > 1) {
+      log.error(
+          String.format("Multiple source columns found for partition transform: %s", sourceFields));
+      throw new PartitionSpecException(
+          String.format("Multiple source columns found for partition transform: %s", sourceFields));
     }
-    StructType currStructType = structType;
-    String[] pathParts = path.split("\\.");
-    for (int i = 0; i < pathParts.length; i++) {
-      StructField[] currFields = currStructType.fields();
-      int lookupIndex = currStructType.fieldIndex(pathParts[i]);
-      if (lookupIndex < 0 || lookupIndex >= currFields.length) {
-        return null;
-      }
-      StructField currField = currFields[lookupIndex];
-      if (i == pathParts.length - 1) {
-        return currField;
-      }
-      if (!(currField.dataType() instanceof StructType)) {
-        return null;
-      }
-      currStructType = (StructType) currField.dataType();
+    Set<ParsedGeneratedExpr.GeneratedExprType> actualTypesPresent =
+        parsedGeneratedExprs.stream()
+            .map(expr -> expr.generatedExprType)
+            .collect(Collectors.toSet());
+    if (!actualTypesPresent.equals(expectedTypesToBePresent)) {
+      log.error(
+          "Mismatched types present. Expected: "
+              + expectedTypesToBePresent
+              + ", Found: "
+              + actualTypesPresent);
+      throw new PartitionSpecException(
+          "Mismatched types present. Expected: "
+              + expectedTypesToBePresent
+              + ", Found: "
+              + actualTypesPresent);
     }
-    return null;
   }
 
   @Builder
