@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -743,6 +744,112 @@ public class TestDeltaSchemaExtractor {
     Assertions.assertEquals(
         structRepresentation,
         DeltaSchemaExtractor.getInstance().fromOneSchema(oneSchemaRepresentation));
+    Assertions.assertEquals(
+        oneSchemaRepresentation,
+        DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
+  }
+
+  @Test
+  public void testFieldIdsInDeltaSchema() {
+    StructType structRepresentation =
+        new StructType()
+            .add(
+                "nestedOne",
+                new StructType()
+                    .add(
+                        "nestedOptionalInt",
+                        DataTypes.IntegerType,
+                        true,
+                        Metadata.fromJson("{\"delta.columnMapping.id\": 3}"))
+                    .add(
+                        "nestedRequiredDouble",
+                        DataTypes.DoubleType,
+                        false,
+                        Metadata.fromJson("{\"delta.columnMapping.id\": 5}"))
+                    .add(
+                        "nestedTwo",
+                        new StructType()
+                            .add(
+                                "doublyNestedString",
+                                DataTypes.StringType,
+                                true,
+                                Metadata.fromJson("{\"delta.columnMapping.id\": 12}")),
+                        false,
+                        Metadata.fromJson("{\"delta.columnMapping.id\": 10}")),
+                true,
+                Metadata.fromJson("{\"delta.columnMapping.id\": 2}"));
+
+    OneSchema oneSchemaRepresentation =
+        OneSchema.builder()
+            .name("struct")
+            .dataType(OneType.RECORD)
+            .isNullable(false)
+            .fields(
+                Collections.singletonList(
+                    OneField.builder()
+                        .name("nestedOne")
+                        .fieldId(2)
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .schema(
+                            OneSchema.builder()
+                                .name("struct")
+                                .dataType(OneType.RECORD)
+                                .isNullable(true)
+                                .fields(
+                                    Arrays.asList(
+                                        OneField.builder()
+                                            .name("nestedOptionalInt")
+                                            .fieldId(3)
+                                            .parentPath("nestedOne")
+                                            .schema(
+                                                OneSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(OneType.INT)
+                                                    .isNullable(true)
+                                                    .build())
+                                            .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                                            .build(),
+                                        OneField.builder()
+                                            .name("nestedRequiredDouble")
+                                            .fieldId(5)
+                                            .parentPath("nestedOne")
+                                            .schema(
+                                                OneSchema.builder()
+                                                    .name("double")
+                                                    .dataType(OneType.DOUBLE)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        OneField.builder()
+                                            .name("nestedTwo")
+                                            .fieldId(10)
+                                            .parentPath("nestedOne")
+                                            .schema(
+                                                OneSchema.builder()
+                                                    .name("struct")
+                                                    .dataType(OneType.RECORD)
+                                                    .isNullable(false)
+                                                    .fields(
+                                                        Collections.singletonList(
+                                                            OneField.builder()
+                                                                .name("doublyNestedString")
+                                                                .fieldId(12)
+                                                                .parentPath("nestedOne.nestedTwo")
+                                                                .schema(
+                                                                    OneSchema.builder()
+                                                                        .name("string")
+                                                                        .dataType(OneType.STRING)
+                                                                        .isNullable(true)
+                                                                        .build())
+                                                                .defaultValue(
+                                                                    OneField.Constants
+                                                                        .NULL_DEFAULT_VALUE)
+                                                                .build()))
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build()))
+            .build();
     Assertions.assertEquals(
         oneSchemaRepresentation,
         DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
