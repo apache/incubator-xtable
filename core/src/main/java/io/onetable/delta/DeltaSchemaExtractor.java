@@ -56,6 +56,7 @@ import io.onetable.model.schema.OneType;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaSchemaExtractor {
+  private static final String DELTA_COLUMN_MAPPING_ID = "delta.columnMapping.id";
   private static final DeltaSchemaExtractor INSTANCE = new DeltaSchemaExtractor();
 
   public static DeltaSchemaExtractor getInstance() {
@@ -183,6 +184,10 @@ public class DeltaSchemaExtractor {
             Arrays.stream(structType.fields())
                 .map(
                     field -> {
+                      Integer fieldId =
+                          field.metadata().contains(DELTA_COLUMN_MAPPING_ID)
+                              ? (int) field.metadata().getLong(DELTA_COLUMN_MAPPING_ID)
+                              : null;
                       String fieldComment =
                           field.getComment().isDefined() ? field.getComment().get() : null;
                       OneSchema schema =
@@ -193,6 +198,7 @@ public class DeltaSchemaExtractor {
                               fieldComment);
                       return OneField.builder()
                           .name(field.name())
+                          .fieldId(fieldId)
                           .parentPath(parentPath)
                           .schema(schema)
                           .defaultValue(

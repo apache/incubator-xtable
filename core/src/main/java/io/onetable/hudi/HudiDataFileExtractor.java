@@ -40,7 +40,6 @@ import org.apache.hadoop.fs.Path;
 
 import org.apache.hudi.avro.model.HoodieRestoreMetadata;
 import org.apache.hudi.avro.model.HoodieRollbackMetadata;
-import org.apache.hudi.avro.model.HoodieRollbackPartitionMetadata;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.engine.HoodieLocalEngineContext;
@@ -220,7 +219,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
               .forEach(
                   (partition, metadata) ->
                       removedFiles.addAll(
-                          getRemovedFilesForRollback(partition, metadata, partitioningFields)));
+                          getRemovedFiles(
+                              partition, metadata.getSuccessDeleteFiles(), partitioningFields)));
           break;
         case HoodieTimeline.RESTORE_ACTION:
           HoodieRestoreMetadata restoreMetadata =
@@ -237,12 +237,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
                                   .forEach(
                                       (partition, metadata) ->
                                           removedFiles.addAll(
-                                              getRemovedFilesForRollback(
-                                                  partition, metadata, partitioningFields)))));
+                                              getRemovedFiles(
+                                                  partition,
+                                                  metadata.getSuccessDeleteFiles(),
+                                                  partitioningFields)))));
           break;
+        case HoodieTimeline.CLEAN_ACTION:
         case HoodieTimeline.SAVEPOINT_ACTION:
         case HoodieTimeline.LOG_COMPACTION_ACTION:
-        case HoodieTimeline.CLEAN_ACTION:
         case HoodieTimeline.INDEXING_ACTION:
         case HoodieTimeline.SCHEMA_COMMIT_ACTION:
           // these do not impact the base files
@@ -256,13 +258,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
     }
   }
 
-  private List<OneDataFile> getRemovedFilesForRollback(
-      String partitionPath,
-      HoodieRollbackPartitionMetadata metadata,
-      List<OnePartitionField> partitioningFields) {
+  private List<OneDataFile> getRemovedFiles(
+      String partitionPath, List<String> deletedPaths, List<OnePartitionField> partitioningFields) {
     Map<OnePartitionField, Range> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
-    List<String> deletedPaths = metadata.getSuccessDeleteFiles();
     return deletedPaths.stream()
         .map(
             path -> {
@@ -302,6 +301,11 @@ public class HudiDataFileExtractor implements AutoCloseable {
             fileGroup -> {
               List<HoodieBaseFile> baseFiles =
                   fileGroup.getAllBaseFiles().collect(Collectors.toList());
+              if (baseFiles.isEmpty()) {
+                // Files might have been cleaned up and we might be processing this instant much
+                // later.
+                return;
+              }
               boolean newBaseFileAdded = false;
               if (HoodieTimeline.compareTimestamps(
                   baseFiles.get(0).getCommitTime(),
