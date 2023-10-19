@@ -41,6 +41,8 @@ import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
+import org.apache.hudi.client.clustering.plan.strategy.JavaSizeBasedClusteringPlanStrategy;
+import org.apache.hudi.client.clustering.run.strategy.JavaSortAndSizeExecutionStrategy;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
@@ -56,6 +58,7 @@ import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.JsonUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieArchivalConfig;
+import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
@@ -351,7 +354,17 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
 
   private HoodieJavaWriteClient<HoodieAvroPayload> initJavaWriteClient(
       Schema schema, TypedProperties keyGenProperties, HoodieArchivalConfig archivalConfig) {
-    HoodieWriteConfig writeConfig = generateWriteConfig(schema, keyGenProperties);
+    HoodieWriteConfig writeConfig =
+        HoodieWriteConfig.newBuilder()
+            .withProperties(generateWriteConfig(schema, keyGenProperties).getProps())
+            .withClusteringConfig(
+                HoodieClusteringConfig.newBuilder()
+                    .withClusteringPlanStrategyClass(
+                        JavaSizeBasedClusteringPlanStrategy.class.getName())
+                    .withClusteringExecutionStrategyClass(
+                        JavaSortAndSizeExecutionStrategy.class.getName())
+                    .build())
+            .build();
     // override archival config if provided
     if (archivalConfig != null) {
       writeConfig =

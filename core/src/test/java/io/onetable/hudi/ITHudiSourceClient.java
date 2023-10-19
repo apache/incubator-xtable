@@ -46,6 +46,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.client.HoodieReadClient;
+import org.apache.hudi.common.model.BaseFile;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieRecord;
@@ -274,9 +275,9 @@ public class ITHudiSourceClient {
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void testsForClustering(HoodieTableType tableType, PartitionConfig partitionConfig) {
     String tableName = "test_table_" + UUID.randomUUID();
-    try (TestSparkHudiTable table =
-        TestSparkHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
       List<List<HoodieBaseFile>> allBaseFiles = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -443,12 +444,10 @@ public class ITHudiSourceClient {
     assertNotNull(oneSnapshot);
     assertNotNull(oneSnapshot.getTable());
     List<String> allActivePaths =
-        allBaseFiles.stream()
-            .map(hoodieBaseFile -> hoodieBaseFile.getPath())
-            .collect(Collectors.toList());
+        allBaseFiles.stream().map(BaseFile::getPath).collect(Collectors.toList());
     List<String> onetablePaths =
-        DefaultSnapshotVisitor.extractDataFilePaths(oneSnapshot.getDataFiles()).keySet().stream()
-            .collect(Collectors.toList());
+        new ArrayList<>(
+            DefaultSnapshotVisitor.extractDataFilePaths(oneSnapshot.getDataFiles()).keySet());
     Collections.sort(allActivePaths);
     Collections.sort(onetablePaths);
     assertEquals(allActivePaths, onetablePaths);
@@ -476,8 +475,9 @@ public class ITHudiSourceClient {
     if (allTableChanges.isEmpty() && allBaseFiles.size() <= 1) {
       return;
     }
-    assertTrue(
-        allTableChanges.size() == allBaseFiles.size() - 1,
+    assertEquals(
+        allTableChanges.size(),
+        allBaseFiles.size() - 1,
         "Number of table changes should be equal to number of commits - 1");
     IntStream.range(0, allBaseFiles.size() - 1)
         .forEach(
@@ -493,13 +493,9 @@ public class ITHudiSourceClient {
     assertNotNull(tableChange);
     assertNotNull(tableChange.getCurrentTableState());
     Set<String> filesForCommitBefore =
-        baseFilesBefore.stream()
-            .map(hoodieBaseFile -> hoodieBaseFile.getPath())
-            .collect(Collectors.toSet());
+        baseFilesBefore.stream().map(BaseFile::getPath).collect(Collectors.toSet());
     Set<String> filesForCommitAfter =
-        baseFilesAfter.stream()
-            .map(hoodieBaseFile -> hoodieBaseFile.getPath())
-            .collect(Collectors.toSet());
+        baseFilesAfter.stream().map(BaseFile::getPath).collect(Collectors.toSet());
     // Get files added by diffing filesForCommitAfter and filesForCommitBefore.
     Set<String> filesAdded =
         filesForCommitAfter.stream()
