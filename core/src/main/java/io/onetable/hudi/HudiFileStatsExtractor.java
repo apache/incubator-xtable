@@ -18,10 +18,13 @@
  
 package io.onetable.hudi;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -30,13 +33,21 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import lombok.AllArgsConstructor;
+import lombok.NonNull;
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.avro.LogicalTypes;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.io.api.Binary;
 
+import org.apache.hudi.avro.HoodieAvroUtils;
+import org.apache.hudi.avro.model.DecimalWrapper;
+import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
+import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.ParquetUtils;
+import org.apache.hudi.common.util.collection.Pair;
+import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.metadata.MetadataPartitionType;
 
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
@@ -48,25 +59,44 @@ import io.onetable.model.storage.OneDataFile;
 /** Responsible for Column stats extraction for Hudi. */
 @AllArgsConstructor
 public class HudiFileStatsExtractor {
+  private static final int DECIMAL_WRAPPER_SCALE =
+      ((LogicalTypes.Decimal) DecimalWrapper.SCHEMA$.getField("value").schema().getLogicalType())
+          .getScale();
 
   private static final ParquetUtils UTILS = new ParquetUtils();
+  private static final String ARRAY_DOT_FIELD = ".array.";
+  private static final String PARQUET_ELMENT_DOT_FIELD = ".list.element.";
 
-  private final Configuration conf;
+  @NonNull private final HoodieTableMetaClient metaClient;
 
   /**
    * Adds column stats and row count information to the provided stream of files.
    *
+   * @param metadataTable the metadata table for the hudi table if it exists, otherwise null
    * @param files a stream of files that require column stats and row count information
    * @param schema the schema of the files (assumed to be the same for all files in stream)
    * @return a stream of files with column stats and row count information
    */
-  public Stream<OneDataFile> addStatsToFiles(Stream<OneDataFile> files, OneSchema schema) {
+  public Stream<OneDataFile> addStatsToFiles(
+      HoodieTableMetadata metadataTable, Stream<OneDataFile> files, OneSchema schema) {
+    boolean useMetadataTableColStats =
+        metadataTable != null
+            && metaClient
+                .getTableConfig()
+                .isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS);
     final Map<String, OneField> nameFieldMap =
         getAllFields(schema).stream()
             .collect(
                 Collectors.toMap(
-                    field -> HudiSchemaExtractor.convertFromOneTablePath(field.getPath()),
+                    field -> getFieldNameForStats(field, useMetadataTableColStats),
                     Function.identity()));
+    return useMetadataTableColStats
+        ? computeColumnStatsFromMetadataTable(metadataTable, files, nameFieldMap)
+        : computeColumnStatsFromParquetFooters(files, nameFieldMap);
+  }
+
+  private Stream<OneDataFile> computeColumnStatsFromParquetFooters(
+      Stream<OneDataFile> files, Map<String, OneField> nameFieldMap) {
     return files.map(
         file -> {
           HudiFileStats fileStats =
@@ -78,10 +108,70 @@ public class HudiFileStatsExtractor {
         });
   }
 
+  private Pair<String, String> getPartitionAndFileName(String partition, String path) {
+    return Pair.of(partition, new Path(path).getName());
+  }
+
+  private Stream<OneDataFile> computeColumnStatsFromMetadataTable(
+      HoodieTableMetadata metadataTable,
+      Stream<OneDataFile> files,
+      Map<String, OneField> nameFieldMap) {
+    Map<Pair<String, String>, OneDataFile> filePathsToDataFile =
+        files.collect(
+            Collectors.toMap(
+                file -> getPartitionAndFileName(file.getPartitionPath(), file.getPhysicalPath()),
+                Function.identity()));
+    if (filePathsToDataFile.isEmpty()) {
+      return Stream.empty();
+    }
+    List<Pair<String, String>> filePaths = new ArrayList<>(filePathsToDataFile.keySet());
+    Map<Pair<String, String>, List<Pair<OneField, HoodieMetadataColumnStats>>> stats =
+        nameFieldMap.entrySet().parallelStream()
+            .flatMap(
+                fieldNameToField -> {
+                  String fieldName = fieldNameToField.getKey();
+                  OneField field = fieldNameToField.getValue();
+                  return metadataTable.getColumnStats(filePaths, fieldName).entrySet().stream()
+                      .map(
+                          filePairToStats ->
+                              Pair.of(
+                                  filePairToStats.getKey(),
+                                  Pair.of(field, filePairToStats.getValue())));
+                })
+            .collect(
+                Collectors.groupingBy(
+                    Map.Entry::getKey,
+                    Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
+    return filePathsToDataFile.entrySet().stream()
+        .map(
+            pathToDataFile -> {
+              Pair<String, String> filePath = pathToDataFile.getKey();
+              OneDataFile file = pathToDataFile.getValue();
+              List<Pair<OneField, HoodieMetadataColumnStats>> fileStats =
+                  stats.getOrDefault(filePath, Collections.emptyList());
+              Map<OneField, ColumnStat> columnStats =
+                  fileStats.stream()
+                      .collect(
+                          Collectors.toMap(
+                              Pair::getKey,
+                              pair -> getColumnStatFromHudiStat(pair.getLeft(), pair.getRight())));
+              long recordCount =
+                  columnStats.entrySet().stream()
+                      .filter(entry -> entry.getKey().getParentPath() == null)
+                      .map(Map.Entry::getValue)
+                      .map(ColumnStat::getNumValues)
+                      .filter(numValues -> numValues > 0)
+                      .findFirst()
+                      .orElse(0L);
+              return file.toBuilder().columnStats(columnStats).recordCount(recordCount).build();
+            });
+  }
+
   private HudiFileStats computeColumnStatsForFile(
       Path filePath, Map<String, OneField> nameFieldMap) {
     List<HoodieColumnRangeMetadata<Comparable>> columnRanges =
-        UTILS.readRangeFromParquetMetadata(conf, filePath, new ArrayList<>(nameFieldMap.keySet()));
+        UTILS.readRangeFromParquetMetadata(
+            metaClient.getHadoopConf(), filePath, new ArrayList<>(nameFieldMap.keySet()));
     Map<OneField, ColumnStat> columnStatMap =
         columnRanges.stream()
             .collect(
@@ -97,9 +187,41 @@ public class HudiFileStatsExtractor {
       }
     }
     if (rowCount == null) {
-      rowCount = UTILS.getRowCount(conf, filePath);
+      rowCount = UTILS.getRowCount(metaClient.getHadoopConf(), filePath);
     }
     return new HudiFileStats(columnStatMap, rowCount);
+  }
+
+  private static ColumnStat getColumnStatFromHudiStat(
+      OneField field, HoodieMetadataColumnStats columnStats) {
+    if (columnStats == null) {
+      return ColumnStat.builder().build();
+    }
+    Comparable<?> minValue = HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMinValue());
+    Comparable<?> maxValue = HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMaxValue());
+    if (field.getSchema().getDataType() == OneType.DECIMAL) {
+      minValue =
+          minValue instanceof ByteBuffer
+              ? convertBytesToBigDecimal((ByteBuffer) minValue, DECIMAL_WRAPPER_SCALE)
+              : minValue;
+      maxValue =
+          maxValue instanceof ByteBuffer
+              ? convertBytesToBigDecimal((ByteBuffer) maxValue, DECIMAL_WRAPPER_SCALE)
+              : maxValue;
+    }
+    return getColumnStatFromValues(
+        minValue,
+        maxValue,
+        field,
+        columnStats.getNullCount(),
+        columnStats.getValueCount(),
+        columnStats.getTotalSize());
+  }
+
+  private static BigDecimal convertBytesToBigDecimal(ByteBuffer value, int scale) {
+    byte[] bytes = new byte[value.remaining()];
+    value.duplicate().get(bytes);
+    return new BigDecimal(new BigInteger(bytes), scale);
   }
 
   private static ColumnStat getColumnStatFromColRange(
@@ -107,8 +229,22 @@ public class HudiFileStatsExtractor {
     if (colRange == null) {
       return ColumnStat.builder().build();
     }
-    Comparable minValue = colRange.getMinValue();
-    Comparable maxValue = colRange.getMaxValue();
+    return getColumnStatFromValues(
+        colRange.getMinValue(),
+        colRange.getMaxValue(),
+        field,
+        colRange.getNullCount(),
+        colRange.getValueCount(),
+        colRange.getTotalSize());
+  }
+
+  private static ColumnStat getColumnStatFromValues(
+      Comparable minValue,
+      Comparable maxValue,
+      OneField field,
+      long nullCount,
+      long valueCount,
+      long totalSize) {
     // Special type handling
     if (minValue instanceof Date || maxValue instanceof Date) {
       minValue = minValue == null ? null : dateToDaysSinceEpoch(minValue);
@@ -126,9 +262,9 @@ public class HudiFileStatsExtractor {
     Range range = isScalar ? Range.scalar(minValue) : Range.vector(minValue, maxValue);
     return ColumnStat.builder()
         .range(range)
-        .numNulls(colRange.getNullCount())
-        .numValues(colRange.getValueCount())
-        .totalSize(colRange.getTotalSize())
+        .numNulls(nullCount)
+        .numValues(valueCount)
+        .totalSize(totalSize)
         .build();
   }
 
@@ -147,5 +283,14 @@ public class HudiFileStatsExtractor {
 
   private static int dateToDaysSinceEpoch(Object date) {
     return (int) ((Date) date).toLocalDate().toEpochDay();
+  }
+
+  private String getFieldNameForStats(OneField field, boolean isReadFromMetadataTable) {
+    String convertedDotPath = HudiSchemaExtractor.convertFromOneTablePath(field.getPath());
+    // the array field naming is different for metadata table
+    if (isReadFromMetadataTable) {
+      return convertedDotPath.replace(ARRAY_DOT_FIELD, PARQUET_ELMENT_DOT_FIELD);
+    }
+    return convertedDotPath;
   }
 }

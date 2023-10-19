@@ -34,11 +34,13 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.Random;
 import java.util.UUID;
 import java.util.function.Function;
@@ -58,6 +60,7 @@ import org.apache.hadoop.fs.LocalFileSystem;
 
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
+import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.config.LockConfiguration;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.fs.FSUtils;
@@ -76,6 +79,7 @@ import org.apache.hudi.common.table.marker.MarkerType;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieCleanConfig;
 import org.apache.hudi.config.HoodieClusteringConfig;
@@ -282,8 +286,7 @@ public abstract class TestAbstractHudiTable implements Closeable {
         .collect(Collectors.toList());
   }
 
-  protected HoodieWriteConfig generateWriteConfig(
-      String schemaStr, TypedProperties keyGenProperties) {
+  protected HoodieWriteConfig generateWriteConfig(Schema schema, TypedProperties keyGenProperties) {
     // allow for compaction and cleaning after a single commit for testing different timeline
     // scenarios
     HoodieCompactionConfig compactionConfig =
@@ -298,6 +301,15 @@ public abstract class TestAbstractHudiTable implements Closeable {
             .build();
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
+    HoodieMetadataConfig metadataConfig =
+        HoodieMetadataConfig.newBuilder()
+            .enable(true)
+            // enable col stats only on un-partitioned data due to bug in Hudi
+            // https://issues.apache.org/jira/browse/HUDI-6954
+            .withMetadataIndexColumnStats(
+                !keyGenProperties.getString(PARTITIONPATH_FIELD_NAME.key(), "").isEmpty())
+            .withColumnStatsIndexForColumns(getColumnsFromSchema(schema))
+            .build();
     Properties lockProperties = new Properties();
     lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_WAIT_TIMEOUT_MS_PROP_KEY, "3000");
     lockProperties.setProperty(
@@ -306,18 +318,71 @@ public abstract class TestAbstractHudiTable implements Closeable {
     return HoodieWriteConfig.newBuilder()
         .withProperties(keyGenProperties)
         .withPath(this.basePath)
-        .withSchema(schemaStr)
+        .withSchema(schema.toString())
         .withKeyGenerator(keyGenerator.getClass().getCanonicalName())
         .withCompactionConfig(compactionConfig)
         .withClusteringConfig(clusteringConfig)
         .withCleanConfig(cleanConfig)
         .withArchivalConfig(archivalConfig)
+        .withMetadataConfig(metadataConfig)
         .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
         .withMarkersType(MarkerType.DIRECT.name())
         .withLockConfig(
             HoodieLockConfig.newBuilder().withLockProvider(InProcessLockProvider.class).build())
         .withProperties(lockProperties)
         .build();
+  }
+
+  /**
+   * Creates a comma separated list of all the columns in dot notation so that all columns will have
+   * stats saved to metadata table for more thorough testing.
+   *
+   * @param schema the writer schema
+   * @return comma separated list of all columns in dot notation
+   */
+  private String getColumnsFromSchema(Schema schema) {
+    Queue<Pair<String, Schema.Field>> parentAndField =
+        new ArrayDeque<>(
+            schema.getFields().stream()
+                .map(field -> Pair.of("", field))
+                .collect(Collectors.toList()));
+    String output = "";
+    while (!parentAndField.isEmpty()) {
+      Pair<String, Schema.Field> pair = parentAndField.poll();
+      String parent = pair.getKey();
+      Schema.Field field = pair.getValue();
+      String fieldName = field.name();
+      Schema fieldSchema = unwrapNullableSchema(field.schema());
+      String prefix = parent.isEmpty() ? "" : parent + ".";
+      if (fieldSchema.getType() == Schema.Type.RECORD) {
+        fieldSchema.getFields().stream()
+            .map(subField -> Pair.of(prefix + fieldName, subField))
+            .forEach(parentAndField::add);
+      } else if (fieldSchema.getType() == Schema.Type.ARRAY) {
+        parentAndField.add(
+            Pair.of(
+                prefix + fieldName + ".list",
+                new Schema.Field("element", fieldSchema.getElementType(), "", null)));
+      } else if (fieldSchema.getType() == Schema.Type.MAP) {
+        output += prefix + fieldName + ".key_value.key" + ",";
+        parentAndField.add(
+            Pair.of(
+                prefix + fieldName + ".key_value",
+                new Schema.Field("value", fieldSchema.getValueType(), "", null)));
+      } else {
+        output += prefix + fieldName + ",";
+      }
+    }
+    return output;
+  }
+
+  private Schema unwrapNullableSchema(Schema schema) {
+    if (schema.getType() == Schema.Type.UNION) {
+      return schema.getTypes().get(0).getType() == Schema.Type.NULL
+          ? schema.getTypes().get(1)
+          : schema.getTypes().get(0);
+    }
+    return schema;
   }
 
   // Create the base path and store it for reference
@@ -500,7 +565,7 @@ public abstract class TestAbstractHudiTable implements Closeable {
           case FIXED:
             if (fieldSchema.getLogicalType() != null
                 && fieldSchema.getLogicalType() instanceof LogicalTypes.Decimal) {
-              value = BigDecimal.valueOf(RANDOM.nextLong(), 2);
+              value = BigDecimal.valueOf(RANDOM.nextInt(1000000), 2);
             } else {
               value =
                   new GenericData.Fixed(
