@@ -83,8 +83,9 @@ public class OneSchema {
   }
 
   /**
-   * Traverses the schema and returns a list of all fields. Use this method to get a list that
-   * includes nested fields. {@link OneSchema#getFields()} will only return the top level fields.
+   * Performs a level-order traversal of the schema and returns a list of all fields. Use this
+   * method to get a list that includes nested fields. Use {@link OneSchema#getFields()} when
+   * fetching the top level fields.
    *
    * @return list of all fields in the schema
    */
