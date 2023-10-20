@@ -23,6 +23,7 @@ import static io.onetable.delta.ScalaUtils.convertJavaMapToScala;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -56,7 +57,7 @@ public class DeltaDataFileUpdatesExtractor {
       DeltaLog deltaLog, OneDataFiles snapshotFiles, StructType tableSchema) {
     List<OneDataFile> dataFiles = new ArrayList<>();
     try (PartitionedDataFileIterator fileIterator =
-        new DeltaDataFileExtractor(deltaLog.snapshot())) {
+        new DeltaDataFileExtractor(deltaLog.snapshot(), Optional.empty())) {
       fileIterator.forEachRemaining(dataFiles::add);
       OneDataFiles currentDataFiles = OneDataFiles.collectionBuilder().files(dataFiles).build();
       OneDataFilesDiff filesDiff = currentDataFiles.diff(snapshotFiles);

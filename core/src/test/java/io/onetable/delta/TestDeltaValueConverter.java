@@ -37,8 +37,10 @@ public class TestDeltaValueConverter {
   @MethodSource("valuesWithSchemaProviderForColStats")
   public void formattedValueDifferentTypesForColStats(
       Object fieldValue, OneSchema fieldSchema, Object expectedDeltaValue) {
-    Object deltaRepresentation = DeltaValueConverter.convertToDeltaColumnStatValue(fieldValue, fieldSchema);
-    Object internalRepresentation = DeltaValueConverter.convertFromDeltaColumnStatValue(deltaRepresentation, fieldSchema);
+    Object deltaRepresentation =
+        DeltaValueConverter.convertToDeltaColumnStatValue(fieldValue, fieldSchema);
+    Object internalRepresentation =
+        DeltaValueConverter.convertFromDeltaColumnStatValue(deltaRepresentation, fieldSchema);
     assertEquals(expectedDeltaValue, deltaRepresentation);
     assertEquals(fieldValue, internalRepresentation);
   }
@@ -51,9 +53,12 @@ public class TestDeltaValueConverter {
       PartitionTransformType transformType,
       String dateFormat,
       String expectedValue) {
-    String deltaRepresentation = DeltaValueConverter.convertToDeltaPartitionValue(
-        fieldValue, oneType, transformType, dateFormat);
-    Object internalRepresentation = DeltaValueConverter.convertFromDeltaPartitionValue(deltaRepresentation, oneType, transformType, dateFormat);
+    String deltaRepresentation =
+        DeltaValueConverter.convertToDeltaPartitionValue(
+            fieldValue, oneType, transformType, dateFormat);
+    Object internalRepresentation =
+        DeltaValueConverter.convertFromDeltaPartitionValue(
+            deltaRepresentation, oneType, transformType, dateFormat);
     assertEquals(expectedValue, deltaRepresentation);
     assertEquals(fieldValue, internalRepresentation);
   }

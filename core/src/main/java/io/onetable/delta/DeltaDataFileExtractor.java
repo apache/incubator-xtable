@@ -19,8 +19,10 @@
 package io.onetable.delta;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.Path;
@@ -39,9 +41,12 @@ public class DeltaDataFileExtractor implements PartitionedDataFileIterator {
   private final Snapshot snapshot;
   private final String tableBasePath;
   private final Iterator<OneDataFile> dataFilesIterator;
+  private final Optional<AddFileStatsExtractor> fileStatsExtractor;
 
-  public DeltaDataFileExtractor(Snapshot snapshot) {
+  public DeltaDataFileExtractor(
+      Snapshot snapshot, Optional<AddFileStatsExtractor> fileStatsExtractor) {
     this.snapshot = snapshot;
+    this.fileStatsExtractor = fileStatsExtractor;
     this.tableBasePath = snapshot.deltaLog().dataPath().toUri().toString();
     this.dataFilesIterator =
         this.snapshot.allFiles().collectAsList().stream()
@@ -82,6 +87,11 @@ public class DeltaDataFileExtractor implements PartitionedDataFileIterator {
         .physicalPath(getFullPathToFile(addFile.path()))
         .fileFormat(convertToOneTableFileFormat(snapshot.metadata().format().provider()))
         .fileSizeBytes(addFile.getFileSize())
+        .recordCount(addFile.getNumLogicalRecords())
+        .columnStats(
+            fileStatsExtractor
+                .map(extractor -> extractor.getColumnStatsForFile(addFile))
+                .orElse(Collections.emptyMap()))
         .build();
   }
 

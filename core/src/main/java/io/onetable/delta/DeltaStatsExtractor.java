@@ -28,10 +28,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.NoArgsConstructor;
 
-import lombok.Value;
 import org.apache.spark.sql.types.DateType;
 import org.apache.spark.sql.types.NumericType;
 import org.apache.spark.sql.types.StringType;
@@ -57,11 +55,6 @@ public class DeltaStatsExtractor {
   private static final String PATH_DELIMITER = "\\.";
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  private static final String NUM_RECORDS = "numRecords";
-  private static final String MIN_VALUES = "minValues";
-  private static final String MAX_VALUES = "maxValues";
-  private static final String NULL_COUNT = "nullCount";
-
   public static DeltaStatsExtractor getInstance() {
     return INSTANCE;
   }
@@ -78,10 +71,12 @@ public class DeltaStatsExtractor {
         getColumnStatKeyedByFullyQualifiedPath(columnStats);
     Map<String, OneField> pathFieldMap = getPathToFieldMap(columnStats);
     Set<String> validPaths = getPathsFromStructSchemaForMinAndMaxStats(deltaTableSchema, "");
-    DeltaStats deltaStats = deltaStatsBuilder.minValues(getMinValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths))
+    DeltaStats deltaStats =
+        deltaStatsBuilder
+            .minValues(getMinValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths))
             .maxValues(getMaxValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths))
-                .nullCount(getNullCount(columnStatsMapKeyedByPath, validPaths))
-        .build();
+            .nullCount(getNullCount(columnStatsMapKeyedByPath, validPaths))
+            .build();
     return MAPPER.writeValueAsString(deltaStats);
   }
 
@@ -201,14 +196,5 @@ public class DeltaStatsExtractor {
   private Map<String, OneField> getPathToFieldMap(Map<OneField, ColumnStat> columnStats) {
     return columnStats.entrySet().stream()
         .collect(Collectors.toMap(e -> e.getKey().getPath(), Map.Entry::getKey));
-  }
-
-  @Builder
-  @Value
-  private static class DeltaStats {
-    long numRecords;
-    Map<String, Object> minValues;
-    Map<String, Object> maxValues;
-    Map<String, Object> nullCount;
   }
 }

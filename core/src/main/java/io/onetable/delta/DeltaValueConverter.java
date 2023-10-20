@@ -36,8 +36,8 @@ import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
 
 /**
- * DeltaValueConverter is specialized in (de)serializing column stats and partition values depending on
- * the data type and partition transform type.
+ * DeltaValueConverter is specialized in (de)serializing column stats and partition values depending
+ * on the data type and partition transform type.
  */
 public class DeltaValueConverter {
   private static final String DATE_FORMAT_STR = "yyyy-MM-dd HH:mm:ss";
@@ -69,7 +69,8 @@ public class DeltaValueConverter {
       if (timestampPrecision == OneSchema.MetadataValue.MILLIS) {
         return instant.toEpochMilli();
       }
-      return TimeUnit.SECONDS.toMicros(instant.getEpochSecond()) + TimeUnit.NANOSECONDS.toMicros(instant.getNano());
+      return TimeUnit.SECONDS.toMicros(instant.getEpochSecond())
+          + TimeUnit.NANOSECONDS.toMicros(instant.getNano());
     } catch (ParseException ex) {
       throw new OneIOException("Unable to parse time from column stats", ex);
     }
@@ -104,10 +105,9 @@ public class DeltaValueConverter {
 
   private static boolean noConversionForSchema(OneSchema fieldSchema) {
     OneType fieldType = fieldSchema.getDataType();
-    return
-        fieldType != OneType.DATE
-            && fieldType != OneType.TIMESTAMP
-            && fieldType != OneType.TIMESTAMP_NTZ;
+    return fieldType != OneType.DATE
+        && fieldType != OneType.TIMESTAMP
+        && fieldType != OneType.TIMESTAMP_NTZ;
   }
 
   public static String convertToDeltaPartitionValue(

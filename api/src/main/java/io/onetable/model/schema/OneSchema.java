@@ -18,10 +18,13 @@
  
 package io.onetable.model.schema;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -77,5 +80,24 @@ public class OneSchema {
   public enum MetadataValue {
     MICROS,
     MILLIS
+  }
+
+  /**
+   * Traverses the schema and returns a list of all fields. Use this method to get a list that
+   * includes nested fields. {@link OneSchema#getFields()} will only return the top level fields.
+   *
+   * @return list of all fields in the schema
+   */
+  public List<OneField> getAllFields() {
+    List<OneField> output = new ArrayList<>();
+    Queue<OneField> fieldQueue = new ArrayDeque<>(getFields());
+    while (!fieldQueue.isEmpty()) {
+      OneField currentField = fieldQueue.poll();
+      if (currentField.getSchema().getFields() != null) {
+        fieldQueue.addAll(currentField.getSchema().getFields());
+      }
+      output.add(currentField);
+    }
+    return output;
   }
 }
