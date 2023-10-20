@@ -99,7 +99,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
     return OneSnapshot.builder()
         .table(table)
         .schemaCatalog(getSchemaCatalog(table, latestCommit))
-        .dataFiles(dataFileExtractor.getFilesCurrentState(completedTimeline, table))
+        .dataFiles(dataFileExtractor.getFilesCurrentState(table))
         .pendingCommits(
             pendingInstants.stream()
                 .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
@@ -114,17 +114,12 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         activeTimeline
             .filterCompletedInstants()
             .findInstantsBeforeOrEquals(hoodieInstantForDiff.getTimestamp());
-    HoodieTimeline timelineForInstant =
-        activeTimeline
-            .filterCompletedInstants()
-            .findInstantsInClosedRange(
-                hoodieInstantForDiff.getTimestamp(), hoodieInstantForDiff.getTimestamp());
     OneTable table = getTable(hoodieInstantForDiff);
     return TableChange.builder()
         .currentTableState(table)
         .filesDiff(
             dataFileExtractor.getDiffForCommit(
-                hoodieInstantForDiff, table, timelineForInstant, visibleTimeline))
+                hoodieInstantForDiff, table, hoodieInstantForDiff, visibleTimeline))
         .build();
   }
 

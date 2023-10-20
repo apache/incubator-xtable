@@ -119,7 +119,7 @@ public class DeltaClient implements TargetClient {
 
   @Override
   public void syncPartitionSpec(List<OnePartitionField> partitionSpec) {
-    Map<String, StructField> spec = partitionExtractor.getPartitionColumns(partitionSpec);
+    Map<String, StructField> spec = partitionExtractor.convertToDeltaPartitionFormat(partitionSpec);
     if (partitionSpec != null) {
       for (Map.Entry<String, StructField> e : spec.entrySet()) {
         transactionState.getPartitionColumns().add(e.getKey());
