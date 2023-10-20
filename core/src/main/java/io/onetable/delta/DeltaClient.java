@@ -30,6 +30,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -72,6 +73,10 @@ public class DeltaClient implements TargetClient {
   private final String tableName;
   private final int logRetentionInHours;
   private TransactionState transactionState;
+
+  public DeltaClient(PerTableConfig perTableConfig, Configuration configuration) {
+    this(perTableConfig, DeltaClientUtils.buildSparkSession(configuration));
+  }
 
   public DeltaClient(PerTableConfig perTableConfig, SparkSession sparkSession) {
     this(
