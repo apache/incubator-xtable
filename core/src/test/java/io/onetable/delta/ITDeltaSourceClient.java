@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -72,7 +73,7 @@ public class ITDeltaSourceClient {
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable("some_table", tempDir, sparkSession);
     List<TableChange> allTableChanges = new ArrayList<>();
-    testSparkDeltaTable.insertRows(30);
+    List<Row> rows = testSparkDeltaTable.insertRows(30);
     Long version1 = testSparkDeltaTable.getVersion();
     Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
     testSparkDeltaTable.insertRows(20);

@@ -26,16 +26,12 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.spark.sql.SparkSession;
 
-import org.apache.spark.sql.delta.DeltaHistory;
 import org.apache.spark.sql.delta.DeltaHistoryManager;
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.actions.Action;
+import org.apache.spark.sql.delta.actions.AddFile;
+import org.apache.spark.sql.delta.actions.RemoveFile;
 
-import scala.Option;
-import scala.Tuple2;
-import scala.collection.Iterator;
-import scala.collection.JavaConverters;
-import scala.collection.Seq;
 import io.delta.tables.DeltaTable;
 
 import io.onetable.model.CurrentCommitState;
@@ -51,6 +47,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
   private final SparkSession sparkSession;
   private final DeltaLog deltaLog;
   private final DeltaTable deltaTable;
+  private DeltaIncrementalChangesCacheStore deltaIncrementalChangesCacheStore;
 
   public DeltaSourceClient(SparkSession sparkSession, String basePath) {
     this.sparkSession = sparkSession;
@@ -75,32 +72,34 @@ public class DeltaSourceClient implements SourceClient<Long> {
 
   @Override
   public TableChange getTableChangeForCommit(Long versionNumber) {
-    // TODO(vamshigv): Implement this method.
-    // TODO(vamshigv): Still look for a method to process a single version to avoid processing lot
-    // of commits at once and hence fixed memory footprint.
-    Iterator<Tuple2<Object, Seq<Action>>> x = deltaLog.getChanges(1, false);
-    java.util.List<Tuple2<Object, List<Action>>> y = new ArrayList<>();
-    while (x.hasNext()) {
-      Tuple2<Object, Seq<Action>> scalaChange = x.next();
-      Object key = scalaChange._1();
-      List<Action> actions = JavaConverters.seqAsJavaListConverter(scalaChange._2()).asJava();
-      y.add(new Tuple2<>(key, actions));
+    // Expects client to call getCurrentCommitState and call this method.
+    List<Action> actionsForVersion =
+        deltaIncrementalChangesCacheStore.getActionsForVersion(versionNumber);
+    List<AddFile> addFileActions = new ArrayList<>();
+    List<RemoveFile> removeFileActions = new ArrayList<>();
+    for (Action action : actionsForVersion) {
+      if (action instanceof AddFile) {
+        addFileActions.add((AddFile) action);
+      } else if (action instanceof RemoveFile) {
+        removeFileActions.add((RemoveFile) action);
+      }
     }
+    // TODO(vamshigv): Handle no updates to add file or remove files.
     return null;
   }
 
   @Override
   public CurrentCommitState<Long> getCurrentCommitState(
       InstantsForIncrementalSync instantsForIncrementalSync) {
-    // TODO(vamshigv): Implement this method.
-    DeltaHistoryManager.Commit commit =
+    DeltaHistoryManager.Commit deltaCommitAtLastSyncInstant =
         deltaLog
             .history()
             .getActiveCommitAtTime(
                 Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()), true, false, true);
-    DeltaHistoryManager x = new DeltaHistoryManager(deltaLog, 100);
-    List<DeltaHistory> y = JavaConverters.seqAsJavaList(x.getHistory(1, Option.empty()));
-    // TODO(vamshigv): update this.
-    return null;
+    Long versionNumberAtLastSyncInstant = deltaCommitAtLastSyncInstant.version();
+    deltaIncrementalChangesCacheStore.initializeOrReload(deltaLog, versionNumberAtLastSyncInstant);
+    return CurrentCommitState.<Long>builder()
+        .commitsToProcess(deltaIncrementalChangesCacheStore.getVersionsInSortedOrder())
+        .build();
   }
 }

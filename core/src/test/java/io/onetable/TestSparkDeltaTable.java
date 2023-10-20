@@ -131,13 +131,13 @@ public class TestSparkDeltaTable {
 
     String mergeSql =
         String.format(
-            "MERGE INTO `%s` AS target "
+            "MERGE INTO delta.`%s` as target"
                 + "USING `%s` AS source "
-                + "ON target.id = source.id "
+                + "ON target.id == source.id "
                 + "WHEN MATCHED THEN UPDATE SET "
                 + "firstName = source.firstName, "
                 + "lastName = source.lastName",
-            tableName, tempViewName);
+            tableName, tempViewName, tableName);
     sparkSession.sql(mergeSql);
   }
 
