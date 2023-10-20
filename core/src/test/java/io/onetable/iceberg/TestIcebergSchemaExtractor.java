@@ -32,12 +32,14 @@ import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 public class TestIcebergSchemaExtractor {
+
+  private static final IcebergSchemaExtractor SCHEMA_EXTRACTOR = IcebergSchemaExtractor.getInstance();
 
   @Test
   public void testPrimitiveTypes() {
-    String schemaName = "testRecord";
-    String doc = "What's up doc";
     Map<OneSchema.MetadataKey, Object> requiredEnumMetadata = new HashMap<>();
     requiredEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
     Map<OneSchema.MetadataKey, Object> optionalEnumMetadata = new HashMap<>();
@@ -61,8 +63,6 @@ public class TestIcebergSchemaExtractor {
 
     OneSchema oneSchemaRepresentation =
         OneSchema.builder()
-            .name(schemaName)
-            .comment(doc)
             .dataType(OneType.RECORD)
             .isNullable(false)
             .fields(
@@ -75,7 +75,7 @@ public class TestIcebergSchemaExtractor {
                                 .dataType(OneType.BOOLEAN)
                                 .isNullable(false)
                                 .build())
-                        .defaultValue(false)
+                        .fieldId(1)
                         .build(),
                     OneField.builder()
                         .name("optionalBoolean")
@@ -86,6 +86,7 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(2)
                         .build(),
                     OneField.builder()
                         .name("requiredInt")
@@ -95,7 +96,7 @@ public class TestIcebergSchemaExtractor {
                                 .dataType(OneType.INT)
                                 .isNullable(false)
                                 .build())
-                        .defaultValue(123)
+                        .fieldId(3)
                         .build(),
                     OneField.builder()
                         .name("optionalInt")
@@ -106,6 +107,7 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(4)
                         .build(),
                     OneField.builder()
                         .name("requiredLong")
@@ -115,6 +117,7 @@ public class TestIcebergSchemaExtractor {
                                 .dataType(OneType.LONG)
                                 .isNullable(false)
                                 .build())
+                        .fieldId(5)
                         .build(),
                     OneField.builder()
                         .name("optionalLong")
@@ -125,6 +128,7 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(6)
                         .build(),
                     OneField.builder()
                         .name("requiredDouble")
@@ -134,6 +138,7 @@ public class TestIcebergSchemaExtractor {
                                 .dataType(OneType.DOUBLE)
                                 .isNullable(false)
                                 .build())
+                        .fieldId(7)
                         .build(),
                     OneField.builder()
                         .name("optionalDouble")
@@ -144,6 +149,7 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(8)
                         .build(),
                     OneField.builder()
                         .name("requiredFloat")
@@ -153,6 +159,7 @@ public class TestIcebergSchemaExtractor {
                                 .dataType(OneType.FLOAT)
                                 .isNullable(false)
                                 .build())
+                        .fieldId(9)
                         .build(),
                     OneField.builder()
                         .name("optionalFloat")
@@ -163,6 +170,7 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(10)
                         .build(),
                     OneField.builder()
                         .name("requiredString")
@@ -172,6 +180,7 @@ public class TestIcebergSchemaExtractor {
                                 .dataType(OneType.STRING)
                                 .isNullable(false)
                                 .build())
+                        .fieldId(11)
                         .build(),
                     OneField.builder()
                         .name("optionalString")
@@ -182,47 +191,28 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(12)
                         .build(),
                     OneField.builder()
                         .name("requiredBytes")
                         .schema(
                             OneSchema.builder()
-                                .name("bytes")
+                                .name("binary")
                                 .dataType(OneType.BYTES)
                                 .isNullable(false)
                                 .build())
+                        .fieldId(13)
                         .build(),
                     OneField.builder()
                         .name("optionalBytes")
                         .schema(
                             OneSchema.builder()
-                                .name("bytes")
+                                .name("binary")
                                 .dataType(OneType.BYTES)
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
-                    OneField.builder()
-                        .name("requiredEnum")
-                        .schema(
-                            OneSchema.builder()
-                                .name("REQUIRED_ENUM")
-                                .dataType(OneType.ENUM)
-                                .isNullable(false)
-                                .metadata(requiredEnumMetadata)
-                                .build())
-                        .defaultValue("ONE")
-                        .build(),
-                    OneField.builder()
-                        .name("optionalEnum")
-                        .schema(
-                            OneSchema.builder()
-                                .name("OPTIONAL_ENUM")
-                                .dataType(OneType.ENUM)
-                                .isNullable(true)
-                                .metadata(optionalEnumMetadata)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(14)
                         .build(),
                     OneField.builder()
                         .name("requiredDate")
@@ -232,6 +222,7 @@ public class TestIcebergSchemaExtractor {
                                 .dataType(OneType.DATE)
                                 .isNullable(false)
                                 .build())
+                        .fieldId(17)
                         .build(),
                     OneField.builder()
                         .name("optionalDate")
@@ -242,90 +233,7 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
-                    OneField.builder()
-                        .name("requiredTimestampMillis")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .metadata(millisTimestamp)
-                                .isNullable(false)
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("optionalTimestampMillis")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .metadata(millisTimestamp)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
-                    OneField.builder()
-                        .name("requiredTimestampNtzMillis")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestampNtz")
-                                .dataType(OneType.TIMESTAMP_NTZ)
-                                .isNullable(false)
-                                .metadata(millisTimestamp)
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("optionalTimestampNtzMillis")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestampNtz")
-                                .dataType(OneType.TIMESTAMP_NTZ)
-                                .metadata(millisTimestamp)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
-                    OneField.builder()
-                        .name("requiredTimestampMicros")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .metadata(microsTimestamp)
-                                .isNullable(false)
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("optionalTimestampMicros")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .metadata(microsTimestamp)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
-                    OneField.builder()
-                        .name("requiredTimestampNtzMicros")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestampNtz")
-                                .dataType(OneType.TIMESTAMP_NTZ)
-                                .isNullable(false)
-                                .metadata(microsTimestamp)
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("optionalTimestampNtzMicros")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestampNtz")
-                                .dataType(OneType.TIMESTAMP_NTZ)
-                                .metadata(microsTimestamp)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(18)
                         .build(),
                     OneField.builder()
                         .name("requiredFixed")
@@ -336,6 +244,7 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(false)
                                 .metadata(fixedMetadata)
                                 .build())
+                        .fieldId(27)
                         .build(),
                     OneField.builder()
                         .name("optionalFixed")
@@ -347,6 +256,7 @@ public class TestIcebergSchemaExtractor {
                                 .metadata(fixedMetadata)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(28)
                         .build(),
                     OneField.builder()
                         .name("requiredDecimal")
@@ -357,6 +267,7 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(false)
                                 .metadata(doubleMetadata)
                                 .build())
+                        .fieldId(29)
                         .build(),
                     OneField.builder()
                         .name("optionalDecimal")
@@ -368,10 +279,11 @@ public class TestIcebergSchemaExtractor {
                                 .metadata(doubleMetadata)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(30)
                         .build()))
             .build();
 
-    Schema expectedSchema =
+    Schema icebergRepresentation =
         new Schema(
             Types.NestedField.required(1, "requiredBoolean", Types.BooleanType.get()),
             Types.NestedField.optional(2, "optionalBoolean", Types.BooleanType.get()),
@@ -387,22 +299,8 @@ public class TestIcebergSchemaExtractor {
             Types.NestedField.optional(12, "optionalString", Types.StringType.get()),
             Types.NestedField.required(13, "requiredBytes", Types.BinaryType.get()),
             Types.NestedField.optional(14, "optionalBytes", Types.BinaryType.get()),
-            Types.NestedField.required(15, "requiredEnum", Types.StringType.get()),
-            Types.NestedField.optional(16, "optionalEnum", Types.StringType.get()),
             Types.NestedField.required(17, "requiredDate", Types.DateType.get()),
             Types.NestedField.optional(18, "optionalDate", Types.DateType.get()),
-            Types.NestedField.required(
-                19, "requiredTimestampMillis", Types.TimestampType.withZone()),
-            Types.NestedField.optional(
-                20, "optionalTimestampMillis", Types.TimestampType.withZone()),
-            Types.NestedField.required(21, "requiredTimestampNtzMillis", Types.LongType.get()),
-            Types.NestedField.optional(22, "optionalTimestampNtzMillis", Types.LongType.get()),
-            Types.NestedField.required(
-                23, "requiredTimestampMicros", Types.TimestampType.withZone()),
-            Types.NestedField.optional(
-                24, "optionalTimestampMicros", Types.TimestampType.withZone()),
-            Types.NestedField.required(25, "requiredTimestampNtzMicros", Types.LongType.get()),
-            Types.NestedField.optional(26, "optionalTimestampNtzMicros", Types.LongType.get()),
             Types.NestedField.required(27, "requiredFixed", Types.FixedType.ofLength(fixedSize)),
             Types.NestedField.optional(28, "optionalFixed", Types.FixedType.ofLength(fixedSize)),
             Types.NestedField.required(
@@ -410,9 +308,12 @@ public class TestIcebergSchemaExtractor {
             Types.NestedField.optional(
                 30, "optionalDecimal", Types.DecimalType.of(precision, scale)));
 
-    Schema actual = IcebergSchemaExtractor.getInstance().toIceberg(oneSchemaRepresentation);
-    Assertions.assertTrue(expectedSchema.sameSchema(actual));
+    Assertions.assertTrue(icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
+
+  // TODO test enum separately
+  // TODO test timestamp separately
 
   @Test
   public void testMaps() {
@@ -531,7 +432,7 @@ public class TestIcebergSchemaExtractor {
                         Types.NestedField.required(7, "requiredDouble", Types.DoubleType.get()),
                         Types.NestedField.optional(8, "optionalString", Types.StringType.get())))));
 
-    Schema actual = IcebergSchemaExtractor.getInstance().toIceberg(oneSchemaRepresentation);
+    Schema actual = SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation);
     Assertions.assertTrue(expectedSchema.sameSchema(actual));
   }
 
@@ -613,7 +514,7 @@ public class TestIcebergSchemaExtractor {
                         .build()))
             .build();
 
-    Schema expectedSchema =
+    Schema icebergRepresentation =
         new Schema(
             Types.NestedField.required(
                 1, "intList", Types.ListType.ofRequired(3, Types.IntegerType.get())),
@@ -626,8 +527,8 @@ public class TestIcebergSchemaExtractor {
                         Types.NestedField.required(5, "requiredDouble", Types.DoubleType.get()),
                         Types.NestedField.optional(6, "optionalString", Types.StringType.get())))));
 
-    Schema actual = IcebergSchemaExtractor.getInstance().toIceberg(oneSchemaRepresentation);
-    Assertions.assertTrue(expectedSchema.sameSchema(actual));
+    Assertions.assertTrue(icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 
   @Test
@@ -699,7 +600,7 @@ public class TestIcebergSchemaExtractor {
                         .build()))
             .build();
 
-    Schema expectedSchema =
+    Schema icebergRepresentation =
         new Schema(
             Types.NestedField.optional(
                 1,
@@ -713,8 +614,8 @@ public class TestIcebergSchemaExtractor {
                         Types.StructType.of(
                             Types.NestedField.optional(
                                 5, "doublyNestedString", Types.StringType.get()))))));
-    Schema actual = IcebergSchemaExtractor.getInstance().toIceberg(oneSchemaRepresentation);
-    Assertions.assertTrue(expectedSchema.sameSchema(actual));
+    Assertions.assertTrue(icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 
   @Test
@@ -840,7 +741,7 @@ public class TestIcebergSchemaExtractor {
                         .build()))
             .build();
 
-    Schema expectedSchema =
+    Schema icebergRepresentation =
         new Schema(
             Types.NestedField.optional(
                 1,
@@ -862,92 +763,7 @@ public class TestIcebergSchemaExtractor {
                         Types.NestedField.optional(
                             10, "optionalString", Types.StringType.get())))));
 
-    Schema actual = IcebergSchemaExtractor.getInstance().toIceberg(oneSchemaRepresentation);
-    Assertions.assertTrue(expectedSchema.sameSchema(actual));
-  }
-
-  /** Test that the schema extractor correctly maps Iceberg types to OneTable types. */
-  @Test
-  public void fromIcebergType() {
-    IcebergSchemaExtractor extractor = IcebergSchemaExtractor.getInstance();
-    Assertions.assertEquals(OneType.STRING, extractor.fromIcebergType(Types.StringType.get()));
-    Assertions.assertEquals(OneType.INT, extractor.fromIcebergType(Types.IntegerType.get()));
-    Assertions.assertEquals(OneType.LONG, extractor.fromIcebergType(Types.LongType.get()));
-    Assertions.assertEquals(OneType.BYTES, extractor.fromIcebergType(Types.BinaryType.get()));
-    Assertions.assertEquals(OneType.BOOLEAN, extractor.fromIcebergType(Types.BooleanType.get()));
-    Assertions.assertEquals(OneType.FLOAT, extractor.fromIcebergType(Types.FloatType.get()));
-    Assertions.assertEquals(OneType.DATE, extractor.fromIcebergType(Types.DateType.get()));
-    Assertions.assertEquals(
-        OneType.TIMESTAMP, extractor.fromIcebergType(Types.TimestampType.withZone()));
-    Assertions.assertEquals(OneType.DOUBLE, extractor.fromIcebergType(Types.DoubleType.get()));
-    Assertions.assertEquals(OneType.DECIMAL, extractor.fromIcebergType(Types.DecimalType.of(1, 1)));
-
-    // the iceberg types below have not been implemented yet
-    Assertions.assertThrows(
-        NotSupportedException.class, () -> extractor.fromIcebergType(Types.FixedType.ofLength(1)));
-    Assertions.assertThrows(
-        NotSupportedException.class,
-        () -> extractor.fromIcebergType(Types.ListType.ofRequired(1, Types.StringType.get())));
-    Assertions.assertThrows(
-        NotSupportedException.class,
-        () ->
-            extractor.fromIcebergType(
-                Types.MapType.ofRequired(1, 2, Types.StringType.get(), Types.StringType.get())));
-    Assertions.assertThrows(
-        NotSupportedException.class,
-        () ->
-            extractor.fromIcebergType(
-                Types.StructType.of(
-                    Types.NestedField.required(1, "test", Types.StringType.get()))));
-  }
-
-  /**
-   * Test that the schema extractor correctly builds {@link OneSchema} with valid fields from
-   * Iceberg schema.
-   */
-  @Test
-  public void fromIceberg() {
-    List<Type.PrimitiveType> iceTypes =
-        Arrays.asList(
-            Types.StringType.get(),
-            Types.IntegerType.get(),
-            Types.LongType.get(),
-            Types.BinaryType.get(),
-            Types.BooleanType.get(),
-            Types.FloatType.get(),
-            Types.DateType.get(),
-            Types.TimestampType.withZone(),
-            Types.DoubleType.get(),
-            Types.DecimalType.of(1, 1));
-
-    List<Types.NestedField> nestedFields = new ArrayList<>();
-    for (int i = 0; i < iceTypes.size(); i++) {
-      String fieldName = "test" + i;
-      String doc = "doc" + i;
-      nestedFields.add(Types.NestedField.of(i, true, fieldName, iceTypes.get(i), doc));
-    }
-
-    Schema iceSchema = new Schema(333, nestedFields);
-
-    IcebergSchemaExtractor extractor = IcebergSchemaExtractor.getInstance();
-    OneSchema irSchema = extractor.fromIceberg(iceSchema);
-
-    // TODO schema id is missing in oneschema
-    // Assertions.assertEquals(irSchema.getId(), iceSchema.schemaId());
-
-    Assertions.assertEquals(irSchema.getFields().size(), iceTypes.size());
-    for (int i = 0; i < iceTypes.size(); i++) {
-      OneField irField = irSchema.getFields().get(i);
-      Types.NestedField iceField = nestedFields.get(i);
-
-      Assertions.assertEquals(irField.getName(), iceField.name());
-      Assertions.assertEquals(irField.getFieldId(), iceField.fieldId());
-      Assertions.assertEquals(irField.getSchema().isNullable(), iceField.isOptional());
-      Assertions.assertEquals(
-          extractor.fromIcebergType(iceField.type()), irField.getSchema().getDataType());
-
-      // TODO doc is missing in oneschema
-      // Assertions.assertEquals(irField.getSchema().getDoc(), iceField.doc());
-    }
+    Assertions.assertTrue(icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 }

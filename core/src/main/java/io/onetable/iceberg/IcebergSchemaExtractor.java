@@ -19,8 +19,10 @@
 package io.onetable.iceberg;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -93,36 +95,23 @@ public class IcebergSchemaExtractor {
    * @return Internal representation of deserialized iceberg schema
    */
   public OneSchema fromIceberg(Schema iceSchema) {
-    OneSchemaBuilder irSchemaBuilder = OneSchema.builder();
+    return OneSchema.builder()
+        .dataType(OneType.RECORD)
+        .fields(fromIceberg(iceSchema.columns()))
+        .build();
+  }
 
-    List<OneField> irFields = new ArrayList<>();
-    for (Types.NestedField iceField : iceSchema.columns()) {
-      OneType irFieldType = fromIcebergType(iceField.type());
-      OneSchema irFieldSchema =
-          OneSchema.builder()
-              .dataType(irFieldType)
-              .isNullable(iceField.isOptional())
-              .metadata(new HashMap<>())
-              .build();
-      if (irFieldType == OneType.DECIMAL) {
-        Types.DecimalType decimalType = (Types.DecimalType) iceField.type();
-        irFieldSchema.getMetadata().put(OneSchema.MetadataKey.DECIMAL_SCALE, decimalType.scale());
-        irFieldSchema
-            .getMetadata()
-            .put(OneSchema.MetadataKey.DECIMAL_PRECISION, decimalType.precision());
-      }
-
-      OneField irField =
+  private List<OneField> fromIceberg(List<Types.NestedField> iceFields) {
+    return iceFields.stream().map(iceField -> {
+      OneSchema irFieldSchema = fromIcebergType(iceField);
+      return
           OneField.builder()
               .name(iceField.name())
               .fieldId(iceField.fieldId())
               .schema(irFieldSchema)
+              .defaultValue(iceField.isOptional() ? OneField.Constants.NULL_DEFAULT_VALUE : null)
               .build();
-      irFields.add(irField);
-    }
-    irSchemaBuilder.fields(irFields);
-
-    return irSchemaBuilder.build();
+    }).collect(Collectors.toList());
   }
 
   static String convertFromOneTablePath(String path) {
@@ -237,47 +226,66 @@ public class IcebergSchemaExtractor {
     }
   }
 
-  /**
-   * Maps Iceberg type to internal type representation
-   *
-   * @param type Iceberg type
-   * @return Internal representation of Iceberg type
-   */
-  OneType fromIcebergType(Type type) {
-    switch (type.typeId()) {
-        // TODO ENUM type is not supported in Iceberg
+  OneSchema fromIcebergType(Types.NestedField iceField) {
+    OneType type;
+    List<OneField> fields = null;
+    Map<OneSchema.MetadataKey, Object> metadata = null;
+    switch (iceField.type().typeId()) {
       case STRING:
-        return OneType.STRING;
+        type = OneType.STRING;
+        break;
       case INTEGER:
-        return OneType.INT;
+        type = OneType.INT;
+        break;
       case LONG:
-        return OneType.LONG;
+        type = OneType.LONG;
+        break;
       case BINARY:
-        return OneType.BYTES;
-        // TODO
-        //      case FIXED:
-        //        return OneType.FIXED;
+        type = OneType.BYTES;
+        break;
       case BOOLEAN:
-        return OneType.BOOLEAN;
+        type = OneType.BOOLEAN;
+        break;
       case FLOAT:
-        return OneType.FLOAT;
+        type = OneType.FLOAT;
+        break;
       case DATE:
-        return OneType.DATE;
+        type = OneType.DATE;
+        break;
       case TIMESTAMP:
-        return OneType.TIMESTAMP;
+        Types.TimestampType timestampType = (Types.TimestampType) iceField.type();
+        type = timestampType.shouldAdjustToUTC() ? OneType.TIMESTAMP : OneType.TIMESTAMP_NTZ;
+        metadata = Collections.singletonMap(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+        break;
       case DOUBLE:
-        return OneType.DOUBLE;
+        type = OneType.DOUBLE;
+        break;
       case DECIMAL:
-        return OneType.DECIMAL;
-        // TODO
-        //      case STRUCT:
-        //        return OneType.RECORD;
-        //      case MAP:
-        //        return OneType.MAP;
-        //      case LIST:
-        //        return OneType.ARRAY;
+        Types.DecimalType decimalType = (Types.DecimalType) iceField.type();
+        metadata = new HashMap<>(2, 1.0f);
+        metadata.put(OneSchema.MetadataKey.DECIMAL_PRECISION, decimalType.precision());
+        metadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, decimalType.scale());
+        type = OneType.DECIMAL;
+        break;
+      case FIXED:
+        type = OneType.FIXED;
+        Types.FixedType fixedType = (Types.FixedType) iceField.type();
+        metadata = Collections.singletonMap(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedType.length());
+        break;
+      case UUID:
+        type = OneType.FIXED;
+        metadata = Collections.singletonMap(OneSchema.MetadataKey.FIXED_BYTES_SIZE, 16);
+        break;
       default:
-        throw new NotSupportedException("Unsupported type: " + type.typeId());
+        throw new NotSupportedException("Unsupported type: " + iceField.type().typeId());
     }
+    return OneSchema.builder()
+        .name(iceField.type().typeId().name().toLowerCase())
+        .dataType(type)
+        .comment(iceField.doc())
+        .isNullable(iceField.isOptional())
+        .metadata(metadata)
+        .fields(fields)
+        .build();
   }
 }
