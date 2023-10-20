@@ -27,6 +27,9 @@ import io.onetable.client.SourceClientProvider;
 public class DeltaSourceClientProvider extends SourceClientProvider<Snapshot> {
   @Override
   public DeltaSourceClient getSourceClientInstance(PerTableConfig sourceTableConfig) {
-    return new DeltaSourceClient(sourceTableConfig, DeltaClientUtils.buildSparkSession(hadoopConf));
+    return DeltaSourceClient.builder()
+        .sourceTableConfig(sourceTableConfig)
+        .sparkSession(DeltaClientUtils.buildSparkSession(hadoopConf))
+        .build();
   }
 }

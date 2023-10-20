@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import lombok.Builder;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.spark.sql.SparkSession;
@@ -42,17 +43,17 @@ import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
+import io.onetable.spi.extractor.PartitionedDataFileIterator;
 import io.onetable.spi.extractor.SourceClient;
 
 @Log4j2
+@Builder
 public class DeltaSourceClient implements SourceClient<Snapshot> {
+  @Builder.Default
+  private final DeltaDataFileExtractor dataFileExtractor = DeltaDataFileExtractor.builder().build();
+
   private final PerTableConfig sourceTableConfig;
   private final SparkSession sparkSession;
-
-  public DeltaSourceClient(PerTableConfig sourceTableConfig, SparkSession sparkSession) {
-    this.sourceTableConfig = sourceTableConfig;
-    this.sparkSession = sparkSession;
-  }
 
   @Override
   public OneTable getTable(Snapshot snapshot) {
@@ -76,13 +77,13 @@ public class DeltaSourceClient implements SourceClient<Snapshot> {
     return OneSnapshot.builder()
         .table(table)
         .schemaCatalog(getSchemaCatalog(table, snapshot))
-        .dataFiles(getOneDataFiles(snapshot))
+        .dataFiles(getOneDataFiles(snapshot, table.getReadSchema()))
         .build();
   }
 
-  private OneDataFiles getOneDataFiles(Snapshot snapshot) {
+  private OneDataFiles getOneDataFiles(Snapshot snapshot, OneSchema schema) {
     OneDataFiles oneDataFiles;
-    try (DeltaDataFileExtractor fileIterator = new DeltaDataFileExtractor(snapshot)) {
+    try (PartitionedDataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
       List<OneDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);
       oneDataFiles = OneDataFiles.collectionBuilder().files(dataFiles).build();
