@@ -20,7 +20,6 @@ package io.onetable.delta;
 
 import static org.junit.jupiter.api.parallel.ExecutionMode.SAME_THREAD;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
@@ -79,7 +78,7 @@ class TestDeltaSourceClient {
   }
 
   @BeforeEach
-  void setUp() throws IOException {
+  void setUp() {
     Configuration hadoopConf = new Configuration();
     hadoopConf.set("fs.defaultFS", "file:///");
 
@@ -148,7 +147,7 @@ class TestDeltaSourceClient {
     validateSchemaCatalog(
         oneSchemaCatalog,
         Collections.singletonMap(new SchemaVersion(1, ""), snapshot.getTable().getReadSchema()));
-    // TODO: Validate data files
+    // TODO: Validate data files (see https://github.com/onetable-io/onetable/issues/96)
   }
 
   @Test
@@ -229,7 +228,7 @@ class TestDeltaSourceClient {
     validateSchemaCatalog(
         oneSchemaCatalog,
         Collections.singletonMap(new SchemaVersion(1, ""), snapshot.getTable().getReadSchema()));
-    // TODO: Validate data files
+    // TODO: Validate data files (see https://github.com/onetable-io/onetable/issues/96)
   }
 
   @Disabled("Requires Spark 3.4.0+")
@@ -260,7 +259,7 @@ class TestDeltaSourceClient {
     DeltaSourceClient client = clientProvider.getSourceClientInstance(tableConfig);
     // Get current snapshot
     OneSnapshot snapshot = client.getCurrentSnapshot();
-    // TODO
+    // TODO: Complete and enable test (see https://github.com/onetable-io/onetable/issues/90)
   }
 
   private static void validateTable(
