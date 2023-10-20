@@ -22,6 +22,7 @@ import static io.onetable.delta.DeltaValueConverter.convertToDeltaColumnStatValu
 
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,13 +38,6 @@ import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.Value;
 
-import org.apache.spark.sql.types.DateType;
-import org.apache.spark.sql.types.NumericType;
-import org.apache.spark.sql.types.StringType;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
-import org.apache.spark.sql.types.TimestampType;
-
 import org.apache.spark.sql.delta.actions.AddFile;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -52,6 +46,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.onetable.exception.OneIOException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
+import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 
@@ -61,6 +56,20 @@ import io.onetable.model.stat.Range;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaStatsExtractor {
+  private static final Set<OneType> FIELD_TYPES_WITH_STATS_SUPPORT =
+      new HashSet<>(
+          Arrays.asList(
+              OneType.BOOLEAN,
+              OneType.DATE,
+              OneType.DECIMAL,
+              OneType.DOUBLE,
+              OneType.INT,
+              OneType.LONG,
+              OneType.FLOAT,
+              OneType.STRING,
+              OneType.TIMESTAMP,
+              OneType.TIMESTAMP_NTZ));
+
   private static final DeltaStatsExtractor INSTANCE = new DeltaStatsExtractor();
 
   private static final String PATH_DELIMITER = "\\.";
@@ -71,7 +80,7 @@ public class DeltaStatsExtractor {
   }
 
   public String convertStatsToDeltaFormat(
-      StructType deltaTableSchema, long numRecords, Map<OneField, ColumnStat> columnStats)
+      OneSchema schema, long numRecords, Map<OneField, ColumnStat> columnStats)
       throws JsonProcessingException {
     DeltaStats.DeltaStatsBuilder deltaStatsBuilder = DeltaStats.builder();
     deltaStatsBuilder.numRecords(numRecords);
@@ -81,7 +90,7 @@ public class DeltaStatsExtractor {
     Map<String, ColumnStat> columnStatsMapKeyedByPath =
         getColumnStatKeyedByFullyQualifiedPath(columnStats);
     Map<String, OneField> pathFieldMap = getPathToFieldMap(columnStats);
-    Set<String> validPaths = getPathsFromStructSchemaForMinAndMaxStats(deltaTableSchema, "");
+    Set<String> validPaths = getPathsFromStructSchemaForMinAndMaxStats(schema);
     DeltaStats deltaStats =
         deltaStatsBuilder
             .minValues(getMinValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths))
@@ -91,23 +100,15 @@ public class DeltaStatsExtractor {
     return MAPPER.writeValueAsString(deltaStats);
   }
 
-  private Set<String> getPathsFromStructSchemaForMinAndMaxStats(
-      StructType schema, String parentPath) {
-    Set<String> allPaths = new HashSet<>();
-    for (StructField sf : schema.fields()) {
-      // Delta only supports min/max stats for these fields.
-      if (sf.dataType() instanceof DateType
-          || sf.dataType() instanceof NumericType
-          || sf.dataType() instanceof TimestampType
-          || sf.dataType() instanceof StringType) {
-        allPaths.add(combinePath(parentPath, sf.name()));
-      } else if (sf.dataType() instanceof StructType) {
-        allPaths.addAll(
-            getPathsFromStructSchemaForMinAndMaxStats(
-                (StructType) sf.dataType(), combinePath(parentPath, sf.name())));
-      }
-    }
-    return allPaths;
+  private Set<String> getPathsFromStructSchemaForMinAndMaxStats(OneSchema schema) {
+    return schema.getAllFields().stream()
+        .filter(
+            field -> {
+              OneType type = field.getSchema().getDataType();
+              return FIELD_TYPES_WITH_STATS_SUPPORT.contains(type);
+            })
+        .map(OneField::getPath)
+        .collect(Collectors.toSet());
   }
 
   private String combinePath(String parentPath, String fieldName) {

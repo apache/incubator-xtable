@@ -29,10 +29,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
@@ -263,14 +262,28 @@ public class DeltaPartitionExtractor {
     return partitionValuesSerialized;
   }
 
-  public Map<OnePartitionField, Range> partitionValueExtraction(scala.collection.Map<String, String> values, List<OnePartitionField> partitionFields) {
-    return partitionFields.stream().collect(Collectors.toMap(Function.identity(), partitionField -> {
-      String serializedValue = values.getOrElse(partitionField.getSourceField().getName(), null);
-      PartitionTransformType partitionTransformType = partitionField.getTransformType();
-      String dateFormat = partitionTransformType != PartitionTransformType.VALUE ? getDateFormat(partitionTransformType) : null;
-      Object partitionValue = convertFromDeltaPartitionValue(serializedValue, partitionField.getSourceField().getSchema().getDataType(), partitionField.getTransformType(), dateFormat);
-      return Range.scalar(partitionValue);
-    }));
+  public Map<OnePartitionField, Range> partitionValueExtraction(
+      scala.collection.Map<String, String> values, List<OnePartitionField> partitionFields) {
+    return partitionFields.stream()
+        .collect(
+            Collectors.toMap(
+                Function.identity(),
+                partitionField -> {
+                  String serializedValue =
+                      values.getOrElse(partitionField.getSourceField().getName(), null);
+                  PartitionTransformType partitionTransformType = partitionField.getTransformType();
+                  String dateFormat =
+                      partitionTransformType != PartitionTransformType.VALUE
+                          ? getDateFormat(partitionTransformType)
+                          : null;
+                  Object partitionValue =
+                      convertFromDeltaPartitionValue(
+                          serializedValue,
+                          partitionField.getSourceField().getSchema().getDataType(),
+                          partitionField.getTransformType(),
+                          dateFormat);
+                  return Range.scalar(partitionValue);
+                }));
   }
 
   private String getGeneratedColumnName(OnePartitionField onePartitionField) {

@@ -27,10 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.Metadata;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
 
 import org.apache.spark.sql.delta.actions.AddFile;
@@ -44,6 +40,7 @@ import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
+import io.onetable.testutil.ColumnStatMapUtil;
 
 public class TestDeltaStatsExtractor {
 
@@ -51,13 +48,12 @@ public class TestDeltaStatsExtractor {
 
   @Test
   public void testDeltaStats() throws JsonProcessingException {
-    StructType structSchema = getStructSchema();
+    OneSchema schema = ColumnStatMapUtil.getSchema();
 
     Map<OneField, ColumnStat> columnStatMap = getColumnStatMap();
 
     String actualStats =
-        DeltaStatsExtractor.getInstance()
-            .convertStatsToDeltaFormat(structSchema, 50L, columnStatMap);
+        DeltaStatsExtractor.getInstance().convertStatsToDeltaFormat(schema, 50L, columnStatMap);
     Map<String, Object> actualStatsMap = MAPPER.readValue(actualStats, HashMap.class);
     assertEquals(50, actualStatsMap.get("numRecords"));
 
@@ -104,44 +100,6 @@ public class TestDeltaStatsExtractor {
     Map<String, Object> nestedMapInNullCountMap =
         (HashMap<String, Object>) nullValueStatsMap.get("nested_struct_field");
     assertEquals(4, nestedMapInNullCountMap.get("nested_long_field"));
-  }
-
-  private StructType getStructSchema() {
-    StructType nestedStructSchema = new StructType();
-    nestedStructSchema =
-        nestedStructSchema.add(
-            new StructField(
-                "array_string_field",
-                DataTypes.createArrayType(DataTypes.StringType),
-                false,
-                Metadata.empty()));
-    nestedStructSchema =
-        nestedStructSchema.add(
-            new StructField("nested_long_field", DataTypes.LongType, false, Metadata.empty()));
-
-    return new StructType(
-        new StructField[] {
-          new StructField("long_field", DataTypes.LongType, false, Metadata.empty()),
-          new StructField("string_field", DataTypes.StringType, false, Metadata.empty()),
-          new StructField("null_string_field", DataTypes.StringType, true, Metadata.empty()),
-          new StructField("timestamp_field", DataTypes.TimestampType, false, Metadata.empty()),
-          new StructField(
-              "timestamp_micros_field", DataTypes.TimestampType, false, Metadata.empty()),
-          new StructField(
-              "local_timestamp_field", DataTypes.TimestampType, false, Metadata.empty()),
-          new StructField("date_field", DataTypes.DateType, false, Metadata.empty()),
-          new StructField(
-              "array_long_field",
-              DataTypes.createArrayType(DataTypes.LongType, false),
-              false,
-              Metadata.empty()),
-          new StructField(
-              "map_string_long_field",
-              DataTypes.createMapType(DataTypes.StringType, DataTypes.LongType, false),
-              false,
-              Metadata.empty()),
-          new StructField("nested_struct_field", nestedStructSchema, false, Metadata.empty())
-        });
   }
 
   @Test

@@ -24,7 +24,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import io.onetable.model.schema.OnePartitionField;
 import lombok.Builder;
 
 import org.apache.hadoop.fs.Path;
@@ -34,6 +33,7 @@ import org.apache.spark.sql.delta.actions.AddFile;
 
 import io.onetable.exception.NotSupportedException;
 import io.onetable.model.schema.OneField;
+import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
@@ -46,6 +46,7 @@ public class DeltaDataFileExtractor {
 
   @Builder.Default
   private final DeltaStatsExtractor fileStatsExtractor = DeltaStatsExtractor.getInstance();
+
   @Builder.Default
   private final DeltaPartitionExtractor partitionExtractor = DeltaPartitionExtractor.getInstance();
 
@@ -56,8 +57,9 @@ public class DeltaDataFileExtractor {
    * @return Delta table file iterator, files returned do not have column stats set to reduce memory
    *     overhead
    */
-  public PartitionedDataFileIterator iteratorWithoutStats(Snapshot deltaSnapshot) {
-    return new DeltaDataFileIterator(deltaSnapshot, null, false);
+  public PartitionedDataFileIterator iteratorWithoutStats(
+      Snapshot deltaSnapshot, OneSchema schema) {
+    return new DeltaDataFileIterator(deltaSnapshot, schema, false);
   }
 
   /**
@@ -66,7 +68,7 @@ public class DeltaDataFileExtractor {
    * @return Delta table file iterator
    */
   public PartitionedDataFileIterator iterator(Snapshot deltaSnapshot, OneSchema schema) {
-    return new DeltaDataFileIterator(deltaSnapshot, schema.getFields(), true);
+    return new DeltaDataFileIterator(deltaSnapshot, schema, true);
   }
 
   public class DeltaDataFileIterator implements PartitionedDataFileIterator {
@@ -77,10 +79,12 @@ public class DeltaDataFileExtractor {
     private final String tableBasePath;
     private final boolean includeColumnStats;
 
-    private DeltaDataFileIterator(
-        Snapshot snapshot, List<OneField> fields, boolean includeColumnStats) {
+    private DeltaDataFileIterator(Snapshot snapshot, OneSchema schema, boolean includeColumnStats) {
       this.fileFormat = convertToOneTableFileFormat(snapshot.metadata().format().provider());
-      this.fields = fields;
+      this.fields = schema.getFields();
+      this.partitionFields =
+          partitionExtractor.convertFromDeltaPartitionFormat(
+              schema, snapshot.metadata().partitionSchema());
       this.tableBasePath = snapshot.deltaLog().dataPath().toUri().toString();
       this.includeColumnStats = includeColumnStats;
       this.dataFilesIterator =
@@ -124,7 +128,9 @@ public class DeltaDataFileExtractor {
           .fileSizeBytes(addFile.getFileSize())
           .recordCount(addFile.getNumLogicalRecords())
           .lastModified(addFile.modificationTime())
-          .partitionValues(partitionExtractor.partitionValueExtraction(addFile.partitionValues(), partitionFields))
+          .partitionValues(
+              partitionExtractor.partitionValueExtraction(
+                  addFile.partitionValues(), partitionFields))
           .columnStats(
               includeColumnStats
                   ? fileStatsExtractor.getColumnStatsForFile(addFile, fields)
