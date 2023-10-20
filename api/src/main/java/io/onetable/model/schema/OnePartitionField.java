@@ -19,7 +19,6 @@
 package io.onetable.model.schema;
 
 import lombok.Builder;
-import lombok.EqualsAndHashCode;
 import lombok.Value;
 
 /**
@@ -29,7 +28,6 @@ import lombok.Value;
  */
 @Value
 @Builder
-@EqualsAndHashCode
 public class OnePartitionField {
   // Source field the partition is based on
   OneField sourceField;
