@@ -18,7 +18,7 @@
  
 package io.onetable.delta;
 
-import static io.onetable.delta.DeltaValueSerializer.getFormattedValueForPartition;
+import static io.onetable.delta.DeltaValueConverter.convertToDeltaPartitionValue;
 
 import java.util.HashMap;
 import java.util.List;
@@ -41,7 +41,7 @@ import io.onetable.model.storage.OneDataFile;
 /**
  * DeltaPartitionExtractor handles extracting partition columns, also creating generated columns in
  * the certain cases. It is also responsible for PartitionValue Serialization leveraging {@link
- * DeltaValueSerializer}.
+ * DeltaValueConverter}.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaPartitionExtractor {
@@ -90,7 +90,7 @@ public class DeltaPartitionExtractor {
       String partitionValueSerialized;
       if (transformType == PartitionTransformType.VALUE) {
         partitionValueSerialized =
-            getFormattedValueForPartition(
+            convertToDeltaPartitionValue(
                 e.getValue().getMaxValue(),
                 e.getKey().getSourceField().getSchema().getDataType(),
                 transformType,
@@ -100,7 +100,7 @@ public class DeltaPartitionExtractor {
       } else {
         // use appropriate date formatter for value serialization.
         partitionValueSerialized =
-            getFormattedValueForPartition(
+            convertToDeltaPartitionValue(
                 e.getValue().getMaxValue(),
                 e.getKey().getSourceField().getSchema().getDataType(),
                 transformType,

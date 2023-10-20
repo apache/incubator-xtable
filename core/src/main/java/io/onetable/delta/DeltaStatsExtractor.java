@@ -18,7 +18,7 @@
  
 package io.onetable.delta;
 
-import static io.onetable.delta.DeltaValueSerializer.getFormattedValueForColumnStats;
+import static io.onetable.delta.DeltaValueConverter.convertToDeltaColumnStatValue;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,8 +28,10 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.NoArgsConstructor;
 
+import lombok.Value;
 import org.apache.spark.sql.types.DateType;
 import org.apache.spark.sql.types.NumericType;
 import org.apache.spark.sql.types.StringType;
@@ -46,7 +48,7 @@ import io.onetable.model.stat.ColumnStat;
 
 /**
  * DeltaStatsExtractor extracts column stats and also responsible for their serialization leveraging
- * {@link DeltaValueSerializer}.
+ * {@link DeltaValueConverter}.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaStatsExtractor {
@@ -67,21 +69,20 @@ public class DeltaStatsExtractor {
   public String convertStatsToDeltaFormat(
       StructType deltaTableSchema, long numRecords, Map<OneField, ColumnStat> columnStats)
       throws JsonProcessingException {
-    Map<String, Object> deltaStatsObject = new HashMap<>();
-    deltaStatsObject.put(NUM_RECORDS, numRecords);
+    DeltaStats.DeltaStatsBuilder deltaStatsBuilder = DeltaStats.builder();
+    deltaStatsBuilder.numRecords(numRecords);
     if (columnStats == null) {
-      return deltaStatsObject.toString();
+      return MAPPER.writeValueAsString(deltaStatsBuilder.build());
     }
     Map<String, ColumnStat> columnStatsMapKeyedByPath =
         getColumnStatKeyedByFullyQualifiedPath(columnStats);
     Map<String, OneField> pathFieldMap = getPathToFieldMap(columnStats);
     Set<String> validPaths = getPathsFromStructSchemaForMinAndMaxStats(deltaTableSchema, "");
-    deltaStatsObject.put(
-        MIN_VALUES, getMinValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths));
-    deltaStatsObject.put(
-        MAX_VALUES, getMaxValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths));
-    deltaStatsObject.put(NULL_COUNT, getNullCount(columnStatsMapKeyedByPath, validPaths));
-    return MAPPER.writeValueAsString(deltaStatsObject);
+    DeltaStats deltaStats = deltaStatsBuilder.minValues(getMinValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths))
+            .maxValues(getMaxValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths))
+                .nullCount(getNullCount(columnStatsMapKeyedByPath, validPaths))
+        .build();
+    return MAPPER.writeValueAsString(deltaStats);
   }
 
   private Set<String> getPathsFromStructSchemaForMinAndMaxStats(
@@ -146,7 +147,7 @@ public class DeltaStatsExtractor {
             insertValueAtPath(
                 jsonObject,
                 pathParts,
-                getFormattedValueForColumnStats(valueExtractor.apply(columnStats), fieldSchema));
+                convertToDeltaColumnStatValue(valueExtractor.apply(columnStats), fieldSchema));
           }
         });
     return jsonObject;
@@ -200,5 +201,14 @@ public class DeltaStatsExtractor {
   private Map<String, OneField> getPathToFieldMap(Map<OneField, ColumnStat> columnStats) {
     return columnStats.entrySet().stream()
         .collect(Collectors.toMap(e -> e.getKey().getPath(), Map.Entry::getKey));
+  }
+
+  @Builder
+  @Value
+  private static class DeltaStats {
+    long numRecords;
+    Map<String, Object> minValues;
+    Map<String, Object> maxValues;
+    Map<String, Object> nullCount;
   }
 }

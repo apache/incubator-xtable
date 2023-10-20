@@ -1,0 +1,179 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+ 
+package io.onetable.delta;
+
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.sql.Date;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
+
+import io.onetable.exception.NotSupportedException;
+import io.onetable.exception.OneIOException;
+import io.onetable.model.schema.OneSchema;
+import io.onetable.model.schema.OneType;
+import io.onetable.model.schema.PartitionTransformType;
+
+/**
+ * DeltaValueConverter is specialized in (de)serializing column stats and partition values depending on
+ * the data type and partition transform type.
+ */
+public class DeltaValueConverter {
+  private static final String DATE_FORMAT_STR = "yyyy-MM-dd HH:mm:ss";
+  private static final TimeZone TIME_ZONE = TimeZone.getTimeZone("UTC");
+
+  public static Object convertFromDeltaColumnStatValue(Object value, OneSchema fieldSchema) {
+    if (value == null) {
+      return null;
+    }
+    if (noConversionForSchema(fieldSchema)) {
+      return value;
+    }
+    // Needs special handling for date and time.
+    OneType fieldType = fieldSchema.getDataType();
+    if (fieldType == OneType.DATE) {
+      return (int) LocalDate.parse(value.toString()).toEpochDay();
+    }
+
+    try {
+      DateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_STR);
+      dateFormat.setTimeZone(TIME_ZONE);
+      Instant instant = dateFormat.parse(value.toString()).toInstant();
+      OneSchema.MetadataValue timestampPrecision =
+          (OneSchema.MetadataValue)
+              fieldSchema
+                  .getMetadata()
+                  .getOrDefault(
+                      OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
+      if (timestampPrecision == OneSchema.MetadataValue.MILLIS) {
+        return instant.toEpochMilli();
+      }
+      return TimeUnit.SECONDS.toMicros(instant.getEpochSecond()) + TimeUnit.NANOSECONDS.toMicros(instant.getNano());
+    } catch (ParseException ex) {
+      throw new OneIOException("Unable to parse time from column stats", ex);
+    }
+  }
+
+  public static Object convertToDeltaColumnStatValue(Object value, OneSchema fieldSchema) {
+    if (value == null) {
+      return null;
+    }
+    if (noConversionForSchema(fieldSchema)) {
+      return value;
+    }
+    // Needs special handling for date and time.
+    OneType fieldType = fieldSchema.getDataType();
+    if (fieldType == OneType.DATE) {
+      return LocalDate.ofEpochDay((int) value).toString();
+    }
+    OneSchema.MetadataValue timestampPrecision =
+        (OneSchema.MetadataValue)
+            fieldSchema
+                .getMetadata()
+                .getOrDefault(
+                    OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
+    long millis =
+        timestampPrecision == OneSchema.MetadataValue.MICROS
+            ? TimeUnit.MILLISECONDS.convert((Long) value, TimeUnit.MICROSECONDS)
+            : (long) value;
+    DateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_STR);
+    dateFormat.setTimeZone(TIME_ZONE);
+    return dateFormat.format(Date.from(Instant.ofEpochMilli(millis)));
+  }
+
+  private static boolean noConversionForSchema(OneSchema fieldSchema) {
+    OneType fieldType = fieldSchema.getDataType();
+    return
+        fieldType != OneType.DATE
+            && fieldType != OneType.TIMESTAMP
+            && fieldType != OneType.TIMESTAMP_NTZ;
+  }
+
+  public static String convertToDeltaPartitionValue(
+      Object value,
+      OneType fieldType,
+      PartitionTransformType partitionTransformType,
+      String dateFormat) {
+    if (value == null) {
+      return null;
+    }
+    if (partitionTransformType == PartitionTransformType.VALUE) {
+      if (fieldType == OneType.DATE) {
+        return LocalDate.ofEpochDay((int) value).toString();
+      } else {
+        return value.toString();
+      }
+    } else {
+      // use appropriate date formatter for value serialization.
+      DateFormat formatter = new SimpleDateFormat(dateFormat);
+      formatter.setTimeZone(TIME_ZONE);
+      return formatter.format(Date.from(Instant.ofEpochMilli((long) value)));
+    }
+  }
+
+  public static Object convertFromDeltaPartitionValue(
+      String value,
+      OneType fieldType,
+      PartitionTransformType partitionTransformType,
+      String dateFormat) {
+    if (value == null) {
+      return null;
+    }
+    if (partitionTransformType == PartitionTransformType.VALUE) {
+      switch (fieldType) {
+        case DATE:
+          return (int) LocalDate.parse(value).toEpochDay();
+        case INT:
+          return Integer.parseInt(value);
+        case LONG:
+          return Long.parseLong(value);
+        case DOUBLE:
+          return Double.parseDouble(value);
+        case FLOAT:
+          return Float.parseFloat(value);
+        case STRING:
+        case ENUM:
+          return value;
+        case DECIMAL:
+          return new BigDecimal(value);
+        case BYTES:
+        case FIXED:
+          return value.getBytes(StandardCharsets.UTF_8);
+        case BOOLEAN:
+          return Boolean.parseBoolean(value);
+        default:
+          throw new NotSupportedException("Unsupported partition value type: " + fieldType);
+      }
+    } else {
+      // use appropriate date formatter for value serialization.
+      try {
+        DateFormat formatter = new SimpleDateFormat(dateFormat);
+        formatter.setTimeZone(TIME_ZONE);
+        return formatter.parse(value).toInstant().toEpochMilli();
+      } catch (ParseException ex) {
+        throw new OneIOException("Unable to parse partition value", ex);
+      }
+    }
+  }
+}
