@@ -20,15 +20,22 @@ package io.onetable.delta;
 
 import static io.onetable.delta.DeltaValueConverter.convertToDeltaColumnStatValue;
 
+import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.NoArgsConstructor;
+import lombok.Value;
 
 import org.apache.spark.sql.types.DateType;
 import org.apache.spark.sql.types.NumericType;
@@ -37,12 +44,16 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.TimestampType;
 
+import org.apache.spark.sql.delta.actions.AddFile;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.onetable.exception.OneIOException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.Range;
 
 /**
  * DeltaStatsExtractor extracts column stats and also responsible for their serialization leveraging
@@ -196,5 +207,78 @@ public class DeltaStatsExtractor {
   private Map<String, OneField> getPathToFieldMap(Map<OneField, ColumnStat> columnStats) {
     return columnStats.entrySet().stream()
         .collect(Collectors.toMap(e -> e.getKey().getPath(), Map.Entry::getKey));
+  }
+
+  public Map<OneField, ColumnStat> getColumnStatsForFile(AddFile addFile, List<OneField> fields) {
+    // TODO: Additional work needed to track maps & arrays.
+    try {
+      DeltaStats deltaStats = MAPPER.readValue(addFile.stats(), DeltaStats.class);
+      Map<String, Object> fieldPathToMaxValue = flattenStatMap(deltaStats.getMaxValues());
+      Map<String, Object> fieldPathToMinValue = flattenStatMap(deltaStats.getMinValues());
+      Map<String, Object> fieldPathToNullCount = flattenStatMap(deltaStats.getNullCount());
+      return fields.stream()
+          .filter(field -> fieldPathToMaxValue.containsKey(field.getPath()))
+          .collect(
+              Collectors.toMap(
+                  Function.identity(),
+                  field -> {
+                    String fieldPath = field.getPath();
+                    Object minValue = fieldPathToMinValue.get(fieldPath);
+                    Object maxValue = fieldPathToMaxValue.get(fieldPath);
+                    Number nullCount = (Number) fieldPathToNullCount.get(fieldPath);
+                    Range range = Range.vector(minValue, maxValue);
+                    return ColumnStat.builder()
+                        .numValues(deltaStats.getNumRecords())
+                        .numNulls(nullCount.longValue())
+                        .range(range)
+                        .build();
+                  }));
+    } catch (IOException ex) {
+      throw new OneIOException("Unable to parse stats json", ex);
+    }
+  }
+
+  /**
+   * Takes the input map which represents a json object and flattens it.
+   *
+   * @param statMap input json map
+   * @return map with keys representing the dot-path for the field
+   */
+  private Map<String, Object> flattenStatMap(Map<String, Object> statMap) {
+    Map<String, Object> result = new HashMap<>();
+    Queue<StatField> statFieldQueue = new ArrayDeque<>();
+    statFieldQueue.add(StatField.of("", statMap));
+    while (!statFieldQueue.isEmpty()) {
+      StatField statField = statFieldQueue.poll();
+      String prefix = statField.getParentPath().isEmpty() ? "" : statField.getParentPath() + ".";
+      statField
+          .getValues()
+          .forEach(
+              (fieldName, value) -> {
+                String fullName = prefix + fieldName;
+                if (value instanceof Map) {
+                  statFieldQueue.add(StatField.of(fullName, (Map<String, Object>) value));
+                } else {
+                  result.put(fullName, value);
+                }
+              });
+    }
+    return result;
+  }
+
+  @Builder
+  @Value
+  private static class DeltaStats {
+    long numRecords;
+    Map<String, Object> minValues;
+    Map<String, Object> maxValues;
+    Map<String, Object> nullCount;
+  }
+
+  @Value
+  @AllArgsConstructor(staticName = "of")
+  private static class StatField {
+    String parentPath;
+    Map<String, Object> values;
   }
 }

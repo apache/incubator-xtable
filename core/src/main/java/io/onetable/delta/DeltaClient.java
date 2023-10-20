@@ -81,8 +81,7 @@ public class DeltaClient implements TargetClient {
         sparkSession,
         DeltaSchemaExtractor.getInstance(),
         DeltaPartitionExtractor.getInstance(),
-        DeltaDataFileUpdatesExtractor.of(
-            DeltaStatsExtractor.getInstance(), DeltaPartitionExtractor.getInstance()));
+        DeltaDataFileUpdatesExtractor.builder().build());
   }
 
   DeltaClient(

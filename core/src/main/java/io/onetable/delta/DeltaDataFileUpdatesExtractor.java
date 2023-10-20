@@ -23,11 +23,10 @@ import static io.onetable.delta.ScalaUtils.convertJavaMapToScala;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import lombok.AllArgsConstructor;
+import lombok.Builder;
 
 import org.apache.spark.sql.types.StructType;
 
@@ -48,16 +47,24 @@ import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.extractor.PartitionedDataFileIterator;
 
-@AllArgsConstructor(staticName = "of")
+@Builder
 public class DeltaDataFileUpdatesExtractor {
-  private final DeltaStatsExtractor deltaStatsExtractor;
-  private final DeltaPartitionExtractor deltaPartitionExtractor;
+  @Builder.Default
+  private final DeltaStatsExtractor deltaStatsExtractor = DeltaStatsExtractor.getInstance();
+
+  @Builder.Default
+  private final DeltaPartitionExtractor deltaPartitionExtractor =
+      DeltaPartitionExtractor.getInstance();
+
+  @Builder.Default
+  private final DeltaDataFileExtractor deltaDataFileExtractor =
+      DeltaDataFileExtractor.builder().build();
 
   public Seq<Action> applySnapshot(
       DeltaLog deltaLog, OneDataFiles snapshotFiles, StructType tableSchema) {
     List<OneDataFile> dataFiles = new ArrayList<>();
     try (PartitionedDataFileIterator fileIterator =
-        new DeltaDataFileExtractor(deltaLog.snapshot(), Optional.empty())) {
+        deltaDataFileExtractor.iteratorWithoutStats(deltaLog.snapshot())) {
       fileIterator.forEachRemaining(dataFiles::add);
       OneDataFiles currentDataFiles = OneDataFiles.collectionBuilder().files(dataFiles).build();
       OneDataFilesDiff filesDiff = currentDataFiles.diff(snapshotFiles);
