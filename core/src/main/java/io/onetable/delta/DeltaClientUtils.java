@@ -18,15 +18,17 @@
  
 package io.onetable.delta;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
 import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.SparkSession;
 
 /** A utility class for Delta client. */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaClientUtils {
-
-  private DeltaClientUtils() {}
 
   static SparkSession buildSparkSession(Configuration conf) {
     SparkConf sparkConf =
