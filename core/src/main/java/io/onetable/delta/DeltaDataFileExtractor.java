@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import io.onetable.model.schema.OnePartitionField;
 import lombok.Builder;
 
 import org.apache.hadoop.fs.Path;
@@ -45,6 +46,8 @@ public class DeltaDataFileExtractor {
 
   @Builder.Default
   private final DeltaStatsExtractor fileStatsExtractor = DeltaStatsExtractor.getInstance();
+  @Builder.Default
+  private final DeltaPartitionExtractor partitionExtractor = DeltaPartitionExtractor.getInstance();
 
   /**
    * Initializes an iterator for Delta Lake files. This should only be used when column stats are
@@ -69,6 +72,7 @@ public class DeltaDataFileExtractor {
   public class DeltaDataFileIterator implements PartitionedDataFileIterator {
     private final FileFormat fileFormat;
     private final List<OneField> fields;
+    private final List<OnePartitionField> partitionFields;
     private final Iterator<OneDataFile> dataFilesIterator;
     private final String tableBasePath;
     private final boolean includeColumnStats;
@@ -120,6 +124,7 @@ public class DeltaDataFileExtractor {
           .fileSizeBytes(addFile.getFileSize())
           .recordCount(addFile.getNumLogicalRecords())
           .lastModified(addFile.modificationTime())
+          .partitionValues(partitionExtractor.partitionValueExtraction(addFile.partitionValues(), partitionFields))
           .columnStats(
               includeColumnStats
                   ? fileStatsExtractor.getColumnStatsForFile(addFile, fields)
