@@ -86,8 +86,7 @@ public class DeltaClient implements TargetClient {
         sparkSession,
         DeltaSchemaExtractor.getInstance(),
         DeltaPartitionExtractor.getInstance(),
-        DeltaDataFileUpdatesExtractor.of(
-            DeltaStatsExtractor.getInstance(), DeltaPartitionExtractor.getInstance()));
+        DeltaDataFileUpdatesExtractor.builder().build());
   }
 
   DeltaClient(
@@ -119,8 +118,7 @@ public class DeltaClient implements TargetClient {
 
   @Override
   public void syncSchema(OneSchema schema) {
-    StructType latestSchema = schemaExtractor.fromOneSchema(schema);
-    transactionState.setLatestSchema(latestSchema);
+    transactionState.setLatestSchema(schema);
   }
 
   @Override
@@ -147,14 +145,16 @@ public class DeltaClient implements TargetClient {
   public void syncFilesForSnapshot(OneDataFiles snapshotFiles) {
     transactionState.setActions(
         dataFileUpdatesExtractor.applySnapshot(
-            deltaLog, snapshotFiles, transactionState.getLatestSchema()));
+            deltaLog, snapshotFiles, transactionState.getLatestSchemaInternal()));
   }
 
   @Override
   public void syncFilesForDiff(OneDataFilesDiff oneDataFilesDiff) {
     transactionState.setActions(
         dataFileUpdatesExtractor.applyDiff(
-            oneDataFilesDiff, transactionState.getLatestSchema(), deltaLog.dataPath().toString()));
+            oneDataFilesDiff,
+            transactionState.getLatestSchemaInternal(),
+            deltaLog.dataPath().toString()));
   }
 
   @Override
@@ -171,14 +171,15 @@ public class DeltaClient implements TargetClient {
 
   @EqualsAndHashCode
   @ToString
-  private static class TransactionState {
+  private class TransactionState {
     private final OptimisticTransaction transaction;
     private final Instant commitTime;
     private final DeltaLog deltaLog;
     private final int retentionInHours;
     @Getter private final List<String> partitionColumns;
     private final String tableName;
-    @Getter @Setter private StructType latestSchema;
+    @Getter private StructType latestSchema;
+    @Getter private OneSchema latestSchemaInternal;
     @Setter private OneTableMetadata metadata;
     @Setter private Seq<Action> actions;
 
@@ -195,6 +196,12 @@ public class DeltaClient implements TargetClient {
 
     private void addColumn(StructField field) {
       latestSchema = latestSchema.add(field);
+      latestSchemaInternal = schemaExtractor.toOneSchema(latestSchema);
+    }
+
+    private void setLatestSchema(OneSchema schema) {
+      this.latestSchemaInternal = schema;
+      this.latestSchema = schemaExtractor.fromOneSchema(schema);
     }
 
     private void commitTransaction() {

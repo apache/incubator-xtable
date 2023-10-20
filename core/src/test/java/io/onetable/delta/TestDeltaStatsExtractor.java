@@ -21,20 +21,26 @@ package io.onetable.delta;
 import static io.onetable.testutil.ColumnStatMapUtil.getColumnStatMap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.Metadata;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
+
+import org.apache.spark.sql.delta.actions.AddFile;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableMap;
 
 import io.onetable.model.schema.OneField;
+import io.onetable.model.schema.OneSchema;
+import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.Range;
+import io.onetable.testutil.ColumnStatMapUtil;
 
 public class TestDeltaStatsExtractor {
 
@@ -42,13 +48,12 @@ public class TestDeltaStatsExtractor {
 
   @Test
   public void testDeltaStats() throws JsonProcessingException {
-    StructType structSchema = getStructSchema();
+    OneSchema schema = ColumnStatMapUtil.getSchema();
 
     Map<OneField, ColumnStat> columnStatMap = getColumnStatMap();
 
     String actualStats =
-        DeltaStatsExtractor.getInstance()
-            .convertStatsToDeltaFormat(structSchema, 50L, columnStatMap);
+        DeltaStatsExtractor.getInstance().convertStatsToDeltaFormat(schema, 50L, columnStatMap);
     Map<String, Object> actualStatsMap = MAPPER.readValue(actualStats, HashMap.class);
     assertEquals(50, actualStatsMap.get("numRecords"));
 
@@ -97,41 +102,93 @@ public class TestDeltaStatsExtractor {
     assertEquals(4, nestedMapInNullCountMap.get("nested_long_field"));
   }
 
-  private StructType getStructSchema() {
-    StructType nestedStructSchema = new StructType();
-    nestedStructSchema =
-        nestedStructSchema.add(
-            new StructField(
-                "array_string_field",
-                DataTypes.createArrayType(DataTypes.StringType),
-                false,
-                Metadata.empty()));
-    nestedStructSchema =
-        nestedStructSchema.add(
-            new StructField("nested_long_field", DataTypes.LongType, false, Metadata.empty()));
+  @Test
+  void convertStatsToInternalRepresentation() throws IOException {
+    List<OneField> fields = getSchemaFields();
+    Map<String, Object> minValues = generateMap("a", 1, 1.0, 10);
+    Map<String, Object> maxValues = generateMap("b", 2, 2.0, 20);
+    Map<String, Object> nullValues = generateMap(1L, 2L, 3L, 4L);
+    Map<String, Object> deltaStats = new HashMap<>();
+    deltaStats.put("minValues", minValues);
+    deltaStats.put("maxValues", maxValues);
+    deltaStats.put("nullCount", nullValues);
+    deltaStats.put("numRecords", 100);
+    String stats = MAPPER.writeValueAsString(deltaStats);
+    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null);
+    DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
+    Map<OneField, ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
 
-    return new StructType(
-        new StructField[] {
-          new StructField("long_field", DataTypes.LongType, false, Metadata.empty()),
-          new StructField("string_field", DataTypes.StringType, false, Metadata.empty()),
-          new StructField("null_string_field", DataTypes.StringType, true, Metadata.empty()),
-          new StructField("timestamp_field", DataTypes.TimestampType, false, Metadata.empty()),
-          new StructField(
-              "timestamp_micros_field", DataTypes.TimestampType, false, Metadata.empty()),
-          new StructField(
-              "local_timestamp_field", DataTypes.TimestampType, false, Metadata.empty()),
-          new StructField("date_field", DataTypes.DateType, false, Metadata.empty()),
-          new StructField(
-              "array_long_field",
-              DataTypes.createArrayType(DataTypes.LongType, false),
-              false,
-              Metadata.empty()),
-          new StructField(
-              "map_string_long_field",
-              DataTypes.createMapType(DataTypes.StringType, DataTypes.LongType, false),
-              false,
-              Metadata.empty()),
-          new StructField("nested_struct_field", nestedStructSchema, false, Metadata.empty())
-        });
+    Map<OneField, ColumnStat> expected =
+        ImmutableMap.<OneField, ColumnStat>builder()
+            .put(
+                fields.get(0),
+                ColumnStat.builder()
+                    .numValues(100)
+                    .numNulls(1)
+                    .range(Range.vector("a", "b"))
+                    .build())
+            .put(
+                fields.get(2),
+                ColumnStat.builder().numValues(100).numNulls(2).range(Range.vector(1, 2)).build())
+            .put(
+                fields.get(4),
+                ColumnStat.builder()
+                    .numValues(100)
+                    .numNulls(3)
+                    .range(Range.vector(1.0, 2.0))
+                    .build())
+            .put(
+                fields.get(5),
+                ColumnStat.builder().numValues(100).numNulls(4).range(Range.vector(10, 20)).build())
+            .build();
+    assertEquals(expected, actual);
+  }
+
+  private List<OneField> getSchemaFields() {
+    return Arrays.asList(
+        OneField.builder()
+            .name("top_level_string")
+            .schema(OneSchema.builder().dataType(OneType.STRING).build())
+            .build(),
+        OneField.builder()
+            .name("nested")
+            .schema(OneSchema.builder().dataType(OneType.RECORD).build())
+            .build(),
+        OneField.builder()
+            .name("int_field")
+            .parentPath("nested")
+            .schema(OneSchema.builder().dataType(OneType.INT).build())
+            .build(),
+        OneField.builder()
+            .name("double_nesting")
+            .parentPath("nested")
+            .schema(OneSchema.builder().dataType(OneType.RECORD).build())
+            .build(),
+        OneField.builder()
+            .name("double_field")
+            .parentPath("nested.double_nesting")
+            .schema(OneSchema.builder().dataType(OneType.DOUBLE).build())
+            .build(),
+        OneField.builder()
+            .name("top_level_int")
+            .schema(OneSchema.builder().dataType(OneType.INT).build())
+            .build());
+  }
+
+  private Map<String, Object> generateMap(
+      Object topLevelStringValue,
+      Object nestedIntValue,
+      Object doubleNestedValue,
+      Object topLevelIntValue) {
+    Map<String, Object> doubleNestedValues = new HashMap<>();
+    doubleNestedValues.put("double_field", doubleNestedValue);
+    Map<String, Object> nestedValues = new HashMap<>();
+    nestedValues.put("int_field", nestedIntValue);
+    nestedValues.put("double_nesting", doubleNestedValues);
+    Map<String, Object> values = new HashMap<>();
+    values.put("top_level_string", topLevelStringValue);
+    values.put("nested", nestedValues);
+    values.put("top_level_int", topLevelIntValue);
+    return values;
   }
 }

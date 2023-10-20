@@ -18,7 +18,8 @@
  
 package io.onetable.delta;
 
-import static io.onetable.delta.DeltaValueSerializer.getFormattedValueForPartition;
+import static io.onetable.delta.DeltaValueConverter.convertFromDeltaPartitionValue;
+import static io.onetable.delta.DeltaValueConverter.convertToDeltaPartitionValue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -57,7 +59,7 @@ import io.onetable.schema.SchemaFieldFinder;
 /**
  * DeltaPartitionExtractor handles extracting partition columns, also creating generated columns in
  * the certain cases. It is also responsible for PartitionValue Serialization leveraging {@link
- * DeltaValueSerializer}.
+ * DeltaValueConverter}.
  */
 @Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -239,7 +241,7 @@ public class DeltaPartitionExtractor {
       String partitionValueSerialized;
       if (transformType == PartitionTransformType.VALUE) {
         partitionValueSerialized =
-            getFormattedValueForPartition(
+            convertToDeltaPartitionValue(
                 e.getValue().getMaxValue(),
                 e.getKey().getSourceField().getSchema().getDataType(),
                 transformType,
@@ -249,7 +251,7 @@ public class DeltaPartitionExtractor {
       } else {
         // use appropriate date formatter for value serialization.
         partitionValueSerialized =
-            getFormattedValueForPartition(
+            convertToDeltaPartitionValue(
                 e.getValue().getMaxValue(),
                 e.getKey().getSourceField().getSchema().getDataType(),
                 transformType,
@@ -258,6 +260,30 @@ public class DeltaPartitionExtractor {
       }
     }
     return partitionValuesSerialized;
+  }
+
+  public Map<OnePartitionField, Range> partitionValueExtraction(
+      scala.collection.Map<String, String> values, List<OnePartitionField> partitionFields) {
+    return partitionFields.stream()
+        .collect(
+            Collectors.toMap(
+                Function.identity(),
+                partitionField -> {
+                  String serializedValue =
+                      values.getOrElse(partitionField.getSourceField().getName(), null);
+                  PartitionTransformType partitionTransformType = partitionField.getTransformType();
+                  String dateFormat =
+                      partitionTransformType != PartitionTransformType.VALUE
+                          ? getDateFormat(partitionTransformType)
+                          : null;
+                  Object partitionValue =
+                      convertFromDeltaPartitionValue(
+                          serializedValue,
+                          partitionField.getSourceField().getSchema().getDataType(),
+                          partitionField.getTransformType(),
+                          dateFormat);
+                  return Range.scalar(partitionValue);
+                }));
   }
 
   private String getGeneratedColumnName(OnePartitionField onePartitionField) {

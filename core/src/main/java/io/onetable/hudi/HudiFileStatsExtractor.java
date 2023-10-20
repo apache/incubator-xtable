@@ -22,12 +22,10 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.sql.Date;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -85,7 +83,7 @@ public class HudiFileStatsExtractor {
                 .getTableConfig()
                 .isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS);
     final Map<String, OneField> nameFieldMap =
-        getAllFields(schema).stream()
+        schema.getAllFields().stream()
             .collect(
                 Collectors.toMap(
                     field -> getFieldNameForStats(field, useMetadataTableColStats),
@@ -266,19 +264,6 @@ public class HudiFileStatsExtractor {
         .numValues(valueCount)
         .totalSize(totalSize)
         .build();
-  }
-
-  private static List<OneField> getAllFields(OneSchema schema) {
-    List<OneField> output = new ArrayList<>();
-    Queue<OneField> fieldQueue = new ArrayDeque<>(schema.getFields());
-    while (!fieldQueue.isEmpty()) {
-      OneField currentField = fieldQueue.poll();
-      if (currentField.getSchema().getFields() != null) {
-        fieldQueue.addAll(currentField.getSchema().getFields());
-      }
-      output.add(currentField);
-    }
-    return output;
   }
 
   private static int dateToDaysSinceEpoch(Object date) {
