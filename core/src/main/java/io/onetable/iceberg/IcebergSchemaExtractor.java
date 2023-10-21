@@ -162,7 +162,7 @@ public class IcebergSchemaExtractor {
       case INT:
         return Types.IntegerType.get();
       case LONG:
-      case TIMESTAMP_NTZ:
+      case TIMESTAMP_NTZ: // TODO - revisit this
         return Types.LongType.get();
       case BYTES:
         return Types.BinaryType.get();

@@ -47,14 +47,8 @@ public class TestIcebergSchemaExtractor {
     doubleMetadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, scale);
 
     int fixedSize = 8;
-    Map<OneSchema.MetadataKey, Object> fixedMetadata = new HashMap<>();
-    fixedMetadata.put(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedSize);
-
-    Map<OneSchema.MetadataKey, Object> millisTimestamp = new HashMap<>();
-    millisTimestamp.put(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
-
-    Map<OneSchema.MetadataKey, Object> microsTimestamp = new HashMap<>();
-    microsTimestamp.put(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+    Map<OneSchema.MetadataKey, Object> fixedMetadata =
+        Collections.singletonMap(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedSize);
 
     OneSchema oneSchemaRepresentation =
         OneSchema.builder()
@@ -311,38 +305,39 @@ public class TestIcebergSchemaExtractor {
   @Test
   public void testEnums() {
     // there are no enums in iceberg so we convert them to string
-    Map<OneSchema.MetadataKey, Object> requiredEnumMetadata = new HashMap<>();
-    requiredEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
-    Map<OneSchema.MetadataKey, Object> optionalEnumMetadata = new HashMap<>();
-    optionalEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
+    Map<OneSchema.MetadataKey, Object> requiredEnumMetadata =
+        Collections.singletonMap(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
+    Map<OneSchema.MetadataKey, Object> optionalEnumMetadata =
+        Collections.singletonMap(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
 
-    OneSchema schemaWithEnums = OneSchema
-        .builder()
-        .dataType(OneType.RECORD)
-        .fields(Arrays.asList(
-            OneField.builder()
-                .name("requiredEnum")
-                .schema(
-                    OneSchema.builder()
-                        .name("REQUIRED_ENUM")
-                        .dataType(OneType.ENUM)
-                        .isNullable(false)
-                        .metadata(requiredEnumMetadata)
-                        .build())
-                .defaultValue("ONE")
-                .build(),
-            OneField.builder()
-                .name("optionalEnum")
-                .schema(
-                    OneSchema.builder()
-                        .name("OPTIONAL_ENUM")
-                        .dataType(OneType.ENUM)
-                        .isNullable(true)
-                        .metadata(optionalEnumMetadata)
-                        .build())
-                .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                .build()))
-        .build();
+    OneSchema schemaWithEnums =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("requiredEnum")
+                        .schema(
+                            OneSchema.builder()
+                                .name("REQUIRED_ENUM")
+                                .dataType(OneType.ENUM)
+                                .isNullable(false)
+                                .metadata(requiredEnumMetadata)
+                                .build())
+                        .defaultValue("ONE")
+                        .build(),
+                    OneField.builder()
+                        .name("optionalEnum")
+                        .schema(
+                            OneSchema.builder()
+                                .name("OPTIONAL_ENUM")
+                                .dataType(OneType.ENUM)
+                                .isNullable(true)
+                                .metadata(optionalEnumMetadata)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
 
     Schema expectedSchema =
         new Schema(
@@ -362,37 +357,218 @@ public class TestIcebergSchemaExtractor {
     int fixedSize = 16;
     Map<OneSchema.MetadataKey, Object> fixedMetadata = new HashMap<>();
     fixedMetadata.put(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedSize);
-    OneSchema expectedSchema = OneSchema
-        .builder()
-        .dataType(OneType.RECORD)
-        .fields(Arrays.asList(
-            OneField.builder()
-                .name("requiredUuid")
-                .fieldId(1)
-                .schema(
-                    OneSchema.builder()
-                        .name("uuid")
-                        .dataType(OneType.FIXED)
-                        .isNullable(false)
-                        .metadata(fixedMetadata)
-                        .build())
-                .build(),
-            OneField.builder()
-                .name("optionalUuid")
-                .fieldId(2)
-                .schema(
-                    OneSchema.builder()
-                        .name("uuid")
-                        .dataType(OneType.FIXED)
-                        .isNullable(true)
-                        .metadata(fixedMetadata)
-                        .build())
-                .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                .build()))
-        .build();
+    OneSchema expectedSchema =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("requiredUuid")
+                        .fieldId(1)
+                        .schema(
+                            OneSchema.builder()
+                                .name("uuid")
+                                .dataType(OneType.FIXED)
+                                .isNullable(false)
+                                .metadata(fixedMetadata)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalUuid")
+                        .fieldId(2)
+                        .schema(
+                            OneSchema.builder()
+                                .name("uuid")
+                                .dataType(OneType.FIXED)
+                                .isNullable(true)
+                                .metadata(fixedMetadata)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
     assertEquals(expectedSchema, (SCHEMA_EXTRACTOR.fromIceberg(inputSchema)));
   }
-  // TODO test timestamp separately
+
+  @Test
+  public void testTimestamps() {
+    Map<OneSchema.MetadataKey, Object> millisTimestamp =
+        Collections.singletonMap(
+            OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
+
+    Map<OneSchema.MetadataKey, Object> microsTimestamp =
+        Collections.singletonMap(
+            OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+
+    OneSchema irSchema =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("requiredTimestampMillis")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .metadata(millisTimestamp)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalTimestampMillis")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .metadata(millisTimestamp)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build(),
+                    OneField.builder()
+                        .name("requiredTimestampNtzMillis")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestampNtz")
+                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .isNullable(false)
+                                .metadata(millisTimestamp)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalTimestampNtzMillis")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestampNtz")
+                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .metadata(millisTimestamp)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build(),
+                    OneField.builder()
+                        .name("requiredTimestampMicros")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .metadata(microsTimestamp)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalTimestampMicros")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .metadata(microsTimestamp)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build(),
+                    OneField.builder()
+                        .name("requiredTimestampNtzMicros")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestampNtz")
+                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .isNullable(false)
+                                .metadata(microsTimestamp)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalTimestampNtzMicros")
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestampNtz")
+                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .metadata(microsTimestamp)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+    Schema expectedTargetSchema =
+        new Schema(
+            Types.NestedField.required(
+                1, "requiredTimestampMillis", Types.TimestampType.withZone()),
+            Types.NestedField.optional(
+                2, "optionalTimestampMillis", Types.TimestampType.withZone()),
+            Types.NestedField.required(3, "requiredTimestampNtzMillis", Types.LongType.get()),
+            Types.NestedField.optional(4, "optionalTimestampNtzMillis", Types.LongType.get()),
+            Types.NestedField.required(
+                5, "requiredTimestampMicros", Types.TimestampType.withZone()),
+            Types.NestedField.optional(
+                6, "optionalTimestampMicros", Types.TimestampType.withZone()),
+            Types.NestedField.required(7, "requiredTimestampNtzMicros", Types.LongType.get()),
+            Types.NestedField.optional(8, "optionalTimestampNtzMicros", Types.LongType.get()));
+    assertTrue(expectedTargetSchema.sameSchema(SCHEMA_EXTRACTOR.toIceberg(irSchema)));
+
+    Schema sourceSchema =
+        new Schema(
+            Types.NestedField.required(
+                4, "requiredTimestampWithZone", Types.TimestampType.withZone()),
+            Types.NestedField.optional(
+                5, "optionalTimestampWithZone", Types.TimestampType.withZone()),
+            Types.NestedField.required(
+                6, "requiredTimestampWithoutZone", Types.TimestampType.withoutZone()),
+            Types.NestedField.optional(
+                7, "optionalTimestampWithoutZone", Types.TimestampType.withoutZone()));
+    OneSchema expectedIrSchema =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("requiredTimestampWithZone")
+                        .fieldId(4)
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .metadata(microsTimestamp)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalTimestampWithZone")
+                        .fieldId(5)
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .metadata(microsTimestamp)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build(),
+                    OneField.builder()
+                        .name("requiredTimestampWithoutZone")
+                        .fieldId(6)
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .metadata(microsTimestamp)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalTimestampWithoutZone")
+                        .fieldId(7)
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .metadata(microsTimestamp)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+    assertEquals(expectedIrSchema, SCHEMA_EXTRACTOR.fromIceberg(sourceSchema));
+  }
 
   @Test
   public void testMaps() {
