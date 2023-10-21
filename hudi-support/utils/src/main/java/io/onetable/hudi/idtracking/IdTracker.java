@@ -82,6 +82,15 @@ public class IdTracker {
   }
 
   /**
+   * Determines whether the ID tracking metadata is set.
+   * @param schema schema to inspect
+   * @return true if ID tracking is set, false otherwise
+   */
+  public boolean hasIdTracking(Schema schema) {
+    return schema.getObjectProp(ID_TRACKING) != null;
+  }
+
+  /**
    * Adds IdTracking information to the properties of a schema and returns a schema with the
    * property set.
    *
@@ -93,6 +102,21 @@ public class IdTracker {
    */
   public Schema addIdTracking(
       Schema schema, Option<Schema> previousSchema, boolean includeMetaFields) {
+    IdTracking newIdTracking = getIdTracking(schema, previousSchema, includeMetaFields);
+    return addIdMappings(schema, newIdTracking);
+  }
+
+  /**
+   * Returns IdTracking information for the provided schema
+   *
+   * @param schema The schema to update the IdTracking property
+   * @param previousSchema Schema previously used, if any, to ensure that IDs are consistent between
+   *     commits.
+   * @param includeMetaFields Whether hoodie meta fields will be included in the table
+   * @return the IdTracking information
+   */
+  public IdTracking getIdTracking(
+      Schema schema, Option<Schema> previousSchema, boolean includeMetaFields) {
     IdTracking existingState = previousSchema.flatMap(this::getIdTracking).orElse(IdTracking.EMPTY);
     AtomicInteger currentId = new AtomicInteger(existingState.getLastIdUsed());
     // add meta fields to the schema in order to ensure they will be assigned IDs
@@ -100,8 +124,7 @@ public class IdTracker {
         includeMetaFields ? HoodieAvroUtils.addMetadataFields(schema) : schema;
     List<IdMapping> newMappings =
         generateIdMappings(schemaForIdMapping, currentId, existingState.getIdMappings());
-    IdTracking newIdTracking = new IdTracking(newMappings, currentId.get());
-    return addIdMappings(schema, newIdTracking);
+    return new IdTracking(newMappings, currentId.get());
   }
 
   private static List<IdMapping> generateIdMappings(
