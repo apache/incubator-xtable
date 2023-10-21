@@ -19,6 +19,7 @@
 package io.onetable.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.*;
 
@@ -39,11 +40,6 @@ public class TestIcebergSchemaExtractor {
 
   @Test
   public void testPrimitiveTypes() {
-    Map<OneSchema.MetadataKey, Object> requiredEnumMetadata = new HashMap<>();
-    requiredEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
-    Map<OneSchema.MetadataKey, Object> optionalEnumMetadata = new HashMap<>();
-    optionalEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
-
     int precision = 10;
     int scale = 5;
     Map<OneSchema.MetadataKey, Object> doubleMetadata = new HashMap<>();
@@ -312,9 +308,91 @@ public class TestIcebergSchemaExtractor {
     assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 
-  // TODO test enum separately
+  @Test
+  public void testEnums() {
+    // there are no enums in iceberg so we convert them to string
+    Map<OneSchema.MetadataKey, Object> requiredEnumMetadata = new HashMap<>();
+    requiredEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
+    Map<OneSchema.MetadataKey, Object> optionalEnumMetadata = new HashMap<>();
+    optionalEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
+
+    OneSchema schemaWithEnums = OneSchema
+        .builder()
+        .dataType(OneType.RECORD)
+        .fields(Arrays.asList(
+            OneField.builder()
+                .name("requiredEnum")
+                .schema(
+                    OneSchema.builder()
+                        .name("REQUIRED_ENUM")
+                        .dataType(OneType.ENUM)
+                        .isNullable(false)
+                        .metadata(requiredEnumMetadata)
+                        .build())
+                .defaultValue("ONE")
+                .build(),
+            OneField.builder()
+                .name("optionalEnum")
+                .schema(
+                    OneSchema.builder()
+                        .name("OPTIONAL_ENUM")
+                        .dataType(OneType.ENUM)
+                        .isNullable(true)
+                        .metadata(optionalEnumMetadata)
+                        .build())
+                .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                .build()))
+        .build();
+
+    Schema expectedSchema =
+        new Schema(
+            Types.NestedField.required(1, "requiredEnum", Types.StringType.get()),
+            Types.NestedField.optional(2, "optionalEnum", Types.StringType.get()));
+    assertTrue(expectedSchema.sameSchema(SCHEMA_EXTRACTOR.toIceberg(schemaWithEnums)));
+  }
+
+  @Test
+  public void testUuids() {
+    // UUIDs are represented as fixed length byte arrays
+    Schema inputSchema =
+        new Schema(
+            Types.NestedField.required(1, "requiredUuid", Types.UUIDType.get()),
+            Types.NestedField.optional(2, "optionalUuid", Types.UUIDType.get()));
+
+    int fixedSize = 16;
+    Map<OneSchema.MetadataKey, Object> fixedMetadata = new HashMap<>();
+    fixedMetadata.put(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedSize);
+    OneSchema expectedSchema = OneSchema
+        .builder()
+        .dataType(OneType.RECORD)
+        .fields(Arrays.asList(
+            OneField.builder()
+                .name("requiredUuid")
+                .fieldId(1)
+                .schema(
+                    OneSchema.builder()
+                        .name("uuid")
+                        .dataType(OneType.FIXED)
+                        .isNullable(false)
+                        .metadata(fixedMetadata)
+                        .build())
+                .build(),
+            OneField.builder()
+                .name("optionalUuid")
+                .fieldId(2)
+                .schema(
+                    OneSchema.builder()
+                        .name("uuid")
+                        .dataType(OneType.FIXED)
+                        .isNullable(true)
+                        .metadata(fixedMetadata)
+                        .build())
+                .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                .build()))
+        .build();
+    assertEquals(expectedSchema, (SCHEMA_EXTRACTOR.fromIceberg(inputSchema)));
+  }
   // TODO test timestamp separately
-  // TODO test UUID handling
 
   @Test
   public void testMaps() {
