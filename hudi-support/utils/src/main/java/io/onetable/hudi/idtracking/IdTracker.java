@@ -83,6 +83,7 @@ public class IdTracker {
 
   /**
    * Determines whether the ID tracking metadata is set.
+   *
    * @param schema schema to inspect
    * @return true if ID tracking is set, false otherwise
    */
