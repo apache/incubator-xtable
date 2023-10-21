@@ -18,7 +18,10 @@
  
 package io.onetable.iceberg;
 
+import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -104,7 +107,11 @@ public class IcebergSchemaExtractor {
     return iceFields.stream()
         .map(
             iceField -> {
-              OneSchema irFieldSchema = fromIcebergType(iceField, parentPath);
+              Type type = iceField.type();
+              String doc = iceField.doc();
+              boolean isOptional = iceField.isOptional();
+              String fieldPath = getFullyQualifiedPath(parentPath, iceField.name());
+              OneSchema irFieldSchema = fromIcebergType(type, fieldPath, doc, isOptional);
               return OneField.builder()
                   .name(iceField.name())
                   .fieldId(iceField.fieldId())
@@ -229,11 +236,12 @@ public class IcebergSchemaExtractor {
     }
   }
 
-  private OneSchema fromIcebergType(Types.NestedField iceField, String parentPath) {
+  private OneSchema fromIcebergType(
+      Type iceType, String fieldPath, String doc, boolean isOptional) {
     OneType type;
     List<OneField> fields = null;
     Map<OneSchema.MetadataKey, Object> metadata = null;
-    switch (iceField.type().typeId()) {
+    switch (iceType.typeId()) {
       case STRING:
         type = OneType.STRING;
         break;
@@ -256,7 +264,7 @@ public class IcebergSchemaExtractor {
         type = OneType.DATE;
         break;
       case TIMESTAMP:
-        Types.TimestampType timestampType = (Types.TimestampType) iceField.type();
+        Types.TimestampType timestampType = (Types.TimestampType) iceType;
         type = timestampType.shouldAdjustToUTC() ? OneType.TIMESTAMP : OneType.TIMESTAMP_NTZ;
         metadata =
             Collections.singletonMap(
@@ -266,7 +274,7 @@ public class IcebergSchemaExtractor {
         type = OneType.DOUBLE;
         break;
       case DECIMAL:
-        Types.DecimalType decimalType = (Types.DecimalType) iceField.type();
+        Types.DecimalType decimalType = (Types.DecimalType) iceType;
         metadata = new HashMap<>(2, 1.0f);
         metadata.put(OneSchema.MetadataKey.DECIMAL_PRECISION, decimalType.precision());
         metadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, decimalType.scale());
@@ -274,7 +282,7 @@ public class IcebergSchemaExtractor {
         break;
       case FIXED:
         type = OneType.FIXED;
-        Types.FixedType fixedType = (Types.FixedType) iceField.type();
+        Types.FixedType fixedType = (Types.FixedType) iceType;
         metadata =
             Collections.singletonMap(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedType.length());
         break;
@@ -283,21 +291,67 @@ public class IcebergSchemaExtractor {
         metadata = Collections.singletonMap(OneSchema.MetadataKey.FIXED_BYTES_SIZE, 16);
         break;
       case STRUCT:
-        Types.StructType structType = (Types.StructType) iceField.type();
-        fields =
-            fromIceberg(
-                structType.fields(),
-                parentPath == null ? iceField.name() : parentPath + "." + iceField.name());
+        Types.StructType structType = (Types.StructType) iceType;
+        fields = fromIceberg(structType.fields(), fieldPath);
         type = OneType.RECORD;
         break;
+      case MAP:
+        Types.MapType mapType = (Types.MapType) iceType;
+        OneSchema keySchema =
+            fromIcebergType(
+                mapType.keyType(),
+                getFullyQualifiedPath(fieldPath, OneField.Constants.MAP_VALUE_FIELD_NAME),
+                null,
+                false);
+        OneField keyField =
+            OneField.builder()
+                .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+                .parentPath(fieldPath)
+                .schema(keySchema)
+                .fieldId(mapType.keyId())
+                .build();
+        OneSchema valueSchema =
+            fromIcebergType(
+                mapType.valueType(),
+                getFullyQualifiedPath(fieldPath, OneField.Constants.MAP_VALUE_FIELD_NAME),
+                null,
+                mapType.isValueOptional());
+        OneField valueField =
+            OneField.builder()
+                .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+                .parentPath(fieldPath)
+                .schema(valueSchema)
+                .fieldId(mapType.valueId())
+                .build();
+        type = OneType.MAP;
+        fields = Arrays.asList(keyField, valueField);
+        break;
+      case LIST:
+        Types.ListType listType = (Types.ListType) iceType;
+        OneSchema elementSchema =
+            fromIcebergType(
+                listType.elementType(),
+                getFullyQualifiedPath(fieldPath, OneField.Constants.ARRAY_ELEMENT_FIELD_NAME),
+                null,
+                listType.isElementOptional());
+        OneField elementField =
+            OneField.builder()
+                .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                .parentPath(fieldPath)
+                .schema(elementSchema)
+                .fieldId(listType.elementId())
+                .build();
+        type = OneType.ARRAY;
+        fields = Collections.singletonList(elementField);
+        break;
       default:
-        throw new NotSupportedException("Unsupported type: " + iceField.type().typeId());
+        throw new NotSupportedException("Unsupported type: " + iceType.typeId());
     }
     return OneSchema.builder()
-        .name(iceField.type().typeId().name().toLowerCase())
+        .name(iceType.typeId().name().toLowerCase())
         .dataType(type)
-        .comment(iceField.doc())
-        .isNullable(iceField.isOptional())
+        .comment(doc)
+        .isNullable(isOptional)
         .metadata(metadata)
         .fields(fields)
         .build();

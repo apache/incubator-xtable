@@ -18,6 +18,8 @@
  
 package io.onetable.avro;
 
+import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -286,13 +288,6 @@ public class AvroSchemaConverter {
     return Schema.Field.NULL_VALUE.equals(avroField.defaultVal())
         ? OneField.Constants.NULL_DEFAULT_VALUE
         : avroField.defaultVal();
-  }
-
-  private static String getFullyQualifiedPath(String path, String fieldName) {
-    if (path == null || path.isEmpty()) {
-      return fieldName;
-    }
-    return path + "." + fieldName;
   }
 
   public Schema fromOneSchema(OneSchema oneSchema) {

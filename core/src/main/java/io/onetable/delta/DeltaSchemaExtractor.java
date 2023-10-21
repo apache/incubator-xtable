@@ -18,6 +18,8 @@
  
 package io.onetable.delta;
 
+import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -272,12 +274,5 @@ public class DeltaSchemaExtractor {
         .metadata(metadata)
         .fields(fields)
         .build();
-  }
-
-  private static String getFullyQualifiedPath(String path, String fieldName) {
-    if (path == null || path.isEmpty()) {
-      return fieldName;
-    }
-    return path + "." + fieldName;
   }
 }
