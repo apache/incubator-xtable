@@ -18,25 +18,24 @@
  
 package io.onetable.iceberg;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.util.*;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
-import io.onetable.exception.NotSupportedException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 public class TestIcebergSchemaExtractor {
 
-  private static final IcebergSchemaExtractor SCHEMA_EXTRACTOR = IcebergSchemaExtractor.getInstance();
+  private static final IcebergSchemaExtractor SCHEMA_EXTRACTOR =
+      IcebergSchemaExtractor.getInstance();
 
   @Test
   public void testPrimitiveTypes() {
@@ -308,7 +307,8 @@ public class TestIcebergSchemaExtractor {
             Types.NestedField.optional(
                 30, "optionalDecimal", Types.DecimalType.of(precision, scale)));
 
-    Assertions.assertTrue(icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+    Assertions.assertTrue(
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
     assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 
@@ -527,7 +527,8 @@ public class TestIcebergSchemaExtractor {
                         Types.NestedField.required(5, "requiredDouble", Types.DoubleType.get()),
                         Types.NestedField.optional(6, "optionalString", Types.StringType.get())))));
 
-    Assertions.assertTrue(icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+    Assertions.assertTrue(
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
     assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 
@@ -535,7 +536,6 @@ public class TestIcebergSchemaExtractor {
   public void testNestedRecords() {
     OneSchema oneSchemaRepresentation =
         OneSchema.builder()
-            .name("testRecord")
             .dataType(OneType.RECORD)
             .isNullable(false)
             .fields(
@@ -543,9 +543,10 @@ public class TestIcebergSchemaExtractor {
                     OneField.builder()
                         .name("nestedOne")
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(1)
                         .schema(
                             OneSchema.builder()
-                                .name("nestedOneType")
+                                .name("struct")
                                 .dataType(OneType.RECORD)
                                 .isNullable(true)
                                 .fields(
@@ -553,9 +554,10 @@ public class TestIcebergSchemaExtractor {
                                         OneField.builder()
                                             .name("nestedOptionalInt")
                                             .parentPath("nestedOne")
+                                            .fieldId(2)
                                             .schema(
                                                 OneSchema.builder()
-                                                    .name("int")
+                                                    .name("integer")
                                                     .dataType(OneType.INT)
                                                     .isNullable(true)
                                                     .build())
@@ -564,6 +566,7 @@ public class TestIcebergSchemaExtractor {
                                         OneField.builder()
                                             .name("nestedRequiredDouble")
                                             .parentPath("nestedOne")
+                                            .fieldId(3)
                                             .schema(
                                                 OneSchema.builder()
                                                     .name("double")
@@ -574,16 +577,18 @@ public class TestIcebergSchemaExtractor {
                                         OneField.builder()
                                             .name("nestedTwo")
                                             .parentPath("nestedOne")
+                                            .fieldId(4)
                                             .schema(
                                                 OneSchema.builder()
-                                                    .name("nestedTwoType")
+                                                    .name("struct")
                                                     .dataType(OneType.RECORD)
                                                     .isNullable(false)
                                                     .fields(
-                                                        Arrays.asList(
+                                                        Collections.singletonList(
                                                             OneField.builder()
                                                                 .name("doublyNestedString")
                                                                 .parentPath("nestedOne.nestedTwo")
+                                                                .fieldId(5)
                                                                 .schema(
                                                                     OneSchema.builder()
                                                                         .name("string")
@@ -614,7 +619,8 @@ public class TestIcebergSchemaExtractor {
                         Types.StructType.of(
                             Types.NestedField.optional(
                                 5, "doublyNestedString", Types.StringType.get()))))));
-    Assertions.assertTrue(icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+    Assertions.assertTrue(
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
     assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 
@@ -763,7 +769,8 @@ public class TestIcebergSchemaExtractor {
                         Types.NestedField.optional(
                             10, "optionalString", Types.StringType.get())))));
 
-    Assertions.assertTrue(icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+    Assertions.assertTrue(
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
     assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 }

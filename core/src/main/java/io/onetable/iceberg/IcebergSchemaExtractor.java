@@ -40,7 +40,6 @@ import io.onetable.exception.NotSupportedException;
 import io.onetable.exception.SchemaExtractorException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
-import io.onetable.model.schema.OneSchema.OneSchemaBuilder;
 import io.onetable.model.schema.OneType;
 
 /**
@@ -97,21 +96,25 @@ public class IcebergSchemaExtractor {
   public OneSchema fromIceberg(Schema iceSchema) {
     return OneSchema.builder()
         .dataType(OneType.RECORD)
-        .fields(fromIceberg(iceSchema.columns()))
+        .fields(fromIceberg(iceSchema.columns(), null))
         .build();
   }
 
-  private List<OneField> fromIceberg(List<Types.NestedField> iceFields) {
-    return iceFields.stream().map(iceField -> {
-      OneSchema irFieldSchema = fromIcebergType(iceField);
-      return
-          OneField.builder()
-              .name(iceField.name())
-              .fieldId(iceField.fieldId())
-              .schema(irFieldSchema)
-              .defaultValue(iceField.isOptional() ? OneField.Constants.NULL_DEFAULT_VALUE : null)
-              .build();
-    }).collect(Collectors.toList());
+  private List<OneField> fromIceberg(List<Types.NestedField> iceFields, String parentPath) {
+    return iceFields.stream()
+        .map(
+            iceField -> {
+              OneSchema irFieldSchema = fromIcebergType(iceField, parentPath);
+              return OneField.builder()
+                  .name(iceField.name())
+                  .fieldId(iceField.fieldId())
+                  .schema(irFieldSchema)
+                  .parentPath(parentPath)
+                  .defaultValue(
+                      iceField.isOptional() ? OneField.Constants.NULL_DEFAULT_VALUE : null)
+                  .build();
+            })
+        .collect(Collectors.toList());
   }
 
   static String convertFromOneTablePath(String path) {
@@ -226,7 +229,7 @@ public class IcebergSchemaExtractor {
     }
   }
 
-  OneSchema fromIcebergType(Types.NestedField iceField) {
+  private OneSchema fromIcebergType(Types.NestedField iceField, String parentPath) {
     OneType type;
     List<OneField> fields = null;
     Map<OneSchema.MetadataKey, Object> metadata = null;
@@ -255,7 +258,9 @@ public class IcebergSchemaExtractor {
       case TIMESTAMP:
         Types.TimestampType timestampType = (Types.TimestampType) iceField.type();
         type = timestampType.shouldAdjustToUTC() ? OneType.TIMESTAMP : OneType.TIMESTAMP_NTZ;
-        metadata = Collections.singletonMap(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+        metadata =
+            Collections.singletonMap(
+                OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
         break;
       case DOUBLE:
         type = OneType.DOUBLE;
@@ -270,11 +275,20 @@ public class IcebergSchemaExtractor {
       case FIXED:
         type = OneType.FIXED;
         Types.FixedType fixedType = (Types.FixedType) iceField.type();
-        metadata = Collections.singletonMap(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedType.length());
+        metadata =
+            Collections.singletonMap(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedType.length());
         break;
       case UUID:
         type = OneType.FIXED;
         metadata = Collections.singletonMap(OneSchema.MetadataKey.FIXED_BYTES_SIZE, 16);
+        break;
+      case STRUCT:
+        Types.StructType structType = (Types.StructType) iceField.type();
+        fields =
+            fromIceberg(
+                structType.fields(),
+                parentPath == null ? iceField.name() : parentPath + "." + iceField.name());
+        type = OneType.RECORD;
         break;
       default:
         throw new NotSupportedException("Unsupported type: " + iceField.type().typeId());
