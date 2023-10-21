@@ -21,8 +21,10 @@ package io.onetable.delta;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -35,6 +37,7 @@ import org.apache.spark.sql.delta.actions.Action;
 import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
+import scala.Option;
 import io.delta.tables.DeltaTable;
 
 import io.onetable.exception.OneIOException;
@@ -48,12 +51,14 @@ import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.extractor.PartitionedDataFileIterator;
 import io.onetable.spi.extractor.SourceClient;
 
 @Log4j2
 public class DeltaSourceClient implements SourceClient<Long> {
   private final DeltaDataFileExtractor dataFileExtractor = DeltaDataFileExtractor.builder().build();
+  private final DeltaTableExtractor tableExtractor;
   private final SparkSession sparkSession;
   private final DeltaLog deltaLog;
   private final DeltaTable deltaTable;
@@ -67,6 +72,8 @@ public class DeltaSourceClient implements SourceClient<Long> {
     this.basePath = basePath;
     this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
     this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
+    this.tableExtractor = new DeltaTableExtractor();
+    this.deltaIncrementalChangesCacheStore = new DeltaIncrementalChangesCacheStore();
   }
 
   @Override
@@ -97,9 +104,12 @@ public class DeltaSourceClient implements SourceClient<Long> {
 
   @Override
   public TableChange getTableChangeForCommit(Long versionNumber) {
-    // Expects client to call getCurrentCommitState and call this method.
+    OneTable tableAtVersion = tableExtractor.table(deltaLog, tableName, versionNumber);
+    // Client to call getCurrentCommitState and call this method.
     List<Action> actionsForVersion =
         deltaIncrementalChangesCacheStore.getActionsForVersion(versionNumber);
+    Snapshot snapshotAtVersion =
+        deltaLog.getSnapshotAt(versionNumber, Option.empty(), Option.empty());
     List<AddFile> addFileActions = new ArrayList<>();
     List<RemoveFile> removeFileActions = new ArrayList<>();
     for (Action action : actionsForVersion) {
@@ -109,8 +119,24 @@ public class DeltaSourceClient implements SourceClient<Long> {
         removeFileActions.add((RemoveFile) action);
       }
     }
-    // TODO(vamshigv): Handle no updates to add file or remove files.
-    return null;
+    Set<OneDataFile> addedFiles = new HashSet<>();
+    Set<OneDataFile> removedFiles = new HashSet<>();
+    for (AddFile addFile : addFileActions) {
+      addedFiles.add(
+          dataFileExtractor.convertAddActionToOneDataFile(
+              addFile,
+              snapshotAtVersion,
+              tableAtVersion.getPartitioningFields(),
+              tableAtVersion.getReadSchema().getFields(),
+              true));
+    }
+    for (RemoveFile removeFile : removeFileActions) {
+      removedFiles.add(
+          dataFileExtractor.convertRemoveActionToOneDataFile(removeFile, snapshotAtVersion));
+    }
+    OneDataFilesDiff dataFilesDiff =
+        OneDataFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
+    return TableChange.builder().currentTableState(tableAtVersion).filesDiff(dataFilesDiff).build();
   }
 
   @Override
@@ -122,7 +148,8 @@ public class DeltaSourceClient implements SourceClient<Long> {
             .getActiveCommitAtTime(
                 Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()), true, false, true);
     Long versionNumberAtLastSyncInstant = deltaCommitAtLastSyncInstant.version();
-    deltaIncrementalChangesCacheStore.initializeOrReload(deltaLog, versionNumberAtLastSyncInstant);
+    deltaIncrementalChangesCacheStore.initializeOrReload(
+        deltaLog, versionNumberAtLastSyncInstant + 1);
     return CurrentCommitState.<Long>builder()
         .commitsToProcess(deltaIncrementalChangesCacheStore.getVersionsInSortedOrder())
         .build();

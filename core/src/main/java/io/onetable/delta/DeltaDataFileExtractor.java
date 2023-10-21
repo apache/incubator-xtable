@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.Path;
 
 import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.AddFile;
+import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import io.onetable.exception.NotSupportedException;
 import io.onetable.model.schema.OneField;
@@ -62,6 +63,54 @@ public class DeltaDataFileExtractor {
     return new DeltaDataFileIterator(deltaSnapshot, schema, false);
   }
 
+  public OneDataFile convertAddActionToOneDataFile(
+      AddFile addFile,
+      Snapshot deltaSnapshot,
+      List<OnePartitionField> partitionFields,
+      List<OneField> fields,
+      boolean includeColumnStats) {
+    String tableBasePath = deltaSnapshot.deltaLog().dataPath().toUri().toString();
+    return OneDataFile.builder()
+        .physicalPath(getFullPathToFile(tableBasePath, addFile.path()))
+        .fileFormat(convertToOneTableFileFormat(deltaSnapshot.metadata().format().provider()))
+        .fileSizeBytes(addFile.getFileSize())
+        .recordCount(addFile.getNumLogicalRecords())
+        .lastModified(addFile.modificationTime())
+        .partitionValues(
+            partitionExtractor.partitionValueExtraction(addFile.partitionValues(), partitionFields))
+        .columnStats(
+            includeColumnStats
+                ? fileStatsExtractor.getColumnStatsForFile(addFile, fields)
+                : Collections.emptyMap())
+        .build();
+  }
+
+  public OneDataFile convertRemoveActionToOneDataFile(
+      RemoveFile removeFile, Snapshot deltaSnapshot) {
+    String tableBasePath = deltaSnapshot.deltaLog().dataPath().toUri().toString();
+    return OneDataFile.builder()
+        .physicalPath(getFullPathToFile(tableBasePath, removeFile.path()))
+        .fileFormat(convertToOneTableFileFormat(deltaSnapshot.metadata().format().provider()))
+        .build();
+  }
+
+  private FileFormat convertToOneTableFileFormat(String provider) {
+    if (provider.equals("parquet")) {
+      return FileFormat.APACHE_PARQUET;
+    } else if (provider.equals("orc")) {
+      return FileFormat.APACHE_ORC;
+    }
+    throw new NotSupportedException(
+        String.format("delta file format %s is not recognized", provider));
+  }
+
+  private String getFullPathToFile(String tableBasePath, String path) {
+    if (path.startsWith(tableBasePath)) {
+      return path;
+    }
+    return tableBasePath + Path.SEPARATOR + path;
+  }
+
   /**
    * Initializes an iterator for Delta Lake files.
    *
@@ -89,7 +138,10 @@ public class DeltaDataFileExtractor {
       this.includeColumnStats = includeColumnStats;
       this.dataFilesIterator =
           snapshot.allFiles().collectAsList().stream()
-              .map(this::convertAddFileToOneDataFile)
+              .map(
+                  addFile ->
+                      convertAddActionToOneDataFile(
+                          addFile, snapshot, partitionFields, fields, includeColumnStats))
               .collect(Collectors.toList())
               .listIterator();
     }
@@ -109,40 +161,6 @@ public class DeltaDataFileExtractor {
         dataFiles.add(this.dataFilesIterator.next());
       }
       return OneDataFiles.collectionBuilder().files(dataFiles).build();
-    }
-
-    private FileFormat convertToOneTableFileFormat(String provider) {
-      if (provider.equals("parquet")) {
-        return FileFormat.APACHE_PARQUET;
-      } else if (provider.equals("orc")) {
-        return FileFormat.APACHE_ORC;
-      }
-      throw new NotSupportedException(
-          String.format("delta file format %s is not recognized", provider));
-    }
-
-    private OneDataFile convertAddFileToOneDataFile(AddFile addFile) {
-      return OneDataFile.builder()
-          .physicalPath(getFullPathToFile(addFile.path()))
-          .fileFormat(fileFormat)
-          .fileSizeBytes(addFile.getFileSize())
-          .recordCount(addFile.getNumLogicalRecords())
-          .lastModified(addFile.modificationTime())
-          .partitionValues(
-              partitionExtractor.partitionValueExtraction(
-                  addFile.partitionValues(), partitionFields))
-          .columnStats(
-              includeColumnStats
-                  ? fileStatsExtractor.getColumnStatsForFile(addFile, fields)
-                  : Collections.emptyMap())
-          .build();
-    }
-
-    private String getFullPathToFile(String path) {
-      if (path.startsWith(tableBasePath)) {
-        return path;
-      }
-      return tableBasePath + Path.SEPARATOR + path;
     }
   }
 }

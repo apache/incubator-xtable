@@ -99,7 +99,7 @@ public class DeltaIncrementalChangesCacheStore {
 
   private void reload(DeltaLog deltaLog, Long versionToStartFrom) {
     Iterator<Tuple2<Object, Seq<Action>>> iterator = deltaLog.getChanges(versionToStartFrom, false);
-    List<Tuple2<Object, List<Action>>> changesList = new ArrayList<>(iterator.size());
+    List<Tuple2<Object, List<Action>>> changesList = new ArrayList<>();
     while (iterator.hasNext()) {
       Tuple2<Object, Seq<Action>> currentChange = iterator.next();
       Object versionNumberObj = currentChange._1();

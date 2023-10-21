@@ -221,4 +221,17 @@ public class TestSparkDeltaTable {
     Files.createDirectories(basePath);
     return basePath.toUri().toString();
   }
+
+  public List<String> getAllActiveFiles() {
+    return deltaLog.snapshot().allFiles().collectAsList().stream()
+        .map(addFile -> addSlashToBasePath(basePath) + addFile.path())
+        .collect(Collectors.toList());
+  }
+
+  private String addSlashToBasePath(String basePath) {
+    if (basePath.endsWith("/")) {
+      return basePath;
+    }
+    return basePath + "/";
+  }
 }
