@@ -20,7 +20,9 @@ package io.onetable.delta;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -28,46 +30,69 @@ import org.apache.spark.sql.SparkSession;
 
 import org.apache.spark.sql.delta.DeltaHistoryManager;
 import org.apache.spark.sql.delta.DeltaLog;
+import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.Action;
 import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import io.delta.tables.DeltaTable;
 
+import io.onetable.exception.OneIOException;
 import io.onetable.model.CurrentCommitState;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
+import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.SchemaCatalog;
+import io.onetable.model.schema.SchemaVersion;
+import io.onetable.model.storage.OneDataFile;
+import io.onetable.model.storage.OneDataFiles;
+import io.onetable.spi.extractor.PartitionedDataFileIterator;
 import io.onetable.spi.extractor.SourceClient;
 
 @Log4j2
 public class DeltaSourceClient implements SourceClient<Long> {
+  private final DeltaDataFileExtractor dataFileExtractor = DeltaDataFileExtractor.builder().build();
   private final SparkSession sparkSession;
   private final DeltaLog deltaLog;
   private final DeltaTable deltaTable;
+  private final String tableName;
+  private final String basePath;
   private DeltaIncrementalChangesCacheStore deltaIncrementalChangesCacheStore;
 
-  public DeltaSourceClient(SparkSession sparkSession, String basePath) {
+  public DeltaSourceClient(SparkSession sparkSession, String tableName, String basePath) {
     this.sparkSession = sparkSession;
+    this.tableName = tableName;
+    this.basePath = basePath;
     this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
     this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
   }
 
   @Override
-  public OneTable getTable(Long versionNumber) {
-    throw new UnsupportedOperationException("Not implemented");
+  public OneTable getTable(Long version) {
+    return new DeltaTableExtractor().table(deltaLog, tableName, version);
   }
 
   @Override
-  public SchemaCatalog getSchemaCatalog(OneTable table, Long versionNumber) {
-    throw new UnsupportedOperationException("Not implemented");
+  public SchemaCatalog getSchemaCatalog(OneTable table, Long version) {
+    // TODO: Does not support schema versions for now
+    Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
+    SchemaVersion schemaVersion = new SchemaVersion(1, "");
+    schemas.put(schemaVersion, table.getReadSchema());
+    return SchemaCatalog.builder().schemas(schemas).build();
   }
 
   @Override
   public OneSnapshot getCurrentSnapshot() {
-    throw new UnsupportedOperationException("Not implemented");
+    DeltaLog deltaLog = DeltaLog.forTable(sparkSession, basePath);
+    Snapshot snapshot = deltaLog.snapshot();
+    OneTable table = getTable(snapshot.version());
+    return OneSnapshot.builder()
+        .table(table)
+        .schemaCatalog(getSchemaCatalog(table, snapshot.version()))
+        .dataFiles(getOneDataFiles(snapshot, table.getReadSchema()))
+        .build();
   }
 
   @Override
@@ -101,5 +126,17 @@ public class DeltaSourceClient implements SourceClient<Long> {
     return CurrentCommitState.<Long>builder()
         .commitsToProcess(deltaIncrementalChangesCacheStore.getVersionsInSortedOrder())
         .build();
+  }
+
+  private OneDataFiles getOneDataFiles(Snapshot snapshot, OneSchema schema) {
+    OneDataFiles oneDataFiles;
+    try (PartitionedDataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
+      List<OneDataFile> dataFiles = new ArrayList<>();
+      fileIterator.forEachRemaining(dataFiles::add);
+      oneDataFiles = OneDataFiles.collectionBuilder().files(dataFiles).build();
+    } catch (Exception e) {
+      throw new OneIOException("Failed to iterate through Delta data files", e);
+    }
+    return oneDataFiles;
   }
 }

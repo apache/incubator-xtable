@@ -89,7 +89,8 @@ public class ITDeltaSourceClient {
     Long version5 = testSparkDeltaTable.getVersion();
     Long timestamp5 = testSparkDeltaTable.getLastCommitTimestamp();
     DeltaSourceClient deltaSourceClient =
-        new DeltaSourceClient(sparkSession, testSparkDeltaTable.getBasePath());
+        new DeltaSourceClient(
+            sparkSession, testSparkDeltaTable.getTableName(), testSparkDeltaTable.getBasePath());
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
         InstantsForIncrementalSync.builder()
