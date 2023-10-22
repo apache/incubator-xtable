@@ -123,6 +123,19 @@ public class ITDeltaSourceClient {
     validateTableChanges(allActiveFiles, allTableChanges);
   }
 
+  @Test
+  public void canDelete() throws ParseException {
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable("some_table", tempDir, sparkSession);
+    List<List<String>> allActiveFiles = new ArrayList<>();
+    List<TableChange> allTableChanges = new ArrayList<>();
+    List<Row> rows = testSparkDeltaTable.insertRows(30);
+    Long version1 = testSparkDeltaTable.getVersion();
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+    testSparkDeltaTable.upsertRowsAnother(rows);
+    int x = 5;
+  }
+
   private void validateOneSnapshot(OneSnapshot oneSnapshot, List<String> allActivePaths) {
     assertNotNull(oneSnapshot);
     assertNotNull(oneSnapshot.getTable());

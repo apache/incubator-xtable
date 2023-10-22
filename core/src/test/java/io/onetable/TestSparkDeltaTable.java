@@ -23,9 +23,11 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Date;
+import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
@@ -42,6 +44,7 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.functions.*;
 
 import org.apache.spark.sql.delta.DeltaLog;
 
@@ -57,7 +60,7 @@ public class TestSparkDeltaTable {
             new StructField("firstName", DataTypes.StringType, true, Metadata.empty()),
             new StructField("lastName", DataTypes.StringType, true, Metadata.empty()),
             new StructField("gender", DataTypes.StringType, true, Metadata.empty()),
-            new StructField("birthDate", DataTypes.StringType, true, Metadata.empty()),
+            new StructField("birthDate", DataTypes.TimestampType, true, Metadata.empty()),
             new StructField("yearOfBirth", DataTypes.IntegerType, true, Metadata.empty())
           });
   // Until Delta 2.4 even generated columns should be provided values.
@@ -123,7 +126,7 @@ public class TestSparkDeltaTable {
   }
 
   // TODO(vamshigv): Couldn't make this work. Throws id column cannot be resolved.
-  public void upsertRows(List<Row> upsertRows) {
+  public void upsertRows(List<Row> upsertRows) throws ParseException {
     List<Row> upserts = generateUpserts(upsertRows);
     Dataset<Row> upsertDataset = sparkSession.createDataFrame(upserts, PERSON_SCHEMA);
     String tempViewName = "temp_upsert_data_" + System.currentTimeMillis();
@@ -139,6 +142,16 @@ public class TestSparkDeltaTable {
                 + "lastName = source.lastName",
             tableName, tempViewName, tableName);
     sparkSession.sql(mergeSql);
+  }
+
+
+  public void upsertRowsAnother(List<Row> upsertRows) throws ParseException {
+    List<Row> upserts = generateUpserts(upsertRows);
+    Dataset<Row> upsertDataset = sparkSession.createDataFrame(upserts, PERSON_SCHEMA);
+
+    DeltaTable deltaTable = DeltaTable.forPath(sparkSession, basePath);
+    upsertDataset.write().format("delta").mode("overwrite").save(basePath);
+    int x = 5;
   }
 
   // TODO(vamshigv): Couldn't make this work. Throws method not found error.
@@ -161,17 +174,19 @@ public class TestSparkDeltaTable {
     return deltaLog.snapshot().timestamp();
   }
 
-  private List<Row> generateUpserts(List<Row> rows) {
+  private List<Row> generateUpserts(List<Row> rows) throws ParseException {
     // Upsert by generating random values for firstName and lastName.
     List<Row> upserts = new ArrayList<>();
     for (Row row : rows) {
+      java.util.Date parsedDate = TIMESTAMP_FORMAT.parse(row.getString(4));
+      Timestamp timestamp = new java.sql.Timestamp(parsedDate.getTime());
       Row upsert =
           RowFactory.create(
               row.getInt(0),
               generateRandomName(),
               generateRandomName(),
               row.getString(3),
-              row.getString(4));
+              timestamp);
       upserts.add(upsert);
     }
     return upserts;
