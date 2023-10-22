@@ -70,11 +70,11 @@ public class DeltaDataFileExtractor {
       List<OneField> fields,
       boolean includeColumnStats) {
     String tableBasePath = deltaSnapshot.deltaLog().dataPath().toUri().toString();
+    // TODO(vamshigv): removed record count as delta api downgraded to 2.0.2
     return OneDataFile.builder()
         .physicalPath(getFullPathToFile(tableBasePath, addFile.path()))
         .fileFormat(convertToOneTableFileFormat(deltaSnapshot.metadata().format().provider()))
-        .fileSizeBytes(addFile.getFileSize())
-        .recordCount(addFile.getNumLogicalRecords())
+        .fileSizeBytes(addFile.size())
         .lastModified(addFile.modificationTime())
         .partitionValues(
             partitionExtractor.partitionValueExtraction(addFile.partitionValues(), partitionFields))

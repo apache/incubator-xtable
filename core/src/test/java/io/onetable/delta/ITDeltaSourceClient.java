@@ -65,6 +65,7 @@ public class ITDeltaSourceClient {
         SparkSession.builder()
             .appName("TestDeltaTable")
             .master("local[4]")
+            .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
             .config(
                 "spark.sql.catalog.spark_catalog",
                 "org.apache.spark.sql.delta.catalog.DeltaCatalog")
@@ -79,34 +80,34 @@ public class ITDeltaSourceClient {
   }
 
   @Test
-  public void insertsOnly() throws ParseException {
+  public void insertsUpsertsAndDeletes() throws ParseException {
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable("some_table", tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
-    List<Row> rows = testSparkDeltaTable.insertRows(30);
-    Long version1 = testSparkDeltaTable.getVersion();
+    List<Row> rows = testSparkDeltaTable.insertRows(50);
     Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
-    testSparkDeltaTable.insertRows(20);
-    Long version2 = testSparkDeltaTable.getVersion();
-    Long timestamp2 = testSparkDeltaTable.getLastCommitTimestamp();
+
+    List<Row> rows1 = testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
-    testSparkDeltaTable.insertRows(10);
-    Long version3 = testSparkDeltaTable.getVersion();
-    Long timestamp3 = testSparkDeltaTable.getLastCommitTimestamp();
+
+    testSparkDeltaTable.upsertRows(rows.subList(0, 20));
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
-    testSparkDeltaTable.insertRows(40);
-    Long version4 = testSparkDeltaTable.getVersion();
-    Long timestamp4 = testSparkDeltaTable.getLastCommitTimestamp();
-    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
     testSparkDeltaTable.insertRows(50);
-    Long version5 = testSparkDeltaTable.getVersion();
-    Long timestamp5 = testSparkDeltaTable.getLastCommitTimestamp();
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.deleteRows(rows1.subList(0, 20));
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
     DeltaSourceClient deltaSourceClient =
         new DeltaSourceClient(
             sparkSession, testSparkDeltaTable.getTableName(), testSparkDeltaTable.getBasePath());
+    assertEquals(180L, testSparkDeltaTable.getNumRows());
     OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
     validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
     // Get changes in incremental format.
@@ -121,19 +122,6 @@ public class ITDeltaSourceClient {
       allTableChanges.add(tableChange);
     }
     validateTableChanges(allActiveFiles, allTableChanges);
-  }
-
-  @Test
-  public void canDelete() throws ParseException {
-    TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable("some_table", tempDir, sparkSession);
-    List<List<String>> allActiveFiles = new ArrayList<>();
-    List<TableChange> allTableChanges = new ArrayList<>();
-    List<Row> rows = testSparkDeltaTable.insertRows(30);
-    Long version1 = testSparkDeltaTable.getVersion();
-    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
-    testSparkDeltaTable.upsertRowsAnother(rows);
-    int x = 5;
   }
 
   private void validateOneSnapshot(OneSnapshot oneSnapshot, List<String> allActivePaths) {

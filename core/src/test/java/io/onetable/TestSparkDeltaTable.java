@@ -27,7 +27,6 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
@@ -35,16 +34,14 @@ import java.util.stream.Collectors;
 import lombok.Value;
 
 import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.functions;
+import org.apache.spark.sql.functions.*;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-import org.apache.spark.sql.functions.*;
 
 import org.apache.spark.sql.delta.DeltaLog;
 
@@ -80,14 +77,16 @@ public class TestSparkDeltaTable {
   private final String basePath;
   private final SparkSession sparkSession;
   private final DeltaLog deltaLog;
+  private final DeltaTable deltaTable;
 
   public TestSparkDeltaTable(String name, Path tempDir, SparkSession sparkSession) {
     try {
       this.tableName = generateTableName(name);
       this.basePath = initBasePath(tempDir, tableName);
       this.sparkSession = sparkSession;
-      this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
       createTable();
+      this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
+      this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
     } catch (IOException ex) {
       throw new UncheckedIOException("Unable initialize Delta spark table", ex);
     }
@@ -125,45 +124,31 @@ public class TestSparkDeltaTable {
     return rows;
   }
 
-  // TODO(vamshigv): Couldn't make this work. Throws id column cannot be resolved.
   public void upsertRows(List<Row> upsertRows) throws ParseException {
-    List<Row> upserts = generateUpserts(upsertRows);
+    List<Row> upserts = transformForUpsertsOrDeletes(upsertRows, true);
     Dataset<Row> upsertDataset = sparkSession.createDataFrame(upserts, PERSON_SCHEMA);
-    String tempViewName = "temp_upsert_data_" + System.currentTimeMillis();
-    upsertDataset.createOrReplaceTempView(tempViewName);
-
-    String mergeSql =
-        String.format(
-            "MERGE INTO delta.`%s` as target"
-                + "USING `%s` AS source "
-                + "ON target.id == source.id "
-                + "WHEN MATCHED THEN UPDATE SET "
-                + "firstName = source.firstName, "
-                + "lastName = source.lastName",
-            tableName, tempViewName, tableName);
-    sparkSession.sql(mergeSql);
+    deltaTable
+        .alias("person")
+        .merge(upsertDataset.alias("source"), "person.id = source.id")
+        .whenMatched()
+        .updateAll()
+        .execute();
   }
 
-
-  public void upsertRowsAnother(List<Row> upsertRows) throws ParseException {
-    List<Row> upserts = generateUpserts(upsertRows);
-    Dataset<Row> upsertDataset = sparkSession.createDataFrame(upserts, PERSON_SCHEMA);
-
-    DeltaTable deltaTable = DeltaTable.forPath(sparkSession, basePath);
-    upsertDataset.write().format("delta").mode("overwrite").save(basePath);
-    int x = 5;
+  public void deleteRows(List<Row> deleteRows) throws ParseException {
+    List<Row> deletes = transformForUpsertsOrDeletes(deleteRows, false);
+    Dataset<Row> deleteDataset = sparkSession.createDataFrame(deletes, PERSON_SCHEMA);
+    deltaTable
+        .alias("person")
+        .merge(deleteDataset.alias("source"), "person.id = source.id")
+        .whenMatched()
+        .delete()
+        .execute();
   }
 
-  // TODO(vamshigv): Couldn't make this work. Throws method not found error.
-  public void deleteRows(List<Row> rows) {
-    List<Integer> idsToDelete =
-        rows.stream().map(row -> row.getInt(0)).collect(Collectors.toList());
-    String idsString = idsToDelete.stream().map(String::valueOf).collect(Collectors.joining(", "));
-    Dataset<Integer> idsDataset = sparkSession.createDataset(idsToDelete, Encoders.INT());
-    DeltaTable deltaTable = DeltaTable.forPath(sparkSession, basePath);
-    for (Integer id : idsToDelete) {
-      deltaTable.delete(functions.col("id").equalTo(id));
-    }
+  public long getNumRows() {
+    Dataset<Row> df = sparkSession.read().format("delta").load(basePath);
+    return (int) df.count();
   }
 
   public Long getVersion() {
@@ -174,8 +159,10 @@ public class TestSparkDeltaTable {
     return deltaLog.snapshot().timestamp();
   }
 
-  private List<Row> generateUpserts(List<Row> rows) throws ParseException {
-    // Upsert by generating random values for firstName and lastName.
+  private List<Row> transformForUpsertsOrDeletes(List<Row> rows, boolean isUpsert)
+      throws ParseException {
+    // Generate random values for few columns for upserts.
+    // For deletes, retain the same values as the original row.
     List<Row> upserts = new ArrayList<>();
     for (Row row : rows) {
       java.util.Date parsedDate = TIMESTAMP_FORMAT.parse(row.getString(4));
@@ -183,10 +170,11 @@ public class TestSparkDeltaTable {
       Row upsert =
           RowFactory.create(
               row.getInt(0),
-              generateRandomName(),
-              generateRandomName(),
+              isUpsert ? generateRandomName() : row.getString(1),
+              isUpsert ? generateRandomName() : row.getString(2),
               row.getString(3),
-              timestamp);
+              timestamp,
+              timestamp.toLocalDateTime().getYear());
       upserts.add(upsert);
     }
     return upserts;
