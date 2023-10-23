@@ -481,7 +481,6 @@ public class ITDeltaSourceClient {
   private void replaceFileScheme(List<String> filePaths) {
     // if file paths start with file:///, replace it with file:/.
     filePaths.replaceAll(path -> path.replaceFirst("file:///", "file:/"));
-    sparkSession.close();
   }
 
   private static void validateTable(

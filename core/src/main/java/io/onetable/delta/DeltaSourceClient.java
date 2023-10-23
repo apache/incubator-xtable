@@ -69,8 +69,9 @@ public class DeltaSourceClient implements SourceClient<Long> {
   @Builder.Default
   private final DeltaTableExtractor tableExtractor = DeltaTableExtractor.builder().build();
 
+  @Builder.Default
   private final DeltaIncrementalChangesCacheStore deltaIncrementalChangesCacheStore =
-      new DeltaIncrementalChangesCacheStore();
+      DeltaIncrementalChangesCacheStore.builder().build();
 
   private final SparkSession sparkSession;
   private final DeltaLog deltaLog;
@@ -152,9 +153,8 @@ public class DeltaSourceClient implements SourceClient<Long> {
             .history()
             .getActiveCommitAtTime(
                 Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()), true, false, true);
-    Long versionNumberAtLastSyncInstant = deltaCommitAtLastSyncInstant.version();
-    deltaIncrementalChangesCacheStore.initializeOrReload(
-        deltaLog, versionNumberAtLastSyncInstant + 1);
+    long versionNumberAtLastSyncInstant = deltaCommitAtLastSyncInstant.version();
+    deltaIncrementalChangesCacheStore.reload(deltaLog, versionNumberAtLastSyncInstant + 1);
     return CurrentCommitState.<Long>builder()
         .commitsToProcess(deltaIncrementalChangesCacheStore.getVersionsInSortedOrder())
         .build();

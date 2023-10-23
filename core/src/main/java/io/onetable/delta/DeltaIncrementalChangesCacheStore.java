@@ -23,8 +23,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+
+import lombok.Builder;
 
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.actions.Action;
@@ -36,65 +36,52 @@ import scala.collection.Seq;
 import com.google.common.base.Preconditions;
 
 /** Cache store for storing incremental table changes in the Delta table. */
+@Builder
 public class DeltaIncrementalChangesCacheStore {
-  private Long startVersion;
-  private Long endVersion;
-  private boolean initialized;
-  // Map of version number to list of actions and it is thread safe.
-  private Map<Long, List<Action>> incrementalChangesByVersion;
-  private final Lock lock = new ReentrantLock();
+  @Builder.Default private Long startVersion = null;
+  @Builder.Default private Long endVersion = null;
 
-  public DeltaIncrementalChangesCacheStore() {
-    this.resetState();
-  }
+  @Builder.Default
+  private final Map<Long, List<Action>> incrementalChangesByVersion = new HashMap<>();
 
   /**
-   * Initializes or reloads the cache store with incremental changes.
+   * Reloads the cache store with incremental changes. Intentionally thread safety is the
+   * responsibility of the caller.
    *
    * @param deltaLog The DeltaLog instance.
    * @param versionToStartFrom The version to start from.
    */
-  public void initializeOrReload(DeltaLog deltaLog, Long versionToStartFrom) {
+  public void reload(DeltaLog deltaLog, Long versionToStartFrom) {
+    reinitialize();
     // TODO: Should fail on data loss(due to vacuum) and fall back to snapshot sync.
-    if (!isUsable(deltaLog, versionToStartFrom)) {
-      reload(deltaLog, versionToStartFrom);
+    List<Tuple2<Long, List<Action>>> changesList =
+        getChangesList(deltaLog.getChanges(versionToStartFrom, false));
+    for (Tuple2<Long, List<Action>> change : changesList) {
+      Long versionNumber = change._1();
+      List<Action> actions = change._2();
+      incrementalChangesByVersion.put(versionNumber, actions);
+      endVersion = endVersion == null ? versionNumber : Math.max(endVersion, versionNumber);
     }
+    startVersion = versionToStartFrom;
+  }
+
+  private void reinitialize() {
+    startVersion = null;
+    endVersion = null;
+    incrementalChangesByVersion.clear();
   }
 
   public List<Long> getVersionsInSortedOrder() {
-    lock.lock();
-    try {
-      List<Long> versions = new ArrayList<>(incrementalChangesByVersion.keySet());
-      versions.sort(Long::compareTo);
-      return versions;
-    } finally {
-      lock.unlock();
-    }
+    List<Long> versions = new ArrayList<>(incrementalChangesByVersion.keySet());
+    versions.sort(Long::compareTo);
+    return versions;
   }
 
   public List<Action> getActionsForVersion(Long version) {
-    lock.lock();
-    try {
-      Preconditions.checkArgument(
-          incrementalChangesByVersion.containsKey(version),
-          "Version %s not found in the DeltaIncrementalChangesCacheStore.");
-      return incrementalChangesByVersion.get(version);
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  private boolean isUsable(DeltaLog deltaLog, Long versionToStartFrom) {
-    lock.lock();
-    try {
-      if (!initialized) {
-        return false;
-      }
-      long latestVersion = deltaLog.snapshot().version();
-      return versionToStartFrom >= startVersion && latestVersion == endVersion;
-    } finally {
-      lock.unlock();
-    }
+    Preconditions.checkArgument(
+        incrementalChangesByVersion.containsKey(version),
+        "Version %s not found in the DeltaIncrementalChangesCacheStore.");
+    return incrementalChangesByVersion.get(version);
   }
 
   private List<Tuple2<Long, List<Action>>> getChangesList(
@@ -110,33 +97,5 @@ public class DeltaIncrementalChangesCacheStore {
               JavaConverters.seqAsJavaListConverter(currentChange._2()).asJava()));
     }
     return changesList;
-  }
-
-  private void reload(DeltaLog deltaLog, Long versionToStartFrom) {
-    List<Tuple2<Long, List<Action>>> changesList =
-        getChangesList(deltaLog.getChanges(versionToStartFrom, false));
-
-    // Use a lock to fill the map in a thread-safe manner.
-    lock.lock();
-    try {
-      this.resetState();
-      for (Tuple2<Long, List<Action>> change : changesList) {
-        Long versionNumber = change._1();
-        List<Action> actions = change._2();
-        incrementalChangesByVersion.put(versionNumber, actions);
-        endVersion = endVersion == null ? versionNumber : Math.max(endVersion, versionNumber);
-      }
-      startVersion = versionToStartFrom;
-      this.initialized = true;
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  private void resetState() {
-    this.initialized = false;
-    this.startVersion = null;
-    this.endVersion = null;
-    this.incrementalChangesByVersion = new HashMap<>();
   }
 }
