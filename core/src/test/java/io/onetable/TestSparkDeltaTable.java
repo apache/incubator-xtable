@@ -68,6 +68,14 @@ public class TestSparkDeltaTable {
           + "'%s' AS gender, "
           + "timestamp('%s') AS birthDate, "
           + "year(timestamp('%s')) AS yearOfBirth";
+  private static final String SQL_SELECT_TEMPLATE_ADDITIONAL_COLUMN =
+      "SELECT %d AS id, "
+          + "'%s' AS firstName, "
+          + "'%s' AS lastName, "
+          + "'%s' AS gender, "
+          + "timestamp('%s') AS birthDate, "
+          + "year(timestamp('%s')) AS yearOfBirth, "
+          + "'%s' AS street";
   private static final Random RANDOM = new Random();
   private static final String[] GENDERS = {"Male", "Female"};
   private static final SimpleDateFormat TIMESTAMP_FORMAT =
@@ -119,6 +127,23 @@ public class TestSparkDeltaTable {
         rows.stream().map(this::generateSelectForRow).collect(Collectors.toList());
     String insertStatement =
         String.format(
+            "INSERT INTO `%s`(id, firstName, lastName, gender, birthDate, yearOfBirth) %s",
+            tableName, String.join(" UNION ALL ", selectsForInsert));
+    sparkSession.sql(insertStatement);
+    return rows;
+  }
+
+  public List<Row> insertRowsWithAdditionalColumns(int numRows) throws ParseException {
+    List<Row> rows = new ArrayList<>();
+    for (int i = 0; i < numRows; i++) {
+      rows.add(generateRandomRowWithAdditionalColumn());
+    }
+    List<String> selectsForInsert =
+        rows.stream()
+            .map(this::generateSelectForRowWithAdditionalColumn)
+            .collect(Collectors.toList());
+    String insertStatement =
+        String.format(
             "INSERT INTO `%s` %s", tableName, String.join(" UNION ALL ", selectsForInsert));
     sparkSession.sql(insertStatement);
     return rows;
@@ -159,6 +184,19 @@ public class TestSparkDeltaTable {
     return deltaLog.snapshot().timestamp();
   }
 
+  public void runVacuum() {
+    deltaTable.vacuum(0.0);
+  }
+
+  public boolean isVacuumStartCommit(Long version) {
+    return deltaTable
+        .history()
+        .filter("version = " + version)
+        .first()
+        .getAs("operation")
+        .equals("VACUUM START");
+  }
+
   private List<Row> transformForUpsertsOrDeletes(List<Row> rows, boolean isUpsert)
       throws ParseException {
     // Generate random values for few columns for upserts.
@@ -191,6 +229,18 @@ public class TestSparkDeltaTable {
         row.getString(4));
   }
 
+  private String generateSelectForRowWithAdditionalColumn(Row row) {
+    return String.format(
+        SQL_SELECT_TEMPLATE_ADDITIONAL_COLUMN,
+        row.getInt(0),
+        row.getString(1),
+        row.getString(2),
+        row.getString(3),
+        row.getString(4),
+        row.getString(4),
+        row.getString(5));
+  }
+
   private Row generateRandomRow() throws ParseException {
     int id = RANDOM.nextInt(1000000) + 1;
     String firstName = generateRandomName();
@@ -204,6 +254,21 @@ public class TestSparkDeltaTable {
     String birthDate = TIMESTAMP_FORMAT.format(randomDate);
 
     return RowFactory.create(id, firstName, lastName, gender, birthDate);
+  }
+
+  private Row generateRandomRowWithAdditionalColumn() throws ParseException {
+    int id = RANDOM.nextInt(1000000) + 1;
+    String firstName = generateRandomName();
+    String lastName = generateRandomName();
+    String gender = GENDERS[RANDOM.nextInt(GENDERS.length)];
+
+    long offset = TIMESTAMP_FORMAT.parse("2013-01-01 00:00:00").getTime();
+    long end = TIMESTAMP_FORMAT.parse("2023-01-01 00:00:00").getTime();
+    long diff = end - offset + 1;
+    Date randomDate = new Date(offset + (long) (RANDOM.nextDouble() * diff));
+    String birthDate = TIMESTAMP_FORMAT.format(randomDate);
+    String street = generateRandomName();
+    return RowFactory.create(id, firstName, lastName, gender, birthDate, street);
   }
 
   private String generateRandomName() {
