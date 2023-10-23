@@ -27,17 +27,19 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
 import lombok.Value;
 
+import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.functions.*;
+import org.apache.spark.sql.functions;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
@@ -78,7 +80,7 @@ public class TestSparkDeltaTable {
           + "'%s' AS street";
   private static final Random RANDOM = new Random();
   private static final String[] GENDERS = {"Male", "Female"};
-  private static final SimpleDateFormat TIMESTAMP_FORMAT =
+  public static final SimpleDateFormat TIMESTAMP_FORMAT =
       new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
   private final String tableName;
@@ -133,6 +135,21 @@ public class TestSparkDeltaTable {
     return rows;
   }
 
+  public List<Row> insertRows(int numRows, Integer partitionValue) throws ParseException {
+    List<Row> rows = new ArrayList<>();
+    for (int i = 0; i < numRows; i++) {
+      rows.add(generateRandomRowWithPartitionValue(partitionValue));
+    }
+    List<String> selectsForInsert =
+        rows.stream().map(this::generateSelectForRow).collect(Collectors.toList());
+    String insertStatement =
+        String.format(
+            "INSERT INTO `%s`(id, firstName, lastName, gender, birthDate, yearOfBirth) %s",
+            tableName, String.join(" UNION ALL ", selectsForInsert));
+    sparkSession.sql(insertStatement);
+    return rows;
+  }
+
   public List<Row> insertRowsWithAdditionalColumns(int numRows) throws ParseException {
     List<Row> rows = new ArrayList<>();
     for (int i = 0; i < numRows; i++) {
@@ -171,6 +188,11 @@ public class TestSparkDeltaTable {
         .execute();
   }
 
+  public void deletePartition(Integer partitionValue) {
+    Column condition = functions.col("yearOfBirth").equalTo(partitionValue);
+    deltaTable.delete(condition);
+  }
+
   public long getNumRows() {
     Dataset<Row> df = sparkSession.read().format("delta").load(basePath);
     return (int) df.count();
@@ -186,15 +208,6 @@ public class TestSparkDeltaTable {
 
   public void runVacuum() {
     deltaTable.vacuum(0.0);
-  }
-
-  public boolean isVacuumStartCommit(Long version) {
-    return deltaTable
-        .history()
-        .filter("version = " + version)
-        .first()
-        .getAs("operation")
-        .equals("VACUUM START");
   }
 
   private List<Row> transformForUpsertsOrDeletes(List<Row> rows, boolean isUpsert)
@@ -239,6 +252,23 @@ public class TestSparkDeltaTable {
         row.getString(4),
         row.getString(4),
         row.getString(5));
+  }
+
+  private Row generateRandomRowWithPartitionValue(Integer year) throws ParseException {
+    int id = RANDOM.nextInt(1000000) + 1;
+    String firstName = generateRandomName();
+    String lastName = generateRandomName();
+    String gender = GENDERS[RANDOM.nextInt(GENDERS.length)];
+
+    Calendar cal = Calendar.getInstance();
+    cal.set(Calendar.YEAR, year);
+    cal.set(Calendar.DAY_OF_YEAR, RANDOM.nextInt(cal.getActualMaximum(Calendar.DAY_OF_YEAR)) + 1);
+    cal.set(Calendar.HOUR_OF_DAY, RANDOM.nextInt(24));
+    cal.set(Calendar.MINUTE, RANDOM.nextInt(60));
+    cal.set(Calendar.SECOND, RANDOM.nextInt(60));
+    String birthDate = TIMESTAMP_FORMAT.format(cal.getTime());
+
+    return RowFactory.create(id, firstName, lastName, gender, birthDate);
   }
 
   private Row generateRandomRow() throws ParseException {
