@@ -489,6 +489,58 @@ public class ITDeltaSourceClient {
     validateTableChanges(allActiveFiles, allTableChanges);
   }
 
+  @Test
+  public void testOptimizeAndClustering() throws ParseException {
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable("some_table", tempDir, sparkSession);
+    List<List<String>> allActiveFiles = new ArrayList<>();
+    List<TableChange> allTableChanges = new ArrayList<>();
+    List<Row> rows = testSparkDeltaTable.insertRows(50);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.runCompaction();
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.runClustering("gender");
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    PerTableConfig tableConfig =
+        PerTableConfig.builder()
+            .tableName(testSparkDeltaTable.getTableName())
+            .tableBasePath(testSparkDeltaTable.getBasePath())
+            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+            .build();
+    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    assertEquals(250L, testSparkDeltaTable.getNumRows());
+    OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+    // Get changes in incremental format.
+    InstantsForIncrementalSync instantsForIncrementalSync =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+            .build();
+    CurrentCommitState<Long> currentCommitState =
+        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
+    for (Long version : currentCommitState.getCommitsToProcess()) {
+      TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
+      allTableChanges.add(tableChange);
+    }
+    validateTableChanges(allActiveFiles, allTableChanges);
+  }
+
   private void validateOneSnapshot(OneSnapshot oneSnapshot, List<String> allActivePaths) {
     assertNotNull(oneSnapshot);
     assertNotNull(oneSnapshot.getTable());

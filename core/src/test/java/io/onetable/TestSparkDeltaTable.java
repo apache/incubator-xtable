@@ -193,6 +193,14 @@ public class TestSparkDeltaTable {
     deltaTable.delete(condition);
   }
 
+  public void runCompaction() {
+    deltaTable.optimize().executeCompaction();
+  }
+
+  public void runClustering(String column) {
+    deltaTable.optimize().executeZOrderBy(column);
+  }
+
   public long getNumRows() {
     Dataset<Row> df = sparkSession.read().format("delta").load(basePath);
     return (int) df.count();
