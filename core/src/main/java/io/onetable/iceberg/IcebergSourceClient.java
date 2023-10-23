@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import lombok.*;
 import lombok.extern.log4j.Log4j2;
@@ -125,7 +126,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         OneDataFile irDataFile = dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap);
         irFiles.add(irDataFile);
       }
-      oneDataFiles = OneDataFiles.collectionBuilder().files(irFiles).build();
+      oneDataFiles = divideFilesinGroupsByPartition(irFiles);
     } catch (IOException e) {
       throw new OneIOException("Failed to fetch current snapshot files from Iceberg source", e);
     }
@@ -136,6 +137,28 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         .schemaCatalog(schemaCatalog)
         .dataFiles(oneDataFiles)
         .build();
+  }
+
+  /**
+   * Chunks a collection of OneDataFile into OneDataFiles based on the file's partition values.
+   *
+   * @param files a collection of files to be chunked by partition
+   * @return a collection of OneDataFiles, each containing a collection of OneDataFile with the same
+   *     partition values
+   */
+  OneDataFiles divideFilesinGroupsByPartition(List<OneDataFile> files) {
+    Map<String, List<OneDataFile>> collected =
+        files.stream().collect(Collectors.groupingBy(OneDataFile::getPartitionPath));
+    List<OneDataFile> x =
+        collected.entrySet().stream()
+            .map(
+                entry ->
+                    OneDataFiles.collectionBuilder()
+                        .partitionPath(entry.getKey())
+                        .files(entry.getValue())
+                        .build())
+            .collect(Collectors.toList());
+    return OneDataFiles.collectionBuilder().files(x).build();
   }
 
   @Override

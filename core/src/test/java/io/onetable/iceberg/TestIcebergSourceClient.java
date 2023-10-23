@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -50,6 +51,7 @@ import io.onetable.model.schema.*;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
+import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.TableFormat;
 
 class TestIcebergSourceClient {
@@ -176,8 +178,13 @@ class TestIcebergSourceClient {
     verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any());
 
     Assertions.assertNotNull(oneSnapshot.getDataFiles());
-    Assertions.assertEquals(5, oneSnapshot.getDataFiles().getFiles().size());
-    for (OneDataFile oneDataFile : oneSnapshot.getDataFiles().getFiles()) {
+    List<OneDataFile> dataFileChunks = oneSnapshot.getDataFiles().getFiles();
+    Assertions.assertEquals(5, dataFileChunks.size());
+    for (OneDataFile dataFilesChunk : dataFileChunks) {
+      Assertions.assertInstanceOf(OneDataFiles.class, dataFilesChunk);
+      OneDataFiles oneDataFiles = (OneDataFiles) dataFilesChunk;
+      Assertions.assertEquals(1, oneDataFiles.getFiles().size());
+      OneDataFile oneDataFile = oneDataFiles.getFiles().get(0);
       Assertions.assertEquals(FileFormat.APACHE_PARQUET, oneDataFile.getFileFormat());
       Assertions.assertEquals(1, oneDataFile.getRecordCount());
       Assertions.assertEquals(1, oneDataFile.getRecordCount());
@@ -224,14 +231,17 @@ class TestIcebergSourceClient {
     AppendFiles appendFiles = catalogSales.newAppend();
 
     for (int numFile = 0; numFile < 5; numFile++) {
+      // The test creates one file in each partition
       String dataFilePath = String.join("/", csPath, "data", UUID.randomUUID() + ".parquet");
+      PartitionData partitionInfo = new PartitionData(csPartitionSpec.partitionType());
+      partitionInfo.set(0, numFile);
       DataWriter<GenericRecord> dataWriter =
           Parquet.writeData(catalogSales.io().newOutputFile(dataFilePath))
               .schema(csSchema)
               .createWriterFunc(GenericParquetWriter::buildWriter)
               .overwrite()
               .withSpec(csPartitionSpec)
-              .withPartition(new PartitionData(csPartitionSpec.partitionType()))
+              .withPartition(partitionInfo)
               .build();
 
       try {

@@ -111,6 +111,7 @@ public class IcebergDataFileExtractor {
         .fileSizeBytes(dataFile.fileSizeInBytes())
         .recordCount(dataFile.recordCount())
         .partitionValues(partitionsInfo)
+        .partitionPath(dataFile.partition().toString())
         .columnStats(Collections.emptyMap())
         .build();
   }
