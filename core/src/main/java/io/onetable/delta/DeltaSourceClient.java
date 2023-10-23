@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import lombok.Builder;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.spark.sql.SparkSession;
@@ -57,26 +58,25 @@ import io.onetable.spi.extractor.PartitionedDataFileIterator;
 import io.onetable.spi.extractor.SourceClient;
 
 @Log4j2
+@Builder
 public class DeltaSourceClient implements SourceClient<Long> {
+  @Builder.Default
   private final DeltaDataFileExtractor dataFileExtractor = DeltaDataFileExtractor.builder().build();
+
+  @Builder.Default
   private final DeltaActionsConverter actionsConverter = DeltaActionsConverter.getInstance();
-  private final DeltaTableExtractor tableExtractor;
+
+  @Builder.Default
+  private final DeltaTableExtractor tableExtractor = DeltaTableExtractor.builder().build();
+
+  private final DeltaIncrementalChangesCacheStore deltaIncrementalChangesCacheStore =
+      new DeltaIncrementalChangesCacheStore();
+
   private final SparkSession sparkSession;
   private final DeltaLog deltaLog;
   private final DeltaTable deltaTable;
   private final String tableName;
   private final String basePath;
-  private final DeltaIncrementalChangesCacheStore deltaIncrementalChangesCacheStore;
-
-  public DeltaSourceClient(SparkSession sparkSession, String tableName, String basePath) {
-    this.sparkSession = sparkSession;
-    this.tableName = tableName;
-    this.basePath = basePath;
-    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
-    this.deltaLog = deltaTable.deltaLog();
-    this.tableExtractor = new DeltaTableExtractor();
-    this.deltaIncrementalChangesCacheStore = new DeltaIncrementalChangesCacheStore();
-  }
 
   @Override
   public OneTable getTable(Long version) {
