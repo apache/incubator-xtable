@@ -70,8 +70,8 @@ public class DeltaSourceClient implements SourceClient<Long> {
   private final DeltaTableExtractor tableExtractor = DeltaTableExtractor.builder().build();
 
   @Builder.Default
-  private final DeltaIncrementalChangesCacheStore deltaIncrementalChangesCacheStore =
-      DeltaIncrementalChangesCacheStore.builder().build();
+  private final DeltaIncrementalChangesCache deltaIncrementalChangesCache =
+      DeltaIncrementalChangesCache.builder().build();
 
   private final SparkSession sparkSession;
   private final DeltaLog deltaLog;
@@ -110,7 +110,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
     OneTable tableAtVersion = tableExtractor.table(deltaLog, tableName, versionNumber);
     // Client to call getCurrentCommitState and call this method.
     List<Action> actionsForVersion =
-        deltaIncrementalChangesCacheStore.getActionsForVersion(versionNumber);
+        deltaIncrementalChangesCache.getActionsForVersion(versionNumber);
     Snapshot snapshotAtVersion =
         deltaLog.getSnapshotAt(versionNumber, Option.empty(), Option.empty());
     FileFormat fileFormat =
@@ -154,9 +154,9 @@ public class DeltaSourceClient implements SourceClient<Long> {
             .getActiveCommitAtTime(
                 Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()), true, false, true);
     long versionNumberAtLastSyncInstant = deltaCommitAtLastSyncInstant.version();
-    deltaIncrementalChangesCacheStore.reload(deltaLog, versionNumberAtLastSyncInstant + 1);
+    deltaIncrementalChangesCache.reload(deltaLog, versionNumberAtLastSyncInstant + 1);
     return CurrentCommitState.<Long>builder()
-        .commitsToProcess(deltaIncrementalChangesCacheStore.getVersionsInSortedOrder())
+        .commitsToProcess(deltaIncrementalChangesCache.getVersionsInSortedOrder())
         .build();
   }
 

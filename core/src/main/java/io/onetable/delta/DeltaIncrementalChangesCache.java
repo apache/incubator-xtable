@@ -37,7 +37,7 @@ import com.google.common.base.Preconditions;
 
 /** Cache store for storing incremental table changes in the Delta table. */
 @Builder
-public class DeltaIncrementalChangesCacheStore {
+public class DeltaIncrementalChangesCache {
   @Builder.Default private Long startVersion = null;
   @Builder.Default private Long endVersion = null;
 
@@ -71,6 +71,13 @@ public class DeltaIncrementalChangesCacheStore {
     incrementalChangesByVersion.clear();
   }
 
+  /**
+   * Returns the versions in sorted order. The start version is the next one after the last sync
+   * version to the target client. The end version is the latest version in the Delta table at the
+   * time of initialization.
+   *
+   * @return
+   */
   public List<Long> getVersionsInSortedOrder() {
     List<Long> versions = new ArrayList<>(incrementalChangesByVersion.keySet());
     versions.sort(Long::compareTo);
@@ -80,7 +87,7 @@ public class DeltaIncrementalChangesCacheStore {
   public List<Action> getActionsForVersion(Long version) {
     Preconditions.checkArgument(
         incrementalChangesByVersion.containsKey(version),
-        "Version %s not found in the DeltaIncrementalChangesCacheStore.");
+        "Version %s not found in the DeltaIncrementalChangesCache.");
     return incrementalChangesByVersion.get(version);
   }
 
