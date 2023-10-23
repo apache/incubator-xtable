@@ -18,8 +18,6 @@
  
 package io.onetable.delta;
 
-import static org.junit.jupiter.api.parallel.ExecutionMode.SAME_THREAD;
-
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
@@ -37,7 +35,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.api.parallel.Execution;
 
 import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneSnapshot;
@@ -58,8 +55,7 @@ import io.onetable.model.storage.TableFormat;
  * A suite of functional tests that assert that the metadata for the Delta table is properly read
  * from disk and converted into OneTable internal representation.
  */
-@Execution(SAME_THREAD)
-class TestDeltaSourceClient {
+class ITDeltaSourceClient {
 
   private static SparkSession sparkSession;
 
