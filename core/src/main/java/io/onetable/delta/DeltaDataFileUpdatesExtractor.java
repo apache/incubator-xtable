@@ -26,9 +26,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import lombok.AllArgsConstructor;
-
-import org.apache.spark.sql.types.StructType;
+import lombok.Builder;
 
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.actions.Action;
@@ -41,22 +39,31 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 import io.onetable.exception.OneIOException;
 import io.onetable.model.schema.OneField;
+import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.spi.extractor.PartitionedDataFileIterator;
 
-@AllArgsConstructor(staticName = "of")
+@Builder
 public class DeltaDataFileUpdatesExtractor {
-  private final DeltaStatsExtractor deltaStatsExtractor;
-  private final DeltaPartitionExtractor deltaPartitionExtractor;
+  @Builder.Default
+  private final DeltaStatsExtractor deltaStatsExtractor = DeltaStatsExtractor.getInstance();
+
+  @Builder.Default
+  private final DeltaPartitionExtractor deltaPartitionExtractor =
+      DeltaPartitionExtractor.getInstance();
+
+  @Builder.Default
+  private final DeltaDataFileExtractor deltaDataFileExtractor =
+      DeltaDataFileExtractor.builder().build();
 
   public Seq<Action> applySnapshot(
-      DeltaLog deltaLog, OneDataFiles snapshotFiles, StructType tableSchema) {
+      DeltaLog deltaLog, OneDataFiles snapshotFiles, OneSchema tableSchema) {
     List<OneDataFile> dataFiles = new ArrayList<>();
     try (PartitionedDataFileIterator fileIterator =
-        new DeltaDataFileExtractor(deltaLog.snapshot())) {
+        deltaDataFileExtractor.iteratorWithoutStats(deltaLog.snapshot(), tableSchema)) {
       fileIterator.forEachRemaining(dataFiles::add);
       OneDataFiles currentDataFiles = OneDataFiles.collectionBuilder().files(dataFiles).build();
       OneDataFilesDiff filesDiff = currentDataFiles.diff(snapshotFiles);
@@ -67,7 +74,7 @@ public class DeltaDataFileUpdatesExtractor {
   }
 
   public Seq<Action> applyDiff(
-      OneDataFilesDiff oneDataFilesDiff, StructType tableSchema, String tableBasePath) {
+      OneDataFilesDiff oneDataFilesDiff, OneSchema tableSchema, String tableBasePath) {
     List<Action> allActions = new ArrayList<>();
     allActions.addAll(
         oneDataFilesDiff.getFilesAdded().stream()
@@ -82,7 +89,7 @@ public class DeltaDataFileUpdatesExtractor {
   }
 
   private Stream<AddFile> createAddFileAction(
-      OneDataFile dataFile, StructType schema, String tableBasePath) {
+      OneDataFile dataFile, OneSchema schema, String tableBasePath) {
     if (dataFile instanceof OneDataFiles) {
       return ((OneDataFiles) dataFile)
           .getFiles().stream()
@@ -102,7 +109,7 @@ public class DeltaDataFileUpdatesExtractor {
   }
 
   private String getColumnStats(
-      StructType schema, long recordCount, Map<OneField, ColumnStat> columnStats) {
+      OneSchema schema, long recordCount, Map<OneField, ColumnStat> columnStats) {
     try {
       return deltaStatsExtractor.convertStatsToDeltaFormat(schema, recordCount, columnStats);
     } catch (JsonProcessingException e) {
