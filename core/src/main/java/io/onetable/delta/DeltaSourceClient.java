@@ -115,37 +115,29 @@ public class DeltaSourceClient implements SourceClient<Long> {
     FileFormat fileFormat =
         actionsConverter.convertToOneTableFileFormat(
             snapshotAtVersion.metadata().format().provider());
-    List<AddFile> addFileActions = new ArrayList<>();
-    List<RemoveFile> removeFileActions = new ArrayList<>();
-    for (Action action : actionsForVersion) {
-      if (action instanceof AddFile) {
-        addFileActions.add((AddFile) action);
-      } else if (action instanceof RemoveFile) {
-        removeFileActions.add((RemoveFile) action);
-      }
-    }
     Set<OneDataFile> addedFiles = new HashSet<>();
     Set<OneDataFile> removedFiles = new HashSet<>();
-    for (AddFile addFile : addFileActions) {
-      addedFiles.add(
-          actionsConverter.convertAddActionToOneDataFile(
-              addFile,
-              snapshotAtVersion,
-              fileFormat,
-              tableAtVersion.getPartitioningFields(),
-              tableAtVersion.getReadSchema().getFields(),
-              true,
-              DeltaPartitionExtractor.getInstance(),
-              DeltaStatsExtractor.getInstance()));
-    }
-    for (RemoveFile removeFile : removeFileActions) {
-      removedFiles.add(
-          actionsConverter.convertRemoveActionToOneDataFile(
-              removeFile,
-              snapshotAtVersion,
-              fileFormat,
-              tableAtVersion.getPartitioningFields(),
-              DeltaPartitionExtractor.getInstance()));
+    for (Action action : actionsForVersion) {
+      if (action instanceof AddFile) {
+        addedFiles.add(
+            actionsConverter.convertAddActionToOneDataFile(
+                (AddFile) action,
+                snapshotAtVersion,
+                fileFormat,
+                tableAtVersion.getPartitioningFields(),
+                tableAtVersion.getReadSchema().getFields(),
+                true,
+                DeltaPartitionExtractor.getInstance(),
+                DeltaStatsExtractor.getInstance()));
+      } else if (action instanceof RemoveFile) {
+        removedFiles.add(
+            actionsConverter.convertRemoveActionToOneDataFile(
+                (RemoveFile) action,
+                snapshotAtVersion,
+                fileFormat,
+                tableAtVersion.getPartitioningFields(),
+                DeltaPartitionExtractor.getInstance()));
+      }
     }
     OneDataFilesDiff dataFilesDiff =
         OneDataFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
