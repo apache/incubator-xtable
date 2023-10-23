@@ -81,7 +81,7 @@ public class TestIcebergSchemaExtractor {
                         .name("requiredInt")
                         .schema(
                             OneSchema.builder()
-                                .name("int")
+                                .name("integer")
                                 .dataType(OneType.INT)
                                 .isNullable(false)
                                 .build())
@@ -91,7 +91,7 @@ public class TestIcebergSchemaExtractor {
                         .name("optionalInt")
                         .schema(
                             OneSchema.builder()
-                                .name("int")
+                                .name("integer")
                                 .dataType(OneType.INT)
                                 .isNullable(true)
                                 .build())
@@ -891,7 +891,7 @@ public class TestIcebergSchemaExtractor {
   }
 
   @Test
-  public void testIdHandling() {
+  public void testToIcebergWithNoFieldIdsSet() {
     OneSchema recordListElementSchema =
         OneSchema.builder()
             .name("element")
@@ -900,7 +900,6 @@ public class TestIcebergSchemaExtractor {
                 Arrays.asList(
                     OneField.builder()
                         .name("requiredDouble")
-                        .fieldId(3)
                         .parentPath("recordList._one_field_element")
                         .schema(
                             OneSchema.builder()
@@ -912,7 +911,6 @@ public class TestIcebergSchemaExtractor {
                     OneField.builder()
                         .name("optionalString")
                         .parentPath("recordList._one_field_element")
-                        .fieldId(9)
                         .schema(
                             OneSchema.builder()
                                 .name("string")
@@ -932,7 +930,6 @@ public class TestIcebergSchemaExtractor {
                     OneField.builder()
                         .name("requiredDouble")
                         .parentPath("recordMap._one_field_value")
-                        .fieldId(7)
                         .schema(
                             OneSchema.builder()
                                 .name("double")
@@ -943,7 +940,6 @@ public class TestIcebergSchemaExtractor {
                     OneField.builder()
                         .name("optionalString")
                         .parentPath("recordMap._one_field_value")
-                        .fieldId(10)
                         .schema(
                             OneSchema.builder()
                                 .name("string")
@@ -963,7 +959,6 @@ public class TestIcebergSchemaExtractor {
                 Arrays.asList(
                     OneField.builder()
                         .name("recordList")
-                        .fieldId(1)
                         .schema(
                             OneSchema.builder()
                                 .name("array")
@@ -974,7 +969,6 @@ public class TestIcebergSchemaExtractor {
                                         OneField.builder()
                                             .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                                             .parentPath("recordList")
-                                            .fieldId(2)
                                             .schema(recordListElementSchema)
                                             .build()))
                                 .build())
@@ -982,7 +976,6 @@ public class TestIcebergSchemaExtractor {
                         .build(),
                     OneField.builder()
                         .name("recordMap")
-                        .fieldId(4)
                         .schema(
                             OneSchema.builder()
                                 .name("map")
@@ -993,7 +986,6 @@ public class TestIcebergSchemaExtractor {
                                         OneField.builder()
                                             .name(OneField.Constants.MAP_KEY_FIELD_NAME)
                                             .parentPath("recordMap")
-                                            .fieldId(5)
                                             .schema(
                                                 OneSchema.builder()
                                                     .name("map_key")
@@ -1003,7 +995,6 @@ public class TestIcebergSchemaExtractor {
                                             .defaultValue("")
                                             .build(),
                                         OneField.builder()
-                                            .fieldId(6)
                                             .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
                                             .parentPath("recordMap")
                                             .schema(recordMapElementSchema)
@@ -1019,24 +1010,22 @@ public class TestIcebergSchemaExtractor {
                 1,
                 "recordList",
                 Types.ListType.ofOptional(
-                    2,
+                    3,
                     Types.StructType.of(
-                        Types.NestedField.required(3, "requiredDouble", Types.DoubleType.get()),
-                        Types.NestedField.optional(9, "optionalString", Types.StringType.get())))),
+                        Types.NestedField.required(4, "requiredDouble", Types.DoubleType.get()),
+                        Types.NestedField.optional(5, "optionalString", Types.StringType.get())))),
             Types.NestedField.optional(
-                4,
+                2,
                 "recordMap",
                 Types.MapType.ofOptional(
-                    5,
                     6,
+                    7,
                     Types.IntegerType.get(),
                     Types.StructType.of(
-                        Types.NestedField.required(7, "requiredDouble", Types.DoubleType.get()),
-                        Types.NestedField.optional(
-                            10, "optionalString", Types.StringType.get())))));
+                        Types.NestedField.required(8, "requiredDouble", Types.DoubleType.get()),
+                        Types.NestedField.optional(9, "optionalString", Types.StringType.get())))));
 
     Assertions.assertTrue(
         icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
-    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 }
