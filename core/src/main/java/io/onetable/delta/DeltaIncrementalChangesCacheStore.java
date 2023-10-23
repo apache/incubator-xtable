@@ -20,6 +20,7 @@ package io.onetable.delta;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
@@ -29,7 +30,6 @@ import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.actions.Action;
 
 import scala.Tuple2;
-import scala.collection.Iterator;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
@@ -97,25 +97,34 @@ public class DeltaIncrementalChangesCacheStore {
     }
   }
 
-  private void reload(DeltaLog deltaLog, Long versionToStartFrom) {
-    Iterator<Tuple2<Object, Seq<Action>>> iterator = deltaLog.getChanges(versionToStartFrom, false);
-    List<Tuple2<Object, List<Action>>> changesList = new ArrayList<>();
-    while (iterator.hasNext()) {
-      Tuple2<Object, Seq<Action>> currentChange = iterator.next();
-      Object versionNumberObj = currentChange._1();
-      List<Action> currentActions = JavaConverters.seqAsJavaList(currentChange._2());
-      changesList.add(new Tuple2<>(versionNumberObj, currentActions));
+  private List<Tuple2<Long, List<Action>>> getChangesList(
+      scala.collection.Iterator<Tuple2<Object, Seq<Action>>> scalaIterator) {
+    List<Tuple2<Long, List<Action>>> changesList = new ArrayList<>();
+    Iterator<Tuple2<Object, Seq<Action>>> javaIterator =
+        JavaConverters.asJavaIteratorConverter(scalaIterator).asJava();
+    while (javaIterator.hasNext()) {
+      Tuple2<Object, Seq<Action>> currentChange = javaIterator.next();
+      changesList.add(
+          new Tuple2<>(
+              (Long) currentChange._1(),
+              JavaConverters.seqAsJavaListConverter(currentChange._2()).asJava()));
     }
+    return changesList;
+  }
+
+  private void reload(DeltaLog deltaLog, Long versionToStartFrom) {
+    List<Tuple2<Long, List<Action>>> changesList =
+        getChangesList(deltaLog.getChanges(versionToStartFrom, false));
 
     // Use a lock to fill the map in a thread-safe manner.
     lock.lock();
     try {
       this.resetState();
-      for (Tuple2<Object, List<Action>> change : changesList) {
-        Long versionNumber = (Long) change._1();
+      for (Tuple2<Long, List<Action>> change : changesList) {
+        Long versionNumber = change._1();
         List<Action> actions = change._2();
         incrementalChangesByVersion.put(versionNumber, actions);
-        endVersion = endVersion == -1L ? versionNumber : Math.max(endVersion, versionNumber);
+        endVersion = endVersion == null ? versionNumber : Math.max(endVersion, versionNumber);
       }
       startVersion = versionToStartFrom;
       this.initialized = true;
@@ -126,8 +135,8 @@ public class DeltaIncrementalChangesCacheStore {
 
   private void resetState() {
     this.initialized = false;
-    this.startVersion = -1L;
-    this.endVersion = -1L;
+    this.startVersion = null;
+    this.endVersion = null;
     this.incrementalChangesByVersion = new HashMap<>();
   }
 }

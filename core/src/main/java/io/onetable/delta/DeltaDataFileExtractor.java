@@ -19,20 +19,14 @@
 package io.onetable.delta;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import lombok.Builder;
 
-import org.apache.hadoop.fs.Path;
-
 import org.apache.spark.sql.delta.Snapshot;
-import org.apache.spark.sql.delta.actions.AddFile;
-import org.apache.spark.sql.delta.actions.RemoveFile;
 
-import io.onetable.exception.NotSupportedException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
@@ -46,10 +40,13 @@ import io.onetable.spi.extractor.PartitionedDataFileIterator;
 public class DeltaDataFileExtractor {
 
   @Builder.Default
+  private final DeltaPartitionExtractor partitionExtractor = DeltaPartitionExtractor.getInstance();
+
+  @Builder.Default
   private final DeltaStatsExtractor fileStatsExtractor = DeltaStatsExtractor.getInstance();
 
   @Builder.Default
-  private final DeltaPartitionExtractor partitionExtractor = DeltaPartitionExtractor.getInstance();
+  private final DeltaActionsConverter actionsConverter = DeltaActionsConverter.getInstance();
 
   /**
    * Initializes an iterator for Delta Lake files. This should only be used when column stats are
@@ -61,54 +58,6 @@ public class DeltaDataFileExtractor {
   public PartitionedDataFileIterator iteratorWithoutStats(
       Snapshot deltaSnapshot, OneSchema schema) {
     return new DeltaDataFileIterator(deltaSnapshot, schema, false);
-  }
-
-  public OneDataFile convertAddActionToOneDataFile(
-      AddFile addFile,
-      Snapshot deltaSnapshot,
-      List<OnePartitionField> partitionFields,
-      List<OneField> fields,
-      boolean includeColumnStats) {
-    String tableBasePath = deltaSnapshot.deltaLog().dataPath().toUri().toString();
-    // TODO(vamshigv): removed record count as delta api downgraded to 2.0.2
-    return OneDataFile.builder()
-        .physicalPath(getFullPathToFile(tableBasePath, addFile.path()))
-        .fileFormat(convertToOneTableFileFormat(deltaSnapshot.metadata().format().provider()))
-        .fileSizeBytes(addFile.size())
-        .lastModified(addFile.modificationTime())
-        .partitionValues(
-            partitionExtractor.partitionValueExtraction(addFile.partitionValues(), partitionFields))
-        .columnStats(
-            includeColumnStats
-                ? fileStatsExtractor.getColumnStatsForFile(addFile, fields)
-                : Collections.emptyMap())
-        .build();
-  }
-
-  public OneDataFile convertRemoveActionToOneDataFile(
-      RemoveFile removeFile, Snapshot deltaSnapshot) {
-    String tableBasePath = deltaSnapshot.deltaLog().dataPath().toUri().toString();
-    return OneDataFile.builder()
-        .physicalPath(getFullPathToFile(tableBasePath, removeFile.path()))
-        .fileFormat(convertToOneTableFileFormat(deltaSnapshot.metadata().format().provider()))
-        .build();
-  }
-
-  private FileFormat convertToOneTableFileFormat(String provider) {
-    if (provider.equals("parquet")) {
-      return FileFormat.APACHE_PARQUET;
-    } else if (provider.equals("orc")) {
-      return FileFormat.APACHE_ORC;
-    }
-    throw new NotSupportedException(
-        String.format("delta file format %s is not recognized", provider));
-  }
-
-  private String getFullPathToFile(String tableBasePath, String path) {
-    if (path.startsWith(tableBasePath)) {
-      return path;
-    }
-    return tableBasePath + Path.SEPARATOR + path;
   }
 
   /**
@@ -129,7 +78,8 @@ public class DeltaDataFileExtractor {
     private final boolean includeColumnStats;
 
     private DeltaDataFileIterator(Snapshot snapshot, OneSchema schema, boolean includeColumnStats) {
-      this.fileFormat = convertToOneTableFileFormat(snapshot.metadata().format().provider());
+      this.fileFormat =
+          actionsConverter.convertToOneTableFileFormat(snapshot.metadata().format().provider());
       this.fields = schema.getFields();
       this.partitionFields =
           partitionExtractor.convertFromDeltaPartitionFormat(
@@ -140,8 +90,15 @@ public class DeltaDataFileExtractor {
           snapshot.allFiles().collectAsList().stream()
               .map(
                   addFile ->
-                      convertAddActionToOneDataFile(
-                          addFile, snapshot, partitionFields, fields, includeColumnStats))
+                      actionsConverter.convertAddActionToOneDataFile(
+                          addFile,
+                          snapshot,
+                          fileFormat,
+                          partitionFields,
+                          fields,
+                          includeColumnStats,
+                          partitionExtractor,
+                          fileStatsExtractor))
               .collect(Collectors.toList())
               .listIterator();
     }

@@ -49,6 +49,7 @@ import io.onetable.model.TableChange;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
+import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
@@ -58,20 +59,21 @@ import io.onetable.spi.extractor.SourceClient;
 @Log4j2
 public class DeltaSourceClient implements SourceClient<Long> {
   private final DeltaDataFileExtractor dataFileExtractor = DeltaDataFileExtractor.builder().build();
+  private final DeltaActionsConverter actionsConverter = DeltaActionsConverter.getInstance();
   private final DeltaTableExtractor tableExtractor;
   private final SparkSession sparkSession;
   private final DeltaLog deltaLog;
   private final DeltaTable deltaTable;
   private final String tableName;
   private final String basePath;
-  private DeltaIncrementalChangesCacheStore deltaIncrementalChangesCacheStore;
+  private final DeltaIncrementalChangesCacheStore deltaIncrementalChangesCacheStore;
 
   public DeltaSourceClient(SparkSession sparkSession, String tableName, String basePath) {
     this.sparkSession = sparkSession;
     this.tableName = tableName;
     this.basePath = basePath;
-    this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
     this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
+    this.deltaLog = deltaTable.deltaLog();
     this.tableExtractor = new DeltaTableExtractor();
     this.deltaIncrementalChangesCacheStore = new DeltaIncrementalChangesCacheStore();
   }
@@ -110,6 +112,9 @@ public class DeltaSourceClient implements SourceClient<Long> {
         deltaIncrementalChangesCacheStore.getActionsForVersion(versionNumber);
     Snapshot snapshotAtVersion =
         deltaLog.getSnapshotAt(versionNumber, Option.empty(), Option.empty());
+    FileFormat fileFormat =
+        actionsConverter.convertToOneTableFileFormat(
+            snapshotAtVersion.metadata().format().provider());
     List<AddFile> addFileActions = new ArrayList<>();
     List<RemoveFile> removeFileActions = new ArrayList<>();
     for (Action action : actionsForVersion) {
@@ -123,16 +128,24 @@ public class DeltaSourceClient implements SourceClient<Long> {
     Set<OneDataFile> removedFiles = new HashSet<>();
     for (AddFile addFile : addFileActions) {
       addedFiles.add(
-          dataFileExtractor.convertAddActionToOneDataFile(
+          actionsConverter.convertAddActionToOneDataFile(
               addFile,
               snapshotAtVersion,
+              fileFormat,
               tableAtVersion.getPartitioningFields(),
               tableAtVersion.getReadSchema().getFields(),
-              true));
+              true,
+              DeltaPartitionExtractor.getInstance(),
+              DeltaStatsExtractor.getInstance()));
     }
     for (RemoveFile removeFile : removeFileActions) {
       removedFiles.add(
-          dataFileExtractor.convertRemoveActionToOneDataFile(removeFile, snapshotAtVersion));
+          actionsConverter.convertRemoveActionToOneDataFile(
+              removeFile,
+              snapshotAtVersion,
+              fileFormat,
+              tableAtVersion.getPartitioningFields(),
+              DeltaPartitionExtractor.getInstance()));
     }
     OneDataFilesDiff dataFilesDiff =
         OneDataFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
