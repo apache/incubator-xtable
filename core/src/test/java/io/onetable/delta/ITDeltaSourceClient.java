@@ -385,7 +385,7 @@ public class ITDeltaSourceClient {
   }
 
   @Test
-  public void testAddColumns() throws ParseException {
+  public void testAddColumns() {
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable("some_table", tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
@@ -425,7 +425,7 @@ public class ITDeltaSourceClient {
   }
 
   @Test
-  public void testDropPartition() throws ParseException {
+  public void testDropPartition() {
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable("some_table", tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
@@ -490,7 +490,7 @@ public class ITDeltaSourceClient {
   }
 
   @Test
-  public void testOptimizeAndClustering() throws ParseException {
+  public void testOptimizeAndClustering() {
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable("some_table", tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();

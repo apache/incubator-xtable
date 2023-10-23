@@ -22,15 +22,16 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Date;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import lombok.Value;
 
@@ -83,11 +84,11 @@ public class TestSparkDeltaTable {
   public static final SimpleDateFormat TIMESTAMP_FORMAT =
       new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
-  private final String tableName;
-  private final String basePath;
-  private final SparkSession sparkSession;
-  private final DeltaLog deltaLog;
-  private final DeltaTable deltaTable;
+  String tableName;
+  String basePath;
+  SparkSession sparkSession;
+  DeltaLog deltaLog;
+  DeltaTable deltaTable;
 
   public TestSparkDeltaTable(String name, Path tempDir, SparkSession sparkSession) {
     try {
@@ -120,7 +121,7 @@ public class TestSparkDeltaTable {
             + "'");
   }
 
-  public List<Row> insertRows(int numRows) throws ParseException {
+  public List<Row> insertRows(int numRows) {
     List<Row> rows = new ArrayList<>();
     for (int i = 0; i < numRows; i++) {
       rows.add(generateRandomRow());
@@ -135,7 +136,7 @@ public class TestSparkDeltaTable {
     return rows;
   }
 
-  public List<Row> insertRows(int numRows, Integer partitionValue) throws ParseException {
+  public List<Row> insertRows(int numRows, Integer partitionValue) {
     List<Row> rows = new ArrayList<>();
     for (int i = 0; i < numRows; i++) {
       rows.add(generateRandomRowWithPartitionValue(partitionValue));
@@ -150,7 +151,7 @@ public class TestSparkDeltaTable {
     return rows;
   }
 
-  public List<Row> insertRowsWithAdditionalColumns(int numRows) throws ParseException {
+  public List<Row> insertRowsWithAdditionalColumns(int numRows) {
     List<Row> rows = new ArrayList<>();
     for (int i = 0; i < numRows; i++) {
       rows.add(generateRandomRowWithAdditionalColumn());
@@ -262,51 +263,50 @@ public class TestSparkDeltaTable {
         row.getString(5));
   }
 
-  private Row generateRandomRowWithPartitionValue(Integer year) throws ParseException {
+  private Row generateRandomRowWithPartitionValue(Integer year) {
+    Object[] rowValues = generateRandomRowForColumns(year, Collections.emptyList());
+    return RowFactory.create(rowValues);
+  }
+
+  private Row generateRandomRow() {
+    int year = 2013 + RANDOM.nextInt(11);
+    Object[] rowValues = generateRandomRowForColumns(year, Collections.emptyList());
+    return RowFactory.create(rowValues);
+  }
+
+  private Row generateRandomRowWithAdditionalColumn() {
+    int year = 2013 + RANDOM.nextInt(11);
+    Object[] rowValues = generateRandomRowForColumns(year, Collections.singletonList("street"));
+    return RowFactory.create(rowValues);
+  }
+
+  /*
+   * Generates a random row for the person schema and additional columns. Additional columns
+   * are appended to the end. String values are generated for additional columns.
+   */
+  private Object[] generateRandomRowForColumns(
+      int partitionYearValue, List<String> additionalColumns) {
     int id = RANDOM.nextInt(1000000) + 1;
     String firstName = generateRandomName();
     String lastName = generateRandomName();
     String gender = GENDERS[RANDOM.nextInt(GENDERS.length)];
 
     Calendar cal = Calendar.getInstance();
-    cal.set(Calendar.YEAR, year);
+    cal.set(Calendar.YEAR, partitionYearValue);
     cal.set(Calendar.DAY_OF_YEAR, RANDOM.nextInt(cal.getActualMaximum(Calendar.DAY_OF_YEAR)) + 1);
     cal.set(Calendar.HOUR_OF_DAY, RANDOM.nextInt(24));
     cal.set(Calendar.MINUTE, RANDOM.nextInt(60));
     cal.set(Calendar.SECOND, RANDOM.nextInt(60));
     String birthDate = TIMESTAMP_FORMAT.format(cal.getTime());
 
-    return RowFactory.create(id, firstName, lastName, gender, birthDate);
-  }
-
-  private Row generateRandomRow() throws ParseException {
-    int id = RANDOM.nextInt(1000000) + 1;
-    String firstName = generateRandomName();
-    String lastName = generateRandomName();
-    String gender = GENDERS[RANDOM.nextInt(GENDERS.length)];
-
-    long offset = TIMESTAMP_FORMAT.parse("2013-01-01 00:00:00").getTime();
-    long end = TIMESTAMP_FORMAT.parse("2023-01-01 00:00:00").getTime();
-    long diff = end - offset + 1;
-    Date randomDate = new Date(offset + (long) (RANDOM.nextDouble() * diff));
-    String birthDate = TIMESTAMP_FORMAT.format(randomDate);
-
-    return RowFactory.create(id, firstName, lastName, gender, birthDate);
-  }
-
-  private Row generateRandomRowWithAdditionalColumn() throws ParseException {
-    int id = RANDOM.nextInt(1000000) + 1;
-    String firstName = generateRandomName();
-    String lastName = generateRandomName();
-    String gender = GENDERS[RANDOM.nextInt(GENDERS.length)];
-
-    long offset = TIMESTAMP_FORMAT.parse("2013-01-01 00:00:00").getTime();
-    long end = TIMESTAMP_FORMAT.parse("2023-01-01 00:00:00").getTime();
-    long diff = end - offset + 1;
-    Date randomDate = new Date(offset + (long) (RANDOM.nextDouble() * diff));
-    String birthDate = TIMESTAMP_FORMAT.format(randomDate);
-    String street = generateRandomName();
-    return RowFactory.create(id, firstName, lastName, gender, birthDate, street);
+    Object[] row = new Object[5 + additionalColumns.size()];
+    row[0] = id;
+    row[1] = firstName;
+    row[2] = lastName;
+    row[3] = gender;
+    row[4] = birthDate;
+    IntStream.range(0, additionalColumns.size()).forEach(i -> row[5 + i] = generateRandomName());
+    return row;
   }
 
   private String generateRandomName() {
