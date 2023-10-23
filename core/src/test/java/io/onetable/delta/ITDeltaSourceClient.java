@@ -24,10 +24,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -85,7 +87,7 @@ class ITDeltaSourceClient {
   @Test
   void getCurrentSnapshotNonPartitionedTest() {
     // Table name
-    final String tableName = "test_" + Instant.now().toEpochMilli();
+    final String tableName = getTableName();
     final Path basePath = tempDir.resolve(tableName);
     // Create table with a single row using Spark
     sparkSession.sql(
@@ -149,7 +151,7 @@ class ITDeltaSourceClient {
   @Test
   void getCurrentSnapshotPartitionedTest() {
     // Table name
-    final String tableName = "test_" + Instant.now().toEpochMilli();
+    final String tableName = getTableName();
     final Path basePath = tempDir.resolve(tableName);
     // Create table with a single row using Spark
     sparkSession.sql(
@@ -227,11 +229,15 @@ class ITDeltaSourceClient {
     // TODO: Validate data files (see https://github.com/onetable-io/onetable/issues/96)
   }
 
+  private static String getTableName() {
+    return "test_" + UUID.randomUUID().toString().replace("-", "_");
+  }
+
   @Disabled("Requires Spark 3.4.0+")
   @Test
   void getCurrentSnapshotGenColPartitionedTest() {
     // Table name
-    final String tableName = "test_" + Instant.now().toEpochMilli();
+    final String tableName = getTableName();
     final Path basePath = tempDir.resolve(tableName);
     // Create table with a single row using Spark
     sparkSession.sql(
@@ -290,7 +296,9 @@ class ITDeltaSourceClient {
             .set(
                 "spark.sql.catalog.spark_catalog",
                 "org.apache.spark.sql.delta.catalog.DeltaCatalog")
-            .set("spark.master", "local[2]");
+            .set("spark.master", "local[2]")
+            .set("spark.sql.shuffle.partitions", "1")
+            .set("spark.default.parallelism", "1");
     return SparkSession.builder().config(sparkConf).getOrCreate();
   }
 }
