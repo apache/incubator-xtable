@@ -668,7 +668,8 @@ public class ITOneTableClient {
 
   @ParameterizedTest
   @MethodSource("testCasesWithSyncModes")
-  public void testTimeTravelQueries(List<TableFormat> targetTableFormats, SyncMode syncMode) throws Exception {
+  public void testTimeTravelQueries(List<TableFormat> targetTableFormats, SyncMode syncMode)
+      throws Exception {
     String tableName = getTableName();
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
