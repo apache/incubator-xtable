@@ -686,11 +686,13 @@ public class ITOneTableClient {
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       Instant instantAfterFirstSync = Instant.now();
+      // sleep before starting the next commit to avoid any rounding issues
       Thread.sleep(1000);
 
       table.insertRecords(50, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       Instant instantAfterSecondSync = Instant.now();
+      // sleep before starting the next commit to avoid any rounding issues
       Thread.sleep(1000);
 
       table.insertRecords(50, true);
