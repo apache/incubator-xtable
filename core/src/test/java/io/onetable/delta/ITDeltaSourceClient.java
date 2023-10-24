@@ -18,15 +18,25 @@
  
 package io.onetable.delta;
 
+import static io.onetable.TestSparkDeltaTable.TIMESTAMP_FORMAT;
+import static io.onetable.ValidationTestHelper.validateOneSnapshot;
+import static io.onetable.ValidationTestHelper.validateTableChanges;
+import static org.junit.jupiter.api.Assertions.*;
+
 import java.nio.file.Path;
+import java.sql.Timestamp;
+import java.text.ParseException;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.spark.SparkConf;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -36,9 +46,13 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import io.onetable.TestSparkDeltaTable;
 import io.onetable.client.PerTableConfig;
+import io.onetable.model.CurrentCommitState;
+import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
+import io.onetable.model.TableChange;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
@@ -47,30 +61,34 @@ import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.storage.DataLayoutStrategy;
-import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.TableFormat;
 
-/**
- * A suite of functional tests that assert that the metadata for the Delta table is properly read
- * from disk and converted into OneTable internal representation.
- */
-class ITDeltaSourceClient {
-
+public class ITDeltaSourceClient {
+  @TempDir private static Path tempDir;
   private static SparkSession sparkSession;
-
-  @TempDir public static java.nio.file.Path tempDir;
 
   private DeltaSourceClientProvider clientProvider;
 
   @BeforeAll
   public static void setupOnce() {
-    sparkSession = buildSparkSession();
+    sparkSession =
+        SparkSession.builder()
+            .appName("TestDeltaTable")
+            .master("local[4]")
+            .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+            .config(
+                "spark.sql.catalog.spark_catalog",
+                "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+            .config("spark.databricks.delta.retentionDurationCheck.enabled", "false")
+            .config("spark.databricks.delta.schema.autoMerge.enabled", "true")
+            .getOrCreate();
   }
 
   @AfterAll
   public static void teardown() {
-    sparkSession.close();
+    if (sparkSession != null) {
+      sparkSession.close();
+    }
   }
 
   @BeforeEach
@@ -258,6 +276,264 @@ class ITDeltaSourceClient {
     // TODO: Complete and enable test (see https://github.com/onetable-io/onetable/issues/90)
   }
 
+  @Test
+  public void testInsertsUpsertsAndDeletes() throws ParseException {
+    String tableName = getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+    List<List<String>> allActiveFiles = new ArrayList<>();
+    List<TableChange> allTableChanges = new ArrayList<>();
+    List<Row> rows = testSparkDeltaTable.insertRows(50);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    List<Row> rows1 = testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.upsertRows(rows.subList(0, 20));
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.deleteRows(rows1.subList(0, 20));
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    PerTableConfig tableConfig =
+        PerTableConfig.builder()
+            .tableName(testSparkDeltaTable.getTableName())
+            .tableBasePath(testSparkDeltaTable.getBasePath())
+            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+            .build();
+    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    assertEquals(180L, testSparkDeltaTable.getNumRows());
+    OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+    // Get changes in incremental format.
+    InstantsForIncrementalSync instantsForIncrementalSync =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+            .build();
+    CurrentCommitState<Long> currentCommitState =
+        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
+    for (Long version : currentCommitState.getCommitsToProcess()) {
+      TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
+      allTableChanges.add(tableChange);
+    }
+    validateTableChanges(allActiveFiles, allTableChanges);
+  }
+
+  @Test
+  public void testVacuum() throws ParseException {
+    String tableName = getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+    List<List<String>> allActiveFiles = new ArrayList<>();
+    List<TableChange> allTableChanges = new ArrayList<>();
+    List<Row> rows = testSparkDeltaTable.insertRows(50);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.deleteRows(rows.subList(0, 20));
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.runVacuum();
+    // vacuum has two commits, one for start and one for end, hence adding twice.
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    PerTableConfig tableConfig =
+        PerTableConfig.builder()
+            .tableName(testSparkDeltaTable.getTableName())
+            .tableBasePath(testSparkDeltaTable.getBasePath())
+            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+            .build();
+    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    assertEquals(130L, testSparkDeltaTable.getNumRows());
+    OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+    // Get changes in incremental format.
+    InstantsForIncrementalSync instantsForIncrementalSync =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+            .build();
+    CurrentCommitState<Long> currentCommitState =
+        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
+    for (Long version : currentCommitState.getCommitsToProcess()) {
+      TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
+      allTableChanges.add(tableChange);
+    }
+    validateTableChanges(allActiveFiles, allTableChanges);
+  }
+
+  @Test
+  public void testAddColumns() {
+    String tableName = getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+    List<List<String>> allActiveFiles = new ArrayList<>();
+    List<TableChange> allTableChanges = new ArrayList<>();
+    List<Row> rows = testSparkDeltaTable.insertRows(50);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRowsWithAdditionalColumns(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    PerTableConfig tableConfig =
+        PerTableConfig.builder()
+            .tableName(testSparkDeltaTable.getTableName())
+            .tableBasePath(testSparkDeltaTable.getBasePath())
+            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+            .build();
+    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    assertEquals(150L, testSparkDeltaTable.getNumRows());
+    OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+    // Get changes in incremental format.
+    InstantsForIncrementalSync instantsForIncrementalSync =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+            .build();
+    CurrentCommitState<Long> currentCommitState =
+        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
+    for (Long version : currentCommitState.getCommitsToProcess()) {
+      TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
+      allTableChanges.add(tableChange);
+    }
+    validateTableChanges(allActiveFiles, allTableChanges);
+  }
+
+  @Test
+  public void testDropPartition() {
+    String tableName = getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+    List<List<String>> allActiveFiles = new ArrayList<>();
+    List<TableChange> allTableChanges = new ArrayList<>();
+
+    List<Row> rows = testSparkDeltaTable.insertRows(50);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    List<Row> rows1 = testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    List<Row> allRows = new ArrayList<>();
+    allRows.addAll(rows);
+    allRows.addAll(rows1);
+
+    Map<Integer, List<Row>> rowsByPartition =
+        allRows.stream()
+            .collect(
+                Collectors.groupingBy(
+                    row -> {
+                      try {
+                        java.util.Date parsedDate = TIMESTAMP_FORMAT.parse(row.getString(4));
+                        Timestamp timestamp = new java.sql.Timestamp(parsedDate.getTime());
+                        return timestamp.toLocalDateTime().getYear();
+                      } catch (Exception e) {
+                        throw new RuntimeException(e);
+                      }
+                    }));
+
+    Integer partitionValueToDelete = rowsByPartition.keySet().stream().findFirst().get();
+    testSparkDeltaTable.deletePartition(partitionValueToDelete);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    // Insert few records for deleted partition again to make it interesting.
+    testSparkDeltaTable.insertRows(20, partitionValueToDelete);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    PerTableConfig tableConfig =
+        PerTableConfig.builder()
+            .tableName(testSparkDeltaTable.getTableName())
+            .tableBasePath(testSparkDeltaTable.getBasePath())
+            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+            .build();
+    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    assertEquals(
+        120 - rowsByPartition.get(partitionValueToDelete).size(), testSparkDeltaTable.getNumRows());
+    OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+    // Get changes in incremental format.
+    InstantsForIncrementalSync instantsForIncrementalSync =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+            .build();
+    CurrentCommitState<Long> currentCommitState =
+        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
+    for (Long version : currentCommitState.getCommitsToProcess()) {
+      TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
+      allTableChanges.add(tableChange);
+    }
+    validateTableChanges(allActiveFiles, allTableChanges);
+  }
+
+  @Test
+  public void testOptimizeAndClustering() {
+    String tableName = getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+    List<List<String>> allActiveFiles = new ArrayList<>();
+    List<TableChange> allTableChanges = new ArrayList<>();
+    List<Row> rows = testSparkDeltaTable.insertRows(50);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.runCompaction();
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.runClustering("gender");
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    PerTableConfig tableConfig =
+        PerTableConfig.builder()
+            .tableName(testSparkDeltaTable.getTableName())
+            .tableBasePath(testSparkDeltaTable.getBasePath())
+            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+            .build();
+    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    assertEquals(250L, testSparkDeltaTable.getNumRows());
+    OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+    // Get changes in incremental format.
+    InstantsForIncrementalSync instantsForIncrementalSync =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+            .build();
+    CurrentCommitState<Long> currentCommitState =
+        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
+    for (Long version : currentCommitState.getCommitsToProcess()) {
+      TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
+      allTableChanges.add(tableChange);
+    }
+    validateTableChanges(allActiveFiles, allTableChanges);
+  }
+
   private static String getTableName() {
     return "test_" + UUID.randomUUID().toString().replace("-", "_");
   }
@@ -281,22 +557,5 @@ class ITDeltaSourceClient {
   private void validateSchemaCatalog(
       SchemaCatalog oneSchemaCatalog, Map<SchemaVersion, OneSchema> schemas) {
     Assertions.assertEquals(schemas, oneSchemaCatalog.getSchemas());
-  }
-
-  private void validateDataFiles(OneDataFiles oneDataFiles, List<OneDataFile> files) {
-    Assertions.assertEquals(files, oneDataFiles.getFiles());
-  }
-
-  private static SparkSession buildSparkSession() {
-    SparkConf sparkConf =
-        new SparkConf()
-            .setAppName("testdeltasourceclient")
-            .set(
-                "spark.sql.catalog.spark_catalog",
-                "org.apache.spark.sql.delta.catalog.DeltaCatalog")
-            .set("spark.master", "local[2]")
-            .set("spark.sql.shuffle.partitions", "1")
-            .set("spark.default.parallelism", "1");
-    return SparkSession.builder().config(sparkConf).getOrCreate();
   }
 }

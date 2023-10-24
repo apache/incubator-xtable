@@ -267,7 +267,7 @@ public abstract class TestAbstractHudiTable implements Closeable {
 
   public abstract void clean();
 
-  public abstract List<HoodieBaseFile> getAllLatestBaseFiles();
+  public abstract List<String> getAllLatestBaseFilePaths();
 
   public List<HoodieBaseFile> getAllLatestBaseFiles(HoodieTableFileSystemView fsView) {
     try {
