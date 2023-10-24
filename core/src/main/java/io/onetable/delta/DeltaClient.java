@@ -30,6 +30,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
@@ -73,6 +74,10 @@ public class DeltaClient implements TargetClient {
   private final int logRetentionInHours;
   private TransactionState transactionState;
 
+  public DeltaClient(PerTableConfig perTableConfig, Configuration configuration) {
+    this(perTableConfig, DeltaClientUtils.buildSparkSession(configuration));
+  }
+
   public DeltaClient(PerTableConfig perTableConfig, SparkSession sparkSession) {
     this(
         perTableConfig.getTableBasePath(),
@@ -81,8 +86,7 @@ public class DeltaClient implements TargetClient {
         sparkSession,
         DeltaSchemaExtractor.getInstance(),
         DeltaPartitionExtractor.getInstance(),
-        DeltaDataFileUpdatesExtractor.of(
-            DeltaStatsExtractor.getInstance(), DeltaPartitionExtractor.getInstance()));
+        DeltaDataFileUpdatesExtractor.builder().build());
   }
 
   DeltaClient(
@@ -114,13 +118,12 @@ public class DeltaClient implements TargetClient {
 
   @Override
   public void syncSchema(OneSchema schema) {
-    StructType latestSchema = schemaExtractor.schema(schema);
-    transactionState.setLatestSchema(latestSchema);
+    transactionState.setLatestSchema(schema);
   }
 
   @Override
   public void syncPartitionSpec(List<OnePartitionField> partitionSpec) {
-    Map<String, StructField> spec = partitionExtractor.getPartitionColumns(partitionSpec);
+    Map<String, StructField> spec = partitionExtractor.convertToDeltaPartitionFormat(partitionSpec);
     if (partitionSpec != null) {
       for (Map.Entry<String, StructField> e : spec.entrySet()) {
         transactionState.getPartitionColumns().add(e.getKey());
@@ -142,14 +145,16 @@ public class DeltaClient implements TargetClient {
   public void syncFilesForSnapshot(OneDataFiles snapshotFiles) {
     transactionState.setActions(
         dataFileUpdatesExtractor.applySnapshot(
-            deltaLog, snapshotFiles, transactionState.getLatestSchema()));
+            deltaLog, snapshotFiles, transactionState.getLatestSchemaInternal()));
   }
 
   @Override
   public void syncFilesForDiff(OneDataFilesDiff oneDataFilesDiff) {
     transactionState.setActions(
         dataFileUpdatesExtractor.applyDiff(
-            oneDataFilesDiff, transactionState.getLatestSchema(), deltaLog.dataPath().toString()));
+            oneDataFilesDiff,
+            transactionState.getLatestSchemaInternal(),
+            deltaLog.dataPath().toString()));
   }
 
   @Override
@@ -166,14 +171,15 @@ public class DeltaClient implements TargetClient {
 
   @EqualsAndHashCode
   @ToString
-  private static class TransactionState {
+  private class TransactionState {
     private final OptimisticTransaction transaction;
     private final Instant commitTime;
     private final DeltaLog deltaLog;
     private final int retentionInHours;
     @Getter private final List<String> partitionColumns;
     private final String tableName;
-    @Getter @Setter private StructType latestSchema;
+    @Getter private StructType latestSchema;
+    @Getter private OneSchema latestSchemaInternal;
     @Setter private OneTableMetadata metadata;
     @Setter private Seq<Action> actions;
 
@@ -190,6 +196,12 @@ public class DeltaClient implements TargetClient {
 
     private void addColumn(StructField field) {
       latestSchema = latestSchema.add(field);
+      latestSchemaInternal = schemaExtractor.toOneSchema(latestSchema);
+    }
+
+    private void setLatestSchema(OneSchema schema) {
+      this.latestSchemaInternal = schema;
+      this.latestSchema = schemaExtractor.fromOneSchema(schema);
     }
 
     private void commitTransaction() {

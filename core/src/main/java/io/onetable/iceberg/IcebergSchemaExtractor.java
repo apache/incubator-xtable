@@ -19,6 +19,7 @@
 package io.onetable.iceberg;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -37,6 +38,8 @@ import io.onetable.exception.NotSupportedException;
 import io.onetable.exception.SchemaExtractorException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
+import io.onetable.model.schema.OneSchema.OneSchemaBuilder;
+import io.onetable.model.schema.OneType;
 
 /**
  * Schema extractor for Iceberg which converts canonical representation of the schema{@link
@@ -83,6 +86,45 @@ public class IcebergSchemaExtractor {
     return new Schema(nestedFields, recordKeyIds);
   }
 
+  /**
+   * Deserializes Iceberg schema representation to internal schema representation
+   *
+   * @param iceSchema Iceberg schema
+   * @return Internal representation of deserialized iceberg schema
+   */
+  public OneSchema fromIceberg(Schema iceSchema) {
+    OneSchemaBuilder irSchemaBuilder = OneSchema.builder();
+
+    List<OneField> irFields = new ArrayList<>();
+    for (Types.NestedField iceField : iceSchema.columns()) {
+      OneType irFieldType = fromIcebergType(iceField.type());
+      OneSchema irFieldSchema =
+          OneSchema.builder()
+              .dataType(irFieldType)
+              .isNullable(iceField.isOptional())
+              .metadata(new HashMap<>())
+              .build();
+      if (irFieldType == OneType.DECIMAL) {
+        Types.DecimalType decimalType = (Types.DecimalType) iceField.type();
+        irFieldSchema.getMetadata().put(OneSchema.MetadataKey.DECIMAL_SCALE, decimalType.scale());
+        irFieldSchema
+            .getMetadata()
+            .put(OneSchema.MetadataKey.DECIMAL_PRECISION, decimalType.precision());
+      }
+
+      OneField irField =
+          OneField.builder()
+              .name(iceField.name())
+              .fieldId(iceField.fieldId())
+              .schema(irFieldSchema)
+              .build();
+      irFields.add(irField);
+    }
+    irSchemaBuilder.fields(irFields);
+
+    return irSchemaBuilder.build();
+  }
+
   static String convertFromOneTablePath(String path) {
     return path.replace(OneField.Constants.MAP_KEY_FIELD_NAME, MAP_KEY_FIELD_NAME)
         .replace(OneField.Constants.MAP_VALUE_FIELD_NAME, MAP_VALUE_FIELD_NAME)
@@ -107,13 +149,13 @@ public class IcebergSchemaExtractor {
               ids.get(i),
               field.getSchema().isNullable(),
               field.getName(),
-              convertFieldType(field, fieldIdTracker),
+              toIcebergType(field, fieldIdTracker),
               field.getSchema().getComment()));
     }
     return nestedFields;
   }
 
-  private Type convertFieldType(OneField field, AtomicInteger fieldIdTracker) {
+  private Type toIcebergType(OneField field, AtomicInteger fieldIdTracker) {
     switch (field.getSchema().getDataType()) {
       case ENUM:
       case STRING:
@@ -166,14 +208,14 @@ public class IcebergSchemaExtractor {
           return Types.MapType.ofOptional(
               keyId,
               valueId,
-              convertFieldType(key, fieldIdTracker),
-              convertFieldType(value, fieldIdTracker));
+              toIcebergType(key, fieldIdTracker),
+              toIcebergType(value, fieldIdTracker));
         } else {
           return Types.MapType.ofRequired(
               keyId,
               valueId,
-              convertFieldType(key, fieldIdTracker),
-              convertFieldType(value, fieldIdTracker));
+              toIcebergType(key, fieldIdTracker),
+              toIcebergType(value, fieldIdTracker));
         }
       case ARRAY:
         OneField element =
@@ -186,12 +228,56 @@ public class IcebergSchemaExtractor {
         int elementId =
             element.getFieldId() == null ? fieldIdTracker.incrementAndGet() : element.getFieldId();
         if (field.getSchema().isNullable()) {
-          return Types.ListType.ofOptional(elementId, convertFieldType(element, fieldIdTracker));
+          return Types.ListType.ofOptional(elementId, toIcebergType(element, fieldIdTracker));
         } else {
-          return Types.ListType.ofRequired(elementId, convertFieldType(element, fieldIdTracker));
+          return Types.ListType.ofRequired(elementId, toIcebergType(element, fieldIdTracker));
         }
       default:
         throw new NotSupportedException("Unsupported type: " + field.getSchema().getDataType());
+    }
+  }
+
+  /**
+   * Maps Iceberg type to internal type representation
+   *
+   * @param type Iceberg type
+   * @return Internal representation of Iceberg type
+   */
+  OneType fromIcebergType(Type type) {
+    switch (type.typeId()) {
+        // TODO ENUM type is not supported in Iceberg
+      case STRING:
+        return OneType.STRING;
+      case INTEGER:
+        return OneType.INT;
+      case LONG:
+        return OneType.LONG;
+      case BINARY:
+        return OneType.BYTES;
+        // TODO
+        //      case FIXED:
+        //        return OneType.FIXED;
+      case BOOLEAN:
+        return OneType.BOOLEAN;
+      case FLOAT:
+        return OneType.FLOAT;
+      case DATE:
+        return OneType.DATE;
+      case TIMESTAMP:
+        return OneType.TIMESTAMP;
+      case DOUBLE:
+        return OneType.DOUBLE;
+      case DECIMAL:
+        return OneType.DECIMAL;
+        // TODO
+        //      case STRUCT:
+        //        return OneType.RECORD;
+        //      case MAP:
+        //        return OneType.MAP;
+        //      case LIST:
+        //        return OneType.ARRAY;
+      default:
+        throw new NotSupportedException("Unsupported type: " + type.typeId());
     }
   }
 }

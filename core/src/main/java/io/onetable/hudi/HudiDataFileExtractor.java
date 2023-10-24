@@ -18,9 +18,6 @@
  
 package io.onetable.hudi;
 
-import static org.apache.hudi.common.table.timeline.HoodieTimeline.GREATER_THAN_OR_EQUALS;
-import static org.apache.hudi.common.table.timeline.HoodieTimeline.LESSER_THAN;
-
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -40,7 +37,7 @@ import org.apache.hadoop.fs.Path;
 
 import org.apache.hudi.avro.model.HoodieRestoreMetadata;
 import org.apache.hudi.avro.model.HoodieRollbackMetadata;
-import org.apache.hudi.avro.model.HoodieRollbackPartitionMetadata;
+import org.apache.hudi.common.config.HoodieCommonConfig;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.engine.HoodieLocalEngineContext;
@@ -55,8 +52,11 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
-import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
-import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
+import org.apache.hudi.common.table.view.FileSystemViewManager;
+import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
+import org.apache.hudi.common.table.view.FileSystemViewStorageType;
+import org.apache.hudi.common.table.view.SyncableFileSystemView;
+import org.apache.hudi.common.table.view.TableFileSystemView;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 
 import io.onetable.exception.OneIOException;
@@ -80,6 +80,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
   private final HudiPartitionValuesExtractor partitionValuesExtractor;
   private final HudiFileStatsExtractor fileStatsExtractor;
   private final HoodieMetadataConfig metadataConfig;
+  private final FileSystemViewManager fileSystemViewManager;
   private final Path basePath;
 
   public HudiDataFileExtractor(
@@ -93,57 +94,54 @@ public class HudiDataFileExtractor implements AutoCloseable {
             .build();
     this.basePath = metaClient.getBasePathV2();
     this.tableMetadata =
-        HoodieTableMetadata.create(engineContext, metadataConfig, basePath.toString(), true);
+        metadataConfig.enabled()
+            ? HoodieTableMetadata.create(engineContext, metadataConfig, basePath.toString(), true)
+            : null;
+    this.fileSystemViewManager =
+        FileSystemViewManager.createViewManager(
+            engineContext,
+            metadataConfig,
+            FileSystemViewStorageConfig.newBuilder()
+                .withStorageType(FileSystemViewStorageType.MEMORY)
+                .build(),
+            HoodieCommonConfig.newBuilder().build(),
+            meta -> tableMetadata);
     this.metaClient = metaClient;
     this.partitionValuesExtractor = hudiPartitionValuesExtractor;
     this.fileStatsExtractor = hudiFileStatsExtractor;
   }
 
-  public OneDataFiles getFilesCurrentState(HoodieTimeline timeline, OneTable table) {
-    List<String> allPartitionPaths;
+  public OneDataFiles getFilesCurrentState(OneTable table) {
     try {
-      allPartitionPaths = tableMetadata.getAllPartitionPaths();
+      List<String> allPartitionPaths =
+          tableMetadata != null
+              ? tableMetadata.getAllPartitionPaths()
+              : FSUtils.getAllPartitionPaths(engineContext, metadataConfig, basePath.toString());
+      return OneDataFiles.collectionBuilder()
+          .files(getOneDataFilesForPartitions(allPartitionPaths, table))
+          .build();
     } catch (IOException ex) {
-      throw new OneIOException("Unable to read partition paths from Hudi Metadata", ex);
+      throw new OneIOException(
+          "Unable to read partitions for table " + metaClient.getTableConfig().getTableName(), ex);
     }
-    return OneDataFiles.collectionBuilder()
-        .files(getOneDataFilesForPartitions(allPartitionPaths, timeline, table))
-        .build();
   }
 
   public OneDataFilesDiff getDiffForCommit(
       HoodieInstant hoodieInstantForDiff,
       OneTable table,
-      HoodieTimeline timelineForInstant,
+      HoodieInstant instant,
       HoodieTimeline visibleTimeline) {
-    HoodieTableFileSystemView fsView =
-        new HoodieMetadataFileSystemView(
-            engineContext, metaClient, visibleTimeline, metadataConfig);
-    List<AddedAndRemovedFiles> allInfo;
-    try {
-      allInfo =
-          timelineForInstant.getInstants().stream()
-              .map(
-                  instant ->
-                      getAddedAndRemovedPartitionInfo(
-                          visibleTimeline,
-                          instant,
-                          fsView,
-                          hoodieInstantForDiff,
-                          table.getPartitioningFields()))
-              .collect(Collectors.toList());
-    } finally {
-      fsView.close();
-    }
+    SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
+    AddedAndRemovedFiles allInfo =
+        getAddedAndRemovedPartitionInfo(
+            visibleTimeline, instant, fsView, hoodieInstantForDiff, table.getPartitioningFields());
 
-    Stream<OneDataFile> filesAddedWithoutStats =
-        allInfo.stream().flatMap(info -> info.getAdded().stream()).parallel();
+    Stream<OneDataFile> filesAddedWithoutStats = allInfo.getAdded().stream();
     List<OneDataFile> filesAdded =
         fileStatsExtractor
-            .addStatsToFiles(filesAddedWithoutStats, table.getReadSchema())
+            .addStatsToFiles(tableMetadata, filesAddedWithoutStats, table.getReadSchema())
             .collect(Collectors.toList());
-    List<OneDataFile> filesRemoved =
-        allInfo.stream().flatMap(info -> info.getRemoved().stream()).collect(Collectors.toList());
+    List<OneDataFile> filesRemoved = allInfo.getRemoved();
 
     return OneDataFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
   }
@@ -151,7 +149,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
   private AddedAndRemovedFiles getAddedAndRemovedPartitionInfo(
       HoodieTimeline timeline,
       HoodieInstant instant,
-      HoodieTableFileSystemView fsView,
+      TableFileSystemView fsView,
       HoodieInstant instantToConsider,
       List<OnePartitionField> partitioningFields) {
     try {
@@ -220,7 +218,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
               .forEach(
                   (partition, metadata) ->
                       removedFiles.addAll(
-                          getRemovedFilesForRollback(partition, metadata, partitioningFields)));
+                          getRemovedFiles(
+                              partition, metadata.getSuccessDeleteFiles(), partitioningFields)));
           break;
         case HoodieTimeline.RESTORE_ACTION:
           HoodieRestoreMetadata restoreMetadata =
@@ -237,12 +236,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
                                   .forEach(
                                       (partition, metadata) ->
                                           removedFiles.addAll(
-                                              getRemovedFilesForRollback(
-                                                  partition, metadata, partitioningFields)))));
+                                              getRemovedFiles(
+                                                  partition,
+                                                  metadata.getSuccessDeleteFiles(),
+                                                  partitioningFields)))));
           break;
+        case HoodieTimeline.CLEAN_ACTION:
         case HoodieTimeline.SAVEPOINT_ACTION:
         case HoodieTimeline.LOG_COMPACTION_ACTION:
-        case HoodieTimeline.CLEAN_ACTION:
         case HoodieTimeline.INDEXING_ACTION:
         case HoodieTimeline.SCHEMA_COMMIT_ACTION:
           // these do not impact the base files
@@ -256,13 +257,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
     }
   }
 
-  private List<OneDataFile> getRemovedFilesForRollback(
-      String partitionPath,
-      HoodieRollbackPartitionMetadata metadata,
-      List<OnePartitionField> partitioningFields) {
+  private List<OneDataFile> getRemovedFiles(
+      String partitionPath, List<String> deletedPaths, List<OnePartitionField> partitioningFields) {
     Map<OnePartitionField, Range> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
-    List<String> deletedPaths = metadata.getSuccessDeleteFiles();
     return deletedPaths.stream()
         .map(
             path -> {
@@ -282,20 +280,18 @@ public class HudiDataFileExtractor implements AutoCloseable {
   }
 
   private AddedAndRemovedFiles getUpdatesToPartition(
-      HoodieTableFileSystemView fsView,
+      TableFileSystemView fsView,
       HoodieInstant instantToConsider,
       String partitionPath,
       Set<String> affectedFileIds,
       List<OnePartitionField> partitioningFields) {
-    List<OneDataFile> filesToAdd = new ArrayList<>();
-    List<OneDataFile> filesToRemove = new ArrayList<>();
+    List<OneDataFile> filesToAdd = new ArrayList<>(affectedFileIds.size());
+    List<OneDataFile> filesToRemove = new ArrayList<>(affectedFileIds.size());
     Map<OnePartitionField, Range> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
     Stream<HoodieFileGroup> fileGroups =
         Stream.concat(
-            fsView.getAllFileGroups(partitionPath),
-            fsView.getReplacedFileGroupsBeforeOrOn(
-                instantToConsider.getTimestamp(), partitionPath));
+            fsView.getAllFileGroups(partitionPath), fsView.getAllReplacedFileGroups(partitionPath));
     fileGroups
         .filter(fileGroup -> affectedFileIds.contains(fileGroup.getFileGroupId().getFileId()))
         .forEach(
@@ -303,42 +299,31 @@ public class HudiDataFileExtractor implements AutoCloseable {
               List<HoodieBaseFile> baseFiles =
                   fileGroup.getAllBaseFiles().collect(Collectors.toList());
               boolean newBaseFileAdded = false;
-              if (HoodieTimeline.compareTimestamps(
-                  baseFiles.get(0).getCommitTime(),
-                  GREATER_THAN_OR_EQUALS,
-                  instantToConsider.getTimestamp())) {
-                filesToAdd.add(
-                    buildFileWithoutStats(partitionPath, partitionValues, baseFiles.get(0)));
-                newBaseFileAdded = true;
-              }
-              if (newBaseFileAdded) {
-                // if a new base file was added, then all the older base files that were added needs
-                // to be removed.
-                baseFiles.stream()
-                    .skip(1)
-                    .filter(
-                        baseFile ->
-                            HoodieTimeline.compareTimestamps(
-                                baseFile.getCommitTime(),
-                                LESSER_THAN,
-                                instantToConsider.getTimestamp()))
-                    .map(
-                        baseFile -> buildFileWithoutStats(partitionPath, partitionValues, baseFile))
-                    .forEach(filesToRemove::add);
+              for (HoodieBaseFile baseFile : baseFiles) {
+                if (baseFile.getCommitTime().equals(instantToConsider.getTimestamp())) {
+                  newBaseFileAdded = true;
+                  filesToAdd.add(buildFileWithoutStats(partitionPath, partitionValues, baseFile));
+                } else if (newBaseFileAdded) {
+                  // if a new base file was added, then the previous base file for the group needs
+                  // to be removed
+                  filesToRemove.add(
+                      buildFileWithoutStats(partitionPath, partitionValues, baseFile));
+                  break;
+                }
               }
             });
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
   }
 
   private AddedAndRemovedFiles getUpdatesToPartitionForReplaceCommit(
-      HoodieTableFileSystemView fsView,
+      TableFileSystemView fsView,
       HoodieInstant instantToConsider,
       String partitionPath,
       Set<String> replacedFileIds,
       Set<String> newFileIds,
       List<OnePartitionField> partitioningFields) {
-    List<OneDataFile> filesToAdd = new ArrayList<>();
-    List<OneDataFile> filesToRemove = new ArrayList<>();
+    List<OneDataFile> filesToAdd = new ArrayList<>(newFileIds.size());
+    List<OneDataFile> filesToRemove = new ArrayList<>(replacedFileIds.size());
     Map<OnePartitionField, Range> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
     Stream<HoodieFileGroup> fileGroups =
@@ -351,7 +336,9 @@ public class HudiDataFileExtractor implements AutoCloseable {
           List<HoodieBaseFile> baseFiles = fileGroup.getAllBaseFiles().collect(Collectors.toList());
           String fileId = fileGroup.getFileGroupId().getFileId();
           if (newFileIds.contains(fileId)) {
-            filesToAdd.add(buildFileWithoutStats(partitionPath, partitionValues, baseFiles.get(0)));
+            filesToAdd.add(
+                buildFileWithoutStats(
+                    partitionPath, partitionValues, baseFiles.get(baseFiles.size() - 1)));
           } else if (replacedFileIds.contains(fileId)) {
             filesToRemove.add(
                 buildFileWithoutStats(partitionPath, partitionValues, baseFiles.get(0)));
@@ -361,47 +348,44 @@ public class HudiDataFileExtractor implements AutoCloseable {
   }
 
   private List<OneDataFile> getOneDataFilesForPartitions(
-      List<String> partitionPaths, HoodieTimeline timeline, OneTable table) {
+      List<String> partitionPaths, OneTable table) {
 
-    HoodieTableFileSystemView fsView =
-        new HoodieMetadataFileSystemView(engineContext, metaClient, timeline, metadataConfig);
-
-    try {
-      Stream<OneDataFile> filesWithoutStats =
-          partitionPaths.stream()
-              .parallel()
-              .flatMap(
-                  partitionPath -> {
-                    Map<OnePartitionField, Range> partitionValues =
-                        partitionValuesExtractor.extractPartitionValues(
-                            table.getPartitioningFields(), partitionPath);
-                    return fsView
-                        .getLatestBaseFiles(partitionPath)
-                        .map(
-                            baseFile ->
-                                buildFileWithoutStats(partitionPath, partitionValues, baseFile));
-                  });
-      Stream<OneDataFile> files =
-          fileStatsExtractor.addStatsToFiles(filesWithoutStats, table.getReadSchema());
-      Map<String, List<OneDataFile>> collected =
-          files.collect(Collectors.groupingBy(OneDataFile::getPartitionPath));
-      return collected.entrySet().stream()
-          .map(
-              entry ->
-                  OneDataFiles.collectionBuilder()
-                      .partitionPath(entry.getKey())
-                      .files(entry.getValue())
-                      .build())
-          .collect(Collectors.toList());
-    } finally {
-      fsView.close();
-    }
+    SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
+    Stream<OneDataFile> filesWithoutStats =
+        partitionPaths.stream()
+            .parallel()
+            .flatMap(
+                partitionPath -> {
+                  Map<OnePartitionField, Range> partitionValues =
+                      partitionValuesExtractor.extractPartitionValues(
+                          table.getPartitioningFields(), partitionPath);
+                  return fsView
+                      .getLatestBaseFiles(partitionPath)
+                      .map(
+                          baseFile ->
+                              buildFileWithoutStats(partitionPath, partitionValues, baseFile));
+                });
+    Stream<OneDataFile> files =
+        fileStatsExtractor.addStatsToFiles(tableMetadata, filesWithoutStats, table.getReadSchema());
+    Map<String, List<OneDataFile>> collected =
+        files.collect(Collectors.groupingBy(OneDataFile::getPartitionPath));
+    return collected.entrySet().stream()
+        .map(
+            entry ->
+                OneDataFiles.collectionBuilder()
+                    .partitionPath(entry.getKey())
+                    .files(entry.getValue())
+                    .build())
+        .collect(Collectors.toList());
   }
 
   @Override
   public void close() {
     try {
-      this.tableMetadata.close();
+      if (tableMetadata != null) {
+        tableMetadata.close();
+      }
+      fileSystemViewManager.close();
     } catch (Exception e) {
       throw new OneIOException(
           "Could not close table metadata for table " + metaClient.getTableConfig().getTableName());

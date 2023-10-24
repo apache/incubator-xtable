@@ -18,15 +18,25 @@
  
 package io.onetable.iceberg;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.transforms.Transform;
+import org.apache.iceberg.types.Types;
 
+import io.onetable.exception.NotSupportedException;
+import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
+import io.onetable.model.schema.OneSchema;
+import io.onetable.model.schema.PartitionTransformType;
+import io.onetable.schema.SchemaFieldFinder;
 
 /** Partition spec builder and extractor for Iceberg. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -37,8 +47,7 @@ public class IcebergPartitionSpecExtractor {
     return INSTANCE;
   }
 
-  public PartitionSpec toPartitionSpec(
-      List<OnePartitionField> partitionFields, Schema tableSchema) {
+  public PartitionSpec toIceberg(List<OnePartitionField> partitionFields, Schema tableSchema) {
     if (partitionFields == null || partitionFields.isEmpty()) {
       return PartitionSpec.unpartitioned();
     }
@@ -67,5 +76,65 @@ public class IcebergPartitionSpecExtractor {
       }
     }
     return partitionSpecBuilder.build();
+  }
+
+  PartitionTransformType fromIcebergTransform(Transform<?, ?> transform) {
+    if (transform.isIdentity()) {
+      return PartitionTransformType.VALUE;
+    }
+
+    String transformName = transform.toString();
+    switch (transformName) {
+      case "year":
+        return PartitionTransformType.YEAR;
+      case "month":
+        return PartitionTransformType.MONTH;
+      case "day":
+        return PartitionTransformType.DAY;
+      case "hour":
+        return PartitionTransformType.HOUR;
+    }
+
+    if (transform.isVoid()) {
+      throw new NotSupportedException(transformName);
+    }
+
+    if (transformName.startsWith("bucket")) {
+      throw new NotSupportedException(transformName);
+    }
+
+    throw new NotSupportedException(transform.toString());
+  }
+
+  /**
+   * Generates internal representation of the Iceberg partition spec.
+   *
+   * @param iceSpec the Iceberg partition spec
+   * @param iceSchema the Iceberg schema
+   * @return generated internal representation of the Iceberg partition spec
+   */
+  public List<OnePartitionField> fromIceberg(
+      PartitionSpec iceSpec, Schema iceSchema, OneSchema irSchema) {
+    if (iceSpec.isUnpartitioned()) {
+      return Collections.emptyList();
+    }
+
+    List<OnePartitionField> irPartitionFields = new ArrayList<>();
+    for (PartitionField iceField : iceSpec.fields()) {
+      // fetch the ice field from the schema to properly handle hidden partition fields
+      int sourceColumnId = iceField.sourceId();
+      Types.NestedField iceSchemaField = iceSchema.findField(sourceColumnId);
+
+      OneField irField =
+          SchemaFieldFinder.getInstance().findFieldByPath(irSchema, iceSchemaField.name());
+      OnePartitionField irPartitionField =
+          OnePartitionField.builder()
+              .sourceField(irField)
+              .transformType(fromIcebergTransform(iceField.transform()))
+              .build();
+      irPartitionFields.add(irPartitionField);
+    }
+
+    return irPartitionFields;
   }
 }

@@ -30,10 +30,6 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.fasterxml.jackson.module</groupId>
             <artifactId>jackson-module-scala_2.12</artifactId>
         </dependency>
@@ -59,10 +55,14 @@
         </dependency>
 
         <!-- Hudi dependencies -->
-        <!-- After schema conversion is handled directly in OneTable revisit Hudi dependencies -->
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.version.prefix}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-common</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.hudi</groupId>
