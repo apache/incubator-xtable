@@ -66,6 +66,18 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Avro -->
+        <dependency>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+            <!-- version downgraded to match Hudi runtime -->
+            <version>1.8.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.parquet</groupId>
+            <artifactId>parquet-avro</artifactId>
+        </dependency>
+
         <!-- Hadoop dependencies -->
        <dependency>
            <groupId>org.apache.hadoop</groupId>

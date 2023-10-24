@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 package io.onetable.avro;
 
 import java.util.ArrayList;
@@ -189,7 +189,7 @@ public class AvroSchemaConverter {
             .comment(schema.getDoc())
             .dataType(OneType.RECORD)
             .fields(subFields)
-            .isNullable(schema.isNullable())
+            .isNullable(isNullable(schema))
             .build();
       case ARRAY:
         IdMapping elementMapping = fieldNameToIdMapping.get(ELEMENT);
@@ -209,7 +209,7 @@ public class AvroSchemaConverter {
             .name(schema.getName())
             .dataType(OneType.ARRAY)
             .comment(schema.getDoc())
-            .isNullable(schema.isNullable())
+            .isNullable(isNullable(schema))
             .fields(Collections.singletonList(elementField))
             .build();
       case MAP:
@@ -231,7 +231,7 @@ public class AvroSchemaConverter {
             .name(schema.getName())
             .dataType(OneType.MAP)
             .comment(schema.getDoc())
-            .isNullable(schema.isNullable())
+            .isNullable(isNullable(schema))
             .fields(
                 Arrays.asList(
                     MAP_KEY_FIELD.toBuilder()
@@ -269,9 +269,21 @@ public class AvroSchemaConverter {
         .name(schema.getName())
         .dataType(newDataType)
         .comment(schema.getDoc())
-        .isNullable(schema.isNullable())
+        .isNullable(isNullable(schema))
         .metadata(metadata.isEmpty() ? null : metadata)
         .build();
+  }
+
+  private boolean isNullable(Schema schema) {
+    if (schema.getType() != Schema.Type.UNION) {
+      return schema.getType() == Schema.Type.NULL;
+    }
+    for (Schema innerSchema : schema.getTypes()) {
+      if (isNullable(innerSchema)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private Map<String, IdMapping> getChildIdMap(IdMapping idMapping) {
