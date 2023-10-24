@@ -73,7 +73,8 @@ public class PerTableConfig {
   /**
    * Configuration options for the Iceberg target. Use this to set catalog and namespace details.
    */
-  @Builder.Default IcebergTargetConfig icebergTargetConfig = IcebergTargetConfig.builder().build();
+  @Builder.Default @Nonnull
+  IcebergTargetConfig icebergTargetConfig = IcebergTargetConfig.builder().build();
 
   /**
    * Mode of a sync. FULL is only supported right now.
