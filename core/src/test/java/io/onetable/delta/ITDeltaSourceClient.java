@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
@@ -277,8 +278,9 @@ public class ITDeltaSourceClient {
 
   @Test
   public void testInsertsUpsertsAndDeletes() throws ParseException {
+    String tableName = "test_" + UUID.randomUUID();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable("some_table", tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -325,8 +327,9 @@ public class ITDeltaSourceClient {
 
   @Test
   public void testVacuum() throws ParseException {
+    String tableName = "test_" + UUID.randomUUID();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable("some_table", tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -373,8 +376,9 @@ public class ITDeltaSourceClient {
 
   @Test
   public void testAddColumns() {
+    String tableName = "test_" + UUID.randomUUID();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable("some_table", tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -413,8 +417,9 @@ public class ITDeltaSourceClient {
 
   @Test
   public void testDropPartition() {
+    String tableName = "test_" + UUID.randomUUID();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable("some_table", tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -478,8 +483,9 @@ public class ITDeltaSourceClient {
 
   @Test
   public void testOptimizeAndClustering() {
+    String tableName = "test_" + UUID.randomUUID();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable("some_table", tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
