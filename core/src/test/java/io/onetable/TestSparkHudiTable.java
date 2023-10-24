@@ -116,17 +116,6 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
         tableType);
   }
 
-  public static TestSparkHudiTable withAdditionalTopLevelField(
-      String tableName,
-      Path tempDir,
-      JavaSparkContext jsc,
-      String partitionConfig,
-      HoodieTableType tableType,
-      Schema previousSchema) {
-    return new TestSparkHudiTable(
-        tableName, addTopLevelField(previousSchema), tempDir, jsc, partitionConfig, tableType);
-  }
-
   private TestSparkHudiTable(
       String name,
       Schema schema,
@@ -179,14 +168,16 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
     return deletes;
   }
 
-  public List<HoodieBaseFile> getAllLatestBaseFiles() {
+  public List<String> getAllLatestBaseFilePaths() {
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             sparkWriteClient.getEngineContext(),
             metaClient,
             metaClient.reloadActiveTimeline(),
             getHoodieWriteConfig(metaClient).getMetadataConfig());
-    return getAllLatestBaseFiles(fsView);
+    return getAllLatestBaseFiles(fsView).stream()
+        .map(HoodieBaseFile::getPath)
+        .collect(Collectors.toList());
   }
 
   public void deletePartition(String partition, HoodieTableType tableType) {

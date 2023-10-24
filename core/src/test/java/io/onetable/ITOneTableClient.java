@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -455,7 +456,8 @@ public class ITOneTableClient {
 
   @ParameterizedTest
   @MethodSource("testCasesWithSyncModes")
-  public void testTimeTravelQueries(List<TableFormat> targetTableFormats, SyncMode syncMode) {
+  public void testTimeTravelQueries(List<TableFormat> targetTableFormats, SyncMode syncMode)
+      throws Exception {
     String tableName = getTableName();
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
@@ -472,10 +474,14 @@ public class ITOneTableClient {
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       Instant instantAfterFirstSync = Instant.now();
+      // sleep before starting the next commit to avoid any rounding issues
+      Thread.sleep(1000);
 
       table.insertRecords(50, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       Instant instantAfterSecondSync = Instant.now();
+      // sleep before starting the next commit to avoid any rounding issues
+      Thread.sleep(1000);
 
       table.insertRecords(50, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
@@ -508,20 +514,75 @@ public class ITOneTableClient {
   }
 
   private static Stream<Arguments> provideArgsForPartitionTesting() {
+    String timestampFilter =
+        String.format(
+            "timestamp_micros_nullable_field < timestamp_millis(%s)",
+            Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
     String levelFilter = "level = 'INFO'";
+    String nestedLevelFilter = "nested_record.level = 'INFO'";
     String severityFilter = "severity = 1";
-    return addSyncModeCases(
-        Stream.of(
-            Arguments.of(
-                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-                "level:VALUE",
-                "level:SIMPLE",
-                levelFilter),
-            Arguments.of(
-                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-                "severity:VALUE",
-                "severity:SIMPLE",
-                severityFilter)));
+    String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
+    return Stream.of(
+        Arguments.of(
+            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+            "level:VALUE",
+            "level:SIMPLE",
+            levelFilter),
+        Arguments.of(
+            // Delta Lake does not currently support nested partition columns
+            Arrays.asList(TableFormat.ICEBERG),
+            "nested_record.level:VALUE",
+            "nested_record.level:SIMPLE",
+            nestedLevelFilter),
+        Arguments.of(
+            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+            "level:VALUE",
+            "level:SIMPLE",
+            levelFilter),
+        Arguments.of(
+            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+            "severity:VALUE",
+            "severity:SIMPLE",
+            severityFilter),
+        Arguments.of(
+            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+            "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
+            "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
+            timestampAndLevelFilter));
+  }
+
+  @ParameterizedTest
+  @MethodSource("provideArgsForPartitionTesting")
+  public void testPartitionedData(
+      List<TableFormat> targetTableFormats,
+      String oneTablePartitionConfig,
+      String hudiPartitionConfig,
+      String filter) {
+    String tableName = getTableName();
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, hudiPartitionConfig, HoodieTableType.COPY_ON_WRITE)) {
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(targetTableFormats)
+              .tableBasePath(table.getBasePath())
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionFieldSpecConfig(oneTablePartitionConfig)
+                      .build())
+              .syncMode(SyncMode.INCREMENTAL)
+              .build();
+      table.insertRecords(100, true);
+      OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      // Do a second sync to force the test to read back the metadata it wrote earlier
+      table.insertRecords(100, true);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+
+      checkDatasetEquivalenceWithFilter(
+          TableFormat.HUDI, targetTableFormats, table.getBasePath(), filter);
+    }
   }
 
   @ParameterizedTest
