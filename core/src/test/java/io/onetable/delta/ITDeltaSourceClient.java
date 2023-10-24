@@ -227,10 +227,6 @@ class ITDeltaSourceClient {
     // TODO: Validate data files (see https://github.com/onetable-io/onetable/issues/96)
   }
 
-  private static String getTableName() {
-    return "test_" + UUID.randomUUID().toString().replace("-", "_");
-  }
-
   @Disabled("Requires Spark 3.4.0+")
   @Test
   void getCurrentSnapshotGenColPartitionedTest() {
