@@ -461,14 +461,6 @@
                 <configuration>
                     <skip>${skipUTs}</skip>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
-                    <properties>
-                        <!-- configure tests to all run in parallel -->
-                        <configurationParameters>
-                            junit.jupiter.execution.parallel.enabled=true
-                            junit.jupiter.execution.parallel.mode.default = concurrent
-                            junit.jupiter.execution.parallel.mode.classes.default = concurrent
-                        </configurationParameters>
-                    </properties>
                 </configuration>
             </plugin>
             <plugin>
@@ -486,16 +478,8 @@
                 <configuration>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <skip>${skipITs}</skip>
-                    <properties>
-                        <!-- configure tests to run in parallel within a single class -->
-                        <configurationParameters>
-                            junit.jupiter.execution.parallel.config.strategy = fixed
-                            junit.jupiter.execution.parallel.config.fixed.parallelism = 8
-                            junit.jupiter.execution.parallel.enabled = true
-                            junit.jupiter.execution.parallel.mode.default = concurrent
-                            junit.jupiter.execution.parallel.mode.classes.default = same_thread
-                        </configurationParameters>
-                    </properties>
+                    <reuseForks>false</reuseForks>
+                    <forkCount>4</forkCount>
                 </configuration>
             </plugin>
             <plugin>
