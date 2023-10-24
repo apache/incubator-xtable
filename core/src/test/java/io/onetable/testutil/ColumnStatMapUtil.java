@@ -107,7 +107,7 @@ public class ColumnStatMapUtil {
             .schema(
                 OneSchema.builder()
                     .name("array")
-                    .dataType(OneType.ARRAY)
+                    .dataType(OneType.LIST)
                     .fields(Collections.singletonList(arrayLongFieldElement))
                     .build())
             .build();
@@ -148,7 +148,7 @@ public class ColumnStatMapUtil {
             .schema(
                 OneSchema.builder()
                     .name("array")
-                    .dataType(OneType.ARRAY)
+                    .dataType(OneType.LIST)
                     .fields(Collections.singletonList(nestedArrayStringFieldElement))
                     .build())
             .build();

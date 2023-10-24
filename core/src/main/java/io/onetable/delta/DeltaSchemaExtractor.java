@@ -124,7 +124,7 @@ public class DeltaSchemaExtractor {
                 .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
         return DataTypes.createMapType(
             convertFieldType(key), convertFieldType(value), value.getSchema().isNullable());
-      case ARRAY:
+      case LIST:
         OneField element =
             field.getSchema().getFields().stream()
                 .filter(
@@ -231,7 +231,7 @@ public class DeltaSchemaExtractor {
                 .parentPath(parentPath)
                 .schema(elementSchema)
                 .build();
-        type = OneType.ARRAY;
+        type = OneType.LIST;
         fields = Collections.singletonList(elementField);
         break;
       case "map":

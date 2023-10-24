@@ -35,7 +35,7 @@ import lombok.ToString;
 public enum OneType {
   RECORD,
   ENUM,
-  ARRAY,
+  LIST,
   MAP,
   UNION,
   FIXED,
@@ -62,7 +62,7 @@ public enum OneType {
           new HashSet<OneType>() {
             {
               add(RECORD);
-              add(ARRAY);
+              add(LIST);
               add(MAP);
               add(UNION);
             }

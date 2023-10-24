@@ -216,7 +216,7 @@ public class IcebergSchemaExtractor {
               toIcebergType(key, fieldIdTracker),
               toIcebergType(value, fieldIdTracker));
         }
-      case ARRAY:
+      case LIST:
         OneField element =
             field.getSchema().getFields().stream()
                 .filter(
@@ -300,7 +300,7 @@ public class IcebergSchemaExtractor {
         OneSchema keySchema =
             fromIcebergType(
                 mapType.keyType(),
-                getFullyQualifiedPath(fieldPath, OneField.Constants.MAP_VALUE_FIELD_NAME),
+                getFullyQualifiedPath(fieldPath, OneField.Constants.MAP_KEY_FIELD_NAME),
                 null,
                 false);
         OneField keyField =
@@ -341,7 +341,7 @@ public class IcebergSchemaExtractor {
                 .schema(elementSchema)
                 .fieldId(listType.elementId())
                 .build();
-        type = OneType.ARRAY;
+        type = OneType.LIST;
         fields = Collections.singletonList(elementField);
         break;
       default:

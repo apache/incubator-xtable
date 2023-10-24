@@ -743,7 +743,7 @@ public class TestIcebergSchemaExtractor {
                             OneSchema.builder()
                                 .name("list")
                                 .isNullable(false)
-                                .dataType(OneType.ARRAY)
+                                .dataType(OneType.LIST)
                                 .fields(
                                     Collections.singletonList(
                                         OneField.builder()
@@ -766,7 +766,7 @@ public class TestIcebergSchemaExtractor {
                             OneSchema.builder()
                                 .name("list")
                                 .isNullable(true)
-                                .dataType(OneType.ARRAY)
+                                .dataType(OneType.LIST)
                                 .fields(
                                     Collections.singletonList(
                                         OneField.builder()
@@ -963,7 +963,7 @@ public class TestIcebergSchemaExtractor {
                             OneSchema.builder()
                                 .name("array")
                                 .isNullable(true)
-                                .dataType(OneType.ARRAY)
+                                .dataType(OneType.LIST)
                                 .fields(
                                     Arrays.asList(
                                         OneField.builder()

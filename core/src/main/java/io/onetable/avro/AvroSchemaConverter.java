@@ -209,7 +209,7 @@ public class AvroSchemaConverter {
                 .build();
         return OneSchema.builder()
             .name(schema.getName())
-            .dataType(OneType.ARRAY)
+            .dataType(OneType.LIST)
             .comment(schema.getDoc())
             .isNullable(schema.isNullable())
             .fields(Collections.singletonList(elementField))
@@ -356,7 +356,7 @@ public class AvroSchemaConverter {
               LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG)),
               oneSchema);
         }
-      case ARRAY:
+      case LIST:
         OneSchema elementSchema =
             oneSchema.getFields().stream()
                 .filter(
