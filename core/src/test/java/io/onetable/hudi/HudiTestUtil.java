@@ -129,8 +129,8 @@ public class HudiTestUtil {
         .set("parquet.avro.write-old-list-structure", "false")
         // Needed for ignoring not nullable constraints on nested columns in Delta.
         .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
-        .set("spark.sql.shuffle.partitions", "4")
-        .set("spark.default.parallelism", "4")
+        .set("spark.sql.shuffle.partitions", "1")
+        .set("spark.default.parallelism", "1")
         .set("spark.sql.session.timeZone", "UTC")
         .set("spark.sql.iceberg.handle-timestamp-without-timezone", "true")
         .setMaster("local[4]");
