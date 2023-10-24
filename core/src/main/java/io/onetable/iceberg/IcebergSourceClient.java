@@ -126,7 +126,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         OneDataFile irDataFile = dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap);
         irFiles.add(irDataFile);
       }
-      oneDataFiles = divideFilesinGroupsByPartition(irFiles);
+      oneDataFiles = clusterFilesByPartition(irFiles);
     } catch (IOException e) {
       throw new OneIOException("Failed to fetch current snapshot files from Iceberg source", e);
     }
@@ -140,17 +140,18 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   }
 
   /**
-   * Chunks a collection of OneDataFile into OneDataFiles based on the file's partition values.
+   * Divides / groups a collection of {@link OneDataFile}s into {@link OneDataFiles} based on the
+   * file's partition values.
    *
-   * @param files a collection of files to be chunked by partition
-   * @return a collection of OneDataFiles, each containing a collection of OneDataFile with the same
-   *     partition values
+   * @param files a collection of files to be grouped by partition
+   * @return a collection of {@link OneDataFiles}, each containing a collection of {@link
+   *     OneDataFile} with the same partition values
    */
-  OneDataFiles divideFilesinGroupsByPartition(List<OneDataFile> files) {
-    Map<String, List<OneDataFile>> collected =
+  private OneDataFiles clusterFilesByPartition(List<OneDataFile> files) {
+    Map<String, List<OneDataFile>> fileClustersMap =
         files.stream().collect(Collectors.groupingBy(OneDataFile::getPartitionPath));
-    List<OneDataFile> x =
-        collected.entrySet().stream()
+    List<OneDataFile> fileClustersList =
+        fileClustersMap.entrySet().stream()
             .map(
                 entry ->
                     OneDataFiles.collectionBuilder()
@@ -158,7 +159,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
                         .files(entry.getValue())
                         .build())
             .collect(Collectors.toList());
-    return OneDataFiles.collectionBuilder().files(x).build();
+    return OneDataFiles.collectionBuilder().files(fileClustersList).build();
   }
 
   @Override

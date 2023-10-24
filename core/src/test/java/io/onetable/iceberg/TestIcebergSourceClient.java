@@ -187,7 +187,6 @@ class TestIcebergSourceClient {
       OneDataFile oneDataFile = oneDataFiles.getFiles().get(0);
       Assertions.assertEquals(FileFormat.APACHE_PARQUET, oneDataFile.getFileFormat());
       Assertions.assertEquals(1, oneDataFile.getRecordCount());
-      Assertions.assertEquals(1, oneDataFile.getRecordCount());
       Assertions.assertTrue(oneDataFile.getPhysicalPath().startsWith(workingDir.toString()));
 
       Map<OnePartitionField, Range> partitionValues = oneDataFile.getPartitionValues();
