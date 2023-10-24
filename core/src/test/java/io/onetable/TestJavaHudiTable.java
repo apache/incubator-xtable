@@ -101,30 +101,10 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, archivalConfig);
   }
 
-  /**
-   * Create a test table instance with a schema that has more fields than an instance returned by
-   * {@link #forStandardSchema(String, Path, String, HoodieTableType)}. Specifically this instance
-   * will add a top level field, nested field, field within a list, and field within a map to ensure
-   * schema evolution is properly handled.
-   *
-   * @param tableName name of the table used in the test, should be unique per test within a shared
-   *     directory
-   * @param tempDir directory where table will be written, typically a temporary directory that will
-   *     be cleaned up after the tests.
-   * @param partitionConfig sets the property `hoodie.datasource.write.partitionpath.field` for the
-   *     {@link CustomKeyGenerator}. If null, {@link NonpartitionedKeyGenerator} will be used.
-   * @param tableType the table type to use (MoR or CoW)
-   * @return an instance of the class with this configuration
-   */
-  public static TestJavaHudiTable withAdditionalColumns(
-      String tableName, Path tempDir, String partitionConfig, HoodieTableType tableType) {
-    return new TestJavaHudiTable(
-        tableName,
-        addSchemaEvolutionFieldsToBase(BASIC_SCHEMA),
-        tempDir,
-        partitionConfig,
-        tableType,
-        null);
+  /** Upgrade schema with additional columns for the test table. */
+  public void upgradeSchemaWithAdditionalColumns() {
+    Schema updatedSchema = addSchemaEvolutionFieldsToBase(BASIC_SCHEMA);
+    this.schema = updatedSchema;
   }
 
   public static TestJavaHudiTable withAdditionalTopLevelField(
