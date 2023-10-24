@@ -70,7 +70,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
   @Builder.Default
   private final DeltaTableExtractor tableExtractor = DeltaTableExtractor.builder().build();
 
-  private Optional<DeltaIncrementalChangesState> deltaIncrementalChangesState;
+  private Optional<DeltaIncrementalChangesState> deltaIncrementalChangesState = Optional.empty();
 
   private final SparkSession sparkSession;
   private final DeltaLog deltaLog;
@@ -154,20 +154,18 @@ public class DeltaSourceClient implements SourceClient<Long> {
     long versionNumberAtLastSyncInstant = deltaCommitAtLastSyncInstant.version();
     resetState(versionNumberAtLastSyncInstant + 1);
     return CurrentCommitState.<Long>builder()
-        .commitsToProcess(deltaIncrementalChangesState.get().getVersionsInSortedOrder())
+        .commitsToProcess(getChangesState().getVersionsInSortedOrder())
         .build();
   }
 
   private DeltaIncrementalChangesState getChangesState() {
-    DeltaIncrementalChangesState changesState =
-        deltaIncrementalChangesState.orElseThrow(
-            () -> new IllegalStateException("DeltaIncrementalChangesState is not initialized"));
-    return changesState;
+    return deltaIncrementalChangesState.orElseThrow(
+        () -> new IllegalStateException("DeltaIncrementalChangesState is not initialized"));
   }
 
   private void resetState(long versionToStartFrom) {
     deltaIncrementalChangesState =
-        Optional.ofNullable(
+        Optional.of(
             DeltaIncrementalChangesState.builder()
                 .deltaLog(deltaLog)
                 .versionToStartFrom(versionToStartFrom)

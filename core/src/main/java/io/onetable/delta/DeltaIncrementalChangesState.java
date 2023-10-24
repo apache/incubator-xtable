@@ -37,8 +37,8 @@ import com.google.common.base.Preconditions;
 
 /** Cache store for storing incremental table changes in the Delta table. */
 public class DeltaIncrementalChangesState {
-  private Long startVersion = null;
-  private Long endVersion = null;
+  private final Long startVersion;
+  private final Long endVersion;
 
   private final Map<Long, List<Action>> incrementalChangesByVersion = new HashMap<>();
 
@@ -51,24 +51,20 @@ public class DeltaIncrementalChangesState {
    */
   @Builder
   public DeltaIncrementalChangesState(DeltaLog deltaLog, Long versionToStartFrom) {
-    reinitialize();
     // TODO (https://github.com/onetable-io/onetable/issues/103) Fall back to snapshot sync in
     // vacuum cases.
     List<Tuple2<Long, List<Action>>> changesList =
         getChangesList(deltaLog.getChanges(versionToStartFrom, false));
+    Long maxSeenVersion = null;
     for (Tuple2<Long, List<Action>> change : changesList) {
       Long versionNumber = change._1();
       List<Action> actions = change._2();
       incrementalChangesByVersion.put(versionNumber, actions);
-      endVersion = endVersion == null ? versionNumber : Math.max(endVersion, versionNumber);
+      maxSeenVersion =
+          maxSeenVersion == null ? versionNumber : Math.max(maxSeenVersion, versionNumber);
     }
     startVersion = versionToStartFrom;
-  }
-
-  private void reinitialize() {
-    startVersion = null;
-    endVersion = null;
-    incrementalChangesByVersion.clear();
+    endVersion = maxSeenVersion;
   }
 
   /**
