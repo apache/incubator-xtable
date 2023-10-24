@@ -19,11 +19,11 @@
 package io.onetable.delta;
 
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
@@ -85,7 +85,7 @@ class ITDeltaSourceClient {
   @Test
   void getCurrentSnapshotNonPartitionedTest() {
     // Table name
-    final String tableName = "test_" + Instant.now().toEpochMilli();
+    final String tableName = "test_" + UUID.randomUUID();
     final Path basePath = tempDir.resolve(tableName);
     // Create table with a single row using Spark
     sparkSession.sql(
@@ -149,7 +149,7 @@ class ITDeltaSourceClient {
   @Test
   void getCurrentSnapshotPartitionedTest() {
     // Table name
-    final String tableName = "test_" + Instant.now().toEpochMilli();
+    final String tableName = "test_" + UUID.randomUUID();
     final Path basePath = tempDir.resolve(tableName);
     // Create table with a single row using Spark
     sparkSession.sql(
@@ -231,7 +231,7 @@ class ITDeltaSourceClient {
   @Test
   void getCurrentSnapshotGenColPartitionedTest() {
     // Table name
-    final String tableName = "test_" + Instant.now().toEpochMilli();
+    final String tableName = "test_" + UUID.randomUUID();
     final Path basePath = tempDir.resolve(tableName);
     // Create table with a single row using Spark
     sparkSession.sql(
