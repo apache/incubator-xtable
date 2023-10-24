@@ -262,6 +262,10 @@ class ITDeltaSourceClient {
     // TODO: Complete and enable test (see https://github.com/onetable-io/onetable/issues/90)
   }
 
+  private static String getTableName() {
+    return "test_" + UUID.randomUUID().toString().replace("-", "_");
+  }
+
   private static void validateTable(
       OneTable oneTable,
       String tableName,

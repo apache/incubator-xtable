@@ -27,6 +27,9 @@ import io.onetable.client.SourceClientProvider;
 public class IcebergSourceClientProvider extends SourceClientProvider<Snapshot> {
   @Override
   public IcebergSourceClient getSourceClientInstance(PerTableConfig sourceTableConfig) {
-    return new IcebergSourceClient(hadoopConf, sourceTableConfig);
+    return IcebergSourceClient.builder()
+        .sourceTableConfig(sourceTableConfig)
+        .hadoopConf(hadoopConf)
+        .build();
   }
 }
