@@ -87,11 +87,11 @@ import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieCompactionConfig;
 import org.apache.hudi.config.HoodieLockConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
-import org.apache.hudi.keygen.CustomAvroKeyGenerator;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.KeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.keygen.SimpleKeyGenerator;
+import org.apache.hudi.keygen.TimestampBasedKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 
 public abstract class TestAbstractHudiTable implements Closeable {
@@ -136,25 +136,23 @@ public abstract class TestAbstractHudiTable implements Closeable {
         this.partitionFieldNames = Collections.emptyList();
       } else {
         if (partitionConfig.contains("timestamp")) {
-          typedProperties.put("hoodie.deltastreamer.keygen.timebased.timestamp.type", "SCALAR");
-          typedProperties.put(
-              "hoodie.deltastreamer.keygen.timebased.timestamp.scalar.time.unit", "MICROSECONDS");
-          typedProperties.put(
-              "hoodie.deltastreamer.keygen.timebased.output.dateformat", "yyyy/MM/dd");
-          typedProperties.put("hoodie.deltastreamer.keygen.timebased.input.timezone", "UTC");
-          typedProperties.put("hoodie.deltastreamer.keygen.timebased.output.timezone", "UTC");
+          typedProperties.put("hoodie.keygen.timebased.timestamp.type", "SCALAR");
+          typedProperties.put("hoodie.keygen.timebased.timestamp.scalar.time.unit", "MICROSECONDS");
+          typedProperties.put("hoodie.keygen.timebased.output.dateformat", "yyyy/MM/dd");
+          typedProperties.put("hoodie.keygen.timebased.input.timezone", "UTC");
+          typedProperties.put("hoodie.keygen.timebased.output.timezone", "UTC");
         }
         String[] partitionFieldConfigs = partitionConfig.split(",");
         if (partitionFieldConfigs.length == 1 && !partitionFieldConfigs[0].contains(".")) {
           typedProperties.put(
               PARTITIONPATH_FIELD_NAME.key(), partitionFieldConfigs[0].split(":")[0]);
           if (partitionFieldConfigs[0].contains(".")) { // nested field
-            this.keyGenerator = new CustomAvroKeyGenerator(typedProperties);
+            this.keyGenerator = new CustomKeyGenerator(typedProperties);
           } else if (partitionFieldConfigs[0].contains("SIMPLE")) { // top level field
             this.keyGenerator = new SimpleKeyGenerator(typedProperties);
           } else { // top level timestamp field
             typedProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
-            this.keyGenerator = new CustomKeyGenerator(typedProperties);
+            this.keyGenerator = new TimestampBasedKeyGenerator(typedProperties);
           }
         } else {
           typedProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
