@@ -103,7 +103,7 @@ public class ITDeltaSourceClient {
   @Test
   void getCurrentSnapshotNonPartitionedTest() {
     // Table name
-    final String tableName = "test_" + Instant.now().toEpochMilli();
+    final String tableName = getTableName();
     final Path basePath = tempDir.resolve(tableName);
     // Create table with a single row using Spark
     sparkSession.sql(
@@ -167,7 +167,7 @@ public class ITDeltaSourceClient {
   @Test
   void getCurrentSnapshotPartitionedTest() {
     // Table name
-    final String tableName = "test_" + Instant.now().toEpochMilli();
+    final String tableName = getTableName();
     final Path basePath = tempDir.resolve(tableName);
     // Create table with a single row using Spark
     sparkSession.sql(
@@ -249,7 +249,7 @@ public class ITDeltaSourceClient {
   @Test
   void getCurrentSnapshotGenColPartitionedTest() {
     // Table name
-    final String tableName = "test_" + Instant.now().toEpochMilli();
+    final String tableName = getTableName();
     final Path basePath = tempDir.resolve(tableName);
     // Create table with a single row using Spark
     sparkSession.sql(
@@ -278,7 +278,7 @@ public class ITDeltaSourceClient {
 
   @Test
   public void testInsertsUpsertsAndDeletes() throws ParseException {
-    String tableName = "test_" + UUID.randomUUID();
+    String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(tableName, tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
@@ -327,7 +327,7 @@ public class ITDeltaSourceClient {
 
   @Test
   public void testVacuum() throws ParseException {
-    String tableName = "test_" + UUID.randomUUID();
+    String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(tableName, tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
@@ -376,7 +376,7 @@ public class ITDeltaSourceClient {
 
   @Test
   public void testAddColumns() {
-    String tableName = "test_" + UUID.randomUUID();
+    String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(tableName, tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
@@ -417,7 +417,7 @@ public class ITDeltaSourceClient {
 
   @Test
   public void testDropPartition() {
-    String tableName = "test_" + UUID.randomUUID();
+    String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(tableName, tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
@@ -483,7 +483,7 @@ public class ITDeltaSourceClient {
 
   @Test
   public void testOptimizeAndClustering() {
-    String tableName = "test_" + UUID.randomUUID();
+    String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(tableName, tempDir, sparkSession);
     List<List<String>> allActiveFiles = new ArrayList<>();
@@ -532,6 +532,10 @@ public class ITDeltaSourceClient {
       allTableChanges.add(tableChange);
     }
     validateTableChanges(allActiveFiles, allTableChanges);
+  }
+
+  private static String getTableName() {
+    return "test_" + UUID.randomUUID().toString().replace("-", "_");
   }
 
   private static void validateTable(
