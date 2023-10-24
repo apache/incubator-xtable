@@ -19,6 +19,8 @@
 package io.onetable.delta;
 
 import static io.onetable.TestSparkDeltaTable.TIMESTAMP_FORMAT;
+import static io.onetable.ValidationTestHelper.validateOneSnapshot;
+import static io.onetable.ValidationTestHelper.validateTableChanges;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Path;
@@ -28,12 +30,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.Row;
@@ -61,19 +60,8 @@ import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.storage.DataLayoutStrategy;
-import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.TableFormat;
-import io.onetable.spi.DefaultSnapshotVisitor;
 
-/*
- * All Tests planning to support.
- * 1. Inserts, Updates, Deletes combination.
- * 2. Add  partition.
- * 3. Change schema as per allowed evolution (adding columns etc...)
- * 4. Drop partition.
- * 5. Vaccum.
- * 6. Clustering.
- */
 public class ITDeltaSourceClient {
   @TempDir private static Path tempDir;
   private static SparkSession sparkSession;
@@ -538,67 +526,6 @@ public class ITDeltaSourceClient {
       allTableChanges.add(tableChange);
     }
     validateTableChanges(allActiveFiles, allTableChanges);
-  }
-
-  private void validateOneSnapshot(OneSnapshot oneSnapshot, List<String> allActivePaths) {
-    assertNotNull(oneSnapshot);
-    assertNotNull(oneSnapshot.getTable());
-    List<String> onetablePaths =
-        new ArrayList<>(
-            DefaultSnapshotVisitor.extractDataFilePaths(oneSnapshot.getDataFiles()).keySet());
-    replaceFileScheme(allActivePaths);
-    replaceFileScheme(onetablePaths);
-    Collections.sort(allActivePaths);
-    Collections.sort(onetablePaths);
-    assertEquals(allActivePaths, onetablePaths);
-  }
-
-  private void validateTableChanges(
-      List<List<String>> allActiveFiles, List<TableChange> allTableChanges) {
-    if (allTableChanges.isEmpty() && allActiveFiles.size() <= 1) {
-      return;
-    }
-    assertEquals(
-        allTableChanges.size(),
-        allActiveFiles.size() - 1,
-        "Number of table changes should be equal to number of commits - 1");
-    IntStream.range(0, allActiveFiles.size() - 1)
-        .forEach(
-            i ->
-                validateTableChange(
-                    allActiveFiles.get(i), allActiveFiles.get(i + 1), allTableChanges.get(i)));
-  }
-
-  private void validateTableChange(
-      List<String> filePathsBefore, List<String> filePathsAfter, TableChange tableChange) {
-    assertNotNull(tableChange);
-    assertNotNull(tableChange.getCurrentTableState());
-    replaceFileScheme(filePathsBefore);
-    replaceFileScheme(filePathsAfter);
-    Set<String> filesForCommitBefore = new HashSet<>(filePathsBefore);
-    Set<String> filesForCommitAfter = new HashSet<>(filePathsAfter);
-    // Get files added by diffing filesForCommitAfter and filesForCommitBefore.
-    Set<String> filesAdded =
-        filesForCommitAfter.stream()
-            .filter(file -> !filesForCommitBefore.contains(file))
-            .collect(Collectors.toSet());
-    // Get files removed by diffing filesForCommitBefore and filesForCommitAfter.
-    Set<String> filesRemoved =
-        filesForCommitBefore.stream()
-            .filter(file -> !filesForCommitAfter.contains(file))
-            .collect(Collectors.toSet());
-    assertEquals(filesAdded, extractPathsFromDataFile(tableChange.getFilesDiff().getFilesAdded()));
-    assertEquals(
-        filesRemoved, extractPathsFromDataFile(tableChange.getFilesDiff().getFilesRemoved()));
-  }
-
-  private Set<String> extractPathsFromDataFile(Set<OneDataFile> dataFiles) {
-    return dataFiles.stream().map(OneDataFile::getPhysicalPath).collect(Collectors.toSet());
-  }
-
-  private void replaceFileScheme(List<String> filePaths) {
-    // if file paths start with file:///, replace it with file:/.
-    filePaths.replaceAll(path -> path.replaceFirst("file:///", "file:/"));
   }
 
   private static void validateTable(
