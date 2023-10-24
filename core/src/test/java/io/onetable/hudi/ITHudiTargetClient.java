@@ -331,8 +331,12 @@ public class ITHudiTargetClient {
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName4);
     }
     // the first commit to the timeline should be archived
+    int numArchivedCommits =
+        metaClient.getArchivedTimeline().reload().filterCompletedInstants().countInstants();
     assertEquals(
-        2, metaClient.getArchivedTimeline().reload().filterCompletedInstants().countInstants());
+        2,
+        numArchivedCommits,
+        String.format("Actual num commits archived: %d but expected %d", numArchivedCommits, 2));
   }
 
   private OneTableMetadata incrementalSync(

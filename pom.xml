@@ -461,6 +461,7 @@
                 <configuration>
                     <skip>${skipUTs}</skip>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                    <trimStackTrace>false</trimStackTrace>
                 </configuration>
             </plugin>
             <plugin>
@@ -480,6 +481,7 @@
                     <skip>${skipITs}</skip>
                     <reuseForks>false</reuseForks>
                     <forkCount>4</forkCount>
+                    <trimStackTrace>false</trimStackTrace>
                 </configuration>
             </plugin>
             <plugin>
