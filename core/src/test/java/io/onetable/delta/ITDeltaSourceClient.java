@@ -85,7 +85,7 @@ class ITDeltaSourceClient {
   @Test
   void getCurrentSnapshotNonPartitionedTest() {
     // Table name
-    final String tableName = "test_" + UUID.randomUUID();
+    final String tableName = getTableName();
     final Path basePath = tempDir.resolve(tableName);
     // Create table with a single row using Spark
     sparkSession.sql(
@@ -149,7 +149,7 @@ class ITDeltaSourceClient {
   @Test
   void getCurrentSnapshotPartitionedTest() {
     // Table name
-    final String tableName = "test_" + UUID.randomUUID();
+    final String tableName = getTableName();
     final Path basePath = tempDir.resolve(tableName);
     // Create table with a single row using Spark
     sparkSession.sql(
@@ -231,7 +231,7 @@ class ITDeltaSourceClient {
   @Test
   void getCurrentSnapshotGenColPartitionedTest() {
     // Table name
-    final String tableName = "test_" + UUID.randomUUID();
+    final String tableName = getTableName();
     final Path basePath = tempDir.resolve(tableName);
     // Create table with a single row using Spark
     sparkSession.sql(
@@ -256,6 +256,10 @@ class ITDeltaSourceClient {
     // Get current snapshot
     OneSnapshot snapshot = client.getCurrentSnapshot();
     // TODO: Complete and enable test (see https://github.com/onetable-io/onetable/issues/90)
+  }
+
+  private static String getTableName() {
+    return "test_" + UUID.randomUUID().toString().replace("-", "_");
   }
 
   private static void validateTable(
