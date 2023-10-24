@@ -215,7 +215,7 @@ public class DeltaClient implements TargetClient {
               JavaConverters.asScalaBuffer(partitionColumns).toList(),
               ScalaUtils.convertJavaMapToScala(getConfigurationsForDeltaSync()),
               new Some<>(commitTime.toEpochMilli()));
-      transaction.updateMetadata(metadata, false);
+      transaction.updateMetadata(metadata);
       transaction.commit(actions, new DeltaOperations.Update(Option.apply("onetable-delta-sync")));
     }
 
