@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -41,12 +42,16 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import lombok.SneakyThrows;
 import org.apache.avro.Schema;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.catalyst.encoders.RowEncoder;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.AfterAll;
@@ -103,6 +108,21 @@ public class ITOneTableClient {
         .hadoopConfiguration()
         .set("parquet.avro.write-old-list-structure", "false");
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
+    // The default_iceberg catalog can fail to load properly when tests are run in parallel, so we
+    // force it to initialize here
+    forceInitIcebergCatalog();
+  }
+
+  @SneakyThrows
+  private static void forceInitIcebergCatalog() {
+    StructType tmpSchema = new StructType(new StructField[]{new StructField("dummy_field", DataTypes.LongType, false, Metadata.empty())});
+    Path tmpBasePath = tempDir.resolve("tmp");
+    Files.createDirectories(tmpBasePath);
+    sparkSession
+        .emptyDataset(RowEncoder.apply(tmpSchema))
+        .write()
+        .format("iceberg")
+        .save(tmpBasePath.toString());
   }
 
   @BeforeEach

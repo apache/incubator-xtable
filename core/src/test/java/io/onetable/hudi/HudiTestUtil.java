@@ -125,9 +125,6 @@ public class HudiTestUtil {
         .set("spark.sql.catalog.default_iceberg", "org.apache.iceberg.spark.SparkCatalog")
         .set("spark.sql.catalog.default_iceberg.type", "hadoop")
         .set("spark.sql.catalog.default_iceberg.warehouse", tempDir.toString())
-        .set("spark.sql.catalog.hadoop_prod", "org.apache.iceberg.spark.SparkCatalog")
-        .set("spark.sql.catalog.hadoop_prod.type", "hadoop")
-        .set("spark.sql.catalog.hadoop_prod.warehouse", tempDir.toString())
         .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         .set("parquet.avro.write-old-list-structure", "false")
         // Needed for ignoring not nullable constraints on nested columns in Delta.
