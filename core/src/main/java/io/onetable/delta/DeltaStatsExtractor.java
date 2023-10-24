@@ -18,89 +18,97 @@
  
 package io.onetable.delta;
 
-import static io.onetable.delta.DeltaValueSerializer.getFormattedValueForColumnStats;
+import static io.onetable.delta.DeltaValueConverter.convertToDeltaColumnStatValue;
 
+import java.io.IOException;
+import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.NoArgsConstructor;
+import lombok.Value;
 
-import org.apache.spark.sql.types.DateType;
-import org.apache.spark.sql.types.NumericType;
-import org.apache.spark.sql.types.StringType;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
-import org.apache.spark.sql.types.TimestampType;
+import org.apache.spark.sql.delta.actions.AddFile;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import io.onetable.exception.OneIOException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
+import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.Range;
 
 /**
  * DeltaStatsExtractor extracts column stats and also responsible for their serialization leveraging
- * {@link DeltaValueSerializer}.
+ * {@link DeltaValueConverter}.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaStatsExtractor {
+  private static final Set<OneType> FIELD_TYPES_WITH_STATS_SUPPORT =
+      new HashSet<>(
+          Arrays.asList(
+              OneType.BOOLEAN,
+              OneType.DATE,
+              OneType.DECIMAL,
+              OneType.DOUBLE,
+              OneType.INT,
+              OneType.LONG,
+              OneType.FLOAT,
+              OneType.STRING,
+              OneType.TIMESTAMP,
+              OneType.TIMESTAMP_NTZ));
+
   private static final DeltaStatsExtractor INSTANCE = new DeltaStatsExtractor();
 
   private static final String PATH_DELIMITER = "\\.";
   private static final ObjectMapper MAPPER = new ObjectMapper();
-
-  private static final String NUM_RECORDS = "numRecords";
-  private static final String MIN_VALUES = "minValues";
-  private static final String MAX_VALUES = "maxValues";
-  private static final String NULL_COUNT = "nullCount";
 
   public static DeltaStatsExtractor getInstance() {
     return INSTANCE;
   }
 
   public String convertStatsToDeltaFormat(
-      StructType deltaTableSchema, long numRecords, Map<OneField, ColumnStat> columnStats)
+      OneSchema schema, long numRecords, Map<OneField, ColumnStat> columnStats)
       throws JsonProcessingException {
-    Map<String, Object> deltaStatsObject = new HashMap<>();
-    deltaStatsObject.put(NUM_RECORDS, numRecords);
+    DeltaStats.DeltaStatsBuilder deltaStatsBuilder = DeltaStats.builder();
+    deltaStatsBuilder.numRecords(numRecords);
     if (columnStats == null) {
-      return deltaStatsObject.toString();
+      return MAPPER.writeValueAsString(deltaStatsBuilder.build());
     }
     Map<String, ColumnStat> columnStatsMapKeyedByPath =
         getColumnStatKeyedByFullyQualifiedPath(columnStats);
     Map<String, OneField> pathFieldMap = getPathToFieldMap(columnStats);
-    Set<String> validPaths = getPathsFromStructSchemaForMinAndMaxStats(deltaTableSchema, "");
-    deltaStatsObject.put(
-        MIN_VALUES, getMinValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths));
-    deltaStatsObject.put(
-        MAX_VALUES, getMaxValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths));
-    deltaStatsObject.put(NULL_COUNT, getNullCount(columnStatsMapKeyedByPath, validPaths));
-    return MAPPER.writeValueAsString(deltaStatsObject);
+    Set<String> validPaths = getPathsFromStructSchemaForMinAndMaxStats(schema);
+    DeltaStats deltaStats =
+        deltaStatsBuilder
+            .minValues(getMinValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths))
+            .maxValues(getMaxValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths))
+            .nullCount(getNullCount(columnStatsMapKeyedByPath, validPaths))
+            .build();
+    return MAPPER.writeValueAsString(deltaStats);
   }
 
-  private Set<String> getPathsFromStructSchemaForMinAndMaxStats(
-      StructType schema, String parentPath) {
-    Set<String> allPaths = new HashSet<>();
-    for (StructField sf : schema.fields()) {
-      // Delta only supports min/max stats for these fields.
-      if (sf.dataType() instanceof DateType
-          || sf.dataType() instanceof NumericType
-          || sf.dataType() instanceof TimestampType
-          || sf.dataType() instanceof StringType) {
-        allPaths.add(combinePath(parentPath, sf.name()));
-      } else if (sf.dataType() instanceof StructType) {
-        allPaths.addAll(
-            getPathsFromStructSchemaForMinAndMaxStats(
-                (StructType) sf.dataType(), combinePath(parentPath, sf.name())));
-      }
-    }
-    return allPaths;
+  private Set<String> getPathsFromStructSchemaForMinAndMaxStats(OneSchema schema) {
+    return schema.getAllFields().stream()
+        .filter(
+            field -> {
+              OneType type = field.getSchema().getDataType();
+              return FIELD_TYPES_WITH_STATS_SUPPORT.contains(type);
+            })
+        .map(OneField::getPath)
+        .collect(Collectors.toSet());
   }
 
   private String combinePath(String parentPath, String fieldName) {
@@ -146,7 +154,7 @@ public class DeltaStatsExtractor {
             insertValueAtPath(
                 jsonObject,
                 pathParts,
-                getFormattedValueForColumnStats(valueExtractor.apply(columnStats), fieldSchema));
+                convertToDeltaColumnStatValue(valueExtractor.apply(columnStats), fieldSchema));
           }
         });
     return jsonObject;
@@ -200,5 +208,78 @@ public class DeltaStatsExtractor {
   private Map<String, OneField> getPathToFieldMap(Map<OneField, ColumnStat> columnStats) {
     return columnStats.entrySet().stream()
         .collect(Collectors.toMap(e -> e.getKey().getPath(), Map.Entry::getKey));
+  }
+
+  public Map<OneField, ColumnStat> getColumnStatsForFile(AddFile addFile, List<OneField> fields) {
+    // TODO: Additional work needed to track maps & arrays.
+    try {
+      DeltaStats deltaStats = MAPPER.readValue(addFile.stats(), DeltaStats.class);
+      Map<String, Object> fieldPathToMaxValue = flattenStatMap(deltaStats.getMaxValues());
+      Map<String, Object> fieldPathToMinValue = flattenStatMap(deltaStats.getMinValues());
+      Map<String, Object> fieldPathToNullCount = flattenStatMap(deltaStats.getNullCount());
+      return fields.stream()
+          .filter(field -> fieldPathToMaxValue.containsKey(field.getPath()))
+          .collect(
+              Collectors.toMap(
+                  Function.identity(),
+                  field -> {
+                    String fieldPath = field.getPath();
+                    Object minValue = fieldPathToMinValue.get(fieldPath);
+                    Object maxValue = fieldPathToMaxValue.get(fieldPath);
+                    Number nullCount = (Number) fieldPathToNullCount.get(fieldPath);
+                    Range range = Range.vector(minValue, maxValue);
+                    return ColumnStat.builder()
+                        .numValues(deltaStats.getNumRecords())
+                        .numNulls(nullCount.longValue())
+                        .range(range)
+                        .build();
+                  }));
+    } catch (IOException ex) {
+      throw new OneIOException("Unable to parse stats json", ex);
+    }
+  }
+
+  /**
+   * Takes the input map which represents a json object and flattens it.
+   *
+   * @param statMap input json map
+   * @return map with keys representing the dot-path for the field
+   */
+  private Map<String, Object> flattenStatMap(Map<String, Object> statMap) {
+    Map<String, Object> result = new HashMap<>();
+    Queue<StatField> statFieldQueue = new ArrayDeque<>();
+    statFieldQueue.add(StatField.of("", statMap));
+    while (!statFieldQueue.isEmpty()) {
+      StatField statField = statFieldQueue.poll();
+      String prefix = statField.getParentPath().isEmpty() ? "" : statField.getParentPath() + ".";
+      statField
+          .getValues()
+          .forEach(
+              (fieldName, value) -> {
+                String fullName = prefix + fieldName;
+                if (value instanceof Map) {
+                  statFieldQueue.add(StatField.of(fullName, (Map<String, Object>) value));
+                } else {
+                  result.put(fullName, value);
+                }
+              });
+    }
+    return result;
+  }
+
+  @Builder
+  @Value
+  private static class DeltaStats {
+    long numRecords;
+    Map<String, Object> minValues;
+    Map<String, Object> maxValues;
+    Map<String, Object> nullCount;
+  }
+
+  @Value
+  @AllArgsConstructor(staticName = "of")
+  private static class StatField {
+    String parentPath;
+    Map<String, Object> values;
   }
 }

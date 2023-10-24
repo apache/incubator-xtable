@@ -41,6 +41,8 @@ import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
+import org.apache.hudi.client.clustering.plan.strategy.JavaSizeBasedClusteringPlanStrategy;
+import org.apache.hudi.client.clustering.run.strategy.JavaSortAndSizeExecutionStrategy;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
@@ -53,14 +55,21 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
+import org.apache.hudi.common.util.JsonUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieArchivalConfig;
+import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
 public class TestJavaHudiTable extends TestAbstractHudiTable {
+  static {
+    // ensure json modules are registered before any json serialization/deserialization
+    JsonUtils.registerModules();
+  }
+
   private HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
   private final Configuration conf;
   /**
@@ -128,6 +137,15 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         tableName, addTopLevelField(previousSchema), tempDir, partitionConfig, tableType, null);
   }
 
+  public static TestJavaHudiTable withSchema(
+      String tableName,
+      Path tempDir,
+      String partitionConfig,
+      HoodieTableType tableType,
+      Schema schema) {
+    return new TestJavaHudiTable(tableName, schema, tempDir, partitionConfig, tableType, null);
+  }
+
   private TestJavaHudiTable(
       String name,
       Schema schema,
@@ -143,7 +161,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     } catch (IOException ex) {
       throw new UncheckedIOException("Unable to initialize metaclient for TestJavaHudiTable", ex);
     }
-    this.javaWriteClient = initJavaWriteClient(schema.toString(), typedProperties, archivalConfig);
+    this.javaWriteClient = initJavaWriteClient(schema, typedProperties, archivalConfig);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
@@ -203,7 +221,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     String instant = javaWriteClient.scheduleClustering(Option.empty()).get();
     javaWriteClient.cluster(instant, true);
     // Reinitializing as clustering disables auto commit and we want to enable it back.
-    javaWriteClient = initJavaWriteClient(schema.toString(), typedProperties, null);
+    javaWriteClient = initJavaWriteClient(schema, typedProperties, null);
   }
 
   public void rollback(String commitInstant) {
@@ -242,17 +260,19 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     return upsertRecordsWithCommitAlreadyStarted(records, instant, checkForNoErrors);
   }
 
-  public List<HoodieBaseFile> getAllLatestBaseFiles() {
+  public List<String> getAllLatestBaseFilePaths() {
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             javaWriteClient.getEngineContext(),
             metaClient,
             metaClient.reloadActiveTimeline(),
             getHoodieWriteConfig(metaClient).getMetadataConfig());
-    return getAllLatestBaseFiles(fsView);
+    return getAllLatestBaseFiles(fsView).stream()
+        .map(HoodieBaseFile::getPath)
+        .collect(Collectors.toList());
   }
 
-  private List<HoodieRecord<HoodieAvroPayload>> insertRecords(
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
     String instant = getStartCommitInstant();
     return insertRecordsWithCommitAlreadyStarted(inserts, instant, checkForNoErrors);
@@ -335,8 +355,18 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   }
 
   private HoodieJavaWriteClient<HoodieAvroPayload> initJavaWriteClient(
-      String schema, TypedProperties keyGenProperties, HoodieArchivalConfig archivalConfig) {
-    HoodieWriteConfig writeConfig = generateWriteConfig(schema, keyGenProperties);
+      Schema schema, TypedProperties keyGenProperties, HoodieArchivalConfig archivalConfig) {
+    HoodieWriteConfig writeConfig =
+        HoodieWriteConfig.newBuilder()
+            .withProperties(generateWriteConfig(schema, keyGenProperties).getProps())
+            .withClusteringConfig(
+                HoodieClusteringConfig.newBuilder()
+                    .withClusteringPlanStrategyClass(
+                        JavaSizeBasedClusteringPlanStrategy.class.getName())
+                    .withClusteringExecutionStrategyClass(
+                        JavaSortAndSizeExecutionStrategy.class.getName())
+                    .build())
+            .build();
     // override archival config if provided
     if (archivalConfig != null) {
       writeConfig =

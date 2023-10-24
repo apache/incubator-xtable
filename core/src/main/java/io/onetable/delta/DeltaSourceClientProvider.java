@@ -16,20 +16,29 @@
  * limitations under the License.
  */
  
-package io.onetable.iceberg;
+package io.onetable.delta;
 
-import org.apache.iceberg.Snapshot;
+import org.apache.spark.sql.SparkSession;
+
+import io.delta.tables.DeltaTable;
 
 import io.onetable.client.PerTableConfig;
 import io.onetable.client.SourceClientProvider;
 
-/** A concrete implementation of {@link SourceClientProvider} for Hudi table format. */
-public class IcebergSourceClientProvider extends SourceClientProvider<Snapshot> {
+/** A concrete implementation of {@link SourceClientProvider} for Delta Lake table format. */
+public class DeltaSourceClientProvider extends SourceClientProvider<Long> {
   @Override
-  public IcebergSourceClient getSourceClientInstance(PerTableConfig sourceTableConfig) {
-    return IcebergSourceClient.builder()
-        .sourceTableConfig(sourceTableConfig)
-        .hadoopConf(hadoopConf)
-        .build();
+  public DeltaSourceClient getSourceClientInstance(PerTableConfig perTableConfig) {
+    SparkSession sparkSession = DeltaClientUtils.buildSparkSession(hadoopConf);
+    DeltaTable deltaTable = DeltaTable.forPath(sparkSession, perTableConfig.getTableBasePath());
+    DeltaSourceClient deltaSourceClient =
+        DeltaSourceClient.builder()
+            .sparkSession(sparkSession)
+            .tableName(perTableConfig.getTableName())
+            .basePath(perTableConfig.getTableBasePath())
+            .deltaTable(deltaTable)
+            .deltaLog(deltaTable.deltaLog())
+            .build();
+    return deltaSourceClient;
   }
 }

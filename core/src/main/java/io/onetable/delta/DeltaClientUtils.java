@@ -16,30 +16,34 @@
  * limitations under the License.
  */
  
-package io.onetable.client;
+package io.onetable.delta;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.spark.SparkConf;
+import org.apache.spark.serializer.KryoSerializer;
+import org.apache.spark.sql.SparkSession;
 
-import io.onetable.delta.DeltaClient;
-import io.onetable.exception.NotSupportedException;
-import io.onetable.iceberg.IcebergClient;
-import io.onetable.model.storage.TableFormat;
-import io.onetable.spi.sync.TableFormatSync;
-
+/** A utility class for Delta client. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class TableFormatClientFactory {
-  public static TableFormatSync createForFormat(
-      TableFormat tableFormat, PerTableConfig perTableConfig, Configuration configuration) {
-    switch (tableFormat) {
-      case ICEBERG:
-        return TableFormatSync.of(new IcebergClient(perTableConfig, configuration));
-      case DELTA:
-        return TableFormatSync.of(new DeltaClient(perTableConfig, configuration));
-      default:
-        throw new NotSupportedException("Target format is not yet supported: " + tableFormat);
-    }
+public class DeltaClientUtils {
+
+  static SparkSession buildSparkSession(Configuration conf) {
+    SparkConf sparkConf =
+        new SparkConf()
+            .setAppName("onetableclient")
+            .set("spark.serializer", KryoSerializer.class.getName())
+            .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true");
+    SparkSession.Builder builder = SparkSession.builder().config(sparkConf);
+    conf.forEach(
+        entry ->
+            builder.config(
+                entry.getKey().startsWith("spark")
+                    ? entry.getKey()
+                    : "spark.hadoop." + entry.getKey(),
+                entry.getValue()));
+    return builder.getOrCreate();
   }
 }

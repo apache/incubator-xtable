@@ -116,17 +116,6 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
         tableType);
   }
 
-  public static TestSparkHudiTable withAdditionalTopLevelField(
-      String tableName,
-      Path tempDir,
-      JavaSparkContext jsc,
-      String partitionConfig,
-      HoodieTableType tableType,
-      Schema previousSchema) {
-    return new TestSparkHudiTable(
-        tableName, addTopLevelField(previousSchema), tempDir, jsc, partitionConfig, tableType);
-  }
-
   private TestSparkHudiTable(
       String name,
       Schema schema,
@@ -137,7 +126,7 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
     super(name, schema, tempDir, partitionConfig);
     // initialize spark session
     this.jsc = jsc;
-    this.sparkWriteClient = initSparkWriteClient(schema.toString(), typedProperties);
+    this.sparkWriteClient = initSparkWriteClient(schema, typedProperties);
     this.metaClient = initMetaClient(jsc, hoodieTableType, typedProperties);
   }
 
@@ -179,14 +168,16 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
     return deletes;
   }
 
-  public List<HoodieBaseFile> getAllLatestBaseFiles() {
+  public List<String> getAllLatestBaseFilePaths() {
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             sparkWriteClient.getEngineContext(),
             metaClient,
             metaClient.reloadActiveTimeline(),
             getHoodieWriteConfig(metaClient).getMetadataConfig());
-    return getAllLatestBaseFiles(fsView);
+    return getAllLatestBaseFiles(fsView).stream()
+        .map(HoodieBaseFile::getPath)
+        .collect(Collectors.toList());
   }
 
   public void deletePartition(String partition, HoodieTableType tableType) {
@@ -216,7 +207,7 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
     String instant = sparkWriteClient.scheduleClustering(Option.empty()).get();
     sparkWriteClient.cluster(instant, true);
     // Reinitializing as clustering disables auto commit and we want to enable it back.
-    sparkWriteClient = initSparkWriteClient(schema.toString(), typedProperties);
+    sparkWriteClient = initSparkWriteClient(schema, typedProperties);
   }
 
   public void rollback(String commitInstant) {
@@ -294,7 +285,7 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
   }
 
   private SparkRDDWriteClient<HoodieAvroPayload> initSparkWriteClient(
-      String schema, TypedProperties keyGenProperties) {
+      Schema schema, TypedProperties keyGenProperties) {
     HoodieWriteConfig writeConfig = generateWriteConfig(schema, keyGenProperties);
     HoodieEngineContext context = new HoodieSparkEngineContext(jsc);
     return new SparkRDDWriteClient<>(context, writeConfig);

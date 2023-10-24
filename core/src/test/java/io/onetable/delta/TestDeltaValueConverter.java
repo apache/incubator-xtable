@@ -31,15 +31,18 @@ import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
 
-public class TestDeltaValueSerializer {
+public class TestDeltaValueConverter {
 
   @ParameterizedTest
   @MethodSource("valuesWithSchemaProviderForColStats")
   public void formattedValueDifferentTypesForColStats(
-      Object fieldValue, OneSchema fieldSchema, Object expectedValue) {
-    assertEquals(
-        expectedValue,
-        DeltaValueSerializer.getFormattedValueForColumnStats(fieldValue, fieldSchema));
+      Object fieldValue, OneSchema fieldSchema, Object expectedDeltaValue) {
+    Object deltaRepresentation =
+        DeltaValueConverter.convertToDeltaColumnStatValue(fieldValue, fieldSchema);
+    Object internalRepresentation =
+        DeltaValueConverter.convertFromDeltaColumnStatValue(deltaRepresentation, fieldSchema);
+    assertEquals(expectedDeltaValue, deltaRepresentation);
+    assertEquals(fieldValue, internalRepresentation);
   }
 
   @ParameterizedTest
@@ -50,10 +53,14 @@ public class TestDeltaValueSerializer {
       PartitionTransformType transformType,
       String dateFormat,
       String expectedValue) {
-    assertEquals(
-        expectedValue,
-        DeltaValueSerializer.getFormattedValueForPartition(
-            fieldValue, oneType, transformType, dateFormat));
+    String deltaRepresentation =
+        DeltaValueConverter.convertToDeltaPartitionValue(
+            fieldValue, oneType, transformType, dateFormat);
+    Object internalRepresentation =
+        DeltaValueConverter.convertFromDeltaPartitionValue(
+            deltaRepresentation, oneType, transformType, dateFormat);
+    assertEquals(expectedValue, deltaRepresentation);
+    assertEquals(fieldValue, internalRepresentation);
   }
 
   private static Stream<Arguments> valuesWithSchemaProviderForColStats() {
@@ -118,24 +125,24 @@ public class TestDeltaValueSerializer {
         Arguments.of(null, OneType.STRING, PartitionTransformType.VALUE, "", null),
         Arguments.of("some value", OneType.STRING, PartitionTransformType.VALUE, "", "some value"),
         Arguments.of(23L, OneType.LONG, PartitionTransformType.VALUE, "", "23"),
-        Arguments.of(25.5, OneType.FLOAT, PartitionTransformType.VALUE, "", "25.5"),
+        Arguments.of(25.5f, OneType.FLOAT, PartitionTransformType.VALUE, "", "25.5"),
         Arguments.of(18181, OneType.DATE, PartitionTransformType.VALUE, "YYYY-MM-DD", "2019-10-12"),
         Arguments.of(true, OneType.BOOLEAN, PartitionTransformType.VALUE, "", "true"),
         Arguments.of(
-            1665263297000L,
+            1665262800000L,
             OneType.TIMESTAMP,
             PartitionTransformType.HOUR,
             "yyyy-MM-dd HH",
             "2022-10-08 21"),
         Arguments.of(
-            1665263297000L,
+            1665187200000L,
             OneType.TIMESTAMP_NTZ,
             PartitionTransformType.DAY,
             "yyyy-MM-dd",
             "2022-10-08"),
         Arguments.of(
-            1665263297000L, OneType.TIMESTAMP, PartitionTransformType.MONTH, "yyyy-MM", "2022-10"),
+            1664582400000L, OneType.TIMESTAMP, PartitionTransformType.MONTH, "yyyy-MM", "2022-10"),
         Arguments.of(
-            1665263297000L, OneType.TIMESTAMP_NTZ, PartitionTransformType.YEAR, "yyyy", "2022"));
+            1640995200000L, OneType.TIMESTAMP_NTZ, PartitionTransformType.YEAR, "yyyy", "2022"));
   }
 }
