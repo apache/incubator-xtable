@@ -136,7 +136,7 @@ public class TestSparkDeltaTable {
     return rows;
   }
 
-  public List<Row> insertRows(int numRows, Integer partitionValue) {
+  public List<Row> insertRows(int numRows, int partitionValue) {
     List<Row> rows = new ArrayList<>();
     for (int i = 0; i < numRows; i++) {
       rows.add(generateRandomRowWithPartitionValue(partitionValue));
@@ -189,7 +189,7 @@ public class TestSparkDeltaTable {
         .execute();
   }
 
-  public void deletePartition(Integer partitionValue) {
+  public void deletePartition(int partitionValue) {
     Column condition = functions.col("yearOfBirth").equalTo(partitionValue);
     deltaTable.delete(condition);
   }
@@ -263,7 +263,7 @@ public class TestSparkDeltaTable {
         row.getString(5));
   }
 
-  private Row generateRandomRowWithPartitionValue(Integer year) {
+  private Row generateRandomRowWithPartitionValue(int year) {
     Object[] rowValues = generateRandomRowForColumns(year, Collections.emptyList());
     return RowFactory.create(rowValues);
   }

@@ -53,7 +53,8 @@ public class DeltaIncrementalChangesCache {
    */
   public void reload(DeltaLog deltaLog, Long versionToStartFrom) {
     reinitialize();
-    // TODO: Should fail on data loss(due to vacuum) and fall back to snapshot sync.
+    // TODO (https://github.com/onetable-io/onetable/issues/103) Fall back to snapshot sync in
+    // vacuum cases.
     List<Tuple2<Long, List<Action>>> changesList =
         getChangesList(deltaLog.getChanges(versionToStartFrom, false));
     for (Tuple2<Long, List<Action>> change : changesList) {
@@ -87,7 +88,7 @@ public class DeltaIncrementalChangesCache {
   public List<Action> getActionsForVersion(Long version) {
     Preconditions.checkArgument(
         incrementalChangesByVersion.containsKey(version),
-        "Version %s not found in the DeltaIncrementalChangesCache.");
+        String.format("Version %s not found in the DeltaIncrementalChangesCache.", version));
     return incrementalChangesByVersion.get(version);
   }
 

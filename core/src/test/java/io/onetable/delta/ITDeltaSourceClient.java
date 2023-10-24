@@ -62,7 +62,6 @@ import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.DefaultSnapshotVisitor;
 
@@ -621,9 +620,5 @@ public class ITDeltaSourceClient {
   private void validateSchemaCatalog(
       SchemaCatalog oneSchemaCatalog, Map<SchemaVersion, OneSchema> schemas) {
     Assertions.assertEquals(schemas, oneSchemaCatalog.getSchemas());
-  }
-
-  private void validateDataFiles(OneDataFiles oneDataFiles, List<OneDataFile> files) {
-    Assertions.assertEquals(files, oneDataFiles.getFiles());
   }
 }

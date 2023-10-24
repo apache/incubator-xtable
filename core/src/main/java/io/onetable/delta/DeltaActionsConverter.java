@@ -55,7 +55,7 @@ public class DeltaActionsConverter {
       DeltaPartitionExtractor partitionExtractor,
       DeltaStatsExtractor fileStatsExtractor) {
     String tableBasePath = deltaSnapshot.deltaLog().dataPath().toUri().toString();
-    // TODO(vamshigv): removed record count as delta api downgraded to 2.0.2
+    // TODO(https://github.com/onetable-io/onetable/issues/102): removed record count.
     return OneDataFile.builder()
         .physicalPath(getFullPathToFile(tableBasePath, addFile.path()))
         .fileFormat(fileFormat)

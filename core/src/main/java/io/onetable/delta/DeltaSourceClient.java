@@ -81,7 +81,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
 
   @Override
   public OneTable getTable(Long version) {
-    return new DeltaTableExtractor().table(deltaLog, tableName, version);
+    return tableExtractor.table(deltaLog, tableName, version);
   }
 
   @Override
