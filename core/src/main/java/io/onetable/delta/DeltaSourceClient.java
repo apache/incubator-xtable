@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import lombok.Builder;
@@ -69,9 +70,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
   @Builder.Default
   private final DeltaTableExtractor tableExtractor = DeltaTableExtractor.builder().build();
 
-  @Builder.Default
-  private final DeltaIncrementalChangesCache deltaIncrementalChangesCache =
-      DeltaIncrementalChangesCache.builder().build();
+  private Optional<DeltaIncrementalChangesState> deltaIncrementalChangesState;
 
   private final SparkSession sparkSession;
   private final DeltaLog deltaLog;
@@ -109,8 +108,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
   public TableChange getTableChangeForCommit(Long versionNumber) {
     OneTable tableAtVersion = tableExtractor.table(deltaLog, tableName, versionNumber);
     // Client to call getCurrentCommitState and call this method.
-    List<Action> actionsForVersion =
-        deltaIncrementalChangesCache.getActionsForVersion(versionNumber);
+    List<Action> actionsForVersion = getChangesState().getActionsForVersion(versionNumber);
     Snapshot snapshotAtVersion =
         deltaLog.getSnapshotAt(versionNumber, Option.empty(), Option.empty());
     FileFormat fileFormat =
@@ -154,10 +152,26 @@ public class DeltaSourceClient implements SourceClient<Long> {
             .getActiveCommitAtTime(
                 Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()), true, false, true);
     long versionNumberAtLastSyncInstant = deltaCommitAtLastSyncInstant.version();
-    deltaIncrementalChangesCache.reload(deltaLog, versionNumberAtLastSyncInstant + 1);
+    resetState(versionNumberAtLastSyncInstant + 1);
     return CurrentCommitState.<Long>builder()
-        .commitsToProcess(deltaIncrementalChangesCache.getVersionsInSortedOrder())
+        .commitsToProcess(deltaIncrementalChangesState.get().getVersionsInSortedOrder())
         .build();
+  }
+
+  private DeltaIncrementalChangesState getChangesState() {
+    DeltaIncrementalChangesState changesState =
+        deltaIncrementalChangesState.orElseThrow(
+            () -> new IllegalStateException("DeltaIncrementalChangesState is not initialized"));
+    return changesState;
+  }
+
+  private void resetState(long versionToStartFrom) {
+    deltaIncrementalChangesState =
+        Optional.ofNullable(
+            DeltaIncrementalChangesState.builder()
+                .deltaLog(deltaLog)
+                .versionToStartFrom(versionToStartFrom)
+                .build());
   }
 
   private OneDataFiles getOneDataFiles(Snapshot snapshot, OneSchema schema) {

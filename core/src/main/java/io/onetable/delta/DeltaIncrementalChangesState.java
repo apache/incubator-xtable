@@ -36,12 +36,10 @@ import scala.collection.Seq;
 import com.google.common.base.Preconditions;
 
 /** Cache store for storing incremental table changes in the Delta table. */
-@Builder
-public class DeltaIncrementalChangesCache {
-  @Builder.Default private Long startVersion = null;
-  @Builder.Default private Long endVersion = null;
+public class DeltaIncrementalChangesState {
+  private Long startVersion = null;
+  private Long endVersion = null;
 
-  @Builder.Default
   private final Map<Long, List<Action>> incrementalChangesByVersion = new HashMap<>();
 
   /**
@@ -51,7 +49,8 @@ public class DeltaIncrementalChangesCache {
    * @param deltaLog The DeltaLog instance.
    * @param versionToStartFrom The version to start from.
    */
-  public void reload(DeltaLog deltaLog, Long versionToStartFrom) {
+  @Builder
+  public DeltaIncrementalChangesState(DeltaLog deltaLog, Long versionToStartFrom) {
     reinitialize();
     // TODO (https://github.com/onetable-io/onetable/issues/103) Fall back to snapshot sync in
     // vacuum cases.
@@ -88,7 +87,7 @@ public class DeltaIncrementalChangesCache {
   public List<Action> getActionsForVersion(Long version) {
     Preconditions.checkArgument(
         incrementalChangesByVersion.containsKey(version),
-        String.format("Version %s not found in the DeltaIncrementalChangesCache.", version));
+        String.format("Version %s not found in the DeltaIncrementalChangesState.", version));
     return incrementalChangesByVersion.get(version);
   }
 
