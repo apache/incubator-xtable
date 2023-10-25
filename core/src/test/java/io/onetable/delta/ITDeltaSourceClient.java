@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -60,7 +61,12 @@ import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
+import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
+import io.onetable.model.storage.FileFormat;
+import io.onetable.model.storage.OneDataFile;
+import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.TableFormat;
 
 public class ITDeltaSourceClient {
@@ -123,36 +129,33 @@ public class ITDeltaSourceClient {
     // Get current snapshot
     OneSnapshot snapshot = client.getCurrentSnapshot();
     // Validate table
+    List<OneField> fields =
+        Arrays.asList(
+            OneField.builder()
+                .name("col1")
+                .schema(
+                    OneSchema.builder()
+                        .name("integer")
+                        .dataType(OneType.INT)
+                        .isNullable(true)
+                        .build())
+                .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                .build(),
+            OneField.builder()
+                .name("col2")
+                .schema(
+                    OneSchema.builder()
+                        .name("integer")
+                        .dataType(OneType.INT)
+                        .isNullable(true)
+                        .build())
+                .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                .build());
     validateTable(
         snapshot.getTable(),
         tableName,
         TableFormat.DELTA,
-        OneSchema.builder()
-            .name("struct")
-            .dataType(OneType.RECORD)
-            .fields(
-                Arrays.asList(
-                    OneField.builder()
-                        .name("col1")
-                        .schema(
-                            OneSchema.builder()
-                                .name("integer")
-                                .dataType(OneType.INT)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
-                    OneField.builder()
-                        .name("col2")
-                        .schema(
-                            OneSchema.builder()
-                                .name("integer")
-                                .dataType(OneType.INT)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build()))
-            .build(),
+        OneSchema.builder().name("struct").dataType(OneType.RECORD).fields(fields).build(),
         DataLayoutStrategy.FLAT,
         "file:" + basePath,
         Collections.emptyList());
@@ -161,7 +164,40 @@ public class ITDeltaSourceClient {
     validateSchemaCatalog(
         oneSchemaCatalog,
         Collections.singletonMap(new SchemaVersion(1, ""), snapshot.getTable().getReadSchema()));
-    // TODO: Validate data files (see https://github.com/onetable-io/onetable/issues/96)
+    // Validate data files
+    Map<OneField, ColumnStat> columnStats = new HashMap<>();
+    columnStats.put(
+        fields.get(0),
+        ColumnStat.builder()
+            .range(Range.vector(1, 1))
+            .numNulls(0)
+            .numValues(1)
+            .totalSize(0)
+            .build());
+    columnStats.put(
+        fields.get(1),
+        ColumnStat.builder()
+            .range(Range.vector(2, 2))
+            .numNulls(0)
+            .numValues(1)
+            .totalSize(0)
+            .build());
+    Assertions.assertEquals(1, snapshot.getDataFiles().getFiles().size());
+    validatePartitionDataFiles(
+        OneDataFiles.collectionBuilder()
+            .files(
+                Collections.singletonList(
+                    OneDataFile.builder()
+                        .schemaVersion(null)
+                        .fileFormat(FileFormat.APACHE_PARQUET)
+                        .partitionValues(Collections.emptyMap())
+                        .partitionPath(null)
+                        .fileSizeBytes(684)
+                        .recordCount(1)
+                        .columnStats(columnStats)
+                        .build()))
+            .build(),
+        (OneDataFiles) snapshot.getDataFiles().getFiles().get(0));
   }
 
   @Test
@@ -199,37 +235,34 @@ public class ITDeltaSourceClient {
                     .build())
             .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
             .build();
+    List<OneField> fields =
+        Arrays.asList(
+            partCol,
+            OneField.builder()
+                .name("col1")
+                .schema(
+                    OneSchema.builder()
+                        .name("integer")
+                        .dataType(OneType.INT)
+                        .isNullable(true)
+                        .build())
+                .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                .build(),
+            OneField.builder()
+                .name("col2")
+                .schema(
+                    OneSchema.builder()
+                        .name("integer")
+                        .dataType(OneType.INT)
+                        .isNullable(true)
+                        .build())
+                .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                .build());
     validateTable(
         snapshot.getTable(),
         tableName,
         TableFormat.DELTA,
-        OneSchema.builder()
-            .name("struct")
-            .dataType(OneType.RECORD)
-            .fields(
-                Arrays.asList(
-                    partCol,
-                    OneField.builder()
-                        .name("col1")
-                        .schema(
-                            OneSchema.builder()
-                                .name("integer")
-                                .dataType(OneType.INT)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
-                    OneField.builder()
-                        .name("col2")
-                        .schema(
-                            OneSchema.builder()
-                                .name("integer")
-                                .dataType(OneType.INT)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build()))
-            .build(),
+        OneSchema.builder().name("struct").dataType(OneType.RECORD).fields(fields).build(),
         DataLayoutStrategy.DIR_HIERARCHY_PARTITION_VALUES,
         "file:" + basePath,
         Collections.singletonList(
@@ -242,7 +275,46 @@ public class ITDeltaSourceClient {
     validateSchemaCatalog(
         oneSchemaCatalog,
         Collections.singletonMap(new SchemaVersion(1, ""), snapshot.getTable().getReadSchema()));
-    // TODO: Validate data files (see https://github.com/onetable-io/onetable/issues/96)
+    // Validate data files
+    Map<OneField, ColumnStat> columnStats = new HashMap<>();
+    columnStats.put(
+        fields.get(1),
+        ColumnStat.builder()
+            .range(Range.vector(1, 1))
+            .numNulls(0)
+            .numValues(1)
+            .totalSize(0)
+            .build());
+    columnStats.put(
+        fields.get(2),
+        ColumnStat.builder()
+            .range(Range.vector(2, 2))
+            .numNulls(0)
+            .numValues(1)
+            .totalSize(0)
+            .build());
+    Assertions.assertEquals(1, snapshot.getDataFiles().getFiles().size());
+    validatePartitionDataFiles(
+        OneDataFiles.collectionBuilder()
+            .files(
+                Collections.singletonList(
+                    OneDataFile.builder()
+                        .schemaVersion(null)
+                        .fileFormat(FileFormat.APACHE_PARQUET)
+                        .partitionValues(
+                            Collections.singletonMap(
+                                OnePartitionField.builder()
+                                    .sourceField(partCol)
+                                    .transformType(PartitionTransformType.VALUE)
+                                    .build(),
+                                Range.scalar("SingleValue")))
+                        .partitionPath(null)
+                        .fileSizeBytes(684)
+                        .recordCount(1)
+                        .columnStats(columnStats)
+                        .build()))
+            .build(),
+        (OneDataFiles) snapshot.getDataFiles().getFiles().get(0));
   }
 
   @Disabled("Requires Spark 3.4.0+")
@@ -557,5 +629,30 @@ public class ITDeltaSourceClient {
   private void validateSchemaCatalog(
       SchemaCatalog oneSchemaCatalog, Map<SchemaVersion, OneSchema> schemas) {
     Assertions.assertEquals(schemas, oneSchemaCatalog.getSchemas());
+  }
+
+  private void validatePartitionDataFiles(
+      OneDataFiles expectedPartitionFiles, OneDataFiles actualPartitionFiles) {
+    validatePropertiesDataFile(expectedPartitionFiles, actualPartitionFiles);
+    validateDataFiles(expectedPartitionFiles.getFiles(), actualPartitionFiles.getFiles());
+  }
+
+  private void validateDataFiles(List<OneDataFile> expectedFiles, List<OneDataFile> actualFiles) {
+    Assertions.assertEquals(expectedFiles.size(), actualFiles.size());
+    for (int i = 0; i < expectedFiles.size(); i++) {
+      OneDataFile expected = expectedFiles.get(i);
+      OneDataFile actual = actualFiles.get(i);
+      validatePropertiesDataFile(expected, actual);
+    }
+  }
+
+  private void validatePropertiesDataFile(OneDataFile expected, OneDataFile actual) {
+    Assertions.assertEquals(expected.getSchemaVersion(), actual.getSchemaVersion());
+    Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
+    Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
+    Assertions.assertEquals(expected.getPartitionPath(), actual.getPartitionPath());
+    Assertions.assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
+    Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
+    Assertions.assertEquals(expected.getColumnStats(), actual.getColumnStats());
   }
 }
