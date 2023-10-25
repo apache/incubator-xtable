@@ -18,13 +18,11 @@
  
 package io.onetable.delta;
 
-import static io.onetable.TestSparkDeltaTable.TIMESTAMP_FORMAT;
 import static io.onetable.ValidationTestHelper.validateOneSnapshot;
 import static io.onetable.ValidationTestHelper.validateTableChanges;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Path;
-import java.sql.Timestamp;
 import java.text.ParseException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -33,7 +31,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
@@ -425,12 +422,11 @@ public class ITDeltaSourceClient {
     validateTableChanges(allActiveFiles, allTableChanges);
   }
 
-  @ParameterizedTest
-  @MethodSource("testWithPartitionToggle")
-  public void testDropPartition(boolean isPartitioned) {
+  @Test
+  public void testDropPartition() {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, true);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -445,20 +441,7 @@ public class ITDeltaSourceClient {
     allRows.addAll(rows);
     allRows.addAll(rows1);
 
-    Map<Integer, List<Row>> rowsByPartition =
-        allRows.stream()
-            .collect(
-                Collectors.groupingBy(
-                    row -> {
-                      try {
-                        java.util.Date parsedDate = TIMESTAMP_FORMAT.parse(row.getString(4));
-                        Timestamp timestamp = new java.sql.Timestamp(parsedDate.getTime());
-                        return timestamp.toLocalDateTime().getYear();
-                      } catch (Exception e) {
-                        throw new RuntimeException(e);
-                      }
-                    }));
-
+    Map<Integer, List<Row>> rowsByPartition = testSparkDeltaTable.getRowsByPartition(allRows);
     Integer partitionValueToDelete = rowsByPartition.keySet().stream().findFirst().get();
     testSparkDeltaTable.deletePartition(partitionValueToDelete);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
@@ -516,7 +499,7 @@ public class ITDeltaSourceClient {
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
-    testSparkDeltaTable.runClustering("gender");
+    testSparkDeltaTable.runClustering();
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
     testSparkDeltaTable.insertRows(50);
