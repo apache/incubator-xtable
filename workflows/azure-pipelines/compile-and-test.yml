@@ -1,10 +1,4 @@
 steps:
-  - script: |
-      java -version
-    env:
-      JAVA_HOME_11_X64: /usr/lib/jvm/openjdk-11
-      JAVA_HOME: $(JAVA_HOME_11_X64)
-      PATH: $(JAVA_HOME_11_X64)/bin:$(PATH)
   - task: Cache@2
     inputs:
       key: 'maven | "$(Agent.OS)" | **/pom.xml'
@@ -18,7 +12,8 @@ steps:
       mavenPomFile: 'pom.xml'
       options: $(MAVEN_OPTS)
       mavenOptions: '-Xmx3072m'
-      javaHomeOption: 'JDKVersion'
+      javaHomeOption: 'path'
+      jdkDirectory: '/usr/lib/jvm/openjdk-11'
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
       publishJUnitResults: true
