@@ -33,6 +33,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -124,7 +125,10 @@ public class ITHudiTargetClient {
 
   @BeforeAll
   public static void setupOnce() {
+    // avoids issues with Hudi default usage of local timezone when setting up tests
     HoodieInstantTimeGenerator.setCommitTimeZone(HoodieTimelineTimeZone.UTC);
+    TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+    System.setProperty("user.timezone", "GMT");
   }
 
   @Test
@@ -326,10 +330,23 @@ public class ITHudiTargetClient {
         Collections.emptyList(),
         Instant.now());
 
+    // create another commit that should trigger archival of the first two commits
+    String fileName5 = "file_5.parquet";
+    String filePath5 = getFilePath(partitionPath, fileName5);
+    incrementalSync(
+        targetClient,
+        Collections.singletonList(getTestFile(partitionPath, fileName5)),
+        Collections.emptyList(),
+        Instant.now());
+
     assertFileGroupCorrectness(
         metaClient,
         partitionPath,
-        Arrays.asList(file0Pair, Pair.of(fileName3, filePath3), Pair.of(fileName4, filePath4)));
+        Arrays.asList(
+            file0Pair,
+            Pair.of(fileName3, filePath3),
+            Pair.of(fileName4, filePath4),
+            Pair.of(fileName5, filePath5)));
     // col stats should be cleaned up for fileName1 but present for fileName2 and fileName3
     try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
         new HoodieBackedTableMetadata(
@@ -339,16 +356,8 @@ public class ITHudiTargetClient {
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName4);
     }
     // the first commit to the timeline should be archived
-    int numArchivedCommits =
-        metaClient.getArchivedTimeline().reload().filterCompletedInstants().countInstants();
     assertEquals(
-        2,
-        numArchivedCommits,
-        String.format(
-            "Actual num commits archived: %d but expected %d, timeline commits: %s",
-            numArchivedCommits,
-            2,
-            metaClient.getActiveTimeline().reload().filterCompletedInstants().getInstants()));
+        2, metaClient.getArchivedTimeline().reload().filterCompletedInstants().countInstants());
   }
 
   private OneTableMetadata incrementalSync(
