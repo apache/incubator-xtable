@@ -18,31 +18,28 @@
  
 package io.onetable.iceberg;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.*;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
-import io.onetable.exception.NotSupportedException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 
 public class TestIcebergSchemaExtractor {
 
+  private static final IcebergSchemaExtractor SCHEMA_EXTRACTOR =
+      IcebergSchemaExtractor.getInstance();
+
   @Test
   public void testPrimitiveTypes() {
-    String schemaName = "testRecord";
-    String doc = "What's up doc";
-    Map<OneSchema.MetadataKey, Object> requiredEnumMetadata = new HashMap<>();
-    requiredEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
-    Map<OneSchema.MetadataKey, Object> optionalEnumMetadata = new HashMap<>();
-    optionalEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
-
     int precision = 10;
     int scale = 5;
     Map<OneSchema.MetadataKey, Object> doubleMetadata = new HashMap<>();
@@ -50,19 +47,11 @@ public class TestIcebergSchemaExtractor {
     doubleMetadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, scale);
 
     int fixedSize = 8;
-    Map<OneSchema.MetadataKey, Object> fixedMetadata = new HashMap<>();
-    fixedMetadata.put(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedSize);
-
-    Map<OneSchema.MetadataKey, Object> millisTimestamp = new HashMap<>();
-    millisTimestamp.put(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
-
-    Map<OneSchema.MetadataKey, Object> microsTimestamp = new HashMap<>();
-    microsTimestamp.put(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+    Map<OneSchema.MetadataKey, Object> fixedMetadata =
+        Collections.singletonMap(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedSize);
 
     OneSchema oneSchemaRepresentation =
         OneSchema.builder()
-            .name(schemaName)
-            .comment(doc)
             .dataType(OneType.RECORD)
             .isNullable(false)
             .fields(
@@ -75,7 +64,7 @@ public class TestIcebergSchemaExtractor {
                                 .dataType(OneType.BOOLEAN)
                                 .isNullable(false)
                                 .build())
-                        .defaultValue(false)
+                        .fieldId(1)
                         .build(),
                     OneField.builder()
                         .name("optionalBoolean")
@@ -86,26 +75,28 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(2)
                         .build(),
                     OneField.builder()
                         .name("requiredInt")
                         .schema(
                             OneSchema.builder()
-                                .name("int")
+                                .name("integer")
                                 .dataType(OneType.INT)
                                 .isNullable(false)
                                 .build())
-                        .defaultValue(123)
+                        .fieldId(3)
                         .build(),
                     OneField.builder()
                         .name("optionalInt")
                         .schema(
                             OneSchema.builder()
-                                .name("int")
+                                .name("integer")
                                 .dataType(OneType.INT)
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(4)
                         .build(),
                     OneField.builder()
                         .name("requiredLong")
@@ -115,6 +106,7 @@ public class TestIcebergSchemaExtractor {
                                 .dataType(OneType.LONG)
                                 .isNullable(false)
                                 .build())
+                        .fieldId(5)
                         .build(),
                     OneField.builder()
                         .name("optionalLong")
@@ -125,6 +117,7 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(6)
                         .build(),
                     OneField.builder()
                         .name("requiredDouble")
@@ -134,6 +127,7 @@ public class TestIcebergSchemaExtractor {
                                 .dataType(OneType.DOUBLE)
                                 .isNullable(false)
                                 .build())
+                        .fieldId(7)
                         .build(),
                     OneField.builder()
                         .name("optionalDouble")
@@ -144,6 +138,7 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(8)
                         .build(),
                     OneField.builder()
                         .name("requiredFloat")
@@ -153,6 +148,7 @@ public class TestIcebergSchemaExtractor {
                                 .dataType(OneType.FLOAT)
                                 .isNullable(false)
                                 .build())
+                        .fieldId(9)
                         .build(),
                     OneField.builder()
                         .name("optionalFloat")
@@ -163,6 +159,7 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(10)
                         .build(),
                     OneField.builder()
                         .name("requiredString")
@@ -172,6 +169,7 @@ public class TestIcebergSchemaExtractor {
                                 .dataType(OneType.STRING)
                                 .isNullable(false)
                                 .build())
+                        .fieldId(11)
                         .build(),
                     OneField.builder()
                         .name("optionalString")
@@ -182,26 +180,141 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(12)
                         .build(),
                     OneField.builder()
                         .name("requiredBytes")
                         .schema(
                             OneSchema.builder()
-                                .name("bytes")
+                                .name("binary")
                                 .dataType(OneType.BYTES)
                                 .isNullable(false)
                                 .build())
+                        .fieldId(13)
                         .build(),
                     OneField.builder()
                         .name("optionalBytes")
                         .schema(
                             OneSchema.builder()
-                                .name("bytes")
+                                .name("binary")
                                 .dataType(OneType.BYTES)
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(14)
                         .build(),
+                    OneField.builder()
+                        .name("requiredDate")
+                        .schema(
+                            OneSchema.builder()
+                                .name("date")
+                                .dataType(OneType.DATE)
+                                .isNullable(false)
+                                .build())
+                        .fieldId(17)
+                        .build(),
+                    OneField.builder()
+                        .name("optionalDate")
+                        .schema(
+                            OneSchema.builder()
+                                .name("date")
+                                .dataType(OneType.DATE)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(18)
+                        .build(),
+                    OneField.builder()
+                        .name("requiredFixed")
+                        .schema(
+                            OneSchema.builder()
+                                .name("fixed")
+                                .dataType(OneType.FIXED)
+                                .isNullable(false)
+                                .metadata(fixedMetadata)
+                                .build())
+                        .fieldId(27)
+                        .build(),
+                    OneField.builder()
+                        .name("optionalFixed")
+                        .schema(
+                            OneSchema.builder()
+                                .name("fixed")
+                                .dataType(OneType.FIXED)
+                                .isNullable(true)
+                                .metadata(fixedMetadata)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(28)
+                        .build(),
+                    OneField.builder()
+                        .name("requiredDecimal")
+                        .schema(
+                            OneSchema.builder()
+                                .name("decimal")
+                                .dataType(OneType.DECIMAL)
+                                .isNullable(false)
+                                .metadata(doubleMetadata)
+                                .build())
+                        .fieldId(29)
+                        .build(),
+                    OneField.builder()
+                        .name("optionalDecimal")
+                        .schema(
+                            OneSchema.builder()
+                                .name("decimal")
+                                .dataType(OneType.DECIMAL)
+                                .isNullable(true)
+                                .metadata(doubleMetadata)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(30)
+                        .build()))
+            .build();
+
+    Schema icebergRepresentation =
+        new Schema(
+            Types.NestedField.required(1, "requiredBoolean", Types.BooleanType.get()),
+            Types.NestedField.optional(2, "optionalBoolean", Types.BooleanType.get()),
+            Types.NestedField.required(3, "requiredInt", Types.IntegerType.get()),
+            Types.NestedField.optional(4, "optionalInt", Types.IntegerType.get()),
+            Types.NestedField.required(5, "requiredLong", Types.LongType.get()),
+            Types.NestedField.optional(6, "optionalLong", Types.LongType.get()),
+            Types.NestedField.required(7, "requiredDouble", Types.DoubleType.get()),
+            Types.NestedField.optional(8, "optionalDouble", Types.DoubleType.get()),
+            Types.NestedField.required(9, "requiredFloat", Types.FloatType.get()),
+            Types.NestedField.optional(10, "optionalFloat", Types.FloatType.get()),
+            Types.NestedField.required(11, "requiredString", Types.StringType.get()),
+            Types.NestedField.optional(12, "optionalString", Types.StringType.get()),
+            Types.NestedField.required(13, "requiredBytes", Types.BinaryType.get()),
+            Types.NestedField.optional(14, "optionalBytes", Types.BinaryType.get()),
+            Types.NestedField.required(17, "requiredDate", Types.DateType.get()),
+            Types.NestedField.optional(18, "optionalDate", Types.DateType.get()),
+            Types.NestedField.required(27, "requiredFixed", Types.FixedType.ofLength(fixedSize)),
+            Types.NestedField.optional(28, "optionalFixed", Types.FixedType.ofLength(fixedSize)),
+            Types.NestedField.required(
+                29, "requiredDecimal", Types.DecimalType.of(precision, scale)),
+            Types.NestedField.optional(
+                30, "optionalDecimal", Types.DecimalType.of(precision, scale)));
+
+    Assertions.assertTrue(
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
+  }
+
+  @Test
+  public void testEnums() {
+    // there are no enums in iceberg so we convert them to string
+    Map<OneSchema.MetadataKey, Object> requiredEnumMetadata =
+        Collections.singletonMap(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
+    Map<OneSchema.MetadataKey, Object> optionalEnumMetadata =
+        Collections.singletonMap(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
+
+    OneSchema schemaWithEnums =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .fields(
+                Arrays.asList(
                     OneField.builder()
                         .name("requiredEnum")
                         .schema(
@@ -223,26 +336,74 @@ public class TestIcebergSchemaExtractor {
                                 .metadata(optionalEnumMetadata)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
+                        .build()))
+            .build();
+
+    Schema expectedSchema =
+        new Schema(
+            Types.NestedField.required(1, "requiredEnum", Types.StringType.get()),
+            Types.NestedField.optional(2, "optionalEnum", Types.StringType.get()));
+    assertTrue(expectedSchema.sameSchema(SCHEMA_EXTRACTOR.toIceberg(schemaWithEnums)));
+  }
+
+  @Test
+  public void testUuids() {
+    // UUIDs are represented as fixed length byte arrays
+    Schema inputSchema =
+        new Schema(
+            Types.NestedField.required(1, "requiredUuid", Types.UUIDType.get()),
+            Types.NestedField.optional(2, "optionalUuid", Types.UUIDType.get()));
+
+    int fixedSize = 16;
+    Map<OneSchema.MetadataKey, Object> fixedMetadata = new HashMap<>();
+    fixedMetadata.put(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedSize);
+    OneSchema expectedSchema =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .fields(
+                Arrays.asList(
                     OneField.builder()
-                        .name("requiredDate")
+                        .name("requiredUuid")
+                        .fieldId(1)
                         .schema(
                             OneSchema.builder()
-                                .name("date")
-                                .dataType(OneType.DATE)
+                                .name("uuid")
+                                .dataType(OneType.FIXED)
                                 .isNullable(false)
+                                .metadata(fixedMetadata)
                                 .build())
                         .build(),
                     OneField.builder()
-                        .name("optionalDate")
+                        .name("optionalUuid")
+                        .fieldId(2)
                         .schema(
                             OneSchema.builder()
-                                .name("date")
-                                .dataType(OneType.DATE)
+                                .name("uuid")
+                                .dataType(OneType.FIXED)
                                 .isNullable(true)
+                                .metadata(fixedMetadata)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
+                        .build()))
+            .build();
+    assertEquals(expectedSchema, (SCHEMA_EXTRACTOR.fromIceberg(inputSchema)));
+  }
+
+  @Test
+  public void testTimestamps() {
+    Map<OneSchema.MetadataKey, Object> millisTimestamp =
+        Collections.singletonMap(
+            OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
+
+    Map<OneSchema.MetadataKey, Object> microsTimestamp =
+        Collections.singletonMap(
+            OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+
+    OneSchema irSchema =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .fields(
+                Arrays.asList(
                     OneField.builder()
                         .name("requiredTimestampMillis")
                         .schema(
@@ -326,433 +487,94 @@ public class TestIcebergSchemaExtractor {
                                 .isNullable(true)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build(),
+                        .build()))
+            .build();
+    Schema expectedTargetSchema =
+        new Schema(
+            Types.NestedField.required(
+                1, "requiredTimestampMillis", Types.TimestampType.withZone()),
+            Types.NestedField.optional(
+                2, "optionalTimestampMillis", Types.TimestampType.withZone()),
+            Types.NestedField.required(3, "requiredTimestampNtzMillis", Types.LongType.get()),
+            Types.NestedField.optional(4, "optionalTimestampNtzMillis", Types.LongType.get()),
+            Types.NestedField.required(
+                5, "requiredTimestampMicros", Types.TimestampType.withZone()),
+            Types.NestedField.optional(
+                6, "optionalTimestampMicros", Types.TimestampType.withZone()),
+            Types.NestedField.required(7, "requiredTimestampNtzMicros", Types.LongType.get()),
+            Types.NestedField.optional(8, "optionalTimestampNtzMicros", Types.LongType.get()));
+    assertTrue(expectedTargetSchema.sameSchema(SCHEMA_EXTRACTOR.toIceberg(irSchema)));
+
+    Schema sourceSchema =
+        new Schema(
+            Types.NestedField.required(
+                4, "requiredTimestampWithZone", Types.TimestampType.withZone()),
+            Types.NestedField.optional(
+                5, "optionalTimestampWithZone", Types.TimestampType.withZone()),
+            Types.NestedField.required(
+                6, "requiredTimestampWithoutZone", Types.TimestampType.withoutZone()),
+            Types.NestedField.optional(
+                7, "optionalTimestampWithoutZone", Types.TimestampType.withoutZone()));
+    OneSchema expectedIrSchema =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .fields(
+                Arrays.asList(
                     OneField.builder()
-                        .name("requiredFixed")
+                        .name("requiredTimestampWithZone")
+                        .fieldId(4)
                         .schema(
                             OneSchema.builder()
-                                .name("fixed")
-                                .dataType(OneType.FIXED)
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .metadata(microsTimestamp)
                                 .isNullable(false)
-                                .metadata(fixedMetadata)
                                 .build())
                         .build(),
                     OneField.builder()
-                        .name("optionalFixed")
+                        .name("optionalTimestampWithZone")
+                        .fieldId(5)
                         .schema(
                             OneSchema.builder()
-                                .name("fixed")
-                                .dataType(OneType.FIXED)
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .metadata(microsTimestamp)
                                 .isNullable(true)
-                                .metadata(fixedMetadata)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
                     OneField.builder()
-                        .name("requiredDecimal")
+                        .name("requiredTimestampWithoutZone")
+                        .fieldId(6)
                         .schema(
                             OneSchema.builder()
-                                .name("decimal")
-                                .dataType(OneType.DECIMAL)
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .metadata(microsTimestamp)
                                 .isNullable(false)
-                                .metadata(doubleMetadata)
                                 .build())
                         .build(),
                     OneField.builder()
-                        .name("optionalDecimal")
+                        .name("optionalTimestampWithoutZone")
+                        .fieldId(7)
                         .schema(
                             OneSchema.builder()
-                                .name("decimal")
-                                .dataType(OneType.DECIMAL)
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .metadata(microsTimestamp)
                                 .isNullable(true)
-                                .metadata(doubleMetadata)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
-
-    Schema expectedSchema =
-        new Schema(
-            Types.NestedField.required(1, "requiredBoolean", Types.BooleanType.get()),
-            Types.NestedField.optional(2, "optionalBoolean", Types.BooleanType.get()),
-            Types.NestedField.required(3, "requiredInt", Types.IntegerType.get()),
-            Types.NestedField.optional(4, "optionalInt", Types.IntegerType.get()),
-            Types.NestedField.required(5, "requiredLong", Types.LongType.get()),
-            Types.NestedField.optional(6, "optionalLong", Types.LongType.get()),
-            Types.NestedField.required(7, "requiredDouble", Types.DoubleType.get()),
-            Types.NestedField.optional(8, "optionalDouble", Types.DoubleType.get()),
-            Types.NestedField.required(9, "requiredFloat", Types.FloatType.get()),
-            Types.NestedField.optional(10, "optionalFloat", Types.FloatType.get()),
-            Types.NestedField.required(11, "requiredString", Types.StringType.get()),
-            Types.NestedField.optional(12, "optionalString", Types.StringType.get()),
-            Types.NestedField.required(13, "requiredBytes", Types.BinaryType.get()),
-            Types.NestedField.optional(14, "optionalBytes", Types.BinaryType.get()),
-            Types.NestedField.required(15, "requiredEnum", Types.StringType.get()),
-            Types.NestedField.optional(16, "optionalEnum", Types.StringType.get()),
-            Types.NestedField.required(17, "requiredDate", Types.DateType.get()),
-            Types.NestedField.optional(18, "optionalDate", Types.DateType.get()),
-            Types.NestedField.required(
-                19, "requiredTimestampMillis", Types.TimestampType.withZone()),
-            Types.NestedField.optional(
-                20, "optionalTimestampMillis", Types.TimestampType.withZone()),
-            Types.NestedField.required(21, "requiredTimestampNtzMillis", Types.LongType.get()),
-            Types.NestedField.optional(22, "optionalTimestampNtzMillis", Types.LongType.get()),
-            Types.NestedField.required(
-                23, "requiredTimestampMicros", Types.TimestampType.withZone()),
-            Types.NestedField.optional(
-                24, "optionalTimestampMicros", Types.TimestampType.withZone()),
-            Types.NestedField.required(25, "requiredTimestampNtzMicros", Types.LongType.get()),
-            Types.NestedField.optional(26, "optionalTimestampNtzMicros", Types.LongType.get()),
-            Types.NestedField.required(27, "requiredFixed", Types.FixedType.ofLength(fixedSize)),
-            Types.NestedField.optional(28, "optionalFixed", Types.FixedType.ofLength(fixedSize)),
-            Types.NestedField.required(
-                29, "requiredDecimal", Types.DecimalType.of(precision, scale)),
-            Types.NestedField.optional(
-                30, "optionalDecimal", Types.DecimalType.of(precision, scale)));
-
-    Schema actual = IcebergSchemaExtractor.getInstance().toIceberg(oneSchemaRepresentation);
-    Assertions.assertTrue(expectedSchema.sameSchema(actual));
+    assertEquals(expectedIrSchema, SCHEMA_EXTRACTOR.fromIceberg(sourceSchema));
   }
 
   @Test
   public void testMaps() {
     OneSchema recordMapElementSchema =
         OneSchema.builder()
-            .name("element")
-            .isNullable(true)
-            .fields(
-                Arrays.asList(
-                    OneField.builder()
-                        .name("requiredDouble")
-                        .parentPath("recordMap._one_field_value")
-                        .schema(
-                            OneSchema.builder()
-                                .name("double")
-                                .dataType(OneType.DOUBLE)
-                                .isNullable(false)
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("optionalString")
-                        .parentPath("recordMap._one_field_value")
-                        .schema(
-                            OneSchema.builder()
-                                .name("string")
-                                .dataType(OneType.STRING)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build()))
-            .dataType(OneType.RECORD)
-            .build();
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
-            .name("testRecord")
-            .dataType(OneType.RECORD)
-            .isNullable(false)
-            .fields(
-                Arrays.asList(
-                    OneField.builder()
-                        .name("intMap")
-                        .schema(
-                            OneSchema.builder()
-                                .name("map")
-                                .isNullable(false)
-                                .dataType(OneType.MAP)
-                                .fields(
-                                    Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_KEY_FIELD_NAME)
-                                            .parentPath("intMap")
-                                            .schema(
-                                                OneSchema.builder()
-                                                    .name("map_key")
-                                                    .dataType(OneType.STRING)
-                                                    .isNullable(false)
-                                                    .build())
-                                            .defaultValue("")
-                                            .build(),
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
-                                            .parentPath("intMap")
-                                            .schema(
-                                                OneSchema.builder()
-                                                    .name("int")
-                                                    .dataType(OneType.INT)
-                                                    .isNullable(false)
-                                                    .build())
-                                            .build()))
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("recordMap")
-                        .schema(
-                            OneSchema.builder()
-                                .name("map")
-                                .isNullable(true)
-                                .dataType(OneType.MAP)
-                                .fields(
-                                    Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_KEY_FIELD_NAME)
-                                            .parentPath("recordMap")
-                                            .schema(
-                                                OneSchema.builder()
-                                                    .name("map_key")
-                                                    .dataType(OneType.INT)
-                                                    .isNullable(false)
-                                                    .build())
-                                            .defaultValue("")
-                                            .build(),
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
-                                            .parentPath("recordMap")
-                                            .schema(recordMapElementSchema)
-                                            .build()))
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build()))
-            .build();
-
-    Schema expectedSchema =
-        new Schema(
-            Types.NestedField.required(
-                1,
-                "intMap",
-                Types.MapType.ofRequired(3, 4, Types.StringType.get(), Types.IntegerType.get())),
-            Types.NestedField.optional(
-                2,
-                "recordMap",
-                Types.MapType.ofOptional(
-                    5,
-                    6,
-                    Types.IntegerType.get(),
-                    Types.StructType.of(
-                        Types.NestedField.required(7, "requiredDouble", Types.DoubleType.get()),
-                        Types.NestedField.optional(8, "optionalString", Types.StringType.get())))));
-
-    Schema actual = IcebergSchemaExtractor.getInstance().toIceberg(oneSchemaRepresentation);
-    Assertions.assertTrue(expectedSchema.sameSchema(actual));
-  }
-
-  @Test
-  public void testLists() {
-    OneSchema recordListElementSchema =
-        OneSchema.builder()
-            .name("element")
-            .isNullable(true)
-            .fields(
-                Arrays.asList(
-                    OneField.builder()
-                        .name("requiredDouble")
-                        .parentPath("recordList._one_field_element")
-                        .schema(
-                            OneSchema.builder()
-                                .name("double")
-                                .dataType(OneType.DOUBLE)
-                                .isNullable(false)
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("optionalString")
-                        .parentPath("recordList._one_field_element")
-                        .schema(
-                            OneSchema.builder()
-                                .name("string")
-                                .dataType(OneType.STRING)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build()))
-            .dataType(OneType.RECORD)
-            .build();
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
-            .name("testRecord")
-            .dataType(OneType.RECORD)
-            .isNullable(false)
-            .fields(
-                Arrays.asList(
-                    OneField.builder()
-                        .name("intList")
-                        .schema(
-                            OneSchema.builder()
-                                .name("array")
-                                .isNullable(false)
-                                .dataType(OneType.ARRAY)
-                                .fields(
-                                    Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                            .parentPath("intList")
-                                            .schema(
-                                                OneSchema.builder()
-                                                    .name("int")
-                                                    .dataType(OneType.INT)
-                                                    .isNullable(false)
-                                                    .build())
-                                            .build()))
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("recordList")
-                        .schema(
-                            OneSchema.builder()
-                                .name("array")
-                                .isNullable(true)
-                                .dataType(OneType.ARRAY)
-                                .fields(
-                                    Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                            .parentPath("recordList")
-                                            .schema(recordListElementSchema)
-                                            .build()))
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build()))
-            .build();
-
-    Schema expectedSchema =
-        new Schema(
-            Types.NestedField.required(
-                1, "intList", Types.ListType.ofRequired(3, Types.IntegerType.get())),
-            Types.NestedField.optional(
-                2,
-                "recordList",
-                Types.ListType.ofOptional(
-                    4,
-                    Types.StructType.of(
-                        Types.NestedField.required(5, "requiredDouble", Types.DoubleType.get()),
-                        Types.NestedField.optional(6, "optionalString", Types.StringType.get())))));
-
-    Schema actual = IcebergSchemaExtractor.getInstance().toIceberg(oneSchemaRepresentation);
-    Assertions.assertTrue(expectedSchema.sameSchema(actual));
-  }
-
-  @Test
-  public void testNestedRecords() {
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
-            .name("testRecord")
-            .dataType(OneType.RECORD)
-            .isNullable(false)
-            .fields(
-                Arrays.asList(
-                    OneField.builder()
-                        .name("nestedOne")
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .schema(
-                            OneSchema.builder()
-                                .name("nestedOneType")
-                                .dataType(OneType.RECORD)
-                                .isNullable(true)
-                                .fields(
-                                    Arrays.asList(
-                                        OneField.builder()
-                                            .name("nestedOptionalInt")
-                                            .parentPath("nestedOne")
-                                            .schema(
-                                                OneSchema.builder()
-                                                    .name("int")
-                                                    .dataType(OneType.INT)
-                                                    .isNullable(true)
-                                                    .build())
-                                            .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                                            .build(),
-                                        OneField.builder()
-                                            .name("nestedRequiredDouble")
-                                            .parentPath("nestedOne")
-                                            .schema(
-                                                OneSchema.builder()
-                                                    .name("double")
-                                                    .dataType(OneType.DOUBLE)
-                                                    .isNullable(false)
-                                                    .build())
-                                            .build(),
-                                        OneField.builder()
-                                            .name("nestedTwo")
-                                            .parentPath("nestedOne")
-                                            .schema(
-                                                OneSchema.builder()
-                                                    .name("nestedTwoType")
-                                                    .dataType(OneType.RECORD)
-                                                    .isNullable(false)
-                                                    .fields(
-                                                        Arrays.asList(
-                                                            OneField.builder()
-                                                                .name("doublyNestedString")
-                                                                .parentPath("nestedOne.nestedTwo")
-                                                                .schema(
-                                                                    OneSchema.builder()
-                                                                        .name("string")
-                                                                        .dataType(OneType.STRING)
-                                                                        .isNullable(true)
-                                                                        .build())
-                                                                .defaultValue(
-                                                                    OneField.Constants
-                                                                        .NULL_DEFAULT_VALUE)
-                                                                .build()))
-                                                    .build())
-                                            .build()))
-                                .build())
-                        .build()))
-            .build();
-
-    Schema expectedSchema =
-        new Schema(
-            Types.NestedField.optional(
-                1,
-                "nestedOne",
-                Types.StructType.of(
-                    Types.NestedField.optional(2, "nestedOptionalInt", Types.IntegerType.get()),
-                    Types.NestedField.required(3, "nestedRequiredDouble", Types.DoubleType.get()),
-                    Types.NestedField.required(
-                        4,
-                        "nestedTwo",
-                        Types.StructType.of(
-                            Types.NestedField.optional(
-                                5, "doublyNestedString", Types.StringType.get()))))));
-    Schema actual = IcebergSchemaExtractor.getInstance().toIceberg(oneSchemaRepresentation);
-    Assertions.assertTrue(expectedSchema.sameSchema(actual));
-  }
-
-  @Test
-  public void testIdHandling() {
-    OneSchema recordListElementSchema =
-        OneSchema.builder()
-            .name("element")
-            .isNullable(true)
-            .fields(
-                Arrays.asList(
-                    OneField.builder()
-                        .name("requiredDouble")
-                        .fieldId(3)
-                        .parentPath("recordList._one_field_element")
-                        .schema(
-                            OneSchema.builder()
-                                .name("double")
-                                .dataType(OneType.DOUBLE)
-                                .isNullable(false)
-                                .build())
-                        .build(),
-                    OneField.builder()
-                        .name("optionalString")
-                        .parentPath("recordList._one_field_element")
-                        .fieldId(9)
-                        .schema(
-                            OneSchema.builder()
-                                .name("string")
-                                .dataType(OneType.STRING)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                        .build()))
-            .dataType(OneType.RECORD)
-            .build();
-    OneSchema recordMapElementSchema =
-        OneSchema.builder()
-            .name("element")
+            .name("struct")
             .isNullable(true)
             .fields(
                 Arrays.asList(
@@ -770,7 +592,354 @@ public class TestIcebergSchemaExtractor {
                     OneField.builder()
                         .name("optionalString")
                         .parentPath("recordMap._one_field_value")
-                        .fieldId(10)
+                        .fieldId(8)
+                        .schema(
+                            OneSchema.builder()
+                                .name("string")
+                                .dataType(OneType.STRING)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .dataType(OneType.RECORD)
+            .build();
+    OneSchema oneSchemaRepresentation =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("intMap")
+                        .fieldId(1)
+                        .schema(
+                            OneSchema.builder()
+                                .name("map")
+                                .isNullable(false)
+                                .dataType(OneType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        OneField.builder()
+                                            .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("intMap")
+                                            .fieldId(3)
+                                            .schema(
+                                                OneSchema.builder()
+                                                    .name("string")
+                                                    .dataType(OneType.STRING)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        OneField.builder()
+                                            .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+                                            .parentPath("intMap")
+                                            .fieldId(4)
+                                            .schema(
+                                                OneSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(OneType.INT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("recordMap")
+                        .fieldId(2)
+                        .schema(
+                            OneSchema.builder()
+                                .name("map")
+                                .isNullable(true)
+                                .dataType(OneType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        OneField.builder()
+                                            .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+                                            .fieldId(5)
+                                            .parentPath("recordMap")
+                                            .schema(
+                                                OneSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(OneType.INT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        OneField.builder()
+                                            .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+                                            .fieldId(6)
+                                            .parentPath("recordMap")
+                                            .schema(recordMapElementSchema)
+                                            .build()))
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    Schema icebergRepresentation =
+        new Schema(
+            Types.NestedField.required(
+                1,
+                "intMap",
+                Types.MapType.ofRequired(3, 4, Types.StringType.get(), Types.IntegerType.get())),
+            Types.NestedField.optional(
+                2,
+                "recordMap",
+                Types.MapType.ofOptional(
+                    5,
+                    6,
+                    Types.IntegerType.get(),
+                    Types.StructType.of(
+                        Types.NestedField.required(7, "requiredDouble", Types.DoubleType.get()),
+                        Types.NestedField.optional(8, "optionalString", Types.StringType.get())))));
+
+    Assertions.assertTrue(
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
+  }
+
+  @Test
+  public void testLists() {
+    OneSchema recordListElementSchema =
+        OneSchema.builder()
+            .name("struct")
+            .isNullable(true)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("requiredDouble")
+                        .fieldId(5)
+                        .parentPath("recordList._one_field_element")
+                        .schema(
+                            OneSchema.builder()
+                                .name("double")
+                                .dataType(OneType.DOUBLE)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalString")
+                        .fieldId(6)
+                        .parentPath("recordList._one_field_element")
+                        .schema(
+                            OneSchema.builder()
+                                .name("string")
+                                .dataType(OneType.STRING)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .dataType(OneType.RECORD)
+            .build();
+    OneSchema oneSchemaRepresentation =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("intList")
+                        .fieldId(1)
+                        .schema(
+                            OneSchema.builder()
+                                .name("list")
+                                .isNullable(false)
+                                .dataType(OneType.LIST)
+                                .fields(
+                                    Collections.singletonList(
+                                        OneField.builder()
+                                            .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                            .fieldId(3)
+                                            .parentPath("intList")
+                                            .schema(
+                                                OneSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(OneType.INT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("recordList")
+                        .fieldId(2)
+                        .schema(
+                            OneSchema.builder()
+                                .name("list")
+                                .isNullable(true)
+                                .dataType(OneType.LIST)
+                                .fields(
+                                    Collections.singletonList(
+                                        OneField.builder()
+                                            .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                            .fieldId(4)
+                                            .parentPath("recordList")
+                                            .schema(recordListElementSchema)
+                                            .build()))
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    Schema icebergRepresentation =
+        new Schema(
+            Types.NestedField.required(
+                1, "intList", Types.ListType.ofRequired(3, Types.IntegerType.get())),
+            Types.NestedField.optional(
+                2,
+                "recordList",
+                Types.ListType.ofOptional(
+                    4,
+                    Types.StructType.of(
+                        Types.NestedField.required(5, "requiredDouble", Types.DoubleType.get()),
+                        Types.NestedField.optional(6, "optionalString", Types.StringType.get())))));
+
+    Assertions.assertTrue(
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
+  }
+
+  @Test
+  public void testNestedRecords() {
+    OneSchema oneSchemaRepresentation =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("nestedOne")
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .fieldId(1)
+                        .schema(
+                            OneSchema.builder()
+                                .name("struct")
+                                .dataType(OneType.RECORD)
+                                .isNullable(true)
+                                .fields(
+                                    Arrays.asList(
+                                        OneField.builder()
+                                            .name("nestedOptionalInt")
+                                            .parentPath("nestedOne")
+                                            .fieldId(2)
+                                            .schema(
+                                                OneSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(OneType.INT)
+                                                    .isNullable(true)
+                                                    .build())
+                                            .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                                            .build(),
+                                        OneField.builder()
+                                            .name("nestedRequiredDouble")
+                                            .parentPath("nestedOne")
+                                            .fieldId(3)
+                                            .schema(
+                                                OneSchema.builder()
+                                                    .name("double")
+                                                    .dataType(OneType.DOUBLE)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        OneField.builder()
+                                            .name("nestedTwo")
+                                            .parentPath("nestedOne")
+                                            .fieldId(4)
+                                            .schema(
+                                                OneSchema.builder()
+                                                    .name("struct")
+                                                    .dataType(OneType.RECORD)
+                                                    .isNullable(false)
+                                                    .fields(
+                                                        Collections.singletonList(
+                                                            OneField.builder()
+                                                                .name("doublyNestedString")
+                                                                .parentPath("nestedOne.nestedTwo")
+                                                                .fieldId(5)
+                                                                .schema(
+                                                                    OneSchema.builder()
+                                                                        .name("string")
+                                                                        .dataType(OneType.STRING)
+                                                                        .isNullable(true)
+                                                                        .build())
+                                                                .defaultValue(
+                                                                    OneField.Constants
+                                                                        .NULL_DEFAULT_VALUE)
+                                                                .build()))
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build()))
+            .build();
+
+    Schema icebergRepresentation =
+        new Schema(
+            Types.NestedField.optional(
+                1,
+                "nestedOne",
+                Types.StructType.of(
+                    Types.NestedField.optional(2, "nestedOptionalInt", Types.IntegerType.get()),
+                    Types.NestedField.required(3, "nestedRequiredDouble", Types.DoubleType.get()),
+                    Types.NestedField.required(
+                        4,
+                        "nestedTwo",
+                        Types.StructType.of(
+                            Types.NestedField.optional(
+                                5, "doublyNestedString", Types.StringType.get()))))));
+    Assertions.assertTrue(
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
+  }
+
+  @Test
+  public void testToIcebergWithNoFieldIdsSet() {
+    OneSchema recordListElementSchema =
+        OneSchema.builder()
+            .name("element")
+            .isNullable(true)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("requiredDouble")
+                        .parentPath("recordList._one_field_element")
+                        .schema(
+                            OneSchema.builder()
+                                .name("double")
+                                .dataType(OneType.DOUBLE)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalString")
+                        .parentPath("recordList._one_field_element")
+                        .schema(
+                            OneSchema.builder()
+                                .name("string")
+                                .dataType(OneType.STRING)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .dataType(OneType.RECORD)
+            .build();
+    OneSchema recordMapElementSchema =
+        OneSchema.builder()
+            .name("element")
+            .isNullable(true)
+            .fields(
+                Arrays.asList(
+                    OneField.builder()
+                        .name("requiredDouble")
+                        .parentPath("recordMap._one_field_value")
+                        .schema(
+                            OneSchema.builder()
+                                .name("double")
+                                .dataType(OneType.DOUBLE)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    OneField.builder()
+                        .name("optionalString")
+                        .parentPath("recordMap._one_field_value")
                         .schema(
                             OneSchema.builder()
                                 .name("string")
@@ -790,18 +959,16 @@ public class TestIcebergSchemaExtractor {
                 Arrays.asList(
                     OneField.builder()
                         .name("recordList")
-                        .fieldId(1)
                         .schema(
                             OneSchema.builder()
                                 .name("array")
                                 .isNullable(true)
-                                .dataType(OneType.ARRAY)
+                                .dataType(OneType.LIST)
                                 .fields(
                                     Arrays.asList(
                                         OneField.builder()
                                             .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                                             .parentPath("recordList")
-                                            .fieldId(2)
                                             .schema(recordListElementSchema)
                                             .build()))
                                 .build())
@@ -809,7 +976,6 @@ public class TestIcebergSchemaExtractor {
                         .build(),
                     OneField.builder()
                         .name("recordMap")
-                        .fieldId(4)
                         .schema(
                             OneSchema.builder()
                                 .name("map")
@@ -820,7 +986,6 @@ public class TestIcebergSchemaExtractor {
                                         OneField.builder()
                                             .name(OneField.Constants.MAP_KEY_FIELD_NAME)
                                             .parentPath("recordMap")
-                                            .fieldId(5)
                                             .schema(
                                                 OneSchema.builder()
                                                     .name("map_key")
@@ -830,7 +995,6 @@ public class TestIcebergSchemaExtractor {
                                             .defaultValue("")
                                             .build(),
                                         OneField.builder()
-                                            .fieldId(6)
                                             .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
                                             .parentPath("recordMap")
                                             .schema(recordMapElementSchema)
@@ -840,114 +1004,28 @@ public class TestIcebergSchemaExtractor {
                         .build()))
             .build();
 
-    Schema expectedSchema =
+    Schema icebergRepresentation =
         new Schema(
             Types.NestedField.optional(
                 1,
                 "recordList",
                 Types.ListType.ofOptional(
-                    2,
+                    3,
                     Types.StructType.of(
-                        Types.NestedField.required(3, "requiredDouble", Types.DoubleType.get()),
-                        Types.NestedField.optional(9, "optionalString", Types.StringType.get())))),
+                        Types.NestedField.required(4, "requiredDouble", Types.DoubleType.get()),
+                        Types.NestedField.optional(5, "optionalString", Types.StringType.get())))),
             Types.NestedField.optional(
-                4,
+                2,
                 "recordMap",
                 Types.MapType.ofOptional(
-                    5,
                     6,
+                    7,
                     Types.IntegerType.get(),
                     Types.StructType.of(
-                        Types.NestedField.required(7, "requiredDouble", Types.DoubleType.get()),
-                        Types.NestedField.optional(
-                            10, "optionalString", Types.StringType.get())))));
+                        Types.NestedField.required(8, "requiredDouble", Types.DoubleType.get()),
+                        Types.NestedField.optional(9, "optionalString", Types.StringType.get())))));
 
-    Schema actual = IcebergSchemaExtractor.getInstance().toIceberg(oneSchemaRepresentation);
-    Assertions.assertTrue(expectedSchema.sameSchema(actual));
-  }
-
-  /** Test that the schema extractor correctly maps Iceberg types to OneTable types. */
-  @Test
-  public void fromIcebergType() {
-    IcebergSchemaExtractor extractor = IcebergSchemaExtractor.getInstance();
-    Assertions.assertEquals(OneType.STRING, extractor.fromIcebergType(Types.StringType.get()));
-    Assertions.assertEquals(OneType.INT, extractor.fromIcebergType(Types.IntegerType.get()));
-    Assertions.assertEquals(OneType.LONG, extractor.fromIcebergType(Types.LongType.get()));
-    Assertions.assertEquals(OneType.BYTES, extractor.fromIcebergType(Types.BinaryType.get()));
-    Assertions.assertEquals(OneType.BOOLEAN, extractor.fromIcebergType(Types.BooleanType.get()));
-    Assertions.assertEquals(OneType.FLOAT, extractor.fromIcebergType(Types.FloatType.get()));
-    Assertions.assertEquals(OneType.DATE, extractor.fromIcebergType(Types.DateType.get()));
-    Assertions.assertEquals(
-        OneType.TIMESTAMP, extractor.fromIcebergType(Types.TimestampType.withZone()));
-    Assertions.assertEquals(OneType.DOUBLE, extractor.fromIcebergType(Types.DoubleType.get()));
-    Assertions.assertEquals(OneType.DECIMAL, extractor.fromIcebergType(Types.DecimalType.of(1, 1)));
-
-    // the iceberg types below have not been implemented yet
-    Assertions.assertThrows(
-        NotSupportedException.class, () -> extractor.fromIcebergType(Types.FixedType.ofLength(1)));
-    Assertions.assertThrows(
-        NotSupportedException.class,
-        () -> extractor.fromIcebergType(Types.ListType.ofRequired(1, Types.StringType.get())));
-    Assertions.assertThrows(
-        NotSupportedException.class,
-        () ->
-            extractor.fromIcebergType(
-                Types.MapType.ofRequired(1, 2, Types.StringType.get(), Types.StringType.get())));
-    Assertions.assertThrows(
-        NotSupportedException.class,
-        () ->
-            extractor.fromIcebergType(
-                Types.StructType.of(
-                    Types.NestedField.required(1, "test", Types.StringType.get()))));
-  }
-
-  /**
-   * Test that the schema extractor correctly builds {@link OneSchema} with valid fields from
-   * Iceberg schema.
-   */
-  @Test
-  public void fromIceberg() {
-    List<Type.PrimitiveType> iceTypes =
-        Arrays.asList(
-            Types.StringType.get(),
-            Types.IntegerType.get(),
-            Types.LongType.get(),
-            Types.BinaryType.get(),
-            Types.BooleanType.get(),
-            Types.FloatType.get(),
-            Types.DateType.get(),
-            Types.TimestampType.withZone(),
-            Types.DoubleType.get(),
-            Types.DecimalType.of(1, 1));
-
-    List<Types.NestedField> nestedFields = new ArrayList<>();
-    for (int i = 0; i < iceTypes.size(); i++) {
-      String fieldName = "test" + i;
-      String doc = "doc" + i;
-      nestedFields.add(Types.NestedField.of(i, true, fieldName, iceTypes.get(i), doc));
-    }
-
-    Schema iceSchema = new Schema(333, nestedFields);
-
-    IcebergSchemaExtractor extractor = IcebergSchemaExtractor.getInstance();
-    OneSchema irSchema = extractor.fromIceberg(iceSchema);
-
-    // TODO schema id is missing in oneschema
-    // Assertions.assertEquals(irSchema.getId(), iceSchema.schemaId());
-
-    Assertions.assertEquals(irSchema.getFields().size(), iceTypes.size());
-    for (int i = 0; i < iceTypes.size(); i++) {
-      OneField irField = irSchema.getFields().get(i);
-      Types.NestedField iceField = nestedFields.get(i);
-
-      Assertions.assertEquals(irField.getName(), iceField.name());
-      Assertions.assertEquals(irField.getFieldId(), iceField.fieldId());
-      Assertions.assertEquals(irField.getSchema().isNullable(), iceField.isOptional());
-      Assertions.assertEquals(
-          extractor.fromIcebergType(iceField.type()), irField.getSchema().getDataType());
-
-      // TODO doc is missing in oneschema
-      // Assertions.assertEquals(irField.getSchema().getDoc(), iceField.doc());
-    }
+    Assertions.assertTrue(
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
   }
 }
