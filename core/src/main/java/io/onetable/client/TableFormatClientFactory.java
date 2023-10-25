@@ -18,6 +18,7 @@
  
 package io.onetable.client;
 
+import io.onetable.hudi.HudiTargetClient;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -38,6 +39,8 @@ public class TableFormatClientFactory {
         return TableFormatSync.of(new IcebergClient(perTableConfig, configuration));
       case DELTA:
         return TableFormatSync.of(new DeltaClient(perTableConfig, configuration));
+      case HUDI:
+        return TableFormatSync.of(new HudiTargetClient(perTableConfig, configuration));
       default:
         throw new NotSupportedException("Target format is not yet supported: " + tableFormat);
     }
