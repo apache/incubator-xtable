@@ -35,6 +35,8 @@ import java.util.stream.IntStream;
 
 import lombok.Value;
 
+import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -89,6 +91,14 @@ public class TestSparkDeltaTable {
   SparkSession sparkSession;
   DeltaLog deltaLog;
   DeltaTable deltaTable;
+
+  public static TestSparkDeltaTable forStandardSchemaAndPartitioning(
+      String tableName,
+      Path tempDir,
+      SparkSession sparkSession,
+      boolean isPartitioned) {
+    return new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+  }
 
   public TestSparkDeltaTable(String name, Path tempDir, SparkSession sparkSession) {
     try {
