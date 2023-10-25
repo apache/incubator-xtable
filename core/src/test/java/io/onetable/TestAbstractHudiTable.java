@@ -79,6 +79,7 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.marker.MarkerType;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
+import org.apache.hudi.common.util.JsonUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieArchivalConfig;
@@ -95,6 +96,11 @@ import org.apache.hudi.keygen.TimestampBasedKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 
 public abstract class TestAbstractHudiTable implements Closeable {
+  static {
+    // ensure json modules are registered before any json serialization/deserialization
+    JsonUtils.registerModules();
+  }
+
   protected static final String RECORD_KEY_FIELD_NAME = "key";
   protected static final Schema BASIC_SCHEMA;
 
