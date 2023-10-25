@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
@@ -36,11 +37,13 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.mapping.MappingUtil;
 import org.apache.iceberg.mapping.NameMappingParser;
 
 @AllArgsConstructor(staticName = "of")
+@Log4j2
 public class IcebergTableManager {
   private static final Map<IcebergCatalogConfig, Catalog> CATALOG_CACHE = new ConcurrentHashMap<>();
   private final Configuration hadoopConfiguration;
@@ -73,9 +76,15 @@ public class IcebergTableManager {
     } else {
       return getCatalog(catalogConfig)
           .map(
-              catalog ->
-                  catalog.createTable(
-                      tableIdentifier, schema, partitionSpec, getDefaultMappingProperties(schema)))
+              catalog -> {
+                try {
+                  return catalog.createTable(
+                      tableIdentifier, schema, partitionSpec, getDefaultMappingProperties(schema));
+                } catch (AlreadyExistsException ex) {
+                  log.info("Table {} not created since it already exists", tableIdentifier);
+                  return catalog.loadTable(tableIdentifier);
+                }
+              })
           .orElseGet(
               () ->
                   getHadoopTables()
