@@ -344,7 +344,11 @@ public class ITHudiTargetClient {
     assertEquals(
         2,
         numArchivedCommits,
-        String.format("Actual num commits archived: %d but expected %d", numArchivedCommits, 2));
+        String.format(
+            "Actual num commits archived: %d but expected %d, timeline commits: %s",
+            numArchivedCommits,
+            2,
+            metaClient.getActiveTimeline().reload().filterCompletedInstants().getInstants()));
   }
 
   private OneTableMetadata incrementalSync(
