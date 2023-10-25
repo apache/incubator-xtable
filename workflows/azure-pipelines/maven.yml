@@ -2,19 +2,17 @@ trigger:
 - main
 
 pr:
-  autoCancel: true
-  branches:
-    include:
-    - main
+- main
 
 variables:
   MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
-  MAVEN_OPTS: '-ntp -B -Dmaven.repo.local=$(MAVEN_CACHE_FOLDER) -Dci'
+  MAVEN_OPTS: '-ntp -B -Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)'
 
 stages:
 - stage: build
   jobs:
   - job: Linux
-    pool: vmssagentspool
+    pool:
+      vmImage: 'ubuntu-latest'
     steps:
     - template: compile-and-test.yml
