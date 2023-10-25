@@ -13,7 +13,7 @@ steps:
       options: $(MAVEN_OPTS)
       mavenOptions: '-Xmx3072m'
       javaHomeOption: 'path'
-      jdkDirectory: '/usr/lib/jvm/openjdk-11'
+      jdkDirectory: '/usr/lib/jvm/java-11-openjdk-amd64'
       jdkVersionOption: '1.11'
       jdkArchitectureOption: 'x64'
       publishJUnitResults: true
