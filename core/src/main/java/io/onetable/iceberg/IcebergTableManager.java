@@ -82,7 +82,7 @@ public class IcebergTableManager {
                       tableIdentifier, schema, partitionSpec, getDefaultMappingProperties(schema));
                 } catch (AlreadyExistsException ex) {
                   log.info("Table {} not created since it already exists", tableIdentifier);
-                  return catalog.loadTable(tableIdentifier);
+                  return getTable(catalogConfig, tableIdentifier, basePath);
                 }
               })
           .orElseGet(
