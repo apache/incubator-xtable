@@ -178,11 +178,11 @@ public class OneTableClient {
                 .filter(
                     change ->
                         change
-                                .getCurrentTableState()
+                                .getTableAsOfChange()
                                 .getLatestCommitTime()
                                 .isAfter(lastSyncInstantByFormat.get(tableFormat).get())
                             || pendingInstantsSet.contains(
-                                change.getCurrentTableState().getLatestCommitTime()))
+                                change.getTableAsOfChange().getLatestCommitTime()))
                 .collect(Collectors.toList());
         IncrementalTableChanges tableFormatIncrementalChanges =
             IncrementalTableChanges.builder()
@@ -193,7 +193,7 @@ public class OneTableClient {
             tableFormatSync.syncChanges(tableFormatIncrementalChanges);
 
         syncedTable =
-            filteredTableChanges.get(filteredTableChanges.size() - 1).getCurrentTableState();
+            filteredTableChanges.get(filteredTableChanges.size() - 1).getTableAsOfChange();
         SyncResult latestSyncResult = syncResultList.get(syncResultList.size() - 1);
         syncResultsByFormat.put(tableFormat, latestSyncResult);
       }

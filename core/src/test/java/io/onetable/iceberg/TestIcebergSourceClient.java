@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
@@ -39,6 +40,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.apache.iceberg.*;
 import org.apache.iceberg.data.GenericRecord;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
+import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.io.DataWriter;
 import org.apache.iceberg.parquet.Parquet;
@@ -47,6 +49,7 @@ import org.apache.iceberg.types.Types;
 import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
+import io.onetable.model.TableChange;
 import io.onetable.model.schema.*;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
@@ -198,6 +201,50 @@ class TestIcebergSourceClient {
       // TODO generate test with column stats
       Assertions.assertEquals(0, oneDataFile.getColumnStats().size());
     }
+  }
+
+  @Test
+  public void testGetTableChangeForCommit(@TempDir Path workingDir) throws IOException {
+    Table catalogSales = createTestTableWithData(workingDir.toString());
+    PerTableConfig sourceTableConfig =
+        PerTableConfig.builder()
+            .tableName(catalogSales.name())
+            .tableBasePath(catalogSales.location())
+            .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
+            .build();
+
+    IcebergSourceClient sourceClient =
+        IcebergSourceClient.builder()
+            .hadoopConf(hadoopConf)
+            .sourceTableConfig(sourceTableConfig)
+            .build();
+
+    Snapshot initialCreateSnapshot = catalogSales.currentSnapshot();
+    Assertions.assertEquals(
+        5, StreamSupport.stream(catalogSales.newScan().planFiles().spliterator(), false).count());
+    TableChange tableChange = sourceClient.getTableChangeForCommit(initialCreateSnapshot);
+    validateTableChangeDiffSize(tableChange, 5, 0);
+
+    // add new commit and validate table change for old and new commit is correctly returned
+    catalogSales
+        .newDelete()
+        .deleteFromRowFilter(Expressions.lessThan("cs_sold_date_sk", 3))
+        .commit();
+    Snapshot rowsDeletedSnapshot = catalogSales.currentSnapshot();
+    Assertions.assertNotEquals(initialCreateSnapshot, rowsDeletedSnapshot);
+    sourceClient.refreshSourceTable();
+    tableChange = sourceClient.getTableChangeForCommit(rowsDeletedSnapshot);
+    validateTableChangeDiffSize(tableChange, 0, 3);
+    tableChange = sourceClient.getTableChangeForCommit(initialCreateSnapshot);
+    validateTableChangeDiffSize(tableChange, 5, 0);
+    Assertions.assertEquals(
+        2, StreamSupport.stream(catalogSales.newScan().planFiles().spliterator(), false).count());
+  }
+
+  private static void validateTableChangeDiffSize(
+      TableChange tableChange, int addedFiles, int removedFiles) {
+    Assertions.assertEquals(addedFiles, tableChange.getFilesDiff().getFilesAdded().size());
+    Assertions.assertEquals(removedFiles, tableChange.getFilesDiff().getFilesRemoved().size());
   }
 
   private void validateSchema(OneSchema readSchema, Schema expectedSchema) {

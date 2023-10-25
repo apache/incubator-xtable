@@ -491,7 +491,7 @@ public class ITHudiSourceClient {
       List<HoodieBaseFile> baseFilesAfter,
       TableChange tableChange) {
     assertNotNull(tableChange);
-    assertNotNull(tableChange.getCurrentTableState());
+    assertNotNull(tableChange.getTableAsOfChange());
     Set<String> filesForCommitBefore =
         baseFilesBefore.stream().map(BaseFile::getPath).collect(Collectors.toSet());
     Set<String> filesForCommitAfter =
