@@ -41,7 +41,7 @@ public class PerTableConfig {
   @Nonnull String tableName;
 
   /** The namespace of the table (optional) */
-  String namespace;
+  String[] namespace;
 
   /**
    * HudiSourceConfig is a config that allows us to infer partition values for hoodie source tables.

@@ -32,6 +32,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.iceberg.*;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.io.CloseableIterable;
 
@@ -67,12 +68,12 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   private Table initSourceTable() {
     IcebergTableManager tableManager = IcebergTableManager.of(hadoopConf);
-    String namespace = sourceTableConfig.getNamespace();
+    String[] namespace = sourceTableConfig.getNamespace();
     String tableName = sourceTableConfig.getTableName();
     TableIdentifier tableIdentifier =
         namespace == null
             ? TableIdentifier.of(tableName)
-            : TableIdentifier.of(namespace, tableName);
+            : TableIdentifier.of(Namespace.of(namespace), tableName);
     return tableManager.getTable(
         sourceTableConfig.getIcebergCatalogConfig(),
         tableIdentifier,

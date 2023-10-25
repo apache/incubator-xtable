@@ -33,6 +33,7 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateProperties;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 
 import io.onetable.client.PerTableConfig;
@@ -92,11 +93,11 @@ public class IcebergClient implements TargetClient {
     this.basePath = perTableConfig.getTableBasePath();
     this.configuration = configuration;
     this.snapshotRetentionInHours = perTableConfig.getTargetMetadataRetentionInHours();
-    String namespace = perTableConfig.getNamespace();
+    String[] namespace = perTableConfig.getNamespace();
     this.tableIdentifier =
         namespace == null
             ? TableIdentifier.of(tableName)
-            : TableIdentifier.of(namespace, tableName);
+            : TableIdentifier.of(Namespace.of(namespace), tableName);
     this.tableManager = tableManager;
     this.catalogConfig = perTableConfig.getIcebergCatalogConfig();
 
