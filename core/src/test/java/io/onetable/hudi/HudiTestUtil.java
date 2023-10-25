@@ -42,6 +42,7 @@ import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
 import org.apache.hudi.common.model.HoodieDeltaWriteStat;
 import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.config.HoodieArchivalConfig;
@@ -62,6 +63,7 @@ public class HudiTestUtil {
   static HoodieTableMetaClient initTableAndGetMetaClient(
       String tableBasePath, String partitionFields) {
     return HoodieTableMetaClient.withPropertyBuilder()
+        .setCommitTimezone(HoodieTimelineTimeZone.UTC)
         .setTableType(HoodieTableType.COPY_ON_WRITE)
         .setTableName("test_table")
         .setPayloadClass(HoodieAvroPayload.class)
