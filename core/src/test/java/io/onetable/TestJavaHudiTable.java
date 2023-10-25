@@ -20,7 +20,6 @@ package io.onetable;
 
 import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -36,7 +35,6 @@ import java.util.stream.Stream;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hudi.config.HoodieCompactionConfig;
 import org.junit.jupiter.api.Assertions;
 
 import org.apache.hudi.avro.HoodieAvroUtils;
@@ -65,6 +63,8 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
+
+import com.google.common.base.Preconditions;
 
 public class TestJavaHudiTable extends TestAbstractHudiTable {
   static {
@@ -288,7 +288,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, Object partitionValue, boolean checkForNoErrors) {
-    Preconditions.checkArgument(!partitionFieldNames.isEmpty(),
+    Preconditions.checkArgument(
+        !partitionFieldNames.isEmpty(),
         "To insert records for a specific partition, table has to be partitioned.");
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
@@ -300,7 +301,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, List<Object> partitionValues, boolean checkForNoErrors) {
-    Preconditions.checkArgument(!partitionFieldNames.isEmpty(),
+    Preconditions.checkArgument(
+        !partitionFieldNames.isEmpty(),
         "To insert records for a specific partitions, table has to be partitioned.");
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
@@ -365,9 +367,6 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     HoodieWriteConfig writeConfig =
         HoodieWriteConfig.newBuilder()
             .withProperties(generateWriteConfig(schema, keyGenProperties).getProps())
-            .withCompactionConfig(HoodieCompactionConfig.newBuilder()
-                .compactionSmallFileSize(0L)
-                .build())
             .withClusteringConfig(
                 HoodieClusteringConfig.newBuilder()
                     .withClusteringPlanStrategyClass(

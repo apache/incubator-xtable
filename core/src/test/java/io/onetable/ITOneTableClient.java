@@ -203,32 +203,33 @@ public class ITOneTableClient {
               .build();
       tableWithUpdatedSchema.insertRecords(100, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats,
-          tableWithUpdatedSchema.getBasePath(), 280);
+      checkDatasetEquivalence(
+          TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 280);
 
       tableWithUpdatedSchema.deleteRecords(insertedRecords.subList(60, 90), true);
-      syncWithCompactionIfRequired(tableType, tableWithUpdatedSchema, perTableConfig, oneTableClient);
-      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats,
-          tableWithUpdatedSchema.getBasePath(), 250);
+      syncWithCompactionIfRequired(
+          tableType, tableWithUpdatedSchema, perTableConfig, oneTableClient);
+      checkDatasetEquivalence(
+          TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 250);
 
       if (partitionConfig.getHudiConfig() != null) {
         // Adds new partition.
         tableWithUpdatedSchema.insertRecords(50, "TRACE", true);
         oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-        checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats,
-            tableWithUpdatedSchema.getBasePath(), 300);
+        checkDatasetEquivalence(
+            TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 300);
 
         // Drops partition.
         tableWithUpdatedSchema.deletePartition("TRACE", tableType);
         oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-        checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats,
-            tableWithUpdatedSchema.getBasePath(), 250);
+        checkDatasetEquivalence(
+            TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 250);
 
         // Insert records to the dropped partition again.
         tableWithUpdatedSchema.insertRecords(50, "TRACE", true);
         oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-        checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats,
-            tableWithUpdatedSchema.getBasePath(), 300);
+        checkDatasetEquivalence(
+            TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 300);
       }
     }
   }
@@ -285,27 +286,27 @@ public class ITOneTableClient {
               .build();
       tableWithUpdatedSchema.insertRecords(100, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-      checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats,
-          tableWithUpdatedSchema.getBasePath(), 300);
+      checkDatasetEquivalence(
+          TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 300);
 
       if (partitionConfig.getHudiConfig() != null) {
         // Adds new partition.
         tableWithUpdatedSchema.insertRecords(50, "TRACE", true);
         oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-        checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats,
-            tableWithUpdatedSchema.getBasePath(), 350);
+        checkDatasetEquivalence(
+            TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 350);
 
         // Drops partition.
         tableWithUpdatedSchema.deletePartition("TRACE", tableType);
         oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-        checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats,
-            tableWithUpdatedSchema.getBasePath(), 300);
+        checkDatasetEquivalence(
+            TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 300);
 
         // Insert records to the dropped partition again.
         tableWithUpdatedSchema.insertRecords(50, "TRACE", true);
         oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-        checkDatasetEquivalence(TableFormat.HUDI, targetTableFormats,
-            tableWithUpdatedSchema.getBasePath(), 350);
+        checkDatasetEquivalence(
+            TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 350);
       }
     }
   }
