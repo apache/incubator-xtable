@@ -43,8 +43,6 @@
         <skipTests>false</skipTests>
         <skipUTs>${skipTests}</skipUTs>
         <skipITs>${skipTests}</skipITs>
-        <!-- per forked jvm settings -->
-        <argLine>-Xmx 1024m</argLine>
     </properties>
 
     <dependencies>
@@ -406,20 +404,6 @@
         </dependencies>
     </dependencyManagement>
 
-    <profiles>
-        <profile>
-            <id>ci</id>
-            <properties>
-                <argLine>-Xmx 2048m</argLine>
-            </properties>
-            <activation>
-                <property>
-                    <name>ci</name>
-                </property>
-            </activation>
-        </profile>
-    </profiles>
-
     <build>
         <pluginManagement>
             <plugins>
@@ -498,7 +482,7 @@
                     <reuseForks>false</reuseForks>
                     <forkCount>4</forkCount>
                     <trimStackTrace>false</trimStackTrace>
-                    <argLine>${argline}</argLine>
+                    <argLine>-Xmx 1024m</argLine>
                 </configuration>
             </plugin>
             <plugin>
