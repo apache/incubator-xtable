@@ -16,55 +16,17 @@
  * limitations under the License.
  */
  
-package io.onetable.model.schema;
+package io.onetable.schema;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
-import lombok.Getter;
-import lombok.ToString;
-
-/**
- * Collection of supported types
- *
- * @since 0.1
- */
-@Getter
-@ToString
-public enum OneType {
-  RECORD,
-  ENUM,
-  LIST,
-  MAP,
-  UNION,
-  FIXED,
-  STRING,
-  BYTES,
-  INT,
-  LONG,
-  FLOAT,
-  DOUBLE,
-  BOOLEAN,
-  NULL,
-  DATE,
-  DECIMAL,
-  TIMESTAMP,
-  TIMESTAMP_NTZ;
-  private final String name;
-
-  OneType() {
-    this.name = this.name().toLowerCase();
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public class SchemaUtils {
+  public static String getFullyQualifiedPath(String path, String fieldName) {
+    if (path == null || path.isEmpty()) {
+      return fieldName;
+    }
+    return path + "." + fieldName;
   }
-
-  public static final Set<OneType> NON_SCALAR_TYPES =
-      Collections.unmodifiableSet(
-          new HashSet<OneType>() {
-            {
-              add(RECORD);
-              add(LIST);
-              add(MAP);
-              add(UNION);
-            }
-          });
 }
