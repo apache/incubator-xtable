@@ -20,6 +20,7 @@ package io.onetable;
 
 import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
 
+import com.google.common.base.Preconditions;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -181,6 +182,8 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
   }
 
   public void deletePartition(String partition, HoodieTableType tableType) {
+    Preconditions.checkArgument(!partitionFieldNames.isEmpty(),
+        "Table is not partitioned. Cannot delete partition.");
     String actionType =
         CommitUtils.getCommitActionType(WriteOperationType.DELETE_PARTITION, tableType);
     String instant = getStartCommitOfActionType(actionType);
@@ -260,6 +263,8 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, Object partitionValue, boolean checkForNoErrors) {
+    Preconditions.checkArgument(!partitionFieldNames.isEmpty(),
+        "To insert records for a specific partition, table has to be partitioned.");
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<HoodieRecord<HoodieAvroPayload>> inserts =

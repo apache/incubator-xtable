@@ -20,6 +20,7 @@ package io.onetable;
 
 import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -35,6 +36,7 @@ import java.util.stream.Stream;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hudi.config.HoodieCompactionConfig;
 import org.junit.jupiter.api.Assertions;
 
 import org.apache.hudi.avro.HoodieAvroUtils;
@@ -101,10 +103,30 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, archivalConfig);
   }
 
-  /** Upgrade schema with additional columns for the test table. */
-  public void upgradeSchemaWithAdditionalColumns() {
-    Schema updatedSchema = addSchemaEvolutionFieldsToBase(BASIC_SCHEMA);
-    this.schema = updatedSchema;
+  /**
+   * Create a test table instance with a schema that has more fields than an instance returned by
+   * {@link #forStandardSchema(String, Path, String, HoodieTableType)}. Specifically this instance
+   * will add a top level field, nested field, field within a list, and field within a map to ensure
+   * schema evolution is properly handled.
+   *
+   * @param tableName name of the table used in the test, should be unique per test within a shared
+   *     directory
+   * @param tempDir directory where table will be written, typically a temporary directory that will
+   *     be cleaned up after the tests.
+   * @param partitionConfig sets the property `hoodie.datasource.write.partitionpath.field` for the
+   *     {@link CustomKeyGenerator}. If null, {@link NonpartitionedKeyGenerator} will be used.
+   * @param tableType the table type to use (MoR or CoW)
+   * @return an instance of the class with this configuration
+   */
+  public static TestJavaHudiTable withAdditionalColumns(
+      String tableName, Path tempDir, String partitionConfig, HoodieTableType tableType) {
+    return new TestJavaHudiTable(
+        tableName,
+        addSchemaEvolutionFieldsToBase(BASIC_SCHEMA),
+        tempDir,
+        partitionConfig,
+        tableType,
+        null);
   }
 
   public static TestJavaHudiTable withAdditionalTopLevelField(
@@ -266,6 +288,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, Object partitionValue, boolean checkForNoErrors) {
+    Preconditions.checkArgument(!partitionFieldNames.isEmpty(),
+        "To insert records for a specific partition, table has to be partitioned.");
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<HoodieRecord<HoodieAvroPayload>> inserts =
@@ -276,6 +300,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, List<Object> partitionValues, boolean checkForNoErrors) {
+    Preconditions.checkArgument(!partitionFieldNames.isEmpty(),
+        "To insert records for a specific partitions, table has to be partitioned.");
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<HoodieRecord<HoodieAvroPayload>> inserts =
@@ -339,6 +365,9 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     HoodieWriteConfig writeConfig =
         HoodieWriteConfig.newBuilder()
             .withProperties(generateWriteConfig(schema, keyGenProperties).getProps())
+            .withCompactionConfig(HoodieCompactionConfig.newBuilder()
+                .compactionSmallFileSize(0L)
+                .build())
             .withClusteringConfig(
                 HoodieClusteringConfig.newBuilder()
                     .withClusteringPlanStrategyClass(
