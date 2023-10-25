@@ -74,26 +74,28 @@ class IcebergTableManager {
     if (tableExists(catalogConfig, tableIdentifier, basePath)) {
       return getTable(catalogConfig, tableIdentifier, basePath);
     } else {
-      return getCatalog(catalogConfig)
-          .map(
-              catalog -> {
-                try {
-                  return catalog.createTable(
-                      tableIdentifier, schema, partitionSpec, getDefaultMappingProperties(schema));
-                } catch (AlreadyExistsException ex) {
-                  log.info("Table {} not created since it already exists", tableIdentifier);
-                  return getTable(catalogConfig, tableIdentifier, basePath);
-                }
-              })
-          .orElseGet(
-              () ->
-                  getHadoopTables()
-                      .create(
-                          schema,
-                          partitionSpec,
-                          SortOrder.unsorted(),
-                          getDefaultMappingProperties(schema),
-                          basePath));
+      try {
+        return getCatalog(catalogConfig)
+            .map(
+                catalog ->
+                    catalog.createTable(
+                        tableIdentifier,
+                        schema,
+                        partitionSpec,
+                        getDefaultMappingProperties(schema)))
+            .orElseGet(
+                () ->
+                    getHadoopTables()
+                        .create(
+                            schema,
+                            partitionSpec,
+                            SortOrder.unsorted(),
+                            getDefaultMappingProperties(schema),
+                            basePath));
+      } catch (AlreadyExistsException ex) {
+        log.info("Table {} not created since it already exists", tableIdentifier);
+        return getTable(catalogConfig, tableIdentifier, basePath);
+      }
     }
   }
 
