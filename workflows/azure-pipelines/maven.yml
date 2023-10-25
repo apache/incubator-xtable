@@ -12,7 +12,6 @@ stages:
 - stage: build
   jobs:
   - job: Linux
-    pool:
-      vmImage: 'ubuntu-latest'
+    pool: vmssagentspool
     steps:
     - template: compile-and-test.yml
