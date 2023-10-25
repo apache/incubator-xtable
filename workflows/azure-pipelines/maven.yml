@@ -9,7 +9,7 @@ pr:
 
 variables:
   MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
-  MAVEN_OPTS: '-ntp -B -Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)'
+  MAVEN_OPTS: '-ntp -B -Dmaven.repo.local=$(MAVEN_CACHE_FOLDER) -Dci'
 
 stages:
 - stage: build
