@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.Row;
@@ -45,6 +46,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import io.onetable.TestSparkDeltaTable;
 import io.onetable.client.PerTableConfig;
@@ -279,11 +283,12 @@ public class ITDeltaSourceClient {
     // TODO: Complete and enable test (see https://github.com/onetable-io/onetable/issues/90)
   }
 
-  @Test
-  public void testInsertsUpsertsAndDeletes() throws ParseException {
+  @ParameterizedTest
+  @MethodSource("testWithPartitionToggle")
+  public void testInsertsUpsertsAndDeletes(boolean isPartitioned) throws ParseException {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -328,11 +333,12 @@ public class ITDeltaSourceClient {
     validateTableChanges(allActiveFiles, allTableChanges);
   }
 
-  @Test
-  public void testVacuum() throws ParseException {
+  @ParameterizedTest
+  @MethodSource("testWithPartitionToggle")
+  public void testVacuum(boolean isPartitioned) throws ParseException {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -377,11 +383,12 @@ public class ITDeltaSourceClient {
     validateTableChanges(allActiveFiles, allTableChanges);
   }
 
-  @Test
-  public void testAddColumns() {
+  @ParameterizedTest
+  @MethodSource("testWithPartitionToggle")
+  public void testAddColumns(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -418,11 +425,12 @@ public class ITDeltaSourceClient {
     validateTableChanges(allActiveFiles, allTableChanges);
   }
 
-  @Test
-  public void testDropPartition() {
+  @ParameterizedTest
+  @MethodSource("testWithPartitionToggle")
+  public void testDropPartition(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -484,11 +492,12 @@ public class ITDeltaSourceClient {
     validateTableChanges(allActiveFiles, allTableChanges);
   }
 
-  @Test
-  public void testOptimizeAndClustering() {
+  @ParameterizedTest
+  @MethodSource("testWithPartitionToggle")
+  public void testOptimizeAndClustering(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -560,5 +569,9 @@ public class ITDeltaSourceClient {
   private void validateSchemaCatalog(
       SchemaCatalog oneSchemaCatalog, Map<SchemaVersion, OneSchema> schemas) {
     Assertions.assertEquals(schemas, oneSchemaCatalog.getSchemas());
+  }
+
+  private static Stream<Arguments> testWithPartitionToggle() {
+    return Stream.of(Arguments.of(false), Arguments.of(true));
   }
 }

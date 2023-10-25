@@ -18,6 +18,8 @@
  
 package io.onetable;
 
+import static io.onetable.delta.TestDeltaHelper.createTestDataHelper;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -41,44 +43,16 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.functions;
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.Metadata;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
 
 import org.apache.spark.sql.delta.DeltaLog;
 
 import io.delta.tables.DeltaTable;
 
+import io.onetable.delta.TestDeltaHelper;
+
 @Value
 public class TestSparkDeltaTable {
 
-  private static final StructType PERSON_SCHEMA =
-      new StructType(
-          new StructField[] {
-            new StructField("id", DataTypes.IntegerType, false, Metadata.empty()),
-            new StructField("firstName", DataTypes.StringType, true, Metadata.empty()),
-            new StructField("lastName", DataTypes.StringType, true, Metadata.empty()),
-            new StructField("gender", DataTypes.StringType, true, Metadata.empty()),
-            new StructField("birthDate", DataTypes.TimestampType, true, Metadata.empty()),
-            new StructField("yearOfBirth", DataTypes.IntegerType, true, Metadata.empty())
-          });
-  // Until Delta 2.4 even generated columns should be provided values.
-  private static final String SQL_SELECT_TEMPLATE =
-      "SELECT %d AS id, "
-          + "'%s' AS firstName, "
-          + "'%s' AS lastName, "
-          + "'%s' AS gender, "
-          + "timestamp('%s') AS birthDate, "
-          + "year(timestamp('%s')) AS yearOfBirth";
-  private static final String SQL_SELECT_TEMPLATE_ADDITIONAL_COLUMN =
-      "SELECT %d AS id, "
-          + "'%s' AS firstName, "
-          + "'%s' AS lastName, "
-          + "'%s' AS gender, "
-          + "timestamp('%s') AS birthDate, "
-          + "year(timestamp('%s')) AS yearOfBirth, "
-          + "'%s' AS street";
   private static final Random RANDOM = new Random();
   private static final String[] GENDERS = {"Male", "Female"};
   public static final SimpleDateFormat TIMESTAMP_FORMAT =
@@ -89,13 +63,16 @@ public class TestSparkDeltaTable {
   SparkSession sparkSession;
   DeltaLog deltaLog;
   DeltaTable deltaTable;
+  TestDeltaHelper testDeltaHelper;
 
-  public TestSparkDeltaTable(String name, Path tempDir, SparkSession sparkSession) {
+  public TestSparkDeltaTable(
+      String name, Path tempDir, SparkSession sparkSession, boolean isPartitioned) {
     try {
       this.tableName = generateTableName(name);
       this.basePath = initBasePath(tempDir, tableName);
       this.sparkSession = sparkSession;
-      createTable();
+      this.testDeltaHelper = createTestDataHelper(isPartitioned);
+      createTable(testDeltaHelper.getCreateSqlStr(), tableName, basePath);
       this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
       this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
     } catch (IOException ex) {
@@ -103,22 +80,8 @@ public class TestSparkDeltaTable {
     }
   }
 
-  private void createTable() {
-    sparkSession.sql(
-        "CREATE TABLE `"
-            + tableName
-            + "` ("
-            + "    id INT, "
-            + "    firstName STRING, "
-            + "    lastName STRING, "
-            + "    gender STRING, "
-            + "    birthDate TIMESTAMP, "
-            + "    yearOfBirth INT "
-            + ") USING DELTA "
-            + "PARTITIONED BY (yearOfBirth) "
-            + "LOCATION '"
-            + basePath
-            + "'");
+  private void createTable(String sqlFormatStr, String tableName, String basePath) {
+    sparkSession.sql(String.format(sqlFormatStr, tableName, basePath));
   }
 
   public List<Row> insertRows(int numRows) {
@@ -169,7 +132,8 @@ public class TestSparkDeltaTable {
 
   public void upsertRows(List<Row> upsertRows) throws ParseException {
     List<Row> upserts = transformForUpsertsOrDeletes(upsertRows, true);
-    Dataset<Row> upsertDataset = sparkSession.createDataFrame(upserts, PERSON_SCHEMA);
+    Dataset<Row> upsertDataset =
+        sparkSession.createDataFrame(upserts, testDeltaHelper.getStructSchema());
     deltaTable
         .alias("person")
         .merge(upsertDataset.alias("source"), "person.id = source.id")
@@ -180,7 +144,8 @@ public class TestSparkDeltaTable {
 
   public void deleteRows(List<Row> deleteRows) throws ParseException {
     List<Row> deletes = transformForUpsertsOrDeletes(deleteRows, false);
-    Dataset<Row> deleteDataset = sparkSession.createDataFrame(deletes, PERSON_SCHEMA);
+    Dataset<Row> deleteDataset =
+        sparkSession.createDataFrame(deletes, testDeltaHelper.getStructSchema());
     deltaTable
         .alias("person")
         .merge(deleteDataset.alias("source"), "person.id = source.id")
@@ -242,7 +207,7 @@ public class TestSparkDeltaTable {
 
   private String generateSelectForRow(Row row) {
     return String.format(
-        SQL_SELECT_TEMPLATE,
+        testDeltaHelper.getSelectForInserts(),
         row.getInt(0),
         row.getString(1),
         row.getString(2),
@@ -253,7 +218,7 @@ public class TestSparkDeltaTable {
 
   private String generateSelectForRowWithAdditionalColumn(Row row) {
     return String.format(
-        SQL_SELECT_TEMPLATE_ADDITIONAL_COLUMN,
+        testDeltaHelper.generateSelectWithAdditionalColumn(),
         row.getInt(0),
         row.getString(1),
         row.getString(2),
