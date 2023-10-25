@@ -289,7 +289,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, Object partitionValue, boolean checkForNoErrors) {
     Preconditions.checkArgument(
-        !partitionFieldNames.isEmpty(),
+        partitionValue == null || !partitionFieldNames.isEmpty(),
         "To insert records for a specific partition, table has to be partitioned.");
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
@@ -302,7 +302,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, List<Object> partitionValues, boolean checkForNoErrors) {
     Preconditions.checkArgument(
-        !partitionFieldNames.isEmpty(),
+        partitionValues.isEmpty() || !partitionFieldNames.isEmpty(),
         "To insert records for a specific partitions, table has to be partitioned.");
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);

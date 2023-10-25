@@ -18,6 +18,8 @@
  
 package io.onetable.avro;
 
+import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -207,7 +209,7 @@ public class AvroSchemaConverter {
                 .build();
         return OneSchema.builder()
             .name(schema.getName())
-            .dataType(OneType.ARRAY)
+            .dataType(OneType.LIST)
             .comment(schema.getDoc())
             .isNullable(schema.isNullable())
             .fields(Collections.singletonList(elementField))
@@ -288,13 +290,6 @@ public class AvroSchemaConverter {
         : avroField.defaultVal();
   }
 
-  private static String getFullyQualifiedPath(String path, String fieldName) {
-    if (path == null || path.isEmpty()) {
-      return fieldName;
-    }
-    return path + "." + fieldName;
-  }
-
   public Schema fromOneSchema(OneSchema oneSchema) {
     switch (oneSchema.getDataType()) {
       case RECORD:
@@ -361,7 +356,7 @@ public class AvroSchemaConverter {
               LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG)),
               oneSchema);
         }
-      case ARRAY:
+      case LIST:
         OneSchema elementSchema =
             oneSchema.getFields().stream()
                 .filter(

@@ -94,6 +94,8 @@ import org.apache.hudi.keygen.SimpleKeyGenerator;
 import org.apache.hudi.keygen.TimestampBasedKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 
+import com.google.common.base.Preconditions;
+
 public abstract class TestAbstractHudiTable implements Closeable {
   protected static final String RECORD_KEY_FIELD_NAME = "key";
   protected static final Schema BASIC_SCHEMA;
@@ -207,6 +209,9 @@ public abstract class TestAbstractHudiTable implements Closeable {
 
   public List<HoodieRecord<HoodieAvroPayload>> generateRecords(
       int numRecords, Object partitionValue) {
+    Preconditions.checkArgument(
+        partitionValue == null || !partitionFieldNames.isEmpty(),
+        "To generate records for a specific partition, table has to be partitioned.");
     Instant currentTime = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<Instant> startTimeWindows =
         Arrays.asList(
