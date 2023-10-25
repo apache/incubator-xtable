@@ -90,11 +90,20 @@ public class ITHudiSourceClient {
       List<TableChange> allTableChanges = new ArrayList<>();
 
       String commitInstant1 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100, "INFO");
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1;
+      if (partitionConfig.getHudiConfig() != null) {
+        insertsForCommit1 = table.generateRecords(100, "INFO");
+      } else {
+        insertsForCommit1 = table.generateRecords(100);
+      }
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 
-      table.insertRecords(100, "WARN", true);
+      if (partitionConfig.getHudiConfig() != null) {
+        table.insertRecords(100, "WARN", true);
+      } else {
+        table.insertRecords(100, true);
+      }
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 
       table.upsertRecords(insertsForCommit1.subList(0, 20), true);
@@ -137,7 +146,12 @@ public class ITHudiSourceClient {
       List<TableChange> allTableChanges = new ArrayList<>();
 
       String commitInstant1 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100, "INFO");
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1;
+      if (partitionConfig.getHudiConfig() != null) {
+        insertsForCommit1 = table.generateRecords(100, "INFO");
+      } else {
+        insertsForCommit1 = table.generateRecords(100);
+      }
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 

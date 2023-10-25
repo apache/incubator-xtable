@@ -64,6 +64,8 @@ import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
+import com.google.common.base.Preconditions;
+
 public class TestJavaHudiTable extends TestAbstractHudiTable {
   static {
     // ensure json modules are registered before any json serialization/deserialization
@@ -286,6 +288,9 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, Object partitionValue, boolean checkForNoErrors) {
+    Preconditions.checkArgument(
+        partitionValue == null || !partitionFieldNames.isEmpty(),
+        "To insert records for a specific partition, table has to be partitioned.");
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<HoodieRecord<HoodieAvroPayload>> inserts =
@@ -296,6 +301,9 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, List<Object> partitionValues, boolean checkForNoErrors) {
+    Preconditions.checkArgument(
+        partitionValues.isEmpty() || !partitionFieldNames.isEmpty(),
+        "To insert records for a specific partitions, table has to be partitioned.");
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<HoodieRecord<HoodieAvroPayload>> inserts =
