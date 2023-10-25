@@ -482,7 +482,7 @@
                     <reuseForks>false</reuseForks>
                     <forkCount>4</forkCount>
                     <trimStackTrace>false</trimStackTrace>
-                    <argLine>-Xmx 1024m</argLine>
+                    <argLine>-Xmx1024m</argLine>
                 </configuration>
             </plugin>
             <plugin>
