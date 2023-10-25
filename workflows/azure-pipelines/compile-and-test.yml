@@ -11,7 +11,7 @@ steps:
     inputs:
       mavenPomFile: 'pom.xml'
       options: $(MAVEN_OPTS)
-      mavenOptions: '-Xmx3072m'
+      mavenOptions: '-Xmx2048m'
       javaHomeOption: 'path'
       jdkDirectory: '/usr/lib/jvm/java-11-openjdk-amd64'
       jdkVersionOption: '1.11'
