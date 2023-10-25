@@ -24,6 +24,7 @@ import static io.onetable.ValidationTestHelper.validateTableChanges;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.time.Instant;
@@ -70,6 +71,27 @@ import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.TableFormat;
 
 public class ITDeltaSourceClient {
+
+  private static final OneField COL1_INT_FIELD =
+      OneField.builder()
+          .name("col1")
+          .schema(
+              OneSchema.builder().name("integer").dataType(OneType.INT).isNullable(true).build())
+          .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+          .build();
+  private static final ColumnStat COL1_COLUMN_STAT =
+      ColumnStat.builder().range(Range.vector(1, 1)).numNulls(0).numValues(1).totalSize(0).build();
+
+  private static final OneField COL2_INT_FIELD =
+      OneField.builder()
+          .name("col2")
+          .schema(
+              OneSchema.builder().name("integer").dataType(OneType.INT).isNullable(true).build())
+          .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+          .build();
+  private static final ColumnStat COL2_COLUMN_STAT =
+      ColumnStat.builder().range(Range.vector(2, 2)).numNulls(0).numValues(1).totalSize(0).build();
+
   @TempDir private static Path tempDir;
   private static SparkSession sparkSession;
 
@@ -129,28 +151,7 @@ public class ITDeltaSourceClient {
     // Get current snapshot
     OneSnapshot snapshot = client.getCurrentSnapshot();
     // Validate table
-    List<OneField> fields =
-        Arrays.asList(
-            OneField.builder()
-                .name("col1")
-                .schema(
-                    OneSchema.builder()
-                        .name("integer")
-                        .dataType(OneType.INT)
-                        .isNullable(true)
-                        .build())
-                .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                .build(),
-            OneField.builder()
-                .name("col2")
-                .schema(
-                    OneSchema.builder()
-                        .name("integer")
-                        .dataType(OneType.INT)
-                        .isNullable(true)
-                        .build())
-                .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                .build());
+    List<OneField> fields = Arrays.asList(COL1_INT_FIELD, COL2_INT_FIELD);
     validateTable(
         snapshot.getTable(),
         tableName,
@@ -166,22 +167,8 @@ public class ITDeltaSourceClient {
         Collections.singletonMap(new SchemaVersion(1, ""), snapshot.getTable().getReadSchema()));
     // Validate data files
     Map<OneField, ColumnStat> columnStats = new HashMap<>();
-    columnStats.put(
-        fields.get(0),
-        ColumnStat.builder()
-            .range(Range.vector(1, 1))
-            .numNulls(0)
-            .numValues(1)
-            .totalSize(0)
-            .build());
-    columnStats.put(
-        fields.get(1),
-        ColumnStat.builder()
-            .range(Range.vector(2, 2))
-            .numNulls(0)
-            .numValues(1)
-            .totalSize(0)
-            .build());
+    columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
+    columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getDataFiles().getFiles().size());
     validatePartitionDataFiles(
         OneDataFiles.collectionBuilder()
@@ -235,29 +222,7 @@ public class ITDeltaSourceClient {
                     .build())
             .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
             .build();
-    List<OneField> fields =
-        Arrays.asList(
-            partCol,
-            OneField.builder()
-                .name("col1")
-                .schema(
-                    OneSchema.builder()
-                        .name("integer")
-                        .dataType(OneType.INT)
-                        .isNullable(true)
-                        .build())
-                .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                .build(),
-            OneField.builder()
-                .name("col2")
-                .schema(
-                    OneSchema.builder()
-                        .name("integer")
-                        .dataType(OneType.INT)
-                        .isNullable(true)
-                        .build())
-                .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
-                .build());
+    List<OneField> fields = Arrays.asList(partCol, COL1_INT_FIELD, COL2_INT_FIELD);
     validateTable(
         snapshot.getTable(),
         tableName,
@@ -277,22 +242,8 @@ public class ITDeltaSourceClient {
         Collections.singletonMap(new SchemaVersion(1, ""), snapshot.getTable().getReadSchema()));
     // Validate data files
     Map<OneField, ColumnStat> columnStats = new HashMap<>();
-    columnStats.put(
-        fields.get(1),
-        ColumnStat.builder()
-            .range(Range.vector(1, 1))
-            .numNulls(0)
-            .numValues(1)
-            .totalSize(0)
-            .build());
-    columnStats.put(
-        fields.get(2),
-        ColumnStat.builder()
-            .range(Range.vector(2, 2))
-            .numNulls(0)
-            .numValues(1)
-            .totalSize(0)
-            .build());
+    columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
+    columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getDataFiles().getFiles().size());
     validatePartitionDataFiles(
         OneDataFiles.collectionBuilder()
@@ -648,11 +599,13 @@ public class ITDeltaSourceClient {
 
   private void validatePropertiesDataFile(OneDataFile expected, OneDataFile actual) {
     Assertions.assertEquals(expected.getSchemaVersion(), actual.getSchemaVersion());
+    Assertions.assertTrue(Paths.get(actual.getPhysicalPath()).isAbsolute());
     Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
     Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
     Assertions.assertEquals(expected.getPartitionPath(), actual.getPartitionPath());
     Assertions.assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
     Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
+    Assertions.assertTrue(actual.getLastModified() > 1672560000); // After 2023-01-01
     Assertions.assertEquals(expected.getColumnStats(), actual.getColumnStats());
   }
 }
