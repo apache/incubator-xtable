@@ -1,4 +1,10 @@
 steps:
+  - script: |
+      java -version
+    env:
+      JAVA_HOME_11_X64: /usr/lib/jvm/openjdk-11
+      JAVA_HOME: $(JAVA_HOME_11_X64)
+      PATH: $(JAVA_HOME_11_X64)/bin:$(PATH)
   - task: Cache@2
     inputs:
       key: 'maven | "$(Agent.OS)" | **/pom.xml'
