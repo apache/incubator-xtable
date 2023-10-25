@@ -610,7 +610,7 @@ public class TestDeltaSchemaExtractor {
                             OneSchema.builder()
                                 .name("array")
                                 .isNullable(false)
-                                .dataType(OneType.ARRAY)
+                                .dataType(OneType.LIST)
                                 .fields(
                                     Collections.singletonList(
                                         OneField.builder()
@@ -631,7 +631,7 @@ public class TestDeltaSchemaExtractor {
                             OneSchema.builder()
                                 .name("array")
                                 .isNullable(true)
-                                .dataType(OneType.ARRAY)
+                                .dataType(OneType.LIST)
                                 .fields(
                                     Collections.singletonList(
                                         OneField.builder()

@@ -18,6 +18,8 @@
  
 package io.onetable.delta;
 
+import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -122,7 +124,7 @@ public class DeltaSchemaExtractor {
                 .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
         return DataTypes.createMapType(
             convertFieldType(key), convertFieldType(value), value.getSchema().isNullable());
-      case ARRAY:
+      case LIST:
         OneField element =
             field.getSchema().getFields().stream()
                 .filter(
@@ -229,7 +231,7 @@ public class DeltaSchemaExtractor {
                 .parentPath(parentPath)
                 .schema(elementSchema)
                 .build();
-        type = OneType.ARRAY;
+        type = OneType.LIST;
         fields = Collections.singletonList(elementField);
         break;
       case "map":
@@ -272,12 +274,5 @@ public class DeltaSchemaExtractor {
         .metadata(metadata)
         .fields(fields)
         .build();
-  }
-
-  private static String getFullyQualifiedPath(String path, String fieldName) {
-    if (path == null || path.isEmpty()) {
-      return fieldName;
-    }
-    return path + "." + fieldName;
   }
 }
