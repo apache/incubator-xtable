@@ -18,7 +18,6 @@
  
 package io.onetable.client;
 
-import io.onetable.hudi.HudiTargetClient;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -26,6 +25,7 @@ import org.apache.hadoop.conf.Configuration;
 
 import io.onetable.delta.DeltaClient;
 import io.onetable.exception.NotSupportedException;
+import io.onetable.hudi.HudiTargetClient;
 import io.onetable.iceberg.IcebergClient;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.sync.TableFormatSync;
