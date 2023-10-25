@@ -96,6 +96,11 @@
                 <artifactId>parquet-avro</artifactId>
                 <version>${parquet.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.apache.parquet</groupId>
+                <artifactId>parquet-hadoop</artifactId>
+                <version>${parquet.version}</version>
+            </dependency>
 
             <!-- Logging -->
             <dependency>
