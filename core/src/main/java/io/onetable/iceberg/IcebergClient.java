@@ -92,13 +92,13 @@ public class IcebergClient implements TargetClient {
     this.basePath = perTableConfig.getTableBasePath();
     this.configuration = configuration;
     this.snapshotRetentionInHours = perTableConfig.getTargetMetadataRetentionInHours();
-    String namespace = perTableConfig.getIcebergTargetConfig().getNamespace();
+    String namespace = perTableConfig.getNamespace();
     this.tableIdentifier =
         namespace == null
             ? TableIdentifier.of(tableName)
             : TableIdentifier.of(namespace, tableName);
     this.tableManager = tableManager;
-    this.catalogConfig = perTableConfig.getIcebergTargetConfig().getCatalogConfig();
+    this.catalogConfig = perTableConfig.getIcebergCatalogConfig();
 
     if (tableManager.tableExists(catalogConfig, tableIdentifier, basePath)) {
       // Load the table state if it already exists

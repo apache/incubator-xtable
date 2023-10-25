@@ -67,14 +67,14 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   private Table initSourceTable() {
     IcebergTableManager tableManager = IcebergTableManager.of(hadoopConf);
-    String namespace = sourceTableConfig.getIcebergTargetConfig().getNamespace();
+    String namespace = sourceTableConfig.getNamespace();
     String tableName = sourceTableConfig.getTableName();
     TableIdentifier tableIdentifier =
         namespace == null
             ? TableIdentifier.of(tableName)
             : TableIdentifier.of(namespace, tableName);
     return tableManager.getTable(
-        sourceTableConfig.getIcebergTargetConfig().getCatalogConfig(),
+        sourceTableConfig.getIcebergCatalogConfig(),
         tableIdentifier,
         sourceTableConfig.getTableBasePath());
   }

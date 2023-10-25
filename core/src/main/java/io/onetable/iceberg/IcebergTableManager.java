@@ -44,7 +44,7 @@ import org.apache.iceberg.mapping.NameMappingParser;
 
 @AllArgsConstructor(staticName = "of")
 @Log4j2
-public class IcebergTableManager {
+class IcebergTableManager {
   private static final Map<IcebergCatalogConfig, Catalog> CATALOG_CACHE = new ConcurrentHashMap<>();
   private final Configuration hadoopConfiguration;
 
