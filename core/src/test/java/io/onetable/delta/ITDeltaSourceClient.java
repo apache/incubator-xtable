@@ -81,6 +81,9 @@ public class ITDeltaSourceClient {
                 "org.apache.spark.sql.delta.catalog.DeltaCatalog")
             .config("spark.databricks.delta.retentionDurationCheck.enabled", "false")
             .config("spark.databricks.delta.schema.autoMerge.enabled", "true")
+            .config("spark.sql.shuffle.partitions", "1")
+            .config("spark.default.parallelism", "1")
+            .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
             .getOrCreate();
   }
 

@@ -33,6 +33,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -42,6 +43,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -56,9 +58,11 @@ import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieFileGroup;
 import org.apache.hudi.common.model.HoodieRecord;
+import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.Option;
@@ -118,6 +122,14 @@ public class ITHudiTargetClient {
                   OneField.builder().name(OTHER_FIELD_NAME).schema(STRING_SCHEMA).build()))
           .build();
   private final String tableBasePath = tempDir.resolve(UUID.randomUUID().toString()).toString();
+
+  @BeforeAll
+  public static void setupOnce() {
+    // avoids issues with Hudi default usage of local timezone when setting up tests
+    HoodieInstantTimeGenerator.setCommitTimeZone(HoodieTimelineTimeZone.UTC);
+    TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+    System.setProperty("user.timezone", "GMT");
+  }
 
   @Test
   void syncForExistingTable() {
@@ -318,10 +330,23 @@ public class ITHudiTargetClient {
         Collections.emptyList(),
         Instant.now());
 
+    // create another commit that should trigger archival of the first two commits
+    String fileName5 = "file_5.parquet";
+    String filePath5 = getFilePath(partitionPath, fileName5);
+    incrementalSync(
+        targetClient,
+        Collections.singletonList(getTestFile(partitionPath, fileName5)),
+        Collections.emptyList(),
+        Instant.now());
+
     assertFileGroupCorrectness(
         metaClient,
         partitionPath,
-        Arrays.asList(file0Pair, Pair.of(fileName3, filePath3), Pair.of(fileName4, filePath4)));
+        Arrays.asList(
+            file0Pair,
+            Pair.of(fileName3, filePath3),
+            Pair.of(fileName4, filePath4),
+            Pair.of(fileName5, filePath5)));
     // col stats should be cleaned up for fileName1 but present for fileName2 and fileName3
     try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
         new HoodieBackedTableMetadata(

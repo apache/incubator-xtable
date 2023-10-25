@@ -37,6 +37,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -77,6 +78,16 @@ public class ITHudiSourceClient {
         .hadoopConfiguration()
         .set("parquet.avro.write-old-list-structure", "false");
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
+  }
+
+  @AfterAll
+  public static void teardown() {
+    if (jsc != null) {
+      jsc.close();
+    }
+    if (sparkSession != null) {
+      sparkSession.close();
+    }
   }
 
   @ParameterizedTest
