@@ -23,11 +23,14 @@ import static io.onetable.ValidationTestHelper.validateOneSnapshot;
 import static io.onetable.ValidationTestHelper.validateTableChanges;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -129,7 +132,7 @@ public class ITDeltaSourceClient {
   }
 
   @Test
-  void getCurrentSnapshotNonPartitionedTest() {
+  void getCurrentSnapshotNonPartitionedTest() throws URISyntaxException {
     // Table name
     final String tableName = getTableName();
     final Path basePath = tempDir.resolve(tableName);
@@ -188,7 +191,7 @@ public class ITDeltaSourceClient {
   }
 
   @Test
-  void getCurrentSnapshotPartitionedTest() {
+  void getCurrentSnapshotPartitionedTest() throws URISyntaxException {
     // Table name
     final String tableName = getTableName();
     final Path basePath = tempDir.resolve(tableName);
@@ -583,29 +586,53 @@ public class ITDeltaSourceClient {
   }
 
   private void validatePartitionDataFiles(
-      OneDataFiles expectedPartitionFiles, OneDataFiles actualPartitionFiles) {
-    validatePropertiesDataFile(expectedPartitionFiles, actualPartitionFiles);
+      OneDataFiles expectedPartitionFiles, OneDataFiles actualPartitionFiles)
+      throws URISyntaxException {
+    validatePropertiesDataFile(expectedPartitionFiles, actualPartitionFiles, false);
     validateDataFiles(expectedPartitionFiles.getFiles(), actualPartitionFiles.getFiles());
   }
 
-  private void validateDataFiles(List<OneDataFile> expectedFiles, List<OneDataFile> actualFiles) {
+  private void validateDataFiles(List<OneDataFile> expectedFiles, List<OneDataFile> actualFiles)
+      throws URISyntaxException {
     Assertions.assertEquals(expectedFiles.size(), actualFiles.size());
     for (int i = 0; i < expectedFiles.size(); i++) {
       OneDataFile expected = expectedFiles.get(i);
       OneDataFile actual = actualFiles.get(i);
-      validatePropertiesDataFile(expected, actual);
+      validatePropertiesDataFile(expected, actual, true);
     }
   }
 
-  private void validatePropertiesDataFile(OneDataFile expected, OneDataFile actual) {
+  private void validatePropertiesDataFile(
+      OneDataFile expected, OneDataFile actual, boolean dataFile) throws URISyntaxException {
     Assertions.assertEquals(expected.getSchemaVersion(), actual.getSchemaVersion());
-    Assertions.assertTrue(Paths.get(actual.getPhysicalPath()).isAbsolute());
+    if (dataFile) {
+      Assertions.assertTrue(
+          Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
+          () -> "path == " + actual.getPhysicalPath() + " is not absolute");
+    } else {
+      Assertions.assertNull(actual.getPhysicalPath());
+    }
     Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
     Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
     Assertions.assertEquals(expected.getPartitionPath(), actual.getPartitionPath());
     Assertions.assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
     Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
-    Assertions.assertTrue(actual.getLastModified() > 1672560000); // After 2023-01-01
+    if (dataFile) {
+      Instant now = Instant.now();
+      long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
+      long maxRange = now.toEpochMilli();
+      Assertions.assertTrue(
+          actual.getLastModified() > minRange && actual.getLastModified() <= maxRange,
+          () ->
+              "last modified == "
+                  + actual.getLastModified()
+                  + " is expected between "
+                  + minRange
+                  + " and "
+                  + maxRange);
+    } else {
+      Assertions.assertEquals(0, actual.getLastModified());
+    }
     Assertions.assertEquals(expected.getColumnStats(), actual.getColumnStats());
   }
 }
