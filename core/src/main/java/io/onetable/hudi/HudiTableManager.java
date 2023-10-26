@@ -44,6 +44,14 @@ import io.onetable.model.schema.OnePartitionField;
 @Log4j2
 @RequiredArgsConstructor(staticName = "of")
 class HudiTableManager {
+  private static final String NONPARTITIONED_KEY_GENERATOR =
+      "org.apache.hudi.keygen.NonpartitionedKeyGenerator";
+  private static final String CUSTOM_KEY_GENERATOR = "org.apache.hudi.keygen.CustomKeyGenerator";
+  private static final String TIMESTAMP_BASED_KEY_GENERATOR =
+      "org.apache.hudi.keygen.TimestampBasedKeyGenerator";
+  private static final String COMPLEX_KEY_GENERATOR = "org.apache.hudi.keygen.ComplexKeyGenerator";
+  private static final String SIMPLE_KEY_GENERATOR = "org.apache.hudi.keygen.SimpleKeyGenerator";
+
   private final Configuration configuration;
 
   /**
@@ -115,24 +123,24 @@ class HudiTableManager {
     boolean multiplePartitionFields = partitionFields.size() > 1;
     String keyGeneratorClass;
     if (partitionFields.isEmpty()) {
-      keyGeneratorClass = "org.apache.hudi.keygen.NonpartitionedKeyGenerator";
+      keyGeneratorClass = NONPARTITIONED_KEY_GENERATOR;
     } else {
       if (partitionFields.stream()
           .anyMatch(onePartitionField -> onePartitionField.getTransformType().isTimeBased())) {
         if (multiplePartitionFields) {
           // if there is more than one partition field and one of them is a date, we need to use
           // CustomKeyGenerator
-          keyGeneratorClass = "org.apache.hudi.keygen.CustomKeyGenerator";
+          keyGeneratorClass = CUSTOM_KEY_GENERATOR;
         } else {
           // if there is only one partition field and it is a date, we can use
           // TimestampBasedKeyGenerator
-          keyGeneratorClass = "org.apache.hudi.keygen.TimestampBasedKeyGenerator";
+          keyGeneratorClass = TIMESTAMP_BASED_KEY_GENERATOR;
         }
       } else {
         keyGeneratorClass =
             multipleRecordKeyFields || multiplePartitionFields
-                ? "org.apache.hudi.keygen.ComplexKeyGenerator"
-                : "org.apache.hudi.keygen.SimpleKeyGenerator";
+                ? COMPLEX_KEY_GENERATOR
+                : SIMPLE_KEY_GENERATOR;
       }
     }
     return keyGeneratorClass;
