@@ -43,6 +43,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -64,6 +66,7 @@ import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.TableFormat;
 
+@Execution(ExecutionMode.SAME_THREAD)
 public class ITDeltaSourceClient {
   @TempDir private static Path tempDir;
   private static SparkSession sparkSession;
