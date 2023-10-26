@@ -162,7 +162,7 @@ class TestIcebergSourceClient {
     verify(spyClient, times(1)).getTable(iceCurrentSnapshot);
     verify(spyClient, times(1)).getSchemaCatalog(oneSnapshot.getTable(), iceCurrentSnapshot);
     verify(spyPartitionConverter, times(5)).toOneTable(any(), any());
-    verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any());
+    verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any(), any());
 
     Assertions.assertNotNull(oneSnapshot.getDataFiles());
     List<OneDataFile> dataFileChunks = oneSnapshot.getDataFiles().getFiles();

@@ -141,7 +141,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
       List<OneDataFile> irFiles = new ArrayList<>();
       for (FileScanTask fileScanTask : files) {
         DataFile file = fileScanTask.file();
-        OneDataFile irDataFile = fromIceberg(file, partitionSpec);
+        OneDataFile irDataFile = fromIceberg(file, partitionSpec, irTable.getReadSchema());
         irFiles.add(irDataFile);
       }
       oneDataFiles = clusterFilesByPartition(irFiles);
@@ -157,10 +157,11 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         .build();
   }
 
-  private OneDataFile fromIceberg(DataFile file, PartitionSpec partitionSpec) {
+  private OneDataFile fromIceberg(
+      DataFile file, PartitionSpec partitionSpec, OneSchema readSchema) {
     Map<OnePartitionField, Range> onePartitionFieldRangeMap =
         partitionConverter.toOneTable(file.partition(), partitionSpec);
-    return dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap);
+    return dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap, readSchema);
   }
 
   /**
@@ -191,15 +192,16 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     FileIO fileIO = getTableOps();
     Table iceTable = getSourceTable();
     PartitionSpec partitionSpec = iceTable.spec();
+    OneTable irTable = getTable(snapshot);
 
     Set<OneDataFile> dataFilesAdded =
         StreamSupport.stream(snapshot.addedDataFiles(fileIO).spliterator(), false)
-            .map(dataFile -> fromIceberg(dataFile, partitionSpec))
+            .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable.getReadSchema()))
             .collect(Collectors.toSet());
 
     Set<OneDataFile> dataFilesRemoved =
         StreamSupport.stream(snapshot.removedDataFiles(fileIO).spliterator(), false)
-            .map(dataFile -> fromIceberg(dataFile, partitionSpec))
+            .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable.getReadSchema()))
             .collect(Collectors.toSet());
 
     OneDataFilesDiff filesDiff =
