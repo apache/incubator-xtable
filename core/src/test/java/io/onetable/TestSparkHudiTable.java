@@ -57,6 +57,8 @@ import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
+import com.google.common.base.Preconditions;
+
 public class TestSparkHudiTable extends TestAbstractHudiTable {
   private final JavaSparkContext jsc;
   private SparkRDDWriteClient<HoodieAvroPayload> sparkWriteClient;
@@ -116,17 +118,6 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
         tableType);
   }
 
-  public static TestSparkHudiTable withAdditionalTopLevelField(
-      String tableName,
-      Path tempDir,
-      JavaSparkContext jsc,
-      String partitionConfig,
-      HoodieTableType tableType,
-      Schema previousSchema) {
-    return new TestSparkHudiTable(
-        tableName, addTopLevelField(previousSchema), tempDir, jsc, partitionConfig, tableType);
-  }
-
   private TestSparkHudiTable(
       String name,
       Schema schema,
@@ -179,17 +170,22 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
     return deletes;
   }
 
-  public List<HoodieBaseFile> getAllLatestBaseFiles() {
+  public List<String> getAllLatestBaseFilePaths() {
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             sparkWriteClient.getEngineContext(),
             metaClient,
             metaClient.reloadActiveTimeline(),
             getHoodieWriteConfig(metaClient).getMetadataConfig());
-    return getAllLatestBaseFiles(fsView);
+    return getAllLatestBaseFiles(fsView).stream()
+        .map(HoodieBaseFile::getPath)
+        .collect(Collectors.toList());
   }
 
   public void deletePartition(String partition, HoodieTableType tableType) {
+    Preconditions.checkArgument(
+        partition == null || !partitionFieldNames.isEmpty(),
+        "Table is not partitioned. Cannot delete partition.");
     String actionType =
         CommitUtils.getCommitActionType(WriteOperationType.DELETE_PARTITION, tableType);
     String instant = getStartCommitOfActionType(actionType);
@@ -269,6 +265,9 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, Object partitionValue, boolean checkForNoErrors) {
+    Preconditions.checkArgument(
+        partitionValue == null || !partitionFieldNames.isEmpty(),
+        "To insert records for a specific partition, table has to be partitioned.");
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<HoodieRecord<HoodieAvroPayload>> inserts =

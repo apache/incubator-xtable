@@ -16,55 +16,19 @@
  * limitations under the License.
  */
  
-package io.onetable.model.schema;
+package io.onetable.iceberg;
 
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Map;
 
-import lombok.Getter;
-import lombok.ToString;
+import lombok.Builder;
+import lombok.NonNull;
+import lombok.Value;
 
-/**
- * Collection of supported types
- *
- * @since 0.1
- */
-@Getter
-@ToString
-public enum OneType {
-  RECORD,
-  ENUM,
-  LIST,
-  MAP,
-  UNION,
-  FIXED,
-  STRING,
-  BYTES,
-  INT,
-  LONG,
-  FLOAT,
-  DOUBLE,
-  BOOLEAN,
-  NULL,
-  DATE,
-  DECIMAL,
-  TIMESTAMP,
-  TIMESTAMP_NTZ;
-  private final String name;
-
-  OneType() {
-    this.name = this.name().toLowerCase();
-  }
-
-  public static final Set<OneType> NON_SCALAR_TYPES =
-      Collections.unmodifiableSet(
-          new HashSet<OneType>() {
-            {
-              add(RECORD);
-              add(LIST);
-              add(MAP);
-              add(UNION);
-            }
-          });
+@Value
+@Builder
+public class IcebergCatalogConfig {
+  @NonNull String catalogImpl;
+  @NonNull String catalogName;
+  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
 }

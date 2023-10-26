@@ -55,7 +55,6 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
-import org.apache.hudi.common.util.JsonUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieClusteringConfig;
@@ -64,12 +63,9 @@ import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
-public class TestJavaHudiTable extends TestAbstractHudiTable {
-  static {
-    // ensure json modules are registered before any json serialization/deserialization
-    JsonUtils.registerModules();
-  }
+import com.google.common.base.Preconditions;
 
+public class TestJavaHudiTable extends TestAbstractHudiTable {
   private HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
   private final Configuration conf;
   /**
@@ -260,14 +256,16 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     return upsertRecordsWithCommitAlreadyStarted(records, instant, checkForNoErrors);
   }
 
-  public List<HoodieBaseFile> getAllLatestBaseFiles() {
+  public List<String> getAllLatestBaseFilePaths() {
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             javaWriteClient.getEngineContext(),
             metaClient,
             metaClient.reloadActiveTimeline(),
             getHoodieWriteConfig(metaClient).getMetadataConfig());
-    return getAllLatestBaseFiles(fsView);
+    return getAllLatestBaseFiles(fsView).stream()
+        .map(HoodieBaseFile::getPath)
+        .collect(Collectors.toList());
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
@@ -284,6 +282,9 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, Object partitionValue, boolean checkForNoErrors) {
+    Preconditions.checkArgument(
+        partitionValue == null || !partitionFieldNames.isEmpty(),
+        "To insert records for a specific partition, table has to be partitioned.");
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<HoodieRecord<HoodieAvroPayload>> inserts =
@@ -294,6 +295,9 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, List<Object> partitionValues, boolean checkForNoErrors) {
+    Preconditions.checkArgument(
+        partitionValues.isEmpty() || !partitionFieldNames.isEmpty(),
+        "To insert records for a specific partitions, table has to be partitioned.");
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<HoodieRecord<HoodieAvroPayload>> inserts =

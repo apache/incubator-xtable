@@ -354,7 +354,7 @@ public class TestAvroSchemaConverter {
                             OneSchema.builder()
                                 .name("array")
                                 .isNullable(false)
-                                .dataType(OneType.ARRAY)
+                                .dataType(OneType.LIST)
                                 .fields(
                                     Arrays.asList(
                                         OneField.builder()
@@ -375,7 +375,7 @@ public class TestAvroSchemaConverter {
                             OneSchema.builder()
                                 .name("array")
                                 .isNullable(true)
-                                .dataType(OneType.ARRAY)
+                                .dataType(OneType.LIST)
                                 .fields(
                                     Arrays.asList(
                                         OneField.builder()
@@ -785,7 +785,7 @@ public class TestAvroSchemaConverter {
                             OneSchema.builder()
                                 .name("array")
                                 .isNullable(false)
-                                .dataType(OneType.ARRAY)
+                                .dataType(OneType.LIST)
                                 .fields(
                                     Arrays.asList(
                                         OneField.builder()
@@ -824,7 +824,7 @@ public class TestAvroSchemaConverter {
                             OneSchema.builder()
                                 .name("array")
                                 .isNullable(false)
-                                .dataType(OneType.ARRAY)
+                                .dataType(OneType.LIST)
                                 .fields(
                                     Arrays.asList(
                                         OneField.builder()

@@ -16,55 +16,10 @@
  * limitations under the License.
  */
  
-package io.onetable.model.schema;
+package io.onetable.testutil;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+public class Issues {
 
-import lombok.Getter;
-import lombok.ToString;
-
-/**
- * Collection of supported types
- *
- * @since 0.1
- */
-@Getter
-@ToString
-public enum OneType {
-  RECORD,
-  ENUM,
-  LIST,
-  MAP,
-  UNION,
-  FIXED,
-  STRING,
-  BYTES,
-  INT,
-  LONG,
-  FLOAT,
-  DOUBLE,
-  BOOLEAN,
-  NULL,
-  DATE,
-  DECIMAL,
-  TIMESTAMP,
-  TIMESTAMP_NTZ;
-  private final String name;
-
-  OneType() {
-    this.name = this.name().toLowerCase();
-  }
-
-  public static final Set<OneType> NON_SCALAR_TYPES =
-      Collections.unmodifiableSet(
-          new HashSet<OneType>() {
-            {
-              add(RECORD);
-              add(LIST);
-              add(MAP);
-              add(UNION);
-            }
-          });
+  /** Refer to <a href="https://github.com/onetable-io/onetable/issues/102">GitHub #102</a> */
+  public static final boolean ISSUE_102_FIXED = false;
 }

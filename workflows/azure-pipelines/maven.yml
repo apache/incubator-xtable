@@ -2,7 +2,10 @@ trigger:
 - main
 
 pr:
-- main
+  autoCancel: true
+  branches:
+    include:
+    - main
 
 variables:
   MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
@@ -12,7 +15,6 @@ stages:
 - stage: build
   jobs:
   - job: Linux
-    pool:
-      vmImage: 'ubuntu-latest'
+    pool: vmssagentspool
     steps:
     - template: compile-and-test.yml

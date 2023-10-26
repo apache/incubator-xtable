@@ -110,6 +110,18 @@
       "default": []
     },
     {
+      "name": "enum_field",
+      "type": {
+        "type": "enum",
+        "name": "SampleEnum",
+        "symbols": [
+          "FIRST",
+          "SECOND"
+        ]
+      },
+      "default": "FIRST"
+    },
+    {
       "name": "date_nullable_field",
       "type": [
         "null",

@@ -127,7 +127,7 @@ public class RunSync {
       PerTableConfig config =
           PerTableConfig.builder()
               .tableBasePath(table.getTableBasePath())
-              .tableName(table.getTableBasePath())
+              .tableName(table.getTableName())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
                       .partitionSpecExtractorClass(
