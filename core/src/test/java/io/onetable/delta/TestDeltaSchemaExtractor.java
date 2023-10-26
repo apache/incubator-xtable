@@ -324,6 +324,9 @@ public class TestDeltaSchemaExtractor {
 
   @Test
   public void testTimestamps() {
+    Map<OneSchema.MetadataKey, Object> metadata =
+        Collections.singletonMap(
+            OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
     OneSchema oneSchemaRepresentationTimestamp =
         OneSchema.builder()
             .name("struct")
@@ -338,6 +341,7 @@ public class TestDeltaSchemaExtractor {
                                 .name("timestamp")
                                 .dataType(OneType.TIMESTAMP)
                                 .isNullable(false)
+                                .metadata(metadata)
                                 .build())
                         .build(),
                     OneField.builder()
@@ -347,6 +351,7 @@ public class TestDeltaSchemaExtractor {
                                 .name("timestamp")
                                 .dataType(OneType.TIMESTAMP)
                                 .isNullable(true)
+                                .metadata(metadata)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
                         .build()))

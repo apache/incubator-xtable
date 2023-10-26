@@ -345,6 +345,10 @@ public class ITDeltaSourceClient {
     DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
     assertEquals(180L, testSparkDeltaTable.getNumRows());
     OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+
+    if (isPartitioned) {
+      validateDeltaPartitioning(oneSnapshot);
+    }
     validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
@@ -395,6 +399,9 @@ public class ITDeltaSourceClient {
     DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
     assertEquals(130L, testSparkDeltaTable.getNumRows());
     OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    if (isPartitioned) {
+      validateDeltaPartitioning(oneSnapshot);
+    }
     validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
@@ -437,6 +444,9 @@ public class ITDeltaSourceClient {
     DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
     assertEquals(150L, testSparkDeltaTable.getNumRows());
     OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    if (isPartitioned) {
+      validateDeltaPartitioning(oneSnapshot);
+    }
     validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
@@ -490,6 +500,8 @@ public class ITDeltaSourceClient {
     assertEquals(
         120 - rowsByPartition.get(partitionValueToDelete).size(), testSparkDeltaTable.getNumRows());
     OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+
+    validateDeltaPartitioning(oneSnapshot);
     validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
@@ -544,6 +556,9 @@ public class ITDeltaSourceClient {
     DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
     assertEquals(250L, testSparkDeltaTable.getNumRows());
     OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    if (isPartitioned) {
+      validateDeltaPartitioning(oneSnapshot);
+    }
     validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
@@ -557,6 +572,14 @@ public class ITDeltaSourceClient {
       allTableChanges.add(tableChange);
     }
     validateTableChanges(allActiveFiles, allTableChanges);
+  }
+
+  private void validateDeltaPartitioning(OneSnapshot oneSnapshot) {
+    List<OnePartitionField> partitionFields = oneSnapshot.getTable().getPartitioningFields();
+    assertEquals(1, partitionFields.size());
+    OnePartitionField partitionField = partitionFields.get(0);
+    assertEquals("birthDate", partitionField.getSourceField().getName());
+    assertEquals(PartitionTransformType.YEAR, partitionField.getTransformType());
   }
 
   private static String getTableName() {

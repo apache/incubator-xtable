@@ -27,7 +27,7 @@ import lombok.Value;
  * @since 0.1
  */
 @Value
-@Builder
+@Builder(toBuilder = true)
 public class ColumnStat {
   Range range;
   long numNulls;

@@ -275,7 +275,7 @@ public class TestIcebergSync {
             partitionSpecArgumentCaptor.capture(),
             partitionSpecArgumentCaptor.capture(),
             transactionArgumentCaptor.capture());
-    verify(mockColumnStatsConverter, times(4)).convert(any(Schema.class), anyLong(), anyMap());
+    verify(mockColumnStatsConverter, times(4)).toIceberg(any(Schema.class), anyLong(), anyMap());
 
     // check that the correct schema is used in calls to the mocks
     // Since we're using a mockSchemaSync we don't expect the table schema used by the partition
@@ -676,7 +676,7 @@ public class TestIcebergSync {
     Metrics response = new Metrics(dataFile.getRecordCount(), null, null, null, null);
     Metrics[] responses =
         IntStream.of(times - 1).mapToObj(unused -> response).toArray(Metrics[]::new);
-    when(mockColumnStatsConverter.convert(
+    when(mockColumnStatsConverter.toIceberg(
             any(Schema.class), eq(dataFile.getRecordCount()), eq(Collections.emptyMap())))
         .thenReturn(response, responses);
   }

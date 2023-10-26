@@ -154,7 +154,7 @@ public class IcebergSchemaExtractor {
     return nestedFields;
   }
 
-  private Type toIcebergType(OneField field, AtomicInteger fieldIdTracker) {
+  Type toIcebergType(OneField field, AtomicInteger fieldIdTracker) {
     switch (field.getSchema().getDataType()) {
       case ENUM:
       case STRING:

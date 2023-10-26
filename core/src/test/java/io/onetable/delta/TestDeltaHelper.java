@@ -18,6 +18,10 @@
  
 package io.onetable.delta;
 
+import static org.apache.spark.sql.types.DataTypes.IntegerType;
+import static org.apache.spark.sql.types.DataTypes.StringType;
+import static org.apache.spark.sql.types.DataTypes.TimestampType;
+
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.time.LocalDateTime;
@@ -37,10 +41,12 @@ import lombok.Value;
 
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
-import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+
+import io.delta.tables.DeltaTable;
 
 @Builder
 @Value
@@ -48,17 +54,16 @@ import org.apache.spark.sql.types.StructType;
 public class TestDeltaHelper {
   private static final StructField[] COMMON_FIELDS =
       new StructField[] {
-        new StructField("id", DataTypes.IntegerType, false, Metadata.empty()),
-        new StructField("firstName", DataTypes.StringType, true, Metadata.empty()),
-        new StructField("lastName", DataTypes.StringType, true, Metadata.empty()),
-        new StructField("gender", DataTypes.StringType, true, Metadata.empty()),
-        new StructField("birthDate", DataTypes.TimestampType, true, Metadata.empty())
+        new StructField("id", IntegerType, false, Metadata.empty()),
+        new StructField("firstName", StringType, true, Metadata.empty()),
+        new StructField("lastName", StringType, true, Metadata.empty()),
+        new StructField("gender", StringType, true, Metadata.empty()),
+        new StructField("birthDate", TimestampType, true, Metadata.empty())
       };
   private static final StructType PERSON_SCHEMA_PARTITIONED =
       new StructType(
           appendFields(
-              COMMON_FIELDS,
-              new StructField("yearOfBirth", DataTypes.IntegerType, true, Metadata.empty())));
+              COMMON_FIELDS, new StructField("yearOfBirth", IntegerType, true, Metadata.empty())));
   private static final StructType PERSON_SCHEMA_NON_PARTITIONED = new StructType(COMMON_FIELDS);
 
   // Until Delta 2.4 even generated columns should be provided values.
@@ -71,27 +76,6 @@ public class TestDeltaHelper {
   private static final String SQL_SELECT_TEMPLATE_PARTITIONED =
       COMMON_SQL_SELECT_FIELDS + ", year(timestamp('%s')) AS yearOfBirth";
   private static final String SQL_SELECT_TEMPLATE_NON_PARTITIONED = COMMON_SQL_SELECT_FIELDS;
-
-  private static final String SQL_CREATE_TABLE_TEMPLATE_PARTITIONED =
-      "CREATE TABLE `%s` ("
-          + "    id INT, "
-          + "    firstName STRING, "
-          + "    lastName STRING, "
-          + "    gender STRING, "
-          + "    birthDate TIMESTAMP, "
-          + "    yearOfBirth INT GENERATED ALWAYS AS (YEAR(birthDate))"
-          + ") USING DELTA "
-          + "PARTITIONED BY (yearOfBirth) "
-          + "LOCATION '%s'";
-  private static final String SQL_CREATE_TABLE_TEMPLATE_NON_PARTITIONED =
-      "CREATE TABLE `%s` ("
-          + "    id INT, "
-          + "    firstName STRING, "
-          + "    lastName STRING, "
-          + "    gender STRING, "
-          + "    birthDate TIMESTAMP "
-          + ") USING DELTA "
-          + "LOCATION '%s'";
 
   private static final String SQL_INSERT_TEMPLATE_PARTITIONED =
       "INSERT INTO `%s` (id, firstName, lastName, gender, birthDate, yearOfBirth) %s";
@@ -112,7 +96,6 @@ public class TestDeltaHelper {
 
   private final StructType tableStructSchema;
   private final String selectTemplateForInserts;
-  private final String createTableSqlStr;
   private final String insertIntoTemplateSqlStr;
   private final boolean tableIsPartitioned;
 
@@ -120,18 +103,56 @@ public class TestDeltaHelper {
     TestDeltaHelperBuilder builder = TestDeltaHelper.builder();
     if (isPartitioned) {
       builder
-          .createTableSqlStr(SQL_CREATE_TABLE_TEMPLATE_PARTITIONED)
           .selectTemplateForInserts(SQL_SELECT_TEMPLATE_PARTITIONED)
           .tableStructSchema(PERSON_SCHEMA_PARTITIONED)
           .insertIntoTemplateSqlStr(SQL_INSERT_TEMPLATE_PARTITIONED);
     } else {
       builder
-          .createTableSqlStr(SQL_CREATE_TABLE_TEMPLATE_NON_PARTITIONED)
           .selectTemplateForInserts(SQL_SELECT_TEMPLATE_NON_PARTITIONED)
           .tableStructSchema(PERSON_SCHEMA_NON_PARTITIONED)
           .insertIntoTemplateSqlStr(SQL_INSERT_TEMPLATE_NON_PARTITIONED);
     }
     return builder.tableIsPartitioned(isPartitioned).build();
+  }
+
+  public void createTable(SparkSession sparkSession, String tableName, String basePath) {
+    if (tableIsPartitioned) {
+      createdPartitionedTable(sparkSession, tableName, basePath);
+      return;
+    }
+    createNonPartitionedTable(sparkSession, tableName, basePath);
+  }
+
+  private void createdPartitionedTable(
+      SparkSession sparkSession, String tableName, String basePath) {
+    DeltaTable.create(sparkSession)
+        .tableName(tableName)
+        .location(basePath)
+        .addColumn("id", IntegerType)
+        .addColumn("firstName", StringType)
+        .addColumn("lastName", StringType)
+        .addColumn("gender", StringType)
+        .addColumn("birthDate", TimestampType)
+        .addColumn(
+            DeltaTable.columnBuilder("yearOfBirth")
+                .dataType(IntegerType)
+                .generatedAlwaysAs("YEAR(birthDate)")
+                .build())
+        .partitionedBy("yearOfBirth")
+        .execute();
+  }
+
+  private void createNonPartitionedTable(
+      SparkSession sparkSession, String tableName, String basePath) {
+    DeltaTable.create(sparkSession)
+        .tableName(tableName)
+        .location(basePath)
+        .addColumn("id", IntegerType)
+        .addColumn("firstName", StringType)
+        .addColumn("lastName", StringType)
+        .addColumn("gender", StringType)
+        .addColumn("birthDate", TimestampType)
+        .execute();
   }
 
   public String generateSelectTemplateForInsertsWithAdditionalColumn() {

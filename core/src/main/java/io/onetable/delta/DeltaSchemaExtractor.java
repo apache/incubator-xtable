@@ -179,6 +179,10 @@ public class DeltaSchemaExtractor {
         break;
       case "timestamp":
         type = OneType.TIMESTAMP;
+        // Timestamps in Delta are microsecond precision by default
+        metadata =
+            Collections.singletonMap(
+                OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
         break;
       case "struct":
         StructType structType = (StructType) dataType;

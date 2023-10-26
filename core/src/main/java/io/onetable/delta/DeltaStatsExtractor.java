@@ -224,8 +224,12 @@ public class DeltaStatsExtractor {
                   Function.identity(),
                   field -> {
                     String fieldPath = field.getPath();
-                    Object minValue = fieldPathToMinValue.get(fieldPath);
-                    Object maxValue = fieldPathToMaxValue.get(fieldPath);
+                    Object minValue =
+                        DeltaValueConverter.convertFromDeltaColumnStatValue(
+                            fieldPathToMinValue.get(fieldPath), field.getSchema());
+                    Object maxValue =
+                        DeltaValueConverter.convertFromDeltaColumnStatValue(
+                            fieldPathToMaxValue.get(fieldPath), field.getSchema());
                     Number nullCount = (Number) fieldPathToNullCount.get(fieldPath);
                     Range range = Range.vector(minValue, maxValue);
                     return ColumnStat.builder()
