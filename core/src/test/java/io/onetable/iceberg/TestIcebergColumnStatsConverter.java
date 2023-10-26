@@ -300,7 +300,8 @@ public class TestIcebergColumnStatsConverter {
                 .build());
 
     Map<OneField, ColumnStat> actual =
-        IcebergColumnStatsConverter.getInstance().fromIceberg(fields, valueCounts, nullCounts, columnSizes, lowerBounds, upperBounds);
+        IcebergColumnStatsConverter.getInstance()
+            .fromIceberg(fields, valueCounts, nullCounts, columnSizes, lowerBounds, upperBounds);
     Map<OneField, ColumnStat> expected = new HashMap<>();
     expected.put(
         fields.get(0),

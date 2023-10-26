@@ -23,9 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import io.onetable.model.schema.OneField;
-import io.onetable.model.schema.OneSchema;
-import io.onetable.model.stat.ColumnStat;
 import lombok.Builder;
 
 import org.apache.iceberg.CombinedScanTask;
@@ -35,7 +32,10 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.io.CloseableIterator;
 
 import io.onetable.exception.NotSupportedException;
+import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
+import io.onetable.model.schema.OneSchema;
+import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
@@ -101,13 +101,15 @@ public class IcebergDataFileExtractor {
   }
 
   /**
-   * Builds {@link OneDataFile} representation from Iceberg {@link DataFile} without any column statistics set. This can be used to reduce memory overhead when statistics are not required.
+   * Builds {@link OneDataFile} representation from Iceberg {@link DataFile} without any column
+   * statistics set. This can be used to reduce memory overhead when statistics are not required.
    *
    * @param dataFile Iceberg data file
    * @param partitionsInfo representation of partition fields and ranges
    * @return corresponding OneTable data file
    */
-  OneDataFile fromIcebergWithoutColumnStats(DataFile dataFile, Map<OnePartitionField, Range> partitionsInfo) {
+  OneDataFile fromIcebergWithoutColumnStats(
+      DataFile dataFile, Map<OnePartitionField, Range> partitionsInfo) {
     return fromIceberg(dataFile, partitionsInfo, null, false);
   }
 
@@ -119,12 +121,27 @@ public class IcebergDataFileExtractor {
    * @param schema current schema for the table, used for mapping field IDs to stats
    * @return corresponding OneTable data file
    */
-  OneDataFile fromIceberg(DataFile dataFile, Map<OnePartitionField, Range> partitionsInfo, OneSchema schema) {
+  OneDataFile fromIceberg(
+      DataFile dataFile, Map<OnePartitionField, Range> partitionsInfo, OneSchema schema) {
     return fromIceberg(dataFile, partitionsInfo, schema, true);
   }
 
-  private OneDataFile fromIceberg(DataFile dataFile, Map<OnePartitionField, Range> partitionsInfo, OneSchema schema, boolean includeColumnStats) {
-    Map<OneField, ColumnStat> columnStatMap = includeColumnStats ? IcebergColumnStatsConverter.getInstance().fromIceberg(schema.getAllFields(), dataFile.valueCounts(), dataFile.nullValueCounts(), dataFile.columnSizes(), dataFile.lowerBounds(), dataFile.upperBounds()) : Collections.emptyMap();
+  private OneDataFile fromIceberg(
+      DataFile dataFile,
+      Map<OnePartitionField, Range> partitionsInfo,
+      OneSchema schema,
+      boolean includeColumnStats) {
+    Map<OneField, ColumnStat> columnStatMap =
+        includeColumnStats
+            ? IcebergColumnStatsConverter.getInstance()
+                .fromIceberg(
+                    schema.getAllFields(),
+                    dataFile.valueCounts(),
+                    dataFile.nullValueCounts(),
+                    dataFile.columnSizes(),
+                    dataFile.lowerBounds(),
+                    dataFile.upperBounds())
+            : Collections.emptyMap();
     return OneDataFile.builder()
         .physicalPath(dataFile.path().toString())
         .fileFormat(fromIcebergFileFormat(dataFile.format()))

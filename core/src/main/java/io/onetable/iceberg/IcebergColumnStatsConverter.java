@@ -87,7 +87,13 @@ public class IcebergColumnStatsConverter {
         upperBounds);
   }
 
-  public Map<OneField, ColumnStat> fromIceberg(List<OneField> fields, Map<Integer, Long> valueCounts, Map<Integer, Long> nullCounts, Map<Integer, Long> size, Map<Integer, ByteBuffer> minValues, Map<Integer, ByteBuffer> maxValues) {
+  public Map<OneField, ColumnStat> fromIceberg(
+      List<OneField> fields,
+      Map<Integer, Long> valueCounts,
+      Map<Integer, Long> nullCounts,
+      Map<Integer, Long> size,
+      Map<Integer, ByteBuffer> minValues,
+      Map<Integer, ByteBuffer> maxValues) {
     if (valueCounts == null || valueCounts.isEmpty()) {
       return Collections.emptyMap();
     }
@@ -102,10 +108,8 @@ public class IcebergColumnStatsConverter {
                   long numNulls = nullCounts.get(fieldId);
                   long totalSize = size.get(fieldId);
                   Type fieldType = SCHEMA_EXTRACTOR.toIcebergType(field, new AtomicInteger(1));
-                  Object minValue =
-                      Conversions.fromByteBuffer(fieldType, minValues.get(fieldId));
-                  Object maxValue =
-                      Conversions.fromByteBuffer(fieldType, maxValues.get(fieldId));
+                  Object minValue = Conversions.fromByteBuffer(fieldType, minValues.get(fieldId));
+                  Object maxValue = Conversions.fromByteBuffer(fieldType, maxValues.get(fieldId));
                   Range range = Range.vector(minValue, maxValue);
                   return ColumnStat.builder()
                       .numValues(numValues)
