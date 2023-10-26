@@ -26,13 +26,16 @@ import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
 import org.apache.iceberg.Metrics;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.types.Conversions;
 import org.apache.iceberg.types.Types;
 
 import io.onetable.model.schema.OneField;
@@ -202,7 +205,7 @@ public class TestIcebergColumnStatsConverter {
 
     Metrics actual =
         IcebergColumnStatsConverter.getInstance()
-            .convert(icebergSchema, totalRowCount, columnStatMap);
+            .toIceberg(icebergSchema, totalRowCount, columnStatMap);
     // Metrics does not implement equals, so we need to manually compare fields
     assertEquals(expected.columnSizes(), actual.columnSizes());
     assertEquals(expected.nanValueCounts(), actual.nanValueCounts());
@@ -251,7 +254,7 @@ public class TestIcebergColumnStatsConverter {
 
     Metrics actual =
         IcebergColumnStatsConverter.getInstance()
-            .convert(icebergSchema, totalRowCount, columnStatMap);
+            .toIceberg(icebergSchema, totalRowCount, columnStatMap);
     // Metrics does not implement equals, so we need to manually compare fields
     assertEquals(expected.columnSizes(), actual.columnSizes());
     assertEquals(expected.nanValueCounts(), actual.nanValueCounts());
@@ -260,6 +263,63 @@ public class TestIcebergColumnStatsConverter {
     assertEquals(expected.valueCounts(), actual.valueCounts());
     assertEquals(expected.upperBounds(), actual.upperBounds());
     assertEquals(expected.lowerBounds(), actual.lowerBounds());
+  }
+
+  @Test
+  public void fromIceberg() {
+    Map<Integer, Long> valueCounts = new HashMap<>();
+    valueCounts.put(1, 123L);
+    valueCounts.put(3, 456L);
+    Map<Integer, Long> nullCounts = new HashMap<>();
+    nullCounts.put(1, 32L);
+    nullCounts.put(3, 456L);
+    Map<Integer, Long> columnSizes = new HashMap<>();
+    columnSizes.put(1, 13L);
+    columnSizes.put(3, 31L);
+    Map<Integer, ByteBuffer> lowerBounds = new HashMap<>();
+    lowerBounds.put(1, Conversions.toByteBuffer(Types.IntegerType.get(), 1));
+    Map<Integer, ByteBuffer> upperBounds = new HashMap<>();
+    upperBounds.put(1, Conversions.toByteBuffer(Types.IntegerType.get(), 2));
+
+    List<OneField> fields =
+        Arrays.asList(
+            OneField.builder()
+                .fieldId(1)
+                .name("int_field")
+                .schema(OneSchema.builder().dataType(OneType.INT).build())
+                .build(),
+            OneField.builder()
+                .fieldId(2)
+                .name("not_tracked_field")
+                .schema(OneSchema.builder().dataType(OneType.DATE).build())
+                .build(),
+            OneField.builder()
+                .fieldId(3)
+                .name("null_field")
+                .schema(OneSchema.builder().dataType(OneType.INT).build())
+                .build());
+
+    Map<OneField, ColumnStat> actual =
+        IcebergColumnStatsConverter.getInstance()
+            .fromIceberg(fields, valueCounts, nullCounts, columnSizes, lowerBounds, upperBounds);
+    Map<OneField, ColumnStat> expected = new HashMap<>();
+    expected.put(
+        fields.get(0),
+        ColumnStat.builder()
+            .numValues(123)
+            .numNulls(32)
+            .totalSize(13)
+            .range(Range.vector(1, 2))
+            .build());
+    expected.put(
+        fields.get(2),
+        ColumnStat.builder()
+            .numValues(456)
+            .numNulls(456)
+            .totalSize(31)
+            .range(Range.vector(null, null))
+            .build());
+    assertEquals(expected, actual);
   }
 
   private Map<Integer, ByteBuffer> getBoundsMap(
