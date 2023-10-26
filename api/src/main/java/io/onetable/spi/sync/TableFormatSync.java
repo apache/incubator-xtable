@@ -78,7 +78,7 @@ public class TableFormatSync {
         results.add(
             getSyncResult(
                 SyncMode.INCREMENTAL,
-                change.getCurrentTableState(),
+                change.getTableAsOfChange(),
                 client -> client.syncFilesForDiff(change.getFilesDiff()),
                 startTime,
                 changes.getPendingCommits()));

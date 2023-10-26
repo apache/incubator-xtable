@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
@@ -39,7 +40,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.apache.iceberg.*;
 import org.apache.iceberg.data.GenericRecord;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
-import org.apache.iceberg.hadoop.HadoopTables;
+import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.DataWriter;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
@@ -47,6 +49,7 @@ import org.apache.iceberg.types.Types;
 import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
+import io.onetable.model.TableChange;
 import io.onetable.model.schema.*;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
@@ -56,7 +59,7 @@ import io.onetable.model.storage.TableFormat;
 
 class TestIcebergSourceClient {
 
-  private HadoopTables tables;
+  private IcebergTableManager tableManager;
   private Schema csSchema;
   private PartitionSpec csPartitionSpec;
   private IcebergSourceClientProvider clientProvider;
@@ -70,7 +73,7 @@ class TestIcebergSourceClient {
     clientProvider = new IcebergSourceClientProvider();
     clientProvider.init(hadoopConf, null);
 
-    tables = new HadoopTables(hadoopConf);
+    tableManager = IcebergTableManager.of(hadoopConf);
 
     byte[] bytes = readResourceFile("schemas/catalog_sales.json");
     csSchema = SchemaParser.fromJson(new String(bytes));
@@ -82,12 +85,7 @@ class TestIcebergSourceClient {
   @Test
   void getTableTest(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestTableWithData(workingDir.toString());
-    PerTableConfig sourceTableConfig =
-        PerTableConfig.builder()
-            .tableName(catalogSales.name())
-            .tableBasePath(catalogSales.location())
-            .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
-            .build();
+    PerTableConfig sourceTableConfig = getPerTableConfig(catalogSales);
 
     IcebergSourceClient client = clientProvider.getSourceClientInstance(sourceTableConfig);
 
@@ -122,12 +120,7 @@ class TestIcebergSourceClient {
     Assertions.assertEquals(2, catalogSales.schemas().size());
     Assertions.assertEquals(0, iceCurrentSnapshot.schemaId());
 
-    PerTableConfig sourceTableConfig =
-        PerTableConfig.builder()
-            .tableName(catalogSales.name())
-            .tableBasePath(catalogSales.location())
-            .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
-            .build();
+    PerTableConfig sourceTableConfig = getPerTableConfig(catalogSales);
 
     IcebergSourceClient client = clientProvider.getSourceClientInstance(sourceTableConfig);
     IcebergSourceClient spyClient = spy(client);
@@ -147,12 +140,7 @@ class TestIcebergSourceClient {
     Table catalogSales = createTestTableWithData(workingDir.toString());
     Snapshot iceCurrentSnapshot = catalogSales.currentSnapshot();
 
-    PerTableConfig sourceTableConfig =
-        PerTableConfig.builder()
-            .tableName(catalogSales.name())
-            .tableBasePath(catalogSales.location())
-            .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
-            .build();
+    PerTableConfig sourceTableConfig = getPerTableConfig(catalogSales);
 
     IcebergDataFileExtractor spyDataFileExtractor = spy(IcebergDataFileExtractor.builder().build());
     IcebergPartitionValueConverter spyPartitionConverter =
@@ -200,6 +188,97 @@ class TestIcebergSourceClient {
     }
   }
 
+  @Test
+  public void testGetTableChangeForCommit(@TempDir Path workingDir) throws IOException {
+    Table catalogSales = createTestTableWithData(workingDir.toString());
+    String tableLocation = catalogSales.location();
+    Assertions.assertEquals(5, getDataFileCount(catalogSales));
+    Snapshot snapshot1 = catalogSales.currentSnapshot();
+
+    catalogSales
+        .newDelete()
+        .deleteFromRowFilter(Expressions.lessThan("cs_sold_date_sk", 3))
+        .commit();
+    Assertions.assertEquals(2, getDataFileCount(catalogSales));
+    Snapshot snapshot2 = catalogSales.currentSnapshot();
+
+    AppendFiles appendAction = catalogSales.newAppend();
+    for (int partition = 2; partition < 7; partition++) {
+      String dataFilePath = String.join("/", tableLocation, "data", UUID.randomUUID() + ".parquet");
+      appendAction.appendFile(generateTestDataFile(partition, catalogSales, dataFilePath));
+    }
+    appendAction.commit();
+    Assertions.assertEquals(7, getDataFileCount(catalogSales));
+    Snapshot snapshot3 = catalogSales.currentSnapshot();
+
+    Transaction tx = catalogSales.newTransaction();
+    tx.newDelete().deleteFromRowFilter(Expressions.lessThan("cs_sold_date_sk", 3)).commit();
+    appendAction = tx.newAppend();
+    for (int partition = 6; partition < 7; partition++) {
+      String dataFilePath = String.join("/", tableLocation, "data", UUID.randomUUID() + ".parquet");
+      appendAction.appendFile(generateTestDataFile(partition, catalogSales, dataFilePath));
+    }
+    appendAction.commit();
+    tx.commitTransaction();
+    Assertions.assertEquals(7, getDataFileCount(catalogSales));
+    // the transaction would result in 2 snapshots
+    Snapshot snapshot5 = catalogSales.currentSnapshot();
+    Snapshot snapshot4 = catalogSales.snapshot(snapshot5.parentId());
+
+    validateTableChangeDiffSize(catalogSales, snapshot1, 5, 0);
+    validateTableChangeDiffSize(catalogSales, snapshot2, 0, 3);
+    validateTableChangeDiffSize(catalogSales, snapshot3, 5, 0);
+    // transaction related snapshot verification
+    validateTableChangeDiffSize(catalogSales, snapshot4, 0, 1);
+    validateTableChangeDiffSize(catalogSales, snapshot5, 1, 0);
+
+    Assertions.assertEquals(4, catalogSales.history().size());
+    catalogSales.expireSnapshots().expireSnapshotId(snapshot1.snapshotId()).commit();
+    Assertions.assertEquals(3, catalogSales.history().size());
+    Assertions.assertNull(catalogSales.snapshot(snapshot1.snapshotId()));
+    Snapshot snapshot6 = catalogSales.currentSnapshot();
+    // expire does not generate a new snapshot
+    Assertions.assertEquals(snapshot6, snapshot5);
+
+    TableScan scan =
+        catalogSales.newScan().filter(Expressions.lessThanOrEqual("cs_sold_date_sk", 3));
+    try (CloseableIterable<FileScanTask> files = scan.planFiles()) {
+      List<DataFile> dataFiles =
+          StreamSupport.stream(files.spliterator(), false)
+              .map(ContentScanTask::file)
+              .collect(Collectors.toList());
+      Assertions.assertEquals(2, dataFiles.size());
+
+      String dataFilePath = String.join("/", tableLocation, "data", UUID.randomUUID() + ".parquet");
+      DataFile newFile = generateTestDataFile(3, catalogSales, dataFilePath);
+      catalogSales
+          .newRewrite()
+          .addFile(newFile)
+          .deleteFile(dataFiles.get(0))
+          .deleteFile(dataFiles.get(1))
+          .commit();
+    }
+    Snapshot snapshot7 = catalogSales.currentSnapshot();
+
+    catalogSales.updateSpec().removeField("cs_sold_date_sk").commit();
+    Snapshot snapshot8 = catalogSales.currentSnapshot();
+
+    validateTableChangeDiffSize(catalogSales, snapshot7, 1, 2);
+    Assertions.assertEquals(snapshot7, snapshot8);
+  }
+
+  private static long getDataFileCount(Table catalogSales) {
+    return StreamSupport.stream(catalogSales.newScan().planFiles().spliterator(), false).count();
+  }
+
+  private void validateTableChangeDiffSize(
+      Table table, Snapshot snapshot, int addedFiles, int removedFiles) {
+    IcebergSourceClient sourceClient = getIcebergSourceClient(table);
+    TableChange tableChange = sourceClient.getTableChangeForCommit(snapshot);
+    Assertions.assertEquals(addedFiles, tableChange.getFilesDiff().getFilesAdded().size());
+    Assertions.assertEquals(removedFiles, tableChange.getFilesDiff().getFilesRemoved().size());
+  }
+
   private void validateSchema(OneSchema readSchema, Schema expectedSchema) {
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     Schema result = schemaExtractor.toIceberg(readSchema);
@@ -224,38 +303,64 @@ class TestIcebergSourceClient {
   }
 
   private Table createTestTableWithData(String workingDir) throws IOException {
-    String csPath = Paths.get(workingDir, "catalog_sales").toString();
-    Table catalogSales = tables.create(csSchema, csPartitionSpec, csPath);
+    Table catalogSales = createTestCatalogTable(workingDir);
 
     AppendFiles appendFiles = catalogSales.newAppend();
-
-    for (int numFile = 0; numFile < 5; numFile++) {
+    for (int partition = 0; partition < 5; partition++) {
       // The test creates one file in each partition
-      String dataFilePath = String.join("/", csPath, "data", UUID.randomUUID() + ".parquet");
-      PartitionData partitionInfo = new PartitionData(csPartitionSpec.partitionType());
-      partitionInfo.set(0, numFile);
-      DataWriter<GenericRecord> dataWriter =
-          Parquet.writeData(catalogSales.io().newOutputFile(dataFilePath))
-              .schema(csSchema)
-              .createWriterFunc(GenericParquetWriter::buildWriter)
-              .overwrite()
-              .withSpec(csPartitionSpec)
-              .withPartition(partitionInfo)
-              .build();
-
-      try {
-        GenericRecord record = GenericRecord.create(csSchema);
-        record.setField("cs_sold_date_sk", numFile);
-        dataWriter.write(record);
-      } finally {
-        dataWriter.close();
-      }
-
-      appendFiles.appendFile(dataWriter.toDataFile());
+      String dataFilePath =
+          String.join("/", catalogSales.location(), "data", UUID.randomUUID() + ".parquet");
+      DataFile dataFile = generateTestDataFile(partition, catalogSales, dataFilePath);
+      appendFiles.appendFile(dataFile);
     }
     appendFiles.commit();
 
     return catalogSales;
+  }
+
+  private DataFile generateTestDataFile(int partition, Table table, String filePath)
+      throws IOException {
+    PartitionData partitionInfo = new PartitionData(csPartitionSpec.partitionType());
+    partitionInfo.set(0, partition);
+    DataWriter<GenericRecord> dataWriter =
+        Parquet.writeData(table.io().newOutputFile(filePath))
+            .schema(csSchema)
+            .createWriterFunc(GenericParquetWriter::buildWriter)
+            .overwrite()
+            .withSpec(csPartitionSpec)
+            .withPartition(partitionInfo)
+            .build();
+
+    try {
+      GenericRecord record = GenericRecord.create(csSchema);
+      record.setField("cs_sold_date_sk", partition);
+      dataWriter.write(record);
+    } finally {
+      dataWriter.close();
+    }
+    return dataWriter.toDataFile();
+  }
+
+  private Table createTestCatalogTable(String workingDir) {
+    String csPath = Paths.get(workingDir, "catalog_sales").toString();
+    return tableManager.getOrCreateTable(null, null, csPath, csSchema, csPartitionSpec);
+  }
+
+  private IcebergSourceClient getIcebergSourceClient(Table catalogSales) {
+    PerTableConfig tableConfig = getPerTableConfig(catalogSales);
+
+    return IcebergSourceClient.builder()
+        .hadoopConf(hadoopConf)
+        .sourceTableConfig(tableConfig)
+        .build();
+  }
+
+  private static PerTableConfig getPerTableConfig(Table catalogSales) {
+    return PerTableConfig.builder()
+        .tableName(catalogSales.name())
+        .tableBasePath(catalogSales.location())
+        .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
+        .build();
   }
 
   private byte[] readResourceFile(String resourcePath) throws IOException {

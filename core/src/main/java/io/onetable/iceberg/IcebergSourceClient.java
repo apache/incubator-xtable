@@ -20,11 +20,9 @@ package io.onetable.iceberg;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import lombok.*;
 import lombok.extern.log4j.Log4j2;
@@ -34,7 +32,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.*;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.hadoop.HadoopFileIO;
 import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.io.FileIO;
 
 import io.onetable.client.PerTableConfig;
 import io.onetable.exception.OneIOException;
@@ -46,6 +46,7 @@ import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.extractor.SourceClient;
 
@@ -57,6 +58,9 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   @Getter(lazy = true, value = AccessLevel.PACKAGE)
   private final Table sourceTable = initSourceTable();
+
+  @Getter(lazy = true, value = AccessLevel.PACKAGE)
+  private final FileIO tableOps = initTableOps();
 
   @Builder.Default
   private final IcebergPartitionValueConverter partitionConverter =
@@ -80,9 +84,14 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         sourceTableConfig.getTableBasePath());
   }
 
+  private FileIO initTableOps() {
+    return new HadoopFileIO(hadoopConf);
+  }
+
   @Override
   public OneTable getTable(Snapshot snapshot) {
     Table iceTable = getSourceTable();
+
     Schema iceSchema = iceTable.schemas().get(snapshot.schemaId());
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     OneSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
@@ -97,7 +106,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         .basePath(iceTable.location())
         .name(iceTable.name())
         .partitioningFields(irPartitionFields)
-        .latestCommitTime(Instant.ofEpochMilli(iceTable.currentSnapshot().timestampMillis()))
+        .latestCommitTime(Instant.ofEpochMilli(snapshot.timestampMillis()))
         .readSchema(irSchema)
         // .layoutStrategy(dataLayoutStrategy)
         .build();
@@ -130,10 +139,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
       List<OneDataFile> irFiles = new ArrayList<>();
       for (FileScanTask fileScanTask : files) {
         DataFile file = fileScanTask.file();
-        Map<OnePartitionField, Range> onePartitionFieldRangeMap =
-            partitionConverter.toOneTable(file.partition(), partitionSpec);
-        OneDataFile irDataFile =
-            dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap, irTable.getReadSchema());
+        OneDataFile irDataFile = fromIceberg(file, partitionSpec, irTable.getReadSchema());
         irFiles.add(irDataFile);
       }
       oneDataFiles = clusterFilesByPartition(irFiles);
@@ -147,6 +153,13 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         .schemaCatalog(schemaCatalog)
         .dataFiles(oneDataFiles)
         .build();
+  }
+
+  private OneDataFile fromIceberg(
+      DataFile file, PartitionSpec partitionSpec, OneSchema readSchema) {
+    Map<OnePartitionField, Range> onePartitionFieldRangeMap =
+        partitionConverter.toOneTable(file.partition(), partitionSpec);
+    return dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap, readSchema);
   }
 
   /**
@@ -174,7 +187,29 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   @Override
   public TableChange getTableChangeForCommit(Snapshot snapshot) {
-    return null;
+    FileIO fileIO = getTableOps();
+    Table iceTable = getSourceTable();
+    PartitionSpec partitionSpec = iceTable.spec();
+    OneTable irTable = getTable(snapshot);
+
+    Set<OneDataFile> dataFilesAdded =
+        StreamSupport.stream(snapshot.addedDataFiles(fileIO).spliterator(), false)
+            .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable.getReadSchema()))
+            .collect(Collectors.toSet());
+
+    Set<OneDataFile> dataFilesRemoved =
+        StreamSupport.stream(snapshot.removedDataFiles(fileIO).spliterator(), false)
+            .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable.getReadSchema()))
+            .collect(Collectors.toSet());
+
+    OneDataFilesDiff filesDiff =
+        OneDataFilesDiff.builder()
+            .filesAdded(dataFilesAdded)
+            .filesRemoved(dataFilesRemoved)
+            .build();
+
+    OneTable table = getTable(snapshot);
+    return TableChange.builder().tableAsOfChange(table).filesDiff(filesDiff).build();
   }
 
   @Override

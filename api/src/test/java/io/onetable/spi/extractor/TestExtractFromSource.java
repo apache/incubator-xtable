@@ -88,7 +88,7 @@ public class TestExtractFromSource {
         OneTable.builder().latestCommitTime(Instant.now().minus(1, ChronoUnit.DAYS)).build();
     TableChange tableChangeToReturnAtFirstInstant =
         TableChange.builder()
-            .currentTableState(tableAtFirstInstant)
+            .tableAsOfChange(tableAtFirstInstant)
             .filesDiff(
                 OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
             .build();
@@ -96,7 +96,7 @@ public class TestExtractFromSource {
         .thenReturn(tableChangeToReturnAtFirstInstant);
     TableChange expectedFirstTableChange =
         TableChange.builder()
-            .currentTableState(tableAtFirstInstant)
+            .tableAsOfChange(tableAtFirstInstant)
             .filesDiff(
                 OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
             .build();
@@ -108,7 +108,7 @@ public class TestExtractFromSource {
     OneTable tableAtSecondInstant = OneTable.builder().latestCommitTime(Instant.now()).build();
     TableChange tableChangeToReturnAtSecondInstant =
         TableChange.builder()
-            .currentTableState(tableAtSecondInstant)
+            .tableAsOfChange(tableAtSecondInstant)
             .filesDiff(
                 OneDataFilesDiff.builder()
                     .filesAdded(Arrays.asList(newFile2, newFile3))
@@ -119,7 +119,7 @@ public class TestExtractFromSource {
         .thenReturn(tableChangeToReturnAtSecondInstant);
     TableChange expectedSecondTableChange =
         TableChange.builder()
-            .currentTableState(tableAtSecondInstant)
+            .tableAsOfChange(tableAtSecondInstant)
             .filesDiff(
                 OneDataFilesDiff.builder()
                     .filesAdded(Arrays.asList(newFile2, newFile3))
