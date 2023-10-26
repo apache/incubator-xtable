@@ -31,6 +31,10 @@ import lombok.Value;
 public class OnePartitionField {
   // Source field the partition is based on
   OneField sourceField;
+  // Name of the partition field, which may be different from the source field in cases other than
+  // value transformations. If it is not present, the source field name should be used.
+  // TODO(vamshigv): should it be a list ? for example delta day partitioned.
+  String partitionFieldName;
   // An enum describing how the source data was transformed into the partition value
   PartitionTransformType transformType;
 }

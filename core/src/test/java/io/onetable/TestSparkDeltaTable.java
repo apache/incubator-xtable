@@ -66,16 +66,12 @@ public class TestSparkDeltaTable {
       this.sparkSession = sparkSession;
       this.tableIsPartitioned = isPartitioned;
       this.testDeltaHelper = createTestDataHelper(isPartitioned);
-      createTable(testDeltaHelper.getCreateTableSqlStr(), tableName, basePath);
+      testDeltaHelper.createTable(sparkSession, tableName, basePath);
       this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
       this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
     } catch (IOException ex) {
       throw new UncheckedIOException("Unable initialize Delta spark table", ex);
     }
-  }
-
-  private void createTable(String sqlFormatStr, String tableName, String basePath) {
-    sparkSession.sql(String.format(sqlFormatStr, tableName, basePath));
   }
 
   public List<Row> insertRows(int numRows) {
