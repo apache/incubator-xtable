@@ -92,8 +92,6 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   public OneTable getTable(Snapshot snapshot) {
     Table iceTable = getSourceTable();
 
-    Table tmp = iceTable.newScan().useSnapshot(snapshot.snapshotId()).table();
-
     Schema iceSchema = iceTable.schemas().get(snapshot.schemaId());
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     OneSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
