@@ -61,6 +61,7 @@ public class IcebergColumnStatsConverter {
           nullValueCounts.put(fieldId, columnStats.getNumNulls());
           Type fieldType = icebergField.type();
           if (columnStats.getRange().getMinValue() != null) {
+            // TODO(vamshigv): for timestamp type string to long is failing while iceberg sync.
             lowerBounds.put(
                 fieldId, Conversions.toByteBuffer(fieldType, columnStats.getRange().getMinValue()));
           }

@@ -113,6 +113,16 @@ public class TestFormatAgnosticTable implements AutoCloseable {
     }
   }
 
+  public String getOrderByColumn() {
+    if (sparkHudiTable.isPresent()) {
+      return "_hoodie_record_key";
+    } else if (sparkDeltaTable.isPresent()) {
+      return "id";
+    } else {
+      throw new IllegalStateException("Neither Hoodie nor Delta table is initialized.");
+    }
+  }
+
   // TODO(vamshigv): Clean up with generics later.
   @Builder
   @Value
