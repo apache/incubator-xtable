@@ -281,8 +281,6 @@ public class TestIcebergColumnStatsConverter {
     Map<Integer, ByteBuffer> upperBounds = new HashMap<>();
     upperBounds.put(1, Conversions.toByteBuffer(Types.IntegerType.get(), 2));
 
-    Metrics metrics =
-        new Metrics(98776L, columnSizes, valueCounts, nullCounts, null, lowerBounds, upperBounds);
     List<OneField> fields =
         Arrays.asList(
             OneField.builder()
@@ -302,7 +300,7 @@ public class TestIcebergColumnStatsConverter {
                 .build());
 
     Map<OneField, ColumnStat> actual =
-        IcebergColumnStatsConverter.getInstance().fromIceberg(fields, metrics);
+        IcebergColumnStatsConverter.getInstance().fromIceberg(fields, valueCounts, nullCounts, columnSizes, lowerBounds, upperBounds);
     Map<OneField, ColumnStat> expected = new HashMap<>();
     expected.put(
         fields.get(0),

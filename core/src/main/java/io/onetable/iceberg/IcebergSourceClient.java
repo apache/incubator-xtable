@@ -132,7 +132,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         DataFile file = fileScanTask.file();
         Map<OnePartitionField, Range> onePartitionFieldRangeMap =
             partitionConverter.toOneTable(file.partition(), partitionSpec);
-        OneDataFile irDataFile = dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap);
+        OneDataFile irDataFile = dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap, irTable.getReadSchema());
         irFiles.add(irDataFile);
       }
       oneDataFiles = clusterFilesByPartition(irFiles);

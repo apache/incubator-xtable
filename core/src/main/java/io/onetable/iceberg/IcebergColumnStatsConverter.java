@@ -19,6 +19,7 @@
 package io.onetable.iceberg;
 
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,22 +87,25 @@ public class IcebergColumnStatsConverter {
         upperBounds);
   }
 
-  public Map<OneField, ColumnStat> fromIceberg(List<OneField> fields, Metrics metrics) {
+  public Map<OneField, ColumnStat> fromIceberg(List<OneField> fields, Map<Integer, Long> valueCounts, Map<Integer, Long> nullCounts, Map<Integer, Long> size, Map<Integer, ByteBuffer> minValues, Map<Integer, ByteBuffer> maxValues) {
+    if (valueCounts == null || valueCounts.isEmpty()) {
+      return Collections.emptyMap();
+    }
     return fields.stream()
-        .filter(field -> metrics.valueCounts().containsKey(field.getFieldId()))
+        .filter(field -> valueCounts.containsKey(field.getFieldId()))
         .collect(
             Collectors.toMap(
                 Function.identity(),
                 field -> {
                   Integer fieldId = field.getFieldId();
-                  long numValues = metrics.valueCounts().get(fieldId);
-                  long numNulls = metrics.nullValueCounts().get(fieldId);
-                  long totalSize = metrics.columnSizes().get(fieldId);
+                  long numValues = valueCounts.get(fieldId);
+                  long numNulls = nullCounts.get(fieldId);
+                  long totalSize = size.get(fieldId);
                   Type fieldType = SCHEMA_EXTRACTOR.toIcebergType(field, new AtomicInteger(1));
                   Object minValue =
-                      Conversions.fromByteBuffer(fieldType, metrics.lowerBounds().get(fieldId));
+                      Conversions.fromByteBuffer(fieldType, minValues.get(fieldId));
                   Object maxValue =
-                      Conversions.fromByteBuffer(fieldType, metrics.upperBounds().get(fieldId));
+                      Conversions.fromByteBuffer(fieldType, maxValues.get(fieldId));
                   Range range = Range.vector(minValue, maxValue);
                   return ColumnStat.builder()
                       .numValues(numValues)
