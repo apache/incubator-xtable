@@ -19,6 +19,7 @@
 package io.onetable.delta;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.text.DateFormat;
@@ -26,6 +27,8 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
@@ -48,7 +51,7 @@ public class DeltaValueConverter {
       return null;
     }
     if (noConversionForSchema(fieldSchema)) {
-      return value;
+      return castObjectToInternalType(value, fieldSchema.getDataType());
     }
     // Needs special handling for date and time.
     OneType fieldType = fieldSchema.getDataType();
@@ -56,24 +59,30 @@ public class DeltaValueConverter {
       return (int) LocalDate.parse(value.toString()).toEpochDay();
     }
 
+    Instant instant;
     try {
+      instant = OffsetDateTime.parse(value.toString()).toInstant();
+    } catch (DateTimeParseException parseException) {
+      // fall back to parsing without offset
       DateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_STR);
       dateFormat.setTimeZone(TIME_ZONE);
-      Instant instant = dateFormat.parse(value.toString()).toInstant();
-      OneSchema.MetadataValue timestampPrecision =
-          (OneSchema.MetadataValue)
-              fieldSchema
-                  .getMetadata()
-                  .getOrDefault(
-                      OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
-      if (timestampPrecision == OneSchema.MetadataValue.MILLIS) {
-        return instant.toEpochMilli();
+      try {
+        instant = dateFormat.parse(value.toString()).toInstant();
+      } catch (ParseException ex) {
+        throw new OneIOException("Unable to parse time from column stats", ex);
       }
-      return TimeUnit.SECONDS.toMicros(instant.getEpochSecond())
-          + TimeUnit.NANOSECONDS.toMicros(instant.getNano());
-    } catch (ParseException ex) {
-      throw new OneIOException("Unable to parse time from column stats", ex);
     }
+    OneSchema.MetadataValue timestampPrecision =
+        (OneSchema.MetadataValue)
+            fieldSchema
+                .getMetadata()
+                .getOrDefault(
+                    OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+    if (timestampPrecision == OneSchema.MetadataValue.MILLIS) {
+      return instant.toEpochMilli();
+    }
+    return TimeUnit.SECONDS.toMicros(instant.getEpochSecond())
+        + TimeUnit.NANOSECONDS.toMicros(instant.getNano());
   }
 
   public static Object convertToDeltaColumnStatValue(Object value, OneSchema fieldSchema) {
@@ -174,6 +183,39 @@ public class DeltaValueConverter {
       } catch (ParseException ex) {
         throw new OneIOException("Unable to parse partition value", ex);
       }
+    }
+  }
+
+  private static Object castObjectToInternalType(Object value, OneType valueType) {
+    switch (valueType) {
+      case FLOAT:
+        if (value instanceof Double) {
+          return ((Double) value).floatValue();
+        }
+        break;
+      case DECIMAL:
+        return numberTypeToBigDecimal(value);
+      case LONG:
+        if (value instanceof Integer) {
+          return ((Integer) value).longValue();
+        }
+        break;
+    }
+    return value;
+  }
+
+  private static BigDecimal numberTypeToBigDecimal(Object value) {
+    // BigDecimal is parsed as Integer, Long, BigInteger and double if none of the above.
+    if (value instanceof Integer) {
+      return BigDecimal.valueOf((Integer) value);
+    } else if (value instanceof Long) {
+      return BigDecimal.valueOf((Long) value);
+    } else if (value instanceof BigInteger) {
+      return new BigDecimal((BigInteger) value);
+    } else if (value instanceof Double) {
+      return BigDecimal.valueOf((Double) value);
+    } else {
+      return (BigDecimal) value;
     }
   }
 }
