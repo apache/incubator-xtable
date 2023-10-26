@@ -18,6 +18,9 @@
  
 package io.onetable.model.schema;
 
+import java.util.Collections;
+import java.util.List;
+
 import lombok.Builder;
 import lombok.Value;
 
@@ -31,10 +34,9 @@ import lombok.Value;
 public class OnePartitionField {
   // Source field the partition is based on
   OneField sourceField;
-  // Name of the partition field, which may be different from the source field in cases other than
-  // value transformations. If it is not present, the source field name should be used.
-  // TODO(vamshigv): should it be a list ? for example delta day partitioned.
-  String partitionFieldName;
+  // Ordered partition field names of the table. These are present when the transform type is not
+  // VALUE. If it is not present, use the source field name directly.
+  @Builder.Default List<String> partitionFieldNames = Collections.emptyList();
   // An enum describing how the source data was transformed into the partition value
   PartitionTransformType transformType;
 }

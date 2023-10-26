@@ -21,6 +21,7 @@ package io.onetable.delta;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -149,6 +150,7 @@ public class TestDeltaPartitionExtractor {
                                 .build())
                         .build())
                 .transformType(PartitionTransformType.DAY)
+                .partitionFieldNames(Collections.singletonList("dateOfBirth"))
                 .build());
     List<OnePartitionField> onePartitionFields =
         deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
@@ -174,6 +176,7 @@ public class TestDeltaPartitionExtractor {
                                 .build())
                         .build())
                 .transformType(PartitionTransformType.HOUR)
+                .partitionFieldNames(Collections.singletonList("dateFmt"))
                 .build());
     List<OnePartitionField> onePartitionFields =
         deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
@@ -199,6 +202,7 @@ public class TestDeltaPartitionExtractor {
                                 .build())
                         .build())
                 .transformType(PartitionTransformType.YEAR)
+                .partitionFieldNames(Collections.singletonList("yearOfBirth"))
                 .build());
     List<OnePartitionField> onePartitionFields =
         deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
@@ -224,6 +228,7 @@ public class TestDeltaPartitionExtractor {
                                 .build())
                         .build())
                 .transformType(PartitionTransformType.YEAR)
+                .partitionFieldNames(Collections.singletonList("yearOfBirth"))
                 .build(),
             OnePartitionField.builder()
                 .sourceField(
@@ -267,6 +272,8 @@ public class TestDeltaPartitionExtractor {
                                 .dataType(OneType.TIMESTAMP)
                                 .build())
                         .build())
+                .partitionFieldNames(
+                    Arrays.asList("yearOfBirth", "monthOfBirth", "dayOfBirth", "hourOfBirth"))
                 .transformType(PartitionTransformType.HOUR)
                 .build());
     List<OnePartitionField> onePartitionFields =
@@ -303,6 +310,7 @@ public class TestDeltaPartitionExtractor {
                                 .build())
                         .build())
                 .transformType(PartitionTransformType.HOUR)
+                .partitionFieldNames(Collections.singletonList("dateFmt"))
                 .build(),
             OnePartitionField.builder()
                 .sourceField(
@@ -323,6 +331,7 @@ public class TestDeltaPartitionExtractor {
                                 .build())
                         .build())
                 .transformType(PartitionTransformType.DAY)
+                .partitionFieldNames(Collections.singletonList("dateOfBirth"))
                 .build());
     List<OnePartitionField> onePartitionFields =
         deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);

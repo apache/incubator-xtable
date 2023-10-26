@@ -184,11 +184,14 @@ public class DeltaPartitionExtractor {
         parsedGeneratedExprs, new HashSet<>(GRANULARITIES.subList(0, parsedGeneratedExprs.size())));
 
     ParsedGeneratedExpr transform = parsedGeneratedExprs.get(0);
-    // TODO(vamshigv): Handle multiple fields.
+    List<String> partitionColumns =
+        parsedGeneratedExprs.stream()
+            .map(parsedGeneratedExpr -> parsedGeneratedExpr.partitionColumnName)
+            .collect(Collectors.toList());
     return OnePartitionField.builder()
         .sourceField(
             SchemaFieldFinder.getInstance().findFieldByPath(oneSchema, transform.sourceColumn))
-        .partitionFieldName(transform.partitionColumnName)
+        .partitionFieldNames(partitionColumns)
         .transformType(
             parsedGeneratedExprs.get(parsedGeneratedExprs.size() - 1)
                 .internalPartitionTransformType)
@@ -202,7 +205,7 @@ public class DeltaPartitionExtractor {
         .sourceField(
             SchemaFieldFinder.getInstance()
                 .findFieldByPath(oneSchema, parsedGeneratedExpr.sourceColumn))
-        .partitionFieldName(partitionColumnName)
+        .partitionFieldNames(Collections.singletonList(partitionColumnName))
         .transformType(PartitionTransformType.DAY)
         .build();
   }
@@ -213,7 +216,7 @@ public class DeltaPartitionExtractor {
         .sourceField(
             SchemaFieldFinder.getInstance()
                 .findFieldByPath(oneSchema, parsedGeneratedExpr.sourceColumn))
-        .partitionFieldName(partitionColumnName)
+        .partitionFieldNames(Collections.singletonList(partitionColumnName))
         .transformType(parsedGeneratedExpr.internalPartitionTransformType)
         .build();
   }
@@ -279,8 +282,12 @@ public class DeltaPartitionExtractor {
             Collectors.toMap(
                 Function.identity(),
                 partitionField -> {
-                  String serializedValue =
-                      values.getOrElse(partitionField.getPartitionFieldName(), null);
+                  // TODO(vamshigv): Handle multiple fields here.
+                  String partitionColumnToUse =
+                      partitionField.getPartitionFieldNames().isEmpty()
+                          ? partitionField.getSourceField().getName()
+                          : partitionField.getPartitionFieldNames().get(0);
+                  String serializedValue = values.getOrElse(partitionColumnToUse, null);
                   PartitionTransformType partitionTransformType = partitionField.getTransformType();
                   String dateFormat =
                       partitionTransformType != PartitionTransformType.VALUE
