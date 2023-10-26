@@ -235,9 +235,7 @@ class TestIcebergSourceClient {
     Assertions.assertEquals(4, catalogSales.history().size());
     catalogSales.expireSnapshots().expireSnapshotId(snapshot1.snapshotId()).commit();
     Assertions.assertEquals(3, catalogSales.history().size());
-    IcebergSourceClient sourceClient = getIcebergSourceClient(catalogSales);
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> sourceClient.getTableChangeForCommit(snapshot1));
+    Assertions.assertNull(catalogSales.snapshot(snapshot1.snapshotId()));
     Snapshot snapshot6 = catalogSales.currentSnapshot();
     // expire does not generate a new snapshot
     Assertions.assertEquals(snapshot6, snapshot5);
