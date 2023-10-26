@@ -32,11 +32,14 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
 
+import scala.collection.JavaConverters;
+
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
+import io.onetable.model.stat.Range;
 
 /** Validates the partition extraction logic from Delta tables. */
 public class TestDeltaPartitionExtractor {
@@ -150,6 +153,7 @@ public class TestDeltaPartitionExtractor {
             OnePartitionField.builder()
                 .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.DAY)
+                .partitionFieldNames(Collections.singletonList("dateOfBirth"))
                 .build());
     List<OnePartitionField> onePartitionFields =
         deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
@@ -167,6 +171,7 @@ public class TestDeltaPartitionExtractor {
             OnePartitionField.builder()
                 .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.HOUR)
+                .partitionFieldNames(Collections.singletonList("dateFmt"))
                 .build());
     List<OnePartitionField> onePartitionFields =
         deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
@@ -184,6 +189,7 @@ public class TestDeltaPartitionExtractor {
             OnePartitionField.builder()
                 .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.YEAR)
+                .partitionFieldNames(Collections.singletonList("yearOfBirth"))
                 .build());
     List<OnePartitionField> onePartitionFields =
         deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
@@ -201,6 +207,7 @@ public class TestDeltaPartitionExtractor {
             OnePartitionField.builder()
                 .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.YEAR)
+                .partitionFieldNames(Collections.singletonList("yearOfBirth"))
                 .build(),
             OnePartitionField.builder()
                 .sourceField(
@@ -236,6 +243,8 @@ public class TestDeltaPartitionExtractor {
         Arrays.asList(
             OnePartitionField.builder()
                 .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+                .partitionFieldNames(
+                    Arrays.asList("yearOfBirth", "monthOfBirth", "dayOfBirth", "hourOfBirth"))
                 .transformType(PartitionTransformType.HOUR)
                 .build());
     List<OnePartitionField> onePartitionFields =
@@ -264,6 +273,7 @@ public class TestDeltaPartitionExtractor {
             OnePartitionField.builder()
                 .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.HOUR)
+                .partitionFieldNames(Collections.singletonList("dateFmt"))
                 .build(),
             OnePartitionField.builder()
                 .sourceField(
@@ -276,10 +286,161 @@ public class TestDeltaPartitionExtractor {
             OnePartitionField.builder()
                 .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.DAY)
+                .partitionFieldNames(Collections.singletonList("dateOfBirth"))
                 .build());
     List<OnePartitionField> onePartitionFields =
         deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
     assertEquals(expectedOnePartitionFields, onePartitionFields);
+  }
+
+  @Test
+  public void testSimplePartitionValueExtraction() {
+    Map<String, String> partitionValuesMap =
+        new HashMap<String, String>() {
+          {
+            put("partition_column1", "partition_value1");
+            put("partition_column2", "partition_value2");
+          }
+        };
+    scala.collection.mutable.Map<String, String> scalaMap =
+        convertJavaMapToScalaMap(partitionValuesMap);
+    OnePartitionField onePartitionField1 =
+        OnePartitionField.builder()
+            .sourceField(
+                OneField.builder()
+                    .name("partition_column1")
+                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    OnePartitionField onePartitionField2 =
+        OnePartitionField.builder()
+            .sourceField(
+                OneField.builder()
+                    .name("partition_column2")
+                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    Range rangeForPartitionField1 = Range.scalar("partition_value1");
+    Range rangeForPartitionField2 = Range.scalar("partition_value2");
+    Map<OnePartitionField, Range> expectedPartitionFieldRangeMap =
+        new HashMap<OnePartitionField, Range>() {
+          {
+            put(onePartitionField1, rangeForPartitionField1);
+            put(onePartitionField2, rangeForPartitionField2);
+          }
+        };
+    Map<OnePartitionField, Range> partitionFieldRangeMap =
+        deltaPartitionExtractor.partitionValueExtraction(
+            scalaMap, Arrays.asList(onePartitionField1, onePartitionField2));
+    assertEquals(expectedPartitionFieldRangeMap, partitionFieldRangeMap);
+  }
+
+  @Test
+  public void testDateFormatGeneratedPartitionValueExtraction() {
+    // date_partition_column is generated in the table as DATE_FORMAT(some_date_column,
+    // 'yyyy-MM-dd-HH')
+    // where some_date_column is of timestamp type.
+    Map<String, String> partitionValuesMap =
+        new HashMap<String, String>() {
+          {
+            put("partition_column1", "partition_value1");
+            put("date_partition_column", "2013-08-20-10");
+          }
+        };
+    scala.collection.mutable.Map<String, String> scalaMap =
+        convertJavaMapToScalaMap(partitionValuesMap);
+    OnePartitionField onePartitionField1 =
+        OnePartitionField.builder()
+            .sourceField(
+                OneField.builder()
+                    .name("partition_column1")
+                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    OnePartitionField onePartitionField2 =
+        OnePartitionField.builder()
+            .sourceField(
+                OneField.builder()
+                    .name("some_date_column")
+                    .schema(
+                        OneSchema.builder().name("timestamp").dataType(OneType.TIMESTAMP).build())
+                    .build())
+            .partitionFieldNames(Collections.singletonList("date_partition_column"))
+            .transformType(PartitionTransformType.HOUR)
+            .build();
+    Range rangeForPartitionField1 = Range.scalar("partition_value1");
+    Range rangeForPartitionField2 = Range.scalar(1376992800000L);
+    Map<OnePartitionField, Range> expectedPartitionFieldRangeMap =
+        new HashMap<OnePartitionField, Range>() {
+          {
+            put(onePartitionField1, rangeForPartitionField1);
+            put(onePartitionField2, rangeForPartitionField2);
+          }
+        };
+    Map<OnePartitionField, Range> partitionFieldRangeMap =
+        deltaPartitionExtractor.partitionValueExtraction(
+            scalaMap, Arrays.asList(onePartitionField1, onePartitionField2));
+    assertEquals(expectedPartitionFieldRangeMap, partitionFieldRangeMap);
+  }
+
+  @Test
+  public void testYearMonthDayHourGeneratedPartitionValueExtraction() {
+    // year, month and day are generated in the table as based on some_date_column which is of
+    // timestamp type.
+    Map<String, String> partitionValuesMap =
+        new HashMap<String, String>() {
+          {
+            put("partition_column1", "partition_value1");
+            put("year_partition_column", "2013");
+            put("month_partition_column", "8");
+            put("day_partition_column", "20");
+          }
+        };
+    scala.collection.mutable.Map<String, String> scalaMap =
+        convertJavaMapToScalaMap(partitionValuesMap);
+    OnePartitionField onePartitionField1 =
+        OnePartitionField.builder()
+            .sourceField(
+                OneField.builder()
+                    .name("partition_column1")
+                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    OnePartitionField onePartitionField2 =
+        OnePartitionField.builder()
+            .sourceField(
+                OneField.builder()
+                    .name("some_date_column")
+                    .schema(
+                        OneSchema.builder().name("timestamp").dataType(OneType.TIMESTAMP).build())
+                    .build())
+            .partitionFieldNames(
+                Arrays.asList(
+                    "year_partition_column", "month_partition_column", "day_partition_column"))
+            .transformType(PartitionTransformType.DAY)
+            .build();
+    Range rangeForPartitionField1 = Range.scalar("partition_value1");
+    Range rangeForPartitionField2 = Range.scalar(1376956800000L);
+    Map<OnePartitionField, Range> expectedPartitionFieldRangeMap =
+        new HashMap<OnePartitionField, Range>() {
+          {
+            put(onePartitionField1, rangeForPartitionField1);
+            put(onePartitionField2, rangeForPartitionField2);
+          }
+        };
+    Map<OnePartitionField, Range> partitionFieldRangeMap =
+        deltaPartitionExtractor.partitionValueExtraction(
+            scalaMap, Arrays.asList(onePartitionField1, onePartitionField2));
+    assertEquals(expectedPartitionFieldRangeMap, partitionFieldRangeMap);
+  }
+
+  private scala.collection.mutable.Map<String, String> convertJavaMapToScalaMap(
+      Map<String, String> javaMap) {
+    return JavaConverters.mapAsScalaMapConverter(javaMap).asScala();
   }
 
   private StructType getSchemaWithFields(List<String> fields) {

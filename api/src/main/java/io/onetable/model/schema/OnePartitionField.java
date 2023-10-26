@@ -18,6 +18,9 @@
  
 package io.onetable.model.schema;
 
+import java.util.Collections;
+import java.util.List;
+
 import lombok.Builder;
 import lombok.Value;
 
@@ -31,6 +34,17 @@ import lombok.Value;
 public class OnePartitionField {
   // Source field the partition is based on
   OneField sourceField;
+  /*
+   * Ordered partition field names of the table if they differ from the source field name. Use the
+   * source field name directly when this list is empty. These are present when the transform is
+   * not `VALUE` and the source table format represents these as a separate field, like a generated
+   * column in Delta Lake.
+   * For example if there is dateOfBirth column in timestamp format and table is partitioned by
+   * yearOfBirth and monthOfBirth columns which are generated columns and computed as
+   * year(dateOfBirth) and month(dateOfBirth) respectively, then partitionFieldNames will be
+   * ["yearOfBirth", "monthOfBirth"] and sourceField will be "dateOfBirth".
+   */
+  @Builder.Default List<String> partitionFieldNames = Collections.emptyList();
   // An enum describing how the source data was transformed into the partition value
   PartitionTransformType transformType;
 }
