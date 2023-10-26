@@ -32,6 +32,7 @@ import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.exception.TableNotFoundException;
 
 import io.onetable.exception.OneIOException;
@@ -82,6 +83,10 @@ class HudiTableManager {
         recordKeyField = String.join(",", recordKeys);
       }
     }
+    String keyGeneratorClass;
+    keyGeneratorClass =
+        getKeyGeneratorClass(
+            table.getPartitioningFields(), table.getReadSchema().getRecordKeyFields());
     try {
       return HoodieTableMetaClient.withPropertyBuilder()
           .setCommitTimezone(HoodieTimelineTimeZone.UTC)
@@ -89,6 +94,7 @@ class HudiTableManager {
           .setTableName(table.getName())
           .setPayloadClass(HoodieAvroPayload.class)
           .setRecordKeyFields(recordKeyField)
+          .setKeyGeneratorClassProp(keyGeneratorClass)
           // other formats will not populate meta fields, so we disable it for consistency
           .setPopulateMetaFields(false)
           .setPartitionFields(
@@ -100,5 +106,35 @@ class HudiTableManager {
     } catch (IOException ex) {
       throw new OneIOException("Unable to initialize Hudi table", ex);
     }
+  }
+
+  @VisibleForTesting
+  static String getKeyGeneratorClass(
+      List<OnePartitionField> partitionFields, List<OneField> recordKeyFields) {
+    boolean multipleRecordKeyFields = recordKeyFields.size() > 1;
+    boolean multiplePartitionFields = partitionFields.size() > 1;
+    String keyGeneratorClass;
+    if (partitionFields.isEmpty()) {
+      keyGeneratorClass = "org.apache.hudi.keygen.NonpartitionedKeyGenerator";
+    } else {
+      if (partitionFields.stream()
+          .anyMatch(onePartitionField -> onePartitionField.getTransformType().isTimeBased())) {
+        if (multiplePartitionFields) {
+          // if there is more than one partition field and one of them is a date, we need to use
+          // CustomKeyGenerator
+          keyGeneratorClass = "org.apache.hudi.keygen.CustomKeyGenerator";
+        } else {
+          // if there is only one partition field and it is a date, we can use
+          // TimestampBasedKeyGenerator
+          keyGeneratorClass = "org.apache.hudi.keygen.TimestampBasedKeyGenerator";
+        }
+      } else {
+        keyGeneratorClass =
+            multipleRecordKeyFields || multiplePartitionFields
+                ? "org.apache.hudi.keygen.ComplexKeyGenerator"
+                : "org.apache.hudi.keygen.SimpleKeyGenerator";
+      }
+    }
+    return keyGeneratorClass;
   }
 }
