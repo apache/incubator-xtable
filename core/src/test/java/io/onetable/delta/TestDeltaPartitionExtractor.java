@@ -242,11 +242,7 @@ public class TestDeltaPartitionExtractor {
     List<OnePartitionField> expectedOnePartitionFields =
         Arrays.asList(
             OnePartitionField.builder()
-                .sourceField(
-                    OneField.builder()
-                        .name("birthDate")
-                        .schema(TIMESTAMP_SCHEMA)
-                        .build())
+                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .partitionFieldNames(
                     Arrays.asList("yearOfBirth", "monthOfBirth", "dayOfBirth", "hourOfBirth"))
                 .transformType(PartitionTransformType.HOUR)
