@@ -32,7 +32,8 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.iceberg.*;
-import org.apache.iceberg.hadoop.HadoopTables;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.io.CloseableIterable;
 
 import io.onetable.client.PerTableConfig;
@@ -58,17 +59,25 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   private final Table sourceTable = initSourceTable();
 
   @Builder.Default
-  private IcebergPartitionValueConverter partitionConverter =
+  private final IcebergPartitionValueConverter partitionConverter =
       IcebergPartitionValueConverter.getInstance();
 
   @Builder.Default
-  private IcebergDataFileExtractor dataFileExtractor = IcebergDataFileExtractor.builder().build();
-
-  ;
+  private final IcebergDataFileExtractor dataFileExtractor =
+      IcebergDataFileExtractor.builder().build();
 
   private Table initSourceTable() {
-    HadoopTables tables = new HadoopTables(hadoopConf);
-    return tables.load(sourceTableConfig.getTableBasePath());
+    IcebergTableManager tableManager = IcebergTableManager.of(hadoopConf);
+    String[] namespace = sourceTableConfig.getNamespace();
+    String tableName = sourceTableConfig.getTableName();
+    TableIdentifier tableIdentifier =
+        namespace == null
+            ? TableIdentifier.of(tableName)
+            : TableIdentifier.of(Namespace.of(namespace), tableName);
+    return tableManager.getTable(
+        sourceTableConfig.getIcebergCatalogConfig(),
+        tableIdentifier,
+        sourceTableConfig.getTableBasePath());
   }
 
   @Override

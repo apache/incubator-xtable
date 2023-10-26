@@ -2,7 +2,10 @@ trigger:
 - main
 
 pr:
-- main
+  autoCancel: true
+  branches:
+    include:
+    - main
 
 variables:
   MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository

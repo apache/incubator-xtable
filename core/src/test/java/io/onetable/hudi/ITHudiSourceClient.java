@@ -37,6 +37,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -79,6 +80,16 @@ public class ITHudiSourceClient {
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
   }
 
+  @AfterAll
+  public static void teardown() {
+    if (jsc != null) {
+      jsc.close();
+    }
+    if (sparkSession != null) {
+      sparkSession.close();
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void insertAndUpsertData(HoodieTableType tableType, PartitionConfig partitionConfig) {
@@ -90,11 +101,20 @@ public class ITHudiSourceClient {
       List<TableChange> allTableChanges = new ArrayList<>();
 
       String commitInstant1 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100, "INFO");
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1;
+      if (partitionConfig.getHudiConfig() != null) {
+        insertsForCommit1 = table.generateRecords(100, "INFO");
+      } else {
+        insertsForCommit1 = table.generateRecords(100);
+      }
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 
-      table.insertRecords(100, "WARN", true);
+      if (partitionConfig.getHudiConfig() != null) {
+        table.insertRecords(100, "WARN", true);
+      } else {
+        table.insertRecords(100, true);
+      }
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 
       table.upsertRecords(insertsForCommit1.subList(0, 20), true);
@@ -137,7 +157,12 @@ public class ITHudiSourceClient {
       List<TableChange> allTableChanges = new ArrayList<>();
 
       String commitInstant1 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100, "INFO");
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1;
+      if (partitionConfig.getHudiConfig() != null) {
+        insertsForCommit1 = table.generateRecords(100, "INFO");
+      } else {
+        insertsForCommit1 = table.generateRecords(100);
+      }
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 

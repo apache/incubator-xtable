@@ -26,6 +26,7 @@ import lombok.Builder;
 import lombok.Value;
 
 import io.onetable.hudi.HudiSourceConfig;
+import io.onetable.iceberg.IcebergCatalogConfig;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 
@@ -38,6 +39,9 @@ public class PerTableConfig {
 
   /** The name of the table */
   @Nonnull String tableName;
+
+  /** The namespace of the table (optional) */
+  String[] namespace;
 
   /**
    * HudiSourceConfig is a config that allows us to infer partition values for hoodie source tables.
@@ -68,6 +72,9 @@ public class PerTableConfig {
 
   /** List of table formats to sync. */
   @Nonnull List<TableFormat> targetTableFormats;
+
+  /** Configuration options for integrating with an existing Iceberg Catalog (optional) */
+  @Builder.Default IcebergCatalogConfig icebergCatalogConfig = null;
 
   /**
    * Mode of a sync. FULL is only supported right now.

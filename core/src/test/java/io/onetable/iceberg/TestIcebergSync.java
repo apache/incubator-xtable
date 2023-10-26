@@ -75,6 +75,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
 import io.onetable.ITOneTableClient;
+import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
@@ -174,16 +175,20 @@ public class TestIcebergSync {
     icebergSync =
         TableFormatSync.of(
             new IcebergClient(
-                basePath.toString(),
-                tableName,
-                1,
+                PerTableConfig.builder()
+                    .tableBasePath(basePath.toString())
+                    .tableName(tableName)
+                    .targetMetadataRetentionInHours(1)
+                    .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+                    .build(),
                 new Configuration(),
                 mockSchemaExtractor,
                 mockSchemaSync,
                 mockPartitionSpecExtractor,
                 mockPartitionSpecSync,
                 IcebergDataFileUpdatesSync.of(
-                    mockColumnStatsConverter, IcebergPartitionValueConverter.getInstance())));
+                    mockColumnStatsConverter, IcebergPartitionValueConverter.getInstance()),
+                IcebergTableManager.of(new Configuration())));
   }
 
   @Test

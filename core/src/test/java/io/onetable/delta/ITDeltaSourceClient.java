@@ -18,7 +18,6 @@
  
 package io.onetable.delta;
 
-import static io.onetable.TestSparkDeltaTable.TIMESTAMP_FORMAT;
 import static io.onetable.ValidationTestHelper.validateOneSnapshot;
 import static io.onetable.ValidationTestHelper.validateTableChanges;
 import static org.junit.jupiter.api.Assertions.*;
@@ -27,7 +26,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.sql.Timestamp;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -38,7 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.Row;
@@ -50,6 +48,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import io.onetable.TestSparkDeltaTable;
 import io.onetable.client.PerTableConfig;
@@ -74,6 +77,7 @@ import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.testutil.Issues;
 
+@Execution(ExecutionMode.SAME_THREAD)
 public class ITDeltaSourceClient {
 
   private static final OneField COL1_INT_FIELD =
@@ -113,6 +117,9 @@ public class ITDeltaSourceClient {
                 "org.apache.spark.sql.delta.catalog.DeltaCatalog")
             .config("spark.databricks.delta.retentionDurationCheck.enabled", "false")
             .config("spark.databricks.delta.schema.autoMerge.enabled", "true")
+            .config("spark.sql.shuffle.partitions", "1")
+            .config("spark.default.parallelism", "1")
+            .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
             .getOrCreate();
   }
 
@@ -303,11 +310,12 @@ public class ITDeltaSourceClient {
     // TODO: Complete and enable test (see https://github.com/onetable-io/onetable/issues/90)
   }
 
-  @Test
-  public void testInsertsUpsertsAndDeletes() throws ParseException {
+  @ParameterizedTest
+  @MethodSource("testWithPartitionToggle")
+  public void testInsertsUpsertsAndDeletes(boolean isPartitioned) throws ParseException {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -352,11 +360,12 @@ public class ITDeltaSourceClient {
     validateTableChanges(allActiveFiles, allTableChanges);
   }
 
-  @Test
-  public void testVacuum() throws ParseException {
+  @ParameterizedTest
+  @MethodSource("testWithPartitionToggle")
+  public void testVacuum(boolean isPartitioned) throws ParseException {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -401,11 +410,12 @@ public class ITDeltaSourceClient {
     validateTableChanges(allActiveFiles, allTableChanges);
   }
 
-  @Test
-  public void testAddColumns() {
+  @ParameterizedTest
+  @MethodSource("testWithPartitionToggle")
+  public void testAddColumns(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -446,7 +456,7 @@ public class ITDeltaSourceClient {
   public void testDropPartition() {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, true);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -461,20 +471,7 @@ public class ITDeltaSourceClient {
     allRows.addAll(rows);
     allRows.addAll(rows1);
 
-    Map<Integer, List<Row>> rowsByPartition =
-        allRows.stream()
-            .collect(
-                Collectors.groupingBy(
-                    row -> {
-                      try {
-                        java.util.Date parsedDate = TIMESTAMP_FORMAT.parse(row.getString(4));
-                        Timestamp timestamp = new java.sql.Timestamp(parsedDate.getTime());
-                        return timestamp.toLocalDateTime().getYear();
-                      } catch (Exception e) {
-                        throw new RuntimeException(e);
-                      }
-                    }));
-
+    Map<Integer, List<Row>> rowsByPartition = testSparkDeltaTable.getRowsByPartition(allRows);
     Integer partitionValueToDelete = rowsByPartition.keySet().stream().findFirst().get();
     testSparkDeltaTable.deletePartition(partitionValueToDelete);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
@@ -508,11 +505,12 @@ public class ITDeltaSourceClient {
     validateTableChanges(allActiveFiles, allTableChanges);
   }
 
-  @Test
-  public void testOptimizeAndClustering() {
+  @ParameterizedTest
+  @MethodSource("testWithPartitionToggle")
+  public void testOptimizeAndClustering(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -531,7 +529,7 @@ public class ITDeltaSourceClient {
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
-    testSparkDeltaTable.runClustering("gender");
+    testSparkDeltaTable.runClustering();
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
     testSparkDeltaTable.insertRows(50);
@@ -637,5 +635,9 @@ public class ITDeltaSourceClient {
       Assertions.assertEquals(0, actual.getLastModified());
     }
     Assertions.assertEquals(expected.getColumnStats(), actual.getColumnStats());
+  }
+
+  private static Stream<Arguments> testWithPartitionToggle() {
+    return Stream.of(Arguments.of(false), Arguments.of(true));
   }
 }
