@@ -21,6 +21,7 @@ package io.onetable;
 import static io.onetable.delta.TestDeltaHelper.DATE_TIME_FORMATTER;
 import static io.onetable.delta.TestDeltaHelper.createTestDataHelper;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -49,7 +50,7 @@ import io.delta.tables.DeltaTable;
 import io.onetable.delta.TestDeltaHelper;
 
 @Value
-public class TestSparkDeltaTable {
+public class TestSparkDeltaTable implements Closeable {
   String tableName;
   String basePath;
   SparkSession sparkSession;
@@ -198,5 +199,12 @@ public class TestSparkDeltaTable {
                     throw new RuntimeException(e);
                   }
                 }));
+  }
+
+  @Override
+  public void close() {
+    if (sparkSession != null) {
+      sparkSession.close();
+    }
   }
 }
