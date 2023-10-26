@@ -19,48 +19,20 @@
 package io.onetable;
 
 import java.nio.file.Path;
-import java.text.ParseException;
 import java.util.List;
-import java.util.Optional;
 
 import lombok.Builder;
 import lombok.Getter;
-import lombok.Value;
 
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-
-import org.apache.hudi.common.model.HoodieAvroPayload;
-import org.apache.hudi.common.model.HoodieRecord;
-import org.apache.hudi.common.model.HoodieTableType;
 
 import io.onetable.model.storage.TableFormat;
 
 @Getter
 @Builder
-public class TestFormatAgnosticTable implements AutoCloseable {
-  private Optional<TestSparkDeltaTable> sparkDeltaTable = Optional.empty();
-  private Optional<TestSparkHudiTable> sparkHudiTable = Optional.empty();
-
-  public static TestFormatAgnosticTable withAdditionalColumns(
-      String tableName,
-      Path tempDir,
-      JavaSparkContext javaSparkContext,
-      TableFormat sourceFormat,
-      boolean isPartitioned) {
-    switch (sourceFormat) {
-      case HUDI:
-        return TestFormatAgnosticTable.builder()
-            .sparkHudiTable(
-                Optional.of(
-                    TestSparkHudiTable.forSchemaWithAdditionalColumnsAndPartitioning(
-                        tableName, tempDir, javaSparkContext, isPartitioned)))
-            .build();
-      default:
-        throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
-    }
-  }
+public class TestFormatAgnosticTable {
+  private final GenericTable genericTable;
 
   public static TestFormatAgnosticTable withStandardColumns(
       String tableName,
@@ -69,118 +41,56 @@ public class TestFormatAgnosticTable implements AutoCloseable {
       JavaSparkContext javaSparkContext,
       TableFormat sourceFormat,
       boolean isPartitioned) {
-    switch (sourceFormat) {
-      case HUDI:
-        return TestFormatAgnosticTable.builder()
-            .sparkHudiTable(
-                Optional.of(
-                    TestSparkHudiTable.forStandardSchemaAndPartitioning(
-                        tableName, tempDir, javaSparkContext, isPartitioned)))
-            .build();
-      case DELTA:
-        return TestFormatAgnosticTable.builder()
-            .sparkDeltaTable(
-                Optional.of(
-                    TestSparkDeltaTable.forStandardSchemaAndPartitioning(
-                        tableName, tempDir, sparkSession, isPartitioned)))
-            .build();
-      default:
-        throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
-    }
+    return TestFormatAgnosticTable.builder()
+        .genericTable(
+            GenericTable.getInstance(
+                tableName, tempDir, sparkSession, javaSparkContext, sourceFormat, isPartitioned))
+        .build();
+  }
+
+  public static TestFormatAgnosticTable withAdditionalColumns(
+      String tableName,
+      Path tempDir,
+      SparkSession sparkSession,
+      JavaSparkContext javaSparkContext,
+      TableFormat sourceFormat,
+      boolean isPartitioned) {
+    return TestFormatAgnosticTable.builder()
+        .genericTable(
+            GenericTable.getInstanceWithAdditionalColumns(
+                tableName, tempDir, sparkSession, javaSparkContext, sourceFormat, isPartitioned))
+        .build();
   }
 
   public String getBasePath() {
-    if (sparkHudiTable.isPresent()) {
-      return sparkHudiTable.get().getBasePath();
-    } else if (sparkDeltaTable.isPresent()) {
-      return sparkDeltaTable.get().getBasePath();
-    } else {
-      throw new IllegalStateException("Neither Hoodie nor Delta table is initialized.");
-    }
+    return genericTable.getBasePath();
   }
 
-  public InsertRecordsHolder insertRecords(int numRows) {
-    if (sparkHudiTable.isPresent()) {
-      List<HoodieRecord<HoodieAvroPayload>> records =
-          sparkHudiTable.get().insertRecords(numRows, true);
-      return InsertRecordsHolder.builder().hoodieRecords(Optional.of(records)).build();
-    } else if (sparkDeltaTable.isPresent()) {
-      List<Row> rows = sparkDeltaTable.get().insertRows(numRows);
-      return InsertRecordsHolder.builder().deltaRows(Optional.of(rows)).build();
-    } else {
-      throw new IllegalStateException("Neither Hoodie nor Delta table is initialized.");
-    }
+  public List<?> insertRecords(int numRows) {
+    return genericTable.insertRows(numRows);
   }
 
-  public void upsertRecords(InsertRecordsHolder insertRecordsHolder) throws ParseException {
-    if (sparkHudiTable.isPresent()) {
-      sparkHudiTable
-          .get()
-          .upsertRecords(insertRecordsHolder.getHoodieRecords().get().subList(0, 20), true);
-    } else if (sparkDeltaTable.isPresent()) {
-      sparkDeltaTable.get().upsertRows(insertRecordsHolder.getDeltaRows().get().subList(0, 20));
-    } else {
-      throw new IllegalStateException("Neither Hoodie nor Delta table is initialized.");
-    }
+  public void upsertRecords(List<?> records) {
+    genericTable.upsertRows(records);
   }
 
-  public void deleteRecords(InsertRecordsHolder insertRecordsHolder) throws ParseException {
-    if (sparkHudiTable.isPresent()) {
-      sparkHudiTable
-          .get()
-          .deleteRecords(insertRecordsHolder.getHoodieRecords().get().subList(30, 50), true);
-    } else if (sparkDeltaTable.isPresent()) {
-      sparkDeltaTable.get().deleteRows(insertRecordsHolder.getDeltaRows().get().subList(30, 50));
-    } else {
-      throw new IllegalStateException("Neither Hoodie nor Delta table is initialized.");
-    }
+  public void deleteRecords(List<?> records) {
+    genericTable.deleteRows(records);
   }
 
-  public void insertRecordsForNewPartition(int numRows) {
-    if (sparkHudiTable.isPresent()) {
-      sparkHudiTable.get().insertRecords(numRows, "TRACE", true);
-    } else if (sparkDeltaTable.isPresent()) {
-      sparkDeltaTable.get().insertRows(numRows, 1990);
-    } else {
-      throw new IllegalStateException("Neither Hoodie nor Delta table is initialized.");
-    }
+  public void insertRecordsForSpecialPartition(int numRows) {
+    genericTable.insertRecordsForSpecialPartition(numRows);
   }
 
-  public void deletePartition() {
-    if (sparkHudiTable.isPresent()) {
-      sparkHudiTable.get().deletePartition("TRACE", HoodieTableType.COPY_ON_WRITE);
-    } else if (sparkDeltaTable.isPresent()) {
-      sparkDeltaTable.get().deletePartition(1990);
-    } else {
-      throw new IllegalStateException("Neither Hoodie nor Delta table is initialized.");
-    }
+  public void deletePartition(Object partitionValue) {
+    genericTable.deletePartition(partitionValue);
+  }
+
+  public void deleteSpecialPartition() {
+    genericTable.deleteSpecialPartition();
   }
 
   public String getOrderByColumn() {
-    if (sparkHudiTable.isPresent()) {
-      return "_hoodie_record_key";
-    } else if (sparkDeltaTable.isPresent()) {
-      return "id";
-    } else {
-      throw new IllegalStateException("Neither Hoodie nor Delta table is initialized.");
-    }
-  }
-
-  // TODO(vamshigv): Clean up with generics later.
-  @Builder
-  @Value
-  public static class InsertRecordsHolder {
-    private final Optional<List<HoodieRecord<HoodieAvroPayload>>> hoodieRecords;
-    private final Optional<List<Row>> deltaRows;
-  }
-
-  @Override
-  public void close() {
-    if (sparkHudiTable.isPresent()) {
-      sparkHudiTable.get().close();
-    }
-    if (sparkDeltaTable.isPresent()) {
-      sparkDeltaTable.get().close();
-    }
+    return genericTable.getOrderByColumn();
   }
 }

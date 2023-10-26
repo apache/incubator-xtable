@@ -27,12 +27,12 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Timestamp;
-import java.text.ParseException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import lombok.SneakyThrows;
 import lombok.Value;
 
 import org.apache.spark.sql.Column;
@@ -50,7 +50,9 @@ import io.delta.tables.DeltaTable;
 import io.onetable.delta.TestDeltaHelper;
 
 @Value
-public class TestSparkDeltaTable implements Closeable {
+public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeable {
+  // typical inserts or upserts do not use this partition value.
+  private static final Integer SPECIAL_PARTITION_VALUE = 1990;
   String tableName;
   String basePath;
   SparkSession sparkSession;
@@ -80,6 +82,7 @@ public class TestSparkDeltaTable implements Closeable {
     }
   }
 
+  @Override
   public List<Row> insertRows(int numRows) {
     List<Row> rows = testDeltaHelper.generateRows(numRows);
     String insertStatement = testDeltaHelper.generateSqlForDataInsert(tableName, rows);
@@ -87,8 +90,10 @@ public class TestSparkDeltaTable implements Closeable {
     return rows;
   }
 
-  public List<Row> insertRows(int numRows, int partitionValue) {
-    List<Row> rows = testDeltaHelper.generateRowsForSpecificPartition(numRows, partitionValue);
+  @Override
+  public List<Row> insertRecordsForSpecialPartition(int numRows) {
+    List<Row> rows =
+        testDeltaHelper.generateRowsForSpecificPartition(numRows, SPECIAL_PARTITION_VALUE);
     String insertStatement = testDeltaHelper.generateSqlForDataInsert(tableName, rows);
     sparkSession.sql(insertStatement);
     return rows;
@@ -101,7 +106,19 @@ public class TestSparkDeltaTable implements Closeable {
     return rows;
   }
 
-  public void upsertRows(List<Row> upsertRows) throws ParseException {
+  @Override
+  public Integer getAnyPartitionValue(List<Row> rows) {
+    Map<Integer, List<Row>> rowsByPartition = getRowsByPartition(rows);
+    return rowsByPartition.keySet().stream().findFirst().get();
+  }
+
+  @Override
+  public String getOrderByColumn() {
+    return "id";
+  }
+
+  @SneakyThrows
+  public void upsertRows(List<Row> upsertRows) {
     List<Row> upserts = testDeltaHelper.transformForUpsertsOrDeletes(upsertRows, true);
     Dataset<Row> upsertDataset =
         sparkSession.createDataFrame(upserts, testDeltaHelper.getTableStructSchema());
@@ -113,7 +130,8 @@ public class TestSparkDeltaTable implements Closeable {
         .execute();
   }
 
-  public void deleteRows(List<Row> deleteRows) throws ParseException {
+  @SneakyThrows
+  public void deleteRows(List<Row> deleteRows) {
     List<Row> deletes = testDeltaHelper.transformForUpsertsOrDeletes(deleteRows, false);
     Dataset<Row> deleteDataset =
         sparkSession.createDataFrame(deletes, testDeltaHelper.getTableStructSchema());
@@ -125,12 +143,18 @@ public class TestSparkDeltaTable implements Closeable {
         .execute();
   }
 
-  public void deletePartition(int partitionValue) {
+  @Override
+  public void deletePartition(Integer partitionValue) {
     Preconditions.checkArgument(
         tableIsPartitioned,
         "Invalid operation! Delete partition is only supported for partitioned tables.");
     Column condition = functions.col("yearOfBirth").equalTo(partitionValue);
     deltaTable.delete(condition);
+  }
+
+  @Override
+  public void deleteSpecialPartition() {
+    deletePartition(SPECIAL_PARTITION_VALUE);
   }
 
   public void runCompaction() {

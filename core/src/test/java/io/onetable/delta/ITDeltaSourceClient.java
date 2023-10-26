@@ -487,7 +487,7 @@ public class ITDeltaSourceClient {
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
     // Insert few records for deleted partition again to make it interesting.
-    testSparkDeltaTable.insertRows(20, partitionValueToDelete);
+    testSparkDeltaTable.insertRowsForPartition(20, partitionValueToDelete);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
     PerTableConfig tableConfig =

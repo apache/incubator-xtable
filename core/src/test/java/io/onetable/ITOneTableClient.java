@@ -180,83 +180,87 @@ public class ITOneTableClient {
     } else {
       throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
     }
-    TestFormatAgnosticTable.InsertRecordsHolder insertsHolder = null;
-    try (TestFormatAgnosticTable table =
+    TestFormatAgnosticTable table =
         TestFormatAgnosticTable.withStandardColumns(
-            tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
-      insertsHolder = table.insertRecords(100);
+            tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned);
+    List<?> insertRecords = table.insertRecords(100);
 
-      PerTableConfig perTableConfig =
-          PerTableConfig.builder()
-              .tableName(tableName)
-              .targetTableFormats(targetTableFormats)
-              .tableBasePath(table.getBasePath())
-              .hudiSourceConfig(
-                  HudiSourceConfig.builder()
-                      .partitionFieldSpecConfig(oneTablePartitionConfig)
-                      .build())
-              .syncMode(syncMode)
-              .build();
-      oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          sourceTableFormat,
-          table.getOrderByColumn(),
-          targetTableFormats,
-          table.getBasePath(),
-          100);
+    PerTableConfig perTableConfig =
+        PerTableConfig.builder()
+            .tableName(tableName)
+            .targetTableFormats(targetTableFormats)
+            .tableBasePath(table.getBasePath())
+            .hudiSourceConfig(
+                HudiSourceConfig.builder()
+                    .partitionFieldSpecConfig(oneTablePartitionConfig)
+                    .build())
+            .syncMode(syncMode)
+            .build();
+    oneTableClient.sync(perTableConfig, sourceClientProvider);
+    checkDatasetEquivalence(
+        sourceTableFormat, table.getOrderByColumn(), targetTableFormats, table.getBasePath(), 100);
 
-      table.insertRecords(100);
-      oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          sourceTableFormat,
-          table.getOrderByColumn(),
-          targetTableFormats,
-          table.getBasePath(),
-          200);
+    table.insertRecords(100);
+    oneTableClient.sync(perTableConfig, sourceClientProvider);
+    checkDatasetEquivalence(
+        sourceTableFormat, table.getOrderByColumn(), targetTableFormats, table.getBasePath(), 200);
 
-      table.upsertRecords(insertsHolder);
-      oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          sourceTableFormat,
-          table.getOrderByColumn(),
-          targetTableFormats,
-          table.getBasePath(),
-          200);
+    table.upsertRecords(insertRecords.subList(0, 20));
+    oneTableClient.sync(perTableConfig, sourceClientProvider);
+    checkDatasetEquivalence(
+        sourceTableFormat, table.getOrderByColumn(), targetTableFormats, table.getBasePath(), 200);
 
-      table.deleteRecords(insertsHolder);
-      oneTableClient.sync(perTableConfig, sourceClientProvider);
+    table.deleteRecords(insertRecords.subList(30, 50));
+    oneTableClient.sync(perTableConfig, sourceClientProvider);
 
-      checkDatasetEquivalence(
-          sourceTableFormat,
-          table.getOrderByColumn(),
-          targetTableFormats,
-          table.getBasePath(),
-          180);
-    }
-    try (TestFormatAgnosticTable tableWithUpdatedSchema =
+    checkDatasetEquivalence(
+        sourceTableFormat, table.getOrderByColumn(), targetTableFormats, table.getBasePath(), 180);
+
+    TestFormatAgnosticTable tableWithUpdatedSchema =
         TestFormatAgnosticTable.withAdditionalColumns(
-            tableName, tempDir, jsc, sourceTableFormat, isPartitioned)) {
-      PerTableConfig perTableConfig =
-          PerTableConfig.builder()
-              .tableName(tableName)
-              .targetTableFormats(targetTableFormats)
-              .tableBasePath(tableWithUpdatedSchema.getBasePath())
-              .hudiSourceConfig(
-                  HudiSourceConfig.builder()
-                      .partitionFieldSpecConfig(oneTablePartitionConfig)
-                      .build())
-              .syncMode(syncMode)
-              .build();
-      tableWithUpdatedSchema.insertRecords(100);
+            tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned);
+    perTableConfig =
+        PerTableConfig.builder()
+            .tableName(tableName)
+            .targetTableFormats(targetTableFormats)
+            .tableBasePath(tableWithUpdatedSchema.getBasePath())
+            .hudiSourceConfig(
+                HudiSourceConfig.builder()
+                    .partitionFieldSpecConfig(oneTablePartitionConfig)
+                    .build())
+            .syncMode(syncMode)
+            .build();
+    tableWithUpdatedSchema.insertRecords(100);
+    oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+    checkDatasetEquivalence(
+        sourceTableFormat,
+        tableWithUpdatedSchema.getOrderByColumn(),
+        targetTableFormats,
+        tableWithUpdatedSchema.getBasePath(),
+        280);
+
+    tableWithUpdatedSchema.deleteRecords(insertRecords.subList(60, 90));
+    checkDatasetEquivalence(
+        sourceTableFormat,
+        tableWithUpdatedSchema.getOrderByColumn(),
+        targetTableFormats,
+        tableWithUpdatedSchema.getBasePath(),
+        250);
+
+    if (isPartitioned) {
+      // Adds new partition.
+      tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
           tableWithUpdatedSchema.getOrderByColumn(),
           targetTableFormats,
           tableWithUpdatedSchema.getBasePath(),
-          280);
+          300);
 
-      tableWithUpdatedSchema.deleteRecords(insertsHolder);
+      // Drops partition.
+      tableWithUpdatedSchema.deleteSpecialPartition();
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
           tableWithUpdatedSchema.getOrderByColumn(),
@@ -264,37 +268,15 @@ public class ITOneTableClient {
           tableWithUpdatedSchema.getBasePath(),
           250);
 
-      if (isPartitioned) {
-        // Adds new partition.
-        tableWithUpdatedSchema.insertRecordsForNewPartition(50);
-        oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-        checkDatasetEquivalence(
-            sourceTableFormat,
-            tableWithUpdatedSchema.getOrderByColumn(),
-            targetTableFormats,
-            tableWithUpdatedSchema.getBasePath(),
-            300);
-
-        // Drops partition.
-        tableWithUpdatedSchema.deletePartition();
-        oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-        checkDatasetEquivalence(
-            sourceTableFormat,
-            tableWithUpdatedSchema.getOrderByColumn(),
-            targetTableFormats,
-            tableWithUpdatedSchema.getBasePath(),
-            250);
-
-        // Insert records to the dropped partition again.
-        tableWithUpdatedSchema.insertRecordsForNewPartition(50);
-        oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-        checkDatasetEquivalence(
-            sourceTableFormat,
-            tableWithUpdatedSchema.getOrderByColumn(),
-            targetTableFormats,
-            tableWithUpdatedSchema.getBasePath(),
-            300);
-      }
+      // Insert records to the dropped partition again.
+      tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(
+          sourceTableFormat,
+          tableWithUpdatedSchema.getOrderByColumn(),
+          targetTableFormats,
+          tableWithUpdatedSchema.getBasePath(),
+          300);
     }
   }
 
