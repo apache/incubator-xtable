@@ -335,10 +335,8 @@ public class AvroSchemaConverter {
         return finalizeSchema(
             LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT)), oneSchema);
       case TIMESTAMP:
-        // TODO(vamshigv): Delta throws NPE here fix it.
-        if (oneSchema.getMetadata() != null
-            && oneSchema.getMetadata().get(OneSchema.MetadataKey.TIMESTAMP_PRECISION)
-                == OneSchema.MetadataValue.MICROS) {
+        if (oneSchema.getMetadata().get(OneSchema.MetadataKey.TIMESTAMP_PRECISION)
+            == OneSchema.MetadataValue.MICROS) {
           return finalizeSchema(
               LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG)),
               oneSchema);
