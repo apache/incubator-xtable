@@ -140,7 +140,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
     }
     OneDataFilesDiff dataFilesDiff =
         OneDataFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
-    return TableChange.builder().currentTableState(tableAtVersion).filesDiff(dataFilesDiff).build();
+    return TableChange.builder().tableAsOfChange(tableAtVersion).filesDiff(dataFilesDiff).build();
   }
 
   @Override

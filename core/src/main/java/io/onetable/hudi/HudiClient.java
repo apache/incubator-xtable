@@ -116,7 +116,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
             .findInstantsBeforeOrEquals(hoodieInstantForDiff.getTimestamp());
     OneTable table = getTable(hoodieInstantForDiff);
     return TableChange.builder()
-        .currentTableState(table)
+        .tableAsOfChange(table)
         .filesDiff(
             dataFileExtractor.getDiffForCommit(
                 hoodieInstantForDiff, table, hoodieInstantForDiff, visibleTimeline))

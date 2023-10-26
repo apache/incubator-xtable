@@ -33,6 +33,7 @@ import io.onetable.model.storage.OneDataFilesDiff;
 public class TableChange {
   // Change in files at the specified instant
   OneDataFilesDiff filesDiff;
-  // OneTable state at the specified instant
-  OneTable currentTableState;
+
+  /** The {@link OneTable} at the commit time to which this table change belongs. */
+  OneTable tableAsOfChange;
 }
