@@ -45,6 +45,8 @@ import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
+import scala.collection.JavaConverters;
+
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
@@ -282,17 +284,13 @@ public class DeltaPartitionExtractor {
             Collectors.toMap(
                 Function.identity(),
                 partitionField -> {
-                  // TODO(vamshigv): Handle multiple fields here.
-                  String partitionColumnToUse =
-                      partitionField.getPartitionFieldNames().isEmpty()
-                          ? partitionField.getSourceField().getName()
-                          : partitionField.getPartitionFieldNames().get(0);
-                  String serializedValue = values.getOrElse(partitionColumnToUse, null);
                   PartitionTransformType partitionTransformType = partitionField.getTransformType();
                   String dateFormat =
                       partitionTransformType != PartitionTransformType.VALUE
                           ? getDateFormat(partitionTransformType)
                           : null;
+                  String serializedValue =
+                      getSerializedPartitionValue(convertScalaMapToJavaMap(values), partitionField);
                   Object partitionValue =
                       convertFromDeltaPartitionValue(
                           serializedValue,
@@ -301,6 +299,21 @@ public class DeltaPartitionExtractor {
                           dateFormat);
                   return Range.scalar(partitionValue);
                 }));
+  }
+
+  private String getSerializedPartitionValue(
+      Map<String, String> values, OnePartitionField partitionField) {
+    if (partitionField.getPartitionFieldNames() == null
+        || partitionField.getPartitionFieldNames().isEmpty()) {
+      return values.getOrDefault(partitionField.getSourceField().getName(), null);
+    }
+    List<String> partitionFieldNames = partitionField.getPartitionFieldNames();
+    if (partitionFieldNames.size() == 1) {
+      return values.getOrDefault(partitionFieldNames.get(0), null);
+    }
+    return partitionFieldNames.stream()
+        .map(name -> values.get(name))
+        .collect(Collectors.joining("-"));
   }
 
   private String getGeneratedColumnName(OnePartitionField onePartitionField) {
@@ -386,6 +399,11 @@ public class DeltaPartitionExtractor {
               + ", Found: "
               + actualTypesPresent);
     }
+  }
+
+  private Map<String, String> convertScalaMapToJavaMap(
+      scala.collection.Map<String, String> scalaMap) {
+    return JavaConverters.mapAsJavaMapConverter(scalaMap).asJava();
   }
 
   @Builder

@@ -420,7 +420,7 @@ public class TestDeltaPartitionExtractor {
             .transformType(PartitionTransformType.HOUR)
             .build();
     Range rangeForPartitionField1 = Range.scalar("partition_value1");
-    Range rangeForPartitionField2 = Range.scalar(1376990400000L);
+    Range rangeForPartitionField2 = Range.scalar(1376992800000L);
     Map<OnePartitionField, Range> expectedPartitionFieldRangeMap =
         new HashMap<OnePartitionField, Range>() {
           {
