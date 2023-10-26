@@ -161,7 +161,7 @@ public class ITOneTableClient {
   @ParameterizedTest
   @MethodSource("generateTestParametersForFormatsSyncModesAndPartitioning")
   public void testVariousOperations(
-      TableFormat sourceTableFormat, SyncMode syncMode, boolean isPartitioned) throws Exception {
+      TableFormat sourceTableFormat, SyncMode syncMode, boolean isPartitioned) {
     String tableName = getTableName();
     OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
     List<TableFormat> targetTableFormats =
@@ -212,7 +212,6 @@ public class ITOneTableClient {
 
     table.deleteRecords(insertRecords.subList(30, 50));
     oneTableClient.sync(perTableConfig, sourceClientProvider);
-
     checkDatasetEquivalence(
         sourceTableFormat, table.getOrderByColumn(), targetTableFormats, table.getBasePath(), 180);
 
@@ -231,7 +230,7 @@ public class ITOneTableClient {
             .syncMode(syncMode)
             .build();
     tableWithUpdatedSchema.insertRecords(100);
-    oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+    oneTableClient.sync(perTableConfig, sourceClientProvider);
     checkDatasetEquivalence(
         sourceTableFormat,
         tableWithUpdatedSchema.getOrderByColumn(),
@@ -240,6 +239,7 @@ public class ITOneTableClient {
         280);
 
     tableWithUpdatedSchema.deleteRecords(insertRecords.subList(60, 90));
+    oneTableClient.sync(perTableConfig, sourceClientProvider);
     checkDatasetEquivalence(
         sourceTableFormat,
         tableWithUpdatedSchema.getOrderByColumn(),
@@ -250,7 +250,7 @@ public class ITOneTableClient {
     if (isPartitioned) {
       // Adds new partition.
       tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
           tableWithUpdatedSchema.getOrderByColumn(),
@@ -260,7 +260,7 @@ public class ITOneTableClient {
 
       // Drops partition.
       tableWithUpdatedSchema.deleteSpecialPartition();
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
           tableWithUpdatedSchema.getOrderByColumn(),
@@ -270,7 +270,7 @@ public class ITOneTableClient {
 
       // Insert records to the dropped partition again.
       tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
           tableWithUpdatedSchema.getOrderByColumn(),
