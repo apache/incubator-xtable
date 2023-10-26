@@ -27,6 +27,8 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
@@ -57,24 +59,30 @@ public class DeltaValueConverter {
       return (int) LocalDate.parse(value.toString()).toEpochDay();
     }
 
+    Instant instant;
     try {
+      instant = OffsetDateTime.parse(value.toString()).toInstant();
+    } catch (DateTimeParseException parseException) {
+      // fall back to parsing without offset
       DateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_STR);
       dateFormat.setTimeZone(TIME_ZONE);
-      Instant instant = dateFormat.parse(value.toString()).toInstant();
-      OneSchema.MetadataValue timestampPrecision =
-          (OneSchema.MetadataValue)
-              fieldSchema
-                  .getMetadata()
-                  .getOrDefault(
-                      OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
-      if (timestampPrecision == OneSchema.MetadataValue.MILLIS) {
-        return instant.toEpochMilli();
+      try {
+        instant = dateFormat.parse(value.toString()).toInstant();
+      } catch (ParseException ex) {
+        throw new OneIOException("Unable to parse time from column stats", ex);
       }
-      return TimeUnit.SECONDS.toMicros(instant.getEpochSecond())
-          + TimeUnit.NANOSECONDS.toMicros(instant.getNano());
-    } catch (ParseException ex) {
-      throw new OneIOException("Unable to parse time from column stats", ex);
     }
+    OneSchema.MetadataValue timestampPrecision =
+        (OneSchema.MetadataValue)
+            fieldSchema
+                .getMetadata()
+                .getOrDefault(
+                    OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+    if (timestampPrecision == OneSchema.MetadataValue.MILLIS) {
+      return instant.toEpochMilli();
+    }
+    return TimeUnit.SECONDS.toMicros(instant.getEpochSecond())
+        + TimeUnit.NANOSECONDS.toMicros(instant.getNano());
   }
 
   public static Object convertToDeltaColumnStatValue(Object value, OneSchema fieldSchema) {
