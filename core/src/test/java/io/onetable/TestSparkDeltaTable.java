@@ -90,13 +90,16 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
     return rows;
   }
 
-  @Override
-  public List<Row> insertRecordsForSpecialPartition(int numRows) {
-    List<Row> rows =
-        testDeltaHelper.generateRowsForSpecificPartition(numRows, SPECIAL_PARTITION_VALUE);
+  public List<Row> insertRowsForPartition(int numRows, Integer partitionValue) {
+    List<Row> rows = testDeltaHelper.generateRowsForSpecificPartition(numRows, partitionValue);
     String insertStatement = testDeltaHelper.generateSqlForDataInsert(tableName, rows);
     sparkSession.sql(insertStatement);
     return rows;
+  }
+
+  @Override
+  public List<Row> insertRecordsForSpecialPartition(int numRows) {
+    return insertRowsForPartition(numRows, SPECIAL_PARTITION_VALUE);
   }
 
   public List<Row> insertRowsWithAdditionalColumns(int numRows) {
