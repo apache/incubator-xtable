@@ -273,7 +273,7 @@ public class DeltaPartitionExtractor {
                       values.getOrElse(partitionField.getSourceField().getName(), null);
                   PartitionTransformType partitionTransformType = partitionField.getTransformType();
                   String dateFormat =
-                      partitionTransformType != PartitionTransformType.VALUE
+                      partitionTransformType.isTimeBased()
                           ? getDateFormat(partitionTransformType)
                           : null;
                   Object partitionValue =
