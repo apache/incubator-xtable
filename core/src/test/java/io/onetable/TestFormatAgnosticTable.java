@@ -40,8 +40,8 @@ import io.onetable.model.storage.TableFormat;
 @Getter
 @Builder
 public class TestFormatAgnosticTable implements AutoCloseable {
-  private Optional<TestSparkDeltaTable> sparkDeltaTable = Optional.empty();
-  private Optional<TestSparkHudiTable> sparkHudiTable = Optional.empty();
+  @Builder.Default private Optional<TestSparkDeltaTable> sparkDeltaTable = Optional.empty();
+  @Builder.Default private Optional<TestSparkHudiTable> sparkHudiTable = Optional.empty();
 
   public static TestFormatAgnosticTable withAdditionalColumns(
       String tableName,

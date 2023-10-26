@@ -257,6 +257,7 @@ public class ITOneTableClient {
           280);
 
       tableWithUpdatedSchema.deleteRecords(insertsHolder);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
           tableWithUpdatedSchema.getOrderByColumn(),
