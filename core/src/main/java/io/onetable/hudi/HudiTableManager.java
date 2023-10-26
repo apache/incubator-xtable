@@ -30,6 +30,7 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.exception.TableNotFoundException;
 
@@ -83,6 +84,7 @@ class HudiTableManager {
     }
     try {
       return HoodieTableMetaClient.withPropertyBuilder()
+          .setCommitTimezone(HoodieTimelineTimeZone.UTC)
           .setTableType(HoodieTableType.COPY_ON_WRITE)
           .setTableName(table.getName())
           .setPayloadClass(HoodieAvroPayload.class)

@@ -74,10 +74,7 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
    * @return
    */
   public static TestSparkHudiTable forStandardSchemaAndPartitioning(
-      String tableName,
-      Path tempDir,
-      JavaSparkContext jsc,
-      boolean isPartitioned) {
+      String tableName, Path tempDir, JavaSparkContext jsc, boolean isPartitioned) {
     String partitionConfig = isPartitioned ? "level:SIMPLE" : null;
     return new TestSparkHudiTable(
         tableName, BASIC_SCHEMA, tempDir, jsc, partitionConfig, HoodieTableType.MERGE_ON_READ);
