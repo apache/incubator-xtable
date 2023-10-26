@@ -20,6 +20,6 @@ package io.onetable.testutil;
 
 public class Issues {
 
-  // See https://github.com/onetable-io/onetable/issues/102
+  /** Refer to <a href="https://github.com/onetable-io/onetable/issues/102">GitHub #102</a> */
   public static final boolean ISSUE_102_FIXED = false;
 }
