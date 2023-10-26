@@ -476,7 +476,7 @@ public class ITHudiSourceClient {
         .flatMap(
             tableType -> partitionConfigs.stream().map(config -> Arguments.of(tableType, config)));
   }
-  
+
   private HudiClient getHudiSourceClient(
       Configuration conf, String basePath, String onetablePartitionConfig) {
     HoodieTableMetaClient hoodieTableMetaClient =

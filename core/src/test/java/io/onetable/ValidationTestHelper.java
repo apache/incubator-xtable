@@ -67,7 +67,7 @@ public class ValidationTestHelper {
   public static void validateTableChange(
       List<String> filePathsBefore, List<String> filePathsAfter, TableChange tableChange) {
     assertNotNull(tableChange);
-    assertNotNull(tableChange.getCurrentTableState());
+    assertNotNull(tableChange.getTableAsOfChange());
     replaceFileScheme(filePathsBefore);
     replaceFileScheme(filePathsAfter);
     Set<String> filesForCommitBefore = new HashSet<>(filePathsBefore);
