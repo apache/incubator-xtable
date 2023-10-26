@@ -226,8 +226,6 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
 
   @Override
   public void close() {
-    if (sparkSession != null) {
-      sparkSession.close();
-    }
+    // no-op as spark session lifecycle is managed by the caller
   }
 }

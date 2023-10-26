@@ -46,6 +46,8 @@ public interface GenericTable<T, Q> {
 
   String getOrderByColumn();
 
+  void close();
+
   static GenericTable getInstance(
       String tableName,
       Path tempDir,

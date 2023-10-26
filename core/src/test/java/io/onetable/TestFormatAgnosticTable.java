@@ -31,7 +31,7 @@ import io.onetable.model.storage.TableFormat;
 
 @Getter
 @Builder
-public class TestFormatAgnosticTable {
+public class TestFormatAgnosticTable implements AutoCloseable {
   private final GenericTable genericTable;
 
   public static TestFormatAgnosticTable withStandardColumns(
@@ -92,5 +92,10 @@ public class TestFormatAgnosticTable {
 
   public String getOrderByColumn() {
     return genericTable.getOrderByColumn();
+  }
+
+  @Override
+  public void close() throws Exception {
+    genericTable.close();
   }
 }
