@@ -33,15 +33,36 @@ import org.apache.spark.sql.SparkSession;
 
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
+import org.apache.hudi.common.model.HoodieTableType;
 
 import io.onetable.model.storage.TableFormat;
 
 @Getter
+@Builder
 public class TestFormatAgnosticTable implements AutoCloseable {
   private Optional<TestSparkDeltaTable> sparkDeltaTable = Optional.empty();
   private Optional<TestSparkHudiTable> sparkHudiTable = Optional.empty();
 
-  public TestFormatAgnosticTable(
+  public static TestFormatAgnosticTable withAdditionalColumns(
+      String tableName,
+      Path tempDir,
+      JavaSparkContext javaSparkContext,
+      TableFormat sourceFormat,
+      boolean isPartitioned) {
+    switch (sourceFormat) {
+      case HUDI:
+        return TestFormatAgnosticTable.builder()
+            .sparkHudiTable(
+                Optional.of(
+                    TestSparkHudiTable.forSchemaWithAdditionalColumnsAndPartitioning(
+                        tableName, tempDir, javaSparkContext, isPartitioned)))
+            .build();
+      default:
+        throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
+    }
+  }
+
+  public static TestFormatAgnosticTable withStandardColumns(
       String tableName,
       Path tempDir,
       SparkSession sparkSession,
@@ -50,17 +71,19 @@ public class TestFormatAgnosticTable implements AutoCloseable {
       boolean isPartitioned) {
     switch (sourceFormat) {
       case HUDI:
-        this.sparkHudiTable =
-            Optional.of(
-                TestSparkHudiTable.forStandardSchemaAndPartitioning(
-                    tableName, tempDir, javaSparkContext, isPartitioned));
-        break;
+        return TestFormatAgnosticTable.builder()
+            .sparkHudiTable(
+                Optional.of(
+                    TestSparkHudiTable.forStandardSchemaAndPartitioning(
+                        tableName, tempDir, javaSparkContext, isPartitioned)))
+            .build();
       case DELTA:
-        this.sparkDeltaTable =
-            Optional.of(
-                TestSparkDeltaTable.forStandardSchemaAndPartitioning(
-                    tableName, tempDir, sparkSession, isPartitioned));
-        break;
+        return TestFormatAgnosticTable.builder()
+            .sparkDeltaTable(
+                Optional.of(
+                    TestSparkDeltaTable.forStandardSchemaAndPartitioning(
+                        tableName, tempDir, sparkSession, isPartitioned)))
+            .build();
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
     }
@@ -108,6 +131,26 @@ public class TestFormatAgnosticTable implements AutoCloseable {
           .deleteRecords(insertRecordsHolder.getHoodieRecords().get().subList(30, 50), true);
     } else if (sparkDeltaTable.isPresent()) {
       sparkDeltaTable.get().deleteRows(insertRecordsHolder.getDeltaRows().get().subList(30, 50));
+    } else {
+      throw new IllegalStateException("Neither Hoodie nor Delta table is initialized.");
+    }
+  }
+
+  public void insertRecordsForNewPartition(int numRows) {
+    if (sparkHudiTable.isPresent()) {
+      sparkHudiTable.get().insertRecords(numRows, "TRACE", true);
+    } else if (sparkDeltaTable.isPresent()) {
+      sparkDeltaTable.get().insertRows(numRows, 1990);
+    } else {
+      throw new IllegalStateException("Neither Hoodie nor Delta table is initialized.");
+    }
+  }
+
+  public void deletePartition() {
+    if (sparkHudiTable.isPresent()) {
+      sparkHudiTable.get().deletePartition("TRACE", HoodieTableType.COPY_ON_WRITE);
+    } else if (sparkDeltaTable.isPresent()) {
+      sparkDeltaTable.get().deletePartition(1990);
     } else {
       throw new IllegalStateException("Neither Hoodie nor Delta table is initialized.");
     }

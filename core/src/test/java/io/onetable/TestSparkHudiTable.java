@@ -63,6 +63,18 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
   private final JavaSparkContext jsc;
   private SparkRDDWriteClient<HoodieAvroPayload> sparkWriteClient;
 
+  public static TestSparkHudiTable forSchemaWithAdditionalColumnsAndPartitioning(
+      String tableName, Path tempDir, JavaSparkContext jsc, boolean isPartitioned) {
+    String partitionConfig = isPartitioned ? "level:SIMPLE" : null;
+    return new TestSparkHudiTable(
+        tableName,
+        addSchemaEvolutionFieldsToBase(BASIC_SCHEMA),
+        tempDir,
+        jsc,
+        partitionConfig,
+        HoodieTableType.MERGE_ON_READ);
+  }
+
   /**
    * Create a test table instance for general testing. The table is created with the known schema
    * and standard partitioning if partitioning is enabled.
