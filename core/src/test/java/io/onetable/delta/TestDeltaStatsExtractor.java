@@ -64,6 +64,9 @@ public class TestDeltaStatsExtractor {
     assertEquals(null, minValueStatsMap.get("null_string_field"));
     assertEquals("2022-10-08 21:08:17", minValueStatsMap.get("timestamp_field"));
     assertEquals("2022-10-08 21:08:17", minValueStatsMap.get("timestamp_micros_field"));
+    assertEquals(1.23, minValueStatsMap.get("float_field"));
+    assertEquals(1.23, minValueStatsMap.get("double_field"));
+    assertEquals(1.0, minValueStatsMap.get("decimal_field"));
     // TOD0: Local timestamp depends on env where it is run, it is non determinstic and this has to
     // be computed dynamically.
     // assertEquals("2022-10-08 14:08:17", minValueStatsMap.get("local_timestamp_field"));
@@ -83,6 +86,9 @@ public class TestDeltaStatsExtractor {
     // be computed dynamically.
     // assertEquals("2022-10-10 14:08:17", maxValueStatsMap.get("local_timestamp_field"));
     assertEquals("2020-10-12", maxValueStatsMap.get("date_field"));
+    assertEquals(6.54321, maxValueStatsMap.get("float_field"));
+    assertEquals(6.54321, maxValueStatsMap.get("double_field"));
+    assertEquals(2.0, maxValueStatsMap.get("decimal_field"));
     Map<String, Object> nestedMapInMaxValueStatsMap =
         (HashMap<String, Object>) maxValueStatsMap.get("nested_struct_field");
     assertEquals(600, nestedMapInMaxValueStatsMap.get("nested_long_field"));
@@ -97,9 +103,41 @@ public class TestDeltaStatsExtractor {
     assertEquals(1, nullValueStatsMap.get("timestamp_micros_field"));
     assertEquals(1, nullValueStatsMap.get("local_timestamp_field"));
     assertEquals(250, nullValueStatsMap.get("date_field"));
+    assertEquals(2, nullValueStatsMap.get("float_field"));
+    assertEquals(3, nullValueStatsMap.get("double_field"));
+    assertEquals(1, nullValueStatsMap.get("decimal_field"));
     Map<String, Object> nestedMapInNullCountMap =
         (HashMap<String, Object>) nullValueStatsMap.get("nested_struct_field");
     assertEquals(4, nestedMapInNullCountMap.get("nested_long_field"));
+  }
+
+  @Test
+  void roundTripStatsConversion() throws IOException {
+    OneSchema schema = ColumnStatMapUtil.getSchema();
+    List<OneField> fields = schema.getAllFields();
+    Map<OneField, ColumnStat> columnStatMap = getColumnStatMap();
+
+    String stats =
+        DeltaStatsExtractor.getInstance().convertStatsToDeltaFormat(schema, 50L, columnStatMap);
+    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null);
+    DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
+    Map<OneField, ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
+
+    Map<OneField, ColumnStat> expected = new HashMap<>();
+    columnStatMap.forEach(
+        (field, stat) -> {
+          OneType dataType = field.getSchema().getDataType();
+          if (dataType != OneType.RECORD && dataType != OneType.LIST && dataType != OneType.MAP) {
+            ColumnStat columnStatWithoutSize = stat.toBuilder().totalSize(0).build();
+            expected.put(field, columnStatWithoutSize);
+          }
+        });
+    for (OneField field : expected.keySet()) {
+      if (!expected.get(field).equals(actual.get(field))) {
+        System.out.println(field.getName());
+      }
+    }
+    assertEquals(expected, actual);
   }
 
   @Test

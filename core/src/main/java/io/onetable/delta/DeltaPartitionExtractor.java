@@ -286,7 +286,7 @@ public class DeltaPartitionExtractor {
                 partitionField -> {
                   PartitionTransformType partitionTransformType = partitionField.getTransformType();
                   String dateFormat =
-                      partitionTransformType != PartitionTransformType.VALUE
+                      partitionTransformType.isTimeBased()
                           ? getDateFormat(partitionTransformType)
                           : null;
                   String serializedValue =

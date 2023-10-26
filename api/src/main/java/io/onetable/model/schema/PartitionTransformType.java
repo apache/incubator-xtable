@@ -30,5 +30,9 @@ public enum PartitionTransformType {
   MONTH,
   DAY,
   HOUR,
-  VALUE
+  VALUE;
+
+  public boolean isTimeBased() {
+    return this == YEAR || this == MONTH || this == DAY || this == HOUR;
+  }
 }

@@ -98,6 +98,14 @@ public class TestDeltaPartitionExtractor {
                   Metadata.fromJson("{\"delta.generationExpression\": \"HOUR(birthDate)\"}")));
         }
       };
+  private static final OneSchema TIMESTAMP_SCHEMA =
+      OneSchema.builder()
+          .name("timestamp")
+          .dataType(OneType.TIMESTAMP)
+          .metadata(
+              Collections.singletonMap(
+                  OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS))
+          .build();
 
   private final DeltaPartitionExtractor deltaPartitionExtractor =
       DeltaPartitionExtractor.getInstance();
@@ -143,15 +151,7 @@ public class TestDeltaPartitionExtractor {
     List<OnePartitionField> expectedOnePartitionFields =
         Arrays.asList(
             OnePartitionField.builder()
-                .sourceField(
-                    OneField.builder()
-                        .name("birthDate")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .build())
-                        .build())
+                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.DAY)
                 .partitionFieldNames(Collections.singletonList("dateOfBirth"))
                 .build());
@@ -169,15 +169,7 @@ public class TestDeltaPartitionExtractor {
     List<OnePartitionField> expectedOnePartitionFields =
         Arrays.asList(
             OnePartitionField.builder()
-                .sourceField(
-                    OneField.builder()
-                        .name("birthDate")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .build())
-                        .build())
+                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.HOUR)
                 .partitionFieldNames(Collections.singletonList("dateFmt"))
                 .build());
@@ -195,15 +187,7 @@ public class TestDeltaPartitionExtractor {
     List<OnePartitionField> expectedOnePartitionFields =
         Arrays.asList(
             OnePartitionField.builder()
-                .sourceField(
-                    OneField.builder()
-                        .name("birthDate")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .build())
-                        .build())
+                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.YEAR)
                 .partitionFieldNames(Collections.singletonList("yearOfBirth"))
                 .build());
@@ -221,15 +205,7 @@ public class TestDeltaPartitionExtractor {
     List<OnePartitionField> expectedOnePartitionFields =
         Arrays.asList(
             OnePartitionField.builder()
-                .sourceField(
-                    OneField.builder()
-                        .name("birthDate")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .build())
-                        .build())
+                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.YEAR)
                 .partitionFieldNames(Collections.singletonList("yearOfBirth"))
                 .build(),
@@ -269,11 +245,7 @@ public class TestDeltaPartitionExtractor {
                 .sourceField(
                     OneField.builder()
                         .name("birthDate")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .build())
+                        .schema(TIMESTAMP_SCHEMA)
                         .build())
                 .partitionFieldNames(
                     Arrays.asList("yearOfBirth", "monthOfBirth", "dayOfBirth", "hourOfBirth"))
@@ -303,15 +275,7 @@ public class TestDeltaPartitionExtractor {
                 .transformType(PartitionTransformType.VALUE)
                 .build(),
             OnePartitionField.builder()
-                .sourceField(
-                    OneField.builder()
-                        .name("birthDate")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .build())
-                        .build())
+                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.HOUR)
                 .partitionFieldNames(Collections.singletonList("dateFmt"))
                 .build(),
@@ -324,15 +288,7 @@ public class TestDeltaPartitionExtractor {
                 .transformType(PartitionTransformType.VALUE)
                 .build(),
             OnePartitionField.builder()
-                .sourceField(
-                    OneField.builder()
-                        .name("birthDate")
-                        .schema(
-                            OneSchema.builder()
-                                .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
-                                .build())
-                        .build())
+                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.DAY)
                 .partitionFieldNames(Collections.singletonList("dateOfBirth"))
                 .build());
