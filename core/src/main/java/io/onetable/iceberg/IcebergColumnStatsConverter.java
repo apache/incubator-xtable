@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import io.onetable.model.stat.Range;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -38,11 +37,13 @@ import org.apache.iceberg.types.Types;
 
 import io.onetable.model.schema.OneField;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.Range;
 
 /** Column stats extractor for iceberg table format. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class IcebergColumnStatsConverter {
-  private static final IcebergSchemaExtractor SCHEMA_EXTRACTOR = IcebergSchemaExtractor.getInstance();
+  private static final IcebergSchemaExtractor SCHEMA_EXTRACTOR =
+      IcebergSchemaExtractor.getInstance();
   private static final IcebergColumnStatsConverter INSTANCE = new IcebergColumnStatsConverter();
 
   public static IcebergColumnStatsConverter getInstance() {
@@ -86,23 +87,28 @@ public class IcebergColumnStatsConverter {
   }
 
   public Map<OneField, ColumnStat> fromIceberg(List<OneField> fields, Metrics metrics) {
-    return fields.stream().filter(field -> metrics.valueCounts().containsKey(field.getFieldId()))
-        .collect(Collectors.toMap(Function.identity(),
+    return fields.stream()
+        .filter(field -> metrics.valueCounts().containsKey(field.getFieldId()))
+        .collect(
+            Collectors.toMap(
+                Function.identity(),
                 field -> {
-      Integer fieldId = field.getFieldId();
-      long numValues = metrics.valueCounts().get(fieldId);
-      long numNulls = metrics.nullValueCounts().get(fieldId);
-      long totalSize = metrics.columnSizes().get(fieldId);
-      Type fieldType = SCHEMA_EXTRACTOR.toIcebergType(field, new AtomicInteger(1));
-      Object minValue = Conversions.fromByteBuffer(fieldType, metrics.lowerBounds().get(fieldId));
-      Object maxValue = Conversions.fromByteBuffer(fieldType, metrics.upperBounds().get(fieldId));
-      Range range = Range.vector(minValue, maxValue);
-      return ColumnStat.builder()
-          .numValues(numValues)
-          .numNulls(numNulls)
-          .totalSize(totalSize)
-          .range(range)
-          .build();
-    }));
+                  Integer fieldId = field.getFieldId();
+                  long numValues = metrics.valueCounts().get(fieldId);
+                  long numNulls = metrics.nullValueCounts().get(fieldId);
+                  long totalSize = metrics.columnSizes().get(fieldId);
+                  Type fieldType = SCHEMA_EXTRACTOR.toIcebergType(field, new AtomicInteger(1));
+                  Object minValue =
+                      Conversions.fromByteBuffer(fieldType, metrics.lowerBounds().get(fieldId));
+                  Object maxValue =
+                      Conversions.fromByteBuffer(fieldType, metrics.upperBounds().get(fieldId));
+                  Range range = Range.vector(minValue, maxValue);
+                  return ColumnStat.builder()
+                      .numValues(numValues)
+                      .numNulls(numNulls)
+                      .totalSize(totalSize)
+                      .range(range)
+                      .build();
+                }));
   }
 }
