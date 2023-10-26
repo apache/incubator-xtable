@@ -19,6 +19,7 @@
 package io.onetable.delta;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.text.DateFormat;
@@ -48,7 +49,7 @@ public class DeltaValueConverter {
       return null;
     }
     if (noConversionForSchema(fieldSchema)) {
-      return value;
+      return castObjectToInternalType(value, fieldSchema.getDataType());
     }
     // Needs special handling for date and time.
     OneType fieldType = fieldSchema.getDataType();
@@ -174,6 +175,39 @@ public class DeltaValueConverter {
       } catch (ParseException ex) {
         throw new OneIOException("Unable to parse partition value", ex);
       }
+    }
+  }
+
+  private static Object castObjectToInternalType(Object value, OneType valueType) {
+    switch (valueType) {
+      case FLOAT:
+        if (value instanceof Double) {
+          return ((Double) value).floatValue();
+        }
+        break;
+      case DECIMAL:
+        return numberTypeToBigDecimal(value);
+      case LONG:
+        if (value instanceof Integer) {
+          return ((Integer) value).longValue();
+        }
+        break;
+    }
+    return value;
+  }
+
+  private static BigDecimal numberTypeToBigDecimal(Object value) {
+    // BigDecimal is parsed as Integer, Long, BigInteger and double if none of the above.
+    if (value instanceof Integer) {
+      return BigDecimal.valueOf((Integer) value);
+    } else if (value instanceof Long) {
+      return BigDecimal.valueOf((Long) value);
+    } else if (value instanceof BigInteger) {
+      return new BigDecimal((BigInteger) value);
+    } else if (value instanceof Double) {
+      return BigDecimal.valueOf((Double) value);
+    } else {
+      return (BigDecimal) value;
     }
   }
 }

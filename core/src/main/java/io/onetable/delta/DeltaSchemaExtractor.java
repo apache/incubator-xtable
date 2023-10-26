@@ -179,6 +179,9 @@ public class DeltaSchemaExtractor {
         break;
       case "timestamp":
         type = OneType.TIMESTAMP;
+        metadata =
+            Collections.singletonMap(
+                OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
         break;
       case "struct":
         StructType structType = (StructType) dataType;
