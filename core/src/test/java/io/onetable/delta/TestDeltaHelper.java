@@ -79,7 +79,7 @@ public class TestDeltaHelper {
           + "    lastName STRING, "
           + "    gender STRING, "
           + "    birthDate TIMESTAMP, "
-          + "    yearOfBirth INT "
+          + "    yearOfBirth INT GENERATED ALWAYS AS (YEAR(birthDate))"
           + ") USING DELTA "
           + "PARTITIONED BY (yearOfBirth) "
           + "LOCATION '%s'";
