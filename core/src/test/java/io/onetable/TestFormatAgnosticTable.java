@@ -26,11 +26,13 @@ import java.util.Optional;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Value;
-import org.apache.hudi.common.model.HoodieAvroPayload;
-import org.apache.hudi.common.model.HoodieRecord;
+
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+
+import org.apache.hudi.common.model.HoodieAvroPayload;
+import org.apache.hudi.common.model.HoodieRecord;
 
 import io.onetable.model.storage.TableFormat;
 
@@ -76,16 +78,12 @@ public class TestFormatAgnosticTable implements AutoCloseable {
 
   public InsertRecordsHolder insertRecords(int numRows) {
     if (sparkHudiTable.isPresent()) {
-      List<HoodieRecord<HoodieAvroPayload>> records = sparkHudiTable.get().insertRecords(numRows,
-          true);
-      return InsertRecordsHolder.builder()
-          .hoodieRecords(Optional.of(records))
-          .build();
+      List<HoodieRecord<HoodieAvroPayload>> records =
+          sparkHudiTable.get().insertRecords(numRows, true);
+      return InsertRecordsHolder.builder().hoodieRecords(Optional.of(records)).build();
     } else if (sparkDeltaTable.isPresent()) {
       List<Row> rows = sparkDeltaTable.get().insertRows(numRows);
-      return InsertRecordsHolder.builder()
-          .deltaRows(Optional.of(rows))
-          .build();
+      return InsertRecordsHolder.builder().deltaRows(Optional.of(rows)).build();
     } else {
       throw new IllegalStateException("Neither Hoodie nor Delta table is initialized.");
     }
@@ -93,8 +91,9 @@ public class TestFormatAgnosticTable implements AutoCloseable {
 
   public void upsertRecords(InsertRecordsHolder insertRecordsHolder) throws ParseException {
     if (sparkHudiTable.isPresent()) {
-      sparkHudiTable.get().upsertRecords(
-          insertRecordsHolder.getHoodieRecords().get().subList(0, 20), true);
+      sparkHudiTable
+          .get()
+          .upsertRecords(insertRecordsHolder.getHoodieRecords().get().subList(0, 20), true);
     } else if (sparkDeltaTable.isPresent()) {
       sparkDeltaTable.get().upsertRows(insertRecordsHolder.getDeltaRows().get().subList(0, 20));
     } else {
@@ -104,8 +103,9 @@ public class TestFormatAgnosticTable implements AutoCloseable {
 
   public void deleteRecords(InsertRecordsHolder insertRecordsHolder) throws ParseException {
     if (sparkHudiTable.isPresent()) {
-      sparkHudiTable.get().deleteRecords(
-          insertRecordsHolder.getHoodieRecords().get().subList(30, 50), true);
+      sparkHudiTable
+          .get()
+          .deleteRecords(insertRecordsHolder.getHoodieRecords().get().subList(30, 50), true);
     } else if (sparkDeltaTable.isPresent()) {
       sparkDeltaTable.get().deleteRows(insertRecordsHolder.getDeltaRows().get().subList(30, 50));
     } else {

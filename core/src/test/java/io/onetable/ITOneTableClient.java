@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import io.onetable.delta.DeltaSourceClientProvider;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -76,6 +75,7 @@ import com.google.common.collect.ImmutableList;
 import io.onetable.client.OneTableClient;
 import io.onetable.client.PerTableConfig;
 import io.onetable.client.SourceClientProvider;
+import io.onetable.delta.DeltaSourceClientProvider;
 import io.onetable.hudi.HudiSourceClientProvider;
 import io.onetable.hudi.HudiSourceConfig;
 import io.onetable.hudi.HudiTestUtil;
@@ -133,17 +133,14 @@ public class ITOneTableClient {
         Arguments.of(TableFormat.HUDI, SyncMode.FULL, false),
         Arguments.of(TableFormat.HUDI, SyncMode.INCREMENTAL, true),
         Arguments.of(TableFormat.HUDI, SyncMode.INCREMENTAL, false),
-
         Arguments.of(TableFormat.ICEBERG, SyncMode.FULL, true),
         Arguments.of(TableFormat.ICEBERG, SyncMode.FULL, false),
         Arguments.of(TableFormat.ICEBERG, SyncMode.INCREMENTAL, true),
         Arguments.of(TableFormat.ICEBERG, SyncMode.INCREMENTAL, false),
-
         Arguments.of(TableFormat.DELTA, SyncMode.FULL, true),
         Arguments.of(TableFormat.DELTA, SyncMode.FULL, false),
         Arguments.of(TableFormat.DELTA, SyncMode.INCREMENTAL, true),
-        Arguments.of(TableFormat.DELTA, SyncMode.INCREMENTAL, false)
-    );
+        Arguments.of(TableFormat.DELTA, SyncMode.INCREMENTAL, false));
   }
 
   private static Stream<Arguments> testCasesWithPartitioningAndTableTypesAndSyncModes() {
@@ -218,7 +215,10 @@ public class ITOneTableClient {
       // TODO(vamshigv): This is a hack.
       if (sourceTableFormat.equals(TableFormat.HUDI)) {
         syncWithCompactionIfRequired(
-            HoodieTableType.MERGE_ON_READ, table.getSparkHudiTable().get(), perTableConfig, oneTableClient);
+            HoodieTableType.MERGE_ON_READ,
+            table.getSparkHudiTable().get(),
+            perTableConfig,
+            oneTableClient);
       } else {
         oneTableClient.sync(perTableConfig, sourceClientProvider);
       }
@@ -228,7 +228,10 @@ public class ITOneTableClient {
       // TODO(vamshigv): This is a hack.
       if (sourceTableFormat.equals(TableFormat.HUDI)) {
         syncWithCompactionIfRequired(
-            HoodieTableType.MERGE_ON_READ, table.getSparkHudiTable().get(), perTableConfig, oneTableClient);
+            HoodieTableType.MERGE_ON_READ,
+            table.getSparkHudiTable().get(),
+            perTableConfig,
+            oneTableClient);
       } else {
         oneTableClient.sync(perTableConfig, sourceClientProvider);
       }
@@ -236,52 +239,52 @@ public class ITOneTableClient {
     }
     // TODO(vamshigv): Uncomment this later.
     /*
-      try (TestSparkHudiTable tableWithUpdatedSchema =
-          TestSparkHudiTable.withAdditionalColumns(
-              tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
-        PerTableConfig perTableConfig =
-            PerTableConfig.builder()
-                .tableName(tableName)
-                .targetTableFormats(targetTableFormats)
-                .tableBasePath(tableWithUpdatedSchema.getBasePath())
-                .hudiSourceConfig(
-                    HudiSourceConfig.builder()
-                        .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
-                        .build())
-                .syncMode(syncMode)
-                .build();
-        tableWithUpdatedSchema.insertRecords(100, true);
-        oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-        checkDatasetEquivalence(
-            TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 280);
+     try (TestSparkHudiTable tableWithUpdatedSchema =
+         TestSparkHudiTable.withAdditionalColumns(
+             tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+       PerTableConfig perTableConfig =
+           PerTableConfig.builder()
+               .tableName(tableName)
+               .targetTableFormats(targetTableFormats)
+               .tableBasePath(tableWithUpdatedSchema.getBasePath())
+               .hudiSourceConfig(
+                   HudiSourceConfig.builder()
+                       .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
+                       .build())
+               .syncMode(syncMode)
+               .build();
+       tableWithUpdatedSchema.insertRecords(100, true);
+       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+       checkDatasetEquivalence(
+           TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 280);
 
-        tableWithUpdatedSchema.deleteRecords(insertedRecords.subList(60, 90), true);
-        syncWithCompactionIfRequired(
-            tableType, tableWithUpdatedSchema, perTableConfig, oneTableClient);
-        checkDatasetEquivalence(
-            TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 250);
+       tableWithUpdatedSchema.deleteRecords(insertedRecords.subList(60, 90), true);
+       syncWithCompactionIfRequired(
+           tableType, tableWithUpdatedSchema, perTableConfig, oneTableClient);
+       checkDatasetEquivalence(
+           TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 250);
 
-        if (partitionConfig.getHudiConfig() != null) {
-          // Adds new partition.
-          tableWithUpdatedSchema.insertRecords(50, "TRACE", true);
-          oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-          checkDatasetEquivalence(
-              TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 300);
+       if (partitionConfig.getHudiConfig() != null) {
+         // Adds new partition.
+         tableWithUpdatedSchema.insertRecords(50, "TRACE", true);
+         oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+         checkDatasetEquivalence(
+             TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 300);
 
-          // Drops partition.
-          tableWithUpdatedSchema.deletePartition("TRACE", tableType);
-          oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-          checkDatasetEquivalence(
-              TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 250);
+         // Drops partition.
+         tableWithUpdatedSchema.deletePartition("TRACE", tableType);
+         oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+         checkDatasetEquivalence(
+             TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 250);
 
-          // Insert records to the dropped partition again.
-          tableWithUpdatedSchema.insertRecords(50, "TRACE", true);
-          oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-          checkDatasetEquivalence(
-              TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 300);
-        }
-      }
-     */
+         // Insert records to the dropped partition again.
+         tableWithUpdatedSchema.insertRecords(50, "TRACE", true);
+         oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+         checkDatasetEquivalence(
+             TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 300);
+       }
+     }
+    */
   }
 
   @ParameterizedTest
@@ -333,7 +336,10 @@ public class ITOneTableClient {
       // TODO(vamshigv): This is a hack.
       if (sourceTableFormat.equals(TableFormat.HUDI)) {
         syncWithCompactionIfRequired(
-            HoodieTableType.MERGE_ON_READ, table.getSparkHudiTable().get(), perTableConfig, oneTableClient);
+            HoodieTableType.MERGE_ON_READ,
+            table.getSparkHudiTable().get(),
+            perTableConfig,
+            oneTableClient);
       } else {
         oneTableClient.sync(perTableConfig, sourceClientProvider);
       }
@@ -343,7 +349,10 @@ public class ITOneTableClient {
       // TODO(vamshigv): This is a hack.
       if (sourceTableFormat.equals(TableFormat.HUDI)) {
         syncWithCompactionIfRequired(
-            HoodieTableType.MERGE_ON_READ, table.getSparkHudiTable().get(), perTableConfig, oneTableClient);
+            HoodieTableType.MERGE_ON_READ,
+            table.getSparkHudiTable().get(),
+            perTableConfig,
+            oneTableClient);
       } else {
         oneTableClient.sync(perTableConfig, sourceClientProvider);
       }
@@ -351,52 +360,52 @@ public class ITOneTableClient {
     }
     // TODO(vamshigv): Uncomment this later.
     /*
-      try (TestSparkHudiTable tableWithUpdatedSchema =
-          TestSparkHudiTable.withAdditionalColumns(
-              tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
-        PerTableConfig perTableConfig =
-            PerTableConfig.builder()
-                .tableName(tableName)
-                .targetTableFormats(targetTableFormats)
-                .tableBasePath(tableWithUpdatedSchema.getBasePath())
-                .hudiSourceConfig(
-                    HudiSourceConfig.builder()
-                        .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
-                        .build())
-                .syncMode(syncMode)
-                .build();
-        tableWithUpdatedSchema.insertRecords(100, true);
-        oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-        checkDatasetEquivalence(
-            TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 280);
+     try (TestSparkHudiTable tableWithUpdatedSchema =
+         TestSparkHudiTable.withAdditionalColumns(
+             tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
+       PerTableConfig perTableConfig =
+           PerTableConfig.builder()
+               .tableName(tableName)
+               .targetTableFormats(targetTableFormats)
+               .tableBasePath(tableWithUpdatedSchema.getBasePath())
+               .hudiSourceConfig(
+                   HudiSourceConfig.builder()
+                       .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
+                       .build())
+               .syncMode(syncMode)
+               .build();
+       tableWithUpdatedSchema.insertRecords(100, true);
+       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+       checkDatasetEquivalence(
+           TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 280);
 
-        tableWithUpdatedSchema.deleteRecords(insertedRecords.subList(60, 90), true);
-        syncWithCompactionIfRequired(
-            tableType, tableWithUpdatedSchema, perTableConfig, oneTableClient);
-        checkDatasetEquivalence(
-            TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 250);
+       tableWithUpdatedSchema.deleteRecords(insertedRecords.subList(60, 90), true);
+       syncWithCompactionIfRequired(
+           tableType, tableWithUpdatedSchema, perTableConfig, oneTableClient);
+       checkDatasetEquivalence(
+           TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 250);
 
-        if (partitionConfig.getHudiConfig() != null) {
-          // Adds new partition.
-          tableWithUpdatedSchema.insertRecords(50, "TRACE", true);
-          oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-          checkDatasetEquivalence(
-              TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 300);
+       if (partitionConfig.getHudiConfig() != null) {
+         // Adds new partition.
+         tableWithUpdatedSchema.insertRecords(50, "TRACE", true);
+         oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+         checkDatasetEquivalence(
+             TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 300);
 
-          // Drops partition.
-          tableWithUpdatedSchema.deletePartition("TRACE", tableType);
-          oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-          checkDatasetEquivalence(
-              TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 250);
+         // Drops partition.
+         tableWithUpdatedSchema.deletePartition("TRACE", tableType);
+         oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+         checkDatasetEquivalence(
+             TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 250);
 
-          // Insert records to the dropped partition again.
-          tableWithUpdatedSchema.insertRecords(50, "TRACE", true);
-          oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-          checkDatasetEquivalence(
-              TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 300);
-        }
-      }
-     */
+         // Insert records to the dropped partition again.
+         tableWithUpdatedSchema.insertRecords(50, "TRACE", true);
+         oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+         checkDatasetEquivalence(
+             TableFormat.HUDI, targetTableFormats, tableWithUpdatedSchema.getBasePath(), 300);
+       }
+     }
+    */
   }
 
   /*

@@ -20,7 +20,6 @@ package io.onetable.iceberg;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,14 +29,12 @@ import org.apache.hadoop.fs.Path;
 
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateProperties;
-import org.apache.iceberg.hadoop.HadoopTables;
-import org.apache.iceberg.mapping.MappingUtil;
-import org.apache.iceberg.mapping.NameMappingParser;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 
 import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneTable;
@@ -55,8 +52,10 @@ public class IcebergClient implements TargetClient {
   private final IcebergPartitionSpecExtractor partitionSpecExtractor;
   private final IcebergPartitionSpecSync partitionSpecSync;
   private final IcebergDataFileUpdatesSync dataFileUpdatesExtractor;
+  private final IcebergTableManager tableManager;
   private final String basePath;
-  private final String tableName;
+  private final TableIdentifier tableIdentifier;
+  private final IcebergCatalogConfig catalogConfig;
   private final Configuration configuration;
   private final int snapshotRetentionInHours;
   private Transaction transaction;
@@ -64,9 +63,7 @@ public class IcebergClient implements TargetClient {
 
   public IcebergClient(PerTableConfig perTableConfig, Configuration configuration) {
     this(
-        perTableConfig.getTableBasePath(),
-        perTableConfig.getTableName(),
-        perTableConfig.getTargetMetadataRetentionInHours(),
+        perTableConfig,
         configuration,
         IcebergSchemaExtractor.getInstance(),
         IcebergSchemaSync.getInstance(),
@@ -74,33 +71,39 @@ public class IcebergClient implements TargetClient {
         IcebergPartitionSpecSync.getInstance(),
         IcebergDataFileUpdatesSync.of(
             IcebergColumnStatsConverter.getInstance(),
-            IcebergPartitionValueConverter.getInstance()));
+            IcebergPartitionValueConverter.getInstance()),
+        IcebergTableManager.of(configuration));
   }
 
   IcebergClient(
-      String basePath,
-      String tableName,
-      int snapshotRetentionInHours,
+      PerTableConfig perTableConfig,
       Configuration configuration,
       IcebergSchemaExtractor schemaExtractor,
       IcebergSchemaSync schemaSync,
       IcebergPartitionSpecExtractor partitionSpecExtractor,
       IcebergPartitionSpecSync partitionSpecSync,
-      IcebergDataFileUpdatesSync dataFileUpdatesExtractor) {
+      IcebergDataFileUpdatesSync dataFileUpdatesExtractor,
+      IcebergTableManager tableManager) {
     this.schemaExtractor = schemaExtractor;
     this.schemaSync = schemaSync;
     this.partitionSpecExtractor = partitionSpecExtractor;
     this.partitionSpecSync = partitionSpecSync;
     this.dataFileUpdatesExtractor = dataFileUpdatesExtractor;
-    this.tableName = tableName;
-    this.basePath = basePath;
+    String tableName = perTableConfig.getTableName();
+    this.basePath = perTableConfig.getTableBasePath();
     this.configuration = configuration;
-    this.snapshotRetentionInHours = snapshotRetentionInHours;
+    this.snapshotRetentionInHours = perTableConfig.getTargetMetadataRetentionInHours();
+    String[] namespace = perTableConfig.getNamespace();
+    this.tableIdentifier =
+        namespace == null
+            ? TableIdentifier.of(tableName)
+            : TableIdentifier.of(Namespace.of(namespace), tableName);
+    this.tableManager = tableManager;
+    this.catalogConfig = perTableConfig.getIcebergCatalogConfig();
 
-    HadoopTables tables = new HadoopTables(configuration);
-    if (tables.exists(basePath)) {
+    if (tableManager.tableExists(catalogConfig, tableIdentifier, basePath)) {
       // Load the table state if it already exists
-      this.table = tables.load(basePath);
+      this.table = tableManager.getTable(catalogConfig, tableIdentifier, basePath);
     }
   }
 
@@ -112,20 +115,15 @@ public class IcebergClient implements TargetClient {
 
   private void initializeTableIfRequired(OneTable oneTable) {
     if (table == null) {
-      HadoopTables tables = new HadoopTables(configuration);
-      boolean doesIcebergTableExist = tables.exists(basePath);
-      if (!doesIcebergTableExist) {
-        Schema schema = schemaExtractor.toIceberg(oneTable.getReadSchema());
-        PartitionSpec partitionSpec =
-            partitionSpecExtractor.toIceberg(oneTable.getPartitioningFields(), schema);
-        Map<String, String> properties = new HashMap<>();
-        properties.put(
-            TableProperties.DEFAULT_NAME_MAPPING,
-            NameMappingParser.toJson(MappingUtil.create(schema)));
-        table = tables.create(schema, partitionSpec, SortOrder.unsorted(), properties, basePath);
-      } else {
-        table = tables.load(basePath);
-      }
+      table =
+          tableManager.getOrCreateTable(
+              catalogConfig,
+              tableIdentifier,
+              basePath,
+              schemaExtractor.toIceberg(oneTable.getReadSchema()),
+              partitionSpecExtractor.toIceberg(
+                  oneTable.getPartitioningFields(),
+                  schemaExtractor.toIceberg(oneTable.getReadSchema())));
     }
   }
 
