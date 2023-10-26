@@ -219,12 +219,4 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
       InstantsForIncrementalSync instantsForIncrementalSync) {
     return null;
   }
-
-  /**
-   * Refreshes the source table to get the latest metadata. This is currently used for testing
-   * purposes.
-   */
-  void refreshSourceTable() {
-    getSourceTable().refresh();
-  }
 }
