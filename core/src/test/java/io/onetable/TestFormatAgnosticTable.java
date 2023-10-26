@@ -39,12 +39,16 @@ public class TestFormatAgnosticTable {
       boolean isPartitioned) {
     switch (sourceFormat) {
       case HUDI:
-        this.sparkHudiTable = Optional.of(TestSparkHudiTable.forStandardSchemaAndPartitioning(
-            tableName, tempDir, javaSparkContext, isPartitioned));
+        this.sparkHudiTable =
+            Optional.of(
+                TestSparkHudiTable.forStandardSchemaAndPartitioning(
+                    tableName, tempDir, javaSparkContext, isPartitioned));
         break;
       case DELTA:
-        this.sparkDeltaTable = Optional.of(TestSparkDeltaTable.forStandardSchemaAndPartitioning(
-            tableName, tempDir, sparkSession, isPartitioned));
+        this.sparkDeltaTable =
+            Optional.of(
+                TestSparkDeltaTable.forStandardSchemaAndPartitioning(
+                    tableName, tempDir, sparkSession, isPartitioned));
         break;
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
