@@ -132,7 +132,11 @@ public class ITOneTableClient {
         Arguments.of(TableFormat.HUDI, SyncMode.FULL, true),
         Arguments.of(TableFormat.HUDI, SyncMode.FULL, false),
         Arguments.of(TableFormat.HUDI, SyncMode.INCREMENTAL, true),
-        Arguments.of(TableFormat.HUDI, SyncMode.INCREMENTAL, false));
+        Arguments.of(TableFormat.HUDI, SyncMode.INCREMENTAL, false),
+        Arguments.of(TableFormat.DELTA, SyncMode.FULL, true),
+        Arguments.of(TableFormat.DELTA, SyncMode.FULL, false),
+        Arguments.of(TableFormat.DELTA, SyncMode.INCREMENTAL, true),
+        Arguments.of(TableFormat.DELTA, SyncMode.INCREMENTAL, false));
   }
 
   private static Stream<Arguments> testCasesWithPartitioningAndTableTypesAndSyncModes() {
