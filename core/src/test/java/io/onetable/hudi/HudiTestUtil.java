@@ -23,7 +23,6 @@ import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Properties;
-import java.util.UUID;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;

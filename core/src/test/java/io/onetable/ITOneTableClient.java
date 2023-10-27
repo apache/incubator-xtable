@@ -129,8 +129,7 @@ public class ITOneTableClient {
   }
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
-    return Stream.of(
-        Arguments.of(TableFormat.DELTA, SyncMode.FULL, false));
+    return Stream.of(Arguments.of(TableFormat.DELTA, SyncMode.FULL, false));
   }
 
   private static Stream<Arguments> testCasesWithPartitioningAndTableTypesAndSyncModes() {
