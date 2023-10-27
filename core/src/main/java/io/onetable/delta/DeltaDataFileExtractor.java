@@ -18,10 +18,8 @@
  
 package io.onetable.delta;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import lombok.Builder;
 
@@ -32,7 +30,6 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.spi.extractor.PartitionedDataFileIterator;
 
 /** DeltaDataFileExtractor lets the consumer iterate over partitions. */
@@ -99,8 +96,7 @@ public class DeltaDataFileExtractor {
                           includeColumnStats,
                           partitionExtractor,
                           fileStatsExtractor))
-              .collect(Collectors.toList())
-              .listIterator();
+              .iterator();
     }
 
     @Override
@@ -112,12 +108,8 @@ public class DeltaDataFileExtractor {
     }
 
     @Override
-    public OneDataFiles next() {
-      List<OneDataFile> dataFiles = new ArrayList<>();
-      while (hasNext()) {
-        dataFiles.add(this.dataFilesIterator.next());
-      }
-      return OneDataFiles.collectionBuilder().files(dataFiles).build();
+    public OneDataFile next() {
+      return dataFilesIterator.next();
     }
   }
 }

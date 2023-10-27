@@ -42,7 +42,6 @@ import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.spi.extractor.PartitionedDataFileIterator;
@@ -91,11 +90,6 @@ public class DeltaDataFileUpdatesExtractor {
 
   private Stream<AddFile> createAddFileAction(
       OneDataFile dataFile, OneSchema schema, String tableBasePath) {
-    if (dataFile instanceof OneDataFiles) {
-      return ((OneDataFiles) dataFile)
-          .getFiles().stream()
-              .flatMap(childDataFile -> createAddFileAction(childDataFile, schema, tableBasePath));
-    }
     return Stream.of(
         new AddFile(
             // Delta Lake supports relative and absolute paths in theory but relative paths seem

@@ -27,7 +27,6 @@ import lombok.Value;
 
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.storage.PartitionedDataFiles;
-import io.onetable.spi.OneTableSnapshotVisitor;
 
 /**
  * Snapshot represents the view of the table at a specific point in time. Snapshot captures all the
@@ -51,8 +50,4 @@ public class OneSnapshot {
   PartitionedDataFiles partitionedDataFiles;
   // pending commits before latest commit on the table.
   @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
-
-  public void acceptVisitor(OneTableSnapshotVisitor defaultDataFileVisitor) {
-    defaultDataFileVisitor.visit(this);
-  }
 }

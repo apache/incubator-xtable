@@ -20,9 +20,9 @@ package io.onetable.spi.extractor;
 
 import java.util.Iterator;
 
-import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.OneDataFile;
 
 /**
  * PartitionedDataFileIterator lets the consumer iterate over partitions (along with the FileSlices)
  */
-public interface PartitionedDataFileIterator extends Iterator<OneDataFiles>, AutoCloseable {}
+public interface PartitionedDataFileIterator extends Iterator<OneDataFile>, AutoCloseable {}

@@ -31,7 +31,6 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
-import io.onetable.spi.OneTableSnapshotVisitor;
 
 /**
  * Represents a data file in the table.
@@ -61,8 +60,4 @@ public class OneDataFile {
   @Builder.Default protected final Map<OneField, ColumnStat> columnStats = Collections.emptyMap();
   // last modified time in millis since epoch
   protected final long lastModified;
-
-  public void acceptVisitor(OneTableSnapshotVisitor defaultDataFileVisitor) {
-    defaultDataFileVisitor.visit(this);
-  }
 }
