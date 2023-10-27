@@ -60,20 +60,31 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
   DeltaTable deltaTable;
   TestDeltaHelper testDeltaHelper;
   boolean tableIsPartitioned;
+  boolean includeAdditionalColumns;
 
   public static TestSparkDeltaTable forStandardSchemaAndPartitioning(
       String tableName, Path tempDir, SparkSession sparkSession, boolean isPartitioned) {
-    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned);
+    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned, false);
+  }
+
+  public static TestSparkDeltaTable forSchemaWithAdditionalColumnsAndPartitioning(
+      String tableName, Path tempDir, SparkSession sparkSession, boolean isPartitioned) {
+    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned, true);
   }
 
   public TestSparkDeltaTable(
-      String name, Path tempDir, SparkSession sparkSession, boolean isPartitioned) {
+      String name,
+      Path tempDir,
+      SparkSession sparkSession,
+      boolean isPartitioned,
+      boolean includeAdditionalColumns) {
     try {
       this.tableName = generateTableName(name);
       this.basePath = initBasePath(tempDir, tableName);
       this.sparkSession = sparkSession;
       this.tableIsPartitioned = isPartitioned;
-      this.testDeltaHelper = createTestDataHelper(isPartitioned);
+      this.includeAdditionalColumns = includeAdditionalColumns;
+      this.testDeltaHelper = createTestDataHelper(isPartitioned, includeAdditionalColumns);
       testDeltaHelper.createTable(sparkSession, tableName, basePath);
       this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
       this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
@@ -100,13 +111,6 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
   @Override
   public List<Row> insertRecordsForSpecialPartition(int numRows) {
     return insertRowsForPartition(numRows, SPECIAL_PARTITION_VALUE);
-  }
-
-  public List<Row> insertRowsWithAdditionalColumns(int numRows) {
-    List<Row> rows = testDeltaHelper.generateRowsWithAdditionalColumn(numRows);
-    String insertStatement = testDeltaHelper.generateInsertSqlForAdditionalColumn(tableName, rows);
-    sparkSession.sql(insertStatement);
-    return rows;
   }
 
   @Override

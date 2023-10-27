@@ -78,6 +78,9 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       case HUDI:
         return TestSparkHudiTable.forSchemaWithAdditionalColumnsAndPartitioning(
             tableName, tempDir, jsc, isPartitioned);
+      case DELTA:
+        return TestSparkDeltaTable.forSchemaWithAdditionalColumnsAndPartitioning(
+            tableName, tempDir, sparkSession, isPartitioned);
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
     }
