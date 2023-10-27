@@ -60,6 +60,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.client.HoodieReadClient;
+import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
@@ -977,15 +978,21 @@ public class ITOneTableClient {
             .collect(
                 Collectors.toMap(
                     Function.identity(),
-                    targetFormat ->
-                        sparkSession
-                            .read()
-                            .options(
-                                targetOptions.getOrDefault(targetFormat, Collections.emptyMap()))
-                            .format(targetFormat.name().toLowerCase())
-                            .load(basePath)
-                            .orderBy(orderByKeyColumn)
-                            .filter(filterCondition)));
+                    targetFormat -> {
+                      Map<String, String> finalTargetOptions =
+                          targetOptions.getOrDefault(targetFormat, Collections.emptyMap());
+                      if (targetFormat.equals(TableFormat.HUDI)) {
+                        finalTargetOptions = new HashMap<>(finalTargetOptions);
+                        finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
+                      }
+                      return sparkSession
+                          .read()
+                          .options(finalTargetOptions)
+                          .format(targetFormat.name().toLowerCase())
+                          .load(basePath)
+                          .orderBy(orderByKeyColumn)
+                          .filter(filterCondition);
+                    }));
     final Set<String> selectColumns = getFieldNamesRemovingGeneratedColumns(sourceRows.schema());
 
     targetRowsByFormat
