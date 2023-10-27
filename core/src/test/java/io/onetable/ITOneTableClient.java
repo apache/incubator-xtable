@@ -242,7 +242,7 @@ public class ITOneTableClient {
                       .build())
               .syncMode(syncMode)
               .build();
-      tableWithUpdatedSchema.insertRows(100);
+      List<Row> insertsAfterSchemaUpdate = tableWithUpdatedSchema.insertRows(100);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
@@ -251,7 +251,7 @@ public class ITOneTableClient {
           tableWithUpdatedSchema.getBasePath(),
           280);
 
-      tableWithUpdatedSchema.deleteRows(insertRecords.subList(60, 90));
+      tableWithUpdatedSchema.deleteRows(insertsAfterSchemaUpdate.subList(60, 90));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
@@ -302,6 +302,7 @@ public class ITOneTableClient {
       HoodieTableType tableType,
       PartitionConfig partitionConfig) {
     String tableName = getTableName();
+    sparkSession.catalog().clearCache();
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {

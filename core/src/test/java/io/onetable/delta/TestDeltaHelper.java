@@ -95,7 +95,7 @@ public class TestDeltaHelper {
 
   public void createTable(SparkSession sparkSession, String tableName, String basePath) {
     DeltaTableBuilder tableBuilder =
-        DeltaTable.create(sparkSession)
+        DeltaTable.createIfNotExists(sparkSession)
             .tableName(tableName)
             .location(basePath)
             .addColumn("id", IntegerType)
@@ -191,14 +191,6 @@ public class TestDeltaHelper {
                 } else {
                   newRowData[i] = row.get(i);
                 }
-              }
-              if (tableIsPartitioned) {
-                Timestamp timestampValue = row.getTimestamp(row.size() - 2);
-                newRowData[row.size() - 2] = timestampValue;
-                newRowData[row.size() - 1] = timestampValue.toLocalDateTime().getYear();
-              } else {
-                Timestamp timestampValue = row.getTimestamp(row.size() - 1);
-                newRowData[row.size() - 1] = timestampValue;
               }
               return RowFactory.create(newRowData);
             })
