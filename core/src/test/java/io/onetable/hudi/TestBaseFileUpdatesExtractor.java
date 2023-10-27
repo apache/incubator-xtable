@@ -50,6 +50,7 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.hadoop.CachingPath;
 
 import io.onetable.model.schema.OneField;
 import io.onetable.model.stat.ColumnStat;
@@ -116,7 +117,8 @@ public class TestBaseFileUpdatesExtractor {
             .filesRemoved(Arrays.asList(removedFile1, removedFile2, removedFile3))
             .build();
 
-    BaseFileUpdatesExtractor extractor = BaseFileUpdatesExtractor.of(CONTEXT, tableBasePath);
+    BaseFileUpdatesExtractor extractor =
+        BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         extractor.convertDiff(diff, COMMIT_TIME);
 
@@ -171,7 +173,8 @@ public class TestBaseFileUpdatesExtractor {
             String.format("%s/%s/%s", tableBasePath, partitionPath2, fileName3),
             getColumnStatMap());
 
-    BaseFileUpdatesExtractor extractor = BaseFileUpdatesExtractor.of(CONTEXT, tableBasePath);
+    BaseFileUpdatesExtractor extractor =
+        BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
     OneDataFiles snapshotFiles =
         OneDataFiles.collectionBuilder()
             .files(
@@ -272,7 +275,8 @@ public class TestBaseFileUpdatesExtractor {
                         .partitionPath(partitionPath3)
                         .build()))
             .build();
-    BaseFileUpdatesExtractor extractor = BaseFileUpdatesExtractor.of(CONTEXT, tableBasePath);
+    BaseFileUpdatesExtractor extractor =
+        BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         extractor.extractSnapshotChanges(snapshotFiles, metaClient, COMMIT_TIME);
 
@@ -345,7 +349,8 @@ public class TestBaseFileUpdatesExtractor {
                         .partitionPath("")
                         .build()))
             .build();
-    BaseFileUpdatesExtractor extractor = BaseFileUpdatesExtractor.of(CONTEXT, tableBasePath);
+    BaseFileUpdatesExtractor extractor =
+        BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         extractor.extractSnapshotChanges(snapshotFiles, metaClient, COMMIT_TIME);
 
