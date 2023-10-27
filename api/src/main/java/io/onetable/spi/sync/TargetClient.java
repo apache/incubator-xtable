@@ -25,7 +25,6 @@ import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.PartitionedDataFiles;
 

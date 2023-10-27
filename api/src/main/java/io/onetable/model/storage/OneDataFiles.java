@@ -18,10 +18,8 @@
  
 package io.onetable.model.storage;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -33,7 +31,6 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
-import io.onetable.spi.DefaultSnapshotVisitor;
 import io.onetable.spi.OneTableSnapshotVisitor;
 
 /**
@@ -73,5 +70,4 @@ public class OneDataFiles extends OneDataFile {
   public void acceptVisitor(OneTableSnapshotVisitor defaultDataFileVisitor) {
     defaultDataFileVisitor.visit(this);
   }
-
 }

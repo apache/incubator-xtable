@@ -37,7 +37,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -73,7 +72,7 @@ import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.testutil.Issues;
 
@@ -257,25 +256,27 @@ public class ITDeltaSourceClient {
     columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
     columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().getPartitions().size());
-    Map<OnePartitionField, Range> partitionValue = Collections.singletonMap(
-        OnePartitionField.builder()
-            .sourceField(partCol)
-            .transformType(PartitionTransformType.VALUE)
-            .build(),
-        Range.scalar("SingleValue"));
+    Map<OnePartitionField, Range> partitionValue =
+        Collections.singletonMap(
+            OnePartitionField.builder()
+                .sourceField(partCol)
+                .transformType(PartitionTransformType.VALUE)
+                .build(),
+            Range.scalar("SingleValue"));
     validatePartitionDataFiles(
         PartitionedDataFiles.PartitionFileGroup.builder()
             .partitionValues(partitionValue)
-            .files(Collections.singletonList(
-                OneDataFile.builder()
-                    .schemaVersion(null)
-                    .fileFormat(FileFormat.APACHE_PARQUET)
-                    .partitionValues(partitionValue)
-                    .partitionPath(null)
-                    .fileSizeBytes(684)
-                    .recordCount(1)
-                    .columnStats(columnStats)
-                    .build()))
+            .files(
+                Collections.singletonList(
+                    OneDataFile.builder()
+                        .schemaVersion(null)
+                        .fileFormat(FileFormat.APACHE_PARQUET)
+                        .partitionValues(partitionValue)
+                        .partitionPath(null)
+                        .fileSizeBytes(684)
+                        .recordCount(1)
+                        .columnStats(columnStats)
+                        .build()))
             .build(),
         snapshot.getPartitionedDataFiles().getPartitions().get(0));
   }
@@ -609,9 +610,11 @@ public class ITDeltaSourceClient {
   }
 
   private void validatePartitionDataFiles(
-      PartitionedDataFiles.PartitionFileGroup expectedPartitionFiles, PartitionedDataFiles.PartitionFileGroup actualPartitionFiles)
+      PartitionedDataFiles.PartitionFileGroup expectedPartitionFiles,
+      PartitionedDataFiles.PartitionFileGroup actualPartitionFiles)
       throws URISyntaxException {
-    assertEquals(expectedPartitionFiles.getPartitionValues(), actualPartitionFiles.getPartitionValues());
+    assertEquals(
+        expectedPartitionFiles.getPartitionValues(), actualPartitionFiles.getPartitionValues());
     validateDataFiles(expectedPartitionFiles.getFiles(), actualPartitionFiles.getFiles());
   }
 
@@ -625,12 +628,12 @@ public class ITDeltaSourceClient {
     }
   }
 
-  private void validatePropertiesDataFile(
-      OneDataFile expected, OneDataFile actual) throws URISyntaxException {
+  private void validatePropertiesDataFile(OneDataFile expected, OneDataFile actual)
+      throws URISyntaxException {
     Assertions.assertEquals(expected.getSchemaVersion(), actual.getSchemaVersion());
-      Assertions.assertTrue(
-          Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
-          () -> "path == " + actual.getPhysicalPath() + " is not absolute");
+    Assertions.assertTrue(
+        Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
+        () -> "path == " + actual.getPhysicalPath() + " is not absolute");
     Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
     Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
     Assertions.assertEquals(expected.getPartitionPath(), actual.getPartitionPath());
@@ -638,18 +641,18 @@ public class ITDeltaSourceClient {
     if (Issues.ISSUE_102_FIXED) {
       Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
     }
-      Instant now = Instant.now();
-      long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
-      long maxRange = now.toEpochMilli();
-      Assertions.assertTrue(
-          actual.getLastModified() > minRange && actual.getLastModified() <= maxRange,
-          () ->
-              "last modified == "
-                  + actual.getLastModified()
-                  + " is expected between "
-                  + minRange
-                  + " and "
-                  + maxRange);
+    Instant now = Instant.now();
+    long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
+    long maxRange = now.toEpochMilli();
+    Assertions.assertTrue(
+        actual.getLastModified() > minRange && actual.getLastModified() <= maxRange,
+        () ->
+            "last modified == "
+                + actual.getLastModified()
+                + " is expected between "
+                + minRange
+                + " and "
+                + maxRange);
     Assertions.assertEquals(expected.getColumnStats(), actual.getColumnStats());
   }
 

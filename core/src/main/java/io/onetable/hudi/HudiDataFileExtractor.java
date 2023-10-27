@@ -30,7 +30,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.Builder;
 import lombok.Value;
 
@@ -69,8 +68,8 @@ import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.PartitionedDataFiles;
 
 /** Extracts all the files for Hudi table represented by {@link OneTable}. */
 public class HudiDataFileExtractor implements AutoCloseable {

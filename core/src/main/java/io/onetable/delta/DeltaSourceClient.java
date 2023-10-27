@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.Builder;
 import lombok.extern.log4j.Log4j2;
 
@@ -54,8 +53,8 @@ import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.spi.extractor.PartitionedDataFileIterator;
 import io.onetable.spi.extractor.SourceClient;
 

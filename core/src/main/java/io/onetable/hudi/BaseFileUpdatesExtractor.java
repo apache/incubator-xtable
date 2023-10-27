@@ -32,7 +32,6 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.Value;
@@ -52,14 +51,12 @@ import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.hadoop.CachingPath;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
-import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.spi.DefaultSnapshotVisitor;
+import io.onetable.model.storage.PartitionedDataFiles;
 
 @AllArgsConstructor(staticName = "of")
 public class BaseFileUpdatesExtractor {
@@ -104,7 +101,10 @@ public class BaseFileUpdatesExtractor {
                   partitionPathsToDrop.remove(partitionPath);
                   // create a map of file path to the data file, any entries not in the hudi table
                   // will be added
-                  Map<String, OneDataFile> physicalPathToFile = dataFiles.stream().collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
+                  Map<String, OneDataFile> physicalPathToFile =
+                      dataFiles.stream()
+                          .collect(
+                              Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
                   List<HoodieBaseFile> baseFiles =
                       isTableInitialized
                           ? fsView.getLatestBaseFiles(partitionPath).collect(Collectors.toList())
@@ -272,8 +272,7 @@ public class BaseFileUpdatesExtractor {
   }
 
   private String getPartitionPath(Path tableBasePath, List<OneDataFile> files) {
-    return getPartitionPath(
-        tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
+    return getPartitionPath(tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
   }
 
   private String getPartitionPath(Path tableBasePath, Path filePath) {

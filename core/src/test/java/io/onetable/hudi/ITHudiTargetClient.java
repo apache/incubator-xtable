@@ -37,7 +37,6 @@ import java.util.TimeZone;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.SneakyThrows;
 
 import org.apache.avro.Schema;
@@ -85,8 +84,8 @@ import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.sync.TargetClient;
 
@@ -112,11 +111,11 @@ public class ITHudiTargetClient {
   private static final OneField PARTITION_FIELD_SOURCE =
       OneField.builder().name(PARTITION_FIELD_NAME).schema(STRING_SCHEMA).build();
 
-  private static final OnePartitionField PARTITION_FIELD = OnePartitionField
-      .builder()
-      .sourceField(PARTITION_FIELD_SOURCE)
-      .transformType(PartitionTransformType.VALUE)
-      .build();
+  private static final OnePartitionField PARTITION_FIELD =
+      OnePartitionField.builder()
+          .sourceField(PARTITION_FIELD_SOURCE)
+          .transformType(PartitionTransformType.VALUE)
+          .build();
   private static final String TEST_SCHEMA_NAME = "test_schema";
   private static final OneSchema SCHEMA =
       OneSchema.builder()
@@ -225,10 +224,14 @@ public class ITHudiTargetClient {
     String partitionPath = "partition_path";
     String fileName = "file_1.parquet";
     String filePath = getFilePath(partitionPath, fileName);
-    PartitionedDataFiles snapshot = PartitionedDataFiles.of(Collections.singletonList(PartitionedDataFiles.PartitionFileGroup.builder()
-            .files(Collections.singletonList(getTestFile(partitionPath, fileName)))
-            .partitionValues(Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
-            .build()));
+    PartitionedDataFiles snapshot =
+        PartitionedDataFiles.of(
+            Collections.singletonList(
+                PartitionedDataFiles.PartitionFileGroup.builder()
+                    .files(Collections.singletonList(getTestFile(partitionPath, fileName)))
+                    .partitionValues(
+                        Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
+                    .build()));
     // sync snapshot and metadata
     OneTable initialState = getState(Instant.now());
     HudiTargetClient targetClient = getTargetClient();
@@ -261,12 +264,16 @@ public class ITHudiTargetClient {
     String fileName1 = "file_1.parquet";
     String filePath1 = getFilePath(partitionPath, fileName1);
     PartitionedDataFiles snapshot =
-        PartitionedDataFiles.of(Collections.singletonList(PartitionedDataFiles.PartitionFileGroup.builder()
-            .files(Arrays.asList(
-                getTestFile(partitionPath, fileName0),
-                getTestFile(partitionPath, fileName1)))
-            .partitionValues(Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
-            .build()));
+        PartitionedDataFiles.of(
+            Collections.singletonList(
+                PartitionedDataFiles.PartitionFileGroup.builder()
+                    .files(
+                        Arrays.asList(
+                            getTestFile(partitionPath, fileName0),
+                            getTestFile(partitionPath, fileName1)))
+                    .partitionValues(
+                        Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
+                    .build()));
     // sync snapshot and metadata
     OneTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));
     HudiTargetClient targetClient = getTargetClient();

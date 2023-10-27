@@ -21,7 +21,6 @@ package io.onetable.iceberg;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.AllArgsConstructor;
 
 import org.apache.iceberg.DataFile;
@@ -36,8 +35,8 @@ import org.apache.iceberg.Transaction;
 import io.onetable.exception.NotSupportedException;
 import io.onetable.exception.OneIOException;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.spi.extractor.PartitionedDataFileIterator;
 
 @AllArgsConstructor(staticName = "of")
@@ -61,7 +60,8 @@ public class IcebergDataFileUpdatesSync {
     }
 
     // Sync the files diff
-    OneDataFilesDiff filesDiff = OneDataFilesDiff.from(currentDataFiles, partitionedDataFiles.getAllFiles());
+    OneDataFilesDiff filesDiff =
+        OneDataFilesDiff.from(currentDataFiles, partitionedDataFiles.getAllFiles());
     applyDiff(transaction, filesDiff, schema, partitionSpec);
   }
 

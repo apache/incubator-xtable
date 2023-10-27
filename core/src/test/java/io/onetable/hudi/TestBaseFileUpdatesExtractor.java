@@ -53,11 +53,16 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.hadoop.CachingPath;
 
 import io.onetable.model.schema.OneField;
+import io.onetable.model.schema.OnePartitionField;
+import io.onetable.model.schema.OneSchema;
+import io.onetable.model.schema.OneType;
+import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.PartitionedDataFiles;
 
 public class TestBaseFileUpdatesExtractor {
   @TempDir public static java.nio.file.Path tempDir;
@@ -67,6 +72,15 @@ public class TestBaseFileUpdatesExtractor {
   private static final long LAST_MODIFIED = System.currentTimeMillis();
   private static final HoodieEngineContext CONTEXT =
       new HoodieJavaEngineContext(new Configuration());
+  private static final OnePartitionField PARTITION_FIELD =
+      OnePartitionField.builder()
+          .sourceField(
+              OneField.builder()
+                  .name("string_field")
+                  .schema(OneSchema.builder().dataType(OneType.STRING).build())
+                  .build())
+          .transformType(PartitionTransformType.VALUE)
+          .build();
 
   @Test
   void convertDiff() {
@@ -175,21 +189,22 @@ public class TestBaseFileUpdatesExtractor {
 
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
-    OneDataFiles snapshotFiles =
-        OneDataFiles.collectionBuilder()
-            .files(
-                Arrays.asList(
-                    OneDataFiles.collectionBuilder()
-                        .files(Arrays.asList(addedFile1, addedFile2))
-                        .partitionPath(partitionPath1)
-                        .build(),
-                    OneDataFiles.collectionBuilder()
-                        .files(Collections.singletonList(addedFile3))
-                        .partitionPath(partitionPath2)
-                        .build()))
-            .build();
+
+    PartitionedDataFiles partitionedDataFiles =
+        PartitionedDataFiles.of(
+            Arrays.asList(
+                PartitionedDataFiles.PartitionFileGroup.builder()
+                    .partitionValues(
+                        Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath1)))
+                    .files(Arrays.asList(addedFile1, addedFile2))
+                    .build(),
+                PartitionedDataFiles.PartitionFileGroup.builder()
+                    .partitionValues(
+                        Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
+                    .files(Arrays.asList(addedFile3))
+                    .build()));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
-        extractor.extractSnapshotChanges(snapshotFiles, metaClient, COMMIT_TIME);
+        extractor.extractSnapshotChanges(partitionedDataFiles, metaClient, COMMIT_TIME);
 
     // table is empty so there be no removals
     assertEquals(Collections.emptyMap(), replaceMetadata.getPartitionToReplacedFileIds());
@@ -262,23 +277,23 @@ public class TestBaseFileUpdatesExtractor {
             partitionPath2,
             String.format("%s/%s/%s", tableBasePath, partitionPath2, existingFileName2),
             Collections.emptyMap());
-    OneDataFiles snapshotFiles =
-        OneDataFiles.collectionBuilder()
-            .files(
-                Arrays.asList(
-                    OneDataFiles.collectionBuilder()
-                        .files(Arrays.asList(addedFile1, existingFile))
-                        .partitionPath(partitionPath2)
-                        .build(),
-                    OneDataFiles.collectionBuilder()
-                        .files(Collections.singletonList(addedFile2))
-                        .partitionPath(partitionPath3)
-                        .build()))
-            .build();
+    PartitionedDataFiles partitionedDataFiles =
+        PartitionedDataFiles.of(
+            Arrays.asList(
+                PartitionedDataFiles.PartitionFileGroup.builder()
+                    .files(Arrays.asList(addedFile1, existingFile))
+                    .partitionValues(
+                        Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
+                    .build(),
+                PartitionedDataFiles.PartitionFileGroup.builder()
+                    .files(Collections.singletonList(addedFile2))
+                    .partitionValues(
+                        Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath3)))
+                    .build()));
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
-        extractor.extractSnapshotChanges(snapshotFiles, metaClient, COMMIT_TIME);
+        extractor.extractSnapshotChanges(partitionedDataFiles, metaClient, COMMIT_TIME);
 
     // validate removed files
     Map<String, List<String>> expectedPartitionToReplacedFileIds = new HashMap<>();
@@ -340,19 +355,17 @@ public class TestBaseFileUpdatesExtractor {
     OneDataFile existingFile =
         createFile(
             "", String.format("%s/%s", tableBasePath, existingFileName2), Collections.emptyMap());
-    OneDataFiles snapshotFiles =
-        OneDataFiles.collectionBuilder()
-            .files(
-                Collections.singletonList(
-                    OneDataFiles.collectionBuilder()
-                        .files(Arrays.asList(addedFile1, existingFile))
-                        .partitionPath("")
-                        .build()))
-            .build();
+    PartitionedDataFiles partitionedDataFiles =
+        PartitionedDataFiles.of(
+            Collections.singletonList(
+                PartitionedDataFiles.PartitionFileGroup.builder()
+                    .files(Arrays.asList(addedFile1, existingFile))
+                    .partitionValues(Collections.emptyMap())
+                    .build()));
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
-        extractor.extractSnapshotChanges(snapshotFiles, metaClient, COMMIT_TIME);
+        extractor.extractSnapshotChanges(partitionedDataFiles, metaClient, COMMIT_TIME);
 
     // validate removed files
     Map<String, List<String>> expectedPartitionToReplacedFileIds =

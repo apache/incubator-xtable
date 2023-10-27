@@ -29,7 +29,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.commons.lang3.tuple.Pair;
@@ -50,8 +49,8 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.PartitionedDataFiles;
 
 /**
  * Unit tests that focus on the basic control flow of the HudiTargetClient. Functional tests are in

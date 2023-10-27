@@ -35,7 +35,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
@@ -90,8 +89,8 @@ import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.spi.sync.TargetClient;
 
 @Log4j2

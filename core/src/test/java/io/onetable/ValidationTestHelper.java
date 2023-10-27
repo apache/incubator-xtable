@@ -20,7 +20,6 @@ package io.onetable;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -31,14 +30,16 @@ import java.util.stream.IntStream;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.TableChange;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.spi.DefaultSnapshotVisitor;
 
 public class ValidationTestHelper {
 
   public static void validateOneSnapshot(OneSnapshot oneSnapshot, List<String> allActivePaths) {
     assertNotNull(oneSnapshot);
     assertNotNull(oneSnapshot.getTable());
-    List<String> onetablePaths = oneSnapshot.getPartitionedDataFiles().getAllFiles().stream().map(OneDataFile::getPhysicalPath).collect(Collectors.toList());
+    List<String> onetablePaths =
+        oneSnapshot.getPartitionedDataFiles().getAllFiles().stream()
+            .map(OneDataFile::getPhysicalPath)
+            .collect(Collectors.toList());
     replaceFileScheme(allActivePaths);
     replaceFileScheme(onetablePaths);
     Collections.sort(allActivePaths);

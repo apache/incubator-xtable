@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
@@ -42,8 +41,8 @@ import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.spi.sync.TargetClient;
 
 public class IcebergClient implements TargetClient {

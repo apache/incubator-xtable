@@ -24,7 +24,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.*;
 import lombok.extern.log4j.Log4j2;
 
@@ -46,8 +45,8 @@ import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.extractor.SourceClient;
 

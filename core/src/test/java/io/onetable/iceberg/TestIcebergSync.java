@@ -49,7 +49,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,7 +89,7 @@ import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.schema.SchemaFieldFinder;
 import io.onetable.spi.sync.TableFormatSync;

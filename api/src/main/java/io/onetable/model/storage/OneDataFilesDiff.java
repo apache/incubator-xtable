@@ -25,9 +25,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import io.onetable.spi.DefaultSnapshotVisitor;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;
@@ -43,21 +40,25 @@ public class OneDataFilesDiff {
   Set<OneDataFile> filesRemoved;
 
   public static OneDataFilesDiff from(List<OneDataFile> source, List<OneDataFile> target) {
-    Map<String, OneDataFile> thisPaths = source.stream().collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
-    Map<String, OneDataFile> thatPaths = target.stream().collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
+    Map<String, OneDataFile> sourcePaths =
+        source.stream()
+            .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
+    Map<String, OneDataFile> targetPaths =
+        target.stream()
+            .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
 
     // addedFiles
-    Set<String> addedFiles = new HashSet<>(thatPaths.keySet());
-    addedFiles.removeAll(thisPaths.keySet());
+    Set<String> addedFiles = new HashSet<>(targetPaths.keySet());
+    addedFiles.removeAll(sourcePaths.keySet());
 
     // removedFiles
-    Set<String> removedFiles = new HashSet<>(thisPaths.keySet());
-    removedFiles.removeAll(thatPaths.keySet());
+    Set<String> removedFiles = new HashSet<>(sourcePaths.keySet());
+    removedFiles.removeAll(targetPaths.keySet());
 
     Set<OneDataFile> filesAdded = new HashSet<>();
     Set<OneDataFile> filesRemoved = new HashSet<>();
-    addedFiles.forEach(a -> filesAdded.add(thatPaths.get(a)));
-    removedFiles.forEach(r -> filesRemoved.add(thisPaths.get(r)));
+    addedFiles.forEach(a -> filesAdded.add(targetPaths.get(a)));
+    removedFiles.forEach(r -> filesRemoved.add(sourcePaths.get(r)));
     return OneDataFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
   }
 }

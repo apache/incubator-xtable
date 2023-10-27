@@ -31,7 +31,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +54,7 @@ import io.onetable.model.schema.*;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.model.storage.TableFormat;
 
 class TestIcebergSourceClient {
@@ -167,7 +166,8 @@ class TestIcebergSourceClient {
     verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any(), any());
 
     Assertions.assertNotNull(oneSnapshot.getPartitionedDataFiles());
-    List<PartitionedDataFiles.PartitionFileGroup> dataFileChunks = oneSnapshot.getPartitionedDataFiles().getPartitions();
+    List<PartitionedDataFiles.PartitionFileGroup> dataFileChunks =
+        oneSnapshot.getPartitionedDataFiles().getPartitions();
     Assertions.assertEquals(5, dataFileChunks.size());
     for (PartitionedDataFiles.PartitionFileGroup dataFilesChunk : dataFileChunks) {
       List<OneDataFile> oneDataFiles = dataFilesChunk.getFiles();

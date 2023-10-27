@@ -22,12 +22,11 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.Builder;
 import lombok.Value;
 
 import io.onetable.model.schema.SchemaCatalog;
-import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.spi.OneTableSnapshotVisitor;
 
 /**

@@ -27,7 +27,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 
-import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -42,8 +41,8 @@ import io.onetable.model.OneTable;
 import io.onetable.model.TableChange;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.PartitionedDataFiles;
 
 public class TestExtractFromSource {
   private final SourceClient<TestCommit> mockSourceClient = mock(SourceClient.class);
