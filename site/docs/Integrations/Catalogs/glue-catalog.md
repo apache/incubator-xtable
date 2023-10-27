@@ -3,9 +3,10 @@ sidebar_position: 2
 ---
 
 # Glue Data Catalog
-This document walks through the steps to create a Onetable synced Iceberg Table in Glue Data Catalog on AWS.
+This document walks through the steps to create a Onetable synced Iceberg table in Glue Data Catalog on AWS.
+You will also be able to run this example with Delta as target format.
 
-## Pre-requisites:
+## Pre-requisites
 1. Hudi table(s) already written to Amazon S3.
    If you don't have a Hudi table written in S3, you can follow the steps in [this](https://link-to-how-to.md) tutorial to set it up.
 2. Setup access to interact with AWS APIs from the command line.
@@ -16,60 +17,70 @@ This document walks through the steps to create a Onetable synced Iceberg Table 
 3. Clone the onetable github [repository](https://github.com/onetable-io/onetable) and create the `utilities-0.1.0-SNAPSHOT-bundled.jar`
    by following the steps [here](https://github.com/onetable-io/onetable#building-the-project-and-running-tests).
 
-## Steps:
-1. Create `my_config.yaml` in the cloned onetable directory.
+## Steps
 
-    ```yaml md title="yaml"
-    sourceFormat: HUDI
-    targetFormats:
-      - ICEBERG
-    datasets:
-      -
-        tableBasePath: s3://path/to/trips_data
-        tableName: hudi_trips_data
-        partitionSpec: partitionpath:VALUE
-    ```
+### Running sync
+Create `my_config.yaml` in the cloned onetable directory.
 
-2. From your terminal under the cloned onetable directory, run the sync process using the below command.
+ ```yaml md title="yaml"
+ sourceFormat: HUDI
+ targetFormats:
+   - ICEBERG
+ datasets:
+   -
+     tableBasePath: s3://path/to/trips_data
+     tableName: hudi_trips_data
+     partitionSpec: partitionpath:VALUE
+ ```
+:::tip Note:
+Replace `ICEBERG` with `DELTA` if you wish to create the target table in Delta format.
+:::
 
-    ```shell md title="shell"
-    java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar -datasetConfig my_config.yaml
-    ```
+From your terminal under the cloned onetable directory, run the sync process using the below command.
 
-   :::tip Note:
-   At this point, if you check your bucket path, you will be able to see the `metadata` directory
-   with metadata files which contains the information that helps query engines interpret the data as an Iceberg table.
-   :::
+ ```shell md title="shell"
+ java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar -datasetConfig my_config.yaml
+ ```
 
-3. From your terminal, create a glue database.
+:::tip Note:
+At this point, if you check your bucket path, you will be able to see the `metadata` directory
+with metadata files which contains the information that helps query engines interpret the data as an Iceberg table.
+:::
+
+### Register the target table in Glue Data Catalog
+From your terminal, create a glue database.
    
-    ```shell md title="shell"
-    aws glue create-database --database-input "{\"Name\":\"onetable_synced_icebergdb\"}"
-    ```
+ ```shell md title="shell"
+ aws glue create-database --database-input "{\"Name\":\"onetable_synced_db\"}"
+ ```
 
-4. From your terminal, create a glue crawler. Modify the `<yourAccountId>`, `<yourRoleName>` 
+From your terminal, create a glue crawler. Modify the `<yourAccountId>`, `<yourRoleName>` 
 and `<path/to/your/data>`, with appropriate values.
 
-   ```shell md title="shell"
-   export accountId=<yourAccountId>
-   export roleName=<yourRoleName>
-   export s3DataPath=s3://<path/to/trips_data>
-   ```
-   ```shell md title="shell"
-   aws glue create-crawler --name onetable_iceberg_crawler --role arn:aws:iam::${accountId}:role/service-role/${roleName} --database onetable_synced_icebergdb --targets "{\"IcebergTargets\":[{\"Paths\":[\"${s3DataPath}\"]}]}"
-   ```
+```shell md title="shell"
+export accountId=<yourAccountId>
+export roleName=<yourRoleName>
+export s3DataPath=s3://<path/to/trips_data>
+```
+```shell md title="shell"
+aws glue create-crawler --name onetable_crawler --role arn:aws:iam::${accountId}:role/service-role/${roleName} --database onetable_synced_db --targets "{\"IcebergTargets\":[{\"Paths\":[\"${s3DataPath}\"]}]}"
+```
+:::tip Note:
+Replace `IcebergTargets` with `DeltaTargets` if you wish to create the target table in Delta format.
+:::
 
-5. From your terminal, run the glue crawler.
+From your terminal, run the glue crawler.
 
-   ```shell md title="shell"
-    aws glue start-crawler --name onetable_iceberg_crawler
-   ```
-   Once the crawler succeeds, you’ll be able to query this Iceberg table from Athena,
-   EMR and/or Redshift query engines.
+```shell md title="shell"
+ aws glue start-crawler --name onetable_crawler
+```
+Once the crawler succeeds, you’ll be able to query this Iceberg table from Athena,
+EMR and/or Redshift query engines.
 
-6. Here’s how our table looks like in Amazon Athena.
+### Validating the results
+Here’s how our table looks like in Amazon Athena.
 
-   ![Iceberg Table in Amazon Athena](./static/img/athena-iceberg.png)
+![Iceberg Table in Amazon Athena](./static/img/athena-iceberg.png)
 
 ## Conclusion:
 In this guide we saw how to, 
