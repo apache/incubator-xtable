@@ -181,10 +181,10 @@ public class ITOneTableClient {
       throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
     }
     List<?> insertRecords;
-    try (TestFormatAgnosticTable table =
-        TestFormatAgnosticTable.withStandardColumns(
+    try (GenericTable table =
+        GenericTable.getInstance(
             tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
-      insertRecords = table.insertRecords(100);
+      insertRecords = table.insertRows(100);
 
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
@@ -205,7 +205,7 @@ public class ITOneTableClient {
           table.getBasePath(),
           100);
 
-      table.insertRecords(100);
+      table.insertRows(100);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
@@ -214,7 +214,7 @@ public class ITOneTableClient {
           table.getBasePath(),
           200);
 
-      table.upsertRecords(insertRecords.subList(0, 20));
+      table.upsertRows(insertRecords.subList(0, 20));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
@@ -223,7 +223,7 @@ public class ITOneTableClient {
           table.getBasePath(),
           200);
 
-      table.deleteRecords(insertRecords.subList(30, 50));
+      table.deleteRows(insertRecords.subList(30, 50));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
@@ -233,8 +233,8 @@ public class ITOneTableClient {
           180);
     }
 
-    try (TestFormatAgnosticTable tableWithUpdatedSchema =
-        TestFormatAgnosticTable.withAdditionalColumns(
+    try (GenericTable tableWithUpdatedSchema =
+        GenericTable.getInstanceWithAdditionalColumns(
             tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
@@ -247,7 +247,7 @@ public class ITOneTableClient {
                       .build())
               .syncMode(syncMode)
               .build();
-      tableWithUpdatedSchema.insertRecords(100);
+      tableWithUpdatedSchema.insertRows(100);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
@@ -256,7 +256,7 @@ public class ITOneTableClient {
           tableWithUpdatedSchema.getBasePath(),
           280);
 
-      tableWithUpdatedSchema.deleteRecords(insertRecords.subList(60, 90));
+      tableWithUpdatedSchema.deleteRows(insertRecords.subList(60, 90));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,

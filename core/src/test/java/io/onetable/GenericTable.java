@@ -26,7 +26,7 @@ import org.apache.spark.sql.SparkSession;
 
 import io.onetable.model.storage.TableFormat;
 
-public interface GenericTable<T, Q> {
+public interface GenericTable<T, Q> extends AutoCloseable {
 
   List<T> insertRows(int numRows);
 
