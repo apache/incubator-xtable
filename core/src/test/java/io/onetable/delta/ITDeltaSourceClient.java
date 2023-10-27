@@ -18,6 +18,7 @@
  
 package io.onetable.delta;
 
+import static io.onetable.GenericTable.getTableName;
 import static io.onetable.ValidationTestHelper.validateOneSnapshot;
 import static io.onetable.ValidationTestHelper.validateTableChanges;
 import static org.junit.jupiter.api.Assertions.*;
@@ -579,10 +580,6 @@ public class ITDeltaSourceClient {
     OnePartitionField partitionField = partitionFields.get(0);
     assertEquals("birthDate", partitionField.getSourceField().getName());
     assertEquals(PartitionTransformType.YEAR, partitionField.getTransformType());
-  }
-
-  private static String getTableName() {
-    return "test_" + UUID.randomUUID().toString().replace("-", "_");
   }
 
   private static void validateTable(

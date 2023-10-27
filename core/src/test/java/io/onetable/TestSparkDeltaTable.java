@@ -79,7 +79,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
       boolean isPartitioned,
       boolean includeAdditionalColumns) {
     try {
-      this.tableName = generateTableName(name);
+      this.tableName = name;
       this.basePath = initBasePath(tempDir, tableName);
       this.sparkSession = sparkSession;
       this.tableIsPartitioned = isPartitioned;
@@ -187,10 +187,6 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
 
   public void runVacuum() {
     deltaTable.vacuum(0.0);
-  }
-
-  private String generateTableName(String tableName) {
-    return tableName + "_" + System.currentTimeMillis();
   }
 
   private String initBasePath(Path tempDir, String tableName) throws IOException {

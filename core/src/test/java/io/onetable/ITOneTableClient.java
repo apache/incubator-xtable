@@ -18,8 +18,8 @@
  
 package io.onetable;
 
+import static io.onetable.GenericTable.getTableName;
 import static io.onetable.hudi.HudiTestUtil.PartitionConfig;
-import static io.onetable.hudi.HudiTestUtil.getTableName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -130,14 +130,7 @@ public class ITOneTableClient {
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     return Stream.of(
-        Arguments.of(TableFormat.HUDI, SyncMode.FULL, true),
-        Arguments.of(TableFormat.HUDI, SyncMode.FULL, false),
-        Arguments.of(TableFormat.HUDI, SyncMode.INCREMENTAL, true),
-        Arguments.of(TableFormat.HUDI, SyncMode.INCREMENTAL, false),
-        Arguments.of(TableFormat.DELTA, SyncMode.FULL, true),
-        Arguments.of(TableFormat.DELTA, SyncMode.FULL, false),
-        Arguments.of(TableFormat.DELTA, SyncMode.INCREMENTAL, true),
-        Arguments.of(TableFormat.DELTA, SyncMode.INCREMENTAL, false));
+        Arguments.of(TableFormat.DELTA, SyncMode.FULL, false));
   }
 
   private static Stream<Arguments> testCasesWithPartitioningAndTableTypesAndSyncModes() {

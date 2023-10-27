@@ -55,10 +55,6 @@ import io.onetable.model.schema.SchemaVersion;
 public class HudiTestUtil {
   static final SchemaVersion SCHEMA_VERSION = new SchemaVersion(1, "");
 
-  public static String getTableName() {
-    return "test_table_" + UUID.randomUUID().toString().replaceAll("-", "_");
-  }
-
   @SneakyThrows
   static HoodieTableMetaClient initTableAndGetMetaClient(
       String tableBasePath, String partitionFields) {
