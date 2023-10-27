@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -208,7 +209,9 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
 
   public Map<Integer, List<Row>> getRowsByPartition(List<Row> rows) {
     return rows.stream()
-        .collect(Collectors.groupingBy(row -> row.getTimestamp(4).toLocalDateTime().getYear()));
+        .collect(
+            Collectors.groupingBy(
+                row -> row.getTimestamp(4).toInstant().atZone(ZoneId.of("UTC")).getYear()));
   }
 
   @Override

@@ -25,6 +25,8 @@ import static org.apache.spark.sql.types.DataTypes.TimestampType;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -166,7 +168,8 @@ public class TestDeltaHelper {
     LocalDateTime localDateTime =
         LocalDateTime.of(
             yearValue, month, day, RANDOM.nextInt(24), RANDOM.nextInt(60), RANDOM.nextInt(60));
-    return Timestamp.valueOf(localDateTime);
+    ZonedDateTime zonedDateTimeInUTC = localDateTime.atZone(ZoneId.of("UTC"));
+    return Timestamp.from(zonedDateTimeInUTC.toInstant());
   }
 
   public static String generateRandomString() {
