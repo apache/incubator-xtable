@@ -18,7 +18,6 @@
  
 package io.onetable;
 
-import static io.onetable.delta.TestDeltaHelper.DATE_TIME_FORMATTER;
 import static io.onetable.delta.TestDeltaHelper.createTestDataHelper;
 
 import java.io.Closeable;
@@ -26,8 +25,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -96,15 +93,15 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
   @Override
   public List<Row> insertRows(int numRows) {
     List<Row> rows = testDeltaHelper.generateRows(numRows);
-    String insertStatement = testDeltaHelper.generateSqlForDataInsert(tableName, rows);
-    sparkSession.sql(insertStatement);
+    Dataset<Row> df = sparkSession.createDataFrame(rows, testDeltaHelper.getTableStructSchema());
+    df.write().format("delta").mode("append").save(basePath);
     return rows;
   }
 
   public List<Row> insertRowsForPartition(int numRows, Integer partitionValue) {
     List<Row> rows = testDeltaHelper.generateRowsForSpecificPartition(numRows, partitionValue);
-    String insertStatement = testDeltaHelper.generateSqlForDataInsert(tableName, rows);
-    sparkSession.sql(insertStatement);
+    Dataset<Row> df = sparkSession.createDataFrame(rows, testDeltaHelper.getTableStructSchema());
+    df.write().format("delta").mode("append").save(basePath);
     return rows;
   }
 
@@ -210,18 +207,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
 
   public Map<Integer, List<Row>> getRowsByPartition(List<Row> rows) {
     return rows.stream()
-        .collect(
-            Collectors.groupingBy(
-                row -> {
-                  try {
-                    LocalDateTime parsedDateTime =
-                        LocalDateTime.parse(row.getString(4), DATE_TIME_FORMATTER);
-                    Timestamp timestamp = Timestamp.valueOf(parsedDateTime);
-                    return timestamp.toLocalDateTime().getYear();
-                  } catch (Exception e) {
-                    throw new RuntimeException(e);
-                  }
-                }));
+        .collect(Collectors.groupingBy(row -> row.getTimestamp(4).toLocalDateTime().getYear()));
   }
 
   @Override
