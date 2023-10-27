@@ -38,9 +38,7 @@ public class ValidationTestHelper {
   public static void validateOneSnapshot(OneSnapshot oneSnapshot, List<String> allActivePaths) {
     assertNotNull(oneSnapshot);
     assertNotNull(oneSnapshot.getTable());
-    List<String> onetablePaths =
-        new ArrayList<>(
-            DefaultSnapshotVisitor.extractDataFilePaths(oneSnapshot.getDataFiles()).keySet());
+    List<String> onetablePaths = oneSnapshot.getPartitionedDataFiles().getAllFiles().stream().map(OneDataFile::getPhysicalPath).collect(Collectors.toList());
     replaceFileScheme(allActivePaths);
     replaceFileScheme(onetablePaths);
     Collections.sort(allActivePaths);

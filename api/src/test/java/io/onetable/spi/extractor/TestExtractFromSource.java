@@ -27,6 +27,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -51,12 +52,12 @@ public class TestExtractFromSource {
   public void extractSnapshot() {
     OneTable table = OneTable.builder().latestCommitTime(Instant.now()).build();
     SchemaCatalog schemaCatalog = new SchemaCatalog(Collections.emptyMap());
-    OneDataFiles dataFiles = OneDataFiles.collectionBuilder().build();
+    PartitionedDataFiles dataFiles = mock(PartitionedDataFiles.class);
     OneSnapshot oneSnapshot =
         OneSnapshot.builder()
             .schemaCatalog(schemaCatalog)
             .table(table)
-            .dataFiles(dataFiles)
+            .partitionedDataFiles(dataFiles)
             .build();
     when(mockSourceClient.getCurrentSnapshot()).thenReturn(oneSnapshot);
     assertEquals(oneSnapshot, ExtractFromSource.of(mockSourceClient).extractSnapshot());

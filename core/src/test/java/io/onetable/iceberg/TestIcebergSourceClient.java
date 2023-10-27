@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -165,14 +166,13 @@ class TestIcebergSourceClient {
     verify(spyPartitionConverter, times(5)).toOneTable(any(), any());
     verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any(), any());
 
-    Assertions.assertNotNull(oneSnapshot.getDataFiles());
-    List<OneDataFile> dataFileChunks = oneSnapshot.getDataFiles().getFiles();
+    Assertions.assertNotNull(oneSnapshot.getPartitionedDataFiles());
+    List<PartitionedDataFiles.PartitionFileGroup> dataFileChunks = oneSnapshot.getPartitionedDataFiles().getPartitions();
     Assertions.assertEquals(5, dataFileChunks.size());
-    for (OneDataFile dataFilesChunk : dataFileChunks) {
-      Assertions.assertInstanceOf(OneDataFiles.class, dataFilesChunk);
-      OneDataFiles oneDataFiles = (OneDataFiles) dataFilesChunk;
-      Assertions.assertEquals(1, oneDataFiles.getFiles().size());
-      OneDataFile oneDataFile = oneDataFiles.getFiles().get(0);
+    for (PartitionedDataFiles.PartitionFileGroup dataFilesChunk : dataFileChunks) {
+      List<OneDataFile> oneDataFiles = dataFilesChunk.getFiles();
+      Assertions.assertEquals(1, oneDataFiles.size());
+      OneDataFile oneDataFile = oneDataFiles.get(0);
       Assertions.assertEquals(FileFormat.APACHE_PARQUET, oneDataFile.getFileFormat());
       Assertions.assertEquals(1, oneDataFile.getRecordCount());
       Assertions.assertTrue(oneDataFile.getPhysicalPath().startsWith(workingDir.toString()));

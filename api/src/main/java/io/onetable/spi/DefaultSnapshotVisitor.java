@@ -51,7 +51,6 @@ public abstract class DefaultSnapshotVisitor implements OneTableSnapshotVisitor 
     this.visitSelf(snapshot);
     this.visit(snapshot.getTable());
     this.visit(snapshot.getSchemaCatalog());
-    this.visit(snapshot.getDataFiles());
   }
 
   private void visitSelf(OneSnapshot snapshot) {}

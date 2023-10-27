@@ -41,6 +41,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
 import org.apache.spark.serializer.KryoSerializer;
@@ -358,7 +359,7 @@ public class TestDeltaSync {
   private OneSnapshot buildSnapshot(OneTable table, OneDataFile... dataFiles) {
     return OneSnapshot.builder()
         .table(table)
-        .dataFiles(OneDataFiles.collectionBuilder().files(Arrays.asList(dataFiles)).build())
+        .partitionedDataFiles(PartitionedDataFiles.fromFiles(Arrays.asList(dataFiles)))
         .build();
   }
 

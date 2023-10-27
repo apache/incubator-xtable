@@ -24,6 +24,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.*;
 import lombok.extern.log4j.Log4j2;
 
@@ -134,7 +135,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
     TableScan scan = iceTable.newScan().useSnapshot(currentSnapshot.snapshotId());
     PartitionSpec partitionSpec = iceTable.spec();
-    OneDataFiles oneDataFiles;
+    PartitionedDataFiles partitionedDataFiles;
     try (CloseableIterable<FileScanTask> files = scan.planFiles()) {
       List<OneDataFile> irFiles = new ArrayList<>();
       for (FileScanTask fileScanTask : files) {
@@ -142,7 +143,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         OneDataFile irDataFile = fromIceberg(file, partitionSpec, irTable.getReadSchema());
         irFiles.add(irDataFile);
       }
-      oneDataFiles = clusterFilesByPartition(irFiles);
+      partitionedDataFiles = PartitionedDataFiles.fromFiles(irFiles);
     } catch (IOException e) {
       throw new OneIOException("Failed to fetch current snapshot files from Iceberg source", e);
     }
@@ -151,7 +152,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         .version(String.valueOf(currentSnapshot.snapshotId()))
         .table(irTable)
         .schemaCatalog(schemaCatalog)
-        .dataFiles(oneDataFiles)
+        .partitionedDataFiles(partitionedDataFiles)
         .build();
   }
 
@@ -160,29 +161,6 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     Map<OnePartitionField, Range> onePartitionFieldRangeMap =
         partitionConverter.toOneTable(file.partition(), partitionSpec);
     return dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap, readSchema);
-  }
-
-  /**
-   * Divides / groups a collection of {@link OneDataFile}s into {@link OneDataFiles} based on the
-   * file's partition values.
-   *
-   * @param files a collection of files to be grouped by partition
-   * @return a collection of {@link OneDataFiles}, each containing a collection of {@link
-   *     OneDataFile} with the same partition values
-   */
-  private OneDataFiles clusterFilesByPartition(List<OneDataFile> files) {
-    Map<String, List<OneDataFile>> fileClustersMap =
-        files.stream().collect(Collectors.groupingBy(OneDataFile::getPartitionPath));
-    List<OneDataFile> fileClustersList =
-        fileClustersMap.entrySet().stream()
-            .map(
-                entry ->
-                    OneDataFiles.collectionBuilder()
-                        .partitionPath(entry.getKey())
-                        .files(entry.getValue())
-                        .build())
-            .collect(Collectors.toList());
-    return OneDataFiles.collectionBuilder().files(fileClustersList).build();
   }
 
   @Override

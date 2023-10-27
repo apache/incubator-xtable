@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.Builder;
 
 import org.apache.spark.sql.delta.DeltaLog;
@@ -60,13 +61,12 @@ public class DeltaDataFileUpdatesExtractor {
       DeltaDataFileExtractor.builder().build();
 
   public Seq<Action> applySnapshot(
-      DeltaLog deltaLog, OneDataFiles snapshotFiles, OneSchema tableSchema) {
-    List<OneDataFile> dataFiles = new ArrayList<>();
+      DeltaLog deltaLog, PartitionedDataFiles partitionedDataFiles, OneSchema tableSchema) {
+    List<OneDataFile> currentDataFiles = new ArrayList<>();
     try (PartitionedDataFileIterator fileIterator =
         deltaDataFileExtractor.iteratorWithoutStats(deltaLog.snapshot(), tableSchema)) {
-      fileIterator.forEachRemaining(dataFiles::add);
-      OneDataFiles currentDataFiles = OneDataFiles.collectionBuilder().files(dataFiles).build();
-      OneDataFilesDiff filesDiff = currentDataFiles.diff(snapshotFiles);
+      fileIterator.forEachRemaining(currentDataFiles::add);
+      OneDataFilesDiff filesDiff = OneDataFilesDiff.from(currentDataFiles, partitionedDataFiles.getAllFiles());
       return applyDiff(filesDiff, tableSchema, deltaLog.dataPath().toString());
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Delta data files", e);

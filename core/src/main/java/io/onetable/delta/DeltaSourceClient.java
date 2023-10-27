@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.Builder;
 import lombok.extern.log4j.Log4j2;
 
@@ -100,7 +101,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
     return OneSnapshot.builder()
         .table(table)
         .schemaCatalog(getSchemaCatalog(table, snapshot.version()))
-        .dataFiles(getOneDataFiles(snapshot, table.getReadSchema()))
+        .partitionedDataFiles(getOneDataFiles(snapshot, table.getReadSchema()))
         .build();
   }
 
@@ -172,15 +173,13 @@ public class DeltaSourceClient implements SourceClient<Long> {
                 .build());
   }
 
-  private OneDataFiles getOneDataFiles(Snapshot snapshot, OneSchema schema) {
-    OneDataFiles oneDataFiles;
+  private PartitionedDataFiles getOneDataFiles(Snapshot snapshot, OneSchema schema) {
     try (PartitionedDataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
       List<OneDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);
-      oneDataFiles = OneDataFiles.collectionBuilder().files(dataFiles).build();
+      return PartitionedDataFiles.fromFiles(dataFiles);
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Delta data files", e);
     }
-    return oneDataFiles;
   }
 }

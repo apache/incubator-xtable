@@ -32,6 +32,7 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.Value;
@@ -71,14 +72,13 @@ public class BaseFileUpdatesExtractor {
   /**
    * Extracts the changes between the snapshot files and the base files in the Hudi table currently.
    *
-   * @param snapshotFiles the snapshot files, assumes that they are grouped by partition like {@link
-   *     io.onetable.spi.extractor.SourceClient#getFilesForAllPartitions(Object, OneTable)} returns.
+   * @param partitionedDataFiles files grouped by partition to sync
    * @param metaClient the meta client for the Hudi table with the latest timeline state loaded
    * @param commit The current commit started by the Hudi client
    * @return The information needed to create a "replace" commit for the Hudi table
    */
   ReplaceMetadata extractSnapshotChanges(
-      OneDataFiles snapshotFiles, HoodieTableMetaClient metaClient, String commit) {
+      PartitionedDataFiles partitionedDataFiles, HoodieTableMetaClient metaClient, String commit) {
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(metaClient.getTableConfig().isMetadataTableAvailable())
@@ -94,18 +94,17 @@ public class BaseFileUpdatesExtractor {
             FSUtils.getAllPartitionPaths(
                 engineContext, metadataConfig, metaClient.getBasePathV2().toString()));
     ReplaceMetadata replaceMetadata =
-        snapshotFiles.getFiles().stream()
+        partitionedDataFiles.getPartitions().stream()
             .map(
-                files -> {
-                  OneDataFiles oneDataFiles = (OneDataFiles) files;
-                  String partitionPath = getPartitionPath(tableBasePath, oneDataFiles);
+                partitionFileGroup -> {
+                  List<OneDataFile> dataFiles = partitionFileGroup.getFiles();
+                  String partitionPath = getPartitionPath(tableBasePath, dataFiles);
                   // remove the partition from the set of partitions to drop since it is present in
                   // the snapshot
                   partitionPathsToDrop.remove(partitionPath);
                   // create a map of file path to the data file, any entries not in the hudi table
                   // will be added
-                  Map<String, OneDataFile> physicalPathToFile =
-                      DefaultSnapshotVisitor.extractDataFilePaths(oneDataFiles);
+                  Map<String, OneDataFile> physicalPathToFile = dataFiles.stream().collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
                   List<HoodieBaseFile> baseFiles =
                       isTableInitialized
                           ? fsView.getLatestBaseFiles(partitionPath).collect(Collectors.toList())
@@ -272,9 +271,9 @@ public class BaseFileUpdatesExtractor {
     }
   }
 
-  private String getPartitionPath(Path tableBasePath, OneDataFiles files) {
+  private String getPartitionPath(Path tableBasePath, List<OneDataFile> files) {
     return getPartitionPath(
-        tableBasePath, new CachingPath(files.getFiles().get(0).getPhysicalPath()));
+        tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
   }
 
   private String getPartitionPath(Path tableBasePath, Path filePath) {

@@ -18,19 +18,46 @@
  
 package io.onetable.model.storage;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
+import io.onetable.spi.DefaultSnapshotVisitor;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;
 
 /** Container for holding the list of files added and files removed between source and target. */
-@Builder
 @Value
+@Builder
 public class OneDataFilesDiff {
   @Singular("fileAdded")
   Set<OneDataFile> filesAdded;
 
   @Singular("fileRemoved")
   Set<OneDataFile> filesRemoved;
+
+  public static OneDataFilesDiff from(List<OneDataFile> source, List<OneDataFile> target) {
+    Map<String, OneDataFile> thisPaths = source.stream().collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
+    Map<String, OneDataFile> thatPaths = target.stream().collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
+
+    // addedFiles
+    Set<String> addedFiles = new HashSet<>(thatPaths.keySet());
+    addedFiles.removeAll(thisPaths.keySet());
+
+    // removedFiles
+    Set<String> removedFiles = new HashSet<>(thisPaths.keySet());
+    removedFiles.removeAll(thatPaths.keySet());
+
+    Set<OneDataFile> filesAdded = new HashSet<>();
+    Set<OneDataFile> filesRemoved = new HashSet<>();
+    addedFiles.forEach(a -> filesAdded.add(thatPaths.get(a)));
+    removedFiles.forEach(r -> filesRemoved.add(thisPaths.get(r)));
+    return OneDataFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
+  }
 }

@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
@@ -220,10 +221,10 @@ public class HudiTargetClient implements TargetClient {
   }
 
   @Override
-  public void syncFilesForSnapshot(OneDataFiles snapshotFiles) {
+  public void syncFilesForSnapshot(PartitionedDataFiles partitionedDataFiles) {
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         baseFileUpdatesExtractor.extractSnapshotChanges(
-            snapshotFiles, getMetaClient(), commitState.getInstantTime());
+            partitionedDataFiles, getMetaClient(), commitState.getInstantTime());
     commitState.setReplaceMetadata(replaceMetadata);
   }
 

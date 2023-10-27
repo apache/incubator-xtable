@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.Builder;
 import lombok.Value;
 
@@ -111,15 +112,13 @@ public class HudiDataFileExtractor implements AutoCloseable {
     this.fileStatsExtractor = hudiFileStatsExtractor;
   }
 
-  public OneDataFiles getFilesCurrentState(OneTable table) {
+  public PartitionedDataFiles getFilesCurrentState(OneTable table) {
     try {
       List<String> allPartitionPaths =
           tableMetadata != null
               ? tableMetadata.getAllPartitionPaths()
               : FSUtils.getAllPartitionPaths(engineContext, metadataConfig, basePath.toString());
-      return OneDataFiles.collectionBuilder()
-          .files(getOneDataFilesForPartitions(allPartitionPaths, table))
-          .build();
+      return getOneDataFilesForPartitions(allPartitionPaths, table);
     } catch (IOException ex) {
       throw new OneIOException(
           "Unable to read partitions for table " + metaClient.getTableConfig().getTableName(), ex);
@@ -347,7 +346,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
   }
 
-  private List<OneDataFile> getOneDataFilesForPartitions(
+  private PartitionedDataFiles getOneDataFilesForPartitions(
       List<String> partitionPaths, OneTable table) {
 
     SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
@@ -367,16 +366,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                 });
     Stream<OneDataFile> files =
         fileStatsExtractor.addStatsToFiles(tableMetadata, filesWithoutStats, table.getReadSchema());
-    Map<String, List<OneDataFile>> collected =
-        files.collect(Collectors.groupingBy(OneDataFile::getPartitionPath));
-    return collected.entrySet().stream()
-        .map(
-            entry ->
-                OneDataFiles.collectionBuilder()
-                    .partitionPath(entry.getKey())
-                    .files(entry.getValue())
-                    .build())
-        .collect(Collectors.toList());
+    return PartitionedDataFiles.fromFiles(files);
   }
 
   @Override

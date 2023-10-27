@@ -74,29 +74,4 @@ public class OneDataFiles extends OneDataFile {
     defaultDataFileVisitor.visit(this);
   }
 
-  /**
-   * Compares this data files collection with the specified dataFiles and extracts the files added
-   * and removed.
-   *
-   * @param filesToCompare {@link OneDataFiles} based on which diff's needs to be computed.
-   * @return {@link OneDataFilesDiff} holding files added and files removed.
-   */
-  public OneDataFilesDiff diff(OneDataFiles filesToCompare) {
-    Map<String, OneDataFile> thisPaths = DefaultSnapshotVisitor.extractDataFilePaths(this);
-    Map<String, OneDataFile> thatPaths =
-        DefaultSnapshotVisitor.extractDataFilePaths(filesToCompare);
-
-    // addedFiles
-    Set<String> addedFiles = new HashSet<>(thatPaths.keySet());
-    addedFiles.removeAll(thisPaths.keySet());
-
-    // removedFiles
-    Set<String> removedFiles = new HashSet<>(thisPaths.keySet());
-    removedFiles.removeAll(thatPaths.keySet());
-
-    OneDataFilesDiff.OneDataFilesDiffBuilder diffBuilder = OneDataFilesDiff.builder();
-    addedFiles.forEach(a -> diffBuilder.fileAdded(thatPaths.get(a)));
-    removedFiles.forEach(r -> diffBuilder.fileRemoved(thisPaths.get(r)));
-    return diffBuilder.build();
-  }
 }

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -142,10 +143,10 @@ public class DeltaClient implements TargetClient {
   }
 
   @Override
-  public void syncFilesForSnapshot(OneDataFiles snapshotFiles) {
+  public void syncFilesForSnapshot(PartitionedDataFiles partitionedDataFiles) {
     transactionState.setActions(
         dataFileUpdatesExtractor.applySnapshot(
-            deltaLog, snapshotFiles, transactionState.getLatestSchemaInternal()));
+            deltaLog, partitionedDataFiles, transactionState.getLatestSchemaInternal()));
   }
 
   @Override

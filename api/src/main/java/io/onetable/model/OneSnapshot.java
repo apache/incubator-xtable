@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.Builder;
 import lombok.Value;
 
@@ -47,8 +48,8 @@ public class OneSnapshot {
   OneTable table;
   // Schema catalog referencing the written schema for each data file in the snapshot
   SchemaCatalog schemaCatalog;
-  // List of data file groupings
-  OneDataFiles dataFiles;
+  // Data files grouped by partition
+  PartitionedDataFiles partitionedDataFiles;
   // pending commits before latest commit on the table.
   @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
 

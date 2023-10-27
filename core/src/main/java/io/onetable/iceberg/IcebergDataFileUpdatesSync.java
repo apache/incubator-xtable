@@ -21,6 +21,7 @@ package io.onetable.iceberg;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import lombok.AllArgsConstructor;
 
 import org.apache.iceberg.DataFile;
@@ -47,22 +48,20 @@ public class IcebergDataFileUpdatesSync {
   public void applySnapshot(
       Table table,
       Transaction transaction,
-      OneDataFiles snapshotFiles,
+      PartitionedDataFiles partitionedDataFiles,
       Schema schema,
       PartitionSpec partitionSpec) {
-    List<OneDataFile> dataFiles = new ArrayList<>();
+    List<OneDataFile> currentDataFiles = new ArrayList<>();
     IcebergDataFileExtractor dataFileExtractor =
         IcebergDataFileExtractor.builder().partitionValueConverter(partitionValueConverter).build();
     try (PartitionedDataFileIterator fileIterator = dataFileExtractor.iterator(table)) {
-      fileIterator.forEachRemaining(dataFiles::add);
+      fileIterator.forEachRemaining(currentDataFiles::add);
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Iceberg data files", e);
     }
 
-    OneDataFiles currentDataFiles = OneDataFiles.collectionBuilder().files(dataFiles).build();
-
     // Sync the files diff
-    OneDataFilesDiff filesDiff = currentDataFiles.diff(snapshotFiles);
+    OneDataFilesDiff filesDiff = OneDataFilesDiff.from(currentDataFiles, partitionedDataFiles.getAllFiles());
     applyDiff(transaction, filesDiff, schema, partitionSpec);
   }
 

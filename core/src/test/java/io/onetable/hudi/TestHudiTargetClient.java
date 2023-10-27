@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.commons.lang3.tuple.Pair;
@@ -203,7 +204,7 @@ public class TestHudiTargetClient {
     HudiTargetClient targetClient = getTargetClient(null);
     HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();
     String instant = "commit";
-    OneDataFilesDiff input = OneDataFilesDiff.builder().build();
+    OneDataFilesDiff input = mock(OneDataFilesDiff.class);
     BaseFileUpdatesExtractor.ReplaceMetadata output =
         BaseFileUpdatesExtractor.ReplaceMetadata.of(
             Collections.emptyMap(), Collections.emptyList());
@@ -223,7 +224,7 @@ public class TestHudiTargetClient {
     HudiTargetClient.CommitState mockCommitState = mocks.getLeft();
     HoodieTableMetaClient mockMetaClient = mocks.getRight();
     String instant = "commit";
-    OneDataFiles input = OneDataFiles.collectionBuilder().build();
+    PartitionedDataFiles input = PartitionedDataFiles.of(Collections.emptyList());
     BaseFileUpdatesExtractor.ReplaceMetadata output =
         BaseFileUpdatesExtractor.ReplaceMetadata.of(
             Collections.emptyMap(), Collections.emptyList());

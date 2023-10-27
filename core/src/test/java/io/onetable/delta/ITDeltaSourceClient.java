@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -179,9 +180,9 @@ public class ITDeltaSourceClient {
     Map<OneField, ColumnStat> columnStats = new HashMap<>();
     columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
     columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
-    Assertions.assertEquals(1, snapshot.getDataFiles().getFiles().size());
+    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().getPartitions().size());
     validatePartitionDataFiles(
-        OneDataFiles.collectionBuilder()
+        PartitionedDataFiles.PartitionFileGroup.builder()
             .files(
                 Collections.singletonList(
                     OneDataFile.builder()
@@ -193,8 +194,9 @@ public class ITDeltaSourceClient {
                         .recordCount(1)
                         .columnStats(columnStats)
                         .build()))
+            .partitionValues(Collections.emptyMap())
             .build(),
-        (OneDataFiles) snapshot.getDataFiles().getFiles().get(0));
+        snapshot.getPartitionedDataFiles().getPartitions().get(0));
   }
 
   @Test
@@ -254,28 +256,28 @@ public class ITDeltaSourceClient {
     Map<OneField, ColumnStat> columnStats = new HashMap<>();
     columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
     columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
-    Assertions.assertEquals(1, snapshot.getDataFiles().getFiles().size());
-    validatePartitionDataFiles(
-        OneDataFiles.collectionBuilder()
-            .files(
-                Collections.singletonList(
-                    OneDataFile.builder()
-                        .schemaVersion(null)
-                        .fileFormat(FileFormat.APACHE_PARQUET)
-                        .partitionValues(
-                            Collections.singletonMap(
-                                OnePartitionField.builder()
-                                    .sourceField(partCol)
-                                    .transformType(PartitionTransformType.VALUE)
-                                    .build(),
-                                Range.scalar("SingleValue")))
-                        .partitionPath(null)
-                        .fileSizeBytes(684)
-                        .recordCount(1)
-                        .columnStats(columnStats)
-                        .build()))
+    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().getPartitions().size());
+    Map<OnePartitionField, Range> partitionValue = Collections.singletonMap(
+        OnePartitionField.builder()
+            .sourceField(partCol)
+            .transformType(PartitionTransformType.VALUE)
             .build(),
-        (OneDataFiles) snapshot.getDataFiles().getFiles().get(0));
+        Range.scalar("SingleValue"));
+    validatePartitionDataFiles(
+        PartitionedDataFiles.PartitionFileGroup.builder()
+            .partitionValues(partitionValue)
+            .files(Collections.singletonList(
+                OneDataFile.builder()
+                    .schemaVersion(null)
+                    .fileFormat(FileFormat.APACHE_PARQUET)
+                    .partitionValues(partitionValue)
+                    .partitionPath(null)
+                    .fileSizeBytes(684)
+                    .recordCount(1)
+                    .columnStats(columnStats)
+                    .build()))
+            .build(),
+        snapshot.getPartitionedDataFiles().getPartitions().get(0));
   }
 
   @Disabled("Requires Spark 3.4.0+")
@@ -607,9 +609,9 @@ public class ITDeltaSourceClient {
   }
 
   private void validatePartitionDataFiles(
-      OneDataFiles expectedPartitionFiles, OneDataFiles actualPartitionFiles)
+      PartitionedDataFiles.PartitionFileGroup expectedPartitionFiles, PartitionedDataFiles.PartitionFileGroup actualPartitionFiles)
       throws URISyntaxException {
-    validatePropertiesDataFile(expectedPartitionFiles, actualPartitionFiles, false);
+    assertEquals(expectedPartitionFiles.getPartitionValues(), actualPartitionFiles.getPartitionValues());
     validateDataFiles(expectedPartitionFiles.getFiles(), actualPartitionFiles.getFiles());
   }
 
@@ -619,20 +621,16 @@ public class ITDeltaSourceClient {
     for (int i = 0; i < expectedFiles.size(); i++) {
       OneDataFile expected = expectedFiles.get(i);
       OneDataFile actual = actualFiles.get(i);
-      validatePropertiesDataFile(expected, actual, true);
+      validatePropertiesDataFile(expected, actual);
     }
   }
 
   private void validatePropertiesDataFile(
-      OneDataFile expected, OneDataFile actual, boolean dataFile) throws URISyntaxException {
+      OneDataFile expected, OneDataFile actual) throws URISyntaxException {
     Assertions.assertEquals(expected.getSchemaVersion(), actual.getSchemaVersion());
-    if (dataFile) {
       Assertions.assertTrue(
           Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
           () -> "path == " + actual.getPhysicalPath() + " is not absolute");
-    } else {
-      Assertions.assertNull(actual.getPhysicalPath());
-    }
     Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
     Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
     Assertions.assertEquals(expected.getPartitionPath(), actual.getPartitionPath());
@@ -640,7 +638,6 @@ public class ITDeltaSourceClient {
     if (Issues.ISSUE_102_FIXED) {
       Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
     }
-    if (dataFile) {
       Instant now = Instant.now();
       long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
       long maxRange = now.toEpochMilli();
@@ -653,9 +650,6 @@ public class ITDeltaSourceClient {
                   + minRange
                   + " and "
                   + maxRange);
-    } else {
-      Assertions.assertEquals(0, actual.getLastModified());
-    }
     Assertions.assertEquals(expected.getColumnStats(), actual.getColumnStats());
   }
 

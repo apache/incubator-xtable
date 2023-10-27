@@ -49,6 +49,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -606,7 +607,7 @@ public class TestIcebergSync {
     return OneSnapshot.builder()
         .table(table)
         .schemaCatalog(SchemaCatalog.builder().schemas(schemas).build())
-        .dataFiles(OneDataFiles.collectionBuilder().files(Arrays.asList(dataFiles)).build())
+        .partitionedDataFiles(PartitionedDataFiles.fromFiles(Arrays.asList(dataFiles)))
         .build();
   }
 

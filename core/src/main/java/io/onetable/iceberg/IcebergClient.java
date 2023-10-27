@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import io.onetable.model.storage.PartitionedDataFiles;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
@@ -159,11 +160,11 @@ public class IcebergClient implements TargetClient {
   }
 
   @Override
-  public void syncFilesForSnapshot(OneDataFiles snapshotFiles) {
+  public void syncFilesForSnapshot(PartitionedDataFiles partitionedDataFiles) {
     dataFileUpdatesExtractor.applySnapshot(
         table,
         transaction,
-        snapshotFiles,
+        partitionedDataFiles,
         transaction.table().schema(),
         transaction.table().spec());
   }
