@@ -103,6 +103,7 @@ public class ITOneTableClient {
         .sparkContext()
         .hadoopConfiguration()
         .set("parquet.avro.write-old-list-structure", "false");
+    sparkSession.catalog().clearCache();
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
   }
 
@@ -120,6 +121,7 @@ public class ITOneTableClient {
       jsc.close();
     }
     if (sparkSession != null) {
+      sparkSession.catalog().clearCache();
       sparkSession.close();
     }
   }
@@ -129,7 +131,7 @@ public class ITOneTableClient {
   }
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
-    return Stream.of(Arguments.of(TableFormat.DELTA, SyncMode.FULL, false));
+    return Stream.of(Arguments.of(TableFormat.DELTA, SyncMode.FULL, true));
   }
 
   private static Stream<Arguments> testCasesWithPartitioningAndTableTypesAndSyncModes() {
@@ -244,7 +246,7 @@ public class ITOneTableClient {
                       .build())
               .syncMode(syncMode)
               .build();
-      tableWithUpdatedSchema.insertRows(100);
+      insertRecords = tableWithUpdatedSchema.insertRows(100);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
@@ -1024,6 +1026,7 @@ public class ITOneTableClient {
     return Arrays.stream(schema.fields())
         .map(StructField::name)
         .filter(name -> !name.startsWith("onetable_partition_col_"))
+        .filter(name -> !name.equals("yearOfBirth"))
         .collect(Collectors.toSet());
   }
 

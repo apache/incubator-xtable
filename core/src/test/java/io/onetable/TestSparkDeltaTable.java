@@ -29,9 +29,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import lombok.Getter;
 import lombok.SneakyThrows;
 import lombok.Value;
 
+import lombok.experimental.FieldDefaults;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -46,18 +48,16 @@ import io.delta.tables.DeltaTable;
 
 import io.onetable.delta.TestDeltaHelper;
 
-@Value
 public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeable {
   // typical inserts or upserts do not use this partition value.
   private static final Integer SPECIAL_PARTITION_VALUE = 1990;
-  String tableName;
-  String basePath;
-  SparkSession sparkSession;
-  DeltaLog deltaLog;
-  DeltaTable deltaTable;
-  TestDeltaHelper testDeltaHelper;
-  boolean tableIsPartitioned;
-  boolean includeAdditionalColumns;
+  @Getter private final String tableName;
+  @Getter private final String basePath;
+  private final SparkSession sparkSession;
+  private final DeltaLog deltaLog;
+  private DeltaTable deltaTable;
+  private final TestDeltaHelper testDeltaHelper;
+  private final boolean tableIsPartitioned;
 
   public static TestSparkDeltaTable forStandardSchemaAndPartitioning(
       String tableName, Path tempDir, SparkSession sparkSession, boolean isPartitioned) {
@@ -80,7 +80,6 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
       this.basePath = initBasePath(tempDir, tableName);
       this.sparkSession = sparkSession;
       this.tableIsPartitioned = isPartitioned;
-      this.includeAdditionalColumns = includeAdditionalColumns;
       this.testDeltaHelper = createTestDataHelper(isPartitioned, includeAdditionalColumns);
       testDeltaHelper.createTable(sparkSession, tableName, basePath);
       this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
@@ -95,6 +94,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
     List<Row> rows = testDeltaHelper.generateRows(numRows);
     Dataset<Row> df = sparkSession.createDataFrame(rows, testDeltaHelper.getTableStructSchema());
     df.write().format("delta").mode("append").save(basePath);
+    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
     return rows;
   }
 
@@ -102,6 +102,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
     List<Row> rows = testDeltaHelper.generateRowsForSpecificPartition(numRows, partitionValue);
     Dataset<Row> df = sparkSession.createDataFrame(rows, testDeltaHelper.getTableStructSchema());
     df.write().format("delta").mode("append").save(basePath);
+    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
     return rows;
   }
 
@@ -132,6 +133,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
         .whenMatched()
         .updateAll()
         .execute();
+    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
   }
 
   @SneakyThrows
@@ -145,6 +147,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
         .whenMatched()
         .delete()
         .execute();
+    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
   }
 
   @Override
@@ -154,6 +157,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
         "Invalid operation! Delete partition is only supported for partitioned tables.");
     Column condition = functions.col("yearOfBirth").equalTo(partitionValue);
     deltaTable.delete(condition);
+    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
   }
 
   @Override
