@@ -29,13 +29,15 @@ import lombok.Value;
  * Represents the current state of commits that are ready for immediate processing and syncing,
  * while also tracking pending commits intended for future incremental syncs.
  *
- * <p>'commitsToProcess' captures commits that are should be processed and synced in the current
- * round. 'pendingInstants' tracks instants that are pending at the start of the sync process and
- * should be considered for future incremental syncs.
+ * <p>'commitsToProcess' captures commits that should be processed and synced in the current round.
+ * 'pendingInstants' tracks instants that are pending at the start of the sync process and should be
+ * considered for future incremental syncs.
  */
 @Value
 @Builder
 public class CurrentCommitState<COMMIT> {
+  // TODO the class name is also confusing. It is more of a incremental job specification than state
+  // TODO suggest better names. to-process and pending are synonyms.
   @Builder.Default List<COMMIT> commitsToProcess = Collections.emptyList();
   @Builder.Default List<Instant> pendingInstants = Collections.emptyList();
 }

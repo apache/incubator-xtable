@@ -214,7 +214,28 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   @Override
   public CurrentCommitState<Snapshot> getCurrentCommitState(
-      InstantsForIncrementalSync instantsForIncrementalSync) {
-    return null;
+      InstantsForIncrementalSync lastSyncInstant) {
+
+    long epochMilli = lastSyncInstant.getLastSyncInstant().toEpochMilli();
+    Table iceTable = getSourceTable();
+
+    // history is not used as only the last snapshot of a transaction is tracked
+    // List<HistoryEntry> history = iceTable.history();
+
+    Snapshot pendingSnapshot = iceTable.currentSnapshot();
+    if (pendingSnapshot.timestampMillis() <= epochMilli) {
+      // even the latest snapshot is older than the last sync instant.
+      return CurrentCommitState.<Snapshot>builder().build();
+    }
+
+    List<Snapshot> snapshots = new ArrayList<>();
+    while (pendingSnapshot != null && pendingSnapshot.timestampMillis() > epochMilli) {
+      snapshots.add(pendingSnapshot);
+      pendingSnapshot =
+          pendingSnapshot.parentId() != null ? iceTable.snapshot(pendingSnapshot.parentId()) : null;
+    }
+    // reverse the list to process the oldest snapshot first
+    Collections.reverse(snapshots);
+    return CurrentCommitState.<Snapshot>builder().commitsToProcess(snapshots).build();
   }
 }
