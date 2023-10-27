@@ -69,7 +69,7 @@ public class IcebergPartitionValueConverter {
   }
 
   public Map<OnePartitionField, Range> toOneTable(
-      StructLike structLike, PartitionSpec partitionSpec) {
+      Schema schema, StructLike structLike, PartitionSpec partitionSpec) {
     if (!partitionSpec.isPartitioned()) {
       return Collections.emptyMap();
     }
@@ -125,11 +125,9 @@ public class IcebergPartitionValueConverter {
       OneSchema fieldSchema =
           SCHEMA_CONVERTER.toOneSchema(
               partitionData.getSchema().getFields().get(fieldPosition).schema());
-      int splitPoint = partitionField.name().lastIndexOf(DOT);
-      String fieldName = partitionField.name().substring(splitPoint + 1);
-      String path = splitPoint == -1 ? null : partitionField.name().substring(0, splitPoint);
+      Types.NestedField partitionSourceField = schema.findField(partitionField.sourceId());
       OneField sourceField =
-          OneField.builder().name(fieldName).parentPath(path).schema(fieldSchema).build();
+          OneField.builder().name(partitionSourceField.name()).schema(fieldSchema).build();
       OnePartitionField onePartitionField =
           OnePartitionField.builder().sourceField(sourceField).transformType(transformType).build();
       partitionValues.put(onePartitionField, Range.scalar(value));

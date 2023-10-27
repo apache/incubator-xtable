@@ -28,6 +28,7 @@ import lombok.Builder;
 import org.apache.iceberg.CombinedScanTask;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.io.CloseableIterator;
 
@@ -85,6 +86,7 @@ public class IcebergDataFileExtractor {
       }
 
       PartitionSpec partitionSpec = iceTable.spec();
+      Schema tableSchema = iceTable.schema();
       CombinedScanTask combinedScan = iceScan.next();
       List<OneDataFile> files =
           combinedScan.files().stream()
@@ -92,7 +94,8 @@ public class IcebergDataFileExtractor {
                   fileScanTask -> {
                     DataFile dataFile = fileScanTask.file();
                     Map<OnePartitionField, Range> onePartitionFieldRangeMap =
-                        partitionValueConverter.toOneTable(dataFile.partition(), partitionSpec);
+                        partitionValueConverter.toOneTable(
+                            tableSchema, dataFile.partition(), partitionSpec);
                     return fromIcebergWithoutColumnStats(dataFile, onePartitionFieldRangeMap);
                   })
               .collect(Collectors.toList());
