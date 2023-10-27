@@ -192,6 +192,14 @@ public class TestDeltaHelper {
                   newRowData[i] = row.get(i);
                 }
               }
+              if (tableIsPartitioned) {
+                Timestamp timestampValue = row.getTimestamp(row.size() - 2);
+                newRowData[row.size() - 2] = timestampValue;
+                newRowData[row.size() - 1] = timestampValue.toLocalDateTime().getYear();
+              } else {
+                Timestamp timestampValue = row.getTimestamp(row.size() - 1);
+                newRowData[row.size() - 1] = timestampValue;
+              }
               return RowFactory.create(newRowData);
             })
         .collect(Collectors.toList());
