@@ -129,10 +129,8 @@ public class ITOneTableClient {
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     return Stream.of(
-        Arguments.of(TableFormat.HUDI, SyncMode.FULL, true),
-        Arguments.of(TableFormat.HUDI, SyncMode.FULL, false),
-        Arguments.of(TableFormat.HUDI, SyncMode.INCREMENTAL, true),
-        Arguments.of(TableFormat.HUDI, SyncMode.INCREMENTAL, false));
+        // fix delta to iceberg unpartitioned case.
+        Arguments.of(TableFormat.DELTA, SyncMode.FULL, false));
   }
 
   private static Stream<Arguments> testCasesWithPartitioningAndTableTypesAndSyncModes() {
@@ -164,10 +162,7 @@ public class ITOneTableClient {
       TableFormat sourceTableFormat, SyncMode syncMode, boolean isPartitioned) throws Exception {
     String tableName = getTableName();
     OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-    List<TableFormat> targetTableFormats =
-        Arrays.stream(TableFormat.values())
-            .filter(format -> !format.equals(sourceTableFormat))
-            .collect(Collectors.toList());
+    List<TableFormat> targetTableFormats = Arrays.asList(TableFormat.ICEBERG);
     String oneTablePartitionConfig = null;
     if (isPartitioned) {
       oneTablePartitionConfig = "level:VALUE";

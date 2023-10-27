@@ -56,10 +56,9 @@ public class TestDeltaHelper {
         new StructField("id", IntegerType, false, Metadata.empty()),
         new StructField("firstName", StringType, true, Metadata.empty()),
         new StructField("lastName", StringType, true, Metadata.empty()),
-        new StructField("gender", StringType, true, Metadata.empty())
+        new StructField("gender", StringType, true, Metadata.empty()),
+        new StructField("birthDate", TimestampType, true, Metadata.empty())
       };
-  private static final StructField[] COMMON_DATE_FIELDS =
-      new StructField[] {new StructField("birthDate", TimestampType, true, Metadata.empty())};
   private static final StructField[] ADDITIONAL_FIELDS =
       new StructField[] {new StructField("street", StringType, true, Metadata.empty())};
   private static final StructField[] PARTITIONED_FIELDS =
@@ -85,12 +84,11 @@ public class TestDeltaHelper {
   private static StructType generateDynamicSchema(
       boolean isPartitioned, boolean includeAdditionalColumns) {
     List<StructField> fields = new ArrayList<>(Arrays.asList(COMMON_FIELDS));
-    if (includeAdditionalColumns) {
-      fields.addAll(Arrays.asList(ADDITIONAL_FIELDS));
-    }
-    fields.addAll(Arrays.asList(COMMON_DATE_FIELDS));
     if (isPartitioned) {
       fields.addAll(Arrays.asList(PARTITIONED_FIELDS));
+    }
+    if (includeAdditionalColumns) {
+      fields.addAll(Arrays.asList(ADDITIONAL_FIELDS));
     }
     return new StructType(fields.toArray(new StructField[0]));
   }
@@ -103,11 +101,8 @@ public class TestDeltaHelper {
             .addColumn("id", IntegerType)
             .addColumn("firstName", StringType)
             .addColumn("lastName", StringType)
-            .addColumn("gender", StringType);
-    if (includeAdditionalColumns) {
-      tableBuilder.addColumn("street", StringType);
-    }
-    tableBuilder.addColumn("birthDate", TimestampType);
+            .addColumn("gender", StringType)
+            .addColumn("birthDate", TimestampType);
     if (tableIsPartitioned) {
       tableBuilder
           .addColumn(
@@ -116,6 +111,9 @@ public class TestDeltaHelper {
                   .generatedAlwaysAs("YEAR(birthDate)")
                   .build())
           .partitionedBy("yearOfBirth");
+    }
+    if (includeAdditionalColumns) {
+      tableBuilder.addColumn("street", StringType);
     }
     tableBuilder.execute();
   }
@@ -187,21 +185,12 @@ public class TestDeltaHelper {
         .map(
             row -> {
               Object[] newRowData = new Object[row.size()];
-              int limit = tableIsPartitioned ? row.size() - 2 : row.size() - 1;
-              for (int i = 0; i < limit; i++) {
+              for (int i = 0; i < row.size(); i++) {
                 if (i == 1 || i == 2) {
                   newRowData[i] = isUpsert ? generateRandomString() : row.get(i);
                 } else {
                   newRowData[i] = row.get(i);
                 }
-              }
-              if (tableIsPartitioned) {
-                Timestamp timestampValue = row.getTimestamp(row.size() - 2);
-                newRowData[row.size() - 2] = timestampValue;
-                newRowData[row.size() - 1] = timestampValue.toLocalDateTime().getYear();
-              } else {
-                Timestamp timestampValue = row.getTimestamp(row.size() - 1);
-                newRowData[row.size() - 1] = timestampValue;
               }
               return RowFactory.create(newRowData);
             })
