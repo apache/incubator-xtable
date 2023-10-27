@@ -97,7 +97,7 @@ public class BaseFileUpdatesExtractor {
                 file -> {
                   // remove the partition from the set of partitions to drop since it is present in
                   // the snapshot
-                  partitionPathsToDrop.remove(file.getPartitionPath());
+                  partitionPathsToDrop.remove(getPartitionPath(file));
                   // create a map of file path to the data file, any entries not in the hudi table
                   // will be added
                   Map<String, OneDataFile> physicalPathToFile =
@@ -106,8 +106,9 @@ public class BaseFileUpdatesExtractor {
                               .files(Collections.singletonList(file))
                               .build());
                   List<HoodieBaseFile> baseFiles =
+                      // TODO(vamshigv): throws NPE from here.
                       fsView
-                          .getLatestBaseFiles(file.getPartitionPath())
+                          .getLatestBaseFiles(getPartitionPath(file))
                           .collect(Collectors.toList());
                   Set<String> existingPaths =
                       baseFiles.stream().map(HoodieBaseFile::getPath).collect(Collectors.toSet());
@@ -132,7 +133,7 @@ public class BaseFileUpdatesExtractor {
                   return ReplaceMetadata.of(
                       fileIdsToRemove.isEmpty()
                           ? Collections.emptyMap()
-                          : Collections.singletonMap(file.getPartitionPath(), fileIdsToRemove),
+                          : Collections.singletonMap(getPartitionPath(file), fileIdsToRemove),
                       writeStatuses);
                 })
             .reduce(ReplaceMetadata::combine)
@@ -202,14 +203,14 @@ public class BaseFileUpdatesExtractor {
     WriteStatus writeStatus = new WriteStatus();
     String fileId = getFileId(file);
     String filePath = file.getPhysicalPath().substring(tableBasePath.length() + 1);
-    String fileName = filePath.substring(file.getPartitionPath().length() + 1);
+    String fileName = filePath.substring(getPartitionPath(file).length() + 1);
     writeStatus.setFileId(fileId);
-    writeStatus.setPartitionPath(file.getPartitionPath());
+    writeStatus.setPartitionPath(getPartitionPath(file));
     HoodieDeltaWriteStat writeStat = new HoodieDeltaWriteStat();
     writeStat.setFileId(fileId);
     writeStat.setPath(
         ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(filePath, commitTime));
-    writeStat.setPartitionPath(file.getPartitionPath());
+    writeStat.setPartitionPath(getPartitionPath(file));
     writeStat.setNumWrites(file.getRecordCount());
     writeStat.setTotalWriteBytes(file.getFileSizeBytes());
     writeStat.setFileSizeInBytes(file.getFileSizeBytes());
@@ -257,5 +258,15 @@ public class BaseFileUpdatesExtractor {
       writeStatuses.addAll(other.writeStatuses);
       return ReplaceMetadata.of(partitionToReplacedFileIds, writeStatuses);
     }
+  }
+
+  // TODO(vamshigv): This is a hack.
+  private String getPartitionPath(OneDataFile file) {
+    if (file.getPartitionValues() == null || file.getPartitionValues().isEmpty()) {
+      return "";
+    }
+    return file.getPartitionValues().entrySet().stream()
+        .map(entry -> (String) entry.getValue().getMinValue())
+        .collect(Collectors.joining("/"));
   }
 }
