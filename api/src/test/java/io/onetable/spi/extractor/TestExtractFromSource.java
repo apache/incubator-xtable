@@ -51,7 +51,7 @@ public class TestExtractFromSource {
   public void extractSnapshot() {
     OneTable table = OneTable.builder().latestCommitTime(Instant.now()).build();
     SchemaCatalog schemaCatalog = new SchemaCatalog(Collections.emptyMap());
-    PartitionedDataFiles dataFiles = mock(PartitionedDataFiles.class);
+    PartitionedDataFiles dataFiles = PartitionedDataFiles.of(Collections.emptyList());
     OneSnapshot oneSnapshot =
         OneSnapshot.builder()
             .schemaCatalog(schemaCatalog)

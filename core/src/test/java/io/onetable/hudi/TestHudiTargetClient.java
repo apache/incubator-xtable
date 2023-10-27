@@ -203,7 +203,7 @@ public class TestHudiTargetClient {
     HudiTargetClient targetClient = getTargetClient(null);
     HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();
     String instant = "commit";
-    OneDataFilesDiff input = mock(OneDataFilesDiff.class);
+    OneDataFilesDiff input = OneDataFilesDiff.builder().build();
     BaseFileUpdatesExtractor.ReplaceMetadata output =
         BaseFileUpdatesExtractor.ReplaceMetadata.of(
             Collections.emptyMap(), Collections.emptyList());
