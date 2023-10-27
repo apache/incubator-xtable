@@ -371,6 +371,16 @@ public class TestSparkHudiTable extends TestAbstractHudiTable
     }
   }
 
+  @Override
+  public void reload() {
+    // no-op.
+  }
+
+  @Override
+  public List<String> getColumnsToSelect() {
+    return schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList());
+  }
+
   private SparkRDDWriteClient<HoodieAvroPayload> initSparkWriteClient(
       Schema schema, TypedProperties keyGenProperties) {
     HoodieWriteConfig writeConfig = generateWriteConfig(schema, keyGenProperties);

@@ -25,12 +25,13 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import lombok.Getter;
 import lombok.SneakyThrows;
-import lombok.Value;
 
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
@@ -46,18 +47,18 @@ import io.delta.tables.DeltaTable;
 
 import io.onetable.delta.TestDeltaHelper;
 
-@Value
+@Getter
 public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeable {
   // typical inserts or upserts do not use this partition value.
   private static final Integer SPECIAL_PARTITION_VALUE = 1990;
-  String tableName;
-  String basePath;
-  SparkSession sparkSession;
+  private final String tableName;
+  private final String basePath;
+  private final SparkSession sparkSession;
+  private final TestDeltaHelper testDeltaHelper;
+  private final boolean tableIsPartitioned;
+  private final boolean includeAdditionalColumns;
   DeltaLog deltaLog;
   DeltaTable deltaTable;
-  TestDeltaHelper testDeltaHelper;
-  boolean tableIsPartitioned;
-  boolean includeAdditionalColumns;
 
   public static TestSparkDeltaTable forStandardSchemaAndPartitioning(
       String tableName, Path tempDir, SparkSession sparkSession, boolean isPartitioned) {
@@ -213,5 +214,20 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
   @Override
   public void close() {
     // no-op as spark session lifecycle is managed by the caller
+  }
+
+  @Override
+  public void reload() {
+    // Handle to reload the table on demand.
+    this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
+    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
+  }
+
+  @Override
+  public List<String> getColumnsToSelect() {
+    // Exclude generated columns.
+    return Arrays.asList(testDeltaHelper.getTableStructSchema().fieldNames()).stream()
+        .filter(columnName -> !columnName.equals("yearOfBirth"))
+        .collect(Collectors.toList());
   }
 }

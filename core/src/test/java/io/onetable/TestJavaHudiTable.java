@@ -381,4 +381,8 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     HoodieEngineContext context = new HoodieJavaEngineContext(conf);
     return new HoodieJavaWriteClient<>(context, writeConfig);
   }
+
+  public List<String> getColumnsToSelect() {
+    return schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList());
+  }
 }
