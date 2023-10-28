@@ -316,7 +316,7 @@ class TestIcebergSourceClient {
             .build();
     IcebergSourceClient sourceClient = getIcebergSourceClient(table);
     CurrentCommitState<Snapshot> toBeProcessed = sourceClient.getCurrentCommitState(instant);
-    Assertions.assertEquals(0, toBeProcessed.getPendingInstants().size());
+    Assertions.assertEquals(0, toBeProcessed.getInFlightInstants().size());
     Assertions.assertArrayEquals(snapshots, toBeProcessed.getCommitsToProcess().toArray());
   }
 

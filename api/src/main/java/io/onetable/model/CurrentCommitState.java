@@ -30,14 +30,19 @@ import lombok.Value;
  * while also tracking pending commits intended for future incremental syncs.
  *
  * <p>'commitsToProcess' captures commits that should be processed and synced in the current round.
- * 'pendingInstants' tracks instants that are pending at the start of the sync process and should be
- * considered for future incremental syncs.
+ * 'inFlightInstants' tracks instants that are pending at the start of the sync process and should
+ * be considered for future incremental syncs.
  */
 @Value
 @Builder
 public class CurrentCommitState<COMMIT> {
   // TODO the class name is also confusing. It is more of a incremental job specification than state
-  // TODO suggest better names. to-process and pending are synonyms.
   @Builder.Default List<COMMIT> commitsToProcess = Collections.emptyList();
-  @Builder.Default List<Instant> pendingInstants = Collections.emptyList();
+
+  /**
+   * The instants of commits that were incomplete or pending at a given time. For e.g. the commits
+   * that were started but not completed when performing the sync. Tracking these commits is
+   * necessary to avoid missing commits in case of concurrent writers in Hudi.
+   */
+  @Builder.Default List<Instant> inFlightInstants = Collections.emptyList();
 }
