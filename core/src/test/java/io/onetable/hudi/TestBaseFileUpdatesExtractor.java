@@ -53,12 +53,7 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.hadoop.CachingPath;
 
 import io.onetable.model.schema.OneField;
-import io.onetable.model.schema.OnePartitionField;
-import io.onetable.model.schema.OneSchema;
-import io.onetable.model.schema.OneType;
-import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.ColumnStat;
-import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
@@ -72,15 +67,6 @@ public class TestBaseFileUpdatesExtractor {
   private static final long LAST_MODIFIED = System.currentTimeMillis();
   private static final HoodieEngineContext CONTEXT =
       new HoodieJavaEngineContext(new Configuration());
-  private static final OnePartitionField PARTITION_FIELD =
-      OnePartitionField.builder()
-          .sourceField(
-              OneField.builder()
-                  .name("string_field")
-                  .schema(OneSchema.builder().dataType(OneType.STRING).build())
-                  .build())
-          .transformType(PartitionTransformType.VALUE)
-          .build();
 
   @Test
   void convertDiff() {
@@ -192,17 +178,7 @@ public class TestBaseFileUpdatesExtractor {
 
     PartitionedDataFiles partitionedDataFiles =
         PartitionedDataFiles.of(
-            Arrays.asList(
-                PartitionedDataFiles.PartitionFileGroup.builder()
-                    .partitionValues(
-                        Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath1)))
-                    .files(Arrays.asList(addedFile1, addedFile2))
-                    .build(),
-                PartitionedDataFiles.PartitionFileGroup.builder()
-                    .partitionValues(
-                        Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
-                    .files(Arrays.asList(addedFile3))
-                    .build()));
+            Arrays.asList(Arrays.asList(addedFile1, addedFile2), Arrays.asList(addedFile3)));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         extractor.extractSnapshotChanges(partitionedDataFiles, metaClient, COMMIT_TIME);
 
@@ -280,16 +256,7 @@ public class TestBaseFileUpdatesExtractor {
     PartitionedDataFiles partitionedDataFiles =
         PartitionedDataFiles.of(
             Arrays.asList(
-                PartitionedDataFiles.PartitionFileGroup.builder()
-                    .files(Arrays.asList(addedFile1, existingFile))
-                    .partitionValues(
-                        Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
-                    .build(),
-                PartitionedDataFiles.PartitionFileGroup.builder()
-                    .files(Collections.singletonList(addedFile2))
-                    .partitionValues(
-                        Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath3)))
-                    .build()));
+                Arrays.asList(addedFile1, existingFile), Collections.singletonList(addedFile2)));
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
@@ -356,12 +323,7 @@ public class TestBaseFileUpdatesExtractor {
         createFile(
             "", String.format("%s/%s", tableBasePath, existingFileName2), Collections.emptyMap());
     PartitionedDataFiles partitionedDataFiles =
-        PartitionedDataFiles.of(
-            Collections.singletonList(
-                PartitionedDataFiles.PartitionFileGroup.builder()
-                    .files(Arrays.asList(addedFile1, existingFile))
-                    .partitionValues(Collections.emptyMap())
-                    .build()));
+        PartitionedDataFiles.of(Collections.singletonList(Arrays.asList(addedFile1, existingFile)));
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =

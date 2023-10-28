@@ -18,13 +18,13 @@
  
 package io.onetable.model.storage;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Value;
 
 import io.onetable.model.schema.OnePartitionField;
@@ -34,20 +34,10 @@ import io.onetable.model.stat.Range;
 @Value
 @AllArgsConstructor(staticName = "of")
 public class PartitionedDataFiles {
-  List<PartitionFileGroup> partitions;
-
-  @Value
-  @Builder
-  public static class PartitionFileGroup {
-    Map<OnePartitionField, Range> partitionValues;
-    List<OneDataFile> files;
-  }
+  List<List<OneDataFile>> fileGroupings;
 
   public List<OneDataFile> getAllFiles() {
-    return partitions.stream()
-        .map(PartitionFileGroup::getFiles)
-        .flatMap(List::stream)
-        .collect(Collectors.toList());
+    return fileGroupings.stream().flatMap(List::stream).collect(Collectors.toList());
   }
 
   public static PartitionedDataFiles fromFiles(List<OneDataFile> files) {
@@ -57,14 +47,6 @@ public class PartitionedDataFiles {
   public static PartitionedDataFiles fromFiles(Stream<OneDataFile> files) {
     Map<Map<OnePartitionField, Range>, List<OneDataFile>> filesGrouped =
         files.collect(Collectors.groupingBy(OneDataFile::getPartitionValues));
-    return PartitionedDataFiles.of(
-        filesGrouped.entrySet().stream()
-            .map(
-                entry ->
-                    PartitionFileGroup.builder()
-                        .partitionValues(entry.getKey())
-                        .files(entry.getValue())
-                        .build())
-            .collect(Collectors.toList()));
+    return PartitionedDataFiles.of(new ArrayList<>(filesGrouped.values()));
   }
 }
