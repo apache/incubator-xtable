@@ -53,11 +53,17 @@ public class OneDataFilesDiff {
         target.stream()
             .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
     // Any files in the source that are not in the target are added
-    Set<OneDataFile> addedFiles = source.stream().map(file -> {
-      OneDataFile targetFileIfPresent = targetPaths.remove(file.getPhysicalPath());
-      return targetFileIfPresent == null ? file : null;
-    }).filter(Objects::nonNull).collect(Collectors.toSet());
-    // Any files remaining in the targetPaths map are not present in the source and should be marked for removal
+    Set<OneDataFile> addedFiles =
+        source.stream()
+            .map(
+                file -> {
+                  OneDataFile targetFileIfPresent = targetPaths.remove(file.getPhysicalPath());
+                  return targetFileIfPresent == null ? file : null;
+                })
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    // Any files remaining in the targetPaths map are not present in the source and should be marked
+    // for removal
     Set<OneDataFile> removedFiles = new HashSet<>(targetPaths.values());
     return OneDataFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
   }

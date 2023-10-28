@@ -60,9 +60,9 @@ import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
-import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.PartitionedDataFiles;
 
 public class TestBaseFileUpdatesExtractor {

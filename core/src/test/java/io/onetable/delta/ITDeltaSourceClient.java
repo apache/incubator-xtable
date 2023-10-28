@@ -71,8 +71,8 @@ import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
-import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.OneDataFile;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.testutil.Issues;
 
@@ -608,7 +608,8 @@ public class ITDeltaSourceClient {
   }
 
   private void validatePartitionDataFiles(
-      OneFileGroup expectedPartitionFiles, OneFileGroup actualPartitionFiles) throws URISyntaxException {
+      OneFileGroup expectedPartitionFiles, OneFileGroup actualPartitionFiles)
+      throws URISyntaxException {
     assertEquals(
         expectedPartitionFiles.getPartitionValues(), actualPartitionFiles.getPartitionValues());
     validateDataFiles(expectedPartitionFiles.getFiles(), actualPartitionFiles.getFiles());

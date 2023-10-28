@@ -53,8 +53,8 @@ import io.onetable.model.TableChange;
 import io.onetable.model.schema.*;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
-import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.OneDataFile;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
 
 class TestIcebergSourceClient {

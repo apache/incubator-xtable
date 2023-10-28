@@ -46,8 +46,7 @@ public class OneDataFile {
   // file format
   @Builder.Default @NonNull FileFormat fileFormat = FileFormat.APACHE_PARQUET;
   // partition ranges for the data file
-  @Builder.Default @NonNull
-  Map<OnePartitionField, Range> partitionValues = Collections.emptyMap();
+  @Builder.Default @NonNull Map<OnePartitionField, Range> partitionValues = Collections.emptyMap();
 
   String partitionPath;
   long fileSizeBytes;
