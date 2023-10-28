@@ -89,7 +89,7 @@ public class IcebergDataFileExtractor {
     }
 
     private void advanceScanTask() {
-      if (currentScanTaskIterator.hasNext()) {
+      if (currentScanTaskIterator != null && currentScanTaskIterator.hasNext()) {
         return;
       }
       if (iceScan.hasNext()) {

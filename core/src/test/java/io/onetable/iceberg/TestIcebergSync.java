@@ -235,9 +235,9 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
     schemas.put(schemaVersion2, schema2);
 
-    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, null);
-    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, null);
-    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, null);
+    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, Collections.emptyMap());
+    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, Collections.emptyMap());
+    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyMap());
     OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
     when(mockSchemaExtractor.toIceberg(schema1)).thenReturn(icebergSchema1);

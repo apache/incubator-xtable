@@ -39,26 +39,35 @@ public class OneDataFilesDiff {
   @Singular("fileRemoved")
   Set<OneDataFile> filesRemoved;
 
-  public static OneDataFilesDiff from(List<OneDataFile> source, List<OneDataFile> target) {
-    Map<String, OneDataFile> sourcePaths =
-        source.stream()
-            .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
+  /**
+   * Creates a OneDataFilesDiff from the list of files in the target table and the list of files in
+   * the source table.
+   *
+   * @param target list of files currently in the target table
+   * @param source list of files currently in the source table
+   * @return the files that need to be added and removed to make the target table match the source
+   *     table
+   */
+  public static OneDataFilesDiff from(List<OneDataFile> target, List<OneDataFile> source) {
     Map<String, OneDataFile> targetPaths =
         target.stream()
             .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
+    Map<String, OneDataFile> sourcePaths =
+        source.stream()
+            .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
 
     // addedFiles
-    Set<String> addedFiles = new HashSet<>(targetPaths.keySet());
-    addedFiles.removeAll(sourcePaths.keySet());
+    Set<String> addedFiles = new HashSet<>(sourcePaths.keySet());
+    addedFiles.removeAll(targetPaths.keySet());
 
     // removedFiles
-    Set<String> removedFiles = new HashSet<>(sourcePaths.keySet());
-    removedFiles.removeAll(targetPaths.keySet());
+    Set<String> removedFiles = new HashSet<>(targetPaths.keySet());
+    removedFiles.removeAll(sourcePaths.keySet());
 
     Set<OneDataFile> filesAdded = new HashSet<>();
     Set<OneDataFile> filesRemoved = new HashSet<>();
-    addedFiles.forEach(a -> filesAdded.add(targetPaths.get(a)));
-    removedFiles.forEach(r -> filesRemoved.add(sourcePaths.get(r)));
+    addedFiles.forEach(a -> filesAdded.add(sourcePaths.get(a)));
+    removedFiles.forEach(r -> filesRemoved.add(targetPaths.get(r)));
     return OneDataFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
   }
 }
