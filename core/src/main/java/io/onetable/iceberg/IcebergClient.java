@@ -60,6 +60,7 @@ public class IcebergClient implements TargetClient {
   private final int snapshotRetentionInHours;
   private Transaction transaction;
   private Table table;
+  private OneTable internalTableState;
 
   public IcebergClient(PerTableConfig perTableConfig, Configuration configuration) {
     this(
@@ -111,6 +112,7 @@ public class IcebergClient implements TargetClient {
   public void beginSync(OneTable oneTable) {
     initializeTableIfRequired(oneTable);
     transaction = table.newTransaction();
+    internalTableState = oneTable;
   }
 
   private void initializeTableIfRequired(OneTable oneTable) {
@@ -162,6 +164,7 @@ public class IcebergClient implements TargetClient {
   public void syncFilesForSnapshot(OneDataFiles snapshotFiles) {
     dataFileUpdatesExtractor.applySnapshot(
         table,
+        internalTableState,
         transaction,
         snapshotFiles,
         transaction.table().schema(),
@@ -185,6 +188,7 @@ public class IcebergClient implements TargetClient {
         .commit();
     transaction.commitTransaction();
     transaction = null;
+    internalTableState = null;
   }
 
   private void safeDelete(String file) {

@@ -20,6 +20,7 @@ package io.onetable.iceberg;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,10 +33,10 @@ import org.apache.iceberg.StructLike;
 import org.apache.iceberg.avro.AvroSchemaUtil;
 import org.apache.iceberg.types.Types;
 
+import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
-import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.Range;
 
@@ -54,13 +55,20 @@ public class TestIcebergPartitionValueConverter {
           Types.NestedField.optional(3, "birthDate", Types.TimestampType.withZone()),
           Types.NestedField.optional(4, "birthDate_year", Types.IntegerType.get()));
   private static final StructLike STRUCT_LIKE_RECORD =
-      Row.of(SCHEMA_WITH_PARTITION, 1, "abc", 1614556800000L, 2021);
+      Row.of(
+          SCHEMA_WITH_PARTITION,
+          1,
+          "abc",
+          1614556800000L,
+          51 /* Iceberg represents year as diff from 1970 */);
+  private static final OneSchema ONE_SCHEMA =
+      IcebergSchemaExtractor.getInstance().fromIceberg(SCHEMA);
 
   @Test
   public void testToOneTableNotPartitioned() {
     PartitionSpec partitionSpec = PartitionSpec.unpartitioned();
     Map<OnePartitionField, Range> partitionValues =
-        partitionValueConverter.toOneTable(SCHEMA, STRUCT_LIKE_RECORD, partitionSpec);
+        partitionValueConverter.toOneTable(buildOnetable(false), STRUCT_LIKE_RECORD, partitionSpec);
     assertTrue(partitionValues.isEmpty());
   }
 
@@ -70,26 +78,35 @@ public class TestIcebergPartitionValueConverter {
     Map<OnePartitionField, Range> expectedPartitionValues =
         new HashMap() {
           {
-            put(
-                OnePartitionField.builder()
-                    .sourceField(
-                        OneField.builder()
-                            .name("birthDate")
-                            .schema(
-                                OneSchema.builder()
-                                    .name("timestamp")
-                                    .dataType(OneType.TIMESTAMP)
-                                    .build())
-                            .build())
-                    .transformType(PartitionTransformType.YEAR)
-                    .build(),
-                Range.scalar(2021));
+            put(getPartitionField(), Range.scalar(1609459200000L));
           }
         };
     Map<OnePartitionField, Range> partitionValues =
-        partitionValueConverter.toOneTable(SCHEMA, STRUCT_LIKE_RECORD, partitionSpec);
+        partitionValueConverter.toOneTable(buildOnetable(true), STRUCT_LIKE_RECORD, partitionSpec);
     assertEquals(1, partitionValues.size());
     assertEquals(expectedPartitionValues, partitionValues);
+  }
+
+  private OneTable buildOnetable(boolean isPartitioned) {
+    return OneTable.builder()
+        .readSchema(IcebergSchemaExtractor.getInstance().fromIceberg(SCHEMA))
+        .partitioningFields(
+            isPartitioned
+                ? Collections.singletonList(getPartitionField())
+                : Collections.emptyList())
+        .build();
+  }
+
+  private OnePartitionField getPartitionField() {
+    OneField birthDateField =
+        ONE_SCHEMA.getFields().stream()
+            .filter(f -> f.getName().equals("birthDate"))
+            .findFirst()
+            .get();
+    return OnePartitionField.builder()
+        .sourceField(birthDateField)
+        .transformType(PartitionTransformType.YEAR)
+        .build();
   }
 
   public static class Row implements StructLike, IndexedRecord {

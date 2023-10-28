@@ -139,8 +139,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
       List<OneDataFile> irFiles = new ArrayList<>();
       for (FileScanTask fileScanTask : files) {
         DataFile file = fileScanTask.file();
-        OneDataFile irDataFile =
-            fromIceberg(file, partitionSpec, iceTable.schema(), irTable.getReadSchema());
+        OneDataFile irDataFile = fromIceberg(file, partitionSpec, irTable);
         irFiles.add(irDataFile);
       }
       oneDataFiles = clusterFilesByPartition(irFiles);
@@ -156,11 +155,10 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         .build();
   }
 
-  private OneDataFile fromIceberg(
-      DataFile file, PartitionSpec partitionSpec, Schema iceSchema, OneSchema readSchema) {
+  private OneDataFile fromIceberg(DataFile file, PartitionSpec partitionSpec, OneTable oneTable) {
     Map<OnePartitionField, Range> onePartitionFieldRangeMap =
-        partitionConverter.toOneTable(iceSchema, file.partition(), partitionSpec);
-    return dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap, readSchema);
+        partitionConverter.toOneTable(oneTable, file.partition(), partitionSpec);
+    return dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap, oneTable.getReadSchema());
   }
 
   /**
@@ -195,18 +193,12 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
     Set<OneDataFile> dataFilesAdded =
         StreamSupport.stream(snapshot.addedDataFiles(fileIO).spliterator(), false)
-            .map(
-                dataFile ->
-                    fromIceberg(
-                        dataFile, partitionSpec, iceTable.schema(), irTable.getReadSchema()))
+            .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable))
             .collect(Collectors.toSet());
 
     Set<OneDataFile> dataFilesRemoved =
         StreamSupport.stream(snapshot.removedDataFiles(fileIO).spliterator(), false)
-            .map(
-                dataFile ->
-                    fromIceberg(
-                        dataFile, partitionSpec, iceTable.schema(), irTable.getReadSchema()))
+            .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable))
             .collect(Collectors.toSet());
 
     OneDataFilesDiff filesDiff =

@@ -34,6 +34,7 @@ import org.apache.iceberg.Transaction;
 
 import io.onetable.exception.NotSupportedException;
 import io.onetable.exception.OneIOException;
+import io.onetable.model.OneTable;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
@@ -46,6 +47,7 @@ public class IcebergDataFileUpdatesSync {
 
   public void applySnapshot(
       Table table,
+      OneTable oneTable,
       Transaction transaction,
       OneDataFiles snapshotFiles,
       Schema schema,
@@ -53,7 +55,7 @@ public class IcebergDataFileUpdatesSync {
     List<OneDataFile> dataFiles = new ArrayList<>();
     IcebergDataFileExtractor dataFileExtractor =
         IcebergDataFileExtractor.builder().partitionValueConverter(partitionValueConverter).build();
-    try (PartitionedDataFileIterator fileIterator = dataFileExtractor.iterator(table)) {
+    try (PartitionedDataFileIterator fileIterator = dataFileExtractor.iterator(table, oneTable)) {
       fileIterator.forEachRemaining(dataFiles::add);
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Iceberg data files", e);
