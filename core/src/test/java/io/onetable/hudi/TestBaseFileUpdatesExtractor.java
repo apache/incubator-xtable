@@ -60,7 +60,7 @@ import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
-import io.onetable.model.storage.FileGroup;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.PartitionedDataFiles;
@@ -194,12 +194,12 @@ public class TestBaseFileUpdatesExtractor {
     PartitionedDataFiles partitionedDataFiles =
         PartitionedDataFiles.of(
             Arrays.asList(
-                FileGroup.builder()
+                OneFileGroup.builder()
                     .partitionValues(
                         Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath1)))
                     .files(Arrays.asList(addedFile1, addedFile2))
                     .build(),
-                FileGroup.builder()
+                OneFileGroup.builder()
                     .partitionValues(
                         Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
                     .files(Arrays.asList(addedFile3))
@@ -281,12 +281,12 @@ public class TestBaseFileUpdatesExtractor {
     PartitionedDataFiles partitionedDataFiles =
         PartitionedDataFiles.of(
             Arrays.asList(
-                FileGroup.builder()
+                OneFileGroup.builder()
                     .files(Arrays.asList(addedFile1, existingFile))
                     .partitionValues(
                         Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
                     .build(),
-                FileGroup.builder()
+                OneFileGroup.builder()
                     .files(Collections.singletonList(addedFile2))
                     .partitionValues(
                         Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath3)))
@@ -359,7 +359,7 @@ public class TestBaseFileUpdatesExtractor {
     PartitionedDataFiles partitionedDataFiles =
         PartitionedDataFiles.of(
             Collections.singletonList(
-                FileGroup.builder()
+                OneFileGroup.builder()
                     .files(Arrays.asList(addedFile1, existingFile))
                     .partitionValues(Collections.emptyMap())
                     .build()));

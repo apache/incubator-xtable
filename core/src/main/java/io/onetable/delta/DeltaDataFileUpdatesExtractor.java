@@ -66,7 +66,7 @@ public class DeltaDataFileUpdatesExtractor {
         deltaDataFileExtractor.iteratorWithoutStats(deltaLog.snapshot(), tableSchema)) {
       fileIterator.forEachRemaining(currentDataFiles::add);
       OneDataFilesDiff filesDiff =
-          OneDataFilesDiff.from(currentDataFiles, partitionedDataFiles.getAllFiles());
+          OneDataFilesDiff.from(partitionedDataFiles.getAllFiles(), currentDataFiles);
       return applyDiff(filesDiff, tableSchema, deltaLog.dataPath().toString());
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Delta data files", e);

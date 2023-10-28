@@ -21,6 +21,7 @@ package io.onetable.model.storage;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -43,31 +44,21 @@ public class OneDataFilesDiff {
    * Creates a OneDataFilesDiff from the list of files in the target table and the list of files in
    * the source table.
    *
-   * @param target list of files currently in the target table
    * @param source list of files currently in the source table
-   * @return the files that need to be added and removed to make the target table match the source
-   *     table
+   * @param target list of files currently in the target table
+   * @return files that need to be added and removed for the target table match the source table
    */
-  public static OneDataFilesDiff from(List<OneDataFile> target, List<OneDataFile> source) {
+  public static OneDataFilesDiff from(List<OneDataFile> source, List<OneDataFile> target) {
     Map<String, OneDataFile> targetPaths =
         target.stream()
             .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
-    Map<String, OneDataFile> sourcePaths =
-        source.stream()
-            .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
-
-    // addedFiles
-    Set<String> addedFiles = new HashSet<>(sourcePaths.keySet());
-    addedFiles.removeAll(targetPaths.keySet());
-
-    // removedFiles
-    Set<String> removedFiles = new HashSet<>(targetPaths.keySet());
-    removedFiles.removeAll(sourcePaths.keySet());
-
-    Set<OneDataFile> filesAdded = new HashSet<>();
-    Set<OneDataFile> filesRemoved = new HashSet<>();
-    addedFiles.forEach(a -> filesAdded.add(sourcePaths.get(a)));
-    removedFiles.forEach(r -> filesRemoved.add(targetPaths.get(r)));
-    return OneDataFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
+    // Any files in the source that are not in the target are added
+    Set<OneDataFile> addedFiles = source.stream().map(file -> {
+      OneDataFile targetFileIfPresent = targetPaths.remove(file.getPhysicalPath());
+      return targetFileIfPresent == null ? file : null;
+    }).filter(Objects::nonNull).collect(Collectors.toSet());
+    // Any files remaining in the targetPaths map are not present in the source and should be marked for removal
+    Set<OneDataFile> removedFiles = new HashSet<>(targetPaths.values());
+    return OneDataFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
   }
 }

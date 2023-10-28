@@ -41,13 +41,13 @@ import io.onetable.model.stat.Range;
 public class OneDataFile {
   // written schema version
   SchemaVersion schemaVersion;
-  // physical path of the file
+  // physical path of the file (absolute)
   @NonNull String physicalPath;
   // file format
   @Builder.Default @NonNull FileFormat fileFormat = FileFormat.APACHE_PARQUET;
   // partition ranges for the data file
   @Builder.Default @NonNull
-  Map<OnePartitionField, Range> partitionValues = Collections.emptyMap(); // Partition path
+  Map<OnePartitionField, Range> partitionValues = Collections.emptyMap();
 
   String partitionPath;
   long fileSizeBytes;

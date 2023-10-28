@@ -71,7 +71,7 @@ import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
-import io.onetable.model.storage.FileGroup;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.testutil.Issues;
@@ -181,7 +181,7 @@ public class ITDeltaSourceClient {
     columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().getFileGroups().size());
     validatePartitionDataFiles(
-        FileGroup.builder()
+        OneFileGroup.builder()
             .files(
                 Collections.singletonList(
                     OneDataFile.builder()
@@ -263,7 +263,7 @@ public class ITDeltaSourceClient {
                 .build(),
             Range.scalar("SingleValue"));
     validatePartitionDataFiles(
-        FileGroup.builder()
+        OneFileGroup.builder()
             .partitionValues(partitionValue)
             .files(
                 Collections.singletonList(
@@ -608,7 +608,7 @@ public class ITDeltaSourceClient {
   }
 
   private void validatePartitionDataFiles(
-      FileGroup expectedPartitionFiles, FileGroup actualPartitionFiles) throws URISyntaxException {
+      OneFileGroup expectedPartitionFiles, OneFileGroup actualPartitionFiles) throws URISyntaxException {
     assertEquals(
         expectedPartitionFiles.getPartitionValues(), actualPartitionFiles.getPartitionValues());
     validateDataFiles(expectedPartitionFiles.getFiles(), actualPartitionFiles.getFiles());

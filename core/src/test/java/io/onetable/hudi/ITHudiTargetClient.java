@@ -83,7 +83,7 @@ import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
-import io.onetable.model.storage.FileGroup;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.PartitionedDataFiles;
@@ -228,7 +228,7 @@ public class ITHudiTargetClient {
     PartitionedDataFiles snapshot =
         PartitionedDataFiles.of(
             Collections.singletonList(
-                FileGroup.builder()
+                OneFileGroup.builder()
                     .files(Collections.singletonList(getTestFile(partitionPath, fileName)))
                     .partitionValues(
                         Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
@@ -267,7 +267,7 @@ public class ITHudiTargetClient {
     PartitionedDataFiles snapshot =
         PartitionedDataFiles.of(
             Collections.singletonList(
-                FileGroup.builder()
+                OneFileGroup.builder()
                     .files(
                         Arrays.asList(
                             getTestFile(partitionPath, fileName0),

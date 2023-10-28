@@ -33,11 +33,11 @@ import io.onetable.model.stat.Range;
 @Value
 @AllArgsConstructor(staticName = "of")
 public class PartitionedDataFiles {
-  List<FileGroup> fileGroups;
+  List<OneFileGroup> fileGroups;
 
   public List<OneDataFile> getAllFiles() {
     return fileGroups.stream()
-        .map(FileGroup::getFiles)
+        .map(OneFileGroup::getFiles)
         .flatMap(List::stream)
         .collect(Collectors.toList());
   }
@@ -53,7 +53,7 @@ public class PartitionedDataFiles {
         filesGrouped.entrySet().stream()
             .map(
                 entry ->
-                    FileGroup.builder()
+                    OneFileGroup.builder()
                         .partitionValues(entry.getKey())
                         .files(entry.getValue())
                         .build())

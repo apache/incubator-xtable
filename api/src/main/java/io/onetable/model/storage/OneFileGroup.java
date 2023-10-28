@@ -30,7 +30,7 @@ import io.onetable.model.stat.Range;
 /** Represents a grouping of {@link OneDataFile} with the same partition values. */
 @Value
 @Builder
-public class FileGroup {
+public class OneFileGroup {
   Map<OnePartitionField, Range> partitionValues;
   List<OneDataFile> files;
 }

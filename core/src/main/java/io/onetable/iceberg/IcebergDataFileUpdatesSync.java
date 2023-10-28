@@ -61,7 +61,7 @@ public class IcebergDataFileUpdatesSync {
 
     // Sync the files diff
     OneDataFilesDiff filesDiff =
-        OneDataFilesDiff.from(currentDataFiles, partitionedDataFiles.getAllFiles());
+        OneDataFilesDiff.from(partitionedDataFiles.getAllFiles(), currentDataFiles);
     applyDiff(transaction, filesDiff, schema, partitionSpec);
   }
 
