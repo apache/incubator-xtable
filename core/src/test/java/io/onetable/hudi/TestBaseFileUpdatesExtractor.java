@@ -60,6 +60,7 @@ import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
+import io.onetable.model.storage.FileGroup;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.PartitionedDataFiles;
@@ -193,12 +194,12 @@ public class TestBaseFileUpdatesExtractor {
     PartitionedDataFiles partitionedDataFiles =
         PartitionedDataFiles.of(
             Arrays.asList(
-                PartitionedDataFiles.PartitionFileGroup.builder()
+                FileGroup.builder()
                     .partitionValues(
                         Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath1)))
                     .files(Arrays.asList(addedFile1, addedFile2))
                     .build(),
-                PartitionedDataFiles.PartitionFileGroup.builder()
+                FileGroup.builder()
                     .partitionValues(
                         Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
                     .files(Arrays.asList(addedFile3))
@@ -280,12 +281,12 @@ public class TestBaseFileUpdatesExtractor {
     PartitionedDataFiles partitionedDataFiles =
         PartitionedDataFiles.of(
             Arrays.asList(
-                PartitionedDataFiles.PartitionFileGroup.builder()
+                FileGroup.builder()
                     .files(Arrays.asList(addedFile1, existingFile))
                     .partitionValues(
                         Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
                     .build(),
-                PartitionedDataFiles.PartitionFileGroup.builder()
+                FileGroup.builder()
                     .files(Collections.singletonList(addedFile2))
                     .partitionValues(
                         Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath3)))
@@ -358,7 +359,7 @@ public class TestBaseFileUpdatesExtractor {
     PartitionedDataFiles partitionedDataFiles =
         PartitionedDataFiles.of(
             Collections.singletonList(
-                PartitionedDataFiles.PartitionFileGroup.builder()
+                FileGroup.builder()
                     .files(Arrays.asList(addedFile1, existingFile))
                     .partitionValues(Collections.emptyMap())
                     .build()));

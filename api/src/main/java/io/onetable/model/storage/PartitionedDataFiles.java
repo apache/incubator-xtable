@@ -24,28 +24,20 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Value;
 
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.stat.Range;
 
-/** Represents a grouping of {@link OneDataFile} with the same partition values. */
+/** Represents all the data files in a table, partitioned by partition values. */
 @Value
 @AllArgsConstructor(staticName = "of")
 public class PartitionedDataFiles {
-  List<PartitionFileGroup> partitions;
-
-  @Value
-  @Builder
-  public static class PartitionFileGroup {
-    Map<OnePartitionField, Range> partitionValues;
-    List<OneDataFile> files;
-  }
+  List<FileGroup> fileGroups;
 
   public List<OneDataFile> getAllFiles() {
-    return partitions.stream()
-        .map(PartitionFileGroup::getFiles)
+    return fileGroups.stream()
+        .map(FileGroup::getFiles)
         .flatMap(List::stream)
         .collect(Collectors.toList());
   }
@@ -61,7 +53,7 @@ public class PartitionedDataFiles {
         filesGrouped.entrySet().stream()
             .map(
                 entry ->
-                    PartitionFileGroup.builder()
+                    FileGroup.builder()
                         .partitionValues(entry.getKey())
                         .files(entry.getValue())
                         .build())

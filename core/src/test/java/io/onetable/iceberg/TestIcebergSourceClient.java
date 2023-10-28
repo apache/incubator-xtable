@@ -53,8 +53,8 @@ import io.onetable.model.TableChange;
 import io.onetable.model.schema.*;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
+import io.onetable.model.storage.FileGroup;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.model.storage.TableFormat;
 
 class TestIcebergSourceClient {
@@ -166,10 +166,9 @@ class TestIcebergSourceClient {
     verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any(), any());
 
     Assertions.assertNotNull(oneSnapshot.getPartitionedDataFiles());
-    List<PartitionedDataFiles.PartitionFileGroup> dataFileChunks =
-        oneSnapshot.getPartitionedDataFiles().getPartitions();
+    List<FileGroup> dataFileChunks = oneSnapshot.getPartitionedDataFiles().getFileGroups();
     Assertions.assertEquals(5, dataFileChunks.size());
-    for (PartitionedDataFiles.PartitionFileGroup dataFilesChunk : dataFileChunks) {
+    for (FileGroup dataFilesChunk : dataFileChunks) {
       List<OneDataFile> oneDataFiles = dataFilesChunk.getFiles();
       Assertions.assertEquals(1, oneDataFiles.size());
       OneDataFile oneDataFile = oneDataFiles.get(0);

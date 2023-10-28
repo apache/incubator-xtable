@@ -91,7 +91,7 @@ public class BaseFileUpdatesExtractor {
             FSUtils.getAllPartitionPaths(
                 engineContext, metadataConfig, metaClient.getBasePathV2().toString()));
     ReplaceMetadata replaceMetadata =
-        partitionedDataFiles.getPartitions().stream()
+        partitionedDataFiles.getFileGroups().stream()
             .map(
                 partitionFileGroup -> {
                   List<OneDataFile> dataFiles = partitionFileGroup.getFiles();
