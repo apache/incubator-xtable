@@ -25,8 +25,8 @@ import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.OneFileGroup;
 
 /** A client that provides the major functionality for syncing changes to a target system. */
 public interface TargetClient {
@@ -57,9 +57,9 @@ public interface TargetClient {
    * Syncs the provided snapshot files to the target system. This method is required to both add and
    * remove files.
    *
-   * @param snapshotFiles the files to sync
+   * @param partitionedDataFiles the files to sync, grouped by partition
    */
-  void syncFilesForSnapshot(OneDataFiles snapshotFiles);
+  void syncFilesForSnapshot(List<OneFileGroup> partitionedDataFiles);
 
   /**
    * Syncs the changes in files to the target system. This method is required to both add and remove

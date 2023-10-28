@@ -89,8 +89,8 @@ import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.spi.sync.TargetClient;
 
 @Log4j2
@@ -220,10 +220,10 @@ public class HudiTargetClient implements TargetClient {
   }
 
   @Override
-  public void syncFilesForSnapshot(OneDataFiles snapshotFiles) {
+  public void syncFilesForSnapshot(List<OneFileGroup> partitionedDataFiles) {
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         baseFileUpdatesExtractor.extractSnapshotChanges(
-            snapshotFiles, getMetaClient(), commitState.getInstantTime());
+            partitionedDataFiles, getMetaClient(), commitState.getInstantTime());
     commitState.setReplaceMetadata(replaceMetadata);
   }
 
