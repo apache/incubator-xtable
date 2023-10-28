@@ -47,8 +47,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.api.parallel.Execution;
-import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -76,7 +74,6 @@ import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.testutil.Issues;
 
-@Execution(ExecutionMode.SAME_THREAD)
 public class ITDeltaSourceClient {
 
   private static final OneField COL1_INT_FIELD =
