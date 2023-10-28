@@ -49,8 +49,8 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.OneFileGroup;
 
 /**
  * Unit tests that focus on the basic control flow of the HudiTargetClient. Functional tests are in
@@ -223,7 +223,7 @@ public class TestHudiTargetClient {
     HudiTargetClient.CommitState mockCommitState = mocks.getLeft();
     HoodieTableMetaClient mockMetaClient = mocks.getRight();
     String instant = "commit";
-    OneDataFiles input = OneDataFiles.collectionBuilder().build();
+    List<OneFileGroup> input = Collections.emptyList();
     BaseFileUpdatesExtractor.ReplaceMetadata output =
         BaseFileUpdatesExtractor.ReplaceMetadata.of(
             Collections.emptyMap(), Collections.emptyList());

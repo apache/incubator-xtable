@@ -73,6 +73,7 @@ import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieCleanConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.hadoop.CachingPath;
 import org.apache.hudi.metadata.HoodieTableMetadataWriter;
 import org.apache.hudi.table.HoodieJavaTable;
 import org.apache.hudi.table.action.clean.CleanPlanner;
@@ -88,8 +89,8 @@ import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.spi.sync.TargetClient;
 
 @Log4j2
@@ -109,7 +110,8 @@ public class HudiTargetClient implements TargetClient {
         perTableConfig.getTargetMetadataRetentionInHours(),
         HoodieMetadataConfig.COMPACT_NUM_DELTA_COMMITS.defaultValue(),
         BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(configuration), perTableConfig.getTableBasePath()),
+            new HoodieJavaEngineContext(configuration),
+            new CachingPath(perTableConfig.getTableBasePath())),
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);
@@ -125,7 +127,8 @@ public class HudiTargetClient implements TargetClient {
         perTableConfig.getTargetMetadataRetentionInHours(),
         maxNumDeltaCommitsBeforeCompaction,
         BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(configuration), perTableConfig.getTableBasePath()),
+            new HoodieJavaEngineContext(configuration),
+            new CachingPath(perTableConfig.getTableBasePath())),
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);
@@ -217,10 +220,10 @@ public class HudiTargetClient implements TargetClient {
   }
 
   @Override
-  public void syncFilesForSnapshot(OneDataFiles snapshotFiles) {
+  public void syncFilesForSnapshot(List<OneFileGroup> partitionedDataFiles) {
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         baseFileUpdatesExtractor.extractSnapshotChanges(
-            snapshotFiles, getMetaClient(), commitState.getInstantTime());
+            partitionedDataFiles, getMetaClient(), commitState.getInstantTime());
     commitState.setReplaceMetadata(replaceMetadata);
   }
 

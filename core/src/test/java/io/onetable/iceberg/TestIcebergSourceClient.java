@@ -50,7 +50,7 @@ import io.onetable.model.schema.*;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
 
 class TestIcebergSourceClient {
@@ -161,14 +161,13 @@ class TestIcebergSourceClient {
     verify(spyPartitionConverter, times(5)).toOneTable(any(), any());
     verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any(), any());
 
-    Assertions.assertNotNull(oneSnapshot.getDataFiles());
-    List<OneDataFile> dataFileChunks = oneSnapshot.getDataFiles().getFiles();
+    Assertions.assertNotNull(oneSnapshot.getPartitionedDataFiles());
+    List<OneFileGroup> dataFileChunks = oneSnapshot.getPartitionedDataFiles();
     Assertions.assertEquals(5, dataFileChunks.size());
-    for (OneDataFile dataFilesChunk : dataFileChunks) {
-      Assertions.assertInstanceOf(OneDataFiles.class, dataFilesChunk);
-      OneDataFiles oneDataFiles = (OneDataFiles) dataFilesChunk;
-      Assertions.assertEquals(1, oneDataFiles.getFiles().size());
-      OneDataFile oneDataFile = oneDataFiles.getFiles().get(0);
+    for (OneFileGroup dataFilesChunk : dataFileChunks) {
+      List<OneDataFile> oneDataFiles = dataFilesChunk.getFiles();
+      Assertions.assertEquals(1, oneDataFiles.size());
+      OneDataFile oneDataFile = oneDataFiles.get(0);
       Assertions.assertEquals(FileFormat.APACHE_PARQUET, oneDataFile.getFileFormat());
       Assertions.assertEquals(1, oneDataFile.getRecordCount());
       Assertions.assertTrue(oneDataFile.getPhysicalPath().startsWith(workingDir.toString()));

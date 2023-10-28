@@ -66,6 +66,7 @@ import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 import com.google.common.base.Preconditions;
 
 public class TestJavaHudiTable extends TestAbstractHudiTable {
+
   private HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
   private final Configuration conf;
   /**

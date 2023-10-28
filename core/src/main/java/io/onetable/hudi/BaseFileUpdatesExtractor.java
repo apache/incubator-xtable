@@ -48,16 +48,15 @@ import org.apache.hudi.common.model.HoodieDeltaWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
+import org.apache.hudi.hadoop.CachingPath;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
-import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.spi.DefaultSnapshotVisitor;
+import io.onetable.model.storage.OneFileGroup;
 
 @AllArgsConstructor(staticName = "of")
 public class BaseFileUpdatesExtractor {
@@ -65,19 +64,18 @@ public class BaseFileUpdatesExtractor {
       Pattern.compile(
           "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9]_[0-9a-fA-F-]+_[0-9]+\\.");
   private final HoodieEngineContext engineContext;
-  private final String tableBasePath;
+  private final Path tableBasePath;
 
   /**
    * Extracts the changes between the snapshot files and the base files in the Hudi table currently.
    *
-   * @param snapshotFiles the snapshot files, assumes that they are grouped by partition like {@link
-   *     io.onetable.spi.extractor.SourceClient#getFilesForAllPartitions(Object, OneTable)} returns.
+   * @param partitionedDataFiles files grouped by partition to sync
    * @param metaClient the meta client for the Hudi table with the latest timeline state loaded
    * @param commit The current commit started by the Hudi client
    * @return The information needed to create a "replace" commit for the Hudi table
    */
   ReplaceMetadata extractSnapshotChanges(
-      OneDataFiles snapshotFiles, HoodieTableMetaClient metaClient, String commit) {
+      List<OneFileGroup> partitionedDataFiles, HoodieTableMetaClient metaClient, String commit) {
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(metaClient.getTableConfig().isMetadataTableAvailable())
@@ -85,6 +83,7 @@ public class BaseFileUpdatesExtractor {
     HoodieTableFileSystemView fsView =
         new HoodieMetadataFileSystemView(
             engineContext, metaClient, metaClient.getActiveTimeline(), metadataConfig);
+    boolean isTableInitialized = metaClient.isTimelineNonEmpty();
     // Track the partitions that are not present in the snapshot, so the files for those partitions
     // can be dropped
     Set<String> partitionPathsToDrop =
@@ -92,23 +91,24 @@ public class BaseFileUpdatesExtractor {
             FSUtils.getAllPartitionPaths(
                 engineContext, metadataConfig, metaClient.getBasePathV2().toString()));
     ReplaceMetadata replaceMetadata =
-        snapshotFiles.getFiles().stream()
+        partitionedDataFiles.stream()
             .map(
-                file -> {
+                partitionFileGroup -> {
+                  List<OneDataFile> dataFiles = partitionFileGroup.getFiles();
+                  String partitionPath = getPartitionPath(tableBasePath, dataFiles);
                   // remove the partition from the set of partitions to drop since it is present in
                   // the snapshot
-                  partitionPathsToDrop.remove(file.getPartitionPath());
+                  partitionPathsToDrop.remove(partitionPath);
                   // create a map of file path to the data file, any entries not in the hudi table
                   // will be added
                   Map<String, OneDataFile> physicalPathToFile =
-                      DefaultSnapshotVisitor.extractDataFilePaths(
-                          OneDataFiles.collectionBuilder()
-                              .files(Collections.singletonList(file))
-                              .build());
+                      dataFiles.stream()
+                          .collect(
+                              Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
                   List<HoodieBaseFile> baseFiles =
-                      fsView
-                          .getLatestBaseFiles(file.getPartitionPath())
-                          .collect(Collectors.toList());
+                      isTableInitialized
+                          ? fsView.getLatestBaseFiles(partitionPath).collect(Collectors.toList())
+                          : Collections.emptyList();
                   Set<String> existingPaths =
                       baseFiles.stream().map(HoodieBaseFile::getPath).collect(Collectors.toSet());
                   // Mark fileIds for removal if the file paths are no longer present in the
@@ -127,12 +127,15 @@ public class BaseFileUpdatesExtractor {
                           .map(
                               snapshotFile ->
                                   toWriteStatus(
-                                      metaClient.getBasePathV2().toString(), commit, snapshotFile))
+                                      tableBasePath,
+                                      commit,
+                                      snapshotFile,
+                                      Optional.of(partitionPath)))
                           .collect(Collectors.toList());
                   return ReplaceMetadata.of(
                       fileIdsToRemove.isEmpty()
                           ? Collections.emptyMap()
-                          : Collections.singletonMap(file.getPartitionPath(), fileIdsToRemove),
+                          : Collections.singletonMap(partitionPath, fileIdsToRemove),
                       writeStatuses);
                 })
             .reduce(ReplaceMetadata::combine)
@@ -152,6 +155,7 @@ public class BaseFileUpdatesExtractor {
                       Collections.emptyList());
                 })
             .reduce(ReplaceMetadata::combine);
+    fsView.close();
     return droppedPartitions.map(replaceMetadata::combine).orElse(replaceMetadata);
   }
 
@@ -166,20 +170,21 @@ public class BaseFileUpdatesExtractor {
     // For all removed files, group by partition and extract the file id
     Map<String, List<String>> partitionToReplacedFileIds =
         oneDataFilesDiff.getFilesRemoved().stream()
+            .map(file -> new CachingPath(file.getPhysicalPath()))
             .collect(
                 Collectors.groupingBy(
-                    OneDataFile::getPartitionPath,
+                    path -> getPartitionPath(tableBasePath, path),
                     Collectors.mapping(this::getFileId, Collectors.toList())));
     // For all added files, group by partition and extract the file id
     List<WriteStatus> writeStatuses =
         oneDataFilesDiff.getFilesAdded().stream()
-            .map(file -> toWriteStatus(tableBasePath, commit, file))
+            .map(file -> toWriteStatus(tableBasePath, commit, file, Optional.empty()))
             .collect(Collectors.toList());
     return ReplaceMetadata.of(partitionToReplacedFileIds, writeStatuses);
   }
 
-  private String getFileId(OneDataFile file) {
-    String fileName = new Path(file.getPhysicalPath()).getName();
+  private String getFileId(Path filePath) {
+    String fileName = filePath.getName();
     // if file was created by Hudi use original fileId, otherwise use the file name as IDs
     if (isFileCreatedByHudiWriter(fileName)) {
       return FSUtils.getFileId(fileName);
@@ -198,18 +203,25 @@ public class BaseFileUpdatesExtractor {
     return HUDI_BASE_FILE_PATTERN.matcher(fileName).find();
   }
 
-  private WriteStatus toWriteStatus(String tableBasePath, String commitTime, OneDataFile file) {
+  private WriteStatus toWriteStatus(
+      Path tableBasePath,
+      String commitTime,
+      OneDataFile file,
+      Optional<String> partitionPathOptional) {
     WriteStatus writeStatus = new WriteStatus();
-    String fileId = getFileId(file);
-    String filePath = file.getPhysicalPath().substring(tableBasePath.length() + 1);
-    String fileName = filePath.substring(file.getPartitionPath().length() + 1);
+    Path path = new CachingPath(file.getPhysicalPath());
+    String partitionPath =
+        partitionPathOptional.orElseGet(() -> getPartitionPath(tableBasePath, path));
+    String fileId = getFileId(path);
+    String filePath = file.getPhysicalPath().substring(tableBasePath.toString().length() + 1);
+    String fileName = path.getName();
     writeStatus.setFileId(fileId);
-    writeStatus.setPartitionPath(file.getPartitionPath());
+    writeStatus.setPartitionPath(partitionPath);
     HoodieDeltaWriteStat writeStat = new HoodieDeltaWriteStat();
     writeStat.setFileId(fileId);
     writeStat.setPath(
         ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(filePath, commitTime));
-    writeStat.setPartitionPath(file.getPartitionPath());
+    writeStat.setPartitionPath(partitionPath);
     writeStat.setNumWrites(file.getRecordCount());
     writeStat.setTotalWriteBytes(file.getFileSizeBytes());
     writeStat.setFileSizeInBytes(file.getFileSizeBytes());
@@ -257,5 +269,17 @@ public class BaseFileUpdatesExtractor {
       writeStatuses.addAll(other.writeStatuses);
       return ReplaceMetadata.of(partitionToReplacedFileIds, writeStatuses);
     }
+  }
+
+  private String getPartitionPath(Path tableBasePath, List<OneDataFile> files) {
+    return getPartitionPath(tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
+  }
+
+  private String getPartitionPath(Path tableBasePath, Path filePath) {
+    String fileName = filePath.getName();
+    String pathStr = filePath.toString();
+    int startIndex = tableBasePath.toString().length() + 1;
+    int endIndex = pathStr.length() - fileName.length() - 1;
+    return endIndex <= startIndex ? "" : pathStr.substring(startIndex, endIndex);
   }
 }
