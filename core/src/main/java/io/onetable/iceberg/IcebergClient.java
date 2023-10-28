@@ -42,7 +42,7 @@ import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.model.storage.PartitionedDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.spi.sync.TargetClient;
 
 public class IcebergClient implements TargetClient {
@@ -159,7 +159,7 @@ public class IcebergClient implements TargetClient {
   }
 
   @Override
-  public void syncFilesForSnapshot(PartitionedDataFiles partitionedDataFiles) {
+  public void syncFilesForSnapshot(List<OneFileGroup> partitionedDataFiles) {
     dataFileUpdatesExtractor.applySnapshot(
         table,
         transaction,

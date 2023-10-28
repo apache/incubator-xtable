@@ -86,7 +86,6 @@ import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
-import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.sync.TargetClient;
 
@@ -225,14 +224,13 @@ public class ITHudiTargetClient {
     String partitionPath = "partition_path";
     String fileName = "file_1.parquet";
     String filePath = getFilePath(partitionPath, fileName);
-    PartitionedDataFiles snapshot =
-        PartitionedDataFiles.of(
-            Collections.singletonList(
-                OneFileGroup.builder()
-                    .files(Collections.singletonList(getTestFile(partitionPath, fileName)))
-                    .partitionValues(
-                        Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
-                    .build()));
+    List<OneFileGroup> snapshot =
+        Collections.singletonList(
+            OneFileGroup.builder()
+                .files(Collections.singletonList(getTestFile(partitionPath, fileName)))
+                .partitionValues(
+                    Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
+                .build());
     // sync snapshot and metadata
     OneTable initialState = getState(Instant.now());
     HudiTargetClient targetClient = getTargetClient();
@@ -264,17 +262,16 @@ public class ITHudiTargetClient {
 
     String fileName1 = "file_1.parquet";
     String filePath1 = getFilePath(partitionPath, fileName1);
-    PartitionedDataFiles snapshot =
-        PartitionedDataFiles.of(
-            Collections.singletonList(
-                OneFileGroup.builder()
-                    .files(
-                        Arrays.asList(
-                            getTestFile(partitionPath, fileName0),
-                            getTestFile(partitionPath, fileName1)))
-                    .partitionValues(
-                        Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
-                    .build()));
+    List<OneFileGroup> snapshot =
+        Collections.singletonList(
+            OneFileGroup.builder()
+                .files(
+                    Arrays.asList(
+                        getTestFile(partitionPath, fileName0),
+                        getTestFile(partitionPath, fileName1)))
+                .partitionValues(
+                    Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
+                .build());
     // sync snapshot and metadata
     OneTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));
     HudiTargetClient targetClient = getTargetClient();

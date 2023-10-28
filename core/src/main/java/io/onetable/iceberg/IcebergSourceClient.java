@@ -46,7 +46,7 @@ import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.model.storage.PartitionedDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.extractor.SourceClient;
 
@@ -134,7 +134,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
     TableScan scan = iceTable.newScan().useSnapshot(currentSnapshot.snapshotId());
     PartitionSpec partitionSpec = iceTable.spec();
-    PartitionedDataFiles partitionedDataFiles;
+    List<OneFileGroup> partitionedDataFiles;
     try (CloseableIterable<FileScanTask> files = scan.planFiles()) {
       List<OneDataFile> irFiles = new ArrayList<>();
       for (FileScanTask fileScanTask : files) {
@@ -142,7 +142,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         OneDataFile irDataFile = fromIceberg(file, partitionSpec, irTable.getReadSchema());
         irFiles.add(irDataFile);
       }
-      partitionedDataFiles = PartitionedDataFiles.fromFiles(irFiles);
+      partitionedDataFiles = OneFileGroup.fromFiles(irFiles);
     } catch (IOException e) {
       throw new OneIOException("Failed to fetch current snapshot files from Iceberg source", e);
     }

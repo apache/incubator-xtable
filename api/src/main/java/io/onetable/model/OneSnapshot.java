@@ -26,7 +26,7 @@ import lombok.Builder;
 import lombok.Value;
 
 import io.onetable.model.schema.SchemaCatalog;
-import io.onetable.model.storage.PartitionedDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 
 /**
  * Snapshot represents the view of the table at a specific point in time. Snapshot captures all the
@@ -47,7 +47,7 @@ public class OneSnapshot {
   // Schema catalog referencing the written schema for each data file in the snapshot
   SchemaCatalog schemaCatalog;
   // Data files grouped by partition
-  PartitionedDataFiles partitionedDataFiles;
+  List<OneFileGroup> partitionedDataFiles;
   // pending commits before latest commit on the table.
   @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
 }

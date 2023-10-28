@@ -69,7 +69,7 @@ import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.model.storage.PartitionedDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 
 /** Extracts all the files for Hudi table represented by {@link OneTable}. */
 public class HudiDataFileExtractor implements AutoCloseable {
@@ -111,7 +111,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
     this.fileStatsExtractor = hudiFileStatsExtractor;
   }
 
-  public PartitionedDataFiles getFilesCurrentState(OneTable table) {
+  public List<OneFileGroup> getFilesCurrentState(OneTable table) {
     try {
       List<String> allPartitionPaths =
           tableMetadata != null
@@ -345,7 +345,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
   }
 
-  private PartitionedDataFiles getOneDataFilesForPartitions(
+  private List<OneFileGroup> getOneDataFilesForPartitions(
       List<String> partitionPaths, OneTable table) {
 
     SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
@@ -365,7 +365,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                 });
     Stream<OneDataFile> files =
         fileStatsExtractor.addStatsToFiles(tableMetadata, filesWithoutStats, table.getReadSchema());
-    return PartitionedDataFiles.fromFiles(files);
+    return OneFileGroup.fromFiles(files);
   }
 
   @Override

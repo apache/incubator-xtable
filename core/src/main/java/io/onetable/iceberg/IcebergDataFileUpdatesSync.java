@@ -20,6 +20,7 @@ package io.onetable.iceberg;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import lombok.AllArgsConstructor;
 
@@ -36,7 +37,7 @@ import io.onetable.exception.NotSupportedException;
 import io.onetable.exception.OneIOException;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.model.storage.PartitionedDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.spi.extractor.DataFileIterator;
 
 @AllArgsConstructor(staticName = "of")
@@ -47,7 +48,7 @@ public class IcebergDataFileUpdatesSync {
   public void applySnapshot(
       Table table,
       Transaction transaction,
-      PartitionedDataFiles partitionedDataFiles,
+      List<OneFileGroup> partitionedDataFiles,
       Schema schema,
       PartitionSpec partitionSpec) {
     List<OneDataFile> currentDataFiles = new ArrayList<>();
@@ -61,7 +62,11 @@ public class IcebergDataFileUpdatesSync {
 
     // Sync the files diff
     OneDataFilesDiff filesDiff =
-        OneDataFilesDiff.from(partitionedDataFiles.getAllFiles(), currentDataFiles);
+        OneDataFilesDiff.from(
+            partitionedDataFiles.stream()
+                .flatMap(group -> group.getFiles().stream())
+                .collect(Collectors.toList()),
+            currentDataFiles);
     applyDiff(transaction, filesDiff, schema, partitionSpec);
   }
 

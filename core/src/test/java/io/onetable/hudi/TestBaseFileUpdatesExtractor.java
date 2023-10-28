@@ -63,7 +63,6 @@ import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
-import io.onetable.model.storage.PartitionedDataFiles;
 
 public class TestBaseFileUpdatesExtractor {
   @TempDir public static java.nio.file.Path tempDir;
@@ -191,19 +190,18 @@ public class TestBaseFileUpdatesExtractor {
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
 
-    PartitionedDataFiles partitionedDataFiles =
-        PartitionedDataFiles.of(
-            Arrays.asList(
-                OneFileGroup.builder()
-                    .partitionValues(
-                        Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath1)))
-                    .files(Arrays.asList(addedFile1, addedFile2))
-                    .build(),
-                OneFileGroup.builder()
-                    .partitionValues(
-                        Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
-                    .files(Arrays.asList(addedFile3))
-                    .build()));
+    List<OneFileGroup> partitionedDataFiles =
+        Arrays.asList(
+            OneFileGroup.builder()
+                .partitionValues(
+                    Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath1)))
+                .files(Arrays.asList(addedFile1, addedFile2))
+                .build(),
+            OneFileGroup.builder()
+                .partitionValues(
+                    Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
+                .files(Arrays.asList(addedFile3))
+                .build());
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         extractor.extractSnapshotChanges(partitionedDataFiles, metaClient, COMMIT_TIME);
 
@@ -278,19 +276,18 @@ public class TestBaseFileUpdatesExtractor {
             partitionPath2,
             String.format("%s/%s/%s", tableBasePath, partitionPath2, existingFileName2),
             Collections.emptyMap());
-    PartitionedDataFiles partitionedDataFiles =
-        PartitionedDataFiles.of(
-            Arrays.asList(
-                OneFileGroup.builder()
-                    .files(Arrays.asList(addedFile1, existingFile))
-                    .partitionValues(
-                        Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
-                    .build(),
-                OneFileGroup.builder()
-                    .files(Collections.singletonList(addedFile2))
-                    .partitionValues(
-                        Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath3)))
-                    .build()));
+    List<OneFileGroup> partitionedDataFiles =
+        Arrays.asList(
+            OneFileGroup.builder()
+                .files(Arrays.asList(addedFile1, existingFile))
+                .partitionValues(
+                    Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
+                .build(),
+            OneFileGroup.builder()
+                .files(Collections.singletonList(addedFile2))
+                .partitionValues(
+                    Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath3)))
+                .build());
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
@@ -356,13 +353,12 @@ public class TestBaseFileUpdatesExtractor {
     OneDataFile existingFile =
         createFile(
             "", String.format("%s/%s", tableBasePath, existingFileName2), Collections.emptyMap());
-    PartitionedDataFiles partitionedDataFiles =
-        PartitionedDataFiles.of(
-            Collections.singletonList(
-                OneFileGroup.builder()
-                    .files(Arrays.asList(addedFile1, existingFile))
-                    .partitionValues(Collections.emptyMap())
-                    .build()));
+    List<OneFileGroup> partitionedDataFiles =
+        Collections.singletonList(
+            OneFileGroup.builder()
+                .files(Arrays.asList(addedFile1, existingFile))
+                .partitionValues(Collections.emptyMap())
+                .build());
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =

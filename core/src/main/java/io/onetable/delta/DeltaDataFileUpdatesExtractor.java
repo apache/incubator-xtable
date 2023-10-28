@@ -43,7 +43,7 @@ import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.model.storage.PartitionedDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.spi.extractor.DataFileIterator;
 
 @Builder
@@ -60,13 +60,17 @@ public class DeltaDataFileUpdatesExtractor {
       DeltaDataFileExtractor.builder().build();
 
   public Seq<Action> applySnapshot(
-      DeltaLog deltaLog, PartitionedDataFiles partitionedDataFiles, OneSchema tableSchema) {
+      DeltaLog deltaLog, List<OneFileGroup> partitionedDataFiles, OneSchema tableSchema) {
     List<OneDataFile> currentDataFiles = new ArrayList<>();
     try (DataFileIterator fileIterator =
         deltaDataFileExtractor.iteratorWithoutStats(deltaLog.snapshot(), tableSchema)) {
       fileIterator.forEachRemaining(currentDataFiles::add);
       OneDataFilesDiff filesDiff =
-          OneDataFilesDiff.from(partitionedDataFiles.getAllFiles(), currentDataFiles);
+          OneDataFilesDiff.from(
+              partitionedDataFiles.stream()
+                  .flatMap(group -> group.getFiles().stream())
+                  .collect(Collectors.toList()),
+              currentDataFiles);
       return applyDiff(filesDiff, tableSchema, deltaLog.dataPath().toString());
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Delta data files", e);

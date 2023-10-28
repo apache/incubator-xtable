@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -42,7 +43,7 @@ import io.onetable.model.TableChange;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.model.storage.PartitionedDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 
 public class TestExtractFromSource {
   private final SourceClient<TestCommit> mockSourceClient = mock(SourceClient.class);
@@ -51,7 +52,7 @@ public class TestExtractFromSource {
   public void extractSnapshot() {
     OneTable table = OneTable.builder().latestCommitTime(Instant.now()).build();
     SchemaCatalog schemaCatalog = new SchemaCatalog(Collections.emptyMap());
-    PartitionedDataFiles dataFiles = PartitionedDataFiles.of(Collections.emptyList());
+    List<OneFileGroup> dataFiles = Collections.emptyList();
     OneSnapshot oneSnapshot =
         OneSnapshot.builder()
             .schemaCatalog(schemaCatalog)

@@ -54,7 +54,7 @@ import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.model.storage.PartitionedDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.spi.extractor.DataFileIterator;
 import io.onetable.spi.extractor.SourceClient;
 
@@ -172,11 +172,11 @@ public class DeltaSourceClient implements SourceClient<Long> {
                 .build());
   }
 
-  private PartitionedDataFiles getOneDataFiles(Snapshot snapshot, OneSchema schema) {
+  private List<OneFileGroup> getOneDataFiles(Snapshot snapshot, OneSchema schema) {
     try (DataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
       List<OneDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);
-      return PartitionedDataFiles.fromFiles(dataFiles);
+      return OneFileGroup.fromFiles(dataFiles);
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Delta data files", e);
     }

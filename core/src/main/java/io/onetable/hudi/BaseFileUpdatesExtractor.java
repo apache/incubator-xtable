@@ -56,7 +56,7 @@ import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.model.storage.PartitionedDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 
 @AllArgsConstructor(staticName = "of")
 public class BaseFileUpdatesExtractor {
@@ -75,7 +75,7 @@ public class BaseFileUpdatesExtractor {
    * @return The information needed to create a "replace" commit for the Hudi table
    */
   ReplaceMetadata extractSnapshotChanges(
-      PartitionedDataFiles partitionedDataFiles, HoodieTableMetaClient metaClient, String commit) {
+      List<OneFileGroup> partitionedDataFiles, HoodieTableMetaClient metaClient, String commit) {
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(metaClient.getTableConfig().isMetadataTableAvailable())
@@ -91,7 +91,7 @@ public class BaseFileUpdatesExtractor {
             FSUtils.getAllPartitionPaths(
                 engineContext, metadataConfig, metaClient.getBasePathV2().toString()));
     ReplaceMetadata replaceMetadata =
-        partitionedDataFiles.getFileGroups().stream()
+        partitionedDataFiles.stream()
             .map(
                 partitionFileGroup -> {
                   List<OneDataFile> dataFiles = partitionFileGroup.getFiles();

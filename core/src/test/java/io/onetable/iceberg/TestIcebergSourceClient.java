@@ -166,7 +166,7 @@ class TestIcebergSourceClient {
     verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any(), any());
 
     Assertions.assertNotNull(oneSnapshot.getPartitionedDataFiles());
-    List<OneFileGroup> dataFileChunks = oneSnapshot.getPartitionedDataFiles().getFileGroups();
+    List<OneFileGroup> dataFileChunks = oneSnapshot.getPartitionedDataFiles();
     Assertions.assertEquals(5, dataFileChunks.size());
     for (OneFileGroup dataFilesChunk : dataFileChunks) {
       List<OneDataFile> oneDataFiles = dataFilesChunk.getFiles();

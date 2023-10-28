@@ -89,7 +89,7 @@ import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.PartitionedDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.schema.SchemaFieldFinder;
 import io.onetable.spi.sync.TableFormatSync;
@@ -606,7 +606,7 @@ public class TestIcebergSync {
     return OneSnapshot.builder()
         .table(table)
         .schemaCatalog(SchemaCatalog.builder().schemas(schemas).build())
-        .partitionedDataFiles(PartitionedDataFiles.fromFiles(Arrays.asList(dataFiles)))
+        .partitionedDataFiles(OneFileGroup.fromFiles(Arrays.asList(dataFiles)))
         .build();
   }
 

@@ -179,7 +179,7 @@ public class ITDeltaSourceClient {
     Map<OneField, ColumnStat> columnStats = new HashMap<>();
     columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
     columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
-    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().getFileGroups().size());
+    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
     validatePartitionDataFiles(
         OneFileGroup.builder()
             .files(
@@ -194,7 +194,7 @@ public class ITDeltaSourceClient {
                         .build()))
             .partitionValues(Collections.emptyMap())
             .build(),
-        snapshot.getPartitionedDataFiles().getFileGroups().get(0));
+        snapshot.getPartitionedDataFiles().get(0));
   }
 
   @Test
@@ -254,7 +254,7 @@ public class ITDeltaSourceClient {
     Map<OneField, ColumnStat> columnStats = new HashMap<>();
     columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
     columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
-    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().getFileGroups().size());
+    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
     Map<OnePartitionField, Range> partitionValue =
         Collections.singletonMap(
             OnePartitionField.builder()
@@ -276,7 +276,7 @@ public class ITDeltaSourceClient {
                         .columnStats(columnStats)
                         .build()))
             .build(),
-        snapshot.getPartitionedDataFiles().getFileGroups().get(0));
+        snapshot.getPartitionedDataFiles().get(0));
   }
 
   @Disabled("Requires Spark 3.4.0+")
