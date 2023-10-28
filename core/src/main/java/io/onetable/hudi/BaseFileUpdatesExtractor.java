@@ -91,9 +91,10 @@ public class BaseFileUpdatesExtractor {
             FSUtils.getAllPartitionPaths(
                 engineContext, metadataConfig, metaClient.getBasePathV2().toString()));
     ReplaceMetadata replaceMetadata =
-        partitionedDataFiles.getFileGroupings().stream()
+        partitionedDataFiles.getPartitions().stream()
             .map(
-                dataFiles -> {
+                partitionFileGroup -> {
+                  List<OneDataFile> dataFiles = partitionFileGroup.getFiles();
                   String partitionPath = getPartitionPath(tableBasePath, dataFiles);
                   // remove the partition from the set of partitions to drop since it is present in
                   // the snapshot

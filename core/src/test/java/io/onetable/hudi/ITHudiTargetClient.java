@@ -108,9 +108,14 @@ public class ITHudiTargetClient {
   private static final OneSchema STRING_SCHEMA =
       OneSchema.builder().name("string").dataType(OneType.STRING).isNullable(false).build();
 
-  private static final OneField PARTITION_FIELD =
+  private static final OneField PARTITION_FIELD_SOURCE =
       OneField.builder().name(PARTITION_FIELD_NAME).schema(STRING_SCHEMA).build();
 
+  private static final OnePartitionField PARTITION_FIELD =
+      OnePartitionField.builder()
+          .sourceField(PARTITION_FIELD_SOURCE)
+          .transformType(PartitionTransformType.VALUE)
+          .build();
   private static final String TEST_SCHEMA_NAME = "test_schema";
   private static final OneSchema SCHEMA =
       OneSchema.builder()
@@ -119,7 +124,7 @@ public class ITHudiTargetClient {
           .fields(
               Arrays.asList(
                   OneField.builder().name(KEY_FIELD_NAME).schema(STRING_SCHEMA).build(),
-                  PARTITION_FIELD,
+                  PARTITION_FIELD_SOURCE,
                   OneField.builder().name(OTHER_FIELD_NAME).schema(STRING_SCHEMA).build()))
           .build();
   private final String tableBasePath = tempDir.resolve(UUID.randomUUID().toString()).toString();
@@ -222,7 +227,11 @@ public class ITHudiTargetClient {
     PartitionedDataFiles snapshot =
         PartitionedDataFiles.of(
             Collections.singletonList(
-                Collections.singletonList(getTestFile(partitionPath, fileName))));
+                PartitionedDataFiles.PartitionFileGroup.builder()
+                    .files(Collections.singletonList(getTestFile(partitionPath, fileName)))
+                    .partitionValues(
+                        Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
+                    .build()));
     // sync snapshot and metadata
     OneTable initialState = getState(Instant.now());
     HudiTargetClient targetClient = getTargetClient();
@@ -257,8 +266,14 @@ public class ITHudiTargetClient {
     PartitionedDataFiles snapshot =
         PartitionedDataFiles.of(
             Collections.singletonList(
-                Arrays.asList(
-                    getTestFile(partitionPath, fileName0), getTestFile(partitionPath, fileName1))));
+                PartitionedDataFiles.PartitionFileGroup.builder()
+                    .files(
+                        Arrays.asList(
+                            getTestFile(partitionPath, fileName0),
+                            getTestFile(partitionPath, fileName1)))
+                    .partitionValues(
+                        Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
+                    .build()));
     // sync snapshot and metadata
     OneTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));
     HudiTargetClient targetClient = getTargetClient();
@@ -556,7 +571,7 @@ public class ITHudiTargetClient {
         .partitioningFields(
             Collections.singletonList(
                 OnePartitionField.builder()
-                    .sourceField(PARTITION_FIELD)
+                    .sourceField(PARTITION_FIELD_SOURCE)
                     .transformType(PartitionTransformType.VALUE)
                     .build()))
         .build();

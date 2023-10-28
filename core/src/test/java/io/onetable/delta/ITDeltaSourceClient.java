@@ -72,6 +72,7 @@ import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
+import io.onetable.model.storage.PartitionedDataFiles;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.testutil.Issues;
 
@@ -178,18 +179,22 @@ public class ITDeltaSourceClient {
     Map<OneField, ColumnStat> columnStats = new HashMap<>();
     columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
     columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
-    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().getFileGroupings().size());
-    validateDataFiles(
-        Collections.singletonList(
-            OneDataFile.builder()
-                .physicalPath("file:/fake/path")
+    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().getPartitions().size());
+    validatePartitionDataFiles(
+        PartitionedDataFiles.PartitionFileGroup.builder()
+            .files(
+                Collections.singletonList(
+                    OneDataFile.builder()
+                        .physicalPath("file:/fake/path")
                 .fileFormat(FileFormat.APACHE_PARQUET)
                 .partitionValues(Collections.emptyMap())
-                .fileSizeBytes(684)
-                .recordCount(1)
-                .columnStats(columnStats)
-                .build()),
-        snapshot.getPartitionedDataFiles().getFileGroupings().get(0));
+                        .fileSizeBytes(684)
+                        .recordCount(1)
+                        .columnStats(columnStats)
+                        .build()))
+            .partitionValues(Collections.emptyMap())
+            .build(),
+        snapshot.getPartitionedDataFiles().getPartitions().get(0));
   }
 
   @Test
@@ -249,7 +254,7 @@ public class ITDeltaSourceClient {
     Map<OneField, ColumnStat> columnStats = new HashMap<>();
     columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
     columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
-    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().getFileGroupings().size());
+    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().getPartitions().size());
     Map<OnePartitionField, Range> partitionValue =
         Collections.singletonMap(
             OnePartitionField.builder()
@@ -257,17 +262,21 @@ public class ITDeltaSourceClient {
                 .transformType(PartitionTransformType.VALUE)
                 .build(),
             Range.scalar("SingleValue"));
-    validateDataFiles(
-        Collections.singletonList(
-            OneDataFile.builder()
-                .physicalPath("file:/fake/path")
+    validatePartitionDataFiles(
+        PartitionedDataFiles.PartitionFileGroup.builder()
+            .partitionValues(partitionValue)
+            .files(
+                Collections.singletonList(
+                    OneDataFile.builder()
+                        .physicalPath("file:/fake/path")
                 .fileFormat(FileFormat.APACHE_PARQUET)
                 .partitionValues(partitionValue)
-                .fileSizeBytes(684)
-                .recordCount(1)
-                .columnStats(columnStats)
-                .build()),
-        snapshot.getPartitionedDataFiles().getFileGroupings().get(0));
+                        .fileSizeBytes(684)
+                        .recordCount(1)
+                        .columnStats(columnStats)
+                        .build()))
+            .build(),
+        snapshot.getPartitionedDataFiles().getPartitions().get(0));
   }
 
   @Disabled("Requires Spark 3.4.0+")
@@ -596,6 +605,15 @@ public class ITDeltaSourceClient {
   private void validateSchemaCatalog(
       SchemaCatalog oneSchemaCatalog, Map<SchemaVersion, OneSchema> schemas) {
     Assertions.assertEquals(schemas, oneSchemaCatalog.getSchemas());
+  }
+
+  private void validatePartitionDataFiles(
+      PartitionedDataFiles.PartitionFileGroup expectedPartitionFiles,
+      PartitionedDataFiles.PartitionFileGroup actualPartitionFiles)
+      throws URISyntaxException {
+    assertEquals(
+        expectedPartitionFiles.getPartitionValues(), actualPartitionFiles.getPartitionValues());
+    validateDataFiles(expectedPartitionFiles.getFiles(), actualPartitionFiles.getFiles());
   }
 
   private void validateDataFiles(List<OneDataFile> expectedFiles, List<OneDataFile> actualFiles)
