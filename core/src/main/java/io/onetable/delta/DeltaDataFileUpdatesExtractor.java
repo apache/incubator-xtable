@@ -44,7 +44,7 @@ import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.PartitionedDataFiles;
-import io.onetable.spi.extractor.PartitionedDataFileIterator;
+import io.onetable.spi.extractor.DataFileIterator;
 
 @Builder
 public class DeltaDataFileUpdatesExtractor {
@@ -62,7 +62,7 @@ public class DeltaDataFileUpdatesExtractor {
   public Seq<Action> applySnapshot(
       DeltaLog deltaLog, PartitionedDataFiles partitionedDataFiles, OneSchema tableSchema) {
     List<OneDataFile> currentDataFiles = new ArrayList<>();
-    try (PartitionedDataFileIterator fileIterator =
+    try (DataFileIterator fileIterator =
         deltaDataFileExtractor.iteratorWithoutStats(deltaLog.snapshot(), tableSchema)) {
       fileIterator.forEachRemaining(currentDataFiles::add);
       OneDataFilesDiff filesDiff =

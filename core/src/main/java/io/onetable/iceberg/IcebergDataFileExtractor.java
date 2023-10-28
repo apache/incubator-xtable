@@ -37,7 +37,7 @@ import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.spi.extractor.PartitionedDataFileIterator;
+import io.onetable.spi.extractor.DataFileIterator;
 
 /** Extractor of data files for Iceberg */
 @Builder
@@ -52,11 +52,11 @@ public class IcebergDataFileExtractor {
    *
    * @return Iceberg table file iterator
    */
-  public PartitionedDataFileIterator iterator(Table iceTable) {
+  public DataFileIterator iterator(Table iceTable) {
     return new IcebergDataFileIterator(iceTable);
   }
 
-  public class IcebergDataFileIterator implements PartitionedDataFileIterator {
+  public class IcebergDataFileIterator implements DataFileIterator {
     private final Table iceTable;
     private final CloseableIterator<CombinedScanTask> iceScan;
     private Iterator<OneDataFile> currentScanTaskIterator;

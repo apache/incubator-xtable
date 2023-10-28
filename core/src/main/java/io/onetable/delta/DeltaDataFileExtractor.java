@@ -30,7 +30,7 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.spi.extractor.PartitionedDataFileIterator;
+import io.onetable.spi.extractor.DataFileIterator;
 
 /** DeltaDataFileExtractor lets the consumer iterate over partitions. */
 @Builder
@@ -52,8 +52,7 @@ public class DeltaDataFileExtractor {
    * @return Delta table file iterator, files returned do not have column stats set to reduce memory
    *     overhead
    */
-  public PartitionedDataFileIterator iteratorWithoutStats(
-      Snapshot deltaSnapshot, OneSchema schema) {
+  public DataFileIterator iteratorWithoutStats(Snapshot deltaSnapshot, OneSchema schema) {
     return new DeltaDataFileIterator(deltaSnapshot, schema, false);
   }
 
@@ -62,11 +61,11 @@ public class DeltaDataFileExtractor {
    *
    * @return Delta table file iterator
    */
-  public PartitionedDataFileIterator iterator(Snapshot deltaSnapshot, OneSchema schema) {
+  public DataFileIterator iterator(Snapshot deltaSnapshot, OneSchema schema) {
     return new DeltaDataFileIterator(deltaSnapshot, schema, true);
   }
 
-  public class DeltaDataFileIterator implements PartitionedDataFileIterator {
+  public class DeltaDataFileIterator implements DataFileIterator {
     private final FileFormat fileFormat;
     private final List<OneField> fields;
     private final List<OnePartitionField> partitionFields;

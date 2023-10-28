@@ -55,7 +55,7 @@ import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.PartitionedDataFiles;
-import io.onetable.spi.extractor.PartitionedDataFileIterator;
+import io.onetable.spi.extractor.DataFileIterator;
 import io.onetable.spi.extractor.SourceClient;
 
 @Log4j2
@@ -173,7 +173,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
   }
 
   private PartitionedDataFiles getOneDataFiles(Snapshot snapshot, OneSchema schema) {
-    try (PartitionedDataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
+    try (DataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
       List<OneDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);
       return PartitionedDataFiles.fromFiles(dataFiles);

@@ -37,7 +37,7 @@ import io.onetable.exception.OneIOException;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.PartitionedDataFiles;
-import io.onetable.spi.extractor.PartitionedDataFileIterator;
+import io.onetable.spi.extractor.DataFileIterator;
 
 @AllArgsConstructor(staticName = "of")
 public class IcebergDataFileUpdatesSync {
@@ -53,7 +53,7 @@ public class IcebergDataFileUpdatesSync {
     List<OneDataFile> currentDataFiles = new ArrayList<>();
     IcebergDataFileExtractor dataFileExtractor =
         IcebergDataFileExtractor.builder().partitionValueConverter(partitionValueConverter).build();
-    try (PartitionedDataFileIterator fileIterator = dataFileExtractor.iterator(table)) {
+    try (DataFileIterator fileIterator = dataFileExtractor.iterator(table)) {
       fileIterator.forEachRemaining(currentDataFiles::add);
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Iceberg data files", e);

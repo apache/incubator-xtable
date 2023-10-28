@@ -22,9 +22,8 @@ import java.util.Collections;
 import java.util.Map;
 
 import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.ToString;
+import lombok.NonNull;
+import lombok.Value;
 
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
@@ -37,27 +36,24 @@ import io.onetable.model.stat.Range;
  *
  * @since 0.1
  */
-@Getter
 @Builder(toBuilder = true)
-@EqualsAndHashCode
-@ToString
+@Value
 public class OneDataFile {
   // written schema version
-  protected final SchemaVersion schemaVersion;
+  SchemaVersion schemaVersion;
   // physical path of the file
-  protected final String physicalPath;
+  @NonNull String physicalPath;
   // file format
-  protected final FileFormat fileFormat;
+  @NonNull FileFormat fileFormat;
   // partition ranges for the data file
-  @Builder.Default
-  protected final Map<OnePartitionField, Range> partitionValues =
-      Collections.emptyMap(); // Partition path
+  @Builder.Default @NonNull
+  Map<OnePartitionField, Range> partitionValues = Collections.emptyMap(); // Partition path
 
-  protected final String partitionPath;
-  protected final long fileSizeBytes;
-  protected final long recordCount;
+  String partitionPath;
+  long fileSizeBytes;
+  long recordCount;
   // column stats for each column in the data file
-  @Builder.Default protected final Map<OneField, ColumnStat> columnStats = Collections.emptyMap();
+  @Builder.Default @NonNull Map<OneField, ColumnStat> columnStats = Collections.emptyMap();
   // last modified time in millis since epoch
-  protected final long lastModified;
+  long lastModified;
 }
