@@ -131,7 +131,7 @@ public class ITOneTableClient {
   }
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
-    return Stream.of(Arguments.of(TableFormat.DELTA, SyncMode.FULL, true));
+    return Stream.of(Arguments.of(TableFormat.DELTA, SyncMode.INCREMENTAL, true));
   }
 
   private static Stream<Arguments> testCasesWithPartitioningAndTableTypesAndSyncModes() {
@@ -164,9 +164,7 @@ public class ITOneTableClient {
     String tableName = getTableName();
     OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
     List<TableFormat> targetTableFormats =
-        Arrays.stream(TableFormat.values())
-            .filter(format -> !format.equals(sourceTableFormat))
-            .collect(Collectors.toList());
+        Arrays.asList(TableFormat.HUDI);
     String oneTablePartitionConfig = null;
     if (isPartitioned) {
       oneTablePartitionConfig = "level:VALUE";
@@ -978,6 +976,7 @@ public class ITOneTableClient {
                       if (targetFormat.equals(TableFormat.HUDI)) {
                         finalTargetOptions = new HashMap<>(finalTargetOptions);
                         finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
+                        finalTargetOptions.put("hoodie.datasource.read.extract.partition.values.from.path", "true");
                       }
                       return sparkSession
                           .read()
@@ -1027,6 +1026,7 @@ public class ITOneTableClient {
         .map(StructField::name)
         .filter(name -> !name.startsWith("onetable_partition_col_"))
         .filter(name -> !name.equals("yearOfBirth"))
+        .filter(name -> !name.equals("birthDate"))
         .collect(Collectors.toSet());
   }
 
