@@ -49,8 +49,8 @@ onetable
 
 ### Create BigLake Database
 Use the `Try this method` on Google's REST reference docs for
-[projects.locations.catalogs.databases.create](https://cloud.google.com/bigquery/docs/reference/biglake/rest/v1/projects.locations.catalogs/create)
-page for [`projects.locations.catalogs.create`] method to create a catalog.
+[`projects.locations.catalogs.databases.create`](https://cloud.google.com/bigquery/docs/reference/biglake/rest/v1/projects.locations.catalogs/create)
+method to create a database.
 ```rest md title="parent"
 projects/<yourProjectName>/locations/us-west1/catalogs/onetable/databases
 ```
@@ -69,7 +69,7 @@ The current implementation of Onetable requires you to set the below options in 
   * `warehouse`
 
 Then proceed to creating the `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps
-[here](https://github.com/onetable-io/onetable#building-the-project-and-running-tests)
+[here](https://github.com/onetable-io/onetable#building-the-project-and-running-tests).
 :::
 
 :::tip

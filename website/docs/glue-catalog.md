@@ -80,7 +80,7 @@ EMR and/or Redshift query engines.
 ### Validating the results
 Here’s how our table looks like in Amazon Athena.
 
-![Iceberg Table in Amazon Athena](./static/img/athena-iceberg.png)
+![Iceberg Table in Amazon Athena](./static/athena-iceberg.png)
 
 ## Conclusion:
 In this guide we saw how to, 
