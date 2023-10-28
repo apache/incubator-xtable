@@ -182,10 +182,9 @@ public class ITDeltaSourceClient {
     validateDataFiles(
         Collections.singletonList(
             OneDataFile.builder()
-                .schemaVersion(null)
+                .physicalPath("file:/fake/path")
                 .fileFormat(FileFormat.APACHE_PARQUET)
                 .partitionValues(Collections.emptyMap())
-                .partitionPath(null)
                 .fileSizeBytes(684)
                 .recordCount(1)
                 .columnStats(columnStats)
@@ -261,10 +260,9 @@ public class ITDeltaSourceClient {
     validateDataFiles(
         Collections.singletonList(
             OneDataFile.builder()
-                .schemaVersion(null)
+                .physicalPath("file:/fake/path")
                 .fileFormat(FileFormat.APACHE_PARQUET)
                 .partitionValues(partitionValue)
-                .partitionPath(null)
                 .fileSizeBytes(684)
                 .recordCount(1)
                 .columnStats(columnStats)

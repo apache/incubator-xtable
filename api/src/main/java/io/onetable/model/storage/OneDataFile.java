@@ -44,7 +44,7 @@ public class OneDataFile {
   // physical path of the file
   @NonNull String physicalPath;
   // file format
-  @NonNull FileFormat fileFormat;
+  @Builder.Default @NonNull FileFormat fileFormat = FileFormat.APACHE_PARQUET;
   // partition ranges for the data file
   @Builder.Default @NonNull
   Map<OnePartitionField, Range> partitionValues = Collections.emptyMap(); // Partition path
