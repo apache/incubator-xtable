@@ -42,9 +42,9 @@ import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.spi.extractor.PartitionedDataFileIterator;
+import io.onetable.model.storage.OneFileGroup;
+import io.onetable.spi.extractor.DataFileIterator;
 
 @Builder
 public class DeltaDataFileUpdatesExtractor {
@@ -60,13 +60,17 @@ public class DeltaDataFileUpdatesExtractor {
       DeltaDataFileExtractor.builder().build();
 
   public Seq<Action> applySnapshot(
-      DeltaLog deltaLog, OneDataFiles snapshotFiles, OneSchema tableSchema) {
-    List<OneDataFile> dataFiles = new ArrayList<>();
-    try (PartitionedDataFileIterator fileIterator =
+      DeltaLog deltaLog, List<OneFileGroup> partitionedDataFiles, OneSchema tableSchema) {
+    List<OneDataFile> currentDataFiles = new ArrayList<>();
+    try (DataFileIterator fileIterator =
         deltaDataFileExtractor.iteratorWithoutStats(deltaLog.snapshot(), tableSchema)) {
-      fileIterator.forEachRemaining(dataFiles::add);
-      OneDataFiles currentDataFiles = OneDataFiles.collectionBuilder().files(dataFiles).build();
-      OneDataFilesDiff filesDiff = currentDataFiles.diff(snapshotFiles);
+      fileIterator.forEachRemaining(currentDataFiles::add);
+      OneDataFilesDiff filesDiff =
+          OneDataFilesDiff.from(
+              partitionedDataFiles.stream()
+                  .flatMap(group -> group.getFiles().stream())
+                  .collect(Collectors.toList()),
+              currentDataFiles);
       return applyDiff(filesDiff, tableSchema, deltaLog.dataPath().toString());
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Delta data files", e);
@@ -90,11 +94,6 @@ public class DeltaDataFileUpdatesExtractor {
 
   private Stream<AddFile> createAddFileAction(
       OneDataFile dataFile, OneSchema schema, String tableBasePath) {
-    if (dataFile instanceof OneDataFiles) {
-      return ((OneDataFiles) dataFile)
-          .getFiles().stream()
-              .flatMap(childDataFile -> createAddFileAction(childDataFile, schema, tableBasePath));
-    }
     return Stream.of(
         new AddFile(
             // Delta Lake supports relative and absolute paths in theory but relative paths seem

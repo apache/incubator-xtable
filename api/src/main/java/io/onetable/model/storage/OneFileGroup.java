@@ -18,41 +18,38 @@
  
 package io.onetable.model.storage;
 
-import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.Builder;
-import lombok.NonNull;
 import lombok.Value;
 
-import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
-import io.onetable.model.schema.SchemaVersion;
-import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 
-/**
- * Represents a data file in the table.
- *
- * @since 0.1
- */
-@Builder(toBuilder = true)
+/** Represents a grouping of {@link OneDataFile} with the same partition values. */
 @Value
-public class OneDataFile {
-  // written schema version
-  SchemaVersion schemaVersion;
-  // physical path of the file (absolute)
-  @NonNull String physicalPath;
-  // file format
-  @Builder.Default @NonNull FileFormat fileFormat = FileFormat.APACHE_PARQUET;
-  // partition ranges for the data file
-  @Builder.Default @NonNull Map<OnePartitionField, Range> partitionValues = Collections.emptyMap();
+@Builder
+public class OneFileGroup {
+  Map<OnePartitionField, Range> partitionValues;
+  List<OneDataFile> files;
 
-  String partitionPath;
-  long fileSizeBytes;
-  long recordCount;
-  // column stats for each column in the data file
-  @Builder.Default @NonNull Map<OneField, ColumnStat> columnStats = Collections.emptyMap();
-  // last modified time in millis since epoch
-  long lastModified;
+  public static List<OneFileGroup> fromFiles(List<OneDataFile> files) {
+    return fromFiles(files.stream());
+  }
+
+  public static List<OneFileGroup> fromFiles(Stream<OneDataFile> files) {
+    Map<Map<OnePartitionField, Range>, List<OneDataFile>> filesGrouped =
+        files.collect(Collectors.groupingBy(OneDataFile::getPartitionValues));
+    return filesGrouped.entrySet().stream()
+        .map(
+            entry ->
+                OneFileGroup.builder()
+                    .partitionValues(entry.getKey())
+                    .files(entry.getValue())
+                    .build())
+        .collect(Collectors.toList());
+  }
 }
