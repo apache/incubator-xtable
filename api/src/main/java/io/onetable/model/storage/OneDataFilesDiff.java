@@ -18,19 +18,53 @@
  
 package io.onetable.model.storage;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;
 
 /** Container for holding the list of files added and files removed between source and target. */
-@Builder
 @Value
+@Builder
 public class OneDataFilesDiff {
   @Singular("fileAdded")
   Set<OneDataFile> filesAdded;
 
   @Singular("fileRemoved")
   Set<OneDataFile> filesRemoved;
+
+  /**
+   * Creates a OneDataFilesDiff from the list of files in the target table and the list of files in
+   * the source table.
+   *
+   * @param source list of files currently in the source table
+   * @param target list of files currently in the target table
+   * @return files that need to be added and removed for the target table match the source table
+   */
+  public static OneDataFilesDiff from(List<OneDataFile> source, List<OneDataFile> target) {
+    Map<String, OneDataFile> targetPaths =
+        target.stream()
+            .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
+    // Any files in the source that are not in the target are added
+    Set<OneDataFile> addedFiles =
+        source.stream()
+            .map(
+                file -> {
+                  OneDataFile targetFileIfPresent = targetPaths.remove(file.getPhysicalPath());
+                  return targetFileIfPresent == null ? file : null;
+                })
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    // Any files remaining in the targetPaths map are not present in the source and should be marked
+    // for removal
+    Set<OneDataFile> removedFiles = new HashSet<>(targetPaths.values());
+    return OneDataFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
+  }
 }

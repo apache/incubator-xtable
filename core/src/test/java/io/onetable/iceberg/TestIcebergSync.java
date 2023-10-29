@@ -89,7 +89,7 @@ import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.schema.SchemaFieldFinder;
 import io.onetable.spi.sync.TableFormatSync;
@@ -235,9 +235,9 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
     schemas.put(schemaVersion2, schema2);
 
-    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, null);
-    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, null);
-    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, null);
+    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, Collections.emptyMap());
+    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, Collections.emptyMap());
+    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyMap());
     OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
     when(mockSchemaExtractor.toIceberg(schema1)).thenReturn(icebergSchema1);
@@ -606,7 +606,7 @@ public class TestIcebergSync {
     return OneSnapshot.builder()
         .table(table)
         .schemaCatalog(SchemaCatalog.builder().schemas(schemas).build())
-        .dataFiles(OneDataFiles.collectionBuilder().files(Arrays.asList(dataFiles)).build())
+        .partitionedDataFiles(OneFileGroup.fromFiles(Arrays.asList(dataFiles)))
         .build();
   }
 

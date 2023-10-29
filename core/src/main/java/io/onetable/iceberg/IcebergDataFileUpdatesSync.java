@@ -20,6 +20,7 @@ package io.onetable.iceberg;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import lombok.AllArgsConstructor;
 
@@ -36,9 +37,9 @@ import io.onetable.exception.NotSupportedException;
 import io.onetable.exception.OneIOException;
 import io.onetable.model.OneTable;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.spi.extractor.PartitionedDataFileIterator;
+import io.onetable.model.storage.OneFileGroup;
+import io.onetable.spi.extractor.DataFileIterator;
 
 @AllArgsConstructor(staticName = "of")
 public class IcebergDataFileUpdatesSync {
@@ -49,22 +50,25 @@ public class IcebergDataFileUpdatesSync {
       Table table,
       OneTable oneTable,
       Transaction transaction,
-      OneDataFiles snapshotFiles,
+      List<OneFileGroup> partitionedDataFiles,
       Schema schema,
       PartitionSpec partitionSpec) {
-    List<OneDataFile> dataFiles = new ArrayList<>();
+    List<OneDataFile> currentDataFiles = new ArrayList<>();
     IcebergDataFileExtractor dataFileExtractor =
         IcebergDataFileExtractor.builder().partitionValueConverter(partitionValueConverter).build();
-    try (PartitionedDataFileIterator fileIterator = dataFileExtractor.iterator(table, oneTable)) {
-      fileIterator.forEachRemaining(dataFiles::add);
+    try (DataFileIterator fileIterator = dataFileExtractor.iterator(table, oneTable)) {
+      fileIterator.forEachRemaining(currentDataFiles::add);
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Iceberg data files", e);
     }
 
-    OneDataFiles currentDataFiles = OneDataFiles.collectionBuilder().files(dataFiles).build();
-
     // Sync the files diff
-    OneDataFilesDiff filesDiff = currentDataFiles.diff(snapshotFiles);
+    OneDataFilesDiff filesDiff =
+        OneDataFilesDiff.from(
+            partitionedDataFiles.stream()
+                .flatMap(group -> group.getFiles().stream())
+                .collect(Collectors.toList()),
+            currentDataFiles);
     applyDiff(transaction, filesDiff, schema, partitionSpec);
   }
 

@@ -19,15 +19,13 @@
 package io.onetable.iceberg;
 
 import java.util.Collections;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import lombok.Builder;
 
 import org.apache.iceberg.CombinedScanTask;
 import org.apache.iceberg.DataFile;
-import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.io.CloseableIterator;
 
@@ -40,8 +38,7 @@ import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
-import io.onetable.spi.extractor.PartitionedDataFileIterator;
+import io.onetable.spi.extractor.DataFileIterator;
 
 /** Extractor of data files for Iceberg */
 @Builder
@@ -56,19 +53,22 @@ public class IcebergDataFileExtractor {
    *
    * @return Iceberg table file iterator
    */
-  public PartitionedDataFileIterator iterator(Table iceTable, OneTable oneTable) {
+  public DataFileIterator iterator(Table iceTable, OneTable oneTable) {
     return new IcebergDataFileIterator(iceTable, oneTable);
   }
 
-  public class IcebergDataFileIterator implements PartitionedDataFileIterator {
+  public class IcebergDataFileIterator implements DataFileIterator {
     private final Table iceTable;
     private final OneTable oneTable;
     private final CloseableIterator<CombinedScanTask> iceScan;
+    private Iterator<OneDataFile> currentScanTaskIterator;
 
     private IcebergDataFileIterator(Table iceTable, OneTable oneTable) {
       this.iceTable = iceTable;
       this.oneTable = oneTable;
       this.iceScan = iceTable.newScan().planTasks().iterator();
+      this.currentScanTaskIterator =
+          iceScan.hasNext() ? getCurrentScanTaskIterator(iceScan.next()) : null;
     }
 
     @Override
@@ -78,29 +78,41 @@ public class IcebergDataFileExtractor {
 
     @Override
     public boolean hasNext() {
-      return iceScan.hasNext();
+      advanceScanTask();
+      return currentScanTaskIterator != null && currentScanTaskIterator.hasNext();
     }
 
     @Override
-    public OneDataFiles next() {
-      if (iceScan == null) {
+    public OneDataFile next() {
+      if (currentScanTaskIterator == null) {
         throw new IllegalStateException("Iterator is not initialized");
       }
+      advanceScanTask();
+      return currentScanTaskIterator.next();
+    }
 
-      PartitionSpec partitionSpec = iceTable.spec();
-      CombinedScanTask combinedScan = iceScan.next();
-      List<OneDataFile> files =
-          combinedScan.files().stream()
-              .map(
-                  fileScanTask -> {
-                    DataFile dataFile = fileScanTask.file();
-                    Map<OnePartitionField, Range> onePartitionFieldRangeMap =
-                        partitionValueConverter.toOneTable(
-                            oneTable, dataFile.partition(), partitionSpec);
-                    return fromIcebergWithoutColumnStats(dataFile, onePartitionFieldRangeMap);
-                  })
-              .collect(Collectors.toList());
-      return OneDataFiles.collectionBuilder().files(files).build();
+    private void advanceScanTask() {
+      if (currentScanTaskIterator != null && currentScanTaskIterator.hasNext()) {
+        return;
+      }
+      if (iceScan.hasNext()) {
+        currentScanTaskIterator = getCurrentScanTaskIterator(iceScan.next());
+      } else {
+        currentScanTaskIterator = null;
+      }
+    }
+
+    private Iterator<OneDataFile> getCurrentScanTaskIterator(CombinedScanTask scanTask) {
+      return scanTask.files().stream()
+          .map(
+              fileScanTask -> {
+                DataFile dataFile = fileScanTask.file();
+                Map<OnePartitionField, Range> onePartitionFieldRangeMap =
+                    partitionValueConverter.toOneTable(
+                        oneTable, dataFile.partition(), iceTable.spec());
+                return fromIcebergWithoutColumnStats(dataFile, onePartitionFieldRangeMap);
+              })
+          .iterator();
     }
   }
 
