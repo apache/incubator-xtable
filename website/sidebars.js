@@ -11,6 +11,7 @@
 
 module.exports = {
     docs: [
+        "setup",
         {
             type: 'category',
             label: 'Quick Start',
