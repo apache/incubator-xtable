@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -131,11 +132,15 @@ public class ITOneTableClient {
   }
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
-    return Stream.of(
-        Arguments.of(TableFormat.DELTA, SyncMode.FULL, true),
-        Arguments.of(TableFormat.DELTA, SyncMode.FULL, false),
-        Arguments.of(TableFormat.DELTA, SyncMode.INCREMENTAL, true),
-        Arguments.of(TableFormat.DELTA, SyncMode.INCREMENTAL, false));
+    List<Arguments> arguments = new ArrayList<>();
+    for (TableFormat sourceTableFormat : Arrays.asList(TableFormat.HUDI, TableFormat.DELTA)) {
+      for (SyncMode syncMode : SyncMode.values()) {
+        for (boolean isPartitioned : new boolean[] {true, false}) {
+          arguments.add(Arguments.of(sourceTableFormat, syncMode, isPartitioned));
+        }
+      }
+    }
+    return arguments.stream();
   }
 
   private static Stream<Arguments> testCasesWithPartitioningAndTableTypesAndSyncModes() {
