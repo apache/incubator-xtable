@@ -167,10 +167,7 @@ public class ITOneTableClient {
       TableFormat sourceTableFormat, SyncMode syncMode, boolean isPartitioned) throws Exception {
     String tableName = getTableName();
     OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-    List<TableFormat> targetTableFormats =
-        Arrays.stream(TableFormat.values())
-            .filter(format -> !format.equals(sourceTableFormat))
-            .collect(Collectors.toList());
+    List<TableFormat> targetTableFormats = getOtherFormats(sourceTableFormat);
     String oneTablePartitionConfig = null;
     if (isPartitioned) {
       oneTablePartitionConfig = "level:VALUE";
@@ -411,21 +408,22 @@ public class ITOneTableClient {
   }
 
   @ParameterizedTest
-  @MethodSource("testCasesWithSyncModes")
-  public void testTimeTravelQueries(List<TableFormat> targetTableFormats, SyncMode syncMode)
-      throws Exception {
+  @EnumSource(
+      value = TableFormat.class,
+      names = {"HUDI", "DELTA"})
+  public void testTimeTravelQueries(TableFormat sourceTableFormat) throws Exception {
     String tableName = getTableName();
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
       table.insertRecords(50, true);
-
+      List<TableFormat> targetTableFormats = getOtherFormats(sourceTableFormat);
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
-              .syncMode(syncMode)
+              .syncMode(SyncMode.INCREMENTAL)
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
@@ -443,8 +441,8 @@ public class ITOneTableClient {
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
 
       checkDatasetEquivalence(
-          TableFormat.HUDI,
-          getTimeTravelOption(TableFormat.HUDI, instantAfterFirstSync),
+          sourceTableFormat,
+          getTimeTravelOption(sourceTableFormat, instantAfterFirstSync),
           "_hoodie_record_key",
           targetTableFormats,
           targetTableFormats.stream()
@@ -456,8 +454,8 @@ public class ITOneTableClient {
           table.getBasePath(),
           50);
       checkDatasetEquivalence(
-          TableFormat.HUDI,
-          getTimeTravelOption(TableFormat.HUDI, instantAfterSecondSync),
+          sourceTableFormat,
+          getTimeTravelOption(sourceTableFormat, instantAfterSecondSync),
           "_hoodie_record_key",
           targetTableFormats,
           targetTableFormats.stream()
@@ -469,6 +467,12 @@ public class ITOneTableClient {
           table.getBasePath(),
           100);
     }
+  }
+
+  private static List<TableFormat> getOtherFormats(TableFormat sourceTableFormat) {
+    return Arrays.stream(TableFormat.values())
+        .filter(format -> !format.equals(sourceTableFormat))
+        .collect(Collectors.toList());
   }
 
   private static Stream<Arguments> provideArgsForPartitionTesting() {
