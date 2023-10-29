@@ -229,7 +229,7 @@ public class TestAvroSchemaConverter {
     Schema avroRepresentation =
         new Schema.Parser()
             .parse(
-                "{\"type\":\"record\",\"name\":\"testRecord\",\"fields\":[{\"name\":\"nestedOne\",\"type\":[\"null\",{\"type\":\"record\",\"name\":\"nestedOneType\",\"fields\":[{\"name\":\"nestedOptionalInt\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"nestedRequiredDouble\",\"type\":\"double\"},{\"name\":\"nestedTwo\",\"type\":{\"type\":\"record\",\"name\":\"nestedTwoType\",\"fields\":[{\"name\":\"doublyNestedString\",\"type\":[\"null\",\"string\"],\"default\":null}]}}]}],\"default\":null}]}");
+                "{\"type\":\"record\",\"name\":\"testRecord\",\"fields\":[{\"name\":\"nestedOne\",\"type\":[\"null\",{\"type\":\"record\",\"name\":\"nestedOneType\",\"namespace\":\"nestedOne\",\"fields\":[{\"name\":\"nestedOptionalInt\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"nestedRequiredDouble\",\"type\":\"double\"},{\"name\":\"nestedTwo\",\"type\":{\"type\":\"record\",\"name\":\"nestedTwoType\",\"namespace\":\"nestedOne.nestedTwo\",\"fields\":[{\"name\":\"doublyNestedString\",\"type\":[\"null\",\"string\"],\"default\":null}]}}]}],\"default\":null}]}");
 
     OneSchema oneSchemaRepresentation =
         OneSchema.builder()
@@ -310,7 +310,7 @@ public class TestAvroSchemaConverter {
     Schema avroRepresentation =
         new Schema.Parser()
             .parse(
-                "{\"type\":\"record\",\"name\":\"testRecord\",\"fields\":[{\"name\":\"intList\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"recordList\",\"type\":[\"null\",{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"element\",\"fields\":[{\"name\":\"requiredDouble\",\"type\":\"double\"},{\"name\":\"optionalString\",\"type\":[\"null\",\"string\"],\"default\":null}]}}],\"default\":null}]}");
+                "{\"type\":\"record\",\"name\":\"testRecord\",\"fields\":[{\"name\":\"intList\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"recordList\",\"type\":[\"null\",{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"element\",\"namespace\":\"recordList._one_field_element\",\"fields\":[{\"name\":\"requiredDouble\",\"type\":\"double\"},{\"name\":\"optionalString\",\"type\":[\"null\",\"string\"],\"default\":null}]}}],\"default\":null}]}");
 
     OneSchema recordListElementSchema =
         OneSchema.builder()
@@ -400,7 +400,7 @@ public class TestAvroSchemaConverter {
     Schema avroRepresentation =
         new Schema.Parser()
             .parse(
-                "{\"type\":\"record\",\"name\":\"testRecord\",\"fields\":[{\"name\":\"intMap\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"recordMap\",\"type\":[\"null\",{\"type\":\"map\",\"values\":{\"type\":\"record\",\"name\":\"element\",\"fields\":[{\"name\":\"requiredDouble\",\"type\":\"double\"},{\"name\":\"optionalString\",\"type\":[\"null\",\"string\"],\"default\":null}]}}],\"default\":null}]}");
+                "{\"type\":\"record\",\"name\":\"testRecord\",\"fields\":[{\"name\":\"intMap\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"recordMap\",\"type\":[\"null\",{\"type\":\"map\",\"values\":{\"type\":\"record\",\"name\":\"element\",\"namespace\":\"recordMap._one_field_value\",\"fields\":[{\"name\":\"requiredDouble\",\"type\":\"double\"},{\"name\":\"optionalString\",\"type\":[\"null\",\"string\"],\"default\":null}]}}],\"default\":null}]}");
 
     OneSchema recordMapElementSchema =
         OneSchema.builder()
