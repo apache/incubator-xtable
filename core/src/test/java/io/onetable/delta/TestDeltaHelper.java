@@ -25,6 +25,7 @@ import static org.apache.spark.sql.types.DataTypes.TimestampType;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -161,7 +162,7 @@ public class TestDeltaHelper {
   }
 
   private Timestamp generateRandomTimeGivenYear(int yearValue) {
-    int month = RANDOM.nextInt(12) + 1;
+    int month = RANDOM.nextInt(11) + 1;
     int daysInMonth = YearMonth.of(yearValue, month).lengthOfMonth();
     int day = RANDOM.nextInt(daysInMonth) + 1;
 
