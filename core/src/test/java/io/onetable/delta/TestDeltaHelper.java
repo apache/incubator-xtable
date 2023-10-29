@@ -64,15 +64,17 @@ import io.delta.tables.DeltaTableBuilder;
 @Getter
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class TestDeltaHelper {
-  private static final StructType STRUCT_SCHEMA = DataTypes.createStructType(new StructField[] {
-      new StructField("nested_int", IntegerType, true, Metadata.empty())
-  });
+  private static final StructType STRUCT_SCHEMA =
+      DataTypes.createStructType(
+          new StructField[] {new StructField("nested_int", IntegerType, true, Metadata.empty())});
 
   private static final StructField[] COMMON_FIELDS =
       new StructField[] {
         new StructField("id", IntegerType, false, Metadata.empty()),
         new StructField("firstName", StringType, true, Metadata.empty()),
         new StructField("lastName", StringType, true, Metadata.empty()),
+        new StructField("gender", StringType, true, Metadata.empty()),
+        new StructField("birthDate", TimestampType, true, Metadata.empty()),
         new StructField("boolean_field", BooleanType, true, Metadata.empty()),
         new StructField("date_field", DateType, true, Metadata.empty()),
         new StructField("timestamp_field", TimestampType, true, Metadata.empty()),
@@ -80,12 +82,21 @@ public class TestDeltaHelper {
         new StructField("float_field", FloatType, true, Metadata.empty()),
         new StructField("long_field", LongType, true, Metadata.empty()),
         new StructField("binary_field", BinaryType, true, Metadata.empty()),
-        new StructField("primitive_map", DataTypes.createMapType(StringType, IntegerType), true, Metadata.empty()),
-        new StructField("record_map", DataTypes.createMapType(StringType, STRUCT_SCHEMA), true, Metadata.empty()),
-        new StructField("primitive_list", DataTypes.createArrayType(IntegerType), true, Metadata.empty()),
-        new StructField("record_list", DataTypes.createArrayType(STRUCT_SCHEMA), true, Metadata.empty()),
+        new StructField(
+            "primitive_map",
+            DataTypes.createMapType(StringType, IntegerType),
+            true,
+            Metadata.empty()),
+        new StructField(
+            "record_map",
+            DataTypes.createMapType(StringType, STRUCT_SCHEMA),
+            true,
+            Metadata.empty()),
+        new StructField(
+            "primitive_list", DataTypes.createArrayType(IntegerType), true, Metadata.empty()),
+        new StructField(
+            "record_list", DataTypes.createArrayType(STRUCT_SCHEMA), true, Metadata.empty()),
         new StructField("record_field", STRUCT_SCHEMA, true, Metadata.empty()),
-        new StructField("birthDate", TimestampType, true, Metadata.empty()),
       };
   private static final StructField[] COMMON_DATE_FIELDS =
       new StructField[] {new StructField("birthDate", TimestampType, true, Metadata.empty())};
@@ -95,6 +106,7 @@ public class TestDeltaHelper {
       new StructField[] {new StructField("yearOfBirth", IntegerType, true, Metadata.empty())};
 
   private static final Random RANDOM = new Random();
+  private static final String[] GENDERS = {"Male", "Female"};
 
   StructType tableStructSchema;
   boolean tableIsPartitioned;
@@ -124,9 +136,7 @@ public class TestDeltaHelper {
 
   public void createTable(SparkSession sparkSession, String tableName, String basePath) {
     DeltaTableBuilder tableBuilder =
-        DeltaTable.createIfNotExists(sparkSession)
-            .tableName(tableName)
-            .location(basePath);
+        DeltaTable.createIfNotExists(sparkSession).tableName(tableName).location(basePath);
     Arrays.stream(COMMON_FIELDS).forEach(tableBuilder::addColumn);
     if (tableIsPartitioned) {
       tableBuilder
@@ -168,6 +178,8 @@ public class TestDeltaHelper {
     switch (field.name()) {
       case "id":
         return RANDOM.nextInt(1000000) + 1;
+      case "gender":
+        return GENDERS[RANDOM.nextInt(GENDERS.length)];
       case "birthDate":
         return generateRandomTimeGivenYear(yearValue);
       case "yearOfBirth":
@@ -202,13 +214,20 @@ public class TestDeltaHelper {
         return Timestamp.from(Instant.now());
       case "array":
         ArrayType arrayType = (ArrayType) type;
-        return IntStream.range(0, RANDOM.nextInt(5)).mapToObj(i -> getRandomValueForField(arrayType.elementType(), false)).collect(Collectors.toList());
+        return IntStream.range(0, RANDOM.nextInt(5))
+            .mapToObj(i -> getRandomValueForField(arrayType.elementType(), false))
+            .collect(Collectors.toList());
       case "map":
         MapType mapType = (MapType) type;
-        return IntStream.range(0, RANDOM.nextInt(5)).mapToObj(i -> getRandomValueForField(mapType.valueType(), false)).collect(Collectors.toMap(unused -> generateRandomString(), Function.identity()));
+        return IntStream.range(0, RANDOM.nextInt(5))
+            .mapToObj(i -> getRandomValueForField(mapType.valueType(), false))
+            .collect(Collectors.toMap(unused -> generateRandomString(), Function.identity()));
       case "struct":
         StructType structType = (StructType) type;
-        return RowFactory.create(Arrays.stream(structType.fields()).map(field -> getRandomValueForField(field.dataType(), false)).toArray());
+        return RowFactory.create(
+            Arrays.stream(structType.fields())
+                .map(field -> getRandomValueForField(field.dataType(), false))
+                .toArray());
       default:
         throw new IllegalArgumentException("Please add code to handle field type: " + type);
     }

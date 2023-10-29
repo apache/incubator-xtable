@@ -839,7 +839,8 @@ public class ITOneTableClient {
                       if (targetFormat.equals(TableFormat.HUDI)) {
                         finalTargetOptions = new HashMap<>(finalTargetOptions);
                         finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
-                        finalTargetOptions.put("hoodie.datasource.read.extract.partition.values.from.path", "true");
+                        finalTargetOptions.put(
+                            "hoodie.datasource.read.extract.partition.values.from.path", "true");
                       }
                       return sparkSession
                           .read()
