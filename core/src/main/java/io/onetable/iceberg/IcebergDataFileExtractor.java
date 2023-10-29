@@ -30,6 +30,7 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.io.CloseableIterator;
 
 import io.onetable.exception.NotSupportedException;
+import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
@@ -52,17 +53,19 @@ public class IcebergDataFileExtractor {
    *
    * @return Iceberg table file iterator
    */
-  public DataFileIterator iterator(Table iceTable) {
-    return new IcebergDataFileIterator(iceTable);
+  public DataFileIterator iterator(Table iceTable, OneTable oneTable) {
+    return new IcebergDataFileIterator(iceTable, oneTable);
   }
 
   public class IcebergDataFileIterator implements DataFileIterator {
     private final Table iceTable;
+    private final OneTable oneTable;
     private final CloseableIterator<CombinedScanTask> iceScan;
     private Iterator<OneDataFile> currentScanTaskIterator;
 
-    private IcebergDataFileIterator(Table iceTable) {
+    private IcebergDataFileIterator(Table iceTable, OneTable oneTable) {
       this.iceTable = iceTable;
+      this.oneTable = oneTable;
       this.iceScan = iceTable.newScan().planTasks().iterator();
       this.currentScanTaskIterator =
           iceScan.hasNext() ? getCurrentScanTaskIterator(iceScan.next()) : null;
@@ -105,7 +108,8 @@ public class IcebergDataFileExtractor {
               fileScanTask -> {
                 DataFile dataFile = fileScanTask.file();
                 Map<OnePartitionField, Range> onePartitionFieldRangeMap =
-                    partitionValueConverter.toOneTable(dataFile.partition(), iceTable.spec());
+                    partitionValueConverter.toOneTable(
+                        oneTable, dataFile.partition(), iceTable.spec());
                 return fromIcebergWithoutColumnStats(dataFile, onePartitionFieldRangeMap);
               })
           .iterator();
