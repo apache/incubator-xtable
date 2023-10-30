@@ -97,7 +97,8 @@ import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 
 import com.google.common.base.Preconditions;
 
-public abstract class TestAbstractHudiTable implements Closeable {
+public abstract class TestAbstractHudiTable
+    implements Closeable, GenericTable<HoodieRecord<HoodieAvroPayload>, String> {
   static {
     // ensure json modules are registered before any json serialization/deserialization
     JsonUtils.registerModules();
@@ -106,6 +107,8 @@ public abstract class TestAbstractHudiTable implements Closeable {
   protected static final String RECORD_KEY_FIELD_NAME = "key";
   protected static final Schema BASIC_SCHEMA;
 
+  // typical inserts or upserts do not use this partition value.
+  private static final String SPECIAL_PARTITION_VALUE = "GRANULAR";
   private static final Random RANDOM = new Random();
   // A list of values for the level field which serves as a basic field to partition on for tests
   private static final List<String> LEVEL_VALUES = Arrays.asList("INFO", "WARN", "ERROR");
@@ -206,8 +209,18 @@ public abstract class TestAbstractHudiTable implements Closeable {
   public abstract List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, boolean checkForNoErrors);
 
+  @Override
+  public List<HoodieRecord<HoodieAvroPayload>> insertRows(int numRecords) {
+    return insertRecords(numRecords, true);
+  }
+
   public abstract List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, Object partitionValue, boolean checkForNoErrors);
+
+  @Override
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecordsForSpecialPartition(int numRecords) {
+    return insertRecords(numRecords, SPECIAL_PARTITION_VALUE, true);
+  }
 
   public List<HoodieRecord<HoodieAvroPayload>> generateRecords(int numRecords) {
     return generateRecords(numRecords, null);
@@ -259,10 +272,40 @@ public abstract class TestAbstractHudiTable implements Closeable {
   public abstract List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
       List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors);
 
+  @Override
+  public void upsertRows(List<HoodieRecord<HoodieAvroPayload>> records) {
+    upsertRecords(records, true);
+  }
+
   public abstract List<HoodieKey> deleteRecords(
       List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors);
 
+  @Override
+  public void deleteRows(List<HoodieRecord<HoodieAvroPayload>> records) {
+    deleteRecords(records, true);
+  }
+
   public abstract void deletePartition(String partition, HoodieTableType tableType);
+
+  @Override
+  public void deletePartition(String partition) {
+    deletePartition(partition, HoodieTableType.COPY_ON_WRITE);
+  }
+
+  @Override
+  public void deleteSpecialPartition() {
+    deletePartition(SPECIAL_PARTITION_VALUE);
+  }
+
+  @Override
+  public String getOrderByColumn() {
+    return "_hoodie_record_key";
+  }
+
+  @Override
+  public List<String> getColumnsToSelect() {
+    return schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList());
+  }
 
   public abstract void compact();
 
@@ -287,6 +330,11 @@ public abstract class TestAbstractHudiTable implements Closeable {
     } finally {
       fsView.close();
     }
+  }
+
+  @Override
+  public void reload() {
+    // no-op.
   }
 
   public static void assertNoWriteErrors(List<WriteStatus> statuses) {

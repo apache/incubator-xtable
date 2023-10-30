@@ -113,12 +113,6 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
   }
 
   @Override
-  public Integer getAnyPartitionValue(List<Row> rows) {
-    Map<Integer, List<Row>> rowsByPartition = getRowsByPartition(rows);
-    return rowsByPartition.keySet().stream().findFirst().get();
-  }
-
-  @Override
   public String getOrderByColumn() {
     return "id";
   }

@@ -40,8 +40,6 @@ public interface GenericTable<T, Q> extends AutoCloseable {
 
   void deleteSpecialPartition();
 
-  Q getAnyPartitionValue(List<T> rows);
-
   String getBasePath();
 
   String getOrderByColumn();
