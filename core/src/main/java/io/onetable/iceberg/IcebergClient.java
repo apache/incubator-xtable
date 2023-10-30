@@ -41,8 +41,8 @@ import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.spi.sync.TargetClient;
 
 public class IcebergClient implements TargetClient {
@@ -60,6 +60,7 @@ public class IcebergClient implements TargetClient {
   private final int snapshotRetentionInHours;
   private Transaction transaction;
   private Table table;
+  private OneTable internalTableState;
 
   public IcebergClient(PerTableConfig perTableConfig, Configuration configuration) {
     this(
@@ -111,6 +112,7 @@ public class IcebergClient implements TargetClient {
   public void beginSync(OneTable oneTable) {
     initializeTableIfRequired(oneTable);
     transaction = table.newTransaction();
+    internalTableState = oneTable;
   }
 
   private void initializeTableIfRequired(OneTable oneTable) {
@@ -159,11 +161,12 @@ public class IcebergClient implements TargetClient {
   }
 
   @Override
-  public void syncFilesForSnapshot(OneDataFiles snapshotFiles) {
+  public void syncFilesForSnapshot(List<OneFileGroup> partitionedDataFiles) {
     dataFileUpdatesExtractor.applySnapshot(
         table,
+        internalTableState,
         transaction,
-        snapshotFiles,
+        partitionedDataFiles,
         transaction.table().schema(),
         transaction.table().spec());
   }
@@ -185,6 +188,7 @@ public class IcebergClient implements TargetClient {
         .commit();
     transaction.commitTransaction();
     transaction = null;
+    internalTableState = null;
   }
 
   private void safeDelete(String file) {

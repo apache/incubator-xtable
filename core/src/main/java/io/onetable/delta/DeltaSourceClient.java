@@ -53,9 +53,9 @@ import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
-import io.onetable.spi.extractor.PartitionedDataFileIterator;
+import io.onetable.model.storage.OneFileGroup;
+import io.onetable.spi.extractor.DataFileIterator;
 import io.onetable.spi.extractor.SourceClient;
 
 @Log4j2
@@ -100,7 +100,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
     return OneSnapshot.builder()
         .table(table)
         .schemaCatalog(getSchemaCatalog(table, snapshot.version()))
-        .dataFiles(getOneDataFiles(snapshot, table.getReadSchema()))
+        .partitionedDataFiles(getOneDataFiles(snapshot, table.getReadSchema()))
         .build();
   }
 
@@ -172,15 +172,13 @@ public class DeltaSourceClient implements SourceClient<Long> {
                 .build());
   }
 
-  private OneDataFiles getOneDataFiles(Snapshot snapshot, OneSchema schema) {
-    OneDataFiles oneDataFiles;
-    try (PartitionedDataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
+  private List<OneFileGroup> getOneDataFiles(Snapshot snapshot, OneSchema schema) {
+    try (DataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
       List<OneDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);
-      oneDataFiles = OneDataFiles.collectionBuilder().files(dataFiles).build();
+      return OneFileGroup.fromFiles(dataFiles);
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Delta data files", e);
     }
-    return oneDataFiles;
   }
 }

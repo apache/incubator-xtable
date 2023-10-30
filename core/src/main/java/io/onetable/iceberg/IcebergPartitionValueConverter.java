@@ -23,6 +23,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -43,11 +44,12 @@ import org.apache.iceberg.types.Types;
 
 import io.onetable.avro.AvroSchemaConverter;
 import io.onetable.exception.NotSupportedException;
+import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
-import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.Range;
+import io.onetable.schema.SchemaFieldFinder;
 
 /** Partition value extractor for Iceberg. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -69,11 +71,13 @@ public class IcebergPartitionValueConverter {
   }
 
   public Map<OnePartitionField, Range> toOneTable(
-      StructLike structLike, PartitionSpec partitionSpec) {
+      OneTable oneTable, StructLike structLike, PartitionSpec partitionSpec) {
     if (!partitionSpec.isPartitioned()) {
       return Collections.emptyMap();
     }
     Map<OnePartitionField, Range> partitionValues = new HashMap<>();
+    Map<OneField, Map<PartitionTransformType, OnePartitionField>> onePartitionFieldMap =
+        getOnePartitionFieldMap(oneTable);
     IndexedRecord partitionData = ((IndexedRecord) structLike);
     for (PartitionField partitionField : partitionSpec.fields()) {
       Object value;
@@ -122,19 +126,45 @@ public class IcebergPartitionValueConverter {
           throw new NotSupportedException(
               "Partition transform not supported: " + partitionField.transform().toString());
       }
-      OneSchema fieldSchema =
-          SCHEMA_CONVERTER.toOneSchema(
-              partitionData.getSchema().getFields().get(fieldPosition).schema());
-      int splitPoint = partitionField.name().lastIndexOf(DOT);
-      String fieldName = partitionField.name().substring(splitPoint + 1);
-      String path = splitPoint == -1 ? null : partitionField.name().substring(0, splitPoint);
+      Types.NestedField partitionSourceField =
+          partitionSpec.schema().findField(partitionField.sourceId());
       OneField sourceField =
-          OneField.builder().name(fieldName).parentPath(path).schema(fieldSchema).build();
+          SchemaFieldFinder.getInstance()
+              .findFieldByPath(oneTable.getReadSchema(), partitionSourceField.name());
+      // This helps reduce creating these objects for each file processed and re-using them.
       OnePartitionField onePartitionField =
-          OnePartitionField.builder().sourceField(sourceField).transformType(transformType).build();
+          getFromOnePartitionFieldMap(onePartitionFieldMap, sourceField, transformType);
       partitionValues.put(onePartitionField, Range.scalar(value));
     }
     return partitionValues;
+  }
+
+  private OnePartitionField getFromOnePartitionFieldMap(
+      Map<OneField, Map<PartitionTransformType, OnePartitionField>> onePartitionFieldMap,
+      OneField sourceField,
+      PartitionTransformType transformType) {
+    if (!onePartitionFieldMap.containsKey(sourceField)) {
+      throw new IllegalStateException(
+          "Partition field not found for source field: " + sourceField.getName());
+    }
+    if (!onePartitionFieldMap.get(sourceField).containsKey(transformType)) {
+      throw new IllegalStateException(
+          "Partition field not found for source field: "
+              + sourceField.getName()
+              + " and transform type: "
+              + transformType);
+    }
+    return onePartitionFieldMap.get(sourceField).get(transformType);
+  }
+
+  private Map<OneField, Map<PartitionTransformType, OnePartitionField>> getOnePartitionFieldMap(
+      OneTable oneTable) {
+    List<OnePartitionField> onePartitionFields = oneTable.getPartitioningFields();
+    return onePartitionFields.stream()
+        .collect(
+            Collectors.groupingBy(
+                OnePartitionField::getSourceField,
+                Collectors.toMap(OnePartitionField::getTransformType, Function.identity())));
   }
 
   private static String escapeFieldName(String fieldName) {
