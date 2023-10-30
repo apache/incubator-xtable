@@ -859,4 +859,38 @@ public class TestDeltaSchemaExtractor {
         oneSchemaRepresentation,
         DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
   }
+
+  @Test
+  void generateColumnsAreNotTranslatedToInternalSchema() {
+    StructType structRepresentation =
+        new StructType()
+            .add("birthDate", DataTypes.TimestampType, false)
+            .add(
+                "birthYear",
+                DataTypes.TimestampType,
+                true,
+                Metadata.fromJson("{\"delta.generationExpression\":\"YEAR(birthDate)\"}"));
+    OneSchema oneSchemaRepresentation =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .name("struct")
+            .fields(
+                Collections.singletonList(
+                    OneField.builder()
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .metadata(
+                                    Collections.singletonMap(
+                                        OneSchema.MetadataKey.TIMESTAMP_PRECISION,
+                                        OneSchema.MetadataValue.MICROS))
+                                .build())
+                        .name("birthDate")
+                        .build()))
+            .build();
+    Assertions.assertEquals(
+        oneSchemaRepresentation,
+        DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
+  }
 }
