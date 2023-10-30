@@ -149,8 +149,10 @@ public class TestDeltaHelper {
                   .generatedAlwaysAs("YEAR(birthDate)")
                   .build())
           .partitionedBy("yearOfBirth");
-    } else if (partitionField != null && !partitionField.isEmpty()) {
+    } else if ("level".equals(partitionField)) {
       tableBuilder.partitionedBy(partitionField);
+    } else if (partitionField != null) {
+      throw new IllegalArgumentException("Unexpected partition field: " + partitionField);
     }
     if (includeAdditionalColumns) {
       tableBuilder.addColumn("street", StringType);
@@ -160,27 +162,27 @@ public class TestDeltaHelper {
 
   public Row generateRandomRow() {
     int year = 2013 + RANDOM.nextInt(11);
-    String level = LEVEL_VALUES.get(RANDOM.nextInt(LEVEL_VALUES.size()));
-    return generateRandomRowForGivenYear(year, level);
+    String levelValue = LEVEL_VALUES.get(RANDOM.nextInt(LEVEL_VALUES.size()));
+    return generateRandomRowForGivenYearAndLevel(year, levelValue);
   }
 
-  public Row generateRandomRowForGivenYear(int year, String level) {
-    return RowFactory.create(generateRandomValuesForGivenYear(year, level));
+  public Row generateRandomRowForGivenYearAndLevel(int year, String level) {
+    return RowFactory.create(generateRandomValuesForGivenYearAndLevel(year, level));
   }
 
   /*
    * Generates a random row for the given schema and additional columns. Additional columns
-   * are appended to the end. String values are generated for additional columns.
+   * are appended to the end. Random values are generated for additional columns.
    */
-  private Object[] generateRandomValuesForGivenYear(int yearValue, String level) {
+  private Object[] generateRandomValuesForGivenYearAndLevel(int yearValue, String levelValue) {
     Object[] row = new Object[tableStructSchema.size()];
     for (int i = 0; i < tableStructSchema.size(); i++) {
-      row[i] = generateValueForField(tableStructSchema.fields()[i], yearValue, level);
+      row[i] = generateValueForField(tableStructSchema.fields()[i], yearValue, levelValue);
     }
     return row;
   }
 
-  private Object generateValueForField(StructField field, int yearValue, String level) {
+  private Object generateValueForField(StructField field, int yearValue, String levelValue) {
     switch (field.name()) {
       case "id":
         return RANDOM.nextInt(1000000) + 1;
@@ -191,7 +193,7 @@ public class TestDeltaHelper {
       case "yearOfBirth":
         return yearValue;
       case "level":
-        return level;
+        return levelValue;
       default:
         return getRandomValueForField(field.dataType(), field.nullable());
     }
@@ -284,7 +286,7 @@ public class TestDeltaHelper {
 
   public List<Row> generateRowsForSpecificPartition(int numRows, int partitionValue, String level) {
     return IntStream.range(0, numRows)
-        .mapToObj(i -> generateRandomRowForGivenYear(partitionValue, level))
+        .mapToObj(i -> generateRandomRowForGivenYearAndLevel(partitionValue, level))
         .collect(Collectors.toList());
   }
 }
