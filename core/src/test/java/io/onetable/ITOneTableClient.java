@@ -201,43 +201,19 @@ public class ITOneTableClient {
               .syncMode(syncMode)
               .build();
       oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          sourceTableFormat,
-          table.getOrderByColumn(),
-          targetTableFormats,
-          table.getBasePath(),
-          100,
-          table.getColumnsToSelect());
+      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 100);
 
       table.insertRows(100);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          sourceTableFormat,
-          table.getOrderByColumn(),
-          targetTableFormats,
-          table.getBasePath(),
-          200,
-          table.getColumnsToSelect());
+      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 200);
 
       table.upsertRows(insertRecords.subList(0, 20));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          sourceTableFormat,
-          table.getOrderByColumn(),
-          targetTableFormats,
-          table.getBasePath(),
-          200,
-          table.getColumnsToSelect());
+      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 200);
 
       table.deleteRows(insertRecords.subList(30, 50));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          sourceTableFormat,
-          table.getOrderByColumn(),
-          targetTableFormats,
-          table.getBasePath(),
-          180,
-          table.getColumnsToSelect());
+      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 180);
     }
 
     try (GenericTable tableWithUpdatedSchema =
@@ -257,57 +233,27 @@ public class ITOneTableClient {
       List<Row> insertsAfterSchemaUpdate = tableWithUpdatedSchema.insertRows(100);
       tableWithUpdatedSchema.reload();
       oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          sourceTableFormat,
-          tableWithUpdatedSchema.getOrderByColumn(),
-          targetTableFormats,
-          tableWithUpdatedSchema.getBasePath(),
-          280,
-          tableWithUpdatedSchema.getColumnsToSelect());
+      checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 280);
 
       tableWithUpdatedSchema.deleteRows(insertsAfterSchemaUpdate.subList(60, 90));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          sourceTableFormat,
-          tableWithUpdatedSchema.getOrderByColumn(),
-          targetTableFormats,
-          tableWithUpdatedSchema.getBasePath(),
-          250,
-          tableWithUpdatedSchema.getColumnsToSelect());
+      checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 250);
 
       if (isPartitioned) {
         // Adds new partition.
         tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
         oneTableClient.sync(perTableConfig, sourceClientProvider);
-        checkDatasetEquivalence(
-            sourceTableFormat,
-            tableWithUpdatedSchema.getOrderByColumn(),
-            targetTableFormats,
-            tableWithUpdatedSchema.getBasePath(),
-            300,
-            tableWithUpdatedSchema.getColumnsToSelect());
+        checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 300);
 
         // Drops partition.
         tableWithUpdatedSchema.deleteSpecialPartition();
         oneTableClient.sync(perTableConfig, sourceClientProvider);
-        checkDatasetEquivalence(
-            sourceTableFormat,
-            tableWithUpdatedSchema.getOrderByColumn(),
-            targetTableFormats,
-            tableWithUpdatedSchema.getBasePath(),
-            250,
-            tableWithUpdatedSchema.getColumnsToSelect());
+        checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 250);
 
         // Insert records to the dropped partition again.
         tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
         oneTableClient.sync(perTableConfig, sourceClientProvider);
-        checkDatasetEquivalence(
-            sourceTableFormat,
-            tableWithUpdatedSchema.getOrderByColumn(),
-            targetTableFormats,
-            tableWithUpdatedSchema.getBasePath(),
-            300,
-            tableWithUpdatedSchema.getColumnsToSelect());
+        checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 300);
       }
     }
   }
@@ -346,22 +292,10 @@ public class ITOneTableClient {
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
 
-      checkDatasetEquivalence(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          targetTableFormats,
-          table.getBasePath(),
-          50,
-          table.getColumnsToSelect());
+      checkDatasetEquivalence(TableFormat.HUDI, table, targetTableFormats, 50);
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-      checkDatasetEquivalence(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          targetTableFormats,
-          table.getBasePath(),
-          100,
-          table.getColumnsToSelect());
+      checkDatasetEquivalence(TableFormat.HUDI, table, targetTableFormats, 100);
     }
   }
 
@@ -390,13 +324,7 @@ public class ITOneTableClient {
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-      checkDatasetEquivalence(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          targetTableFormats,
-          table.getBasePath(),
-          50,
-          table.getColumnsToSelect());
+      checkDatasetEquivalence(TableFormat.HUDI, table, targetTableFormats, 50);
 
       table.deleteRecords(insertedRecords1.subList(0, 20), true);
       // At this point table should have 30 records but only after compaction.
@@ -409,36 +337,26 @@ public class ITOneTableClient {
       // Because compaction is not completed yet and read optimized query, there are 100 records.
       checkDatasetEquivalence(
           TableFormat.HUDI,
+          table,
           sourceHudiOptions,
-          "_hoodie_record_key",
           targetTableFormats,
           Collections.emptyMap(),
-          table.getBasePath(),
-          100,
-          table.getColumnsToSelect());
+          100);
 
       table.insertRecords(50, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       // Because compaction is not completed yet and read optimized query, there are 150 records.
       checkDatasetEquivalence(
           TableFormat.HUDI,
+          table,
           sourceHudiOptions,
-          "_hoodie_record_key",
           targetTableFormats,
           Collections.emptyMap(),
-          table.getBasePath(),
-          150,
-          table.getColumnsToSelect());
+          150);
 
       table.completeScheduledCompaction(scheduledCompactionInstant);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
-      checkDatasetEquivalence(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          targetTableFormats,
-          table.getBasePath(),
-          130,
-          table.getColumnsToSelect());
+      checkDatasetEquivalence(TableFormat.HUDI, table, targetTableFormats, 130);
     }
   }
 
@@ -449,8 +367,7 @@ public class ITOneTableClient {
   public void testTimeTravelQueries(TableFormat sourceTableFormat) throws Exception {
     String tableName = getTableName();
     try (GenericTable table =
-             GenericTable.getInstance(
-                 tableName, tempDir, sparkSession, jsc, sourceTableFormat, false)) {
+        GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, false)) {
       table.insertRows(50);
       List<TableFormat> targetTableFormats = getOtherFormats(sourceTableFormat);
       PerTableConfig perTableConfig =
@@ -478,8 +395,8 @@ public class ITOneTableClient {
 
       checkDatasetEquivalence(
           sourceTableFormat,
+          table,
           getTimeTravelOption(sourceTableFormat, instantAfterFirstSync),
-          table.getOrderByColumn(),
           targetTableFormats,
           targetTableFormats.stream()
               .collect(
@@ -487,13 +404,11 @@ public class ITOneTableClient {
                       Function.identity(),
                       targetTableFormat ->
                           getTimeTravelOption(targetTableFormat, instantAfterFirstSync))),
-          table.getBasePath(),
-          50,
-          table.getColumnsToSelect());
+          50);
       checkDatasetEquivalence(
           sourceTableFormat,
+          table,
           getTimeTravelOption(sourceTableFormat, instantAfterSecondSync),
-          table.getOrderByColumn(),
           targetTableFormats,
           targetTableFormats.stream()
               .collect(
@@ -501,9 +416,7 @@ public class ITOneTableClient {
                       Function.identity(),
                       targetTableFormat ->
                           getTimeTravelOption(targetTableFormat, instantAfterSecondSync))),
-          table.getBasePath(),
-          100,
-          table.getColumnsToSelect());
+          100);
     }
   }
 
@@ -580,13 +493,7 @@ public class ITOneTableClient {
       table.insertRecords(100, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
 
-      checkDatasetEquivalenceWithFilter(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          targetTableFormats,
-          table.getBasePath(),
-          filter,
-          table.getColumnsToSelect());
+      checkDatasetEquivalenceWithFilter(TableFormat.HUDI, table, targetTableFormats, filter);
     }
   }
 
@@ -618,38 +525,18 @@ public class ITOneTableClient {
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfigIceberg, hudiSourceClientProvider);
       checkDatasetEquivalence(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          Collections.singletonList(TableFormat.ICEBERG),
-          table.getBasePath(),
-          100,
-          table.getColumnsToSelect());
+          TableFormat.HUDI, table, Collections.singletonList(TableFormat.ICEBERG), 100);
       oneTableClient.sync(perTableConfigDelta, hudiSourceClientProvider);
       checkDatasetEquivalence(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          Collections.singletonList(TableFormat.DELTA),
-          table.getBasePath(),
-          100,
-          table.getColumnsToSelect());
+          TableFormat.HUDI, table, Collections.singletonList(TableFormat.DELTA), 100);
 
       table.insertRecords(100, true);
       oneTableClient.sync(perTableConfigIceberg, hudiSourceClientProvider);
       checkDatasetEquivalence(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          Collections.singletonList(TableFormat.ICEBERG),
-          table.getBasePath(),
-          200,
-          table.getColumnsToSelect());
+          TableFormat.HUDI, table, Collections.singletonList(TableFormat.ICEBERG), 200);
       oneTableClient.sync(perTableConfigDelta, hudiSourceClientProvider);
       checkDatasetEquivalence(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          Collections.singletonList(TableFormat.DELTA),
-          table.getBasePath(),
-          200,
-          table.getColumnsToSelect());
+          TableFormat.HUDI, table, Collections.singletonList(TableFormat.DELTA), 200);
     }
   }
 
@@ -702,23 +589,13 @@ public class ITOneTableClient {
       // sync iceberg only
       oneTableClient.sync(singleTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          Collections.singletonList(TableFormat.ICEBERG),
-          table.getBasePath(),
-          50,
-          table.getColumnsToSelect());
+          TableFormat.HUDI, table, Collections.singletonList(TableFormat.ICEBERG), 50);
       // insert more records
       table.insertRecords(50, true);
       // iceberg will be an incremental sync and delta will need to bootstrap with snapshot sync
       oneTableClient.sync(dualTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-          table.getBasePath(),
-          100,
-          table.getColumnsToSelect());
+          TableFormat.HUDI, table, Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), 100);
 
       // insert more records
       table.insertRecords(50, true);
@@ -727,24 +604,14 @@ public class ITOneTableClient {
       // incremental sync for two commits for iceberg only
       oneTableClient.sync(singleTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          Collections.singletonList(TableFormat.ICEBERG),
-          table.getBasePath(),
-          200,
-          table.getColumnsToSelect());
+          TableFormat.HUDI, table, Collections.singletonList(TableFormat.ICEBERG), 200);
 
       // insert more records
       table.insertRecords(50, true);
       // incremental sync for one commit for iceberg and three commits for delta
       oneTableClient.sync(dualTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
-          TableFormat.HUDI,
-          "_hoodie_record_key",
-          Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-          table.getBasePath(),
-          250,
-          table.getColumnsToSelect());
+          TableFormat.HUDI, table, Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), 250);
     }
   }
 
@@ -815,80 +682,66 @@ public class ITOneTableClient {
 
   private void checkDatasetEquivalenceWithFilter(
       TableFormat sourceFormat,
-      String orderByKeyColumn,
+      GenericTable<?, ?> sourceTable,
       List<TableFormat> targetFormats,
-      String basePath,
-      String filter,
-      List<String> columnsToSelect) {
+      String filter) {
     checkDatasetEquivalence(
         sourceFormat,
+        sourceTable,
         Collections.emptyMap(),
-        orderByKeyColumn,
         targetFormats,
         Collections.emptyMap(),
-        basePath,
         null,
-        filter,
-        columnsToSelect);
+        filter);
   }
 
   private void checkDatasetEquivalence(
       TableFormat sourceFormat,
-      String orderByKeyColumn,
+      GenericTable<?, ?> sourceTable,
       List<TableFormat> targetFormats,
-      String basePath,
-      Integer expectedCount,
-      List<String> columnsToSelect) {
+      Integer expectedCount) {
     checkDatasetEquivalence(
         sourceFormat,
+        sourceTable,
         Collections.emptyMap(),
-        orderByKeyColumn,
         targetFormats,
         Collections.emptyMap(),
-        basePath,
         expectedCount,
-        "1 = 1",
-        columnsToSelect);
+        "1 = 1");
   }
 
   private void checkDatasetEquivalence(
       TableFormat sourceFormat,
+      GenericTable<?, ?> sourceTable,
       Map<String, String> sourceOptions,
-      String orderByKeyColumn,
       List<TableFormat> targetFormats,
       Map<TableFormat, Map<String, String>> targetOptions,
-      String basePath,
-      Integer expectedCount,
-      List<String> columnsToSelect) {
+      Integer expectedCount) {
     checkDatasetEquivalence(
         sourceFormat,
+        sourceTable,
         sourceOptions,
-        orderByKeyColumn,
         targetFormats,
         targetOptions,
-        basePath,
         expectedCount,
-        "1 = 1",
-        columnsToSelect);
+        "1 = 1");
   }
 
   private void checkDatasetEquivalence(
       TableFormat sourceFormat,
+      GenericTable<?, ?> sourceTable,
       Map<String, String> sourceOptions,
-      String orderByKeyColumn,
       List<TableFormat> targetFormats,
       Map<TableFormat, Map<String, String>> targetOptions,
-      String basePath,
       Integer expectedCount,
-      String filterCondition,
-      List<String> columnsToSelect) {
+      String filterCondition) {
     Dataset<Row> sourceRows =
         sparkSession
             .read()
             .options(sourceOptions)
             .format(sourceFormat.name().toLowerCase())
-            .load(basePath)
-            .orderBy(orderByKeyColumn)
+            .load(sourceTable.getBasePath())
+            .orderBy(sourceTable.getOrderByColumn())
             .filter(filterCondition);
     Map<TableFormat, Dataset<Row>> targetRowsByFormat =
         targetFormats.stream()
@@ -908,12 +761,12 @@ public class ITOneTableClient {
                           .read()
                           .options(finalTargetOptions)
                           .format(targetFormat.name().toLowerCase())
-                          .load(basePath)
-                          .orderBy(orderByKeyColumn)
+                          .load(sourceTable.getBasePath())
+                          .orderBy(sourceTable.getOrderByColumn())
                           .filter(filterCondition);
                     }));
 
-    String[] selectColumnsArr = columnsToSelect.toArray(new String[] {});
+    String[] selectColumnsArr = sourceTable.getColumnsToSelect().toArray(new String[] {});
     List<String> dataset1Rows = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
     targetRowsByFormat.forEach(
         (format, targetRows) -> {

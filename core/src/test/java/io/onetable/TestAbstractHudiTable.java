@@ -504,7 +504,11 @@ public abstract class TestAbstractHudiTable implements Closeable {
     fs.mkdirs(new org.apache.hadoop.fs.Path(basePath));
 
     if (fs.exists(new org.apache.hadoop.fs.Path(basePath + "/.hoodie"))) {
-      return HoodieTableMetaClient.builder().setConf(conf).setBasePath(basePath).setLoadActiveTimelineOnLoad(true).build();
+      return HoodieTableMetaClient.builder()
+          .setConf(conf)
+          .setBasePath(basePath)
+          .setLoadActiveTimelineOnLoad(true)
+          .build();
     }
     Properties properties =
         HoodieTableMetaClient.withPropertyBuilder()
