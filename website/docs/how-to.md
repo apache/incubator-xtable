@@ -2,6 +2,9 @@
 sidebar_position: 1
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Creating your first interoperable table
 
 :::danger Important
@@ -36,14 +39,47 @@ For the purpose of this tutorial, we will walk through the steps to using Onetab
 :::tip Note:
 You can choose to follow this example with `spark-sql` or `spark-shell` as well.
 :::
-   
+
+<Tabs
+groupId="table-format"
+defaultValue="hudi"
+values={[
+{ label: 'Hudi', value: 'hudi', },
+{ label: 'Delta', value: 'delta', },
+{ label: 'Iceberg', value: 'iceberg', },
+]}
+>
+<TabItem value="hudi">
+
 ```shell md title="shell"
 pyspark \
---packages org.apache.hudi:hudi-spark3.2-bundle_2.12:0.14.0 \
---conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" \
---conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog" \
---conf "spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension"
+  --packages org.apache.hudi:hudi-spark3.2-bundle_2.12:0.14.0 \
+  --conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" \
+  --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog" \
+  --conf "spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension"
 ```
+</TabItem>
+
+<TabItem value="delta">
+
+```shell md title="shell"
+pyspark \
+  --packages io.delta:delta-core_2.12:2.1.0 \
+  --conf "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension" \
+  --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
+```
+</TabItem>
+
+<TabItem value="iceberg">
+
+```shell md title="shell"
+pyspark \
+  --packages org.apache.iceberg:iceberg-spark-runtime-3.2_2.12:1.4.1 \
+  --conf "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
+  --conf "spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog"
+```
+</TabItem>
+</Tabs>
 
 :::tip Note:
 If you instead want to write your table to Amazon S3 or Google Cloud Storage,
@@ -54,52 +90,148 @@ your spark session will need additional configurations
 
 
 ### Create dataset 
-Write a Hudi table locally
-```python md title="pyspark"
+Write a source table locally.
+
+<Tabs
+groupId="table-format"
+defaultValue="hudi"
+values={[
+{ label: 'Hudi', value: 'hudi', },
+{ label: 'Delta', value: 'delta', },
+{ label: 'Iceberg', value: 'iceberg', },
+]}
+>
+<TabItem value="hudi">
+
+```python md title="python"
 from pyspark.sql.types import *
 
 # initialize the bucket
-table_name = "trips_data"
-local_base_path = "/tmp/onetable-data"
+table_name = "people"
+local_base_path = "/tmp/hudi-dataset"
 
-# generate data
-quickstart_utils = sc._jvm.org.apache.hudi.QuickstartUtils
-dataGen = quickstart_utils.DataGenerator()
-inserts = sc._jvm.org.apache.hudi.QuickstartUtils.convertToStringList(dataGen.generateInserts(10))
+records = [
+   (1, 'John', 25, 'NYC', '2023-09-28 00:00:00'),
+   (2, 'Emily', 30, 'SFO', '2023-09-28 00:00:00'),
+   (3, 'Michael', 35, 'ORD', '2023-09-28 00:00:00'),
+   (4, 'Andrew', 40, 'NYC', '2023-10-28 00:00:00'),
+   (5, 'Bob', 28, 'SEA', '2023-09-23 00:00:00'),
+   (6, 'Charlie', 31, 'DFW', '2023-08-29 00:00:00')
+]
 
-# write to local
-df = spark.read.json(spark.sparkContext.parallelize(inserts, 2))
+schema = StructType([
+   StructField("id", IntegerType(), True),
+   StructField("name", StringType(), True),
+   StructField("age", IntegerType(), True),
+   StructField("city", StringType(), True),
+   StructField("create_ts", StringType(), True)
+])
+
+df = spark.createDataFrame(records, schema)
 
 hudi_options = {
    'hoodie.table.name': table_name,
-   'hoodie.datasource.write.partitionpath.field': 'partitionpath'
+   'hoodie.datasource.write.partitionpath.field': 'city'
 }
 
 (
    df.write.format("hudi")
-      .options(**hudi_options)
-      .mode("overwrite")
-      .save(f"{local_base_path}/{table_name}")
+   .options(**hudi_options)
+   .save(f"{local_base_path}/{table_name}")
 )
 ```
+</TabItem>
+
+<TabItem value="delta">
+
+```python md title="python"
+from pyspark.sql.types import *
+
+# initialize the bucket
+table_name = "people"
+local_base_path = "/tmp/delta-dataset"
+
+records = [
+   (1, 'John', 25, 'NYC', '2023-09-28 00:00:00'),
+   (2, 'Emily', 30, 'SFO', '2023-09-28 00:00:00'),
+   (3, 'Michael', 35, 'ORD', '2023-09-28 00:00:00'),
+   (4, 'Andrew', 40, 'NYC', '2023-10-28 00:00:00'),
+   (5, 'Bob', 28, 'SEA', '2023-09-23 00:00:00'),
+   (6, 'Charlie', 31, 'DFW', '2023-08-29 00:00:00')
+]
+
+schema = StructType([
+   StructField("id", IntegerType(), True),
+   StructField("name", StringType(), True),
+   StructField("age", IntegerType(), True),
+   StructField("city", StringType(), True),
+   StructField("create_ts", StringType(), True)
+])
+
+df = spark.createDataFrame(records, schema)
+
+(
+   df.write.format("delta")
+   .partitionBy("city")
+   .save(f"{local_base_path}/{table_name}")
+)
+```
+</TabItem>
+
+<TabItem value="iceberg">
+
+```python md title="python"
+from pyspark.sql.types import *
+
+# initialize the bucket
+table_name = "people"
+local_base_path = "/tmp/iceberg-dataset"
+
+records = [
+   (1, 'John', 25, 'NYC', '2023-09-28 00:00:00'),
+   (2, 'Emily', 30, 'SFO', '2023-09-28 00:00:00'),
+   (3, 'Michael', 35, 'ORD', '2023-09-28 00:00:00'),
+   (4, 'Andrew', 40, 'NYC', '2023-10-28 00:00:00'),
+   (5, 'Bob', 28, 'SEA', '2023-09-23 00:00:00'),
+   (6, 'Charlie', 31, 'DFW', '2023-08-29 00:00:00')
+]
+
+schema = StructType([
+   StructField("id", IntegerType(), True),
+   StructField("name", StringType(), True),
+   StructField("age", IntegerType(), True),
+   StructField("city", StringType(), True),
+   StructField("create_ts", StringType(), True)
+])
+
+df = spark.createDataFrame(records, schema)
+
+(
+   df.write
+   .format("iceberg")
+   .partitionBy("city")
+   .save(f"{local_base_path}/{table_name}")
+)
+```
+</TabItem>
+</Tabs>
+
 
 ### Running sync 
 
 Create `my_config.yaml` in the cloned onetable directory.
 
-```yaml  md title="yaml"
-sourceFormat: HUDI
-targetFormats:
-  - DELTA
-  - ICEBERG
-datasets:
-  -
-    tableBasePath: /tmp/onetable-data/hudi_trips_data
-    tableName: hudi_trips_data
-    partitionSpec: partitionpath:VALUE
-```
-**Optional:** If your source table exists in Amazon S3 or Google Cloud Storage, 
-you should use a `yaml` file similar to below..
+<Tabs
+groupId="table-format"
+defaultValue="hudi"
+values={[
+{ label: 'Hudi', value: 'hudi', },
+{ label: 'Delta', value: 'delta', },
+{ label: 'Iceberg', value: 'iceberg', },
+]}
+>
+
+<TabItem value="hudi">
 
 ```yaml  md title="yaml"
 sourceFormat: HUDI
@@ -108,10 +240,103 @@ targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: s3://path/to/trips/data  # replace this with gs://path/to/trips/data if your data is in GCS. 
-    tableName: hudi_trips_data
-    partitionSpec: partitionpath:VALUE
+    tableBasePath: /tmp/hudi-dataset/people
+    tableName: people
+    partitionSpec: city:VALUE
 ```
+</TabItem>
+
+<TabItem value="delta">
+
+```yaml  md title="yaml"
+sourceFormat: DELTA
+targetFormats:
+  - HUDI
+  - ICEBERG
+datasets:
+  -
+    tableBasePath: /tmp/delta-dataset/people
+    tableName: people
+    partitionSpec: city:VALUE
+```
+</TabItem>
+
+<TabItem value="iceberg">
+
+```yaml  md title="yaml"
+sourceFormat: ICEBERG
+targetFormats:
+  - HUDI
+  - DELTA
+datasets:
+  -
+    tableBasePath: /tmp/iceberg-dataset/people
+    tableName: people
+    partitionSpec: city:VALUE
+```
+</TabItem>
+</Tabs>
+
+**Optional:** If your source table exists in Amazon S3 or Google Cloud Storage, 
+you should use a `yaml` file similar to below..
+
+<Tabs
+groupId="table-format"
+defaultValue="hudi"
+values={[
+{ label: 'Hudi', value: 'hudi', },
+{ label: 'Delta', value: 'delta', },
+{ label: 'Iceberg', value: 'iceberg', },
+]}
+>
+<TabItem value="hudi">
+
+```yaml  md title="yaml"
+sourceFormat: HUDI
+targetFormats:
+  - DELTA
+  - ICEBERG
+datasets:
+  -
+    tableBasePath: s3://path/to/hudi_data  # replace this with gs://path/to/hudi_data if your data is in GCS. 
+    tableName: people
+    partitionSpec: city:VALUE
+```
+
+</TabItem>
+
+<TabItem value="delta">
+
+```yaml  md title="yaml"
+sourceFormat: HUDI
+targetFormats:
+  - DELTA
+  - ICEBERG
+datasets:
+  -
+    tableBasePath: s3://path/to/delta_data  # replace this with gs://path/to/delta_data if your data is in GCS. 
+    tableName: people
+    partitionSpec: city:VALUE
+```
+
+</TabItem>
+
+<TabItem value="iceberg">
+
+```yaml  md title="yaml"
+sourceFormat: HUDI
+targetFormats:
+  - DELTA
+  - ICEBERG
+datasets:
+  -
+    tableBasePath: s3://path/to/iceberg_data  # replace this with gs://path/to/icberg_data if your data is in GCS. 
+    tableName: people
+    partitionSpec: city:VALUE
+```
+
+</TabItem>
+</Tabs>
 
 :::tip Note:
 Authentication for AWS is done with `com.amazonaws.auth.DefaultAWSCredentialsProviderChain`. 
