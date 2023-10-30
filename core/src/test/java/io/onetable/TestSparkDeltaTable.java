@@ -158,7 +158,11 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
 
   @Override
   public void deleteSpecialPartition() {
-    deletePartition(SPECIAL_PARTITION_VALUE);
+    if (partitionField.equals("level")) {
+      deletePartition(SPECIAL_PARTITION_VALUE);
+    } else {
+      deletePartition(SPECIAL_DATE_PARTITION_VALUE);
+    }
   }
 
   public void runCompaction() {
