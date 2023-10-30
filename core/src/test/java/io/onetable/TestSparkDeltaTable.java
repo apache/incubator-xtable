@@ -49,41 +49,41 @@ import io.delta.tables.DeltaTable;
 import io.onetable.delta.TestDeltaHelper;
 
 @Getter
-public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeable {
+public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable {
   // typical inserts or upserts do not use this partition value.
-  private static final Integer SPECIAL_PARTITION_VALUE = 1990;
+  private static final Integer SPECIAL_DATE_PARTITION_VALUE = 1990;
   private final String tableName;
   private final String basePath;
   private final SparkSession sparkSession;
   private final TestDeltaHelper testDeltaHelper;
-  private final boolean tableIsPartitioned;
+  private final String partitionField;
   private final boolean includeAdditionalColumns;
   DeltaLog deltaLog;
   DeltaTable deltaTable;
 
   public static TestSparkDeltaTable forStandardSchemaAndPartitioning(
-      String tableName, Path tempDir, SparkSession sparkSession, boolean isPartitioned) {
-    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned, false);
+      String tableName, Path tempDir, SparkSession sparkSession, String partitionField) {
+    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, partitionField, false);
   }
 
   public static TestSparkDeltaTable forSchemaWithAdditionalColumnsAndPartitioning(
-      String tableName, Path tempDir, SparkSession sparkSession, boolean isPartitioned) {
-    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned, true);
+      String tableName, Path tempDir, SparkSession sparkSession, String partitionField) {
+    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, partitionField, true);
   }
 
   public TestSparkDeltaTable(
       String name,
       Path tempDir,
       SparkSession sparkSession,
-      boolean isPartitioned,
+      String partitionField,
       boolean includeAdditionalColumns) {
     try {
       this.tableName = name;
       this.basePath = initBasePath(tempDir, tableName);
       this.sparkSession = sparkSession;
-      this.tableIsPartitioned = isPartitioned;
+      this.partitionField = partitionField;
       this.includeAdditionalColumns = includeAdditionalColumns;
-      this.testDeltaHelper = createTestDataHelper(isPartitioned, includeAdditionalColumns);
+      this.testDeltaHelper = createTestDataHelper(partitionField, includeAdditionalColumns);
       testDeltaHelper.createTable(sparkSession, tableName, basePath);
       this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
       this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
@@ -101,7 +101,11 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
   }
 
   public List<Row> insertRowsForPartition(int numRows, Integer partitionValue) {
-    List<Row> rows = testDeltaHelper.generateRowsForSpecificPartition(numRows, partitionValue);
+    return insertRowsForPartition(numRows, partitionValue, partitionField);
+  }
+
+  public List<Row> insertRowsForPartition(int numRows, Integer year, String level) {
+    List<Row> rows = testDeltaHelper.generateRowsForSpecificPartition(numRows, year, level);
     Dataset<Row> df = sparkSession.createDataFrame(rows, testDeltaHelper.getTableStructSchema());
     df.write().format("delta").mode("append").save(basePath);
     return rows;
@@ -109,13 +113,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
 
   @Override
   public List<Row> insertRecordsForSpecialPartition(int numRows) {
-    return insertRowsForPartition(numRows, SPECIAL_PARTITION_VALUE);
-  }
-
-  @Override
-  public Integer getAnyPartitionValue(List<Row> rows) {
-    Map<Integer, List<Row>> rowsByPartition = getRowsByPartition(rows);
-    return rowsByPartition.keySet().stream().findFirst().get();
+    return insertRowsForPartition(numRows, SPECIAL_DATE_PARTITION_VALUE, SPECIAL_PARTITION_VALUE);
   }
 
   @Override
@@ -150,17 +148,24 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
   }
 
   @Override
-  public void deletePartition(Integer partitionValue) {
+  public void deletePartition(Object partitionValue) {
     Preconditions.checkArgument(
-        tableIsPartitioned,
+        partitionField != null,
         "Invalid operation! Delete partition is only supported for partitioned tables.");
-    Column condition = functions.col("yearOfBirth").equalTo(partitionValue);
+    Column condition = functions.col(partitionField).equalTo(partitionValue);
     deltaTable.delete(condition);
   }
 
   @Override
   public void deleteSpecialPartition() {
-    deletePartition(SPECIAL_PARTITION_VALUE);
+    if (partitionField.equals("level")) {
+      deletePartition(SPECIAL_PARTITION_VALUE);
+    } else if (partitionField.equals("yearOfBirth")) {
+      deletePartition(SPECIAL_DATE_PARTITION_VALUE);
+    } else {
+      throw new IllegalArgumentException(
+          "Delete special partition is only supported for tables partitioned on level or yearOfBirth");
+    }
   }
 
   public void runCompaction() {

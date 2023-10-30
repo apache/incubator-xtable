@@ -19,6 +19,7 @@
 package io.onetable;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,6 +29,10 @@ import org.apache.spark.sql.SparkSession;
 import io.onetable.model.storage.TableFormat;
 
 public interface GenericTable<T, Q> extends AutoCloseable {
+  // A list of values for the level field which serves as a basic field to partition on for tests
+  List<String> LEVEL_VALUES = Arrays.asList("INFO", "WARN", "ERROR");
+  // typical inserts or upserts do not use this partition value.
+  String SPECIAL_PARTITION_VALUE = "FATAL";
 
   List<T> insertRows(int numRows);
 
@@ -40,8 +45,6 @@ public interface GenericTable<T, Q> extends AutoCloseable {
   void deletePartition(Q partitionValue);
 
   void deleteSpecialPartition();
-
-  Q getAnyPartitionValue(List<T> rows);
 
   String getBasePath();
 
@@ -66,7 +69,7 @@ public interface GenericTable<T, Q> extends AutoCloseable {
             tableName, tempDir, jsc, isPartitioned);
       case DELTA:
         return TestSparkDeltaTable.forStandardSchemaAndPartitioning(
-            tableName, tempDir, sparkSession, isPartitioned);
+            tableName, tempDir, sparkSession, isPartitioned ? "level" : null);
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
     }
@@ -85,7 +88,7 @@ public interface GenericTable<T, Q> extends AutoCloseable {
             tableName, tempDir, jsc, isPartitioned);
       case DELTA:
         return TestSparkDeltaTable.forSchemaWithAdditionalColumnsAndPartitioning(
-            tableName, tempDir, sparkSession, isPartitioned);
+            tableName, tempDir, sparkSession, isPartitioned ? "level" : null);
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
     }

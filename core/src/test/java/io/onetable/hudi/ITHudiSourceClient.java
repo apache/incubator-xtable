@@ -18,6 +18,7 @@
  
 package io.onetable.hudi;
 
+import static io.onetable.GenericTable.getTableName;
 import static io.onetable.ValidationTestHelper.validateOneSnapshot;
 import static io.onetable.ValidationTestHelper.validateTableChange;
 import static io.onetable.ValidationTestHelper.validateTableChanges;
@@ -93,7 +94,7 @@ public class ITHudiSourceClient {
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void insertAndUpsertData(HoodieTableType tableType, PartitionConfig partitionConfig) {
-    String tableName = "test_table_" + UUID.randomUUID();
+    String tableName = getTableName();
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
