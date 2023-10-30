@@ -101,7 +101,6 @@ public class ITOneTableClient {
         .sparkContext()
         .hadoopConfiguration()
         .set("parquet.avro.write-old-list-structure", "false");
-    sparkSession.catalog().clearCache();
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
   }
 
@@ -119,7 +118,6 @@ public class ITOneTableClient {
       jsc.close();
     }
     if (sparkSession != null) {
-      sparkSession.catalog().clearCache();
       sparkSession.close();
     }
   }
@@ -153,6 +151,16 @@ public class ITOneTableClient {
         Stream.of(Arguments.of(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))));
   }
 
+  private SourceClientProvider<?> getSourceClientProvider(TableFormat sourceTableFormat) {
+    if (sourceTableFormat == TableFormat.HUDI) {
+      return hudiSourceClientProvider;
+    } else if (sourceTableFormat == TableFormat.DELTA) {
+      return deltaSourceClientProvider;
+    } else {
+      throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
+    }
+  }
+
   /*
    * This test has the following steps at a high level.
    * 1. Insert few records.
@@ -174,14 +182,7 @@ public class ITOneTableClient {
     if (isPartitioned) {
       oneTablePartitionConfig = "level:VALUE";
     }
-    SourceClientProvider<?> sourceClientProvider;
-    if (sourceTableFormat.equals(TableFormat.HUDI)) {
-      sourceClientProvider = hudiSourceClientProvider;
-    } else if (sourceTableFormat.equals(TableFormat.DELTA)) {
-      sourceClientProvider = deltaSourceClientProvider;
-    } else {
-      throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
-    }
+    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(sourceTableFormat);
     List<?> insertRecords;
     try (GenericTable table =
         GenericTable.getInstance(
@@ -447,10 +448,10 @@ public class ITOneTableClient {
       names = {"HUDI", "DELTA"})
   public void testTimeTravelQueries(TableFormat sourceTableFormat) throws Exception {
     String tableName = getTableName();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
-      table.insertRecords(50, true);
+    try (GenericTable table =
+             GenericTable.getInstance(
+                 tableName, tempDir, sparkSession, jsc, sourceTableFormat, false)) {
+      table.insertRows(50);
       List<TableFormat> targetTableFormats = getOtherFormats(sourceTableFormat);
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
@@ -459,25 +460,26 @@ public class ITOneTableClient {
               .tableBasePath(table.getBasePath())
               .syncMode(SyncMode.INCREMENTAL)
               .build();
+      SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(sourceTableFormat);
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
       Instant instantAfterFirstSync = Instant.now();
       // sleep before starting the next commit to avoid any rounding issues
       Thread.sleep(1000);
 
-      table.insertRecords(50, true);
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      table.insertRows(50);
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
       Instant instantAfterSecondSync = Instant.now();
       // sleep before starting the next commit to avoid any rounding issues
       Thread.sleep(1000);
 
-      table.insertRecords(50, true);
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      table.insertRows(50);
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
 
       checkDatasetEquivalence(
           sourceTableFormat,
           getTimeTravelOption(sourceTableFormat, instantAfterFirstSync),
-          "_hoodie_record_key",
+          table.getOrderByColumn(),
           targetTableFormats,
           targetTableFormats.stream()
               .collect(
@@ -491,7 +493,7 @@ public class ITOneTableClient {
       checkDatasetEquivalence(
           sourceTableFormat,
           getTimeTravelOption(sourceTableFormat, instantAfterSecondSync),
-          "_hoodie_record_key",
+          table.getOrderByColumn(),
           targetTableFormats,
           targetTableFormats.stream()
               .collect(
@@ -826,6 +828,7 @@ public class ITOneTableClient {
         Collections.emptyMap(),
         basePath,
         null,
+        filter,
         columnsToSelect);
   }
 
