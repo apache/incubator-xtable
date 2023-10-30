@@ -18,11 +18,12 @@
  
 package io.onetable;
 
+import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
+import static java.util.stream.Collectors.groupingBy;
 import static org.apache.hudi.keygen.constant.KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -39,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Random;
@@ -57,7 +59,10 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalFileSystem;
+import org.junit.jupiter.api.Assertions;
 
+import org.apache.hudi.avro.model.HoodieCleanMetadata;
+import org.apache.hudi.client.BaseHoodieWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
@@ -77,7 +82,7 @@ import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.model.WriteConcurrencyMode;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.marker.MarkerType;
-import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.JsonUtils;
 import org.apache.hudi.common.util.Option;
@@ -94,10 +99,15 @@ import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.keygen.SimpleKeyGenerator;
 import org.apache.hudi.keygen.TimestampBasedKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
+import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
 import com.google.common.base.Preconditions;
 
-public abstract class TestAbstractHudiTable implements Closeable {
+public abstract class TestAbstractHudiTable
+    implements GenericTable<HoodieRecord<HoodieAvroPayload>, String> {
+  // typical inserts or upserts do not use this partition value.
+  protected static final String SPECIAL_PARTITION_VALUE = "GRANULAR";
+
   static {
     // ensure json modules are registered before any json serialization/deserialization
     JsonUtils.registerModules();
@@ -130,7 +140,7 @@ public abstract class TestAbstractHudiTable implements Closeable {
   protected Schema schema;
   protected List<String> partitionFieldNames;
 
-  public TestAbstractHudiTable(String name, Schema schema, Path tempDir, String partitionConfig) {
+  TestAbstractHudiTable(String name, Schema schema, Path tempDir, String partitionConfig) {
     try {
       this.tableName = name;
       this.schema = schema;
@@ -176,17 +186,10 @@ public abstract class TestAbstractHudiTable implements Closeable {
     }
   }
 
+  protected abstract BaseHoodieWriteClient<?, ?, ?, ?> getWriteClient();
+
   public String getBasePath() {
     return basePath;
-  }
-
-  public HoodieActiveTimeline getActiveTimeline() {
-    metaClient.reloadActiveTimeline();
-    return metaClient.getActiveTimeline();
-  }
-
-  Schema getSchema() {
-    return schema;
   }
 
   protected HoodieRecord<HoodieAvroPayload> getRecord(
@@ -244,7 +247,23 @@ public abstract class TestAbstractHudiTable implements Closeable {
     return inserts;
   }
 
-  public abstract String startCommit();
+  public String startCommit() {
+    return getStartCommitInstant();
+  }
+
+  protected String getStartCommitInstant() {
+    return getWriteClient().startCommit(metaClient.getCommitActionType(), metaClient);
+  }
+
+  protected String getStartCommitOfActionType(String actionType) {
+    return getWriteClient().startCommit(actionType, metaClient);
+  }
+
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
+      boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
+    String instant = getStartCommitInstant();
+    return insertRecordsWithCommitAlreadyStarted(inserts, instant, checkForNoErrors);
+  }
 
   public abstract List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
       List<HoodieRecord<HoodieAvroPayload>> inserts,
@@ -256,29 +275,61 @@ public abstract class TestAbstractHudiTable implements Closeable {
       String commitInstant,
       boolean checkForNoErrors);
 
-  public abstract List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
-      List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors);
+  public List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
+      List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors) {
+    String instant = getStartCommitInstant();
+    return upsertRecordsWithCommitAlreadyStarted(records, instant, checkForNoErrors);
+  }
 
   public abstract List<HoodieKey> deleteRecords(
       List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors);
 
   public abstract void deletePartition(String partition, HoodieTableType tableType);
 
-  public abstract void compact();
-
-  public abstract String onlyScheduleCompaction();
-
-  public abstract void completeScheduledCompaction(String instant);
-
   public abstract void cluster();
 
-  public abstract void rollback(String commitInstant);
+  public List<String> getAllLatestBaseFilePaths() {
+    HoodieTableFileSystemView fsView =
+        new HoodieMetadataFileSystemView(
+            getWriteClient().getEngineContext(),
+            metaClient,
+            metaClient.reloadActiveTimeline(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig());
+    return getAllLatestBaseFiles(fsView).stream()
+        .map(HoodieBaseFile::getPath)
+        .collect(Collectors.toList());
+  }
 
-  public abstract void savepointRestoreForPreviousInstant();
+  public void compact() {
+    String instant = onlyScheduleCompaction();
+    getWriteClient().compact(instant);
+  }
 
-  public abstract void clean();
+  public String onlyScheduleCompaction() {
+    return getWriteClient().scheduleCompaction(Option.empty()).get();
+  }
 
-  public abstract List<String> getAllLatestBaseFilePaths();
+  public void completeScheduledCompaction(String instant) {
+    getWriteClient().compact(instant);
+  }
+
+  public void clean() {
+    HoodieCleanMetadata metadata = getWriteClient().clean();
+    // Assert that files are deleted to ensure test is realistic
+    Assertions.assertTrue(metadata.getTotalFilesDeleted() > 0);
+  }
+
+  public void rollback(String commitInstant) {
+    getWriteClient().rollback(commitInstant);
+  }
+
+  public void savepointRestoreForPreviousInstant() {
+    List<HoodieInstant> commitInstants =
+        metaClient.getActiveTimeline().reload().getCommitsTimeline().getInstants();
+    HoodieInstant instantToRestore = commitInstants.get(commitInstants.size() - 2);
+    getWriteClient().savepoint(instantToRestore.getTimestamp(), "user", "savepoint-test");
+    getWriteClient().restoreToSavepoint(instantToRestore.getTimestamp());
+  }
 
   public List<HoodieBaseFile> getAllLatestBaseFiles(HoodieTableFileSystemView fsView) {
     try {
@@ -503,6 +554,13 @@ public abstract class TestAbstractHudiTable implements Closeable {
     fs.setVerifyChecksum(true);
     fs.mkdirs(new org.apache.hadoop.fs.Path(basePath));
 
+    if (fs.exists(new org.apache.hadoop.fs.Path(basePath + "/.hoodie"))) {
+      return HoodieTableMetaClient.builder()
+          .setConf(conf)
+          .setBasePath(basePath)
+          .setLoadActiveTimelineOnLoad(true)
+          .build();
+    }
     Properties properties =
         HoodieTableMetaClient.withPropertyBuilder()
             .fromProperties(keyGenProperties)
@@ -667,5 +725,49 @@ public abstract class TestAbstractHudiTable implements Closeable {
       record.put(fieldName, value);
     }
     return record;
+  }
+
+  @Override
+  public List<HoodieRecord<HoodieAvroPayload>> insertRows(int numRecords) {
+    List<HoodieRecord<HoodieAvroPayload>> inserts = generateRecords(numRecords);
+    return insertRecords(true, inserts);
+  }
+
+  @Override
+  public void upsertRows(List<HoodieRecord<HoodieAvroPayload>> records) {
+    String instant = getStartCommitInstant();
+    upsertRecordsWithCommitAlreadyStarted(records, instant, true);
+  }
+
+  @Override
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecordsForSpecialPartition(int numRecords) {
+    return insertRecords(numRecords, SPECIAL_PARTITION_VALUE, true);
+  }
+
+  @Override
+  public List<String> getColumnsToSelect() {
+    return schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList());
+  }
+
+  @Override
+  public String getAnyPartitionValue(List<HoodieRecord<HoodieAvroPayload>> rows) {
+    Map<String, List<HoodieRecord>> recordsByPartition =
+        rows.stream().collect(groupingBy(HoodieRecord::getPartitionPath));
+    return recordsByPartition.keySet().stream().sorted().findFirst().get();
+  }
+
+  @Override
+  public void deleteRows(List<HoodieRecord<HoodieAvroPayload>> records) {
+    deleteRecords(records, true);
+  }
+
+  @Override
+  public void reload() {
+    // no-op.
+  }
+
+  @Override
+  public String getOrderByColumn() {
+    return "_hoodie_record_key";
   }
 }
