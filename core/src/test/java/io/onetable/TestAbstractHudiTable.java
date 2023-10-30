@@ -19,7 +19,6 @@
 package io.onetable;
 
 import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
-import static java.util.stream.Collectors.groupingBy;
 import static org.apache.hudi.keygen.constant.KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -40,7 +39,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Random;
@@ -105,8 +103,6 @@ import com.google.common.base.Preconditions;
 
 public abstract class TestAbstractHudiTable
     implements GenericTable<HoodieRecord<HoodieAvroPayload>, String> {
-  // typical inserts or upserts do not use this partition value.
-  protected static final String SPECIAL_PARTITION_VALUE = "GRANULAR";
 
   static {
     // ensure json modules are registered before any json serialization/deserialization
@@ -117,8 +113,6 @@ public abstract class TestAbstractHudiTable
   protected static final Schema BASIC_SCHEMA;
 
   private static final Random RANDOM = new Random();
-  // A list of values for the level field which serves as a basic field to partition on for tests
-  private static final List<String> LEVEL_VALUES = Arrays.asList("INFO", "WARN", "ERROR");
 
   static {
     try (InputStream schemaStream =
@@ -747,13 +741,6 @@ public abstract class TestAbstractHudiTable
   @Override
   public List<String> getColumnsToSelect() {
     return schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList());
-  }
-
-  @Override
-  public String getAnyPartitionValue(List<HoodieRecord<HoodieAvroPayload>> rows) {
-    Map<String, List<HoodieRecord>> recordsByPartition =
-        rows.stream().collect(groupingBy(HoodieRecord::getPartitionPath));
-    return recordsByPartition.keySet().stream().sorted().findFirst().get();
   }
 
   @Override

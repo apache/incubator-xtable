@@ -18,6 +18,7 @@
  
 package io.onetable.delta;
 
+import static io.onetable.GenericTable.LEVEL_VALUES;
 import static org.apache.spark.sql.types.DataTypes.BinaryType;
 import static org.apache.spark.sql.types.DataTypes.BooleanType;
 import static org.apache.spark.sql.types.DataTypes.DateType;
@@ -48,6 +49,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
@@ -76,7 +78,8 @@ public class TestDeltaHelper {
         new StructField("firstName", StringType, true, Metadata.empty()),
         new StructField("lastName", StringType, true, Metadata.empty()),
         new StructField("gender", StringType, true, Metadata.empty()),
-        new StructField("birthDate", TimestampType, true, Metadata.empty()),
+        new StructField("birthDate", TimestampType, false, Metadata.empty()),
+        new StructField("level", StringType, false, Metadata.empty()),
         new StructField("boolean_field", BooleanType, true, Metadata.empty()),
         new StructField("date_field", DateType, true, Metadata.empty()),
         new StructField("timestamp_field", TimestampType, true, Metadata.empty()),
@@ -102,31 +105,31 @@ public class TestDeltaHelper {
       };
   private static final StructField[] ADDITIONAL_FIELDS =
       new StructField[] {new StructField("street", StringType, true, Metadata.empty())};
-  private static final StructField[] PARTITIONED_FIELDS =
+  private static final StructField[] DATE_PARTITIONED_FIELDS =
       new StructField[] {new StructField("yearOfBirth", IntegerType, true, Metadata.empty())};
 
   private static final Random RANDOM = new Random();
   private static final String[] GENDERS = {"Male", "Female"};
 
   StructType tableStructSchema;
-  boolean tableIsPartitioned;
+  String partitionField;
   boolean includeAdditionalColumns;
 
   public static TestDeltaHelper createTestDataHelper(
-      boolean isPartitioned, boolean includeAdditionalColumns) {
-    StructType tableSchema = generateDynamicSchema(isPartitioned, includeAdditionalColumns);
+      String partitionField, boolean includeAdditionalColumns) {
+    StructType tableSchema = generateDynamicSchema(partitionField, includeAdditionalColumns);
     return TestDeltaHelper.builder()
         .tableStructSchema(tableSchema)
-        .tableIsPartitioned(isPartitioned)
+        .partitionField(partitionField)
         .includeAdditionalColumns(includeAdditionalColumns)
         .build();
   }
 
   private static StructType generateDynamicSchema(
-      boolean isPartitioned, boolean includeAdditionalColumns) {
+      String partitionField, boolean includeAdditionalColumns) {
     List<StructField> fields = new ArrayList<>(Arrays.asList(COMMON_FIELDS));
-    if (isPartitioned) {
-      fields.addAll(Arrays.asList(PARTITIONED_FIELDS));
+    if ("yearOfBirth".equals(partitionField)) {
+      fields.addAll(Arrays.asList(DATE_PARTITIONED_FIELDS));
     }
     if (includeAdditionalColumns) {
       fields.addAll(Arrays.asList(ADDITIONAL_FIELDS));
@@ -138,7 +141,7 @@ public class TestDeltaHelper {
     DeltaTableBuilder tableBuilder =
         DeltaTable.createIfNotExists(sparkSession).tableName(tableName).location(basePath);
     Arrays.stream(COMMON_FIELDS).forEach(tableBuilder::addColumn);
-    if (tableIsPartitioned) {
+    if ("yearOfBirth".equals(partitionField)) {
       tableBuilder
           .addColumn(
               DeltaTable.columnBuilder("yearOfBirth")
@@ -146,6 +149,8 @@ public class TestDeltaHelper {
                   .generatedAlwaysAs("YEAR(birthDate)")
                   .build())
           .partitionedBy("yearOfBirth");
+    } else if (partitionField != null && !partitionField.isEmpty()) {
+      tableBuilder.partitionedBy(partitionField);
     }
     if (includeAdditionalColumns) {
       tableBuilder.addColumn("street", StringType);
@@ -155,26 +160,27 @@ public class TestDeltaHelper {
 
   public Row generateRandomRow() {
     int year = 2013 + RANDOM.nextInt(11);
-    return generateRandomRowForGivenYear(year);
+    String level = LEVEL_VALUES.get(RANDOM.nextInt(LEVEL_VALUES.size()));
+    return generateRandomRowForGivenYear(year, level);
   }
 
-  public Row generateRandomRowForGivenYear(int year) {
-    return RowFactory.create(generateRandomValuesForGivenYear(year));
+  public Row generateRandomRowForGivenYear(int year, String level) {
+    return RowFactory.create(generateRandomValuesForGivenYear(year, level));
   }
 
   /*
    * Generates a random row for the given schema and additional columns. Additional columns
    * are appended to the end. String values are generated for additional columns.
    */
-  private Object[] generateRandomValuesForGivenYear(int yearValue) {
+  private Object[] generateRandomValuesForGivenYear(int yearValue, String level) {
     Object[] row = new Object[tableStructSchema.size()];
     for (int i = 0; i < tableStructSchema.size(); i++) {
-      row[i] = generateValueForField(tableStructSchema.fields()[i], yearValue);
+      row[i] = generateValueForField(tableStructSchema.fields()[i], yearValue, level);
     }
     return row;
   }
 
-  private Object generateValueForField(StructField field, int yearValue) {
+  private Object generateValueForField(StructField field, int yearValue, String level) {
     switch (field.name()) {
       case "id":
         return RANDOM.nextInt(1000000) + 1;
@@ -184,6 +190,8 @@ public class TestDeltaHelper {
         return generateRandomTimeGivenYear(yearValue);
       case "yearOfBirth":
         return yearValue;
+      case "level":
+        return level;
       default:
         return getRandomValueForField(field.dataType(), field.nullable());
     }
@@ -234,7 +242,7 @@ public class TestDeltaHelper {
   }
 
   private Timestamp generateRandomTimeGivenYear(int yearValue) {
-    int month = RANDOM.nextInt(11) + 1;
+    int month = RANDOM.nextInt(12) + 1;
     int daysInMonth = YearMonth.of(yearValue, month).lengthOfMonth();
     int day = RANDOM.nextInt(daysInMonth) + 1;
 
@@ -246,12 +254,7 @@ public class TestDeltaHelper {
   }
 
   public static String generateRandomString() {
-    StringBuilder name = new StringBuilder(5);
-    for (int i = 0; i < 5; i++) {
-      char randomChar = (char) (RANDOM.nextInt(26) + 'A');
-      name.append(randomChar);
-    }
-    return name.toString();
+    return RandomStringUtils.randomAlphanumeric(5);
   }
 
   public List<Row> transformForUpsertsOrDeletes(List<Row> rows, boolean isUpsert) {
@@ -279,9 +282,9 @@ public class TestDeltaHelper {
         .collect(Collectors.toList());
   }
 
-  public List<Row> generateRowsForSpecificPartition(int numRows, int partitionValue) {
+  public List<Row> generateRowsForSpecificPartition(int numRows, int partitionValue, String level) {
     return IntStream.range(0, numRows)
-        .mapToObj(i -> generateRandomRowForGivenYear(partitionValue))
+        .mapToObj(i -> generateRandomRowForGivenYear(partitionValue, level))
         .collect(Collectors.toList());
   }
 }
