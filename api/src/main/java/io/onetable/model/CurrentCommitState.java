@@ -36,7 +36,6 @@ import lombok.Value;
 @Value
 @Builder
 public class CurrentCommitState<COMMIT> {
-  // TODO the class name is also confusing. It is more of a incremental job specification than state
   @Builder.Default List<COMMIT> commitsToProcess = Collections.emptyList();
 
   /**
