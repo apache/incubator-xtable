@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -68,6 +69,7 @@ import io.delta.tables.DeltaTableBuilder;
 @Getter
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class TestDeltaHelper {
+  private static final AtomicInteger ID_GENERATOR = new AtomicInteger(0);
   private static final StructType STRUCT_SCHEMA =
       DataTypes.createStructType(
           new StructField[] {new StructField("nested_int", IntegerType, true, Metadata.empty())});
@@ -185,7 +187,7 @@ public class TestDeltaHelper {
   private Object generateValueForField(StructField field, int yearValue, String levelValue) {
     switch (field.name()) {
       case "id":
-        return RANDOM.nextInt(1000000) + 1;
+        return ID_GENERATOR.incrementAndGet();
       case "gender":
         return GENDERS[RANDOM.nextInt(GENDERS.length)];
       case "birthDate":

@@ -160,8 +160,11 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
   public void deleteSpecialPartition() {
     if (partitionField.equals("level")) {
       deletePartition(SPECIAL_PARTITION_VALUE);
-    } else {
+    } else if (partitionField.equals("yearOfBirth")) {
       deletePartition(SPECIAL_DATE_PARTITION_VALUE);
+    } else {
+      throw new IllegalArgumentException(
+          "Delete special partition is only supported for tables partitioned on level or yearOfBirth");
     }
   }
 
