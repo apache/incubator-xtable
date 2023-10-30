@@ -135,7 +135,8 @@ hudi_options = {
 }
 
 (
-   df.write.format("hudi")
+   df.write
+   .format("hudi")
    .options(**hudi_options)
    .save(f"{local_base_path}/{table_name}")
 )
@@ -171,7 +172,8 @@ schema = StructType([
 df = spark.createDataFrame(records, schema)
 
 (
-   df.write.format("delta")
+   df.write
+   .format("delta")
    .partitionBy("city")
    .save(f"{local_base_path}/{table_name}")
 )
