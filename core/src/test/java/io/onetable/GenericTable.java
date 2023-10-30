@@ -20,6 +20,7 @@ package io.onetable;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.UUID;
 
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
@@ -88,5 +89,9 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
     }
+  }
+
+  static String getTableName() {
+    return "test_table_" + UUID.randomUUID().toString().replaceAll("-", "_");
   }
 }
