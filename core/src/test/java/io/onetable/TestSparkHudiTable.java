@@ -18,8 +18,6 @@
  
 package io.onetable;
 
-import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
-
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -29,12 +27,13 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+
 import org.apache.avro.Schema;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.junit.jupiter.api.Assertions;
 
-import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.client.HoodieWriteResult;
 import org.apache.hudi.client.SparkRDDWriteClient;
 import org.apache.hudi.client.WriteStatus;
@@ -42,27 +41,25 @@ import org.apache.hudi.client.common.HoodieSparkEngineContext;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieAvroPayload;
-import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.common.table.timeline.HoodieInstant;
-import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.CommitUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
-import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
 import com.google.common.base.Preconditions;
 
 public class TestSparkHudiTable extends TestAbstractHudiTable {
 
   private final JavaSparkContext jsc;
-  private SparkRDDWriteClient<HoodieAvroPayload> sparkWriteClient;
+
+  @Getter(value = AccessLevel.PROTECTED)
+  private SparkRDDWriteClient<HoodieAvroPayload> writeClient;
 
   public static TestSparkHudiTable forSchemaWithAdditionalColumnsAndPartitioning(
       String tableName, Path tempDir, JavaSparkContext jsc, boolean isPartitioned) {
@@ -158,7 +155,7 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
     super(name, schema, tempDir, partitionConfig);
     // initialize spark session
     this.jsc = jsc;
-    this.sparkWriteClient = initSparkWriteClient(schema, typedProperties);
+    this.writeClient = initSparkWriteClient(schema, typedProperties);
     this.metaClient = initMetaClient(jsc, hoodieTableType, typedProperties);
   }
 
@@ -167,7 +164,7 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
       String commitInstant,
       boolean checkForNoErrors) {
     JavaRDD<HoodieRecord<HoodieAvroPayload>> writeRecords = jsc.parallelize(inserts, 1);
-    List<WriteStatus> result = sparkWriteClient.bulkInsert(writeRecords, commitInstant).collect();
+    List<WriteStatus> result = writeClient.bulkInsert(writeRecords, commitInstant).collect();
     if (checkForNoErrors) {
       assertNoWriteErrors(result);
     }
@@ -180,7 +177,7 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
       boolean checkForNoErrors) {
     List<HoodieRecord<HoodieAvroPayload>> updates = generateUpdatesForRecords(records);
     JavaRDD<HoodieRecord<HoodieAvroPayload>> writeRecords = jsc.parallelize(updates, 1);
-    List<WriteStatus> result = sparkWriteClient.upsert(writeRecords, commitInstant).collect();
+    List<WriteStatus> result = writeClient.upsert(writeRecords, commitInstant).collect();
     if (checkForNoErrors) {
       assertNoWriteErrors(result);
     }
@@ -193,23 +190,11 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
         records.stream().map(HoodieRecord::getKey).collect(Collectors.toList());
     JavaRDD<HoodieKey> deleteKeys = jsc.parallelize(deletes, 1);
     String instant = getStartCommitInstant();
-    List<WriteStatus> result = sparkWriteClient.delete(deleteKeys, instant).collect();
+    List<WriteStatus> result = writeClient.delete(deleteKeys, instant).collect();
     if (checkForNoErrors) {
       assertNoWriteErrors(result);
     }
     return deletes;
-  }
-
-  public List<String> getAllLatestBaseFilePaths() {
-    HoodieTableFileSystemView fsView =
-        new HoodieMetadataFileSystemView(
-            sparkWriteClient.getEngineContext(),
-            metaClient,
-            metaClient.reloadActiveTimeline(),
-            getHoodieWriteConfig(metaClient).getMetadataConfig());
-    return getAllLatestBaseFiles(fsView).stream()
-        .map(HoodieBaseFile::getPath)
-        .collect(Collectors.toList());
   }
 
   @Override
@@ -230,57 +215,16 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
         CommitUtils.getCommitActionType(WriteOperationType.DELETE_PARTITION, tableType);
     String instant = getStartCommitOfActionType(actionType);
     HoodieWriteResult writeResult =
-        sparkWriteClient.deletePartitions(Collections.singletonList(partition), instant);
+        writeClient.deletePartitions(Collections.singletonList(partition), instant);
     List<WriteStatus> result = writeResult.getWriteStatuses().collect();
     assertNoWriteErrors(result);
   }
 
-  public void compact() {
-    String instant = sparkWriteClient.scheduleCompaction(Option.empty()).get();
-    sparkWriteClient.compact(instant);
-  }
-
-  public String onlyScheduleCompaction() {
-    return sparkWriteClient.scheduleCompaction(Option.empty()).get();
-  }
-
-  public void completeScheduledCompaction(String instant) {
-    sparkWriteClient.compact(instant);
-  }
-
   public void cluster() {
-    String instant = sparkWriteClient.scheduleClustering(Option.empty()).get();
-    sparkWriteClient.cluster(instant, true);
+    String instant = writeClient.scheduleClustering(Option.empty()).get();
+    writeClient.cluster(instant, true);
     // Reinitializing as clustering disables auto commit and we want to enable it back.
-    sparkWriteClient = initSparkWriteClient(schema, typedProperties);
-  }
-
-  public void rollback(String commitInstant) {
-    sparkWriteClient.rollback(commitInstant);
-  }
-
-  public void savepointRestoreForPreviousInstant() {
-    List<HoodieInstant> commitInstants =
-        metaClient.getActiveTimeline().reload().getCommitsTimeline().getInstants();
-    HoodieInstant instantToRestore = commitInstants.get(commitInstants.size() - 2);
-    sparkWriteClient.savepoint(instantToRestore.getTimestamp(), "user", "savepoint-test");
-    sparkWriteClient.restoreToSavepoint(instantToRestore.getTimestamp());
-  }
-
-  public void clean() {
-    HoodieCleanMetadata metadata = sparkWriteClient.clean();
-    // Assert that files are deleted to ensure test is realistic
-    Assertions.assertTrue(metadata.getTotalFilesDeleted() > 0);
-  }
-
-  public String startCommit() {
-    return getStartCommitInstant();
-  }
-
-  public List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
-      List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors) {
-    String instant = getStartCommitInstant();
-    return upsertRecordsWithCommitAlreadyStarted(records, instant, checkForNoErrors);
+    writeClient = initSparkWriteClient(schema, typedProperties);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
@@ -313,8 +257,8 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
 
   @Override
   public void close() {
-    if (sparkWriteClient != null) {
-      sparkWriteClient.close();
+    if (writeClient != null) {
+      writeClient.close();
     }
   }
 

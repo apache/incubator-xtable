@@ -18,6 +18,7 @@
  
 package io.onetable;
 
+import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static java.util.stream.Collectors.groupingBy;
 import static org.apache.hudi.keygen.constant.KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -58,7 +59,9 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalFileSystem;
+import org.junit.jupiter.api.Assertions;
 
+import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.client.BaseHoodieWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
@@ -79,7 +82,7 @@ import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.model.WriteConcurrencyMode;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.marker.MarkerType;
-import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.JsonUtils;
 import org.apache.hudi.common.util.Option;
@@ -96,6 +99,7 @@ import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.keygen.SimpleKeyGenerator;
 import org.apache.hudi.keygen.TimestampBasedKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
+import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
 import com.google.common.base.Preconditions;
 
@@ -135,9 +139,8 @@ public abstract class TestAbstractHudiTable
   protected KeyGenerator keyGenerator;
   protected Schema schema;
   protected List<String> partitionFieldNames;
-  private BaseHoodieWriteClient writeClient;
 
-  public TestAbstractHudiTable(String name, Schema schema, Path tempDir, String partitionConfig) {
+  TestAbstractHudiTable(String name, Schema schema, Path tempDir, String partitionConfig) {
     try {
       this.tableName = name;
       this.schema = schema;
@@ -183,17 +186,10 @@ public abstract class TestAbstractHudiTable
     }
   }
 
+  protected abstract BaseHoodieWriteClient<?, ?, ?, ?> getWriteClient();
+
   public String getBasePath() {
     return basePath;
-  }
-
-  public HoodieActiveTimeline getActiveTimeline() {
-    metaClient.reloadActiveTimeline();
-    return metaClient.getActiveTimeline();
-  }
-
-  Schema getSchema() {
-    return schema;
   }
 
   protected HoodieRecord<HoodieAvroPayload> getRecord(
@@ -251,7 +247,17 @@ public abstract class TestAbstractHudiTable
     return inserts;
   }
 
-  public abstract String startCommit();
+  public String startCommit() {
+    return getStartCommitInstant();
+  }
+
+  protected String getStartCommitInstant() {
+    return getWriteClient().startCommit(metaClient.getCommitActionType(), metaClient);
+  }
+
+  protected String getStartCommitOfActionType(String actionType) {
+    return getWriteClient().startCommit(actionType, metaClient);
+  }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
@@ -269,29 +275,61 @@ public abstract class TestAbstractHudiTable
       String commitInstant,
       boolean checkForNoErrors);
 
-  public abstract List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
-      List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors);
+  public List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
+      List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors) {
+    String instant = getStartCommitInstant();
+    return upsertRecordsWithCommitAlreadyStarted(records, instant, checkForNoErrors);
+  }
 
   public abstract List<HoodieKey> deleteRecords(
       List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors);
 
   public abstract void deletePartition(String partition, HoodieTableType tableType);
 
-  public abstract void compact();
-
-  public abstract String onlyScheduleCompaction();
-
-  public abstract void completeScheduledCompaction(String instant);
-
   public abstract void cluster();
 
-  public abstract void rollback(String commitInstant);
+  public List<String> getAllLatestBaseFilePaths() {
+    HoodieTableFileSystemView fsView =
+        new HoodieMetadataFileSystemView(
+            getWriteClient().getEngineContext(),
+            metaClient,
+            metaClient.reloadActiveTimeline(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig());
+    return getAllLatestBaseFiles(fsView).stream()
+        .map(HoodieBaseFile::getPath)
+        .collect(Collectors.toList());
+  }
 
-  public abstract void savepointRestoreForPreviousInstant();
+  public void compact() {
+    String instant = onlyScheduleCompaction();
+    getWriteClient().compact(instant);
+  }
 
-  public abstract void clean();
+  public String onlyScheduleCompaction() {
+    return getWriteClient().scheduleCompaction(Option.empty()).get();
+  }
 
-  public abstract List<String> getAllLatestBaseFilePaths();
+  public void completeScheduledCompaction(String instant) {
+    getWriteClient().compact(instant);
+  }
+
+  public void clean() {
+    HoodieCleanMetadata metadata = getWriteClient().clean();
+    // Assert that files are deleted to ensure test is realistic
+    Assertions.assertTrue(metadata.getTotalFilesDeleted() > 0);
+  }
+
+  public void rollback(String commitInstant) {
+    getWriteClient().rollback(commitInstant);
+  }
+
+  public void savepointRestoreForPreviousInstant() {
+    List<HoodieInstant> commitInstants =
+        metaClient.getActiveTimeline().reload().getCommitsTimeline().getInstants();
+    HoodieInstant instantToRestore = commitInstants.get(commitInstants.size() - 2);
+    getWriteClient().savepoint(instantToRestore.getTimestamp(), "user", "savepoint-test");
+    getWriteClient().restoreToSavepoint(instantToRestore.getTimestamp());
+  }
 
   public List<HoodieBaseFile> getAllLatestBaseFiles(HoodieTableFileSystemView fsView) {
     try {
@@ -731,13 +769,5 @@ public abstract class TestAbstractHudiTable
   @Override
   public String getOrderByColumn() {
     return "_hoodie_record_key";
-  }
-
-  protected String getStartCommitInstant() {
-    return writeClient.startCommit(metaClient.getCommitActionType(), metaClient);
-  }
-
-  protected String getStartCommitOfActionType(String actionType) {
-    return writeClient.startCommit(actionType, metaClient);
   }
 }
