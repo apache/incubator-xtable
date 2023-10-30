@@ -204,7 +204,8 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
     Snapshot pendingSnapshot = iceTable.currentSnapshot();
     if (pendingSnapshot.timestampMillis() <= epochMilli) {
-      // even the latest snapshot is older than the last sync instant.
+      // Even the latest snapshot was committed before the lastSyncInstant. No new commits were made
+      // and no new snapshots need to be synced. Return empty state.
       return CurrentCommitState.<Snapshot>builder().build();
     }
 
