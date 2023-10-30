@@ -190,7 +190,32 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   @Override
   public CurrentCommitState<Snapshot> getCurrentCommitState(
-      InstantsForIncrementalSync instantsForIncrementalSync) {
-    return null;
+      InstantsForIncrementalSync lastSyncInstant) {
+
+    long epochMilli = lastSyncInstant.getLastSyncInstant().toEpochMilli();
+    Table iceTable = getSourceTable();
+
+    // There are two ways to fetch Iceberg table's change log; 1) fetch the history using .history()
+    // method and 2) fetch the snapshots using .snapshots() method and traverse the snapshots in
+    // reverse chronological order. The issue with #1 is that if transactions are involved, the
+    // history tracks only the last snapshot of a multi-snapshot transaction. As a result the
+    // timeline generated for sync would be incomplete. Hence, #2 is used.
+
+    Snapshot pendingSnapshot = iceTable.currentSnapshot();
+    if (pendingSnapshot.timestampMillis() <= epochMilli) {
+      // Even the latest snapshot was committed before the lastSyncInstant. No new commits were made
+      // and no new snapshots need to be synced. Return empty state.
+      return CurrentCommitState.<Snapshot>builder().build();
+    }
+
+    List<Snapshot> snapshots = new ArrayList<>();
+    while (pendingSnapshot != null && pendingSnapshot.timestampMillis() > epochMilli) {
+      snapshots.add(pendingSnapshot);
+      pendingSnapshot =
+          pendingSnapshot.parentId() != null ? iceTable.snapshot(pendingSnapshot.parentId()) : null;
+    }
+    // reverse the list to process the oldest snapshot first
+    Collections.reverse(snapshots);
+    return CurrentCommitState.<Snapshot>builder().commitsToProcess(snapshots).build();
   }
 }
