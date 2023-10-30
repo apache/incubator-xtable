@@ -55,7 +55,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import io.onetable.TestSparkDeltaTable;
 import io.onetable.client.PerTableConfig;
-import io.onetable.model.CurrentCommitState;
+import io.onetable.model.CommitHistoryBacklog;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
@@ -355,9 +355,9 @@ public class ITDeltaSourceClient {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-    CurrentCommitState<Long> currentCommitState =
-        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
-    for (Long version : currentCommitState.getCommitsToProcess()) {
+    CommitHistoryBacklog<Long> commitHistoryBacklog =
+        deltaSourceClient.getCommitHistoryBacklog(instantsForIncrementalSync);
+    for (Long version : commitHistoryBacklog.getCommitsToProcess()) {
       TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
       allTableChanges.add(tableChange);
     }
@@ -408,9 +408,9 @@ public class ITDeltaSourceClient {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-    CurrentCommitState<Long> currentCommitState =
-        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
-    for (Long version : currentCommitState.getCommitsToProcess()) {
+    CommitHistoryBacklog<Long> commitHistoryBacklog =
+        deltaSourceClient.getCommitHistoryBacklog(instantsForIncrementalSync);
+    for (Long version : commitHistoryBacklog.getCommitsToProcess()) {
       TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
       allTableChanges.add(tableChange);
     }
@@ -453,9 +453,9 @@ public class ITDeltaSourceClient {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-    CurrentCommitState<Long> currentCommitState =
-        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
-    for (Long version : currentCommitState.getCommitsToProcess()) {
+    CommitHistoryBacklog<Long> commitHistoryBacklog =
+        deltaSourceClient.getCommitHistoryBacklog(instantsForIncrementalSync);
+    for (Long version : commitHistoryBacklog.getCommitsToProcess()) {
       TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
       allTableChanges.add(tableChange);
     }
@@ -508,9 +508,9 @@ public class ITDeltaSourceClient {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-    CurrentCommitState<Long> currentCommitState =
-        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
-    for (Long version : currentCommitState.getCommitsToProcess()) {
+    CommitHistoryBacklog<Long> commitHistoryBacklog =
+        deltaSourceClient.getCommitHistoryBacklog(instantsForIncrementalSync);
+    for (Long version : commitHistoryBacklog.getCommitsToProcess()) {
       TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
       allTableChanges.add(tableChange);
     }
@@ -565,9 +565,9 @@ public class ITDeltaSourceClient {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-    CurrentCommitState<Long> currentCommitState =
-        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
-    for (Long version : currentCommitState.getCommitsToProcess()) {
+    CommitHistoryBacklog<Long> commitHistoryBacklog =
+        deltaSourceClient.getCommitHistoryBacklog(instantsForIncrementalSync);
+    for (Long version : commitHistoryBacklog.getCommitsToProcess()) {
       TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
       allTableChanges.add(tableChange);
     }

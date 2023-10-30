@@ -20,7 +20,7 @@ package io.onetable.spi.extractor;
 
 import java.time.Instant;
 
-import io.onetable.model.CurrentCommitState;
+import io.onetable.model.CommitHistoryBacklog;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
@@ -66,12 +66,12 @@ public interface SourceClient<COMMIT> {
   TableChange getTableChangeForCommit(COMMIT commit);
 
   /**
-   * Retrieves {@link CurrentCommitState} to process based on the provided {@link
+   * Retrieves {@link CommitHistoryBacklog} to process based on the provided {@link
    * InstantsForIncrementalSync}.
    *
    * @param instantsForIncrementalSync The input to determine the next commits to process.
-   * @return {@link CurrentCommitState} to process.
+   * @return {@link CommitHistoryBacklog} to process.
    */
-  CurrentCommitState<COMMIT> getCurrentCommitState(
+  CommitHistoryBacklog<COMMIT> getCommitHistoryBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync);
 }

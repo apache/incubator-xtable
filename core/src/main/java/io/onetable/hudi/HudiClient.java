@@ -42,7 +42,7 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
 import io.onetable.exception.OneIOException;
-import io.onetable.model.CurrentCommitState;
+import io.onetable.model.CommitHistoryBacklog;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
@@ -124,7 +124,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public CurrentCommitState<HoodieInstant> getCurrentCommitState(
+  public CommitHistoryBacklog<HoodieInstant> getCommitHistoryBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync) {
     Instant lastSyncInstant = instantsForIncrementalSync.getLastSyncInstant();
     List<Instant> lastPendingInstants = instantsForIncrementalSync.getPendingCommits();
@@ -140,7 +140,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         mergeAndDedupLists(
             lastPendingHoodieInstantsCommitsPair.getPendingCommits(),
             commitsPair.getPendingCommits());
-    return CurrentCommitState.<HoodieInstant>builder()
+    return CommitHistoryBacklog.<HoodieInstant>builder()
         .commitsToProcess(commitsToProcessNext)
         .inFlightInstants(pendingInstantsToProcessNext)
         .build();

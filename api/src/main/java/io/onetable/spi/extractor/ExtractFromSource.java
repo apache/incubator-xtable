@@ -23,7 +23,7 @@ import java.util.List;
 
 import lombok.AllArgsConstructor;
 
-import io.onetable.model.CurrentCommitState;
+import io.onetable.model.CommitHistoryBacklog;
 import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
@@ -39,17 +39,17 @@ public class ExtractFromSource<COMMIT> {
 
   public IncrementalTableChanges extractTableChanges(
       InstantsForIncrementalSync instantsForIncrementalSync) {
-    CurrentCommitState<COMMIT> currentCommitState =
-        sourceClient.getCurrentCommitState(instantsForIncrementalSync);
+    CommitHistoryBacklog<COMMIT> commitHistoryBacklog =
+        sourceClient.getCommitHistoryBacklog(instantsForIncrementalSync);
     // No overlap between updatedPendingCommits and commitList, process separately.
     List<TableChange> tableChangeList = new ArrayList<>();
-    for (COMMIT commit : currentCommitState.getCommitsToProcess()) {
+    for (COMMIT commit : commitHistoryBacklog.getCommitsToProcess()) {
       TableChange tableChange = sourceClient.getTableChangeForCommit(commit);
       tableChangeList.add(tableChange);
     }
     return IncrementalTableChanges.builder()
         .tableChanges(tableChangeList)
-        .pendingCommits(currentCommitState.getInFlightInstants())
+        .pendingCommits(commitHistoryBacklog.getInFlightInstants())
         .build();
   }
 }
