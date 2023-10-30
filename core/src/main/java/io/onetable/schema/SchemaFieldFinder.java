@@ -18,8 +18,6 @@
  
 package io.onetable.schema;
 
-import java.util.Arrays;
-
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -47,20 +45,19 @@ public class SchemaFieldFinder {
    * @return the field if it exists, otherwise returns null
    */
   public OneField findFieldByPath(OneSchema schema, String path) {
-    return findFieldByPath(schema, path.split("\\."));
+    return findFieldByPath(schema, path.split("\\."), 0);
   }
 
-  private OneField findFieldByPath(OneSchema schema, String[] pathParts) {
+  private OneField findFieldByPath(OneSchema schema, String[] pathParts, int index) {
     if (pathParts.length == 0) {
       return null;
     }
     for (OneField field : schema.getFields()) {
-      if (field.getName().equals(pathParts[0])) {
-        if (pathParts.length == 1) {
+      if (field.getName().equals(pathParts[index])) {
+        if (pathParts.length == index + 1) {
           return field;
         }
-        return findFieldByPath(
-            field.getSchema(), Arrays.copyOfRange(pathParts, 1, pathParts.length));
+        return findFieldByPath(field.getSchema(), pathParts, index + 1);
       }
     }
     return null;
