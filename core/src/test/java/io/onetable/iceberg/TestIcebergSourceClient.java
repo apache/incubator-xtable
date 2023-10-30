@@ -24,10 +24,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.time.Instant;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -47,9 +45,7 @@ import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 
 import io.onetable.client.PerTableConfig;
-import io.onetable.model.OneSnapshot;
-import io.onetable.model.OneTable;
-import io.onetable.model.TableChange;
+import io.onetable.model.*;
 import io.onetable.model.schema.*;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
@@ -266,8 +262,68 @@ class TestIcebergSourceClient {
     Assertions.assertEquals(snapshot7, snapshot8);
   }
 
-  private static long getDataFileCount(Table catalogSales) {
-    return StreamSupport.stream(catalogSales.newScan().planFiles().spliterator(), false).count();
+  @Test
+  public void testGetCurrentCommitState(@TempDir Path workingDir) throws IOException {
+    Table catalogSales = createTestTableWithData(workingDir.toString());
+    String tablePath = catalogSales.location();
+    Snapshot snapshot1 = catalogSales.currentSnapshot();
+
+    String dataFilePath = String.join("/", tablePath, "data", UUID.randomUUID() + ".parquet");
+    catalogSales
+        .newAppend()
+        .appendFile(generateTestDataFile(10, catalogSales, dataFilePath))
+        .commit();
+    Snapshot snapshot2 = catalogSales.currentSnapshot();
+
+    Transaction tx = catalogSales.newTransaction();
+    tx.newDelete().deleteFromRowFilter(Expressions.lessThan("cs_sold_date_sk", 3)).commit();
+    AppendFiles appendAction = tx.newAppend();
+    for (int partition = 6; partition < 7; partition++) {
+      dataFilePath = String.join("/", tablePath, "data", UUID.randomUUID() + ".parquet");
+      appendAction.appendFile(generateTestDataFile(partition, catalogSales, dataFilePath));
+    }
+    appendAction.commit();
+    tx.commitTransaction();
+    // the transaction would result in 2 snapshots, although 3a will not be in the history as only
+    // the last snapshot of a multi-snapshot transaction is tracked in history.
+    Snapshot snapshot3b = catalogSales.currentSnapshot();
+    Snapshot snapshot3a = catalogSales.snapshot(snapshot3b.parentId());
+
+    dataFilePath = String.join("/", tablePath, "data", UUID.randomUUID() + ".parquet");
+    catalogSales
+        .newAppend()
+        .appendFile(generateTestDataFile(11, catalogSales, dataFilePath))
+        .commit();
+    Snapshot snapshot4 = catalogSales.currentSnapshot();
+
+    validatePendingCommits(catalogSales, snapshot1, snapshot2, snapshot3a, snapshot3b, snapshot4);
+    validatePendingCommits(catalogSales, snapshot3a, snapshot3b, snapshot4);
+
+    // TODO this use case is invalid. If a snapshot in the middle of a chain is expired, the chain
+    // TODO in invalid. This should result in termination of incremental sync?
+    catalogSales.expireSnapshots().expireSnapshotId(snapshot2.snapshotId()).commit();
+    validatePendingCommits(catalogSales, snapshot1, snapshot3a, snapshot3b, snapshot4);
+    // TODO invalid use case below
+    // even though 3a, 3b belong to same transaction, one of the two can be expired
+    // catalogSales.expireSnapshots().expireSnapshotId(snapshot3a.snapshotId()).commit();
+    // validatePendingCommits(catalogSales, snapshot1, snapshot2, snapshot3b, snapshot4);
+  }
+
+  private void validatePendingCommits(Table table, Snapshot lastSync, Snapshot... snapshots) {
+    InstantsForIncrementalSync instant =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(lastSync.timestampMillis()))
+            .build();
+    IcebergSourceClient sourceClient = getIcebergSourceClient(table);
+    CurrentCommitState<Snapshot> toBeProcessed = sourceClient.getCurrentCommitState(instant);
+    Assertions.assertEquals(0, toBeProcessed.getInFlightInstants().size());
+    Assertions.assertArrayEquals(snapshots, toBeProcessed.getCommitsToProcess().toArray());
+  }
+
+  private static long getDataFileCount(Table catalogSales) throws IOException {
+    try (CloseableIterable<FileScanTask> files = catalogSales.newScan().planFiles()) {
+      return StreamSupport.stream(files.spliterator(), false).count();
+    }
   }
 
   private void validateTableChangeDiffSize(
@@ -293,11 +349,7 @@ class TestIcebergSourceClient {
       Assertions.assertEquals(expectedField.fieldId(), column.fieldId());
       Assertions.assertEquals(expectedField.type(), column.type());
       Assertions.assertEquals(expectedField.isOptional(), column.isOptional());
-
-      // TODO: fix this
-      //      Assertions.assertEquals(expectedField.doc(), column.doc());
-      //      Assertions.assertEquals(expectedField.getOrdinal(), column.getOrdinal());
-      //      Assertions.assertEquals(expectedField.getTransform(), column.getTransform());
+      Assertions.assertEquals(expectedField.doc(), column.doc());
     }
   }
 

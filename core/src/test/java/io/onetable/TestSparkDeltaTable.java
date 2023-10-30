@@ -25,6 +25,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -46,16 +48,18 @@ import io.delta.tables.DeltaTable;
 
 import io.onetable.delta.TestDeltaHelper;
 
+@Getter
 public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeable {
   // typical inserts or upserts do not use this partition value.
   private static final Integer SPECIAL_PARTITION_VALUE = 1990;
-  @Getter private final String tableName;
-  @Getter private final String basePath;
+  private final String tableName;
+  private final String basePath;
   private final SparkSession sparkSession;
-  private final DeltaLog deltaLog;
-  private DeltaTable deltaTable;
   private final TestDeltaHelper testDeltaHelper;
   private final boolean tableIsPartitioned;
+  private final boolean includeAdditionalColumns;
+  DeltaLog deltaLog;
+  DeltaTable deltaTable;
 
   public static TestSparkDeltaTable forStandardSchemaAndPartitioning(
       String tableName, Path tempDir, SparkSession sparkSession, boolean isPartitioned) {
@@ -78,6 +82,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
       this.basePath = initBasePath(tempDir, tableName);
       this.sparkSession = sparkSession;
       this.tableIsPartitioned = isPartitioned;
+      this.includeAdditionalColumns = includeAdditionalColumns;
       this.testDeltaHelper = createTestDataHelper(isPartitioned, includeAdditionalColumns);
       testDeltaHelper.createTable(sparkSession, tableName, basePath);
       this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
@@ -92,7 +97,6 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
     List<Row> rows = testDeltaHelper.generateRows(numRows);
     Dataset<Row> df = sparkSession.createDataFrame(rows, testDeltaHelper.getTableStructSchema());
     df.write().format("delta").mode("append").save(basePath);
-    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
     return rows;
   }
 
@@ -100,7 +104,6 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
     List<Row> rows = testDeltaHelper.generateRowsForSpecificPartition(numRows, partitionValue);
     Dataset<Row> df = sparkSession.createDataFrame(rows, testDeltaHelper.getTableStructSchema());
     df.write().format("delta").mode("append").save(basePath);
-    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
     return rows;
   }
 
@@ -131,7 +134,6 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
         .whenMatched()
         .updateAll()
         .execute();
-    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
   }
 
   @SneakyThrows
@@ -145,7 +147,6 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
         .whenMatched()
         .delete()
         .execute();
-    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
   }
 
   @Override
@@ -155,7 +156,6 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
         "Invalid operation! Delete partition is only supported for partitioned tables.");
     Column condition = functions.col("yearOfBirth").equalTo(partitionValue);
     deltaTable.delete(condition);
-    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
   }
 
   @Override
@@ -209,11 +209,28 @@ public class TestSparkDeltaTable implements GenericTable<Row, Integer>, Closeabl
 
   public Map<Integer, List<Row>> getRowsByPartition(List<Row> rows) {
     return rows.stream()
-        .collect(Collectors.groupingBy(row -> row.getTimestamp(4).toLocalDateTime().getYear()));
+        .collect(
+            Collectors.groupingBy(
+                row -> row.getTimestamp(4).toInstant().atZone(ZoneId.of("UTC")).getYear()));
   }
 
   @Override
   public void close() {
     // no-op as spark session lifecycle is managed by the caller
+  }
+
+  @Override
+  public void reload() {
+    // Handle to reload the table on demand.
+    this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
+    this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
+  }
+
+  @Override
+  public List<String> getColumnsToSelect() {
+    // Exclude generated columns.
+    return Arrays.asList(testDeltaHelper.getTableStructSchema().fieldNames()).stream()
+        .filter(columnName -> !columnName.equals("yearOfBirth"))
+        .collect(Collectors.toList());
   }
 }

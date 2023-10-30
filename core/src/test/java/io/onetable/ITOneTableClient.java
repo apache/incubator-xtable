@@ -35,7 +35,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -47,8 +46,6 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -208,7 +205,8 @@ public class ITOneTableClient {
           table.getOrderByColumn(),
           targetTableFormats,
           table.getBasePath(),
-          100);
+          100,
+          table.getColumnsToSelect());
 
       table.insertRows(100);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
@@ -217,7 +215,8 @@ public class ITOneTableClient {
           table.getOrderByColumn(),
           targetTableFormats,
           table.getBasePath(),
-          200);
+          200,
+          table.getColumnsToSelect());
 
       table.upsertRows(insertRecords.subList(0, 20));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
@@ -226,7 +225,8 @@ public class ITOneTableClient {
           table.getOrderByColumn(),
           targetTableFormats,
           table.getBasePath(),
-          200);
+          200,
+          table.getColumnsToSelect());
 
       table.deleteRows(insertRecords.subList(30, 50));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
@@ -235,7 +235,8 @@ public class ITOneTableClient {
           table.getOrderByColumn(),
           targetTableFormats,
           table.getBasePath(),
-          180);
+          180,
+          table.getColumnsToSelect());
     }
 
     try (GenericTable tableWithUpdatedSchema =
@@ -252,23 +253,26 @@ public class ITOneTableClient {
                       .build())
               .syncMode(syncMode)
               .build();
-      insertRecords = tableWithUpdatedSchema.insertRows(100);
+      List<Row> insertsAfterSchemaUpdate = tableWithUpdatedSchema.insertRows(100);
+      tableWithUpdatedSchema.reload();
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
           tableWithUpdatedSchema.getOrderByColumn(),
           targetTableFormats,
           tableWithUpdatedSchema.getBasePath(),
-          280);
+          280,
+          tableWithUpdatedSchema.getColumnsToSelect());
 
-      tableWithUpdatedSchema.deleteRows(insertRecords.subList(60, 90));
+      tableWithUpdatedSchema.deleteRows(insertsAfterSchemaUpdate.subList(60, 90));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           sourceTableFormat,
           tableWithUpdatedSchema.getOrderByColumn(),
           targetTableFormats,
           tableWithUpdatedSchema.getBasePath(),
-          250);
+          250,
+          tableWithUpdatedSchema.getColumnsToSelect());
 
       if (isPartitioned) {
         // Adds new partition.
@@ -279,7 +283,8 @@ public class ITOneTableClient {
             tableWithUpdatedSchema.getOrderByColumn(),
             targetTableFormats,
             tableWithUpdatedSchema.getBasePath(),
-            300);
+            300,
+            tableWithUpdatedSchema.getColumnsToSelect());
 
         // Drops partition.
         tableWithUpdatedSchema.deleteSpecialPartition();
@@ -289,7 +294,8 @@ public class ITOneTableClient {
             tableWithUpdatedSchema.getOrderByColumn(),
             targetTableFormats,
             tableWithUpdatedSchema.getBasePath(),
-            250);
+            250,
+            tableWithUpdatedSchema.getColumnsToSelect());
 
         // Insert records to the dropped partition again.
         tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
@@ -299,7 +305,8 @@ public class ITOneTableClient {
             tableWithUpdatedSchema.getOrderByColumn(),
             targetTableFormats,
             tableWithUpdatedSchema.getBasePath(),
-            300);
+            300,
+            tableWithUpdatedSchema.getColumnsToSelect());
       }
     }
   }
@@ -339,11 +346,21 @@ public class ITOneTableClient {
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
 
       checkDatasetEquivalence(
-          TableFormat.HUDI, "_hoodie_record_key", targetTableFormats, table.getBasePath(), 50);
+          TableFormat.HUDI,
+          "_hoodie_record_key",
+          targetTableFormats,
+          table.getBasePath(),
+          50,
+          table.getColumnsToSelect());
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
-          TableFormat.HUDI, "_hoodie_record_key", targetTableFormats, table.getBasePath(), 100);
+          TableFormat.HUDI,
+          "_hoodie_record_key",
+          targetTableFormats,
+          table.getBasePath(),
+          100,
+          table.getColumnsToSelect());
     }
   }
 
@@ -373,7 +390,12 @@ public class ITOneTableClient {
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
-          TableFormat.HUDI, "_hoodie_record_key", targetTableFormats, table.getBasePath(), 50);
+          TableFormat.HUDI,
+          "_hoodie_record_key",
+          targetTableFormats,
+          table.getBasePath(),
+          50,
+          table.getColumnsToSelect());
 
       table.deleteRecords(insertedRecords1.subList(0, 20), true);
       // At this point table should have 30 records but only after compaction.
@@ -391,7 +413,8 @@ public class ITOneTableClient {
           targetTableFormats,
           Collections.emptyMap(),
           table.getBasePath(),
-          100);
+          100,
+          table.getColumnsToSelect());
 
       table.insertRecords(50, true);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
@@ -403,12 +426,18 @@ public class ITOneTableClient {
           targetTableFormats,
           Collections.emptyMap(),
           table.getBasePath(),
-          150);
+          150,
+          table.getColumnsToSelect());
 
       table.completeScheduledCompaction(scheduledCompactionInstant);
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
       checkDatasetEquivalence(
-          TableFormat.HUDI, "_hoodie_record_key", targetTableFormats, table.getBasePath(), 130);
+          TableFormat.HUDI,
+          "_hoodie_record_key",
+          targetTableFormats,
+          table.getBasePath(),
+          130,
+          table.getColumnsToSelect());
     }
   }
 
@@ -457,7 +486,8 @@ public class ITOneTableClient {
                       targetTableFormat ->
                           getTimeTravelOption(targetTableFormat, instantAfterFirstSync))),
           table.getBasePath(),
-          50);
+          50,
+          table.getColumnsToSelect());
       checkDatasetEquivalence(
           sourceTableFormat,
           getTimeTravelOption(sourceTableFormat, instantAfterSecondSync),
@@ -470,7 +500,8 @@ public class ITOneTableClient {
                       targetTableFormat ->
                           getTimeTravelOption(targetTableFormat, instantAfterSecondSync))),
           table.getBasePath(),
-          100);
+          100,
+          table.getColumnsToSelect());
     }
   }
 
@@ -548,7 +579,12 @@ public class ITOneTableClient {
       oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
 
       checkDatasetEquivalenceWithFilter(
-          TableFormat.HUDI, "_hoodie_record_key", targetTableFormats, table.getBasePath(), filter);
+          TableFormat.HUDI,
+          "_hoodie_record_key",
+          targetTableFormats,
+          table.getBasePath(),
+          filter,
+          table.getColumnsToSelect());
     }
   }
 
@@ -584,14 +620,16 @@ public class ITOneTableClient {
           "_hoodie_record_key",
           Collections.singletonList(TableFormat.ICEBERG),
           table.getBasePath(),
-          100);
+          100,
+          table.getColumnsToSelect());
       oneTableClient.sync(perTableConfigDelta, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI,
           "_hoodie_record_key",
           Collections.singletonList(TableFormat.DELTA),
           table.getBasePath(),
-          100);
+          100,
+          table.getColumnsToSelect());
 
       table.insertRecords(100, true);
       oneTableClient.sync(perTableConfigIceberg, hudiSourceClientProvider);
@@ -600,14 +638,16 @@ public class ITOneTableClient {
           "_hoodie_record_key",
           Collections.singletonList(TableFormat.ICEBERG),
           table.getBasePath(),
-          200);
+          200,
+          table.getColumnsToSelect());
       oneTableClient.sync(perTableConfigDelta, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI,
           "_hoodie_record_key",
           Collections.singletonList(TableFormat.DELTA),
           table.getBasePath(),
-          200);
+          200,
+          table.getColumnsToSelect());
     }
   }
 
@@ -664,7 +704,8 @@ public class ITOneTableClient {
           "_hoodie_record_key",
           Collections.singletonList(TableFormat.ICEBERG),
           table.getBasePath(),
-          50);
+          50,
+          table.getColumnsToSelect());
       // insert more records
       table.insertRecords(50, true);
       // iceberg will be an incremental sync and delta will need to bootstrap with snapshot sync
@@ -674,7 +715,8 @@ public class ITOneTableClient {
           "_hoodie_record_key",
           Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
           table.getBasePath(),
-          100);
+          100,
+          table.getColumnsToSelect());
 
       // insert more records
       table.insertRecords(50, true);
@@ -687,7 +729,8 @@ public class ITOneTableClient {
           "_hoodie_record_key",
           Collections.singletonList(TableFormat.ICEBERG),
           table.getBasePath(),
-          200);
+          200,
+          table.getColumnsToSelect());
 
       // insert more records
       table.insertRecords(50, true);
@@ -698,7 +741,8 @@ public class ITOneTableClient {
           "_hoodie_record_key",
           Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
           table.getBasePath(),
-          250);
+          250,
+          table.getColumnsToSelect());
     }
   }
 
@@ -772,7 +816,8 @@ public class ITOneTableClient {
       String orderByKeyColumn,
       List<TableFormat> targetFormats,
       String basePath,
-      String filter) {
+      String filter,
+      List<String> columnsToSelect) {
     checkDatasetEquivalence(
         sourceFormat,
         Collections.emptyMap(),
@@ -781,7 +826,7 @@ public class ITOneTableClient {
         Collections.emptyMap(),
         basePath,
         null,
-        filter);
+        columnsToSelect);
   }
 
   private void checkDatasetEquivalence(
@@ -789,7 +834,8 @@ public class ITOneTableClient {
       String orderByKeyColumn,
       List<TableFormat> targetFormats,
       String basePath,
-      Integer expectedCount) {
+      Integer expectedCount,
+      List<String> columnsToSelect) {
     checkDatasetEquivalence(
         sourceFormat,
         Collections.emptyMap(),
@@ -798,26 +844,8 @@ public class ITOneTableClient {
         Collections.emptyMap(),
         basePath,
         expectedCount,
-        "1 = 1");
-  }
-
-  private void checkDatasetEquivalence(
-      TableFormat sourceFormat,
-      Map<String, String> sourceOptions,
-      String orderByKeyColumn,
-      List<TableFormat> targetFormats,
-      Map<TableFormat, Map<String, String>> targetOptions,
-      String basePath,
-      Integer expectedCount) {
-    checkDatasetEquivalence(
-        sourceFormat,
-        sourceOptions,
-        orderByKeyColumn,
-        targetFormats,
-        targetOptions,
-        basePath,
-        expectedCount,
-        "1 = 1");
+        "1 = 1",
+        columnsToSelect);
   }
 
   private void checkDatasetEquivalence(
@@ -828,7 +856,29 @@ public class ITOneTableClient {
       Map<TableFormat, Map<String, String>> targetOptions,
       String basePath,
       Integer expectedCount,
-      String filterCondition) {
+      List<String> columnsToSelect) {
+    checkDatasetEquivalence(
+        sourceFormat,
+        sourceOptions,
+        orderByKeyColumn,
+        targetFormats,
+        targetOptions,
+        basePath,
+        expectedCount,
+        "1 = 1",
+        columnsToSelect);
+  }
+
+  private void checkDatasetEquivalence(
+      TableFormat sourceFormat,
+      Map<String, String> sourceOptions,
+      String orderByKeyColumn,
+      List<TableFormat> targetFormats,
+      Map<TableFormat, Map<String, String>> targetOptions,
+      String basePath,
+      Integer expectedCount,
+      String filterCondition,
+      List<String> columnsToSelect) {
     Dataset<Row> sourceRows =
         sparkSession
             .read()
@@ -859,14 +909,8 @@ public class ITOneTableClient {
                           .orderBy(orderByKeyColumn)
                           .filter(filterCondition);
                     }));
-    final Set<String> selectColumns = getFieldNamesRemovingGeneratedColumns(sourceRows.schema());
 
-    targetRowsByFormat
-        .values()
-        .forEach(
-            targetRows ->
-                selectColumns.addAll(getFieldNamesRemovingGeneratedColumns(targetRows.schema())));
-    String[] selectColumnsArr = selectColumns.toArray(new String[] {});
+    String[] selectColumnsArr = columnsToSelect.toArray(new String[] {});
     List<String> dataset1Rows = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
     targetRowsByFormat.forEach(
         (format, targetRows) -> {
@@ -892,15 +936,6 @@ public class ITOneTableClient {
                   "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
                   sourceFormat, format));
         });
-  }
-
-  private Set<String> getFieldNamesRemovingGeneratedColumns(StructType schema) {
-    return Arrays.stream(schema.fields())
-        .map(StructField::name)
-        .filter(name -> !name.startsWith("onetable_partition_col_"))
-        .filter(name -> !name.equals("yearOfBirth"))
-        .filter(name -> !name.equals("birthDate"))
-        .collect(Collectors.toSet());
   }
 
   private void assertNoSyncFailures(Map<TableFormat, SyncResult> results) {

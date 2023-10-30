@@ -33,6 +33,8 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -98,8 +100,6 @@ public class TestDeltaHelper {
             "record_list", DataTypes.createArrayType(STRUCT_SCHEMA), true, Metadata.empty()),
         new StructField("record_field", STRUCT_SCHEMA, true, Metadata.empty()),
       };
-  private static final StructField[] COMMON_DATE_FIELDS =
-      new StructField[] {new StructField("birthDate", TimestampType, true, Metadata.empty())};
   private static final StructField[] ADDITIONAL_FIELDS =
       new StructField[] {new StructField("street", StringType, true, Metadata.empty())};
   private static final StructField[] PARTITIONED_FIELDS =
@@ -241,7 +241,8 @@ public class TestDeltaHelper {
     LocalDateTime localDateTime =
         LocalDateTime.of(
             yearValue, month, day, RANDOM.nextInt(24), RANDOM.nextInt(60), RANDOM.nextInt(60));
-    return Timestamp.valueOf(localDateTime);
+    ZonedDateTime zonedDateTimeInUTC = localDateTime.atZone(ZoneId.of("UTC"));
+    return Timestamp.from(zonedDateTimeInUTC.toInstant());
   }
 
   public static String generateRandomString() {

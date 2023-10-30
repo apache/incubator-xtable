@@ -142,7 +142,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
             commitsPair.getPendingCommits());
     return CurrentCommitState.<HoodieInstant>builder()
         .commitsToProcess(commitsToProcessNext)
-        .pendingInstants(pendingInstantsToProcessNext)
+        .inFlightInstants(pendingInstantsToProcessNext)
         .build();
   }
 

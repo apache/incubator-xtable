@@ -49,6 +49,10 @@ public interface GenericTable<T, Q> extends AutoCloseable {
 
   void close();
 
+  void reload();
+
+  List<String> getColumnsToSelect();
+
   static GenericTable getInstance(
       String tableName,
       Path tempDir,
