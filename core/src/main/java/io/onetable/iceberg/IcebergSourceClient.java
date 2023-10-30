@@ -196,8 +196,11 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     long epochMilli = lastSyncInstant.getLastSyncInstant().toEpochMilli();
     Table iceTable = getSourceTable();
 
-    // history is not used as only the last snapshot of a transaction is tracked
-    // List<HistoryEntry> history = iceTable.history();
+    // There are two ways to fetch Iceberg table's change log; 1) fetch the history using .history()
+    // method and 2) fetch the snapshots using .snapshots() method and traverse the snapshots in
+    // reverse chronological order. The issue with #1 is that if transactions are involved, the
+    // history tracks only the last snapshot of a multi-snapshot transaction. As a result the
+    // timeline generated for sync would be incomplete. Hence, #2 is used.
 
     Snapshot pendingSnapshot = iceTable.currentSnapshot();
     if (pendingSnapshot.timestampMillis() <= epochMilli) {

@@ -284,7 +284,8 @@ class TestIcebergSourceClient {
     }
     appendAction.commit();
     tx.commitTransaction();
-    // the transaction would result in 2 snapshots, although 3b will not be in the history
+    // the transaction would result in 2 snapshots, although 3a will not be in the history as only
+    // the last snapshot of a multi-snapshot transaction is tracked in history.
     Snapshot snapshot3b = catalogSales.currentSnapshot();
     Snapshot snapshot3a = catalogSales.snapshot(snapshot3b.parentId());
 
