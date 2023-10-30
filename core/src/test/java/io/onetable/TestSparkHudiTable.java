@@ -19,14 +19,12 @@
 package io.onetable;
 
 import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
-import static java.util.stream.Collectors.groupingBy;
 
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -61,10 +59,7 @@ import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
 import com.google.common.base.Preconditions;
 
-public class TestSparkHudiTable extends TestAbstractHudiTable
-    implements GenericTable<HoodieRecord<HoodieAvroPayload>, String> {
-  // typical inserts or upserts do not use this partition value.
-  private static final String SPECIAL_PARTITION_VALUE = "GRANULAR";
+public class TestSparkHudiTable extends TestAbstractHudiTable {
 
   private final JavaSparkContext jsc;
   private SparkRDDWriteClient<HoodieAvroPayload> sparkWriteClient;
@@ -192,11 +187,6 @@ public class TestSparkHudiTable extends TestAbstractHudiTable
     return updates;
   }
 
-  @Override
-  public void deleteRows(List<HoodieRecord<HoodieAvroPayload>> records) {
-    deleteRecords(records, true);
-  }
-
   public List<HoodieKey> deleteRecords(
       List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors) {
     List<HoodieKey> deletes =
@@ -232,13 +222,6 @@ public class TestSparkHudiTable extends TestAbstractHudiTable
     deletePartition(SPECIAL_PARTITION_VALUE);
   }
 
-  @Override
-  public String getAnyPartitionValue(List<HoodieRecord<HoodieAvroPayload>> rows) {
-    Map<String, List<HoodieRecord>> recordsByPartition =
-        rows.stream().collect(groupingBy(HoodieRecord::getPartitionPath));
-    return recordsByPartition.keySet().stream().sorted().findFirst().get();
-  }
-
   public void deletePartition(String partition, HoodieTableType tableType) {
     Preconditions.checkArgument(
         partition == null || !partitionFieldNames.isEmpty(),
@@ -250,11 +233,6 @@ public class TestSparkHudiTable extends TestAbstractHudiTable
         sparkWriteClient.deletePartitions(Collections.singletonList(partition), instant);
     List<WriteStatus> result = writeResult.getWriteStatuses().collect();
     assertNoWriteErrors(result);
-  }
-
-  @Override
-  public String getOrderByColumn() {
-    return "_hoodie_record_key";
   }
 
   public void compact() {
@@ -295,22 +273,8 @@ public class TestSparkHudiTable extends TestAbstractHudiTable
     Assertions.assertTrue(metadata.getTotalFilesDeleted() > 0);
   }
 
-  private String getStartCommitInstant() {
-    return sparkWriteClient.startCommit(metaClient.getCommitActionType(), metaClient);
-  }
-
-  private String getStartCommitOfActionType(String actionType) {
-    return sparkWriteClient.startCommit(actionType, metaClient);
-  }
-
   public String startCommit() {
     return getStartCommitInstant();
-  }
-
-  @Override
-  public void upsertRows(List<HoodieRecord<HoodieAvroPayload>> records) {
-    String instant = getStartCommitInstant();
-    upsertRecordsWithCommitAlreadyStarted(records, instant, true);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
@@ -319,27 +283,10 @@ public class TestSparkHudiTable extends TestAbstractHudiTable
     return upsertRecordsWithCommitAlreadyStarted(records, instant, checkForNoErrors);
   }
 
-  private List<HoodieRecord<HoodieAvroPayload>> insertRecords(
-      boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
-    String instant = getStartCommitInstant();
-    return insertRecordsWithCommitAlreadyStarted(inserts, instant, checkForNoErrors);
-  }
-
-  @Override
-  public List<HoodieRecord<HoodieAvroPayload>> insertRows(int numRecords) {
-    List<HoodieRecord<HoodieAvroPayload>> inserts = generateRecords(numRecords);
-    return insertRecords(true, inserts);
-  }
-
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
       int numRecords, boolean checkForNoErrors) {
     List<HoodieRecord<HoodieAvroPayload>> inserts = generateRecords(numRecords);
     return insertRecords(checkForNoErrors, inserts);
-  }
-
-  @Override
-  public List<HoodieRecord<HoodieAvroPayload>> insertRecordsForSpecialPartition(int numRecords) {
-    return insertRecords(numRecords, SPECIAL_PARTITION_VALUE, true);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
@@ -369,16 +316,6 @@ public class TestSparkHudiTable extends TestAbstractHudiTable
     if (sparkWriteClient != null) {
       sparkWriteClient.close();
     }
-  }
-
-  @Override
-  public void reload() {
-    // no-op.
-  }
-
-  @Override
-  public List<String> getColumnsToSelect() {
-    return schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList());
   }
 
   private SparkRDDWriteClient<HoodieAvroPayload> initSparkWriteClient(

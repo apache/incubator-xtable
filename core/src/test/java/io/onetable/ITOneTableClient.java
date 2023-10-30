@@ -174,7 +174,7 @@ public class ITOneTableClient {
   @ParameterizedTest
   @MethodSource("generateTestParametersForFormatsSyncModesAndPartitioning")
   public void testVariousOperations(
-      TableFormat sourceTableFormat, SyncMode syncMode, boolean isPartitioned) throws Exception {
+      TableFormat sourceTableFormat, SyncMode syncMode, boolean isPartitioned) {
     String tableName = getTableName();
     OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
     List<TableFormat> targetTableFormats = getOtherFormats(sourceTableFormat);

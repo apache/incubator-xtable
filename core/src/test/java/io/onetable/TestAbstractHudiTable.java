@@ -18,11 +18,11 @@
  
 package io.onetable;
 
+import static java.util.stream.Collectors.groupingBy;
 import static org.apache.hudi.keygen.constant.KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Random;
@@ -58,6 +59,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalFileSystem;
 
+import org.apache.hudi.client.BaseHoodieWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
@@ -97,7 +99,11 @@ import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 
 import com.google.common.base.Preconditions;
 
-public abstract class TestAbstractHudiTable implements Closeable {
+public abstract class TestAbstractHudiTable
+    implements GenericTable<HoodieRecord<HoodieAvroPayload>, String> {
+  // typical inserts or upserts do not use this partition value.
+  protected static final String SPECIAL_PARTITION_VALUE = "GRANULAR";
+
   static {
     // ensure json modules are registered before any json serialization/deserialization
     JsonUtils.registerModules();
@@ -129,6 +135,7 @@ public abstract class TestAbstractHudiTable implements Closeable {
   protected KeyGenerator keyGenerator;
   protected Schema schema;
   protected List<String> partitionFieldNames;
+  private BaseHoodieWriteClient writeClient;
 
   public TestAbstractHudiTable(String name, Schema schema, Path tempDir, String partitionConfig) {
     try {
@@ -245,6 +252,12 @@ public abstract class TestAbstractHudiTable implements Closeable {
   }
 
   public abstract String startCommit();
+
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
+      boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
+    String instant = getStartCommitInstant();
+    return insertRecordsWithCommitAlreadyStarted(inserts, instant, checkForNoErrors);
+  }
 
   public abstract List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
       List<HoodieRecord<HoodieAvroPayload>> inserts,
@@ -674,5 +687,57 @@ public abstract class TestAbstractHudiTable implements Closeable {
       record.put(fieldName, value);
     }
     return record;
+  }
+
+  @Override
+  public List<HoodieRecord<HoodieAvroPayload>> insertRows(int numRecords) {
+    List<HoodieRecord<HoodieAvroPayload>> inserts = generateRecords(numRecords);
+    return insertRecords(true, inserts);
+  }
+
+  @Override
+  public void upsertRows(List<HoodieRecord<HoodieAvroPayload>> records) {
+    String instant = getStartCommitInstant();
+    upsertRecordsWithCommitAlreadyStarted(records, instant, true);
+  }
+
+  @Override
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecordsForSpecialPartition(int numRecords) {
+    return insertRecords(numRecords, SPECIAL_PARTITION_VALUE, true);
+  }
+
+  @Override
+  public List<String> getColumnsToSelect() {
+    return schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList());
+  }
+
+  @Override
+  public String getAnyPartitionValue(List<HoodieRecord<HoodieAvroPayload>> rows) {
+    Map<String, List<HoodieRecord>> recordsByPartition =
+        rows.stream().collect(groupingBy(HoodieRecord::getPartitionPath));
+    return recordsByPartition.keySet().stream().sorted().findFirst().get();
+  }
+
+  @Override
+  public void deleteRows(List<HoodieRecord<HoodieAvroPayload>> records) {
+    deleteRecords(records, true);
+  }
+
+  @Override
+  public void reload() {
+    // no-op.
+  }
+
+  @Override
+  public String getOrderByColumn() {
+    return "_hoodie_record_key";
+  }
+
+  protected String getStartCommitInstant() {
+    return writeClient.startCommit(metaClient.getCommitActionType(), metaClient);
+  }
+
+  protected String getStartCommitOfActionType(String actionType) {
+    return writeClient.startCommit(actionType, metaClient);
   }
 }

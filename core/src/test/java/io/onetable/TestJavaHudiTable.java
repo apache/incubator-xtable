@@ -239,14 +239,6 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     Assertions.assertTrue(metadata.getTotalFilesDeleted() > 0);
   }
 
-  private String getStartCommitInstant() {
-    return javaWriteClient.startCommit(metaClient.getCommitActionType(), metaClient);
-  }
-
-  private String getStartCommitOfActionType(String actionType) {
-    return javaWriteClient.startCommit(actionType, metaClient);
-  }
-
   public String startCommit() {
     return getStartCommitInstant();
   }
@@ -267,12 +259,6 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     return getAllLatestBaseFiles(fsView).stream()
         .map(HoodieBaseFile::getPath)
         .collect(Collectors.toList());
-  }
-
-  public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
-      boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
-    String instant = getStartCommitInstant();
-    return insertRecordsWithCommitAlreadyStarted(inserts, instant, checkForNoErrors);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
@@ -323,6 +309,18 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
                     endTimeWindow,
                     null,
                     partitionValue));
+  }
+
+  @Override
+  public void deletePartition(String partitionValue) {
+    throw new UnsupportedOperationException(
+        "Hoodie java client does not support delete partitions");
+  }
+
+  @Override
+  public void deleteSpecialPartition() {
+    throw new UnsupportedOperationException(
+        "Hoodie java client does not support delete partitions");
   }
 
   @Override
