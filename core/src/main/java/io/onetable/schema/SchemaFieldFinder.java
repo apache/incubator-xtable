@@ -48,16 +48,16 @@ public class SchemaFieldFinder {
     return findFieldByPath(schema, path.split("\\."), 0);
   }
 
-  private OneField findFieldByPath(OneSchema schema, String[] pathParts, int index) {
+  private OneField findFieldByPath(OneSchema schema, String[] pathParts, int startIndex) {
     if (pathParts.length == 0) {
       return null;
     }
     for (OneField field : schema.getFields()) {
-      if (field.getName().equals(pathParts[index])) {
-        if (pathParts.length == index + 1) {
+      if (field.getName().equals(pathParts[startIndex])) {
+        if (pathParts.length == startIndex + 1) {
           return field;
         }
-        return findFieldByPath(field.getSchema(), pathParts, index + 1);
+        return findFieldByPath(field.getSchema(), pathParts, startIndex + 1);
       }
     }
     return null;
