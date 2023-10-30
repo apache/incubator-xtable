@@ -1,5 +1,5 @@
 # onetable
-OneTable is an omni-directional converter for table formats that facilitates interoporability across data processing systems
+OneTable is an omni-directional converter for table formats that facilitates interoperability across data processing systems
 and query engines.
 Currently, OneTable supports widely adopted open-source table formats such as Apache Hudi, Apache Iceberg, and Delta Lake.
 
