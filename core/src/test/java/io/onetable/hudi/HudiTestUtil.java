@@ -23,7 +23,6 @@ import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Properties;
-import java.util.UUID;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -54,10 +53,6 @@ import io.onetable.model.schema.SchemaVersion;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class HudiTestUtil {
   static final SchemaVersion SCHEMA_VERSION = new SchemaVersion(1, "");
-
-  public static String getTableName() {
-    return "test_table_" + UUID.randomUUID().toString().replaceAll("-", "_");
-  }
 
   @SneakyThrows
   static HoodieTableMetaClient initTableAndGetMetaClient(

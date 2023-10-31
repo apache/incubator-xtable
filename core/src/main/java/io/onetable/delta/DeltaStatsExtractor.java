@@ -87,15 +87,16 @@ public class DeltaStatsExtractor {
     if (columnStats == null) {
       return MAPPER.writeValueAsString(deltaStatsBuilder.build());
     }
-    Map<String, ColumnStat> columnStatsMapKeyedByPath =
-        getColumnStatKeyedByFullyQualifiedPath(columnStats);
-    Map<String, OneField> pathFieldMap = getPathToFieldMap(columnStats);
     Set<String> validPaths = getPathsFromStructSchemaForMinAndMaxStats(schema);
+    Map<OneField, ColumnStat> validColumnStats =
+        columnStats.entrySet().stream()
+            .filter(e -> validPaths.contains(e.getKey().getPath()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     DeltaStats deltaStats =
         deltaStatsBuilder
-            .minValues(getMinValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths))
-            .maxValues(getMaxValues(pathFieldMap, columnStatsMapKeyedByPath, validPaths))
-            .nullCount(getNullCount(columnStatsMapKeyedByPath, validPaths))
+            .minValues(getMinValues(validColumnStats))
+            .maxValues(getMaxValues(validColumnStats))
+            .nullCount(getNullCount(validColumnStats))
             .build();
     return MAPPER.writeValueAsString(deltaStats);
   }
@@ -111,65 +112,36 @@ public class DeltaStatsExtractor {
         .collect(Collectors.toSet());
   }
 
-  private String combinePath(String parentPath, String fieldName) {
-    if (parentPath == null || parentPath.isEmpty()) {
-      return fieldName;
-    }
-    return parentPath + "." + fieldName;
+  private Map<String, Object> getMinValues(Map<OneField, ColumnStat> validColumnStats) {
+    return getValues(validColumnStats, columnStat -> columnStat.getRange().getMinValue());
   }
 
-  private Map<String, Object> getMinValues(
-      Map<String, OneField> pathFieldMap,
-      Map<String, ColumnStat> columnStatsMapKeyedByPath,
-      Set<String> validPaths) {
-    return getValues(
-        pathFieldMap,
-        columnStatsMapKeyedByPath,
-        validPaths,
-        columnStat -> columnStat.getRange().getMinValue());
-  }
-
-  private Map<String, Object> getMaxValues(
-      Map<String, OneField> pathFieldMap,
-      Map<String, ColumnStat> columnStatsMapKeyedByPath,
-      Set<String> validPaths) {
-    return getValues(
-        pathFieldMap,
-        columnStatsMapKeyedByPath,
-        validPaths,
-        columnStat -> columnStat.getRange().getMaxValue());
+  private Map<String, Object> getMaxValues(Map<OneField, ColumnStat> validColumnStats) {
+    return getValues(validColumnStats, columnStat -> columnStat.getRange().getMaxValue());
   }
 
   private Map<String, Object> getValues(
-      Map<String, OneField> pathFieldMap,
-      Map<String, ColumnStat> columnStatsMapKeyedByPath,
-      Set<String> validPaths,
-      Function<ColumnStat, Object> valueExtractor) {
+      Map<OneField, ColumnStat> validColumnStats, Function<ColumnStat, Object> valueExtractor) {
     Map<String, Object> jsonObject = new HashMap<>();
-    columnStatsMapKeyedByPath.forEach(
-        (path, columnStats) -> {
-          if (validPaths.contains(path)) {
-            OneSchema fieldSchema = pathFieldMap.get(path).getSchema();
-            String[] pathParts = path.split(PATH_DELIMITER);
-            insertValueAtPath(
-                jsonObject,
-                pathParts,
-                convertToDeltaColumnStatValue(valueExtractor.apply(columnStats), fieldSchema));
-          }
+    validColumnStats.forEach(
+        (field, columnStat) -> {
+          String[] pathParts = field.getPathParts();
+          insertValueAtPath(
+              jsonObject,
+              pathParts,
+              convertToDeltaColumnStatValue(valueExtractor.apply(columnStat), field.getSchema()));
         });
     return jsonObject;
   }
 
-  private Map<String, Object> getNullCount(
-      Map<String, ColumnStat> columnStatsMapKeyedByPath, Set<String> validPaths) {
+  private Map<String, Object> getNullCount(Map<OneField, ColumnStat> validColumnStats) {
     // TODO: Additional work needed to track nulls maps & arrays.
     Map<String, Object> jsonObject = new HashMap<>();
-    for (Map.Entry<String, ColumnStat> e : columnStatsMapKeyedByPath.entrySet()) {
-      if (validPaths.contains(e.getKey())) {
-        String[] pathParts = e.getKey().split(PATH_DELIMITER);
-        insertValueAtPath(jsonObject, pathParts, e.getValue().getNumNulls());
-      }
-    }
+    validColumnStats.forEach(
+        (field, columnStat) -> {
+          String[] pathParts = field.getPathParts();
+          insertValueAtPath(jsonObject, pathParts, columnStat.getNumNulls());
+        });
     return jsonObject;
   }
 
@@ -197,17 +169,6 @@ public class DeltaStatsExtractor {
         }
       }
     }
-  }
-
-  private Map<String, ColumnStat> getColumnStatKeyedByFullyQualifiedPath(
-      Map<OneField, ColumnStat> columnStats) {
-    return columnStats.entrySet().stream()
-        .collect(Collectors.toMap(e -> e.getKey().getPath(), Map.Entry::getValue));
-  }
-
-  private Map<String, OneField> getPathToFieldMap(Map<OneField, ColumnStat> columnStats) {
-    return columnStats.entrySet().stream()
-        .collect(Collectors.toMap(e -> e.getKey().getPath(), Map.Entry::getKey));
   }
 
   public Map<OneField, ColumnStat> getColumnStatsForFile(AddFile addFile, List<OneField> fields) {

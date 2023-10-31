@@ -18,8 +18,6 @@
  
 package io.onetable;
 
-import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -32,13 +30,14 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import lombok.AccessLevel;
+import lombok.Getter;
+
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
-import org.junit.jupiter.api.Assertions;
 
 import org.apache.hudi.avro.HoodieAvroUtils;
-import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.clustering.plan.strategy.JavaSizeBasedClusteringPlanStrategy;
@@ -48,26 +47,24 @@ import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieAvroRecord;
-import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.common.table.timeline.HoodieInstant;
-import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
-import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
 import com.google.common.base.Preconditions;
 
 public class TestJavaHudiTable extends TestAbstractHudiTable {
 
-  private HoodieJavaWriteClient<HoodieAvroPayload> javaWriteClient;
+  @Getter(value = AccessLevel.PROTECTED)
+  private HoodieJavaWriteClient<HoodieAvroPayload> writeClient;
+
   private final Configuration conf;
   /**
    * Create a test table instance for general testing. The table is created with the schema defined
@@ -158,14 +155,14 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     } catch (IOException ex) {
       throw new UncheckedIOException("Unable to initialize metaclient for TestJavaHudiTable", ex);
     }
-    this.javaWriteClient = initJavaWriteClient(schema, typedProperties, archivalConfig);
+    this.writeClient = initJavaWriteClient(schema, typedProperties, archivalConfig);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
       List<HoodieRecord<HoodieAvroPayload>> inserts,
       String commitInstant,
       boolean checkForNoErrors) {
-    List<WriteStatus> result = javaWriteClient.bulkInsert(copyRecords(inserts), commitInstant);
+    List<WriteStatus> result = writeClient.bulkInsert(copyRecords(inserts), commitInstant);
     if (checkForNoErrors) {
       assertNoWriteErrors(result);
     }
@@ -177,7 +174,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       String commitInstant,
       boolean checkForNoErrors) {
     List<HoodieRecord<HoodieAvroPayload>> updates = generateUpdatesForRecords(records);
-    List<WriteStatus> result = javaWriteClient.upsert(copyRecords(updates), commitInstant);
+    List<WriteStatus> result = writeClient.upsert(copyRecords(updates), commitInstant);
     if (checkForNoErrors) {
       assertNoWriteErrors(result);
     }
@@ -189,7 +186,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
     List<HoodieKey> deletes =
         records.stream().map(HoodieRecord::getKey).collect(Collectors.toList());
     String instant = getStartCommitInstant();
-    List<WriteStatus> result = javaWriteClient.delete(deletes, instant);
+    List<WriteStatus> result = writeClient.delete(deletes, instant);
     if (checkForNoErrors) {
       assertNoWriteErrors(result);
     }
@@ -201,78 +198,11 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         "Hoodie java client does not support delete partitions");
   }
 
-  public void compact() {
-    String instant = javaWriteClient.scheduleCompaction(Option.empty()).get();
-    javaWriteClient.compact(instant);
-  }
-
-  public String onlyScheduleCompaction() {
-    return javaWriteClient.scheduleCompaction(Option.empty()).get();
-  }
-
-  public void completeScheduledCompaction(String instant) {
-    javaWriteClient.compact(instant);
-  }
-
   public void cluster() {
-    String instant = javaWriteClient.scheduleClustering(Option.empty()).get();
-    javaWriteClient.cluster(instant, true);
+    String instant = writeClient.scheduleClustering(Option.empty()).get();
+    writeClient.cluster(instant, true);
     // Reinitializing as clustering disables auto commit and we want to enable it back.
-    javaWriteClient = initJavaWriteClient(schema, typedProperties, null);
-  }
-
-  public void rollback(String commitInstant) {
-    javaWriteClient.rollback(commitInstant);
-  }
-
-  public void savepointRestoreForPreviousInstant() {
-    List<HoodieInstant> commitInstants =
-        metaClient.getActiveTimeline().reload().getCommitsTimeline().getInstants();
-    HoodieInstant instantToRestore = commitInstants.get(commitInstants.size() - 2);
-    javaWriteClient.savepoint(instantToRestore.getTimestamp(), "user", "savepoint-test");
-    javaWriteClient.restoreToSavepoint(instantToRestore.getTimestamp());
-  }
-
-  public void clean() {
-    HoodieCleanMetadata metadata = javaWriteClient.clean();
-    // Assert that files are deleted to ensure test is realistic
-    Assertions.assertTrue(metadata.getTotalFilesDeleted() > 0);
-  }
-
-  private String getStartCommitInstant() {
-    return javaWriteClient.startCommit(metaClient.getCommitActionType(), metaClient);
-  }
-
-  private String getStartCommitOfActionType(String actionType) {
-    return javaWriteClient.startCommit(actionType, metaClient);
-  }
-
-  public String startCommit() {
-    return getStartCommitInstant();
-  }
-
-  public List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
-      List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors) {
-    String instant = getStartCommitInstant();
-    return upsertRecordsWithCommitAlreadyStarted(records, instant, checkForNoErrors);
-  }
-
-  public List<String> getAllLatestBaseFilePaths() {
-    HoodieTableFileSystemView fsView =
-        new HoodieMetadataFileSystemView(
-            javaWriteClient.getEngineContext(),
-            metaClient,
-            metaClient.reloadActiveTimeline(),
-            getHoodieWriteConfig(metaClient).getMetadataConfig());
-    return getAllLatestBaseFiles(fsView).stream()
-        .map(HoodieBaseFile::getPath)
-        .collect(Collectors.toList());
-  }
-
-  public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
-      boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
-    String instant = getStartCommitInstant();
-    return insertRecordsWithCommitAlreadyStarted(inserts, instant, checkForNoErrors);
+    writeClient = initJavaWriteClient(schema, typedProperties, null);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
@@ -326,9 +256,21 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   }
 
   @Override
+  public void deletePartition(String partitionValue) {
+    throw new UnsupportedOperationException(
+        "Hoodie java client does not support delete partitions");
+  }
+
+  @Override
+  public void deleteSpecialPartition() {
+    throw new UnsupportedOperationException(
+        "Hoodie java client does not support delete partitions");
+  }
+
+  @Override
   public void close() {
-    if (javaWriteClient != null) {
-      javaWriteClient.close();
+    if (writeClient != null) {
+      writeClient.close();
     }
   }
 

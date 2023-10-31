@@ -18,6 +18,7 @@
  
 package io.onetable.delta;
 
+import static io.onetable.GenericTable.getTableName;
 import static io.onetable.ValidationTestHelper.validateOneSnapshot;
 import static io.onetable.ValidationTestHelper.validateTableChanges;
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,7 +35,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
@@ -70,7 +70,7 @@ import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.testutil.Issues;
 
@@ -176,22 +176,22 @@ public class ITDeltaSourceClient {
     Map<OneField, ColumnStat> columnStats = new HashMap<>();
     columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
     columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
-    Assertions.assertEquals(1, snapshot.getDataFiles().getFiles().size());
+    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
     validatePartitionDataFiles(
-        OneDataFiles.collectionBuilder()
+        OneFileGroup.builder()
             .files(
                 Collections.singletonList(
                     OneDataFile.builder()
-                        .schemaVersion(null)
+                        .physicalPath("file:/fake/path")
                         .fileFormat(FileFormat.APACHE_PARQUET)
                         .partitionValues(Collections.emptyMap())
-                        .partitionPath(null)
                         .fileSizeBytes(684)
                         .recordCount(1)
                         .columnStats(columnStats)
                         .build()))
+            .partitionValues(Collections.emptyMap())
             .build(),
-        (OneDataFiles) snapshot.getDataFiles().getFiles().get(0));
+        snapshot.getPartitionedDataFiles().get(0));
   }
 
   @Test
@@ -251,28 +251,29 @@ public class ITDeltaSourceClient {
     Map<OneField, ColumnStat> columnStats = new HashMap<>();
     columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
     columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
-    Assertions.assertEquals(1, snapshot.getDataFiles().getFiles().size());
+    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
+    Map<OnePartitionField, Range> partitionValue =
+        Collections.singletonMap(
+            OnePartitionField.builder()
+                .sourceField(partCol)
+                .transformType(PartitionTransformType.VALUE)
+                .build(),
+            Range.scalar("SingleValue"));
     validatePartitionDataFiles(
-        OneDataFiles.collectionBuilder()
+        OneFileGroup.builder()
+            .partitionValues(partitionValue)
             .files(
                 Collections.singletonList(
                     OneDataFile.builder()
-                        .schemaVersion(null)
+                        .physicalPath("file:/fake/path")
                         .fileFormat(FileFormat.APACHE_PARQUET)
-                        .partitionValues(
-                            Collections.singletonMap(
-                                OnePartitionField.builder()
-                                    .sourceField(partCol)
-                                    .transformType(PartitionTransformType.VALUE)
-                                    .build(),
-                                Range.scalar("SingleValue")))
-                        .partitionPath(null)
+                        .partitionValues(partitionValue)
                         .fileSizeBytes(684)
                         .recordCount(1)
                         .columnStats(columnStats)
                         .build()))
             .build(),
-        (OneDataFiles) snapshot.getDataFiles().getFiles().get(0));
+        snapshot.getPartitionedDataFiles().get(0));
   }
 
   @Disabled("Requires Spark 3.4.0+")
@@ -311,7 +312,8 @@ public class ITDeltaSourceClient {
   public void testInsertsUpsertsAndDeletes(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned, false);
+        new TestSparkDeltaTable(
+            tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -365,7 +367,8 @@ public class ITDeltaSourceClient {
   public void testVacuum(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned, false);
+        new TestSparkDeltaTable(
+            tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -418,7 +421,8 @@ public class ITDeltaSourceClient {
   public void testAddColumns(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned, true);
+        new TestSparkDeltaTable(
+            tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, true);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -462,7 +466,7 @@ public class ITDeltaSourceClient {
   public void testDropPartition() {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession, true, false);
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, "yearOfBirth", false);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -518,7 +522,8 @@ public class ITDeltaSourceClient {
   public void testOptimizeAndClustering(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession, isPartitioned, false);
+        new TestSparkDeltaTable(
+            tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -578,10 +583,6 @@ public class ITDeltaSourceClient {
     assertEquals(PartitionTransformType.YEAR, partitionField.getTransformType());
   }
 
-  private static String getTableName() {
-    return "test_" + UUID.randomUUID().toString().replace("-", "_");
-  }
-
   private static void validateTable(
       OneTable oneTable,
       String tableName,
@@ -604,9 +605,10 @@ public class ITDeltaSourceClient {
   }
 
   private void validatePartitionDataFiles(
-      OneDataFiles expectedPartitionFiles, OneDataFiles actualPartitionFiles)
+      OneFileGroup expectedPartitionFiles, OneFileGroup actualPartitionFiles)
       throws URISyntaxException {
-    validatePropertiesDataFile(expectedPartitionFiles, actualPartitionFiles, false);
+    assertEquals(
+        expectedPartitionFiles.getPartitionValues(), actualPartitionFiles.getPartitionValues());
     validateDataFiles(expectedPartitionFiles.getFiles(), actualPartitionFiles.getFiles());
   }
 
@@ -616,20 +618,16 @@ public class ITDeltaSourceClient {
     for (int i = 0; i < expectedFiles.size(); i++) {
       OneDataFile expected = expectedFiles.get(i);
       OneDataFile actual = actualFiles.get(i);
-      validatePropertiesDataFile(expected, actual, true);
+      validatePropertiesDataFile(expected, actual);
     }
   }
 
-  private void validatePropertiesDataFile(
-      OneDataFile expected, OneDataFile actual, boolean dataFile) throws URISyntaxException {
+  private void validatePropertiesDataFile(OneDataFile expected, OneDataFile actual)
+      throws URISyntaxException {
     Assertions.assertEquals(expected.getSchemaVersion(), actual.getSchemaVersion());
-    if (dataFile) {
-      Assertions.assertTrue(
-          Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
-          () -> "path == " + actual.getPhysicalPath() + " is not absolute");
-    } else {
-      Assertions.assertNull(actual.getPhysicalPath());
-    }
+    Assertions.assertTrue(
+        Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
+        () -> "path == " + actual.getPhysicalPath() + " is not absolute");
     Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
     Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
     Assertions.assertEquals(expected.getPartitionPath(), actual.getPartitionPath());
@@ -637,22 +635,18 @@ public class ITDeltaSourceClient {
     if (Issues.ISSUE_102_FIXED) {
       Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
     }
-    if (dataFile) {
-      Instant now = Instant.now();
-      long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
-      long maxRange = now.toEpochMilli();
-      Assertions.assertTrue(
-          actual.getLastModified() > minRange && actual.getLastModified() <= maxRange,
-          () ->
-              "last modified == "
-                  + actual.getLastModified()
-                  + " is expected between "
-                  + minRange
-                  + " and "
-                  + maxRange);
-    } else {
-      Assertions.assertEquals(0, actual.getLastModified());
-    }
+    Instant now = Instant.now();
+    long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
+    long maxRange = now.toEpochMilli();
+    Assertions.assertTrue(
+        actual.getLastModified() > minRange && actual.getLastModified() <= maxRange,
+        () ->
+            "last modified == "
+                + actual.getLastModified()
+                + " is expected between "
+                + minRange
+                + " and "
+                + maxRange);
     Assertions.assertEquals(expected.getColumnStats(), actual.getColumnStats());
   }
 

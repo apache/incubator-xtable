@@ -45,8 +45,8 @@ import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
 import io.onetable.model.storage.OneDataFilesDiff;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.extractor.SourceClient;
 
@@ -134,15 +134,15 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
     TableScan scan = iceTable.newScan().useSnapshot(currentSnapshot.snapshotId());
     PartitionSpec partitionSpec = iceTable.spec();
-    OneDataFiles oneDataFiles;
+    List<OneFileGroup> partitionedDataFiles;
     try (CloseableIterable<FileScanTask> files = scan.planFiles()) {
       List<OneDataFile> irFiles = new ArrayList<>();
       for (FileScanTask fileScanTask : files) {
         DataFile file = fileScanTask.file();
-        OneDataFile irDataFile = fromIceberg(file, partitionSpec, irTable.getReadSchema());
+        OneDataFile irDataFile = fromIceberg(file, partitionSpec, irTable);
         irFiles.add(irDataFile);
       }
-      oneDataFiles = clusterFilesByPartition(irFiles);
+      partitionedDataFiles = OneFileGroup.fromFiles(irFiles);
     } catch (IOException e) {
       throw new OneIOException("Failed to fetch current snapshot files from Iceberg source", e);
     }
@@ -151,38 +151,14 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         .version(String.valueOf(currentSnapshot.snapshotId()))
         .table(irTable)
         .schemaCatalog(schemaCatalog)
-        .dataFiles(oneDataFiles)
+        .partitionedDataFiles(partitionedDataFiles)
         .build();
   }
 
-  private OneDataFile fromIceberg(
-      DataFile file, PartitionSpec partitionSpec, OneSchema readSchema) {
+  private OneDataFile fromIceberg(DataFile file, PartitionSpec partitionSpec, OneTable oneTable) {
     Map<OnePartitionField, Range> onePartitionFieldRangeMap =
-        partitionConverter.toOneTable(file.partition(), partitionSpec);
-    return dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap, readSchema);
-  }
-
-  /**
-   * Divides / groups a collection of {@link OneDataFile}s into {@link OneDataFiles} based on the
-   * file's partition values.
-   *
-   * @param files a collection of files to be grouped by partition
-   * @return a collection of {@link OneDataFiles}, each containing a collection of {@link
-   *     OneDataFile} with the same partition values
-   */
-  private OneDataFiles clusterFilesByPartition(List<OneDataFile> files) {
-    Map<String, List<OneDataFile>> fileClustersMap =
-        files.stream().collect(Collectors.groupingBy(OneDataFile::getPartitionPath));
-    List<OneDataFile> fileClustersList =
-        fileClustersMap.entrySet().stream()
-            .map(
-                entry ->
-                    OneDataFiles.collectionBuilder()
-                        .partitionPath(entry.getKey())
-                        .files(entry.getValue())
-                        .build())
-            .collect(Collectors.toList());
-    return OneDataFiles.collectionBuilder().files(fileClustersList).build();
+        partitionConverter.toOneTable(oneTable, file.partition(), partitionSpec);
+    return dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap, oneTable.getReadSchema());
   }
 
   @Override
@@ -194,12 +170,12 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
     Set<OneDataFile> dataFilesAdded =
         StreamSupport.stream(snapshot.addedDataFiles(fileIO).spliterator(), false)
-            .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable.getReadSchema()))
+            .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable))
             .collect(Collectors.toSet());
 
     Set<OneDataFile> dataFilesRemoved =
         StreamSupport.stream(snapshot.removedDataFiles(fileIO).spliterator(), false)
-            .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable.getReadSchema()))
+            .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable))
             .collect(Collectors.toSet());
 
     OneDataFilesDiff filesDiff =
@@ -214,7 +190,32 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   @Override
   public CurrentCommitState<Snapshot> getCurrentCommitState(
-      InstantsForIncrementalSync instantsForIncrementalSync) {
-    return null;
+      InstantsForIncrementalSync lastSyncInstant) {
+
+    long epochMilli = lastSyncInstant.getLastSyncInstant().toEpochMilli();
+    Table iceTable = getSourceTable();
+
+    // There are two ways to fetch Iceberg table's change log; 1) fetch the history using .history()
+    // method and 2) fetch the snapshots using .snapshots() method and traverse the snapshots in
+    // reverse chronological order. The issue with #1 is that if transactions are involved, the
+    // history tracks only the last snapshot of a multi-snapshot transaction. As a result the
+    // timeline generated for sync would be incomplete. Hence, #2 is used.
+
+    Snapshot pendingSnapshot = iceTable.currentSnapshot();
+    if (pendingSnapshot.timestampMillis() <= epochMilli) {
+      // Even the latest snapshot was committed before the lastSyncInstant. No new commits were made
+      // and no new snapshots need to be synced. Return empty state.
+      return CurrentCommitState.<Snapshot>builder().build();
+    }
+
+    List<Snapshot> snapshots = new ArrayList<>();
+    while (pendingSnapshot != null && pendingSnapshot.timestampMillis() > epochMilli) {
+      snapshots.add(pendingSnapshot);
+      pendingSnapshot =
+          pendingSnapshot.parentId() != null ? iceTable.snapshot(pendingSnapshot.parentId()) : null;
+    }
+    // reverse the list to process the oldest snapshot first
+    Collections.reverse(snapshots);
+    return CurrentCommitState.<Snapshot>builder().commitsToProcess(snapshots).build();
   }
 }

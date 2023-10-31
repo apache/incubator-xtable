@@ -55,7 +55,7 @@ public class TableFormatSync {
       return getSyncResult(
           SyncMode.FULL,
           oneTable,
-          client -> client.syncFilesForSnapshot(snapshot.getDataFiles()),
+          client -> client.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
           startTime,
           snapshot.getPendingCommits());
     } catch (Exception e) {

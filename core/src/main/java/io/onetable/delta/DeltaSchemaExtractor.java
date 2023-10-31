@@ -18,6 +18,7 @@
  
 package io.onetable.delta;
 
+import static io.onetable.delta.DeltaPartitionExtractor.DELTA_GENERATION_EXPRESSION;
 import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
 
 import java.util.Arrays;
@@ -188,6 +189,7 @@ public class DeltaSchemaExtractor {
         StructType structType = (StructType) dataType;
         fields =
             Arrays.stream(structType.fields())
+                .filter(field -> !field.metadata().contains(DELTA_GENERATION_EXPRESSION))
                 .map(
                     field -> {
                       Integer fieldId =

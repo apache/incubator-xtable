@@ -49,7 +49,7 @@ public class ExtractFromSource<COMMIT> {
     }
     return IncrementalTableChanges.builder()
         .tableChanges(tableChangeList)
-        .pendingCommits(currentCommitState.getPendingInstants())
+        .pendingCommits(currentCommitState.getInFlightInstants())
         .build();
   }
 }

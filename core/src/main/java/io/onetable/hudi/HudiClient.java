@@ -99,7 +99,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
     return OneSnapshot.builder()
         .table(table)
         .schemaCatalog(getSchemaCatalog(table, latestCommit))
-        .dataFiles(dataFileExtractor.getFilesCurrentState(table))
+        .partitionedDataFiles(dataFileExtractor.getFilesCurrentState(table))
         .pendingCommits(
             pendingInstants.stream()
                 .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
@@ -142,7 +142,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
             commitsPair.getPendingCommits());
     return CurrentCommitState.<HoodieInstant>builder()
         .commitsToProcess(commitsToProcessNext)
-        .pendingInstants(pendingInstantsToProcessNext)
+        .inFlightInstants(pendingInstantsToProcessNext)
         .build();
   }
 
