@@ -6,9 +6,9 @@ sidebar_position: 3
 This document walks through the steps to create a Onetable synced Delta table on Unity Catalog on Databricks.
 
 ## Pre-requisites
-1. Hudi table(s) already written to external storage locations like S3/GCS.
-   If you don't have a Hudi table written in S3/GCS,
-   you can follow the steps in [this](https://link-to-how-to.md) tutorial to set it up.
+1. Source table(s) (Hudi/Iceberg) already written to external storage locations like S3/GCS.
+   If you don't have a source table written in S3/GCS,
+   you can follow the steps in [this](https://link-to-how-to/create/dataset.md) tutorial to set it up.
 2. A compute instance where you can run Apache Spark.
    This can be your local machine, docker, or a distributed system like Amazon EMR, Cloud Dataproc etc.
 3. Setup connection to external storage locations from Databricks.
@@ -25,17 +25,17 @@ This document walks through the steps to create a Onetable synced Delta table on
 Create `my_config.yaml` in the cloned onetable directory.
 
 ```yaml md title="yaml"
-sourceFormat: HUDI
+sourceFormat: HUDI|ICEBERG # choose only one
 targetFormats:
   - DELTA
 datasets:
   -
-    tableBasePath: s3://path/to/trips/data
-    tableName: trips_data
+    tableBasePath: s3://path/to/source/data
+    tableName: table_name
     partitionSpec: partitionpath:VALUE
 ```
 :::tip Note:
-Replace `s3://path/to/trips/data` to `gs://path/to/trips/data` if you have your source table in GCS. 
+Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have your source table in GCS. 
 :::
 
 From your terminal under the cloned onetable directory, run the sync process using the below command.
@@ -57,19 +57,19 @@ CREATE CATALOG onetable;
 
 CREATE SCHEMA onetable.synced_delta_schema;
 
-CREATE TABLE onetable.synced_delta_schema.trips_data
+CREATE TABLE onetable.synced_delta_schema.<table_name>
 USING DELTA
-LOCATION 's3://path/to/trips/data';
+LOCATION 's3://path/to/source/data';
 ```
 :::tip Note:
-Replace `s3://path/to/trips/data` to `gs://path/to/trips/data` if you have your source table in GCS.
+Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have your source table in GCS.
 :::
 
 
-You can now see the created delta table in **Unity Catalog** under **Catalog** as `trips_data` under
+You can now see the created delta table in **Unity Catalog** under **Catalog** as `<table_name>` under
 `synced_delta_schema`
 
 ## Conclusion
 In this guide we saw how to 
-1. sync a Hudi table to create Iceberg metadata with Onetable
+1. sync a table in Hudi/Iceberg to create Delta metadata with Onetable
 2. catalog the data as a Delta table in Unity Catalog on Databricks

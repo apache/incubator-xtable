@@ -2,12 +2,15 @@
 sidebar_position: 4
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # BigLake Metastore
 This document walks through the steps to create a Onetable synced Iceberg table in BigLake Metastore on GCP.
 
 ## Pre-requisites
-1. Hudi table(s) already written to Google Cloud Storage.
-   If you don't have a Hudi table written in GCS,
+1. Source (Hudi/Delta) table(s) already written to Google Cloud Storage.
+   If you don't have the source table written in GCS,
    you can follow the steps in [this](https://link-to-how-to.md) tutorial to set it up.
 2. To ensure that the BigLake API's caller (your service account used by Onetable) has the
    necessary permissions to create a BigLake table, ask your administrator to grant the service account
@@ -79,17 +82,43 @@ is being tracked under [this](https://github.com/onetable-io/onetable/issues/107
 
 ### Running sync
 
+<Tabs
+groupId="table-format"
+defaultValue="hudi"
+values={[
+{ label: 'sourceFormat: HUDI', value: 'hudi', },
+{ label: 'sourceFormat: DELTA', value: 'delta', },
+]}
+>
+<TabItem value="hudi">
+
 ```yaml md title="yaml"
 sourceFormat: HUDI
 targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: gs://path/to/trips_data
-    tableName: trips_data
-    namespace: onetable_synced_db
+    tableBasePath: gs://path/to/source/data
+    tableName: table_name
     partitionSpec: partitionpath:VALUE
 ```
+</TabItem>
+
+<TabItem value="delta">
+
+```yaml md title="yaml"
+sourceFormat: DELTA
+targetFormats:
+  - ICEBERG
+datasets:
+  -
+    tableBasePath: gs://path/to/source/data
+    tableName: table_name
+    partitionSpec: partitionpath:VALUE
+```
+
+</TabItem>
+</Tabs>
 
 From your terminal under the cloned onetable directory, run the sync process using the below command.
 
@@ -109,11 +138,11 @@ We can use `Try this method` option on Google's REST reference docs for
 [`projects.locations.catalogs.databases.tables.get`](https://cloud.google.com/bigquery/docs/reference/biglake/rest/v1/projects.locations.catalogs.databases.tables/get)
 method to view the created table.
 ```rest md title="name"
-projects/<yourProjectName>/locations/us-west1/catalogs/onetable/databases/onetable_synced_db/tables/trips_data
+projects/<yourProjectName>/locations/us-west1/catalogs/onetable/databases/onetable_synced_db/tables/table_name
 ```
 
 ## Conclusion
 In this guide we saw how to,
-1. sync a hudi table to create Iceberg metadata with Onetable
+1. sync a source table to create Iceberg metadata with Onetable
 2. catalog the data as an Iceberg table in BigLake Metastore
 3. validate the table creation using `projects.locations.catalogs.databases.tables.get` method
