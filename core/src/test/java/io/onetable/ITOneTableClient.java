@@ -138,8 +138,7 @@ public class ITOneTableClient {
   }
 
   private static Stream<Arguments> testCasesWithSyncModes() {
-    return addSyncModeCases(
-        Stream.of(Arguments.of(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))));
+    return Stream.of(Arguments.of(SyncMode.INCREMENTAL), Arguments.of(SyncMode.FULL));
   }
 
   private SourceClientProvider<?> getSourceClientProvider(TableFormat sourceTableFormat) {
@@ -252,8 +251,9 @@ public class ITOneTableClient {
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndSyncModes")
   public void testConcurrentInsertWritesInSource(
-      List<TableFormat> targetTableFormats, SyncMode syncMode, PartitionConfig partitionConfig) {
+      SyncMode syncMode, PartitionConfig partitionConfig) {
     String tableName = getTableName();
+    List<TableFormat> targetTableFormats = getOtherFormats(TableFormat.HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, partitionConfig.getHudiConfig(), HoodieTableType.COPY_ON_WRITE)) {
@@ -290,9 +290,10 @@ public class ITOneTableClient {
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndSyncModes")
   public void testConcurrentInsertsAndTableServiceWrites(
-      List<TableFormat> targetTableFormats, SyncMode syncMode, PartitionConfig partitionConfig) {
+      SyncMode syncMode, PartitionConfig partitionConfig) {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
 
+    List<TableFormat> targetTableFormats = getOtherFormats(TableFormat.HUDI);
     String tableName = getTableName();
     try (TestSparkHudiTable table =
         TestSparkHudiTable.forStandardSchema(
@@ -779,17 +780,6 @@ public class ITOneTableClient {
               String.format(
                   "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
                   sourceFormat, format));
-        });
-  }
-
-  private static Stream<Arguments> addSyncModeCases(Stream<Arguments> arguments) {
-    return arguments.flatMap(
-        args -> {
-          Object[] snapshotArgs = Arrays.copyOf(args.get(), args.get().length + 1);
-          snapshotArgs[snapshotArgs.length - 1] = SyncMode.FULL;
-          Object[] incrementalArgs = Arrays.copyOf(args.get(), args.get().length + 1);
-          incrementalArgs[incrementalArgs.length - 1] = SyncMode.INCREMENTAL;
-          return Stream.of(Arguments.arguments(snapshotArgs), Arguments.arguments(incrementalArgs));
         });
   }
 
