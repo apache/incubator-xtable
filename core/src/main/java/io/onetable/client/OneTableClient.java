@@ -29,6 +29,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.Builder;
 import lombok.Value;
@@ -228,12 +229,31 @@ public class OneTableClient {
       ExtractFromSource<COMMIT> source,
       Optional<Instant> lastSyncInstant,
       List<Instant> pendingInstants) {
-    if (!doesInstantExists(source, lastSyncInstant)) {
+    Optional<Instant> earliestInstant;
+    Stream<Instant> pendingInstantsStream =
+        (pendingInstants == null) ? Stream.empty() : pendingInstants.stream();
+    if (lastSyncInstant.isPresent()) {
+      earliestInstant =
+          Stream.concat(Stream.of(lastSyncInstant.get()), pendingInstantsStream)
+              .min(Instant::compareTo);
+    } else {
+      earliestInstant = pendingInstantsStream.min(Instant::compareTo);
+    }
+    boolean isEarliestInstantExists = doesInstantExists(source, earliestInstant);
+    if (!isEarliestInstantExists) {
+      log.info(
+          "Earliest instant {} doesn't exist in the source table. Falling back to full sync.",
+          earliestInstant);
       return false;
     }
-    return pendingInstants == null
-        || pendingInstants.isEmpty()
-        || doesInstantExists(source, Optional.ofNullable(pendingInstants.get(0)));
+    boolean isEarliestInstantAffectedByCleaned =
+        source.getSourceClient().isAffectedByClean(earliestInstant.get());
+    if (isEarliestInstantAffectedByCleaned) {
+      log.info(
+          "Earliest instant {} is affected by clean. Falling back to full sync.", earliestInstant);
+      return false;
+    }
+    return true;
   }
 
   private Map<TableFormat, TableFormatSync> getFormatsForSyncMode(
@@ -271,13 +291,7 @@ public class OneTableClient {
     if (!instantToCheck.isPresent()) {
       return false;
     }
-
-    // TODO This check is not generic and should be moved to HudiClient
-    // TODO hardcoding the return value to true for now
-    //    COMMIT lastSyncHoodieInstant = source.getLastSyncCommit(lastSyncInstant.get());
-    //    return HudiClient.parseFromInstantTime(lastSyncHoodieInstant.getTimestamp())
-    //        .equals(lastSyncInstant.get());
-    return true;
+    return source.getSourceClient().doesCommitForInstantExists(instantToCheck.get());
   }
 
   @Value

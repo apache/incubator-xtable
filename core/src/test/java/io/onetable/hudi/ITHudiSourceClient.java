@@ -27,12 +27,17 @@ import static java.util.stream.Collectors.groupingBy;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import lombok.Builder;
+import lombok.Value;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
@@ -40,6 +45,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -47,6 +53,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.client.HoodieReadClient;
+import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
@@ -144,6 +151,163 @@ public class ITHudiSourceClient {
       }
       validateTableChanges(allBaseFilePaths, allTableChanges);
     }
+  }
+
+  // TODO(vamshigv): Highlight during review and remove before merging.
+  @Test
+  @Disabled
+  public void testShowsFailureOfIncrementalSync() {
+    HoodieTableType tableType = HoodieTableType.COPY_ON_WRITE;
+    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
+    String tableName = getTableName();
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+      String commitInstant1 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+      HudiClient hudiClient =
+          getHudiSourceClient(
+              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
+      OneSnapshot snapshotAfterCommit1 = hudiClient.getCurrentSnapshot();
+      List<String> allActivePaths = getAllFilePaths(snapshotAfterCommit1);
+      assertEquals(1, allActivePaths.size());
+      String activePathAfterCommit1 = allActivePaths.get(0);
+
+      String commitInstant2 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> upsertsForCommit2 =
+          table.generateUpdatesForRecords(insertsForCommit1.subList(30, 40));
+      table.upsertRecordsWithCommitAlreadyStarted(upsertsForCommit2, commitInstant2, true);
+
+      String commitInstant3 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit3 = table.generateRecords(100);
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit3, commitInstant3, true);
+      table.clean(); // uncommenting this makes test pass.
+
+      InstantsForIncrementalSync instantsForIncrementalSync =
+          InstantsForIncrementalSync.builder()
+              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
+              .build();
+      hudiClient =
+          getHudiSourceClient(
+              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
+
+      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
+          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
+      boolean areFilesRemoved = false;
+      boolean newFileGroupsAdded = false;
+      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
+        TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
+        areFilesRemoved =
+            areFilesRemoved | checkIfFileIsRemoved(activePathAfterCommit1, tableChange);
+        newFileGroupsAdded =
+            newFileGroupsAdded | checkIfNewFileGroupIsAdded(activePathAfterCommit1, tableChange);
+      }
+      assertTrue(newFileGroupsAdded);
+      assertTrue(areFilesRemoved);
+    }
+  }
+
+  @Test
+  public void fallBackToSnapshotSyncWhenIncrementalSyncIsNotPossible() {
+    HoodieTableType tableType = HoodieTableType.COPY_ON_WRITE;
+    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
+    String tableName = getTableName();
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+      String commitInstant1 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+
+      String commitInstant2 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> upsertsForCommit2 =
+          table.generateUpdatesForRecords(insertsForCommit1.subList(30, 40));
+      table.upsertRecordsWithCommitAlreadyStarted(upsertsForCommit2, commitInstant2, true);
+
+      String commitInstant3 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit3 = table.generateRecords(100);
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit3, commitInstant3, true);
+      table.clean(); // This cleans older file slices from commitInstant1.
+
+      InstantsForIncrementalSync instantsForIncrementalSync =
+          InstantsForIncrementalSync.builder()
+              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
+              .build();
+      HudiClient hudiClient =
+          getHudiSourceClient(
+              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
+
+      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
+          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
+      boolean areFilesRemoved = false;
+      boolean newFileGroupsAdded = false;
+      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
+        TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
+        areFilesRemoved =
+            areFilesRemoved | checkIfFileIsRemoved(activePathAfterCommit1, tableChange);
+        newFileGroupsAdded =
+            newFileGroupsAdded | checkIfNewFileGroupIsAdded(activePathAfterCommit1, tableChange);
+      }
+      assertTrue(newFileGroupsAdded);
+      assertTrue(areFilesRemoved);
+    }
+  }
+
+  private boolean checkIfNewFileGroupIsAdded(String activePath, TableChange tableChange) {
+    String activePathFileGroupId = getFileGroupInfo(activePath).fileId;
+    String activePathCommitTime = getFileGroupInfo(activePath).commitTime;
+    Map<String, String> fileIdToCommitTimeMap =
+        tableChange.getFilesDiff().getFilesAdded().stream()
+            .collect(
+                Collectors.groupingBy(
+                    oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).fileId,
+                    Collectors.collectingAndThen(
+                        Collectors.mapping(
+                            oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).commitTime,
+                            Collectors.toList()),
+                        list -> {
+                          if (list.size() > 1) {
+                            throw new IllegalStateException(
+                                "Some fileIds have more than one commit time.");
+                          }
+                          return list.get(0);
+                        })));
+    if (!fileIdToCommitTimeMap.containsKey(activePathFileGroupId)) {
+      return false;
+    }
+    Instant newCommitInstant =
+        HudiInstantUtils.parseFromInstantTime(fileIdToCommitTimeMap.get(activePathFileGroupId));
+    Instant oldCommitInstant = HudiInstantUtils.parseFromInstantTime(activePathCommitTime);
+    return newCommitInstant.isAfter(oldCommitInstant);
+  }
+
+  private boolean checkIfFileIsRemoved(String activePath, TableChange tableChange) {
+    String activePathFileGroupId = getFileGroupInfo(activePath).fileId;
+    String activePathCommitTime = getFileGroupInfo(activePath).commitTime;
+    Map<String, String> fileIdToCommitTimeMap =
+        tableChange.getFilesDiff().getFilesRemoved().stream()
+            .collect(
+                Collectors.groupingBy(
+                    oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).fileId,
+                    Collectors.collectingAndThen(
+                        Collectors.mapping(
+                            oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).commitTime,
+                            Collectors.toList()),
+                        list -> {
+                          if (list.size() > 1) {
+                            throw new IllegalStateException(
+                                "Some fileIds have more than one commit time.");
+                          }
+                          return list.get(0);
+                        })));
+    if (!fileIdToCommitTimeMap.containsKey(activePathFileGroupId)) {
+      return false;
+    }
+    if (!fileIdToCommitTimeMap.get(activePathFileGroupId).equals(activePathCommitTime)) {
+      return false;
+    }
+    return true;
   }
 
   @Test
@@ -461,6 +625,13 @@ public class ITHudiSourceClient {
     }
   }
 
+  private List<String> getAllFilePaths(OneSnapshot oneSnapshot) {
+    return oneSnapshot.getPartitionedDataFiles().stream()
+        .flatMap(oneFileGroup -> oneFileGroup.getFiles().stream())
+        .map(oneDataFile -> oneDataFile.getPhysicalPath())
+        .collect(Collectors.toList());
+  }
+
   private static Stream<Arguments> testsForAllTableTypes() {
     return Stream.of(
         Arguments.of(HoodieTableType.COPY_ON_WRITE), Arguments.of(HoodieTableType.MERGE_ON_READ));
@@ -490,5 +661,21 @@ public class ITHudiSourceClient {
         new ConfigurationBasedPartitionSpecExtractor(
             HudiSourceConfig.builder().partitionFieldSpecConfig(onetablePartitionConfig).build());
     return new HudiClient(hoodieTableMetaClient, partitionSpecExtractor);
+  }
+
+  private FileGroupInfo getFileGroupInfo(String path) {
+    String[] pathParts = path.split("/");
+    String fileName = pathParts[pathParts.length - 1];
+    return FileGroupInfo.builder()
+        .fileId(FSUtils.getFileId(fileName))
+        .commitTime(FSUtils.getCommitTime(fileName))
+        .build();
+  }
+
+  @Builder
+  @Value
+  private static class FileGroupInfo {
+    String fileId;
+    String commitTime;
   }
 }

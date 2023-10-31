@@ -218,4 +218,16 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     Collections.reverse(snapshots);
     return CurrentCommitState.<Snapshot>builder().commitsToProcess(snapshots).build();
   }
+
+  // TODO(vamshigv): Handle this.
+  @Override
+  public boolean doesCommitForInstantExists(Instant instant) {
+    return true;
+  }
+
+  // TODO(vamshigv): Handle this.
+  @Override
+  public boolean isAffectedByClean(Instant instant) {
+    return false;
+  }
 }

@@ -19,6 +19,7 @@
 package io.onetable.delta;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -156,6 +157,18 @@ public class DeltaSourceClient implements SourceClient<Long> {
     return CurrentCommitState.<Long>builder()
         .commitsToProcess(getChangesState().getVersionsInSortedOrder())
         .build();
+  }
+
+  // TODO(vamshigv): Handle this
+  @Override
+  public boolean doesCommitForInstantExists(Instant instant) {
+    return true;
+  }
+
+  // TODO(vamshigv): Handle this(In delta clean cannot affect onetable sync).
+  @Override
+  public boolean isAffectedByClean(Instant instant) {
+    return false;
   }
 
   private DeltaIncrementalChangesState getChangesState() {

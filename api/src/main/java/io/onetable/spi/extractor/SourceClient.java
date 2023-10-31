@@ -74,4 +74,23 @@ public interface SourceClient<COMMIT> {
    */
   CurrentCommitState<COMMIT> getCurrentCommitState(
       InstantsForIncrementalSync instantsForIncrementalSync);
+
+  /**
+   * Checks if the commit for instant exists in the source table format. This helps to validate if
+   * incremental sync is possible and there is no data mismatch between source and target formats.
+   *
+   * @param instant
+   * @return
+   */
+  boolean doesCommitForInstantExists(Instant instant);
+
+  /**
+   * Checks if the instant is affected by a clean operation in the source table format. This helps
+   * to avoid incremental sync when it is not safe and avoid data mismatch between source and target
+   * formats.
+   *
+   * @param instant
+   * @return
+   */
+  boolean isAffectedByClean(Instant instant);
 }

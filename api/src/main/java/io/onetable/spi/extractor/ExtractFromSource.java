@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 import io.onetable.model.CurrentCommitState;
 import io.onetable.model.IncrementalTableChanges;
@@ -30,6 +31,7 @@ import io.onetable.model.OneSnapshot;
 import io.onetable.model.TableChange;
 
 @AllArgsConstructor(staticName = "of")
+@Getter
 public class ExtractFromSource<COMMIT> {
   private final SourceClient<COMMIT> sourceClient;
 
