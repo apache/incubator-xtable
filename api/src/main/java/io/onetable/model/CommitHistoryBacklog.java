@@ -37,17 +37,22 @@ import lombok.Value;
  *
  * <p>{@see InstantsForIncrementalSync} for more details on pending commits.
  *
- * <p>For e.g., assume T1[t1, t4] is a commit that started at t1 and completed at t5.
+ * <p>For e.g., assume T1[t1, t4] is a commit that started at t1 and completed at t4.
  *
- * <p>Also, T2[t2,t6], T3[t6, t7] are other commits. If current sync time = t5, and previous sync
- * time = t3, the backlog at t3 = commitsToProcess = [T1] as T1 completed before current time t5,
+ * <p>Also, T2[t2,t6], T3[t6, t7] are other commits
+ *
+ * <p>Now say the first sync starts at current time = t3. Both T1 and T2 are visible but incomplete
+ * at t3. So the backlog at t3: commitsToProcess = [], inFlightInstants = [T1, T2].
+ *
+ * <p>Now assume the next sync starts at t5. So the backlog at t5: commitsToProcess = [T1],
+ * inFlightInstants = [T2]. commitsToProcess = [T1] as T1 completed before current time t5, and
  * inFlightInstants = [T2] as T2 started before t5 but did not complete before t5. T3 did not start
  * till t5, so it is not part of the backlog.
  *
- * <p>Now say in a new cycle, the sync time=t7, and last sync time is t5, the backlog at t7 =
+ * <p>Now in a next sync cycle at time=t7, and last sync instant is t5, the backlog at t7 =
  * commitsToProcess = [T2, T3]. Although T2 completed before t7, but it was in-flight at previous
- * sync time t5. So T2 is part of backlog. If T2 was not tracked explicitly as a in-flight commit,
- * it could get missed resulting in incomplete replication.
+ * sync instant, t5. So T2 is part of backlog. If T2 was not tracked explicitly as an in-flight
+ * commit, it could get missed resulting in incomplete replication.
  *
  * <p>'commitsToProcess' captures commits that should be processed and synced in the current round.
  * 'inFlightInstants' tracks instants that are pending at the start of the sync process and should
