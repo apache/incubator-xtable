@@ -26,11 +26,20 @@ import lombok.Builder;
 import lombok.Value;
 
 /**
- * Represents a collection of commits that are awaiting processing and syncing at a given instant,
- * say T. These commits include two types of commits, 1) the commits that were in-flight at T, i.e.
- * commits that have started before T but not completed yet and 2) the commits that started and
- * completed after T. Note that the collection is valid for a given instant T only. The goal of the
- * class is to provide commits that are ready for immediate processing and syncing, while also
+ * Represents a collection of commits that are awaiting processing and syncing w.r.t. a sync
+ * instant, say T. These commits include three types of commits,
+ *
+ * <ol>
+ *   <li>the commits that started and completed after T are ready for syncing
+ *   <li>the commits that started before and completed before T, but were in-flight in the previous
+ *       sync cycle. Since these commits were in flight in the previous sync cycle, they were not
+ *       processed in the previous sync cycle. So they need to be synced in the current sync cycle.
+ *   <li>the commits that were in-flight at T, i.e. commits that started before T and have not
+ *       completed. They need to be tracked and added to the next sync cycle.
+ * </ol>
+ *
+ * Note that the collection is valid for a given instant T only and current timestamp. The goal of
+ * the class is to provide commits that are ready for immediate processing and syncing, while also
  * tracking pending commits intended for future incremental syncs. Tracking the pending commits is
  * necessary to avoid missing commits in case of concurrent writers (for e.g. in Hudi) and "slow"
  * commits.
@@ -60,7 +69,7 @@ import lombok.Value;
  */
 @Value
 @Builder
-public class CommitHistoryBacklog<COMMIT> {
+public class CommitsBacklog<COMMIT> {
   /**
    * The commits that are ready for processing and syncing as they have completed before the current
    * sync time. These commits were either in-flight in the previous sync cycle, or started and

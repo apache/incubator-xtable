@@ -55,11 +55,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import io.onetable.TestSparkDeltaTable;
 import io.onetable.client.PerTableConfig;
-import io.onetable.model.CommitHistoryBacklog;
-import io.onetable.model.InstantsForIncrementalSync;
-import io.onetable.model.OneSnapshot;
-import io.onetable.model.OneTable;
-import io.onetable.model.TableChange;
+import io.onetable.model.*;
+import io.onetable.model.CommitsBacklog;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
@@ -355,9 +352,9 @@ public class ITDeltaSourceClient {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-    CommitHistoryBacklog<Long> commitHistoryBacklog =
-        deltaSourceClient.getCommitHistoryBacklog(instantsForIncrementalSync);
-    for (Long version : commitHistoryBacklog.getCommitsToProcess()) {
+    CommitsBacklog<Long> commitsBacklog =
+        deltaSourceClient.getCommitsBacklog(instantsForIncrementalSync);
+    for (Long version : commitsBacklog.getCommitsToProcess()) {
       TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
       allTableChanges.add(tableChange);
     }
@@ -408,9 +405,9 @@ public class ITDeltaSourceClient {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-    CommitHistoryBacklog<Long> commitHistoryBacklog =
-        deltaSourceClient.getCommitHistoryBacklog(instantsForIncrementalSync);
-    for (Long version : commitHistoryBacklog.getCommitsToProcess()) {
+    CommitsBacklog<Long> commitsBacklog =
+        deltaSourceClient.getCommitsBacklog(instantsForIncrementalSync);
+    for (Long version : commitsBacklog.getCommitsToProcess()) {
       TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
       allTableChanges.add(tableChange);
     }
@@ -453,9 +450,9 @@ public class ITDeltaSourceClient {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-    CommitHistoryBacklog<Long> commitHistoryBacklog =
-        deltaSourceClient.getCommitHistoryBacklog(instantsForIncrementalSync);
-    for (Long version : commitHistoryBacklog.getCommitsToProcess()) {
+    CommitsBacklog<Long> commitsBacklog =
+        deltaSourceClient.getCommitsBacklog(instantsForIncrementalSync);
+    for (Long version : commitsBacklog.getCommitsToProcess()) {
       TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
       allTableChanges.add(tableChange);
     }
@@ -508,9 +505,9 @@ public class ITDeltaSourceClient {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-    CommitHistoryBacklog<Long> commitHistoryBacklog =
-        deltaSourceClient.getCommitHistoryBacklog(instantsForIncrementalSync);
-    for (Long version : commitHistoryBacklog.getCommitsToProcess()) {
+    CommitsBacklog<Long> commitsBacklog =
+        deltaSourceClient.getCommitsBacklog(instantsForIncrementalSync);
+    for (Long version : commitsBacklog.getCommitsToProcess()) {
       TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
       allTableChanges.add(tableChange);
     }
@@ -565,9 +562,9 @@ public class ITDeltaSourceClient {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-    CommitHistoryBacklog<Long> commitHistoryBacklog =
-        deltaSourceClient.getCommitHistoryBacklog(instantsForIncrementalSync);
-    for (Long version : commitHistoryBacklog.getCommitsToProcess()) {
+    CommitsBacklog<Long> commitsBacklog =
+        deltaSourceClient.getCommitsBacklog(instantsForIncrementalSync);
+    for (Long version : commitsBacklog.getCommitsToProcess()) {
       TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
       allTableChanges.add(tableChange);
     }

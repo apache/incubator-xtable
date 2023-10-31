@@ -20,11 +20,8 @@ package io.onetable.spi.extractor;
 
 import java.time.Instant;
 
-import io.onetable.model.CommitHistoryBacklog;
-import io.onetable.model.InstantsForIncrementalSync;
-import io.onetable.model.OneSnapshot;
-import io.onetable.model.OneTable;
-import io.onetable.model.TableChange;
+import io.onetable.model.*;
+import io.onetable.model.CommitsBacklog;
 import io.onetable.model.schema.SchemaCatalog;
 
 /**
@@ -66,12 +63,11 @@ public interface SourceClient<COMMIT> {
   TableChange getTableChangeForCommit(COMMIT commit);
 
   /**
-   * Retrieves {@link CommitHistoryBacklog} to process based on the provided {@link
-   * InstantsForIncrementalSync}.
+   * Retrieves {@link CommitsBacklog}, i.e. commits that have not been processed yet. based on the
+   * provided {@link InstantsForIncrementalSync}.
    *
    * @param instantsForIncrementalSync The input to determine the next commits to process.
-   * @return {@link CommitHistoryBacklog} to process.
+   * @return {@link CommitsBacklog} to process.
    */
-  CommitHistoryBacklog<COMMIT> getCommitHistoryBacklog(
-      InstantsForIncrementalSync instantsForIncrementalSync);
+  CommitsBacklog<COMMIT> getCommitsBacklog(InstantsForIncrementalSync instantsForIncrementalSync);
 }
