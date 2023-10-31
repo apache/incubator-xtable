@@ -78,7 +78,7 @@ datasets:
 
 :::tip Note:
 Replace `/path/to/source/data` to appropriate source data path
-if you have your source table in S3/GCS i.e. `s3:///path/to/source/data` or `gs:///path/to/source/data`.
+if you have your source table in S3/GCS i.e. `s3://path/to/source/data` or `gs://path/to/source/data`.
 :::
 
 From your terminal under the cloned onetable directory, run the sync process using the below command.
