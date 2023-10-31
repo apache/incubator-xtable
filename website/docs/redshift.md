@@ -6,8 +6,8 @@ sidebar_position: 2
 To read a Onetable synced target table (regardless of the table format) in Amazon Redshift,
 users have to create an external schema and refer to the external data catalog that contains the table.
 Redshift infers the table's schema and format from the external catalog/database directly.
-For more information on creating external schemas,
-refer to [Redshift docs](https://docs.aws.amazon.com/redshift/latest/dg/c-spectrum-external-schemas.html#c-spectrum-external-catalogs).
+For more information on creating external schemas, refer to
+[Redshift docs](https://docs.aws.amazon.com/redshift/latest/dg/c-spectrum-external-schemas.html#c-spectrum-external-catalogs).
 
 ### Hudi and Iceberg tables
 The following query creates an external schema `onetable_synced_schema` using the Glue database `glue_database_name`
@@ -15,8 +15,8 @@ The following query creates an external schema `onetable_synced_schema` using th
 ```sql md title="sql"
 CREATE EXTERNAL SCHEMA onetable_synced_schema
 FROM DATA CATALOG
-DATABASE glue_database_name
-IAM_ROLE 'arn:aws:iam::accountId:role/roleName'
+DATABASE <glue_database_name>
+IAM_ROLE 'arn:aws:iam::<accountId>:role/<roleName>'
 CREATE EXTERNAL DATABASE IF NOT EXISTS;
 ```
 
@@ -29,7 +29,7 @@ Redshift can infer the tables present in the Glue database automatically. You ca
 
 ```sql md title="sql"
 SELECT *
-FROM onetable_synced_schema.table_name;
+FROM onetable_synced_schema.<table_name>;
 ```
 
 ### Delta Lake table
@@ -38,17 +38,23 @@ file containing the list of data files to read for querying a Delta table.
 
 You have two options to create and query Delta tables in Redshift Spectrum:
 1. Follow the steps in
-   [this](https://docs.delta.io/latest/redshift-spectrum-integration.html#set-up-a-redshift-spectrum-to-delta-lake-integration-and-query-delta-tables) article to
-   set up a Redshift Spectrum to Delta Lake integration and query Delta tables directly from Amazon S3.
+   [this](https://docs.delta.io/latest/redshift-spectrum-integration.html#set-up-a-redshift-spectrum-to-delta-lake-integration-and-query-delta-tables) 
+   article to set up a Redshift Spectrum to Delta Lake integration and query Delta tables directly from Amazon S3.
 2. While creating the Glue Crawler to crawl the Onetable synced Delta table, choose the `Create Symlink tables`
    option in `Add data source` pop-up window. This will add `_symlink_format_manifest` folder with manifest files in the table
    root path.
-   You can then use a similar approach to query the Hudi and Iceberg tables mentioned above.
+
+You can then use a similar approach to query the Hudi and Iceberg tables mentioned above.
 
 ```sql md title="sql"
 CREATE EXTERNAL SCHEMA onetable_synced_schema_delta
 FROM DATA CATALOG
-DATABASE delta_glue_database
-IAM_ROLE 'arn:aws:iam::accountId:role/roleName'
+DATABASE <delta_glue_database_name>
+IAM_ROLE 'arn:aws:iam::<accountId>:role/<roleName>'
 CREATE EXTERNAL DATABASE IF NOT EXISTS;
+```
+
+```sql md title="sql"
+SELECT *
+FROM onetable_synced_schema_delta.<table_name>;
 ```

@@ -10,26 +10,27 @@ import TabItem from '@theme/TabItem';
 :::danger Important
 Using Onetable to sync your source tables in different target format involves running sync on your 
 current dataset using a bundled jar. You can create this bundled jar by following the instructions 
-on Onetable's [github](https://github.com/onetable-io/onetable#building-the-project-and-running-tests) page.
+on the [Installation page](https://link/to/installation/page). Read through Onetable's 
+[github page](https://github.com/onetable-io/onetable#building-the-project-and-running-tests) for more information.
 :::
 
 In this tutorial we will look at how to use Onetable to add interoperability between table formats. 
-For example, you can expose tables ingested with Hudi as an Iceberg and/or Delta Lake table without
+For example, you can expose a table ingested with Hudi as an Iceberg and/or Delta Lake table without
 copying or moving the underlying data files used for that table while maintaining a similar commit 
 history to enable proper point in time queries.
 
 ## Pre-requisites
-1. A compute instance where you can run Apache Spark. This can be your local machine, docker, 
-or a distributed service like Amazon EMR, Cloud Dataproc etc.
-2. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the 
-`utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps [here](https://github.com/onetable-io/onetable#onetable).
+1. A compute instance where you can run Apache Spark. This can be your local machine, docker,
+   or a distributed service like Amazon EMR, Cloud Dataproc etc
+2. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the
+   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://link/to/installation/page)
 3. Optional: Setup access to write to and/or read from distributed storage services like:
    * Amazon S3 by following the steps 
    [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) to install AWSCLIv2 
    and setup access credentials by following the steps
    [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html)
    * Google Cloud Storage by following the steps 
-   [here](https://cloud.google.com/iam/docs/keys-create-delete#creating).
+   [here](https://cloud.google.com/iam/docs/keys-create-delete#creating)
 
 For the purpose of this tutorial, we will walk through the steps to using Onetable locally.
 
@@ -280,7 +281,7 @@ datasets:
 </Tabs>
 
 **Optional:** If your source table exists in Amazon S3 or Google Cloud Storage, 
-you should use a `yaml` file similar to below..
+you should use a `yaml` file similar to below.
 
 <Tabs
 groupId="table-format"
@@ -300,13 +301,12 @@ targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: s3://path/to/hudi_data  # replace this with gs://path/to/hudi_data if your data is in GCS. 
+    tableBasePath: s3://path/to/hudi-data  # replace this with gs://path/to/hudi_data if your data is in GCS. 
     tableName: people
     partitionSpec: city:VALUE
 ```
 
 </TabItem>
-
 <TabItem value="delta">
 
 ```yaml  md title="yaml"
@@ -316,13 +316,12 @@ targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: s3://path/to/delta_data  # replace this with gs://path/to/delta_data if your data is in GCS. 
+    tableBasePath: s3://path/to/delta-data  # replace this with gs://path/to/delta_data if your data is in GCS. 
     tableName: people
     partitionSpec: city:VALUE
 ```
 
 </TabItem>
-
 <TabItem value="iceberg">
 
 ```yaml  md title="yaml"
@@ -332,7 +331,7 @@ targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: s3://path/to/iceberg_data  # replace this with gs://path/to/icberg_data if your data is in GCS. 
+    tableBasePath: s3://path/to/iceberg-data  # replace this with gs://path/to/icberg_data if your data is in GCS. 
     tableName: people
     partitionSpec: city:VALUE
 ```
@@ -348,22 +347,20 @@ Authentication for GCP requires service account credentials to be exported. i.e.
 `export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service_account_key.json`
 :::
 
-In your terminal under the cloned onetable directory, run the below command.
+In your terminal under the cloned Onetable directory, run the below command.
 
 ```shell md title="shell"
 java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar -datasetConfig my_config.yaml
 ```
 
 **Optional:**
-At this point, if you check your local path, you will be able to see `_delta_log` 
-and `metadata` directories with necessary log files that contain the schema, 
-commit history, partitions, and column stats that helps query engines to interpret the data 
-as a delta and/or iceberg table.
+At this point, if you check your local path, you will be able to see the necessary metadata files that contain the schema, 
+commit history, partitions, and column stats that helps query engines to interpret the data in the target table format.
 
 ## Conclusion
-In this tutorial, we saw how to create a source table in Hudi format and
-use Onetable to create metadata/log files that can be used to query the source table in Delta/Iceberg format.
+In this tutorial, we saw how to create a source table and use Onetable to create the metadata files 
+that can be used to query the source table in different target table formats.
 
 ## Next steps
-Go through the [Catalog Integration guides](https://link-to-guide) to add the Onetable synced tables
+Go through the [Catalog Integration guides](https://link-to-guide) to registere the Onetable synced tables
 in different data catalogs.

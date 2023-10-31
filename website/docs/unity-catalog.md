@@ -3,26 +3,23 @@ sidebar_position: 3
 ---
 
 # Unity Catalog
-This document walks through the steps to create a Onetable synced Delta table on Unity Catalog on Databricks.
+This document walks through the steps to register a Onetable synced Delta table in Unity Catalog on Databricks.
 
 ## Pre-requisites
 1. Source table(s) (Hudi/Iceberg) already written to external storage locations like S3/GCS.
    If you don't have a source table written in S3/GCS,
    you can follow the steps in [this](https://link-to-how-to/create/dataset.md) tutorial to set it up.
-2. A compute instance where you can run Apache Spark.
-   This can be your local machine, docker, or a distributed system like Amazon EMR, Cloud Dataproc etc.
-3. Setup connection to external storage locations from Databricks.
+2. Setup connection to external storage locations from Databricks.
    * Follow the steps outlined [here](https://docs.databricks.com/en/storage/amazon-s3.html) for Amazon S3
    * Follow the steps outlined [here](https://docs.databricks.com/en/storage/gcs.html) for Google Cloud Storage
-4. Create a Unity Catalog metastore in Databricks as outlined [here](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html#create-a-unity-catalog-metastore).
-5. Create an external location in Databricks as outlined [here](https://github.com/onetable-io/onetable#onetable).
-6. Clone the onetable github [repository](https://github.com/onetable-io/onetable) 
-   and create the `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps here.
+3. Create a Unity Catalog metastore in Databricks as outlined [here](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html#create-a-unity-catalog-metastore).
+4. Create an external location in Databricks as outlined [here](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-location.html).
+5. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the
+   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://link/to/installation/page)
 
 ## Steps
-
 ### Running sync
-Create `my_config.yaml` in the cloned onetable directory.
+Create `my_config.yaml` in the cloned Onetable directory.
 
 ```yaml md title="yaml"
 sourceFormat: HUDI|ICEBERG # choose only one
@@ -36,9 +33,10 @@ datasets:
 ```
 :::tip Note:
 Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have your source table in GCS. 
+And replace with appropriate values for `sourceFormat`, and `tableName` fields. 
 :::
 
-From your terminal under the cloned onetable directory, run the sync process using the below command.
+From your terminal under the cloned Onetable directory, run the sync process using the below command.
 
 ```shell md title="shell"
 java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar -datasetConfig my_config.yaml
@@ -46,7 +44,7 @@ java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar -datasetConfig m
 
 :::tip Note: 
 At this point, if you check your bucket path, you will be able to see `_delta_log` directory with 
-00000000000000000000.json which contains the log that helps query engines to interpret the data as a delta table.
+00000000000000000000.json which contains the logs that helps query engines to interpret the source table as a Delta table.
 :::
 
 ### Register the target table in Unity Catalog 
@@ -65,11 +63,16 @@ LOCATION 's3://path/to/source/data';
 Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have your source table in GCS.
 :::
 
-
+### Validating the results
 You can now see the created delta table in **Unity Catalog** under **Catalog** as `<table_name>` under
-`synced_delta_schema`
+`synced_delta_schema` and also query the table in the SQL editor:
+
+```sql
+SELECT * FROM onetable.synced_delta_schema.<table_name>;
+```
 
 ## Conclusion
-In this guide we saw how to 
-1. sync a table in Hudi/Iceberg to create Delta metadata with Onetable
-2. catalog the data as a Delta table in Unity Catalog on Databricks
+In this guide we saw how to,
+1. sync a source table to create metadata for the desired target table formats using Onetable
+2. catalog the data in Delta format in Unity Catalog on Databricks
+3. query the Delta table using Databricks SQL editor

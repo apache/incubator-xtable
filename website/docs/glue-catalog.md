@@ -6,24 +6,23 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Glue Data Catalog
-This document walks through the steps to create a Onetable synced target table in Glue Data Catalog on AWS.
+This document walks through the steps to register a Onetable synced table in Glue Data Catalog on AWS.
 
 ## Pre-requisites
 1. Source table(s) (Hudi/Delta/Iceberg) already written to Amazon S3.
-   If you don't have a Hudi table written in S3, you can follow the steps in [this](https://link-to-how-to/create-dataset.md)
-   tutorial to set it up.
+   If you don't have the source table written in S3 already,
+   you can follow the steps in [this](https://link-to-how-to/create-dataset.md) tutorial to set it up
 2. Setup access to interact with AWS APIs from the command line.
    If you haven’t installed AWSCLIv2, you do so by following the steps outlined in
    [AWS docs](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and
    also set up access credentials by following the steps
-   [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html).
-3. Clone the onetable github [repository](https://github.com/onetable-io/onetable) and create the `utilities-0.1.0-SNAPSHOT-bundled.jar`
-   by following the steps [here](https://github.com/onetable-io/onetable#building-the-project-and-running-tests).
+   [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html)
+3. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the
+   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://link/to/installation/page)
 
 ## Steps
-
 ### Running sync
-Create `my_config.yaml` in the cloned onetable directory.
+Create `my_config.yaml` in the cloned Onetable directory.
 
 <Tabs
 groupId="table-format"
@@ -46,9 +45,6 @@ datasets:
     tableName: table_name
     partitionSpec: partitionpath:VALUE
 ```
-:::danger Note:
-Add appropriate `sourceFormat`, `tableBasePath` and `tableName` values appropriately.
-:::
 
 </TabItem>
 <TabItem value="delta">
@@ -63,9 +59,6 @@ datasets:
     tableName: table_name
     partitionSpec: partitionpath:VALUE
 ```
-:::danger Note:
-Add appropriate `sourceFormat`, `tableBasePath` and `tableName` values appropriately.
-:::
 
 </TabItem>
 <TabItem value="iceberg">
@@ -80,12 +73,13 @@ datasets:
     tableName: table_name
     partitionSpec: partitionpath:VALUE
 ```
-:::danger Note:
-Add appropriate `sourceFormat`, `tableBasePath` and `tableName` values appropriately.
-:::
 
 </TabItem>
 </Tabs>
+
+:::danger Note:
+Replace with appropriate values for `sourceFormat`, `tableBasePath` and `tableName` fields.
+:::
 
 From your terminal under the cloned onetable directory, run the sync process using the below command.
 
@@ -156,44 +150,15 @@ Once the crawler succeeds, you’ll be able to query this Iceberg table from Ath
 EMR and/or Redshift query engines.
 
 ### Validating the results
-Here’s how our table looks like in Amazon Athena.
+After the crawler runs successfully, you can inspect the catalogued tables in Glue 
+and also query the table in Amazon Athena like below:
 
-![Iceberg Table in Amazon Athena](./static/athena-iceberg.png)
+```sql
+SELECT * FROM onetable_synced_db.<table_name>;
+```
 
 ## Conclusion
-
-<Tabs
-groupId="table-format"
-defaultValue="hudi"
-values={[
-{ label: 'targetFormat: HUDI', value: 'hudi', },
-{ label: 'targetFormat: DELTA', value: 'delta', },
-{ label: 'targetFormat: ICEBERG', value: 'iceberg', },
-]}
->
-
-<TabItem value="hudi">
-
-In this guide we saw how to, 
-1. sync a source table to create Hudi metadata with Onetable
-2. catalog the data as a Hudi table in Glue Data Catalog
-3. validate the Onetable synced Hudi table in Amazon Athena
-
-</TabItem>
-<TabItem value="delta">
-
 In this guide we saw how to,
-1. sync a source table to create Delta metadata with Onetable
-2. catalog the data as a Delta table in Glue Data Catalog
-3. validate the Onetable synced Delta table in Amazon Athena
-
-</TabItem>
-<TabItem value="iceberg">
-
-In this guide we saw how to,
-1. sync a source table to create Iceberg metadata with Onetable
-2. catalog the data as an Iceberg table in Glue Data Catalog
-3. validate the Onetable synced Iceberg table in Amazon Athena
-
-</TabItem>
-</Tabs>
+1. sync a source table to create metadata for the desired target table formats using Onetable
+2. catalog the data in the target table format in Glue Data Catalog
+3. query the target table using Amazon Athena
