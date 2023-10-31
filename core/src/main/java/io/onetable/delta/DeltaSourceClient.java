@@ -43,11 +43,8 @@ import scala.Option;
 import io.delta.tables.DeltaTable;
 
 import io.onetable.exception.OneIOException;
-import io.onetable.model.CurrentCommitState;
-import io.onetable.model.InstantsForIncrementalSync;
-import io.onetable.model.OneSnapshot;
-import io.onetable.model.OneTable;
-import io.onetable.model.TableChange;
+import io.onetable.model.*;
+import io.onetable.model.CommitsBacklog;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
@@ -107,7 +104,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
   @Override
   public TableChange getTableChangeForCommit(Long versionNumber) {
     OneTable tableAtVersion = tableExtractor.table(deltaLog, tableName, versionNumber);
-    // Client to call getCurrentCommitState and call this method.
+    // Client to call getCommitsBacklog and call this method.
     List<Action> actionsForVersion = getChangesState().getActionsForVersion(versionNumber);
     Snapshot snapshotAtVersion =
         deltaLog.getSnapshotAt(versionNumber, Option.empty(), Option.empty());
@@ -144,7 +141,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
   }
 
   @Override
-  public CurrentCommitState<Long> getCurrentCommitState(
+  public CommitsBacklog<Long> getCommitsBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync) {
     DeltaHistoryManager.Commit deltaCommitAtLastSyncInstant =
         deltaLog
@@ -153,7 +150,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
                 Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()), true, false, true);
     long versionNumberAtLastSyncInstant = deltaCommitAtLastSyncInstant.version();
     resetState(versionNumberAtLastSyncInstant + 1);
-    return CurrentCommitState.<Long>builder()
+    return CommitsBacklog.<Long>builder()
         .commitsToProcess(getChangesState().getVersionsInSortedOrder())
         .build();
   }

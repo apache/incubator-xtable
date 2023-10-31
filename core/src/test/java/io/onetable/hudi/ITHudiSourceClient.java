@@ -55,7 +55,7 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import io.onetable.TestJavaHudiTable;
 import io.onetable.TestSparkHudiTable;
-import io.onetable.model.CurrentCommitState;
+import io.onetable.model.CommitsBacklog;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.TableChange;
@@ -136,9 +136,9 @@ public class ITHudiSourceClient {
           InstantsForIncrementalSync.builder()
               .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
               .build();
-      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
-          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
-      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
+      CommitsBacklog<HoodieInstant> instantCommitsBacklog =
+          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
+      for (HoodieInstant instant : instantCommitsBacklog.getCommitsToProcess()) {
         TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
         allTableChanges.add(tableChange);
       }
@@ -183,9 +183,9 @@ public class ITHudiSourceClient {
           InstantsForIncrementalSync.builder()
               .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
               .build();
-      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
-          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
-      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
+      CommitsBacklog<HoodieInstant> instantCommitsBacklog =
+          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
+      for (HoodieInstant instant : instantCommitsBacklog.getCommitsToProcess()) {
         TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
         allTableChanges.add(tableChange);
       }
@@ -231,9 +231,9 @@ public class ITHudiSourceClient {
           InstantsForIncrementalSync.builder()
               .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
               .build();
-      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
-          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
-      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
+      CommitsBacklog<HoodieInstant> instantCommitsBacklog =
+          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
+      for (HoodieInstant instant : instantCommitsBacklog.getCommitsToProcess()) {
         TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
         allTableChanges.add(tableChange);
       }
@@ -282,9 +282,9 @@ public class ITHudiSourceClient {
           InstantsForIncrementalSync.builder()
               .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
               .build();
-      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
-          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
-      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
+      CommitsBacklog<HoodieInstant> instantCommitsBacklog =
+          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
+      for (HoodieInstant instant : instantCommitsBacklog.getCommitsToProcess()) {
         TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
         allTableChanges.add(tableChange);
       }
@@ -347,9 +347,9 @@ public class ITHudiSourceClient {
           InstantsForIncrementalSync.builder()
               .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
               .build();
-      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
-          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
-      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
+      CommitsBacklog<HoodieInstant> instantCommitsBacklog =
+          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
+      for (HoodieInstant instant : instantCommitsBacklog.getCommitsToProcess()) {
         TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
         allTableChanges.add(tableChange);
       }
@@ -392,9 +392,9 @@ public class ITHudiSourceClient {
           InstantsForIncrementalSync.builder()
               .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
               .build();
-      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
-          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
-      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
+      CommitsBacklog<HoodieInstant> instantCommitsBacklog =
+          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
+      for (HoodieInstant instant : instantCommitsBacklog.getCommitsToProcess()) {
         TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
         allTableChanges.add(tableChange);
       }
@@ -444,9 +444,9 @@ public class ITHudiSourceClient {
           InstantsForIncrementalSync.builder()
               .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
               .build();
-      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
-          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
-      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
+      CommitsBacklog<HoodieInstant> instantCommitsBacklog =
+          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
+      for (HoodieInstant instant : instantCommitsBacklog.getCommitsToProcess()) {
         TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
         if (commitInstant2.equals(instant.getTimestamp())) {
           validateTableChange(baseFilesAfterCommit1, baseFilesAfterCommit2, tableChange);

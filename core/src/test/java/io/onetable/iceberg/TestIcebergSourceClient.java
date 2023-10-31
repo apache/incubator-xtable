@@ -315,9 +315,9 @@ class TestIcebergSourceClient {
             .lastSyncInstant(Instant.ofEpochMilli(lastSync.timestampMillis()))
             .build();
     IcebergSourceClient sourceClient = getIcebergSourceClient(table);
-    CurrentCommitState<Snapshot> toBeProcessed = sourceClient.getCurrentCommitState(instant);
-    Assertions.assertEquals(0, toBeProcessed.getInFlightInstants().size());
-    Assertions.assertArrayEquals(snapshots, toBeProcessed.getCommitsToProcess().toArray());
+    CommitsBacklog<Snapshot> commitsBacklog = sourceClient.getCommitsBacklog(instant);
+    Assertions.assertEquals(0, commitsBacklog.getInFlightInstants().size());
+    Assertions.assertArrayEquals(snapshots, commitsBacklog.getCommitsToProcess().toArray());
   }
 
   private static long getDataFileCount(Table catalogSales) throws IOException {
