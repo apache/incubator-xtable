@@ -162,9 +162,6 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   @Override
   @SneakyThrows
   public boolean isAffectedByClean(Instant instant) {
-    // get clean commits
-    // get earliest retained time.
-    // if earliest retained time is after instant, then return true.
     Option<HoodieInstant> lastCleanInstant =
         metaClient.getActiveTimeline().getCleanerTimeline().filterCompletedInstants().lastInstant();
     if (!lastCleanInstant.isPresent()) {
