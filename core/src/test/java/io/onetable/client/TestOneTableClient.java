@@ -179,12 +179,6 @@ public class TestOneTableClient {
     assertEquals(expectedSyncResult, result);
   }
 
-  @Test
-  void testIncrementalSyncFallbackToSnapshotSync() {}
-
-  @Test
-  void testIncrementalSyncFallbackToSnapshotSyncForOnlyOneTarget() {}
-
   private SyncResult getLastSyncResult(List<SyncResult> syncResults) {
     return syncResults.get(syncResults.size() - 1);
   }
