@@ -164,7 +164,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
     DeltaHistoryManager.Commit deltaCommitAtOrBeforeInstant =
         deltaLog.history().getActiveCommitAtTime(Timestamp.from(instant), true, false, true);
     // There is a chance earliest commit of the table is returned if the instant is before the
-    // earliest commit of the table.
+    // earliest commit of the table, hence the additional check.
     Instant deltaCommitInstant = Instant.ofEpochMilli(deltaCommitAtOrBeforeInstant.getTimestamp());
     return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
   }

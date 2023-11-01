@@ -223,10 +223,9 @@ public class OneTableClient {
       ExtractFromSource<COMMIT> source,
       Optional<Instant> lastSyncInstant,
       List<Instant> pendingInstants) {
-    Optional<Instant> earliestInstant;
     Stream<Instant> pendingInstantsStream =
         (pendingInstants == null) ? Stream.empty() : pendingInstants.stream();
-    earliestInstant =
+    Optional<Instant> earliestInstant =
         lastSyncInstant
             .map(
                 instant ->
@@ -241,7 +240,7 @@ public class OneTableClient {
       return false;
     }
     boolean isEarliestInstantAffectedByCleaned =
-        source.getSourceClient().isAffectedByClean(earliestInstant.get());
+        source.getSourceClient().isAffectedByCleanupProcess(earliestInstant.get());
     if (isEarliestInstantAffectedByCleaned) {
       log.info(
           "Earliest instant {} is affected by clean. Falling back to full sync.", earliestInstant);
