@@ -111,7 +111,7 @@ values={[
 <TabItem value="hudi">
 
 ```shell md title="shell"
-pyspark --packages org.apache.hudi:hudi-spark3.2-bundle_2.12:0.14.0 \
+spark-sql --packages org.apache.hudi:hudi-spark3.2-bundle_2.12:0.14.0 \
 --conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" \
 --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog" \
 --conf "spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension"
@@ -121,7 +121,7 @@ pyspark --packages org.apache.hudi:hudi-spark3.2-bundle_2.12:0.14.0 \
 <TabItem value="delta">
 
 ```shell md title="shell"
-pyspark --packages io.delta:delta-core_2.12:2.0.0 \
+spark-sql --packages io.delta:delta-core_2.12:2.0.0 \
 --conf "spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension" \
 --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog" \
 --conf "spark.sql.catalogImplementation=hive"
@@ -131,10 +131,10 @@ pyspark --packages io.delta:delta-core_2.12:2.0.0 \
 <TabItem value="iceberg">
 
 ```shell md title="shell"
-pyspark --packages org.apache.iceberg:iceberg-spark-runtime-3.2_2.12:1.2.1 \
+spark-sql --packages org.apache.iceberg:iceberg-spark-runtime-3.2_2.12:1.2.1 \
 --conf "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
---conf "spark.sql.catalog.hive_prod=org.apache.iceberg.spark.SparkCatalog" \              
---conf "spark.sql.catalog.hive_prod.type=hive" \                                          
+--conf "spark.sql.catalog.hive_prod=org.apache.iceberg.spark.SparkCatalog" \
+--conf "spark.sql.catalog.hive_prod.type=hive" \
 --conf "spark.sql.catalog.hive_prod.uri=thrift://localhost:9083" \
 --conf "spark.sql.defaultCatalog=hive_prod"
 ```
@@ -149,7 +149,7 @@ your spark session will need additional configurations
 * For Google Cloud Storage, follow the configurations specified [here](https://docs.delta.io/latest/delta-storage.html#requirements-gcs)
 :::
 
-In the `pyspark` shell, you need to create a schema and table like below.
+In the `spark-sql` shell, you need to create a schema and table like below.
 
 <Tabs
 groupId="table-format"
@@ -162,12 +162,10 @@ values={[
 >
 <TabItem value="hudi">
 
-```python md title="python"
-spark.sql("CREATE SCHEMA hudi_db;")
+```sql md title="sql"
+CREATE SCHEMA hudi_db;
 
-df = spark.read.format("hudi").load("/path/to/synced/hudi/table")
-
-df.write.format("hudi").saveAsTable("hudi_db.table_name")
+CREATE TABLE hudi_db.<table_name> USING HUDI LOCATION '/path/to/synced/hudi/table';
 ```
 
 :::tip Note:
@@ -180,18 +178,16 @@ using query engines like `Presto` and/or `Trino`. Check out the guides for query
 [Presto](https://link/to/presto) or [Trino](https://link/to/trino) query engines for more information.
 
 ```sql md title="sql"
-spark.sql("SELECT * FROM hudi.hudi_db.table_name;").show()
+SELECT * FROM hudi_db.<table_name>;
 ```
 
 </TabItem>
 <TabItem value="delta">
 
-```python md title="python"
-spark.sql("CREATE SCHEMA delta_db;")
+```sql md title="sql"
+CREATE SCHEMA delta_db;
 
-df = spark.read.format("delta").load("/path/to/synced/delta/table")
-
-df.write.format("delta").saveAsTable("delta_db.table_name")
+CREATE TABLE delta_db.<table_name> USING DELTA LOCATION '/path/to/synced/delta/table';
 ```
 
 :::tip Note:
@@ -204,18 +200,16 @@ using query engines like `Presto` and/or `Trino`. Check out the guides for query
 [Presto](https://link/to/presto) or [Trino](https://link/to/trino) query engines for more information.
 
 ```sql md title="sql"
-spark.sql("SELECT * FROM delta.delta_db.table_name;").show()
+SELECT * FROM delta_db.<table_name>;
 ```
 
 </TabItem>
 <TabItem value="iceberg">
 
-```python md title="python"
-spark.sql("CREATE SCHEMA iceberg_db;")
+```sql md title="sql"
+CREATE SCHEMA iceberg_db;
 
-df = spark.read.format("iceberg").load("/path/to/synced/iceberg/table")
-
-df.write.format("iceberg").saveAsTable("iceberg_db.table_name")
+CREATE TABLE iceberg_db.<table_name> USING ICEBERG LOCATION '/path/to/synced/iceberg/table';
 ```
 
 :::tip Note:
@@ -228,7 +222,7 @@ using query engines like `Presto` and/or `Trino`. Check out the guides for query
 [Presto](https://link/to/presto) or [Trino](https://link/to/trino) query engines for more information.
 
 ```sql md title="sql"
-spark.sql("SELECT * FROM iceberg.iceberg_db.table_name;").show()
+SELECT * FROM iceberg_db.<table_name>;
 ```
 
 </TabItem>

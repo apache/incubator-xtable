@@ -132,7 +132,8 @@ df = spark.createDataFrame(records, schema)
 
 hudi_options = {
    'hoodie.table.name': table_name,
-   'hoodie.datasource.write.partitionpath.field': 'city'
+   'hoodie.datasource.write.partitionpath.field': 'city',
+   'hoodie.datasource.write.hive_style_partitioning': 'true'
 }
 
 (

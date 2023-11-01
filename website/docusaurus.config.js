@@ -66,6 +66,8 @@ const config = {
         title: 'Onetable',
         logo: {
           alt: 'Onetable Logo',
+          href: 'pathname:///',
+          target: '_self',
           src: 'img/onetable-logo.png',
         },
         items: [
