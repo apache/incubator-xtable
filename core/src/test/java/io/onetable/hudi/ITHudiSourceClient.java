@@ -210,41 +210,6 @@ public class ITHudiSourceClient {
   }
 
   @Test
-  public void fallBackToSnapshotSyncWhenIncrementalSyncIsNotPossible() {
-    HoodieTableType tableType = HoodieTableType.COPY_ON_WRITE;
-    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
-    String tableName = getTableName();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
-      String commitInstant1 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
-
-      String commitInstant2 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> upsertsForCommit2 =
-          table.generateUpdatesForRecords(insertsForCommit1.subList(30, 40));
-      table.upsertRecordsWithCommitAlreadyStarted(upsertsForCommit2, commitInstant2, true);
-
-      String commitInstant3 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit3 = table.generateRecords(100);
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit3, commitInstant3, true);
-      table.clean(); // This cleans older file slices from commitInstant1.
-
-      InstantsForIncrementalSync instantsForIncrementalSync =
-          InstantsForIncrementalSync.builder()
-              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
-              .build();
-      HudiClient hudiClient =
-          getHudiSourceClient(
-              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
-
-      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
-          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
-    }
-  }
-
-  @Test
   public void testOnlyUpsertsAfterInserts() {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
     PartitionConfig partitionConfig = PartitionConfig.of(null, null);

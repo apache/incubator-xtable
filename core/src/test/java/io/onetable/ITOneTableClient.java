@@ -420,6 +420,39 @@ public class ITOneTableClient {
     }
   }
 
+  @Test
+  public void fallBackToSnapshotSyncWhenIncrementalSyncIsNotSufficient() {
+    HoodieTableType tableType = HoodieTableType.COPY_ON_WRITE;
+    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
+    String tableName = getTableName();
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
+              .tableBasePath(table.getBasePath())
+              .syncMode(SyncMode.INCREMENTAL)
+              .build();
+      OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
+
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.insertRecords(100, true);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.HUDI, table, Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), 100);
+
+      table.deleteRecords(insertsForCommit1.subList(30, 70), true);
+
+      table.insertRecords(100, true);
+
+      table.clean(); // This cleans older file slices from commitInstant1.
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.HUDI, table, Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), 160);
+    }
+  }
+
   private static List<TableFormat> getOtherFormats(TableFormat sourceTableFormat) {
     return Arrays.stream(TableFormat.values())
         .filter(format -> !format.equals(sourceTableFormat))

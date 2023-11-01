@@ -34,7 +34,7 @@ import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
 
 import io.onetable.model.exception.OneParseException;
 
-class HudiInstantUtils {
+public class HudiInstantUtils {
   private static final ZoneId ZONE_ID = ZoneId.of("UTC");
 
   // Unfortunately millisecond format is not parsable as is
@@ -54,7 +54,7 @@ class HudiInstantUtils {
    * @param timestamp input commit timestamp
    * @return timestamp parsed as Instant
    */
-  static Instant parseFromInstantTime(String timestamp) {
+  public static Instant parseFromInstantTime(String timestamp) {
     try {
       String timestampInMillis = timestamp;
       if (isSecondGranularity(timestamp)) {
