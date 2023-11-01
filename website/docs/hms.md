@@ -41,7 +41,7 @@ targetFormats:
   - HUDI
 datasets:
   -
-    tableBasePath: /path/to/source/data
+    tableBasePath: file:///path/to/source/data
     tableName: table_name
     partitionSpec: partitionpath:VALUE
 ```
@@ -55,7 +55,7 @@ targetFormats:
   - DELTA
 datasets:
   -
-    tableBasePath: /path/to/source/data
+    tableBasePath: file:///path/to/source/data
     tableName: table_name
     partitionSpec: partitionpath:VALUE
 ```
@@ -69,7 +69,7 @@ targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: /path/to/source/data
+    tableBasePath: file:///path/to/source/data
     tableName: table_name
     partitionSpec: partitionpath:VALUE
 ```
@@ -78,11 +78,12 @@ datasets:
 </Tabs>
 
 :::danger Note:
-Replace with appropriate values for `sourceFormat`, `tableBasePath` and `tableName` fields.
+1. Replace with appropriate values for `sourceFormat`, `tableBasePath` and `tableName` fields
+2. If your running sync in your local file system, you should use `file:///path/to/source/data` and not `/path/to/source/data`
 :::
 
 :::tip Note:
-Replace `/path/to/source/data` to appropriate source data path
+Replace `file:///path/to/source/data` to appropriate source data path
 if you have your source table in S3/GCS i.e. `s3://path/to/source/data` or `gs://path/to/source/data`.
 :::
 

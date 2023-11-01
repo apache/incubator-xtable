@@ -244,7 +244,7 @@ targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: /tmp/hudi-dataset/people
+    tableBasePath: file:///tmp/hudi-dataset/people
     tableName: people
     partitionSpec: city:VALUE
 ```
@@ -259,7 +259,7 @@ targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: /tmp/delta-dataset/people
+    tableBasePath: file:///tmp/delta-dataset/people
     tableName: people
     partitionSpec: city:VALUE
 ```
@@ -274,7 +274,7 @@ targetFormats:
   - DELTA
 datasets:
   -
-    tableBasePath: /tmp/iceberg-dataset/people
+    tableBasePath: file:///tmp/iceberg-dataset/people
     tableName: people
     partitionSpec: city:VALUE
 ```
