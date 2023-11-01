@@ -159,13 +159,21 @@ public class DeltaSourceClient implements SourceClient<Long> {
         .build();
   }
 
-  // TODO(vamshigv): Handle this
   @Override
   public boolean doesCommitForInstantExists(Instant instant) {
-    return true;
+    DeltaHistoryManager.Commit deltaCommitAtOrBeforeInstant =
+        deltaLog.history().getActiveCommitAtTime(Timestamp.from(instant), true, false, true);
+    // There is a chance earliest commit of the table is returned if the instant is before the
+    // earliest commit of the table.
+    Instant deltaCommitInstant = Instant.ofEpochMilli(deltaCommitAtOrBeforeInstant.getTimestamp());
+    return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
   }
 
-  // TODO(vamshigv): Handle this(In delta clean cannot affect onetable sync).
+  /*
+   * In Delta Lake, each commit is a self-describing one i.e. it contains list of new files while
+   * also containing list of files that were deleted. So, vacuum has no special effect on the
+   * incremental sync. Hence, we return false.
+   */
   @Override
   public boolean isAffectedByClean(Instant instant) {
     return false;

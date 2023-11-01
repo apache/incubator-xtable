@@ -19,6 +19,7 @@
 package io.onetable.hudi;
 
 import static io.onetable.GenericTable.getTableName;
+import static io.onetable.ValidationTestHelper.getAllFilePaths;
 import static io.onetable.ValidationTestHelper.validateOneSnapshot;
 import static io.onetable.ValidationTestHelper.validateTableChange;
 import static io.onetable.ValidationTestHelper.validateTableChanges;
@@ -240,74 +241,7 @@ public class ITHudiSourceClient {
 
       CurrentCommitState<HoodieInstant> instantCurrentCommitState =
           hudiClient.getCurrentCommitState(instantsForIncrementalSync);
-      boolean areFilesRemoved = false;
-      boolean newFileGroupsAdded = false;
-      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
-        TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
-        areFilesRemoved =
-            areFilesRemoved | checkIfFileIsRemoved(activePathAfterCommit1, tableChange);
-        newFileGroupsAdded =
-            newFileGroupsAdded | checkIfNewFileGroupIsAdded(activePathAfterCommit1, tableChange);
-      }
-      assertTrue(newFileGroupsAdded);
-      assertTrue(areFilesRemoved);
     }
-  }
-
-  private boolean checkIfNewFileGroupIsAdded(String activePath, TableChange tableChange) {
-    String activePathFileGroupId = getFileGroupInfo(activePath).fileId;
-    String activePathCommitTime = getFileGroupInfo(activePath).commitTime;
-    Map<String, String> fileIdToCommitTimeMap =
-        tableChange.getFilesDiff().getFilesAdded().stream()
-            .collect(
-                Collectors.groupingBy(
-                    oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).fileId,
-                    Collectors.collectingAndThen(
-                        Collectors.mapping(
-                            oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).commitTime,
-                            Collectors.toList()),
-                        list -> {
-                          if (list.size() > 1) {
-                            throw new IllegalStateException(
-                                "Some fileIds have more than one commit time.");
-                          }
-                          return list.get(0);
-                        })));
-    if (!fileIdToCommitTimeMap.containsKey(activePathFileGroupId)) {
-      return false;
-    }
-    Instant newCommitInstant =
-        HudiInstantUtils.parseFromInstantTime(fileIdToCommitTimeMap.get(activePathFileGroupId));
-    Instant oldCommitInstant = HudiInstantUtils.parseFromInstantTime(activePathCommitTime);
-    return newCommitInstant.isAfter(oldCommitInstant);
-  }
-
-  private boolean checkIfFileIsRemoved(String activePath, TableChange tableChange) {
-    String activePathFileGroupId = getFileGroupInfo(activePath).fileId;
-    String activePathCommitTime = getFileGroupInfo(activePath).commitTime;
-    Map<String, String> fileIdToCommitTimeMap =
-        tableChange.getFilesDiff().getFilesRemoved().stream()
-            .collect(
-                Collectors.groupingBy(
-                    oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).fileId,
-                    Collectors.collectingAndThen(
-                        Collectors.mapping(
-                            oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).commitTime,
-                            Collectors.toList()),
-                        list -> {
-                          if (list.size() > 1) {
-                            throw new IllegalStateException(
-                                "Some fileIds have more than one commit time.");
-                          }
-                          return list.get(0);
-                        })));
-    if (!fileIdToCommitTimeMap.containsKey(activePathFileGroupId)) {
-      return false;
-    }
-    if (!fileIdToCommitTimeMap.get(activePathFileGroupId).equals(activePathCommitTime)) {
-      return false;
-    }
-    return true;
   }
 
   @Test
@@ -625,13 +559,6 @@ public class ITHudiSourceClient {
     }
   }
 
-  private List<String> getAllFilePaths(OneSnapshot oneSnapshot) {
-    return oneSnapshot.getPartitionedDataFiles().stream()
-        .flatMap(oneFileGroup -> oneFileGroup.getFiles().stream())
-        .map(oneDataFile -> oneDataFile.getPhysicalPath())
-        .collect(Collectors.toList());
-  }
-
   private static Stream<Arguments> testsForAllTableTypes() {
     return Stream.of(
         Arguments.of(HoodieTableType.COPY_ON_WRITE), Arguments.of(HoodieTableType.MERGE_ON_READ));
@@ -661,6 +588,62 @@ public class ITHudiSourceClient {
         new ConfigurationBasedPartitionSpecExtractor(
             HudiSourceConfig.builder().partitionFieldSpecConfig(onetablePartitionConfig).build());
     return new HudiClient(hoodieTableMetaClient, partitionSpecExtractor);
+  }
+
+  private boolean checkIfNewFileGroupIsAdded(String activePath, TableChange tableChange) {
+    String activePathFileGroupId = getFileGroupInfo(activePath).getFileId();
+    String activePathCommitTime = getFileGroupInfo(activePath).getCommitTime();
+    Map<String, String> fileIdToCommitTimeMap =
+        tableChange.getFilesDiff().getFilesAdded().stream()
+            .collect(
+                Collectors.groupingBy(
+                    oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).getFileId(),
+                    Collectors.collectingAndThen(
+                        Collectors.mapping(
+                            oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).getCommitTime(),
+                            Collectors.toList()),
+                        list -> {
+                          if (list.size() > 1) {
+                            throw new IllegalStateException(
+                                "Some fileIds have more than one commit time.");
+                          }
+                          return list.get(0);
+                        })));
+    if (!fileIdToCommitTimeMap.containsKey(activePathFileGroupId)) {
+      return false;
+    }
+    Instant newCommitInstant =
+        HudiInstantUtils.parseFromInstantTime(fileIdToCommitTimeMap.get(activePathFileGroupId));
+    Instant oldCommitInstant = HudiInstantUtils.parseFromInstantTime(activePathCommitTime);
+    return newCommitInstant.isAfter(oldCommitInstant);
+  }
+
+  private boolean checkIfFileIsRemoved(String activePath, TableChange tableChange) {
+    String activePathFileGroupId = getFileGroupInfo(activePath).getFileId();
+    String activePathCommitTime = getFileGroupInfo(activePath).getCommitTime();
+    Map<String, String> fileIdToCommitTimeMap =
+        tableChange.getFilesDiff().getFilesRemoved().stream()
+            .collect(
+                Collectors.groupingBy(
+                    oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).getFileId(),
+                    Collectors.collectingAndThen(
+                        Collectors.mapping(
+                            oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).getCommitTime(),
+                            Collectors.toList()),
+                        list -> {
+                          if (list.size() > 1) {
+                            throw new IllegalStateException(
+                                "Some fileIds have more than one commit time.");
+                          }
+                          return list.get(0);
+                        })));
+    if (!fileIdToCommitTimeMap.containsKey(activePathFileGroupId)) {
+      return false;
+    }
+    if (!fileIdToCommitTimeMap.get(activePathFileGroupId).equals(activePathCommitTime)) {
+      return false;
+    }
+    return true;
   }
 
   private FileGroupInfo getFileGroupInfo(String path) {

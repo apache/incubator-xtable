@@ -19,6 +19,7 @@
 package io.onetable.delta;
 
 import static io.onetable.GenericTable.getTableName;
+import static io.onetable.ValidationTestHelper.getAllFilePaths;
 import static io.onetable.ValidationTestHelper.validateOneSnapshot;
 import static io.onetable.ValidationTestHelper.validateTableChanges;
 import static org.junit.jupiter.api.Assertions.*;
@@ -35,6 +36,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
@@ -365,6 +368,52 @@ public class ITDeltaSourceClient {
     validateTableChanges(allActiveFiles, allTableChanges);
   }
 
+  @Test
+  public void testsShowingVacuumHasNoEffectOnIncrementalSync() {
+    boolean isPartitioned = true;
+    String tableName = getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(
+            tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
+    // Insert 50 rows to 2018 partition.
+    List<Row> commit1Rows = testSparkDeltaTable.insertRowsForPartition(50, 2018);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+    PerTableConfig tableConfig =
+        PerTableConfig.builder()
+            .tableName(testSparkDeltaTable.getTableName())
+            .tableBasePath(testSparkDeltaTable.getBasePath())
+            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+            .build();
+    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    OneSnapshot snapshotAfterCommit1 = deltaSourceClient.getCurrentSnapshot();
+    List<String> allActivePaths = getAllFilePaths(snapshotAfterCommit1);
+    assertEquals(1, allActivePaths.size());
+    String activePathAfterCommit1 = allActivePaths.get(0);
+
+    // Upsert all rows inserted before, so all files are replaced.
+    testSparkDeltaTable.upsertRows(commit1Rows.subList(0, 50));
+
+    // Insert 50 rows to different (2020) partition.
+    testSparkDeltaTable.insertRowsForPartition(50, 2020);
+
+    // Run vacuum. This deletes all older files from commit1 of 2018 partition.
+    testSparkDeltaTable.runVacuum();
+
+    InstantsForIncrementalSync instantsForIncrementalSync =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+            .build();
+    deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    CurrentCommitState<Long> instantCurrentCommitState =
+        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
+    boolean areFilesRemoved = false;
+    for (Long version : instantCurrentCommitState.getCommitsToProcess()) {
+      TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
+      areFilesRemoved = areFilesRemoved | checkIfFileIsRemoved(activePathAfterCommit1, tableChange);
+    }
+    assertTrue(areFilesRemoved);
+  }
+
   @ParameterizedTest
   @MethodSource("testWithPartitionToggle")
   public void testVacuum(boolean isPartitioned) {
@@ -655,5 +704,13 @@ public class ITDeltaSourceClient {
 
   private static Stream<Arguments> testWithPartitionToggle() {
     return Stream.of(Arguments.of(false), Arguments.of(true));
+  }
+
+  private boolean checkIfFileIsRemoved(String activePath, TableChange tableChange) {
+    Set<String> filePathsRemoved =
+        tableChange.getFilesDiff().getFilesRemoved().stream()
+            .map(oneDf -> oneDf.getPhysicalPath())
+            .collect(Collectors.toSet());
+    return filePathsRemoved.contains(activePath);
   }
 }

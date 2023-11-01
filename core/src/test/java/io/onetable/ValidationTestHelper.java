@@ -87,6 +87,13 @@ public class ValidationTestHelper {
         filesRemoved, extractPathsFromDataFile(tableChange.getFilesDiff().getFilesRemoved()));
   }
 
+  public static List<String> getAllFilePaths(OneSnapshot oneSnapshot) {
+    return oneSnapshot.getPartitionedDataFiles().stream()
+        .flatMap(oneFileGroup -> oneFileGroup.getFiles().stream())
+        .map(oneDataFile -> oneDataFile.getPhysicalPath())
+        .collect(Collectors.toList());
+  }
+
   private static Set<String> extractPathsFromDataFile(Set<OneDataFile> dataFiles) {
     return dataFiles.stream().map(OneDataFile::getPhysicalPath).collect(Collectors.toSet());
   }
