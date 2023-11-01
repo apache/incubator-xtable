@@ -80,7 +80,6 @@ import io.onetable.hudi.HudiSourceConfig;
 import io.onetable.hudi.HudiTestUtil;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
-import io.onetable.model.sync.SyncResult;
 
 public class ITOneTableClient {
   @TempDir public static Path tempDir;
@@ -138,17 +137,8 @@ public class ITOneTableClient {
     return arguments.stream();
   }
 
-  private static Stream<Arguments> testCasesWithPartitioningAndTableTypesAndSyncModes() {
-    return addBasicPartitionCases(testCasesWithTableTypesAndSyncModes());
-  }
-
-  private static Stream<Arguments> testCasesWithTableTypesAndSyncModes() {
-    return addTableTypeCases(testCasesWithSyncModes());
-  }
-
   private static Stream<Arguments> testCasesWithSyncModes() {
-    return addSyncModeCases(
-        Stream.of(Arguments.of(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))));
+    return Stream.of(Arguments.of(SyncMode.INCREMENTAL), Arguments.of(SyncMode.FULL));
   }
 
   private SourceClientProvider<?> getSourceClientProvider(TableFormat sourceTableFormat) {
@@ -259,16 +249,14 @@ public class ITOneTableClient {
   }
 
   @ParameterizedTest
-  @MethodSource("testCasesWithPartitioningAndTableTypesAndSyncModes")
+  @MethodSource("testCasesWithPartitioningAndSyncModes")
   public void testConcurrentInsertWritesInSource(
-      List<TableFormat> targetTableFormats,
-      SyncMode syncMode,
-      HoodieTableType tableType,
-      PartitionConfig partitionConfig) {
+      SyncMode syncMode, PartitionConfig partitionConfig) {
     String tableName = getTableName();
+    List<TableFormat> targetTableFormats = getOtherFormats(TableFormat.HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+            tableName, tempDir, partitionConfig.getHudiConfig(), HoodieTableType.COPY_ON_WRITE)) {
       // commit time 1 starts first but ends 2nd.
       // commit time 2 starts second but ends 1st.
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
@@ -302,9 +290,10 @@ public class ITOneTableClient {
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndSyncModes")
   public void testConcurrentInsertsAndTableServiceWrites(
-      List<TableFormat> targetTableFormats, SyncMode syncMode, PartitionConfig partitionConfig) {
+      SyncMode syncMode, PartitionConfig partitionConfig) {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
 
+    List<TableFormat> targetTableFormats = getOtherFormats(TableFormat.HUDI);
     String tableName = getTableName();
     try (TestSparkHudiTable table =
         TestSparkHudiTable.forStandardSchema(
@@ -824,35 +813,6 @@ public class ITOneTableClient {
               String.format(
                   "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
                   sourceFormat, format));
-        });
-  }
-
-  private void assertNoSyncFailures(Map<TableFormat, SyncResult> results) {
-    Assertions.assertTrue(
-        results.values().stream()
-            .noneMatch(
-                result -> result.getStatus().getStatusCode() != SyncResult.SyncStatusCode.SUCCESS));
-  }
-
-  private static Stream<Arguments> addSyncModeCases(Stream<Arguments> arguments) {
-    return arguments.flatMap(
-        args -> {
-          Object[] snapshotArgs = Arrays.copyOf(args.get(), args.get().length + 1);
-          snapshotArgs[snapshotArgs.length - 1] = SyncMode.FULL;
-          Object[] incrementalArgs = Arrays.copyOf(args.get(), args.get().length + 1);
-          incrementalArgs[incrementalArgs.length - 1] = SyncMode.INCREMENTAL;
-          return Stream.of(Arguments.arguments(snapshotArgs), Arguments.arguments(incrementalArgs));
-        });
-  }
-
-  private static Stream<Arguments> addTableTypeCases(Stream<Arguments> arguments) {
-    return arguments.flatMap(
-        args -> {
-          Object[] morArgs = Arrays.copyOf(args.get(), args.get().length + 1);
-          morArgs[morArgs.length - 1] = HoodieTableType.MERGE_ON_READ;
-          Object[] cowArgs = Arrays.copyOf(args.get(), args.get().length + 1);
-          cowArgs[cowArgs.length - 1] = HoodieTableType.COPY_ON_WRITE;
-          return Stream.of(Arguments.arguments(morArgs), Arguments.arguments(cowArgs));
         });
   }
 

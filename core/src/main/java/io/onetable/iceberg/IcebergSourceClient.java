@@ -189,8 +189,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   }
 
   @Override
-  public CurrentCommitState<Snapshot> getCurrentCommitState(
-      InstantsForIncrementalSync lastSyncInstant) {
+  public CommitsBacklog<Snapshot> getCommitsBacklog(InstantsForIncrementalSync lastSyncInstant) {
 
     long epochMilli = lastSyncInstant.getLastSyncInstant().toEpochMilli();
     Table iceTable = getSourceTable();
@@ -205,7 +204,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     if (pendingSnapshot.timestampMillis() <= epochMilli) {
       // Even the latest snapshot was committed before the lastSyncInstant. No new commits were made
       // and no new snapshots need to be synced. Return empty state.
-      return CurrentCommitState.<Snapshot>builder().build();
+      return CommitsBacklog.<Snapshot>builder().build();
     }
 
     List<Snapshot> snapshots = new ArrayList<>();
@@ -216,7 +215,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     }
     // reverse the list to process the oldest snapshot first
     Collections.reverse(snapshots);
-    return CurrentCommitState.<Snapshot>builder().commitsToProcess(snapshots).build();
+    return CommitsBacklog.<Snapshot>builder().commitsToProcess(snapshots).build();
   }
 
   // TODO(vamshigv): Handle this.
