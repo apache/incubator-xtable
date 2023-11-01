@@ -151,7 +151,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public boolean doesCommitForInstantExists(Instant instant) {
+  public boolean doesCommitExistsAsOfInstant(Instant instant) {
     HoodieInstant hoodieInstant = getCommitAtInstant(instant);
     if (hoodieInstant == null) {
       return false;
@@ -161,7 +161,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
 
   @Override
   @SneakyThrows
-  public boolean isAffectedByClean(Instant instant) {
+  public boolean isAffectedByCleanupProcess(Instant instant) {
     Option<HoodieInstant> lastCleanInstant =
         metaClient.getActiveTimeline().getCleanerTimeline().filterCompletedInstants().lastInstant();
     if (!lastCleanInstant.isPresent()) {

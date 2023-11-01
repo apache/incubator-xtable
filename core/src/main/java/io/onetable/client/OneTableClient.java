@@ -276,7 +276,7 @@ public class OneTableClient {
     if (!instantToCheck.isPresent()) {
       return false;
     }
-    return source.getSourceClient().doesCommitForInstantExists(instantToCheck.get());
+    return source.getSourceClient().doesCommitExistsAsOfInstant(instantToCheck.get());
   }
 
   @Value

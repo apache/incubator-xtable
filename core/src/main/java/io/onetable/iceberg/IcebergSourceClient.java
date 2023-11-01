@@ -221,13 +221,13 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   // TODO(vamshigv): Handle this.
   @Override
-  public boolean doesCommitForInstantExists(Instant instant) {
+  public boolean doesCommitExistsAsOfInstant(Instant instant) {
     return true;
   }
 
   // TODO(vamshigv): Handle this.
   @Override
-  public boolean isAffectedByClean(Instant instant) {
+  public boolean isAffectedByCleanupProcess(Instant instant) {
     return false;
   }
 }

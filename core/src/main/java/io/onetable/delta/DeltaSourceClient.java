@@ -160,7 +160,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
   }
 
   @Override
-  public boolean doesCommitForInstantExists(Instant instant) {
+  public boolean doesCommitExistsAsOfInstant(Instant instant) {
     DeltaHistoryManager.Commit deltaCommitAtOrBeforeInstant =
         deltaLog.history().getActiveCommitAtTime(Timestamp.from(instant), true, false, true);
     // There is a chance earliest commit of the table is returned if the instant is before the
@@ -175,7 +175,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
    * incremental sync. Hence, we return false.
    */
   @Override
-  public boolean isAffectedByClean(Instant instant) {
+  public boolean isAffectedByCleanupProcess(Instant instant) {
     return false;
   }
 

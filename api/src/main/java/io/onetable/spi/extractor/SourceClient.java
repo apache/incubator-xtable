@@ -76,21 +76,23 @@ public interface SourceClient<COMMIT> {
       InstantsForIncrementalSync instantsForIncrementalSync);
 
   /**
-   * Checks if the commit for instant exists in the source table format. This helps to validate if
-   * incremental sync is possible and there is no data mismatch between source and target formats.
+   * Confirms the presence of a commit at or before the given instant. This check is crucial to
+   * ensure that if commits have been purged from the metadata since the last sync, snapshot sync is
+   * leveraged to avoid data inconsistency between source and target formats.
    *
-   * @param instant
-   * @return
+   * @param instant the instant in time to verify against existing commits
+   * @return true if a commit at or before the provided instant exists, false otherwise
    */
-  boolean doesCommitForInstantExists(Instant instant);
+  boolean doesCommitExistsAsOfInstant(Instant instant);
 
   /**
-   * Checks if the instant is affected by a clean operation in the source table format. This helps
-   * to avoid incremental sync when it is not safe and avoid data mismatch between source and target
-   * formats.
+   * Checks if the instant is impacted by any cleanup operation such as Hudi's cleaner, Delta Lake's
+   * vacuum, or Iceberg's snapshot expiry in the source table format. This check is crucial to
+   * ensure that we fall back to snapshot sync when the incremental sync could lead to
+   * inconsistencies.
    *
-   * @param instant
-   * @return
+   * @param instant instant to check for cleanup operations
+   * @return true if the instant is impacted by cleanup operations, false otherwise
    */
-  boolean isAffectedByClean(Instant instant);
+  boolean isAffectedByCleanupProcess(Instant instant);
 }
