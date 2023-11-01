@@ -32,7 +32,13 @@ import io.onetable.spi.sync.TableFormatSync;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class TableFormatClientFactory {
-  public static TableFormatSync createForFormat(
+  private static final TableFormatClientFactory INSTANCE = new TableFormatClientFactory();
+
+  public static TableFormatClientFactory getInstance() {
+    return INSTANCE;
+  }
+
+  public TableFormatSync createForFormat(
       TableFormat tableFormat, PerTableConfig perTableConfig, Configuration configuration) {
     switch (tableFormat) {
       case ICEBERG:
