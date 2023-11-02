@@ -1,0 +1,49 @@
+SalesTerritoryKey,GeographyKey,SalesTerritoryName,SalesTerritoryRegion,SalesTerritoryCountry,SalesTerritoryGroup,SalesTerritoryLevel,SalesTerritoryManager,Status,EmployeeKey
+101,551,Spokane,Washington,United States,North America,4,135,Current,135
+102,827,Fond du Lac,Wisconsin,United States,North America,4,136,Current,136
+103,806,Burlington,Wisconsin,United States,North America,4,137,Current,137
+104,821,East Troy,Wisconsin,United States,North America,4,138,Current,138
+105,911,Plattsburgh,New York,United States,North America,4,139,Current,139
+106,804,Brooklyn,New York,United States,North America,4,140,Current,140
+107,902,Oswego,New York,United States,North America,4,141,Current,141
+108,852,Ithaca,New York,United States,North America,4,142,Current,142
+110,916,Queens,New York,United States,North America,4,143,Current,143
+111,823,Elmira,New York,United States,North America,4,144,Current,144
+112,912,Poestenkill,New York,United States,North America,4,145,Current,145
+113,943,Trenton,New Jersey,United States,North America,4,146,Current,146
+114,891,Newark,New Jersey,United States,North America,4,147,Current,147
+115,854,Jersey City,New Jersey,United States,North America,4,148,Current,148
+116,908,Paterson,New Jersey,United States,North America,4,149,Current,149
+117,814,Clifton,New Jersey,United States,North America,4,150,Current,150
+118,820,East Orange ,New Jersey,United States,North America,4,151,Current,151
+119,907,Passaic ,New Jersey,United States,North America,4,152,Current,152
+120,797,Bayonne ,New Jersey,United States,North America,4,153,Current,153
+121,945,Vineland,New Jersey,United States,North America,4,154,Current,154
+122,886,New Brunswick ,New Jersey,United States,North America,4,155,Current,155
+123,842,Hackensack ,New Jersey,United States,North America,4,156,Current,156
+124,788,Atlantic City ,New Jersey,United States,North America,4,157,Current,157
+125,880,Montclair ,New Jersey,United States,North America,4,158,Current,158
+126,847,Hoboken ,New Jersey,United States,North America,4,159,Current,159
+127,882,Morristown ,New Jersey,United States,North America,4,160,Current,160
+128,808,Cape May,New Jersey,United States,North America,4,161,Current,161
+129,802,Boston,Massachusetts,United States,North America,4,162,Current,162
+130,952,Worcester,Massachusetts,United States,North America,4,163,Current,163
+132,885,New Bedford,Massachusetts,United States,North America,4,164,Current,164
+133,789,Attleboro,Massachusetts,United States,North America,4,165,Current,165
+134,868,Lowell,Massachusetts,United States,North America,4,166,Current,166
+135,861,Leominster,Massachusetts,United States,North America,4,167,Current,167
+136,846,Hingham,Massachusetts,United States,North America,4,168,Current,168
+137,917,Quincy,Massachusetts,United States,North America,4,169,Current,169
+138,832,Framingham,Massachusetts,United States,North America,4,170,Current,170
+139,449,Cambridge,Massachusetts,United States,North America,4,171,Current,171
+140,931,Somerville,Massachusetts,United States,North America,4,172,Current,172
+141,844,Haverhill,Massachusetts,United States,North America,4,173,Current,173
+142,869,Lynn,Massachusetts,United States,North America,4,174,Current,174
+143,895,Northampton,Massachusetts,United States,North America,4,175,Current,175
+144,848,Holyoke,Massachusetts,United States,North America,4,176,Current,176
+145,909,Pittsfield,Massachusetts,United States,North America,4,177,Current,177
+146,826,Falmouth,Massachusetts,United States,North America,4,178,Current,178
+147,914,Provincetown,Massachusetts,United States,North America,4,179,Current,179
+148,883,Nantucket,Massachusetts,United States,North America,4,180,Current,180
+149,795,Bangor,Maine,United States,North America,4,181,Current,181
+150,796,Bar Harbor,Maine,United States,North America,4,182,Current,182

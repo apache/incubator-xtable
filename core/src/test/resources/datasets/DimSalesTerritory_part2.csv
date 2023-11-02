@@ -1,0 +1,51 @@
+SalesTerritoryKey,GeographyKey,SalesTerritoryName,SalesTerritoryRegion,SalesTerritoryCountry,SalesTerritoryGroup,SalesTerritoryLevel,SalesTerritoryManager,Status,EmployeeKey
+51,822,Edgerton,Wisconsin,United States,North America,4,85,Current,85
+52,828,Fort Atkinson,Wisconsin,United States,North America,4,86,Current,86
+53,918,Racine,Wisconsin,United States,North America,4,87,Current,87
+54,849,Houston,Texas,United States,North America,4,88,Current,88
+55,876,Midland,Texas,United States,North America,4,89,Current,89
+56,924,Russellville,Texas,United States,North America,4,90,Current,90
+57,879,Minden,Texas,United States,North America,4,91,Current,91
+58,929,Shreveport,Texas,United States,North America,4,92,Current,92
+59,872,Marshall,Texas,United States,North America,4,93,Current,93
+60,866,Longview,Texas,United States,North America,4,94,Current,94
+61,798,Beaumont,Texas,United States,North America,4,95,Current,95
+62,897,Orange,Texas,United States,North America,4,96,Current,96
+63,579,Baytown,Texas,United States,North America,4,97,Current,97
+64,858,La Porte,Texas,United States,North America,4,98,Current,98
+65,793,Bacliff,Texas,United States,North America,4,99,Current,99
+66,939,Texas City,Texas,United States,North America,4,100,Current,100
+67,906,Pasadena,Texas,United States,North America,4,101,Current,101
+68,851,Humble,Texas,United States,North America,4,102,Current,102
+69,933,Spring,Texas,United States,North America,4,103,Current,103
+70,791,Austin,Texas,United States,North America,4,104,Current,104
+71,925,San Antonio,Texas,United States,North America,4,105,Current,105
+72,453,Cedar Park,Texas,United States,North America,4,106,Current,106
+73,923,Round Rock,Texas,United States,North America,4,107,Current,107
+74,815,Dallas,Texas,United States,North America,4,108,Current,108
+75,834,Georgetown,Texas,United States,North America,4,109,Current,109
+76,845,Hillsboro,Texas,United States,North America,4,110,Current,110
+77,787,Arlington,Texas,United States,North America,4,111,Current,111
+78,837,Grand Prairie,Texas,United States,North America,4,112,Current,112
+79,819,Desoto,Texas,United States,North America,4,113,Current,113
+80,919,Richardson,Texas,United States,North America,4,114,Current,114
+81,863,Lewisville,Texas,United States,North America,4,115,Current,115
+82,817,Denton,Texas,United States,North America,4,116,Current,116
+83,831,Fort Worth,Texas,United States,North America,4,117,Current,117
+84,910,Plano,Texas,United States,North America,4,118,Current,118
+85,875,Miami,Florida,United States,North America,4,119,Current,119
+86,853,Jacksonville,Florida,United States,North America,4,120,Current,120
+87,937,Tallahassee,Florida,United States,North America,4,121,Current,121
+88,884,Naples,Florida,United States,North America,4,122,Current,122
+89,926,Sebring,Florida,United States,North America,4,123,Current,123
+90,860,Lakeland,Florida,United States,North America,4,124,Current,124
+91,830,Fort Lauderdale,Florida,United States,North America,4,125,Current,125
+92,899,Orlando,Florida,United States,North America,4,126,Current,126
+93,938,Tampa,Florida,United States,North America,4,127,Current,127
+94,857,Key West,Florida,United States,North America,4,128,Current,128
+95,807,Cape Canaveral,Florida,United States,North America,4,129,Current,129
+96,782,Albany,New York,United States,North America,4,130,Current,130
+97,890,New York,New York,United States,North America,4,131,Current,131
+98,922,Rochester,New York,United States,North America,4,132,Current,132
+99,936,Syracuse,New York,United States,North America,4,133,Current,133
+100,805,Buffalo,New York,United States,North America,4,134,Current,134

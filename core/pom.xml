@@ -167,5 +167,12 @@
             <artifactId>log4j-slf4j-impl</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-azure</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 </project>

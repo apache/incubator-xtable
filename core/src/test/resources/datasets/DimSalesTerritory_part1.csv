@@ -1,0 +1,50 @@
+SalesTerritoryKey,GeographyKey,SalesTerritoryName,SalesTerritoryRegion,SalesTerritoryCountry,SalesTerritoryGroup,SalesTerritoryLevel,SalesTerritoryManager,Status,EmployeeKey
+1,693,Seattle,Washington,United States,North America,4,35,Current,35
+2,856,Kennewick,Washington,United States,North America,4,36,Current,36
+3,424,Bellevue,Washington,United States,North America,4,37,Current,37
+4,677,Redmond,Washington,United States,North America,4,38,Current,38
+5,575,Yakima,Washington,United States,North America,4,39,Current,39
+6,838,Granger,Washington,United States,North America,4,40,Current,40
+7,935,Sunnyside,Washington,United States,North America,4,41,Current,41
+8,941,Toppenish,Washington,United States,North America,4,42,Current,42
+9,947,Wapato,Washington,United States,North America,4,43,Current,43
+10,813,Cle Elum,Washington,United States,North America,4,44,Current,44
+11,893,North Bend,Washington,United States,North America,4,45,Current,45
+12,930,Snoqualmie,Washington,United States,North America,4,46,Current,46
+13,825,Fall City,Washington,United States,North America,4,47,Current,47
+14,678,Renton,Washington,United States,North America,4,48,Current,48
+15,627,Everett,Washington,United States,North America,4,49,Current,49
+16,944,Veradale,Washington,United States,North America,4,50,Current,50
+17,812,Cheney,Washington,United States,North America,4,51,Current,51
+18,824,Englewood,Colorado,United States,North America,4,52,Current,52
+19,950,Wheat Ridge,Colorado,United States,North America,4,66,Current,66
+20,571,Westminster,Colorado,United States,North America,4,54,Current,54
+21,836,Grand Junction,Colorado,United States,North America,4,55,Current,55
+22,887,New Castle,Colorado,United States,North America,4,56,Current,56
+23,839,Greeley,Colorado,United States,North America,4,57,Current,57
+24,867,Loveland,Colorado,United States,North America,4,58,Current,58
+25,859,Lafayette,Colorado,United States,North America,4,59,Current,59
+26,809,Castle Rock,Colorado,United States,North America,4,60,Current,60
+27,927,Sedalia,Colorado,United States,North America,4,61,Current,61
+28,829,Fort Collins,Colorado,United States,North America,4,62,Current,62
+29,877,Milliken,Colorado,United States,North America,4,63,Current,63
+30,799,Berthoud,Colorado,United States,North America,4,64,Current,64
+31,818,Denver,Colorado,United States,North America,4,65,Current,65
+32,803,Boulder,Colorado,United States,North America,4,66,Current,66
+33,940,Thornton,Colorado,United States,North America,4,67,Current,67
+34,865,Littleton,Colorado,United States,North America,4,68,Current,68
+35,790,Aurora,Colorado,United States,North America,4,69,Current,69
+36,904,Parker,Colorado,United States,North America,4,70,Current,70
+37,840,Green Bay,Wisconsin,United States,North America,4,71,Current,71
+38,786,Appleton,Wisconsin,United States,North America,4,72,Current,72
+39,874,Menasha,Wisconsin,United States,North America,4,73,Current,73
+40,901,Oshkosh,Wisconsin,United States,North America,4,74,Current,74
+41,878,Milwaukee,Wisconsin,United States,North America,4,75,Current,75
+42,949,Waukesha,Wisconsin,United States,North America,4,76,Current,76
+43,835,Germantown,Maryland,United States,North America,4,77,Current,77
+45,913,Port Washington,Wisconsin,United States,North America,4,79,Current,79
+46,928,Sheboygan,Wisconsin,United States,North America,4,80,Current,80
+47,871,Manitowoc,Wisconsin,United States,North America,4,81,Current,81
+48,870,Madison,Wisconsin,United States,North America,4,82,Current,82
+49,898,Oregon,Wisconsin,United States,North America,4,83,Current,83
+50,934,Stoughton,Wisconsin,United States,North America,4,84,Current,84
