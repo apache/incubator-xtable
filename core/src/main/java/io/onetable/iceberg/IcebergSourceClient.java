@@ -217,4 +217,13 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     Collections.reverse(snapshots);
     return CommitsBacklog.<Snapshot>builder().commitsToProcess(snapshots).build();
   }
+
+  // TODO(https://github.com/onetable-io/onetable/issues/147): Handle this.
+  @Override
+  public boolean isIncrementalSyncSafeFrom(Instant instant) {
+    // Two checks to be performed:
+    // 1. Check if snapshot at or before the provided instant exists.
+    // 2. Check if expiring of snapshots has impacted the provided instant.
+    return true;
+  }
 }

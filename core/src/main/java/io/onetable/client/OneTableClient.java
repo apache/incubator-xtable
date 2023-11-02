@@ -29,6 +29,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.Builder;
 import lombok.Value;
@@ -103,7 +104,7 @@ public class OneTableClient {
                     tableFormat ->
                         tableFormatClientFactory.createForFormat(tableFormat, config, conf)));
     Map<TableFormat, TableFormatSync> formatsToSyncIncrementally =
-        getFormatsToSyncIncrementally(config, syncClientByFormat, source);
+        getFormatsToSyncIncrementally(config, syncClientByFormat, source.getSourceClient());
     Map<TableFormat, TableFormatSync> formatsToSyncBySnapshot =
         syncClientByFormat.entrySet().stream()
             .filter(entry -> !formatsToSyncIncrementally.containsKey(entry.getKey()))
@@ -127,7 +128,7 @@ public class OneTableClient {
   private <COMMIT> Map<TableFormat, TableFormatSync> getFormatsToSyncIncrementally(
       PerTableConfig perTableConfig,
       Map<TableFormat, TableFormatSync> syncClientByFormat,
-      ExtractFromSource<COMMIT> source) {
+      SourceClient<COMMIT> sourceClient) {
     if (perTableConfig.getSyncMode() == SyncMode.FULL) {
       // Full sync requested by config, hence no incremental sync.
       return Collections.emptyMap();
@@ -149,7 +150,7 @@ public class OneTableClient {
               Optional<Instant> lastSyncInstant = lastSyncInstantByFormat.get(entry.getKey());
               List<Instant> pendingInstants =
                   pendingInstantsToConsiderForNextSyncByFormat.get(entry.getKey());
-              return isIncrementalSyncSufficient(source, lastSyncInstant, pendingInstants);
+              return isIncrementalSyncSufficient(sourceClient, lastSyncInstant, pendingInstants);
             })
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
@@ -228,16 +229,41 @@ public class OneTableClient {
         .build();
   }
 
+  /**
+   * Checks if incremental sync is sufficient for a target table format.
+   *
+   * @param sourceClient {@link SourceClient}
+   * @param lastSyncInstant the last instant at which the target table format was synced
+   * @param pendingInstants the list of pending instants for the target table format to consider for
+   *     next sync
+   * @return true if incremental sync is sufficient, false otherwise.
+   */
   private <COMMIT> boolean isIncrementalSyncSufficient(
-      ExtractFromSource<COMMIT> source,
+      SourceClient<COMMIT> sourceClient,
       Optional<Instant> lastSyncInstant,
       List<Instant> pendingInstants) {
-    if (!doesInstantExists(source, lastSyncInstant)) {
+    Stream<Instant> pendingInstantsStream =
+        (pendingInstants == null) ? Stream.empty() : pendingInstants.stream();
+    Optional<Instant> earliestInstant =
+        lastSyncInstant
+            .map(
+                instant ->
+                    Stream.concat(Stream.of(instant), pendingInstantsStream)
+                        .min(Instant::compareTo))
+            .orElseGet(() -> pendingInstantsStream.min(Instant::compareTo));
+    if (!earliestInstant.isPresent()) {
+      log.info("No previous OneTable sync for target. Falling back to snapshot sync.");
       return false;
     }
-    return pendingInstants == null
-        || pendingInstants.isEmpty()
-        || doesInstantExists(source, Optional.ofNullable(pendingInstants.get(0)));
+    boolean isIncrementalSafeFromInstant =
+        sourceClient.isIncrementalSyncSafeFrom(earliestInstant.get());
+    if (!isIncrementalSafeFromInstant) {
+      log.info(
+          "Incremental sync is not safe from instant {}. Falling back to snapshot sync.",
+          earliestInstant);
+      return false;
+    }
+    return true;
   }
 
   private InstantsForIncrementalSync getMostOutOfSyncCommitAndPendingCommits(
@@ -259,20 +285,6 @@ public class OneTableClient {
         .lastSyncInstant(mostOutOfSyncCommit.get())
         .pendingCommits(allPendingInstants)
         .build();
-  }
-
-  private <COMMIT> boolean doesInstantExists(
-      ExtractFromSource<COMMIT> source, Optional<Instant> instantToCheck) {
-    if (!instantToCheck.isPresent()) {
-      return false;
-    }
-
-    // TODO This check is not generic and should be moved to HudiClient
-    // TODO hardcoding the return value to true for now
-    //    COMMIT lastSyncHoodieInstant = source.getLastSyncCommit(lastSyncInstant.get());
-    //    return HudiClient.parseFromInstantTime(lastSyncHoodieInstant.getTimestamp())
-    //        .equals(lastSyncInstant.get());
-    return true;
   }
 
   @Value

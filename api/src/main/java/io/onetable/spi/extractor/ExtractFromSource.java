@@ -22,11 +22,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 import io.onetable.model.*;
 import io.onetable.model.CommitsBacklog;
 
 @AllArgsConstructor(staticName = "of")
+@Getter
 public class ExtractFromSource<COMMIT> {
   private final SourceClient<COMMIT> sourceClient;
 

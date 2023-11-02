@@ -19,6 +19,7 @@
 package io.onetable.delta;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -153,6 +154,21 @@ public class DeltaSourceClient implements SourceClient<Long> {
     return CommitsBacklog.<Long>builder()
         .commitsToProcess(getChangesState().getVersionsInSortedOrder())
         .build();
+  }
+
+  /*
+   * In Delta Lake, each commit is a self-describing one i.e. it contains list of new files while
+   * also containing list of files that were deleted. So, vacuum has no special effect on the
+   * incremental sync. Hence, existence of commit is the only check required.
+   */
+  @Override
+  public boolean isIncrementalSyncSafeFrom(Instant instant) {
+    DeltaHistoryManager.Commit deltaCommitAtOrBeforeInstant =
+        deltaLog.history().getActiveCommitAtTime(Timestamp.from(instant), true, false, true);
+    // There is a chance earliest commit of the table is returned if the instant is before the
+    // earliest commit of the table, hence the additional check.
+    Instant deltaCommitInstant = Instant.ofEpochMilli(deltaCommitAtOrBeforeInstant.getTimestamp());
+    return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
   }
 
   private DeltaIncrementalChangesState getChangesState() {
