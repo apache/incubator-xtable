@@ -193,8 +193,8 @@ public class ITHudiSourceClient {
           getHudiSourceClient(
               CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
 
-      CurrentCommitState<HoodieInstant> instantCurrentCommitState =
-          hudiClient.getCurrentCommitState(instantsForIncrementalSync);
+      CommitsBacklog<HoodieInstant> instantCurrentCommitState =
+          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
       boolean areFilesRemoved = false;
       boolean newFileGroupsAdded = false;
       for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {

@@ -54,7 +54,7 @@ public class HudiInstantUtils {
    * @param timestamp input commit timestamp
    * @return timestamp parsed as Instant
    */
-  public static Instant parseFromInstantTime(String timestamp) {
+  static Instant parseFromInstantTime(String timestamp) {
     try {
       String timestampInMillis = timestamp;
       if (isSecondGranularity(timestamp)) {

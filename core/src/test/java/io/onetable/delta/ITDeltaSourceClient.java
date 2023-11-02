@@ -398,8 +398,8 @@ public class ITDeltaSourceClient {
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
     deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
-    CurrentCommitState<Long> instantCurrentCommitState =
-        deltaSourceClient.getCurrentCommitState(instantsForIncrementalSync);
+    CommitsBacklog<Long> instantCurrentCommitState =
+        deltaSourceClient.getCommitsBacklog(instantsForIncrementalSync);
     boolean areFilesRemoved = false;
     for (Long version : instantCurrentCommitState.getCommitsToProcess()) {
       TableChange tableChange = deltaSourceClient.getTableChangeForCommit(version);
