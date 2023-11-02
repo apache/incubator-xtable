@@ -20,7 +20,6 @@ package io.onetable.client;
 
 import static io.onetable.GenericTable.getTableName;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -120,7 +119,6 @@ public class TestOneTableClient {
         .thenReturn(mockTableFormatSync);
     when(mockTableFormatClientFactory.createForFormat(TableFormat.DELTA, perTableConfig, mockConf))
         .thenReturn(mockTableFormatSync1);
-    when(mockSourceClient.isIncrementalSyncSafeFrom(any(Instant.class))).thenReturn(true);
 
     Instant instantAsOfNow = Instant.now();
     Instant instantAt15 = getInstantAtLastNMinutes(instantAsOfNow, 15);
@@ -129,6 +127,8 @@ public class TestOneTableClient {
     Instant instantAt8 = getInstantAtLastNMinutes(instantAsOfNow, 8);
     Instant instantAt5 = getInstantAtLastNMinutes(instantAsOfNow, 5);
     Instant instantAt2 = getInstantAtLastNMinutes(instantAsOfNow, 2);
+    when(mockSourceClient.isIncrementalSyncSafeFrom(eq(instantAt15))).thenReturn(true);
+    when(mockSourceClient.isIncrementalSyncSafeFrom(eq(instantAt8))).thenReturn(true);
 
     // Iceberg last synced at instantAt10 and has pending instants at instantAt15.
     Instant icebergLastSyncInstant = instantAt10;
@@ -240,7 +240,7 @@ public class TestOneTableClient {
     Instant instantAt5 = getInstantAtLastNMinutes(instantAsOfNow, 5);
     Instant instantAt2 = getInstantAtLastNMinutes(instantAsOfNow, 2);
 
-    when(mockSourceClient.isIncrementalSyncSafeFrom(any())).thenReturn(true);
+    when(mockSourceClient.isIncrementalSyncSafeFrom(eq(instantAt8))).thenReturn(true);
     when(mockSourceClient.isIncrementalSyncSafeFrom(eq(instantAt15))).thenReturn(false);
 
     // Iceberg last synced at instantAt10 and has pending instants at instantAt15.

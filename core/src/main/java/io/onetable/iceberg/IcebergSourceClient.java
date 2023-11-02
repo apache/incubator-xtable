@@ -218,7 +218,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     return CommitsBacklog.<Snapshot>builder().commitsToProcess(snapshots).build();
   }
 
-  // TODO(vamshigv): Handle this.
+  // TODO(https://github.com/onetable-io/onetable/issues/147): Handle this.
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
     // Two checks to be performed:

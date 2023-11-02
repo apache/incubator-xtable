@@ -229,6 +229,15 @@ public class OneTableClient {
         .build();
   }
 
+  /**
+   * Checks if incremental sync is sufficient for a target table format.
+   *
+   * @param sourceClient {@link SourceClient}
+   * @param lastSyncInstant the last instant at which the target table format was synced
+   * @param pendingInstants the list of pending instants for the target table format to consider for
+   *     next sync
+   * @return true if incremental sync is sufficient, false otherwise.
+   */
   private <COMMIT> boolean isIncrementalSyncSufficient(
       SourceClient<COMMIT> sourceClient,
       Optional<Instant> lastSyncInstant,
@@ -243,7 +252,7 @@ public class OneTableClient {
                         .min(Instant::compareTo))
             .orElseGet(() -> pendingInstantsStream.min(Instant::compareTo));
     if (!earliestInstant.isPresent()) {
-      log.info("No instants to sync. Falling back to snapshot sync.");
+      log.info("No previous OneTable sync for target. Falling back to snapshot sync.");
       return false;
     }
     boolean isIncrementalSafeFromInstant =

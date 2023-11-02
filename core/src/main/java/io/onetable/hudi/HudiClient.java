@@ -170,10 +170,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
     String earliestCommitToRetain = cleanMetadata.getEarliestCommitToRetain();
     Instant earliestCommitToRetainInstant =
         HudiInstantUtils.parseFromInstantTime(earliestCommitToRetain);
-    if (earliestCommitToRetainInstant.isAfter(instant)) {
-      return true;
-    }
-    return false;
+    return earliestCommitToRetainInstant.isAfter(instant);
   }
 
   private CommitsPair getCompletedAndPendingCommitsForInstants(List<Instant> lastPendingInstants) {
