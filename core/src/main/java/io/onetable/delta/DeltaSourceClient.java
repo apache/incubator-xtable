@@ -156,24 +156,19 @@ public class DeltaSourceClient implements SourceClient<Long> {
         .build();
   }
 
+  /*
+   * In Delta Lake, each commit is a self-describing one i.e. it contains list of new files while
+   * also containing list of files that were deleted. So, vacuum has no special effect on the
+   * incremental sync. Hence, existence of commit is the only check required.
+   */
   @Override
-  public boolean doesCommitExistsAsOfInstant(Instant instant) {
+  public boolean isIncrementalSyncSafeFrom(Instant instant) {
     DeltaHistoryManager.Commit deltaCommitAtOrBeforeInstant =
         deltaLog.history().getActiveCommitAtTime(Timestamp.from(instant), true, false, true);
     // There is a chance earliest commit of the table is returned if the instant is before the
     // earliest commit of the table, hence the additional check.
     Instant deltaCommitInstant = Instant.ofEpochMilli(deltaCommitAtOrBeforeInstant.getTimestamp());
     return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
-  }
-
-  /*
-   * In Delta Lake, each commit is a self-describing one i.e. it contains list of new files while
-   * also containing list of files that were deleted. So, vacuum has no special effect on the
-   * incremental sync. Hence, we return false.
-   */
-  @Override
-  public boolean isAffectedByCleanupProcess(Instant instant) {
-    return false;
   }
 
   private DeltaIncrementalChangesState getChangesState() {

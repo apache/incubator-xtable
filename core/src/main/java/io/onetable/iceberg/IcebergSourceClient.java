@@ -220,13 +220,10 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   // TODO(vamshigv): Handle this.
   @Override
-  public boolean doesCommitExistsAsOfInstant(Instant instant) {
+  public boolean isIncrementalSyncSafeFrom(Instant instant) {
+    // Two checks to be performed:
+    // 1. Check if snapshot at or before the provided instant exists.
+    // 2. Check if expiring of snapshots has impacted the provided instant.
     return true;
-  }
-
-  // TODO(vamshigv): Handle this.
-  @Override
-  public boolean isAffectedByCleanupProcess(Instant instant) {
-    return false;
   }
 }

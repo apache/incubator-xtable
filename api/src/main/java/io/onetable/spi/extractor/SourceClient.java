@@ -72,23 +72,16 @@ public interface SourceClient<COMMIT> {
   CommitsBacklog<COMMIT> getCommitsBacklog(InstantsForIncrementalSync instantsForIncrementalSync);
 
   /**
-   * Confirms the presence of a commit at or before the given instant. This check is crucial to
-   * ensure that if commits have been purged from the metadata since the last sync, snapshot sync is
-   * leveraged to avoid data inconsistency between source and target formats.
+   * Determines whether an incremental sync process is safe to perform from a given instant. This
+   * method checks for a couple of things: the existence of a commit at or before the provided
+   * instant and whether the instant has been impacted by any table cleanup operations, (Ex: Cleaner
+   * process in Hudi, Vacuum in Delta, Expiration of snapshots in Iceberg) It ensures that
+   * incremental sync is not used if there is a risk of data inconsistencies due to missing commits
+   * (e.g., those purged from the metadata) or due to table clean-up processes.
    *
-   * @param instant the instant in time to verify against existing commits
-   * @return true if a commit at or before the provided instant exists, false otherwise
+   * @param instant the instant to check for incremental sync safety.
+   * @return true if it is safe to proceed with incremental sync from the given instant or otherwise
+   *     false.
    */
-  boolean doesCommitExistsAsOfInstant(Instant instant);
-
-  /**
-   * Checks if the instant is impacted by any cleanup operation such as Hudi's cleaner, Delta Lake's
-   * vacuum, or Iceberg's snapshot expiry in the source table format. This check is crucial to
-   * ensure that we fall back to snapshot sync when the incremental sync could lead to
-   * inconsistencies.
-   *
-   * @param instant instant to check for cleanup operations
-   * @return true if the instant is impacted by cleanup operations, false otherwise
-   */
-  boolean isAffectedByCleanupProcess(Instant instant);
+  boolean isIncrementalSyncSafeFrom(Instant instant);
 }

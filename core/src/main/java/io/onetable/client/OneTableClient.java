@@ -242,18 +242,16 @@ public class OneTableClient {
                     Stream.concat(Stream.of(instant), pendingInstantsStream)
                         .min(Instant::compareTo))
             .orElseGet(() -> pendingInstantsStream.min(Instant::compareTo));
-    boolean isEarliestInstantExists = doesInstantExists(source, earliestInstant);
-    if (!isEarliestInstantExists) {
-      log.info(
-          "Earliest instant {} doesn't exist in the source table. Falling back to full sync.",
-          earliestInstant);
+    if (!earliestInstant.isPresent()) {
+      log.info("No instants to sync. Falling back to snapshot sync.");
       return false;
     }
-    boolean isEarliestInstantAffectedByCleaned =
-        source.getSourceClient().isAffectedByCleanupProcess(earliestInstant.get());
-    if (isEarliestInstantAffectedByCleaned) {
+    boolean isIncrementalSafeFromInstant =
+        source.getSourceClient().isIncrementalSyncSafeFrom(earliestInstant.get());
+    if (!isIncrementalSafeFromInstant) {
       log.info(
-          "Earliest instant {} is affected by clean. Falling back to full sync.", earliestInstant);
+          "Incremental sync is not safe from instant {}. Falling back to snapshot sync.",
+          earliestInstant);
       return false;
     }
     return true;
@@ -278,14 +276,6 @@ public class OneTableClient {
         .lastSyncInstant(mostOutOfSyncCommit.get())
         .pendingCommits(allPendingInstants)
         .build();
-  }
-
-  private <COMMIT> boolean doesInstantExists(
-      ExtractFromSource<COMMIT> source, Optional<Instant> instantToCheck) {
-    if (!instantToCheck.isPresent()) {
-      return false;
-    }
-    return source.getSourceClient().doesCommitExistsAsOfInstant(instantToCheck.get());
   }
 
   @Value

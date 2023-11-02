@@ -148,7 +148,11 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public boolean doesCommitExistsAsOfInstant(Instant instant) {
+  public boolean isIncrementalSyncSafeFrom(Instant instant) {
+    return doesCommitExistsAsOfInstant(instant) && !isAffectedByCleanupProcess(instant);
+  }
+
+  private boolean doesCommitExistsAsOfInstant(Instant instant) {
     HoodieInstant hoodieInstant = getCommitAtInstant(instant);
     if (hoodieInstant == null) {
       return false;
@@ -156,9 +160,8 @@ public class HudiClient implements SourceClient<HoodieInstant> {
     return true;
   }
 
-  @Override
   @SneakyThrows
-  public boolean isAffectedByCleanupProcess(Instant instant) {
+  private boolean isAffectedByCleanupProcess(Instant instant) {
     Option<HoodieInstant> lastCleanInstant =
         metaClient.getActiveTimeline().getCleanerTimeline().filterCompletedInstants().lastInstant();
     if (!lastCleanInstant.isPresent()) {
