@@ -72,12 +72,12 @@ public interface SourceClient<COMMIT> {
   CommitsBacklog<COMMIT> getCommitsBacklog(InstantsForIncrementalSync instantsForIncrementalSync);
 
   /**
-   * Determines whether an incremental sync process is safe to perform from a given instant. This
-   * method checks for a couple of things: the existence of a commit at or before the provided
-   * instant and whether the instant has been impacted by any table cleanup operations, (Ex: Cleaner
-   * process in Hudi, Vacuum in Delta, Expiration of snapshots in Iceberg) It ensures that
-   * incremental sync is not used if there is a risk of data inconsistencies due to missing commits
-   * (e.g., those purged from the metadata) or due to table clean-up processes.
+   * Determines whether an incremental sync is safe from a given instant. This method checks for a
+   * couple of things: the existence of a commit at or before the provided instant and whether the
+   * instant has been impacted by any table cleanup operations, (Ex: Cleaner runs in Hudi, Vacuum in
+   * Delta, Expiration of snapshots in Iceberg) It ensures that incremental sync is not used if
+   * there is a risk of data inconsistencies due to missing commits (e.g., those purged from the
+   * metadata) or due to table clean-up processes.
    *
    * @param instant the instant to check for incremental sync safety.
    * @return true if it is safe to proceed with incremental sync from the given instant or otherwise

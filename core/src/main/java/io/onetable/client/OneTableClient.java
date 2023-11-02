@@ -104,7 +104,7 @@ public class OneTableClient {
                     tableFormat ->
                         tableFormatClientFactory.createForFormat(tableFormat, config, conf)));
     Map<TableFormat, TableFormatSync> formatsToSyncIncrementally =
-        getFormatsToSyncIncrementally(config, syncClientByFormat, source);
+        getFormatsToSyncIncrementally(config, syncClientByFormat, source.getSourceClient());
     Map<TableFormat, TableFormatSync> formatsToSyncBySnapshot =
         syncClientByFormat.entrySet().stream()
             .filter(entry -> !formatsToSyncIncrementally.containsKey(entry.getKey()))
@@ -128,7 +128,7 @@ public class OneTableClient {
   private <COMMIT> Map<TableFormat, TableFormatSync> getFormatsToSyncIncrementally(
       PerTableConfig perTableConfig,
       Map<TableFormat, TableFormatSync> syncClientByFormat,
-      ExtractFromSource<COMMIT> source) {
+      SourceClient<COMMIT> sourceClient) {
     if (perTableConfig.getSyncMode() == SyncMode.FULL) {
       // Full sync requested by config, hence no incremental sync.
       return Collections.emptyMap();
@@ -150,7 +150,7 @@ public class OneTableClient {
               Optional<Instant> lastSyncInstant = lastSyncInstantByFormat.get(entry.getKey());
               List<Instant> pendingInstants =
                   pendingInstantsToConsiderForNextSyncByFormat.get(entry.getKey());
-              return isIncrementalSyncSufficient(source, lastSyncInstant, pendingInstants);
+              return isIncrementalSyncSufficient(sourceClient, lastSyncInstant, pendingInstants);
             })
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
@@ -230,7 +230,7 @@ public class OneTableClient {
   }
 
   private <COMMIT> boolean isIncrementalSyncSufficient(
-      ExtractFromSource<COMMIT> source,
+      SourceClient<COMMIT> sourceClient,
       Optional<Instant> lastSyncInstant,
       List<Instant> pendingInstants) {
     Stream<Instant> pendingInstantsStream =
@@ -247,7 +247,7 @@ public class OneTableClient {
       return false;
     }
     boolean isIncrementalSafeFromInstant =
-        source.getSourceClient().isIncrementalSyncSafeFrom(earliestInstant.get());
+        sourceClient.isIncrementalSyncSafeFrom(earliestInstant.get());
     if (!isIncrementalSafeFromInstant) {
       log.info(
           "Incremental sync is not safe from instant {}. Falling back to snapshot sync.",

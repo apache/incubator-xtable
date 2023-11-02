@@ -154,10 +154,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
 
   private boolean doesCommitExistsAsOfInstant(Instant instant) {
     HoodieInstant hoodieInstant = getCommitAtInstant(instant);
-    if (hoodieInstant == null) {
-      return false;
-    }
-    return true;
+    return hoodieInstant != null;
   }
 
   @SneakyThrows

@@ -34,7 +34,7 @@ import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
 
 import io.onetable.model.exception.OneParseException;
 
-public class HudiInstantUtils {
+class HudiInstantUtils {
   private static final ZoneId ZONE_ID = ZoneId.of("UTC");
 
   // Unfortunately millisecond format is not parsable as is
