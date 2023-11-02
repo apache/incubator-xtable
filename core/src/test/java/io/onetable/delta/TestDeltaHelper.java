@@ -248,7 +248,11 @@ public class TestDeltaHelper {
   private Timestamp generateRandomTimeGivenYear(int yearValue) {
     int month = RANDOM.nextInt(12) + 1;
     int daysInMonth = YearMonth.of(yearValue, month).lengthOfMonth();
-    int day = RANDOM.nextInt(daysInMonth) + 1;
+    // Adjust days in December to avoid timezone issues with Delta generated columns check
+    // constraint
+    // for tests.
+    int maxDay = month == 12 ? daysInMonth - 5 : daysInMonth;
+    int day = RANDOM.nextInt(maxDay) + 1;
 
     LocalDateTime localDateTime =
         LocalDateTime.of(
