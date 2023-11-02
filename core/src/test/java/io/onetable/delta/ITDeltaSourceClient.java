@@ -406,6 +406,10 @@ public class ITDeltaSourceClient {
       areFilesRemoved = areFilesRemoved | checkIfFileIsRemoved(activePathAfterCommit1, tableChange);
     }
     assertTrue(areFilesRemoved);
+    assertTrue(deltaSourceClient.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));
+    // Table doesn't have instant of this older commit, hence it is not safe.
+    Instant instantAsOfHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
+    assertFalse(deltaSourceClient.isIncrementalSyncSafeFrom(instantAsOfHourAgo));
   }
 
   @ParameterizedTest
