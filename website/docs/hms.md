@@ -125,6 +125,13 @@ spark-sql --packages io.delta:delta-core_2.12:2.0.0 \
 --conf "spark.sql.catalogImplementation=hive"
 ```
 
+:::tip Note:
+If you instead want to write your table to Amazon S3 or Google Cloud Storage,
+your spark session will need additional configurations
+* For Amazon S3, follow the configurations specified [here](https://docs.delta.io/latest/delta-storage.html#quickstart-s3-single-cluster)
+* For Google Cloud Storage, follow the configurations specified [here](https://docs.delta.io/latest/delta-storage.html#requirements-gcs)
+:::
+
 </TabItem>
 <TabItem value="iceberg">
 
@@ -137,15 +144,15 @@ spark-sql --packages org.apache.iceberg:iceberg-spark-runtime-3.2_2.12:1.2.1 \
 --conf "spark.sql.catalog.hive_prod.type=hive"
 ```
 
-</TabItem>
-</Tabs>
-
 :::tip Note:
-If you instead want to write your table to Amazon S3 or Google Cloud Storage, 
+If you instead want to write your table to Amazon S3 or Google Cloud Storage,
 your spark session will need additional configurations
 * For Amazon S3, follow the configurations specified [here](https://docs.delta.io/latest/delta-storage.html#quickstart-s3-single-cluster)
 * For Google Cloud Storage, follow the configurations specified [here](https://docs.delta.io/latest/delta-storage.html#requirements-gcs)
 :::
+
+</TabItem>
+</Tabs>
 
 <Tabs
 groupId="table-format"
