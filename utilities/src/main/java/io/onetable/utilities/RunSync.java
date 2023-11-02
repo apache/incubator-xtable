@@ -33,6 +33,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
@@ -63,8 +64,10 @@ import io.onetable.utilities.RunSync.TableFormatClients.ClientConfig;
 public class RunSync {
 
   private static final String DATASET_CONFIG_OPTION = "d";
-  private static final String HADOOP_CONFIG_PATH = "h";
+  private static final String HADOOP_CONFIG_PATH = "hc";
   private static final String CLIENTS_CONFIG_PATH = "c";
+  private static final String HELP_OPTION = "h";
+
   private static final Options OPTIONS =
       new Options()
           .addOption(
@@ -83,11 +86,17 @@ public class RunSync {
               "clientsConfig",
               true,
               "The path to a yaml file containing onetable client configurations. "
-                  + "These configs will override the default");
+                  + "These configs will override the default")
+          .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   public static void main(String[] args) throws IOException, ParseException {
     CommandLineParser parser = new DefaultParser();
     CommandLine cmd = parser.parse(OPTIONS, args);
+    if (cmd.hasOption(HELP_OPTION)) {
+      HelpFormatter formatter = new HelpFormatter();
+      formatter.printHelp("RunSync", OPTIONS);
+      return;
+    }
 
     DatasetConfig datasetConfig = new DatasetConfig();
     try (InputStream inputStream =
