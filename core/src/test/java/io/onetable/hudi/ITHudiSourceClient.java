@@ -199,6 +199,32 @@ public class ITHudiSourceClient {
     }
   }
 
+  @Test
+  public void testForIncrementalSyncSafetyCheck() {
+    HoodieTableType tableType = HoodieTableType.COPY_ON_WRITE;
+    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
+    String tableName = getTableName();
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+      String commitInstant1 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+
+      table.upsertRecords(insertsForCommit1.subList(30, 40), true);
+
+      table.insertRecords(100, true);
+      table.clean(); // cleans up file groups from commitInstant1
+
+      HudiClient hudiClient =
+          getHudiSourceClient(
+              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
+      assertFalse(
+          hudiClient.isIncrementalSyncSafeFrom(
+              HudiInstantUtils.parseFromInstantTime(commitInstant1)));
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("testsForAllTableTypes")
   public void testsForDropPartition(HoodieTableType tableType) {
