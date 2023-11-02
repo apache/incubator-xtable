@@ -8,14 +8,14 @@ This document walks through the steps to register a Onetable synced Delta table 
 ## Pre-requisites
 1. Source table(s) (Hudi/Iceberg) already written to external storage locations like S3/GCS.
    If you don't have a source table written in S3/GCS,
-   you can follow the steps in [this](https://link-to-how-to/create/dataset.md) tutorial to set it up.
+   you can follow the steps in [this](https://onetable.dev/docs/hms) tutorial to set it up.
 2. Setup connection to external storage locations from Databricks.
    * Follow the steps outlined [here](https://docs.databricks.com/en/storage/amazon-s3.html) for Amazon S3
    * Follow the steps outlined [here](https://docs.databricks.com/en/storage/gcs.html) for Google Cloud Storage
 3. Create a Unity Catalog metastore in Databricks as outlined [here](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html#create-a-unity-catalog-metastore).
 4. Create an external location in Databricks as outlined [here](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-location.html).
 5. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the
-   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://link/to/installation/page)
+   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://onetable.dev/docs/setup)
 
 ## Steps
 ### Running sync

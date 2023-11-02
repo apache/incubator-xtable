@@ -22,7 +22,7 @@ OPTIONS (
 ```
 :::danger Note:
 This method requires you to keep the table updated when there are table updates and hence Google
-[does not recommended]((https://cloud.google.com/bigquery/docs/iceberg-tables#create-using-metadata-file)) this approach.
+[does not recommend]((https://cloud.google.com/bigquery/docs/iceberg-tables#create-using-metadata-file)) this approach.
 :::
 
 :::danger Important: For Hudi source format to Iceberg target format use cases
@@ -44,7 +44,7 @@ If you are not planning on using Iceberg, then you do not need to add these to y
 #### [Using BigLake Metastore to create the Iceberg BigLake tables](https://cloud.google.com/bigquery/docs/iceberg-tables#create-using-biglake-metastore):
 You can use two options to register Onetable synced Iceberg tables to BigLake Metastore:
 * To directly register the Onetable synced Iceberg table to BigLake Metastore,
-  follow the [Onetable guide to integrate with BigLake Metastore](https://link/to/guide)
+  follow the [Onetable guide to integrate with BigLake Metastore](https://onetable.dev/docs/biglake-metastore)
 * Use [stored procedures for Spark](https://cloud.google.com/bigquery/docs/spark-procedures)
   on BigQuery to register the table in BigLake Metastore and query the tables from BigQuery.
 

@@ -11,12 +11,12 @@ This document walks through the steps to register a Onetable synced table on Hiv
 ## Pre-requisites
 1. Source table(s) (Hudi/Delta/Iceberg) already written to your local storage or external storage locations like S3/GCS. 
    If you don't have the source table written in place already,
-   you can follow the steps in [this](https://link-to-how-to/create-dataset.md) tutorial to set it up.
+   you can follow the steps in [this](https://onetable.dev/docs/how-to#create-dataset) tutorial to set it up.
 2. A compute instance where you can run Apache Spark. This can be your local machine, docker,
    or a distributed system like Amazon EMR, Cloud Dataproc etc.
    This is a required step to register the table in HMS using a Spark client.
 3. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the
-   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://link/to/installation/page) 
+   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://onetable.dev/docs/setup) 
 4. This guide also assumes that you have configured the Hive Metastore locally or on EMR/Cloud Dataproc
    and is already running.
 
@@ -93,7 +93,7 @@ java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar -datasetConfig m
 ```
 
 :::tip Note:
-At this point, if you check your bucket path, you will be able to see `.hoodie`, `_delta_log`, `metadata` directory with
+At this point, if you check your bucket path, you will be able to see `.hoodie`/`_delta_log`/`metadata` directory with
 relevant metadata files that helps query engines to interpret the data as a Hudi/Delta/Iceberg table.
 :::
 
@@ -111,12 +111,9 @@ values={[
 >
 <TabItem value="hudi">
 
-```shell md title="shell"
-spark-sql --packages org.apache.hudi:hudi-spark3.2-bundle_2.12:0.14.0 \
---conf "spark.serializer=org.apache.spark.serializer.KryoSerializer" \
---conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.hudi.catalog.HoodieCatalog" \
---conf "spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension"
-```
+A Hudi table can directly be synced to the Hive Metastore using Hive Sync Tool 
+and subsequently be queried by different query engines. For more information on the Hive Sync Tool, check 
+[Hudi Hive Metastore](https://hudi.apache.org/docs/syncing_metastore) docs.
 
 </TabItem>
 <TabItem value="delta">
@@ -134,10 +131,10 @@ spark-sql --packages io.delta:delta-core_2.12:2.0.0 \
 ```shell md title="shell"
 spark-sql --packages org.apache.iceberg:iceberg-spark-runtime-3.2_2.12:1.2.1 \
 --conf "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions" \
+--conf "spark.sql.catalog.spark_catalog=org.apache.iceberg.spark.SparkSessionCatalog" \
+--conf "spark.sql.catalog.spark_catalog.type=hive" \
 --conf "spark.sql.catalog.hive_prod=org.apache.iceberg.spark.SparkCatalog" \
---conf "spark.sql.catalog.hive_prod.type=hive" \
---conf "spark.sql.catalog.hive_prod.uri=thrift://localhost:9083" \
---conf "spark.sql.defaultCatalog=hive_prod"
+--conf "spark.sql.catalog.hive_prod.type=hive"
 ```
 
 </TabItem>
@@ -150,8 +147,6 @@ your spark session will need additional configurations
 * For Google Cloud Storage, follow the configurations specified [here](https://docs.delta.io/latest/delta-storage.html#requirements-gcs)
 :::
 
-In the `spark-sql` shell, you need to create a schema and table like below.
-
 <Tabs
 groupId="table-format"
 defaultValue="hudi"
@@ -163,10 +158,17 @@ values={[
 >
 <TabItem value="hudi">
 
-```sql md title="sql"
-CREATE SCHEMA hudi_db;
+```shell md title="shell"
+cd $HUDI_HOME/hudi-sync/hudi-hive-sync
 
-CREATE TABLE hudi_db.<table_name> USING HUDI LOCATION '/path/to/synced/hudi/table';
+./run_sync_tool.sh  \
+--jdbc-url <jdbc_url> \
+--user <username> \
+--pass <password> \
+--partitioned-by <partition_field> \
+--base-path <'/path/to/synced/hudi/table'> \
+--database <database_name> \
+--table <tableName>
 ```
 
 :::tip Note:
@@ -179,11 +181,13 @@ using query engines like `Presto` and/or `Trino`. Check out the guides for query
 [Presto](https://link/to/presto) or [Trino](https://link/to/trino) query engines for more information.
 
 ```sql md title="sql"
-SELECT * FROM hudi_db.<table_name>;
+SELECT * FROM <database_name>.<table_name>;
 ```
 
 </TabItem>
 <TabItem value="delta">
+
+In the `spark-sql` shell, you need to create a schema and table like below.
 
 ```sql md title="sql"
 CREATE SCHEMA delta_db;
@@ -207,20 +211,27 @@ SELECT * FROM delta_db.<table_name>;
 </TabItem>
 <TabItem value="iceberg">
 
+In the `spark-sql` shell, you need to create a schema and table like below.
+
 ```sql md title="sql"
 CREATE SCHEMA iceberg_db;
 
-CREATE TABLE iceberg_db.<table_name> USING ICEBERG LOCATION '/path/to/synced/iceberg/table';
+CALL hive_prod.system.register_table(
+   table => 'hive_prod.iceberg_db.<table_name>',
+   metadata_file => '/path/to/synced/iceberg/table/metadata/*.metadata.json'
+);
+
 ```
 
 :::tip Note:
 Replace the dataset path while creating a dataframe to appropriate data path if you have your table
-in S3/GCS i.e. `s3://path/to/synced/iceberg/table` or `gs://path/to/synced/iceberg/table`.
+in S3/GCS i.e. `s3://path/to/synced/iceberg/table` or `gs://path/to/synced/iceberg/table` and `*.metadata.json` 
+with the appropriate metadata file.
 :::
 
 Now you will be able to query the created table directly as an Iceberg table from the same `spark` session or
 using query engines like `Presto` and/or `Trino`. Check out the guides for querying the Onetable synced tables on 
-[Presto](https://link/to/presto) or [Trino](https://link/to/trino) query engines for more information.
+[Presto](https://onetable.dev/docs/presto) or [Trino](https://onetable.dev/docs/trino) query engines for more information.
 
 ```sql md title="sql"
 SELECT * FROM iceberg_db.<table_name>;

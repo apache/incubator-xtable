@@ -11,14 +11,14 @@ This document walks through the steps to register a Onetable synced table in Glu
 ## Pre-requisites
 1. Source table(s) (Hudi/Delta/Iceberg) already written to Amazon S3.
    If you don't have the source table written in S3 already,
-   you can follow the steps in [this](https://link-to-how-to/create-dataset.md) tutorial to set it up
+   you can follow the steps in [this](https://onetable.dev/docs/biglake-metastore) tutorial to set it up
 2. Setup access to interact with AWS APIs from the command line.
    If you haven’t installed AWSCLIv2, you do so by following the steps outlined in
    [AWS docs](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and
    also set up access credentials by following the steps
    [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html)
 3. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the
-   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://link/to/installation/page)
+   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://onetable.dev/docs/setup)
 
 ## Steps
 ### Running sync

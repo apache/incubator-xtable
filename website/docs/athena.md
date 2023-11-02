@@ -12,4 +12,4 @@ you can create the table either by:
 * Or maintain the tables in Glue Data Catalog
 
 For an end to end tutorial that walks through S3, Glue Data Catalog and Athena to query a Onetable synced table,
-you can refer to the Onetable [Glue Data Catalog guide](https://link/to/glue/guide).
+you can refer to the Onetable [Glue Data Catalog guide](https://onetable.dev/docs/glue-catalog).

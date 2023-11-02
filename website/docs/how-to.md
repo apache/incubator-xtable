@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 :::danger Important
 Using Onetable to sync your source tables in different target format involves running sync on your 
 current dataset using a bundled jar. You can create this bundled jar by following the instructions 
-on the [Installation page](https://link/to/installation/page). Read through Onetable's 
+on the [Installation page](https://onetable.dev/docs/setup). Read through Onetable's 
 [github page](https://github.com/onetable-io/onetable#building-the-project-and-running-tests) for more information.
 :::
 
@@ -23,7 +23,7 @@ history to enable proper point in time queries.
 1. A compute instance where you can run Apache Spark. This can be your local machine, docker,
    or a distributed service like Amazon EMR, Cloud Dataproc etc
 2. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the
-   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://link/to/installation/page)
+   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://onetable.dev/docs/setup)
 3. Optional: Setup access to write to and/or read from distributed storage services like:
    * Amazon S3 by following the steps 
    [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) to install AWSCLIv2 
@@ -363,5 +363,5 @@ In this tutorial, we saw how to create a source table and use Onetable to create
 that can be used to query the source table in different target table formats.
 
 ## Next steps
-Go through the [Catalog Integration guides](https://link-to-guide) to registere the Onetable synced tables
+Go through the [Catalog Integration guides](https://onetable.dev/docs/catalogs-index) to register the Onetable synced tables
 in different data catalogs.

@@ -11,7 +11,7 @@ This document walks through the steps to register a Onetable synced Iceberg tabl
 ## Pre-requisites
 1. Source (Hudi/Delta) table(s) already written to Google Cloud Storage.
    If you don't have the source table written in GCS,
-   you can follow the steps in [this](https://link-to-how-to/create/dataset.md) tutorial to set it up.
+   you can follow the steps in [this](https://onetable.dev/docs/how-to#create-dataset) tutorial to set it up.
 2. To ensure that the BigLake API's caller (your service account used by Onetable) has the
    necessary permissions to create a BigLake table, ask your administrator to grant [BigLake Admin](https://cloud.google.com/iam/docs/understanding-roles#biglake.admin) (roles/bigquery.admin)
    access to the service account.
@@ -24,7 +24,7 @@ This document walks through the steps to register a Onetable synced Iceberg tabl
    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service_account_key.json
    ```
 5. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the
-   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://link/to/installation/page)
+   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://onetable.dev/docs/setup)
 
 ## Steps
 :::danger Important:

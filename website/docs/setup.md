@@ -24,5 +24,5 @@ mvn clean install
 For more information on the steps, follow the project's github [README.md](https://github.com/onetable-io/onetable/blob/main/README.md) 
 
 ## Next Steps
-See the [Quickstart](https://link/to/quickstart) guide to learn to use Onetable to add interoperability between
+See the [Quickstart](https://onetable.dev/docs/how-to) guide to learn to use Onetable to add interoperability between
 different table formats.
