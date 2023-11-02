@@ -19,7 +19,6 @@
 package io.onetable.hudi;
 
 import static io.onetable.GenericTable.getTableName;
-import static io.onetable.ValidationTestHelper.getAllFilePaths;
 import static io.onetable.ValidationTestHelper.validateOneSnapshot;
 import static io.onetable.ValidationTestHelper.validateTableChange;
 import static io.onetable.ValidationTestHelper.validateTableChanges;
@@ -46,7 +45,6 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -151,61 +149,6 @@ public class ITHudiSourceClient {
         allTableChanges.add(tableChange);
       }
       validateTableChanges(allBaseFilePaths, allTableChanges);
-    }
-  }
-
-  // TODO(vamshigv): Highlight during review and remove before merging.
-  @Test
-  @Disabled
-  public void testShowsFailureOfIncrementalSync() {
-    HoodieTableType tableType = HoodieTableType.COPY_ON_WRITE;
-    PartitionConfig partitionConfig = PartitionConfig.of(null, null);
-    String tableName = getTableName();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
-      String commitInstant1 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
-      HudiClient hudiClient =
-          getHudiSourceClient(
-              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
-      OneSnapshot snapshotAfterCommit1 = hudiClient.getCurrentSnapshot();
-      List<String> allActivePaths = getAllFilePaths(snapshotAfterCommit1);
-      assertEquals(1, allActivePaths.size());
-      String activePathAfterCommit1 = allActivePaths.get(0);
-
-      String commitInstant2 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> upsertsForCommit2 =
-          table.generateUpdatesForRecords(insertsForCommit1.subList(30, 40));
-      table.upsertRecordsWithCommitAlreadyStarted(upsertsForCommit2, commitInstant2, true);
-
-      String commitInstant3 = table.startCommit();
-      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit3 = table.generateRecords(100);
-      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit3, commitInstant3, true);
-      table.clean(); // uncommenting this makes test pass.
-
-      InstantsForIncrementalSync instantsForIncrementalSync =
-          InstantsForIncrementalSync.builder()
-              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
-              .build();
-      hudiClient =
-          getHudiSourceClient(
-              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
-
-      CommitsBacklog<HoodieInstant> instantCurrentCommitState =
-          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
-      boolean areFilesRemoved = false;
-      boolean newFileGroupsAdded = false;
-      for (HoodieInstant instant : instantCurrentCommitState.getCommitsToProcess()) {
-        TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
-        areFilesRemoved =
-            areFilesRemoved | checkIfFileIsRemoved(activePathAfterCommit1, tableChange);
-        newFileGroupsAdded =
-            newFileGroupsAdded | checkIfNewFileGroupIsAdded(activePathAfterCommit1, tableChange);
-      }
-      assertTrue(newFileGroupsAdded);
-      assertTrue(areFilesRemoved);
     }
   }
 
