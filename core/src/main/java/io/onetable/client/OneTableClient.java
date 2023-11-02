@@ -37,6 +37,8 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
@@ -62,9 +64,17 @@ import io.onetable.spi.sync.TableFormatSync;
 @Log4j2
 public class OneTableClient {
   private final Configuration conf;
+  private final TableFormatClientFactory tableFormatClientFactory;
 
   public OneTableClient(Configuration conf) {
     this.conf = conf;
+    this.tableFormatClientFactory = TableFormatClientFactory.getInstance();
+  }
+
+  @VisibleForTesting
+  OneTableClient(Configuration conf, TableFormatClientFactory tableFormatClientFactory) {
+    this.conf = conf;
+    this.tableFormatClientFactory = tableFormatClientFactory;
   }
 
   /**
@@ -92,7 +102,7 @@ public class OneTableClient {
                 Collectors.toMap(
                     Function.identity(),
                     tableFormat ->
-                        TableFormatClientFactory.createForFormat(tableFormat, config, conf)));
+                        tableFormatClientFactory.createForFormat(tableFormat, config, conf)));
     Map<TableFormat, TableFormatSync> formatsToSyncIncrementally =
         getFormatsToSyncIncrementally(config, syncClientByFormat, source);
     Map<TableFormat, TableFormatSync> formatsToSyncBySnapshot =
