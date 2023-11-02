@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -213,15 +214,28 @@ public class ITHudiSourceClient {
 
       table.upsertRecords(insertsForCommit1.subList(30, 40), true);
 
-      table.insertRecords(100, true);
+      String commitInstant2 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit2 = table.generateRecords(100);
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit2, commitInstant2, true);
+
       table.clean(); // cleans up file groups from commitInstant1
 
       HudiClient hudiClient =
           getHudiSourceClient(
               CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
+      // commitInstant1 is not safe for incremental sync as cleaner has run after and touched
+      // related files.
       assertFalse(
           hudiClient.isIncrementalSyncSafeFrom(
               HudiInstantUtils.parseFromInstantTime(commitInstant1)));
+      // commitInstant2 is safe for incremental sync as cleaner has no affect on data written in
+      // this commit.
+      assertTrue(
+          hudiClient.isIncrementalSyncSafeFrom(
+              HudiInstantUtils.parseFromInstantTime(commitInstant2)));
+      // commit older by an hour is not present in table, hence not safe for incremental sync.
+      Instant instantAsOfHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
+      assertFalse(hudiClient.isIncrementalSyncSafeFrom(instantAsOfHourAgo));
     }
   }
 
