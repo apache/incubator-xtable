@@ -64,7 +64,7 @@ import io.onetable.utilities.RunSync.TableFormatClients.ClientConfig;
 public class RunSync {
 
   private static final String DATASET_CONFIG_OPTION = "d";
-  private static final String HADOOP_CONFIG_PATH = "hc";
+  private static final String HADOOP_CONFIG_PATH = "p";
   private static final String CLIENTS_CONFIG_PATH = "c";
   private static final String HELP_OPTION = "h";
 
