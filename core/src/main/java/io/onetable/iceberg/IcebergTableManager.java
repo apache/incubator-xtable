@@ -82,6 +82,7 @@ class IcebergTableManager {
                         tableIdentifier,
                         schema,
                         partitionSpec,
+                        basePath,
                         getDefaultMappingProperties(schema)))
             .orElseGet(
                 () ->
