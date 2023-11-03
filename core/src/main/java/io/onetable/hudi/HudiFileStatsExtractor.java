@@ -57,9 +57,6 @@ import io.onetable.model.storage.OneDataFile;
 /** Responsible for Column stats extraction for Hudi. */
 @AllArgsConstructor
 public class HudiFileStatsExtractor {
-  private static final int DECIMAL_WRAPPER_SCALE =
-      ((LogicalTypes.Decimal) DecimalWrapper.SCHEMA$.getField("value").schema().getLogicalType())
-          .getScale();
 
   private static final ParquetUtils UTILS = new ParquetUtils();
   private static final String ARRAY_DOT_FIELD = ".array.";
@@ -198,13 +195,14 @@ public class HudiFileStatsExtractor {
     Comparable<?> minValue = HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMinValue());
     Comparable<?> maxValue = HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMaxValue());
     if (field.getSchema().getDataType() == OneType.DECIMAL) {
+      int decimalScale = (int)field.getSchema().getMetadata().get(OneSchema.MetadataKey.DECIMAL_SCALE);
       minValue =
           minValue instanceof ByteBuffer
-              ? convertBytesToBigDecimal((ByteBuffer) minValue, DECIMAL_WRAPPER_SCALE)
+              ? convertBytesToBigDecimal((ByteBuffer) minValue, decimalScale)
               : minValue;
       maxValue =
           maxValue instanceof ByteBuffer
-              ? convertBytesToBigDecimal((ByteBuffer) maxValue, DECIMAL_WRAPPER_SCALE)
+              ? convertBytesToBigDecimal((ByteBuffer) maxValue, decimalScale)
               : maxValue;
     }
     return getColumnStatFromValues(

@@ -73,6 +73,11 @@
            <scope>compile</scope>
        </dependency>
 
+       <dependency>
+           <groupId>org.apache.parquet</groupId>
+           <artifactId>parquet-avro</artifactId>
+        </dependency>
+
         <!-- AWS Dependencies -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>
