@@ -148,6 +148,10 @@ public class IcebergClient implements TargetClient {
     for (Map.Entry<String, String> stateProperty : metadata.asMap().entrySet()) {
       updateProperties.set(stateProperty.getKey(), stateProperty.getValue());
     }
+    if (!table.properties().containsKey(TableProperties.WRITE_DATA_LOCATION)) {
+      // Required for a consistent write location when writing back to the table as Iceberg
+      updateProperties.set(TableProperties.WRITE_DATA_LOCATION, basePath);
+    }
     if (!Boolean.parseBoolean(
         table
             .properties()
