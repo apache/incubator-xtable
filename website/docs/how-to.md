@@ -8,13 +8,13 @@ import TabItem from '@theme/TabItem';
 # Creating your first interoperable table
 
 :::danger Important
-Using Onetable to sync your source tables in different target format involves running sync on your 
+Using OneTable to sync your source tables in different target format involves running sync on your 
 current dataset using a bundled jar. You can create this bundled jar by following the instructions 
-on the [Installation page](https://onetable.dev/docs/setup). Read through Onetable's 
+on the [Installation page](https://onetable.dev/docs/setup). Read through OneTable's 
 [github page](https://github.com/onetable-io/onetable#building-the-project-and-running-tests) for more information.
 :::
 
-In this tutorial we will look at how to use Onetable to add interoperability between table formats. 
+In this tutorial we will look at how to use OneTable to add interoperability between table formats. 
 For example, you can expose a table ingested with Hudi as an Iceberg and/or Delta Lake table without
 copying or moving the underlying data files used for that table while maintaining a similar commit 
 history to enable proper point in time queries.
@@ -22,7 +22,7 @@ history to enable proper point in time queries.
 ## Pre-requisites
 1. A compute instance where you can run Apache Spark. This can be your local machine, docker,
    or a distributed service like Amazon EMR, Cloud Dataproc etc
-2. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the
+2. Clone the OneTable [repository](https://github.com/onetable-io/onetable) and create the
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://onetable.dev/docs/setup)
 3. Optional: Setup access to write to and/or read from distributed storage services like:
    * Amazon S3 by following the steps 
@@ -32,7 +32,7 @@ history to enable proper point in time queries.
    * Google Cloud Storage by following the steps 
    [here](https://cloud.google.com/iam/docs/keys-create-delete#creating)
 
-For the purpose of this tutorial, we will walk through the steps to using Onetable locally.
+For the purpose of this tutorial, we will walk through the steps to using OneTable locally.
 
 ## Steps
 
@@ -348,7 +348,7 @@ Authentication for GCP requires service account credentials to be exported. i.e.
 `export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service_account_key.json`
 :::
 
-In your terminal under the cloned Onetable directory, run the below command.
+In your terminal under the cloned OneTable directory, run the below command.
 
 ```shell md title="shell"
 java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar -datasetConfig my_config.yaml
@@ -359,9 +359,9 @@ At this point, if you check your local path, you will be able to see the necessa
 commit history, partitions, and column stats that helps query engines to interpret the data in the target table format.
 
 ## Conclusion
-In this tutorial, we saw how to create a source table and use Onetable to create the metadata files 
+In this tutorial, we saw how to create a source table and use OneTable to create the metadata files 
 that can be used to query the source table in different target table formats.
 
 ## Next steps
-Go through the [Catalog Integration guides](https://onetable.dev/docs/catalogs-index) to register the Onetable synced tables
+Go through the [Catalog Integration guides](https://onetable.dev/docs/catalogs-index) to register the OneTable synced tables
 in different data catalogs.

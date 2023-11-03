@@ -6,7 +6,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Hive Metastore
-This document walks through the steps to register a Onetable synced table on Hive Metastore (HMS).
+This document walks through the steps to register a OneTable synced table on Hive Metastore (HMS).
 
 ## Pre-requisites
 1. Source table(s) (Hudi/Delta/Iceberg) already written to your local storage or external storage locations like S3/GCS. 
@@ -15,14 +15,14 @@ This document walks through the steps to register a Onetable synced table on Hiv
 2. A compute instance where you can run Apache Spark. This can be your local machine, docker,
    or a distributed system like Amazon EMR, Cloud Dataproc etc.
    This is a required step to register the table in HMS using a Spark client.
-3. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the
+3. Clone the OneTable [repository](https://github.com/onetable-io/onetable) and create the
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://onetable.dev/docs/setup) 
 4. This guide also assumes that you have configured the Hive Metastore locally or on EMR/Cloud Dataproc
    and is already running.
 
 ## Steps
 ### Running sync
-Create `my_config.yaml` in the cloned Onetable directory.
+Create `my_config.yaml` in the cloned OneTable directory.
 
 <Tabs
 groupId="table-format"
@@ -87,7 +87,7 @@ Replace `file:///path/to/source/data` to appropriate source data path
 if you have your source table in S3/GCS i.e. `s3://path/to/source/data` or `gs://path/to/source/data`.
 :::
 
-From your terminal under the cloned Onetable directory, run the sync process using the below command.
+From your terminal under the cloned OneTable directory, run the sync process using the below command.
 ```shell md title="shell"
 java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar -datasetConfig my_config.yaml
 ```
@@ -98,7 +98,7 @@ relevant metadata files that helps query engines to interpret the data as a Hudi
 :::
 
 ### Register the target table in Hive Metastore 
-Now you need to register the Onetable synced target table in Hive Metastore.  
+Now you need to register the OneTable synced target table in Hive Metastore.  
 
 <Tabs
 groupId="table-format"
@@ -184,7 +184,7 @@ in S3/GCS i.e. `s3://path/to/synced/hudi/table` or `gs://path/to/synced/hudi/tab
 :::
 
 Now you will be able to query the created table directly as a Hudi table from the same `spark` session or
-using query engines like `Presto` and/or `Trino`. Check out the guides for querying the Onetable synced tables on
+using query engines like `Presto` and/or `Trino`. Check out the guides for querying the OneTable synced tables on
 [Presto](https://link/to/presto) or [Trino](https://link/to/trino) query engines for more information.
 
 ```sql md title="sql"
@@ -208,7 +208,7 @@ in S3/GCS i.e. `s3://path/to/synced/delta/table` or `gs://path/to/synced/delta/t
 :::
 
 Now you will be able to query the created table directly as a Delta table from the same `spark` session or
-using query engines like `Presto` and/or `Trino`. Check out the guides for querying the Onetable synced tables on
+using query engines like `Presto` and/or `Trino`. Check out the guides for querying the OneTable synced tables on
 [Presto](https://link/to/presto) or [Trino](https://link/to/trino) query engines for more information.
 
 ```sql md title="sql"
@@ -237,7 +237,7 @@ with the appropriate metadata file.
 :::
 
 Now you will be able to query the created table directly as an Iceberg table from the same `spark` session or
-using query engines like `Presto` and/or `Trino`. Check out the guides for querying the Onetable synced tables on 
+using query engines like `Presto` and/or `Trino`. Check out the guides for querying the OneTable synced tables on 
 [Presto](https://onetable.dev/docs/presto) or [Trino](https://onetable.dev/docs/trino) query engines for more information.
 
 ```sql md title="sql"
@@ -249,6 +249,6 @@ SELECT * FROM iceberg_db.<table_name>;
 
 ## Conclusion
 In this guide we saw how to,
-1. sync a source table to create metadata for the desired target table formats using Onetable
+1. sync a source table to create metadata for the desired target table formats using OneTable
 2. catalog the data in the target table format in Hive Metastore
 3. query the target table using Spark

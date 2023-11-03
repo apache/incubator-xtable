@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 # Presto
 
 Presto allows you to query table formats like Hudi, Delta and Iceberg using connectors. The same setup will
-work for Onetable synced tables as well.
+work for OneTable synced tables as well.
 
 For more information and required configurations refer to:
 * [Hudi Connector](https://prestodb.io/docs/current/connector/hudi.html)
@@ -16,12 +16,12 @@ For more information and required configurations refer to:
 * [Iceberg Connector](https://prestodb.io/docs/current/connector/iceberg.html)
 
 :::danger Delta Lake:
-Currently Onetable generated partition columns i.e. TIMESTAMP (or DATE) based partitions will show `NULL` when
+Currently OneTable generated partition columns i.e. TIMESTAMP (or DATE) based partitions will show `NULL` when
 queried from Presto CLI. Partition columns with STRING type will not have any issues.
 :::
 
 For hands on experimentation, please follow [Creating your first interoperable table](https://onetable.dev/docs/setup) tutorial
-to create Onetable synced tables followed by [Hive Metastore](https://onetable.dev/docs/hms) tutorial to register the target table
+to create OneTable synced tables followed by [Hive Metastore](https://onetable.dev/docs/hms) tutorial to register the target table
 in Hive Metastore. Once done, follow the below high level steps:
 1. If you are working with a self-managed Presto service, from the presto-server directory run `./bin/launcher run`
 2. From the directory where you have installed presto-cli: login to presto-cli by running `./presto-cli`
@@ -39,7 +39,7 @@ values={[
 <TabItem value="hudi">
 
 :::tip Note 
-If you are following the example from [Hive Metastore](https://onetable.dev/docs/hms), you can query the Onetable synced Hudi table 
+If you are following the example from [Hive Metastore](https://onetable.dev/docs/hms), you can query the OneTable synced Hudi table 
 from Presto using the below query.
 ```sql md title="sql"
 SELECT * FROM hudi.hudi_db.<table_name>;
@@ -50,7 +50,7 @@ SELECT * FROM hudi.hudi_db.<table_name>;
 <TabItem value="delta">
 
 :::tip Note
-If you are following the example from [Hive Metastore](https://onetable.dev/docs/hms), you can query the Onetable synced Delta table
+If you are following the example from [Hive Metastore](https://onetable.dev/docs/hms), you can query the OneTable synced Delta table
 from Presto using the below query.
 ```sql md title="sql"
 SELECT * FROM delta.delta_db.<table_name>;
@@ -61,7 +61,7 @@ SELECT * FROM delta.delta_db.<table_name>;
 <TabItem value="iceberg">
 
 :::tip Note
-If you are following the example from [Hive Metastore](https://onetable.dev/docs/hms), you can query the Onetable synced Iceberg table
+If you are following the example from [Hive Metastore](https://onetable.dev/docs/hms), you can query the OneTable synced Iceberg table
 from Presto using the below query.
 ```sql md title="sql"
 SELECT * FROM iceberg.iceberg_db.<table_name>;

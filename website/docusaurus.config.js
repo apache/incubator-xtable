@@ -6,9 +6,9 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Onetable',
+  title: 'OneTable',
 //  tagline: 'Dinosaurs are cool',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/onetable_favicon.png',
 
   // Set the production url of your site here
   url: 'https://onetable.dev',
@@ -63,12 +63,12 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        title: 'Onetable',
+//        title: 'OneTable',
         logo: {
-          alt: 'Onetable Logo',
+          alt: 'OneTable Logo',
           href: 'pathname:///',
           target: '_self',
-          src: 'img/onetable-logo.png',
+          src: 'img/Onetable_dark.png',
         },
         items: [
           {

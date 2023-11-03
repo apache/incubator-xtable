@@ -3,7 +3,7 @@ sidebar_position: 3
 ---
 
 # Unity Catalog
-This document walks through the steps to register a Onetable synced Delta table in Unity Catalog on Databricks.
+This document walks through the steps to register a OneTable synced Delta table in Unity Catalog on Databricks.
 
 ## Pre-requisites
 1. Source table(s) (Hudi/Iceberg) already written to external storage locations like S3/GCS.
@@ -14,12 +14,12 @@ This document walks through the steps to register a Onetable synced Delta table 
    * Follow the steps outlined [here](https://docs.databricks.com/en/storage/gcs.html) for Google Cloud Storage
 3. Create a Unity Catalog metastore in Databricks as outlined [here](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html#create-a-unity-catalog-metastore).
 4. Create an external location in Databricks as outlined [here](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-location.html).
-5. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the
+5. Clone the OneTable [repository](https://github.com/onetable-io/onetable) and create the
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://onetable.dev/docs/setup)
 
 ## Steps
 ### Running sync
-Create `my_config.yaml` in the cloned Onetable directory.
+Create `my_config.yaml` in the cloned OneTable directory.
 
 ```yaml md title="yaml"
 sourceFormat: HUDI|ICEBERG # choose only one
@@ -36,7 +36,7 @@ Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have you
 And replace with appropriate values for `sourceFormat`, and `tableName` fields. 
 :::
 
-From your terminal under the cloned Onetable directory, run the sync process using the below command.
+From your terminal under the cloned OneTable directory, run the sync process using the below command.
 
 ```shell md title="shell"
 java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar -datasetConfig my_config.yaml
@@ -73,6 +73,6 @@ SELECT * FROM onetable.synced_delta_schema.<table_name>;
 
 ## Conclusion
 In this guide we saw how to,
-1. sync a source table to create metadata for the desired target table formats using Onetable
+1. sync a source table to create metadata for the desired target table formats using OneTable
 2. catalog the data in Delta format in Unity Catalog on Databricks
 3. query the Delta table using Databricks SQL editor

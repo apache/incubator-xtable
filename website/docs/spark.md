@@ -6,7 +6,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Apache Spark
-To read a Onetable synced target table (regardless of the table format) in Apache Spark locally or on services like
+To read a OneTable synced target table (regardless of the table format) in Apache Spark locally or on services like
 Amazon EMR or Google's Cloud Data Proc, you do not need additional jars or configs other than what is needed by the
 respective table formats.
 

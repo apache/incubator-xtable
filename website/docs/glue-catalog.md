@@ -6,7 +6,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Glue Data Catalog
-This document walks through the steps to register a Onetable synced table in Glue Data Catalog on AWS.
+This document walks through the steps to register a OneTable synced table in Glue Data Catalog on AWS.
 
 ## Pre-requisites
 1. Source table(s) (Hudi/Delta/Iceberg) already written to Amazon S3.
@@ -17,12 +17,12 @@ This document walks through the steps to register a Onetable synced table in Glu
    [AWS docs](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and
    also set up access credentials by following the steps
    [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html)
-3. Clone the Onetable [repository](https://github.com/onetable-io/onetable) and create the
+3. Clone the OneTable [repository](https://github.com/onetable-io/onetable) and create the
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://onetable.dev/docs/setup)
 
 ## Steps
 ### Running sync
-Create `my_config.yaml` in the cloned Onetable directory.
+Create `my_config.yaml` in the cloned OneTable directory.
 
 <Tabs
 groupId="table-format"
@@ -159,6 +159,6 @@ SELECT * FROM onetable_synced_db.<table_name>;
 
 ## Conclusion
 In this guide we saw how to,
-1. sync a source table to create metadata for the desired target table formats using Onetable
+1. sync a source table to create metadata for the desired target table formats using OneTable
 2. catalog the data in the target table format in Glue Data Catalog
 3. query the target table using Amazon Athena

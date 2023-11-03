@@ -3,7 +3,7 @@ sidebar_position: 2
 ---
 
 # Amazon Redshift Spectrum
-To read a Onetable synced target table (regardless of the table format) in Amazon Redshift,
+To read a OneTable synced target table (regardless of the table format) in Amazon Redshift,
 users have to create an external schema and refer to the external data catalog that contains the table.
 Redshift infers the table's schema and format from the external catalog/database directly.
 For more information on creating external schemas, refer to
@@ -40,7 +40,7 @@ You have two options to create and query Delta tables in Redshift Spectrum:
 1. Follow the steps in
    [this](https://docs.delta.io/latest/redshift-spectrum-integration.html#set-up-a-redshift-spectrum-to-delta-lake-integration-and-query-delta-tables) 
    article to set up a Redshift Spectrum to Delta Lake integration and query Delta tables directly from Amazon S3.
-2. While creating the Glue Crawler to crawl the Onetable synced Delta table, choose the `Create Symlink tables`
+2. While creating the Glue Crawler to crawl the OneTable synced Delta table, choose the `Create Symlink tables`
    option in `Add data source` pop-up window. This will add `_symlink_format_manifest` folder with manifest files in the table
    root path.
 

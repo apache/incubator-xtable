@@ -8,7 +8,7 @@ import TabItem from '@theme/TabItem';
 # Trino
 
 Trino just like Presto allows you to query table formats like Hudi, Delta and Iceberg tables using connectors.
-Users do not need additional configurations to work with Onetable synced tables.
+Users do not need additional configurations to work with OneTable synced tables.
 
 For more information and required configurations refer to:
 * [Hudi Connector](https://trino.io/docs/current/connector/hudi.html)
@@ -16,7 +16,7 @@ For more information and required configurations refer to:
 * [Iceberg Connector](https://trino.io/docs/current/connector/iceberg.html)
 
 For hands on experimentation, please follow [Creating your first interoperable table](https://onetable.dev/docs/how-to#create-dataset)
-to create Onetable synced tables followed by [Hive Metastore](https://onetable.dev/docs/hms) to register the target table
+to create OneTable synced tables followed by [Hive Metastore](https://onetable.dev/docs/hms) to register the target table
 in Hive Metastore. Once done, please follow the below high level steps:
 1. Start the Trino server manually if you are working with a non-managed Trino service:
    from the trino-server directory run `./bin/launcher run`
@@ -35,7 +35,7 @@ values={[
 <TabItem value="hudi">
 
 :::tip Note
-If you are following the example from [Hive Metastore](https://onetable.dev/docs/hms), you can query the Onetable synced Hudi table
+If you are following the example from [Hive Metastore](https://onetable.dev/docs/hms), you can query the OneTable synced Hudi table
 from Trino using the below query.
 ```sql md title="sql"
 SELECT * FROM hudi.hudi_db.<table_name>;
@@ -46,7 +46,7 @@ SELECT * FROM hudi.hudi_db.<table_name>;
 <TabItem value="delta">
 
 :::tip Note
-If you are following the example from [Hive Metastore](https://onetable.dev/docs/hms), you can query the Onetable synced Delta table
+If you are following the example from [Hive Metastore](https://onetable.dev/docs/hms), you can query the OneTable synced Delta table
 from Trino using the below query.
 ```sql md title="sql"
 SELECT * FROM delta.delta_db.<table_name>;
@@ -57,7 +57,7 @@ SELECT * FROM delta.delta_db.<table_name>;
 <TabItem value="iceberg">
 
 :::tip Note
-If you are following the example from [Hive Metastore](https://onetable.dev/docs/hms), you can query the Onetable synced Iceberg table
+If you are following the example from [Hive Metastore](https://onetable.dev/docs/hms), you can query the OneTable synced Iceberg table
 from Trino using the below query.
 ```sql md title="sql"
 SELECT * FROM iceberg.iceberg_db.<table_name>;
