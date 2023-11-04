@@ -70,8 +70,9 @@ public class StubCatalog implements Catalog {
       TableIdentifier identifier,
       Schema schema,
       PartitionSpec spec,
+      String location,
       Map<String, String> properties) {
-    return mockedCatalog.createTable(identifier, schema, spec, properties);
+    return mockedCatalog.createTable(identifier, schema, spec, location, properties);
   }
 
   @Override
