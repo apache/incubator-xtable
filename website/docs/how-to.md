@@ -1,5 +1,6 @@
 ---
 sidebar_position: 1
+title: "Creating your first interoperable table"
 ---
 
 import Tabs from '@theme/Tabs';
@@ -10,8 +11,8 @@ import TabItem from '@theme/TabItem';
 :::danger Important
 Using OneTable to sync your source tables in different target format involves running sync on your 
 current dataset using a bundled jar. You can create this bundled jar by following the instructions 
-on the [Installation page](https://onetable.dev/docs/setup). Read through OneTable's 
-[github page](https://github.com/onetable-io/onetable#building-the-project-and-running-tests) for more information.
+on the [Installation page](/docs/setup). Read through OneTable's 
+[GitHub page](https://github.com/onetable-io/onetable#building-the-project-and-running-tests) for more information.
 :::
 
 In this tutorial we will look at how to use OneTable to add interoperability between table formats. 
@@ -21,9 +22,9 @@ history to enable proper point in time queries.
 
 ## Pre-requisites
 1. A compute instance where you can run Apache Spark. This can be your local machine, docker,
-   or a distributed service like Amazon EMR, Cloud Dataproc etc
+   or a distributed service like Amazon EMR, Google Cloud's Dataproc, Azure HDInsight etc
 2. Clone the OneTable [repository](https://github.com/onetable-io/onetable) and create the
-   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://onetable.dev/docs/setup)
+   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 3. Optional: Setup access to write to and/or read from distributed storage services like:
    * Amazon S3 by following the steps 
    [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) to install AWSCLIv2 
@@ -37,7 +38,7 @@ For the purpose of this tutorial, we will walk through the steps to using OneTab
 ## Steps
 
 ### Initialize a pyspark shell
-:::tip Note:
+:::note Note:
 You can choose to follow this example with `spark-sql` or `spark-shell` as well.
 :::
 
@@ -60,7 +61,6 @@ pyspark \
   --conf "spark.sql.extensions=org.apache.spark.sql.hudi.HoodieSparkSessionExtension"
 ```
 </TabItem>
-
 <TabItem value="delta">
 
 ```shell md title="shell"
@@ -70,7 +70,6 @@ pyspark \
   --conf "spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog"
 ```
 </TabItem>
-
 <TabItem value="iceberg">
 
 ```shell md title="shell"
@@ -82,13 +81,10 @@ pyspark \
 </TabItem>
 </Tabs>
 
-:::tip Note:
-If you instead want to write your table to Amazon S3 or Google Cloud Storage,
-your spark session will need additional configurations
-* For Amazon S3, follow the configurations specified [here](https://hudi.apache.org/docs/s3_hoodie/)
-* For Google Cloud Storage, follow the configurations specified [here](https://hudi.apache.org/docs/gcs_hoodie)
+:::danger Note:
+You may need additional configurations to write to external cloud storage locations like Amazon S3, GCS or ADLS
+when you are working with spark locally. Refer to the respective cloud provider's documentation for more information.
 :::
-
 
 ### Create dataset 
 Write a source table locally.
@@ -281,8 +277,7 @@ datasets:
 </TabItem>
 </Tabs>
 
-**Optional:** If your source table exists in Amazon S3 or Google Cloud Storage, 
-you should use a `yaml` file similar to below.
+**Optional:** If your source table exists in Amazon S3, GCS or ADLS you should use a `yaml` file similar to below.
 
 <Tabs
 groupId="table-format"
@@ -332,7 +327,7 @@ targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: s3://path/to/iceberg-data  # replace this with gs://path/to/icberg_data if your data is in GCS. 
+    tableBasePath: s3://path/to/iceberg-data  # replace this with gs://path/to/iceberg_data if your data is in GCS. 
     tableName: people
     partitionSpec: city:VALUE
 ```
@@ -340,7 +335,7 @@ datasets:
 </TabItem>
 </Tabs>
 
-:::tip Note:
+:::note Note:
 Authentication for AWS is done with `com.amazonaws.auth.DefaultAWSCredentialsProviderChain`. 
 To override this setting, specify a different implementation with the `--awsCredentialsProvider` option.
 
@@ -351,7 +346,7 @@ Authentication for GCP requires service account credentials to be exported. i.e.
 In your terminal under the cloned OneTable directory, run the below command.
 
 ```shell md title="shell"
-java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar -datasetConfig my_config.yaml
+java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
 ```
 
 **Optional:**
@@ -363,5 +358,5 @@ In this tutorial, we saw how to create a source table and use OneTable to create
 that can be used to query the source table in different target table formats.
 
 ## Next steps
-Go through the [Catalog Integration guides](https://onetable.dev/docs/catalogs-index) to register the OneTable synced tables
+Go through the [Catalog Integration guides](/docs/catalogs-index) to register the OneTable synced tables
 in different data catalogs.

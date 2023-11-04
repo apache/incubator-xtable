@@ -1,8 +1,9 @@
 ---
 sidebar_position: 4
+title: "Google BigQuery"
 ---
 
-# Google BigQuery
+# Querying from Google BigQuery
 
 ### Iceberg tables
 To read a OneTable synced [Iceberg table from BigQuery](https://cloud.google.com/bigquery/docs/iceberg-tables),
@@ -21,8 +22,9 @@ OPTIONS (
  )
 ```
 :::danger Note:
-This method requires you to keep the table updated when there are table updates and hence Google
-[does not recommend]((https://cloud.google.com/bigquery/docs/iceberg-tables#create-using-metadata-file)) this approach.
+This method requires you to manually update the latest metadata when there are table updates and hence [Google
+recommends using BigLake Metastore](https://cloud.google.com/bigquery/docs/iceberg-tables#create-using-biglake-metastore)
+for creating Iceberg BigLake tables. Follow the guide on [Syncing to BigLake Metastore](/docs/biglake-metastore) for the steps.
 :::
 
 :::danger Important: For Hudi source format to Iceberg target format use cases
@@ -44,7 +46,7 @@ If you are not planning on using Iceberg, then you do not need to add these to y
 #### [Using BigLake Metastore to create the Iceberg BigLake tables](https://cloud.google.com/bigquery/docs/iceberg-tables#create-using-biglake-metastore):
 You can use two options to register OneTable synced Iceberg tables to BigLake Metastore:
 * To directly register the OneTable synced Iceberg table to BigLake Metastore,
-  follow the [OneTable guide to integrate with BigLake Metastore](https://onetable.dev/docs/biglake-metastore)
+  follow the [OneTable guide to integrate with BigLake Metastore](/docs/biglake-metastore)
 * Use [stored procedures for Spark](https://cloud.google.com/bigquery/docs/spark-procedures)
   on BigQuery to register the table in BigLake Metastore and query the tables from BigQuery.
 

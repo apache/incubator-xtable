@@ -15,7 +15,7 @@ module.exports = {
         {
             type: 'category',
             label: 'Quick Start',
-            collapsed: true,
+            collapsed: false,
             items: [
                 'how-to'
             ],
@@ -23,11 +23,12 @@ module.exports = {
         {
             type: 'category',
             label: 'Integrations',
-            collapsed: true,
+            collapsed: false,
             items: [
                 {
                     type: 'category',
                     label: 'Catalogs',
+                    collapsed: false,
                     link: {
                         type: 'doc',
                         id: 'catalogs-index'
@@ -42,6 +43,7 @@ module.exports = {
                 {
                     type: 'category',
                     label: 'Query Engines',
+                    collapsed: false,
                     link: {
                         type: 'doc',
                         id: 'query-engines-index'
@@ -50,6 +52,7 @@ module.exports = {
                         'athena',
                         'redshift',
                         'spark',
+                        'bigquery',
                         'presto',
                         'snowflake',
                         'trino',

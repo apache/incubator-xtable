@@ -1,8 +1,9 @@
 ---
 sidebar_position: 1
+title: "Amazon Athena"
 ---
 
-# Amazon Athena
+# Querying from Amazon Athena
 To read a OneTable synced target table (regardless of the table format) in Amazon Athena,
 you can create the table either by:
 * Using a DDL statement as mentioned in the following AWS docs:
@@ -12,4 +13,4 @@ you can create the table either by:
 * Or maintain the tables in Glue Data Catalog
 
 For an end to end tutorial that walks through S3, Glue Data Catalog and Athena to query a OneTable synced table,
-you can refer to the OneTable [Glue Data Catalog guide](https://onetable.dev/docs/glue-catalog).
+you can refer to the OneTable [Glue Data Catalog Guide](/docs/glue-catalog).

@@ -1,17 +1,18 @@
 ---
 sidebar_position: 4
+title: "BigLake Metastore"
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# BigLake Metastore
+# Syncing to BigLake Metastore
 This document walks through the steps to register a OneTable synced Iceberg table in BigLake Metastore on GCP.
 
 ## Pre-requisites
 1. Source (Hudi/Delta) table(s) already written to Google Cloud Storage.
    If you don't have the source table written in GCS,
-   you can follow the steps in [this](https://onetable.dev/docs/how-to#create-dataset) tutorial to set it up.
+   you can follow the steps in [this](/docs/how-to#create-dataset) tutorial to set it up.
 2. To ensure that the BigLake API's caller (your service account used by OneTable) has the
    necessary permissions to create a BigLake table, ask your administrator to grant [BigLake Admin](https://cloud.google.com/iam/docs/understanding-roles#biglake.admin) (roles/bigquery.admin)
    access to the service account.
@@ -24,7 +25,7 @@ This document walks through the steps to register a OneTable synced Iceberg tabl
    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service_account_key.json
    ```
 5. Clone the OneTable [repository](https://github.com/onetable-io/onetable) and create the
-   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://onetable.dev/docs/setup)
+   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 
 ## Steps
 :::danger Important:
@@ -73,7 +74,7 @@ Then proceed to creating the `utilities-0.1.0-SNAPSHOT-bundled.jar` by following
 [here](https://github.com/onetable-io/onetable#building-the-project-and-running-tests).
 :::
 
-:::tip
+:::tip Note:
 The improvement to let users pass these options through the `my_config.yaml` 
 is being tracked under [this](https://github.com/onetable-io/onetable/issues/107) github issue.
 :::
@@ -118,14 +119,14 @@ datasets:
 </TabItem>
 </Tabs>
 
-:::danger Note:
+:::note Note:
 Replace with appropriate values for `tableBasePath` and `tableName` fields.
 :::
 
 From your terminal under the cloned OneTable directory, run the sync process using the below command.
 
 ```shell md title="shell"
-java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar -datasetConfig my_config.yaml
+java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
 ```
 
 :::tip Note:

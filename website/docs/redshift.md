@@ -1,8 +1,9 @@
 ---
 sidebar_position: 2
+title: "Amazon Redshift Spectrum"
 ---
 
-# Amazon Redshift Spectrum
+# Querying from Redshift Spectrum
 To read a OneTable synced target table (regardless of the table format) in Amazon Redshift,
 users have to create an external schema and refer to the external data catalog that contains the table.
 Redshift infers the table's schema and format from the external catalog/database directly.

@@ -1,21 +1,23 @@
 ---
 sidebar_position: 3
+title: "Unity Catalog"
 ---
 
-# Unity Catalog
+# Syncing to Unity Catalog
 This document walks through the steps to register a OneTable synced Delta table in Unity Catalog on Databricks.
 
 ## Pre-requisites
-1. Source table(s) (Hudi/Iceberg) already written to external storage locations like S3/GCS.
-   If you don't have a source table written in S3/GCS,
-   you can follow the steps in [this](https://onetable.dev/docs/hms) tutorial to set it up.
+1. Source table(s) (Hudi/Iceberg) already written to external storage locations like S3/GCS/ADLS.
+   If you don't have a source table written in S3/GCS/ADLS,
+   you can follow the steps in [this](/docs/hms) tutorial to set it up.
 2. Setup connection to external storage locations from Databricks.
    * Follow the steps outlined [here](https://docs.databricks.com/en/storage/amazon-s3.html) for Amazon S3
    * Follow the steps outlined [here](https://docs.databricks.com/en/storage/gcs.html) for Google Cloud Storage
+   * Follow the steps outlined [here](https://docs.databricks.com/en/storage/azure-storage.html) for Azure Data Lake Storage Gen2 and Blob Storage.
 3. Create a Unity Catalog metastore in Databricks as outlined [here](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html#create-a-unity-catalog-metastore).
 4. Create an external location in Databricks as outlined [here](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-location.html).
 5. Clone the OneTable [repository](https://github.com/onetable-io/onetable) and create the
-   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](https://onetable.dev/docs/setup)
+   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 
 ## Steps
 ### Running sync
@@ -31,15 +33,16 @@ datasets:
     tableName: table_name
     partitionSpec: partitionpath:VALUE
 ```
-:::tip Note:
-Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have your source table in GCS. 
-And replace with appropriate values for `sourceFormat`, and `tableName` fields. 
+:::note Note:
+1. Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have your source table in GCS
+   and `abfss://<container-name>@<storage-account-name>.dfs.core.windows.net/<path-to-data>` if you have your source table in ADLS.
+2. And replace with appropriate values for `sourceFormat`, and `tableName` fields. 
 :::
 
 From your terminal under the cloned OneTable directory, run the sync process using the below command.
 
 ```shell md title="shell"
-java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar -datasetConfig my_config.yaml
+java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
 ```
 
 :::tip Note: 
@@ -59,8 +62,9 @@ CREATE TABLE onetable.synced_delta_schema.<table_name>
 USING DELTA
 LOCATION 's3://path/to/source/data';
 ```
-:::tip Note:
-Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have your source table in GCS.
+:::note Note:
+Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have your source table in GCS
+and `abfss://<container-name>@<storage-account-name>.dfs.core.windows.net/<path-to-data>` if you have your source table in ADLS.
 :::
 
 ### Validating the results
