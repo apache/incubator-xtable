@@ -23,7 +23,12 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 import lombok.Builder;
+import lombok.NonNull;
 import lombok.Value;
+
+import org.apache.hadoop.fs.Path;
+
+import com.google.common.base.Preconditions;
 
 import io.onetable.hudi.HudiSourceConfig;
 import io.onetable.iceberg.IcebergCatalogConfig;
@@ -31,7 +36,6 @@ import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 
 /** Represents input configuration to the sync process. */
-@Builder
 @Value
 public class PerTableConfig {
   /** table base path in local file system or HDFS or object stores like S3, GCS etc. */
@@ -68,13 +72,13 @@ public class PerTableConfig {
    *           the date string as it appears in your file paths
    *     </ul>
    */
-  @Builder.Default HudiSourceConfig hudiSourceConfig = HudiSourceConfig.builder().build();
+  @Nonnull HudiSourceConfig hudiSourceConfig;
 
   /** List of table formats to sync. */
   @Nonnull List<TableFormat> targetTableFormats;
 
   /** Configuration options for integrating with an existing Iceberg Catalog (optional) */
-  @Builder.Default IcebergCatalogConfig icebergCatalogConfig = null;
+  IcebergCatalogConfig icebergCatalogConfig;
 
   /**
    * Mode of a sync. FULL is only supported right now.
@@ -86,11 +90,43 @@ public class PerTableConfig {
    *       and to points in the timeline
    * </ul>
    */
-  @Builder.Default @Nonnull SyncMode syncMode = SyncMode.FULL;
+  @Nonnull SyncMode syncMode;
 
   /**
    * The retention for metadata or versions of the table in the target systems to bound the size of
    * any metadata tracked in the target system. Specified in hours.
    */
-  @Builder.Default int targetMetadataRetentionInHours = 24 * 7;
+  int targetMetadataRetentionInHours;
+
+  @Builder
+  PerTableConfig(
+      @NonNull String tableBasePath,
+      @NonNull String tableName,
+      String[] namespace,
+      HudiSourceConfig hudiSourceConfig,
+      @NonNull List<TableFormat> targetTableFormats,
+      IcebergCatalogConfig icebergCatalogConfig,
+      SyncMode syncMode,
+      Integer targetMetadataRetentionInHours) {
+    // sanitize source path
+    Path path = new Path(tableBasePath);
+    Preconditions.checkArgument(path.isAbsolute(), "Table base path must be absolute");
+    if (path.isAbsoluteAndSchemeAuthorityNull()) {
+      // assume this is local file system and append scheme
+      this.tableBasePath = "file:/" + path;
+    } else {
+      this.tableBasePath = path.toString();
+    }
+    this.tableName = tableName;
+    this.namespace = namespace;
+    this.hudiSourceConfig =
+        hudiSourceConfig == null ? HudiSourceConfig.builder().build() : hudiSourceConfig;
+    Preconditions.checkArgument(
+        targetTableFormats.size() > 0, "At least one target table format must be specified");
+    this.targetTableFormats = targetTableFormats;
+    this.icebergCatalogConfig = icebergCatalogConfig;
+    this.syncMode = syncMode == null ? SyncMode.FULL : syncMode;
+    this.targetMetadataRetentionInHours =
+        targetMetadataRetentionInHours == null ? 24 * 7 : targetMetadataRetentionInHours;
+  }
 }
