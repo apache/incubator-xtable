@@ -49,6 +49,14 @@ class TestPerTableConfig {
             .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
             .build();
     assertEquals("file://local/data/path", localFilePath.getTableBasePath());
+
+    PerTableConfig properLocalFilePath =
+        PerTableConfig.builder()
+            .tableBasePath("file://local/data//path")
+            .tableName("name")
+            .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+            .build();
+    assertEquals("file://local/data/path", properLocalFilePath.getTableBasePath());
   }
 
   @Test
