@@ -109,14 +109,7 @@ public class PerTableConfig {
       SyncMode syncMode,
       Integer targetMetadataRetentionInHours) {
     // sanitize source path
-    Path path = new Path(tableBasePath);
-    Preconditions.checkArgument(path.isAbsolute(), "Table base path must be absolute");
-    if (path.isAbsoluteAndSchemeAuthorityNull()) {
-      // assume this is local file system and append scheme
-      this.tableBasePath = "file:/" + path;
-    } else {
-      this.tableBasePath = path.toString();
-    }
+    this.tableBasePath = sanitizeBasePath(tableBasePath);
     this.tableName = tableName;
     this.namespace = namespace;
     this.hudiSourceConfig =
@@ -128,5 +121,19 @@ public class PerTableConfig {
     this.syncMode = syncMode == null ? SyncMode.FULL : syncMode;
     this.targetMetadataRetentionInHours =
         targetMetadataRetentionInHours == null ? 24 * 7 : targetMetadataRetentionInHours;
+  }
+
+  private String sanitizeBasePath(String tableBasePath) {
+    Path path = new Path(tableBasePath);
+    Preconditions.checkArgument(path.isAbsolute(), "Table base path must be absolute");
+    if (path.isAbsoluteAndSchemeAuthorityNull()) {
+      // assume this is local file system and append scheme
+      return "file://" + path;
+    } else if (path.toUri().getScheme().equals("file")) {
+      // add extra slashes
+      return "file://" + path.toUri().getPath();
+    } else {
+      return path.toString();
+    }
   }
 }
