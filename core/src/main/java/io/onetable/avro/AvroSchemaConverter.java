@@ -192,7 +192,7 @@ public class AvroSchemaConverter {
             .comment(schema.getDoc())
             .dataType(OneType.RECORD)
             .fields(subFields)
-            .isNullable(isNullable(schema))
+            .isNullable(schema.isNullable())
             .build();
       case ARRAY:
         IdMapping elementMapping = fieldNameToIdMapping.get(ELEMENT);
@@ -212,7 +212,7 @@ public class AvroSchemaConverter {
             .name(schema.getName())
             .dataType(OneType.LIST)
             .comment(schema.getDoc())
-            .isNullable(isNullable(schema))
+            .isNullable(schema.isNullable())
             .fields(Collections.singletonList(elementField))
             .build();
       case MAP:
@@ -234,7 +234,7 @@ public class AvroSchemaConverter {
             .name(schema.getName())
             .dataType(OneType.MAP)
             .comment(schema.getDoc())
-            .isNullable(isNullable(schema))
+            .isNullable(schema.isNullable())
             .fields(
                 Arrays.asList(
                     MAP_KEY_FIELD.toBuilder()
@@ -272,21 +272,9 @@ public class AvroSchemaConverter {
         .name(schema.getName())
         .dataType(newDataType)
         .comment(schema.getDoc())
-        .isNullable(isNullable(schema))
+        .isNullable(schema.isNullable())
         .metadata(metadata.isEmpty() ? null : metadata)
         .build();
-  }
-
-  private boolean isNullable(Schema schema) {
-    if (schema.getType() != Schema.Type.UNION) {
-      return schema.getType() == Schema.Type.NULL;
-    }
-    for (Schema innerSchema : schema.getTypes()) {
-      if (isNullable(innerSchema)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private Map<String, IdMapping> getChildIdMap(IdMapping idMapping) {
