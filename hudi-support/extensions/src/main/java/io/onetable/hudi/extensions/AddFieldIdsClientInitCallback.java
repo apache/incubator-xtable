@@ -18,7 +18,7 @@
  
 package io.onetable.hudi.extensions;
 
-import lombok.extern.log4j.Log4j;
+import lombok.extern.slf4j.Slf4j;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
@@ -43,7 +43,7 @@ import io.onetable.hudi.idtracking.IdTracker;
  * the parquet file making them compatible with Iceberg readers that do not support the default
  * field id mapping.
  */
-@Log4j
+@Slf4j
 public class AddFieldIdsClientInitCallback implements HoodieClientInitCallback {
   private final IdTracker idTracker;
 
