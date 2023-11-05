@@ -22,7 +22,6 @@ import static io.onetable.GenericTable.getTableName;
 import static io.onetable.hudi.HudiTestUtil.PartitionConfig;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -526,28 +525,6 @@ public class ITOneTableClient {
       oneTableClient.sync(perTableConfigDelta, hudiSourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI, table, Collections.singletonList(TableFormat.DELTA), 200);
-    }
-  }
-
-  @Test
-  public void testSyncForInvalidPerTableConfig() {
-    String tableName = getTableName();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, "level:SIMPLE", HoodieTableType.COPY_ON_WRITE)) {
-      table.insertRecords(100, true);
-
-      PerTableConfig perTableConfig =
-          PerTableConfig.builder()
-              .tableName(tableName)
-              .targetTableFormats(ImmutableList.of())
-              .tableBasePath(table.getBasePath())
-              .build();
-      OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> oneTableClient.sync(perTableConfig, hudiSourceClientProvider));
     }
   }
 

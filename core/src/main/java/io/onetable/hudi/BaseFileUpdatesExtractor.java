@@ -213,7 +213,7 @@ public class BaseFileUpdatesExtractor {
     String partitionPath =
         partitionPathOptional.orElseGet(() -> getPartitionPath(tableBasePath, path));
     String fileId = getFileId(path);
-    String filePath = file.getPhysicalPath().substring(tableBasePath.toString().length() + 1);
+    String filePath = path.toString().substring(tableBasePath.toString().length() + 1);
     String fileName = path.getName();
     writeStatus.setFileId(fileId);
     writeStatus.setPartitionPath(partitionPath);
