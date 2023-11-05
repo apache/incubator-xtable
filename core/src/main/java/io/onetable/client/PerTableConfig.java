@@ -115,7 +115,7 @@ public class PerTableConfig {
     this.hudiSourceConfig =
         hudiSourceConfig == null ? HudiSourceConfig.builder().build() : hudiSourceConfig;
     Preconditions.checkArgument(
-        targetTableFormats.size() > 0, "At least one target table format must be specified");
+        targetTableFormats.size() > 0, "Please provide at-least one format to sync");
     this.targetTableFormats = targetTableFormats;
     this.icebergCatalogConfig = icebergCatalogConfig;
     this.syncMode = syncMode == null ? SyncMode.FULL : syncMode;

@@ -101,13 +101,15 @@ class TestPerTableConfig {
 
   @Test
   void errorIfNoTargetsSet() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            PerTableConfig.builder()
-                .tableName("name")
-                .tableBasePath("file://bucket/path")
-                .targetTableFormats(Collections.emptyList())
-                .build());
+    Exception thrownException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PerTableConfig.builder()
+                    .tableName("name")
+                    .tableBasePath("file://bucket/path")
+                    .targetTableFormats(Collections.emptyList())
+                    .build());
+    assertEquals("Please provide at-least one format to sync", thrownException.getMessage());
   }
 }
