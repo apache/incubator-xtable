@@ -25,19 +25,28 @@ import org.apache.hadoop.conf.Configuration;
 
 import io.onetable.delta.DeltaClient;
 import io.onetable.exception.NotSupportedException;
+import io.onetable.hudi.HudiTargetClient;
 import io.onetable.iceberg.IcebergClient;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.sync.TableFormatSync;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class TableFormatClientFactory {
-  public static TableFormatSync createForFormat(
+  private static final TableFormatClientFactory INSTANCE = new TableFormatClientFactory();
+
+  public static TableFormatClientFactory getInstance() {
+    return INSTANCE;
+  }
+
+  public TableFormatSync createForFormat(
       TableFormat tableFormat, PerTableConfig perTableConfig, Configuration configuration) {
     switch (tableFormat) {
       case ICEBERG:
         return TableFormatSync.of(new IcebergClient(perTableConfig, configuration));
       case DELTA:
         return TableFormatSync.of(new DeltaClient(perTableConfig, configuration));
+      case HUDI:
+        return TableFormatSync.of(new HudiTargetClient(perTableConfig, configuration));
       default:
         throw new NotSupportedException("Target format is not yet supported: " + tableFormat);
     }

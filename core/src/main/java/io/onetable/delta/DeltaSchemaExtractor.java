@@ -18,6 +18,9 @@
  
 package io.onetable.delta;
 
+import static io.onetable.delta.DeltaPartitionExtractor.DELTA_GENERATION_EXPRESSION;
+import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -122,7 +125,7 @@ public class DeltaSchemaExtractor {
                 .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
         return DataTypes.createMapType(
             convertFieldType(key), convertFieldType(value), value.getSchema().isNullable());
-      case ARRAY:
+      case LIST:
         OneField element =
             field.getSchema().getFields().stream()
                 .filter(
@@ -177,11 +180,16 @@ public class DeltaSchemaExtractor {
         break;
       case "timestamp":
         type = OneType.TIMESTAMP;
+        // Timestamps in Delta are microsecond precision by default
+        metadata =
+            Collections.singletonMap(
+                OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
         break;
       case "struct":
         StructType structType = (StructType) dataType;
         fields =
             Arrays.stream(structType.fields())
+                .filter(field -> !field.metadata().contains(DELTA_GENERATION_EXPRESSION))
                 .map(
                     field -> {
                       Integer fieldId =
@@ -229,7 +237,7 @@ public class DeltaSchemaExtractor {
                 .parentPath(parentPath)
                 .schema(elementSchema)
                 .build();
-        type = OneType.ARRAY;
+        type = OneType.LIST;
         fields = Collections.singletonList(elementField);
         break;
       case "map":
@@ -272,12 +280,5 @@ public class DeltaSchemaExtractor {
         .metadata(metadata)
         .fields(fields)
         .build();
-  }
-
-  private static String getFullyQualifiedPath(String path, String fieldName) {
-    if (path == null || path.isEmpty()) {
-      return fieldName;
-    }
-    return path + "." + fieldName;
   }
 }

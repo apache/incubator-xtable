@@ -55,7 +55,7 @@ public class TableFormatSync {
       return getSyncResult(
           SyncMode.FULL,
           oneTable,
-          client -> client.syncFilesForSnapshot(snapshot.getDataFiles()),
+          client -> client.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
           startTime,
           snapshot.getPendingCommits());
     } catch (Exception e) {
@@ -78,7 +78,7 @@ public class TableFormatSync {
         results.add(
             getSyncResult(
                 SyncMode.INCREMENTAL,
-                change.getCurrentTableState(),
+                change.getTableAsOfChange(),
                 client -> client.syncFilesForDiff(change.getFilesDiff()),
                 startTime,
                 changes.getPendingCommits()));

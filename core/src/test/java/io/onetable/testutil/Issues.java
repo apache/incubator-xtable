@@ -16,26 +16,10 @@
  * limitations under the License.
  */
  
-package io.onetable.model;
+package io.onetable.testutil;
 
-import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
+public class Issues {
 
-import lombok.Builder;
-import lombok.Value;
-
-/**
- * Represents the current state of commits that are ready for immediate processing and syncing,
- * while also tracking pending commits intended for future incremental syncs.
- *
- * <p>'commitsToProcess' captures commits that are should be processed and synced in the current
- * round. 'pendingInstants' tracks instants that are pending at the start of the sync process and
- * should be considered for future incremental syncs.
- */
-@Value
-@Builder
-public class CurrentCommitState<COMMIT> {
-  @Builder.Default List<COMMIT> commitsToProcess = Collections.emptyList();
-  @Builder.Default List<Instant> pendingInstants = Collections.emptyList();
+  /** Refer to <a href="https://github.com/onetable-io/onetable/issues/102">GitHub #102</a> */
+  public static final boolean ISSUE_102_FIXED = false;
 }

@@ -31,22 +31,23 @@ import java.util.stream.Collectors;
 
 import lombok.Builder;
 import lombok.NonNull;
+import lombok.SneakyThrows;
 import lombok.Value;
 
+import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
+import org.apache.hudi.common.util.Option;
 
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
 import io.onetable.exception.OneIOException;
-import io.onetable.model.CurrentCommitState;
-import io.onetable.model.InstantsForIncrementalSync;
-import io.onetable.model.OneSnapshot;
-import io.onetable.model.OneTable;
-import io.onetable.model.TableChange;
+import io.onetable.model.*;
+import io.onetable.model.CommitsBacklog;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.spi.extractor.SourceClient;
 
@@ -99,7 +100,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
     return OneSnapshot.builder()
         .table(table)
         .schemaCatalog(getSchemaCatalog(table, latestCommit))
-        .dataFiles(dataFileExtractor.getFilesCurrentState(table))
+        .partitionedDataFiles(dataFileExtractor.getFilesCurrentState(table))
         .pendingCommits(
             pendingInstants.stream()
                 .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
@@ -116,7 +117,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
             .findInstantsBeforeOrEquals(hoodieInstantForDiff.getTimestamp());
     OneTable table = getTable(hoodieInstantForDiff);
     return TableChange.builder()
-        .currentTableState(table)
+        .tableAsOfChange(table)
         .filesDiff(
             dataFileExtractor.getDiffForCommit(
                 hoodieInstantForDiff, table, hoodieInstantForDiff, visibleTimeline))
@@ -124,7 +125,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public CurrentCommitState<HoodieInstant> getCurrentCommitState(
+  public CommitsBacklog<HoodieInstant> getCommitsBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync) {
     Instant lastSyncInstant = instantsForIncrementalSync.getLastSyncInstant();
     List<Instant> lastPendingInstants = instantsForIncrementalSync.getPendingCommits();
@@ -140,10 +141,36 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         mergeAndDedupLists(
             lastPendingHoodieInstantsCommitsPair.getPendingCommits(),
             commitsPair.getPendingCommits());
-    return CurrentCommitState.<HoodieInstant>builder()
+    return CommitsBacklog.<HoodieInstant>builder()
         .commitsToProcess(commitsToProcessNext)
-        .pendingInstants(pendingInstantsToProcessNext)
+        .inFlightInstants(pendingInstantsToProcessNext)
         .build();
+  }
+
+  @Override
+  public boolean isIncrementalSyncSafeFrom(Instant instant) {
+    return doesCommitExistsAsOfInstant(instant) && !isAffectedByCleanupProcess(instant);
+  }
+
+  private boolean doesCommitExistsAsOfInstant(Instant instant) {
+    HoodieInstant hoodieInstant = getCommitAtInstant(instant);
+    return hoodieInstant != null;
+  }
+
+  @SneakyThrows
+  private boolean isAffectedByCleanupProcess(Instant instant) {
+    Option<HoodieInstant> lastCleanInstant =
+        metaClient.getActiveTimeline().getCleanerTimeline().filterCompletedInstants().lastInstant();
+    if (!lastCleanInstant.isPresent()) {
+      return false;
+    }
+    HoodieCleanMetadata cleanMetadata =
+        TimelineMetadataUtils.deserializeHoodieCleanMetadata(
+            metaClient.getActiveTimeline().getInstantDetails(lastCleanInstant.get()).get());
+    String earliestCommitToRetain = cleanMetadata.getEarliestCommitToRetain();
+    Instant earliestCommitToRetainInstant =
+        HudiInstantUtils.parseFromInstantTime(earliestCommitToRetain);
+    return earliestCommitToRetainInstant.isAfter(instant);
   }
 
   private CommitsPair getCompletedAndPendingCommitsForInstants(List<Instant> lastPendingInstants) {
@@ -200,7 +227,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
     return getCompletedCommits()
         .findInstantsBeforeOrEquals(convertInstantToCommit(instant))
         .lastInstant()
-        .get();
+        .orElse(null);
   }
 
   private List<HoodieInstant> getCommitsForInstants(List<Instant> instants) {

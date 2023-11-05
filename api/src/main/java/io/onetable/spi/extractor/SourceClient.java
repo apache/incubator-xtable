@@ -20,11 +20,8 @@ package io.onetable.spi.extractor;
 
 import java.time.Instant;
 
-import io.onetable.model.CurrentCommitState;
-import io.onetable.model.InstantsForIncrementalSync;
-import io.onetable.model.OneSnapshot;
-import io.onetable.model.OneTable;
-import io.onetable.model.TableChange;
+import io.onetable.model.*;
+import io.onetable.model.CommitsBacklog;
 import io.onetable.model.schema.SchemaCatalog;
 
 /**
@@ -66,12 +63,25 @@ public interface SourceClient<COMMIT> {
   TableChange getTableChangeForCommit(COMMIT commit);
 
   /**
-   * Retrieves {@link CurrentCommitState} to process based on the provided {@link
-   * InstantsForIncrementalSync}.
+   * Retrieves {@link CommitsBacklog}, i.e. commits that have not been processed yet. based on the
+   * provided {@link InstantsForIncrementalSync}.
    *
    * @param instantsForIncrementalSync The input to determine the next commits to process.
-   * @return {@link CurrentCommitState} to process.
+   * @return {@link CommitsBacklog} to process.
    */
-  CurrentCommitState<COMMIT> getCurrentCommitState(
-      InstantsForIncrementalSync instantsForIncrementalSync);
+  CommitsBacklog<COMMIT> getCommitsBacklog(InstantsForIncrementalSync instantsForIncrementalSync);
+
+  /**
+   * Determines whether an incremental sync is safe from a given instant. This method checks for a
+   * couple of things: the existence of a commit at or before the provided instant and whether the
+   * instant has been impacted by any table cleanup operations, (Ex: Cleaner runs in Hudi, Vacuum in
+   * Delta, Expiration of snapshots in Iceberg) It ensures that incremental sync is not used if
+   * there is a risk of data inconsistencies due to missing commits (e.g., those purged from the
+   * metadata) or due to table clean-up processes.
+   *
+   * @param instant the instant to check for incremental sync safety.
+   * @return true if it is safe to proceed with incremental sync from the given instant or otherwise
+   *     false.
+   */
+  boolean isIncrementalSyncSafeFrom(Instant instant);
 }

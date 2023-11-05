@@ -18,12 +18,15 @@
 
 package io.onetable.avro;
 
+import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -207,7 +210,7 @@ public class AvroSchemaConverter {
                 .build();
         return OneSchema.builder()
             .name(schema.getName())
-            .dataType(OneType.ARRAY)
+            .dataType(OneType.LIST)
             .comment(schema.getDoc())
             .isNullable(isNullable(schema))
             .fields(Collections.singletonList(elementField))
@@ -300,14 +303,25 @@ public class AvroSchemaConverter {
         : avroField.defaultVal();
   }
 
-  private static String getFullyQualifiedPath(String path, String fieldName) {
-    if (path == null || path.isEmpty()) {
-      return fieldName;
-    }
-    return path + "." + fieldName;
+  /**
+   * Converts the {@link OneSchema} to Avro {@link Schema}.
+   *
+   * @param oneSchema internal schema representation
+   * @return an Avro schema
+   */
+  public Schema fromOneSchema(OneSchema oneSchema) {
+    return fromOneSchema(oneSchema, null);
   }
 
-  public Schema fromOneSchema(OneSchema oneSchema) {
+  /**
+   * Internal method for converting the {@link OneSchema} to Avro {@link Schema}.
+   *
+   * @param oneSchema internal schema representation
+   * @param currentPath If this schema is nested within another, this will be a dot separated
+   *     string. This is used for the avro namespace to guarantee unique names for nested records.
+   * @return an Avro schema
+   */
+  private Schema fromOneSchema(OneSchema oneSchema, String currentPath) {
     switch (oneSchema.getDataType()) {
       case RECORD:
         List<Schema.Field> fields =
@@ -316,14 +330,17 @@ public class AvroSchemaConverter {
                     field ->
                         new Schema.Field(
                             field.getName(),
-                            fromOneSchema(field.getSchema()),
+                            fromOneSchema(
+                                field.getSchema(),
+                                getFullyQualifiedPath(currentPath, field.getName())),
                             field.getSchema().getComment(),
                             OneField.Constants.NULL_DEFAULT_VALUE == field.getDefaultValue()
                                 ? Schema.Field.NULL_VALUE
                                 : field.getDefaultValue()))
                 .collect(Collectors.toList());
         return finalizeSchema(
-            Schema.createRecord(oneSchema.getName(), oneSchema.getComment(), null, false, fields),
+            Schema.createRecord(
+                oneSchema.getName(), oneSchema.getComment(), currentPath, false, fields),
             oneSchema);
       case BYTES:
         return finalizeSchema(Schema.create(Schema.Type.BYTES), oneSchema);
@@ -373,23 +390,25 @@ public class AvroSchemaConverter {
               LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG)),
               oneSchema);
         }
-      case ARRAY:
-        OneSchema elementSchema =
+      case LIST:
+        OneField elementField =
             oneSchema.getFields().stream()
                 .filter(
                     field -> OneField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(field.getName()))
                 .findFirst()
-                .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"))
-                .getSchema();
-        return finalizeSchema(Schema.createArray(fromOneSchema(elementSchema)), oneSchema);
+                .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
+        return finalizeSchema(
+            Schema.createArray(fromOneSchema(elementField.getSchema(), elementField.getPath())),
+            oneSchema);
       case MAP:
-        OneSchema valueSchema =
+        OneField valueField =
             oneSchema.getFields().stream()
                 .filter(field -> OneField.Constants.MAP_VALUE_FIELD_NAME.equals(field.getName()))
                 .findFirst()
-                .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"))
-                .getSchema();
-        return finalizeSchema(Schema.createMap(fromOneSchema(valueSchema)), oneSchema);
+                .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
+        return finalizeSchema(
+            Schema.createMap(fromOneSchema(valueField.getSchema(), valueField.getPath())),
+            oneSchema);
       case DECIMAL:
         int precision = (int) oneSchema.getMetadata().get(OneSchema.MetadataKey.DECIMAL_PRECISION);
         int scale = (int) oneSchema.getMetadata().get(OneSchema.MetadataKey.DECIMAL_SCALE);
@@ -417,6 +436,12 @@ public class AvroSchemaConverter {
             "Encountered unhandled type during OneSchema to Avro conversion: "
                 + oneSchema.getDataType());
     }
+  }
+
+  private String buildCurrentPath(OneField field, String parentPath) {
+    return Optional.ofNullable(parentPath)
+        .map(path -> path + "." + field.getName())
+        .orElse(field.getName());
   }
 
   private static Schema finalizeSchema(Schema targetSchema, OneSchema inputSchema) {

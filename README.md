@@ -1,11 +1,15 @@
 # onetable
-OneTable is a vision towards standardizing data lake storage integration with data processing systems and query engines.
-By creating a common model for representing tables stored in a data lake, users can now write data in one format and still
-leverage integrations and other features that are present in other formats only. Currently this repo supports converting
-Hudi copy-on-write and read-optimized merge-on-read tables to Delta and Iceberg tables. This gives existing Hudi users
-the ability to work with Databricks's Photon Engine or query Iceberg tables with Snowflake. Creating transformations 
-from one format to other formats just requires implementing few interfaces, so we hope to expand the number of supported
-transformations between source and target formats in the future.
+OneTable is an omni-directional converter for table formats that facilitates interoperability across data processing systems
+and query engines.
+Currently, OneTable supports widely adopted open-source table formats such as Apache Hudi, Apache Iceberg, and Delta Lake.
+
+OneTable simplifies data lake operations by leveraging a common model for table representation.
+This allows users to write data in one format while still benefiting from integrations and features available in other
+formats.
+For instance, OneTable enables existing Hudi users to seamlessly work with Databricks's Photon Engine or query Iceberg
+tables with Snowflake.
+Creating transformations from one format to another is straightforward and only requires the implementation of a few interfaces,
+which we believe will facilitate the expansion of supported source and target formats in the future.
 
 # Building the project and running tests.
 1. Use Java11 for building the project. If you are using some other java version, you can use [jenv](https://github.com/jenv/jenv) to use multiple java versions locally.

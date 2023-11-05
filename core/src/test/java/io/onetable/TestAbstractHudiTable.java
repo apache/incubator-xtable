@@ -18,11 +18,11 @@
  
 package io.onetable;
 
+import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.apache.hudi.keygen.constant.KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -57,10 +57,14 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalFileSystem;
+import org.junit.jupiter.api.Assertions;
 
+import org.apache.hudi.avro.model.HoodieCleanMetadata;
+import org.apache.hudi.client.BaseHoodieWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
+import org.apache.hudi.common.config.HoodieStorageConfig;
 import org.apache.hudi.common.config.LockConfiguration;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.fs.FSUtils;
@@ -76,8 +80,9 @@ import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.model.WriteConcurrencyMode;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.marker.MarkerType;
-import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
+import org.apache.hudi.common.util.JsonUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieArchivalConfig;
@@ -89,15 +94,25 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.KeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
+import org.apache.hudi.keygen.SimpleKeyGenerator;
+import org.apache.hudi.keygen.TimestampBasedKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
+import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
-public abstract class TestAbstractHudiTable implements Closeable {
+import com.google.common.base.Preconditions;
+
+public abstract class TestAbstractHudiTable
+    implements GenericTable<HoodieRecord<HoodieAvroPayload>, String> {
+
+  static {
+    // ensure json modules are registered before any json serialization/deserialization
+    JsonUtils.registerModules();
+  }
+
   protected static final String RECORD_KEY_FIELD_NAME = "key";
   protected static final Schema BASIC_SCHEMA;
 
   private static final Random RANDOM = new Random();
-  // A list of values for the level field which serves as a basic field to partition on for tests
-  private static final List<String> LEVEL_VALUES = Arrays.asList("INFO", "WARN", "ERROR");
 
   static {
     try (InputStream schemaStream =
@@ -119,7 +134,7 @@ public abstract class TestAbstractHudiTable implements Closeable {
   protected Schema schema;
   protected List<String> partitionFieldNames;
 
-  public TestAbstractHudiTable(String name, Schema schema, Path tempDir, String partitionConfig) {
+  TestAbstractHudiTable(String name, Schema schema, Path tempDir, String partitionConfig) {
     try {
       this.tableName = name;
       this.schema = schema;
@@ -132,10 +147,31 @@ public abstract class TestAbstractHudiTable implements Closeable {
         this.keyGenerator = new NonpartitionedKeyGenerator(typedProperties);
         this.partitionFieldNames = Collections.emptyList();
       } else {
-        typedProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
-        this.keyGenerator = new CustomKeyGenerator(typedProperties);
+        if (partitionConfig.contains("timestamp")) {
+          typedProperties.put("hoodie.keygen.timebased.timestamp.type", "SCALAR");
+          typedProperties.put("hoodie.keygen.timebased.timestamp.scalar.time.unit", "MICROSECONDS");
+          typedProperties.put("hoodie.keygen.timebased.output.dateformat", "yyyy/MM/dd");
+          typedProperties.put("hoodie.keygen.timebased.input.timezone", "UTC");
+          typedProperties.put("hoodie.keygen.timebased.output.timezone", "UTC");
+        }
+        String[] partitionFieldConfigs = partitionConfig.split(",");
+        if (partitionFieldConfigs.length == 1 && !partitionFieldConfigs[0].contains(".")) {
+          typedProperties.put(
+              PARTITIONPATH_FIELD_NAME.key(), partitionFieldConfigs[0].split(":")[0]);
+          if (partitionFieldConfigs[0].contains(".")) { // nested field
+            this.keyGenerator = new CustomKeyGenerator(typedProperties);
+          } else if (partitionFieldConfigs[0].contains("SIMPLE")) { // top level field
+            this.keyGenerator = new SimpleKeyGenerator(typedProperties);
+          } else { // top level timestamp field
+            typedProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
+            this.keyGenerator = new TimestampBasedKeyGenerator(typedProperties);
+          }
+        } else {
+          typedProperties.put(PARTITIONPATH_FIELD_NAME.key(), partitionConfig);
+          this.keyGenerator = new CustomKeyGenerator(typedProperties);
+        }
         this.partitionFieldNames =
-            Arrays.stream(partitionConfig.split(","))
+            Arrays.stream(partitionFieldConfigs)
                 .map(config -> config.split(":")[0])
                 .collect(Collectors.toList());
       }
@@ -144,17 +180,10 @@ public abstract class TestAbstractHudiTable implements Closeable {
     }
   }
 
+  protected abstract BaseHoodieWriteClient<?, ?, ?, ?> getWriteClient();
+
   public String getBasePath() {
     return basePath;
-  }
-
-  public HoodieActiveTimeline getActiveTimeline() {
-    metaClient.reloadActiveTimeline();
-    return metaClient.getActiveTimeline();
-  }
-
-  Schema getSchema() {
-    return schema;
   }
 
   protected HoodieRecord<HoodieAvroPayload> getRecord(
@@ -183,6 +212,9 @@ public abstract class TestAbstractHudiTable implements Closeable {
 
   public List<HoodieRecord<HoodieAvroPayload>> generateRecords(
       int numRecords, Object partitionValue) {
+    Preconditions.checkArgument(
+        partitionValue == null || !partitionFieldNames.isEmpty(),
+        "To generate records for a specific partition, table has to be partitioned.");
     Instant currentTime = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<Instant> startTimeWindows =
         Arrays.asList(
@@ -209,7 +241,23 @@ public abstract class TestAbstractHudiTable implements Closeable {
     return inserts;
   }
 
-  public abstract String startCommit();
+  public String startCommit() {
+    return getStartCommitInstant();
+  }
+
+  protected String getStartCommitInstant() {
+    return getWriteClient().startCommit(metaClient.getCommitActionType(), metaClient);
+  }
+
+  protected String getStartCommitOfActionType(String actionType) {
+    return getWriteClient().startCommit(actionType, metaClient);
+  }
+
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecords(
+      boolean checkForNoErrors, List<HoodieRecord<HoodieAvroPayload>> inserts) {
+    String instant = getStartCommitInstant();
+    return insertRecordsWithCommitAlreadyStarted(inserts, instant, checkForNoErrors);
+  }
 
   public abstract List<HoodieRecord<HoodieAvroPayload>> insertRecordsWithCommitAlreadyStarted(
       List<HoodieRecord<HoodieAvroPayload>> inserts,
@@ -221,29 +269,61 @@ public abstract class TestAbstractHudiTable implements Closeable {
       String commitInstant,
       boolean checkForNoErrors);
 
-  public abstract List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
-      List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors);
+  public List<HoodieRecord<HoodieAvroPayload>> upsertRecords(
+      List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors) {
+    String instant = getStartCommitInstant();
+    return upsertRecordsWithCommitAlreadyStarted(records, instant, checkForNoErrors);
+  }
 
   public abstract List<HoodieKey> deleteRecords(
       List<HoodieRecord<HoodieAvroPayload>> records, boolean checkForNoErrors);
 
   public abstract void deletePartition(String partition, HoodieTableType tableType);
 
-  public abstract void compact();
-
-  public abstract String onlyScheduleCompaction();
-
-  public abstract void completeScheduledCompaction(String instant);
-
   public abstract void cluster();
 
-  public abstract void rollback(String commitInstant);
+  public List<String> getAllLatestBaseFilePaths() {
+    HoodieTableFileSystemView fsView =
+        new HoodieMetadataFileSystemView(
+            getWriteClient().getEngineContext(),
+            metaClient,
+            metaClient.reloadActiveTimeline(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig());
+    return getAllLatestBaseFiles(fsView).stream()
+        .map(HoodieBaseFile::getPath)
+        .collect(Collectors.toList());
+  }
 
-  public abstract void savepointRestoreForPreviousInstant();
+  public void compact() {
+    String instant = onlyScheduleCompaction();
+    getWriteClient().compact(instant);
+  }
 
-  public abstract void clean();
+  public String onlyScheduleCompaction() {
+    return getWriteClient().scheduleCompaction(Option.empty()).get();
+  }
 
-  public abstract List<HoodieBaseFile> getAllLatestBaseFiles();
+  public void completeScheduledCompaction(String instant) {
+    getWriteClient().compact(instant);
+  }
+
+  public void clean() {
+    HoodieCleanMetadata metadata = getWriteClient().clean();
+    // Assert that files are deleted to ensure test is realistic
+    Assertions.assertTrue(metadata.getTotalFilesDeleted() > 0);
+  }
+
+  public void rollback(String commitInstant) {
+    getWriteClient().rollback(commitInstant);
+  }
+
+  public void savepointRestoreForPreviousInstant() {
+    List<HoodieInstant> commitInstants =
+        metaClient.getActiveTimeline().reload().getCommitsTimeline().getInstants();
+    HoodieInstant instantToRestore = commitInstants.get(commitInstants.size() - 2);
+    getWriteClient().savepoint(instantToRestore.getTimestamp(), "user", "savepoint-test");
+    getWriteClient().restoreToSavepoint(instantToRestore.getTimestamp());
+  }
 
   public List<HoodieBaseFile> getAllLatestBaseFiles(HoodieTableFileSystemView fsView) {
     try {
@@ -264,7 +344,7 @@ public abstract class TestAbstractHudiTable implements Closeable {
                             status.hasErrors(), "Errors found in write of " + status.getFileId())));
   }
 
-  protected List<HoodieRecord<HoodieAvroPayload>> generateUpdatesForRecords(
+  public List<HoodieRecord<HoodieAvroPayload>> generateUpdatesForRecords(
       List<HoodieRecord<HoodieAvroPayload>> records) {
     Instant startTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
     Instant endTimeWindow = Instant.now().truncatedTo(ChronoUnit.DAYS);
@@ -299,6 +379,8 @@ public abstract class TestAbstractHudiTable implements Closeable {
             .withMaxCommitsBeforeCleaning(1)
             .withAutoClean(false)
             .build();
+    HoodieStorageConfig storageConfig =
+        HoodieStorageConfig.newBuilder().parquetCompressionCodec("UNCOMPRESSED").build();
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
     HoodieMetadataConfig metadataConfig =
@@ -466,6 +548,13 @@ public abstract class TestAbstractHudiTable implements Closeable {
     fs.setVerifyChecksum(true);
     fs.mkdirs(new org.apache.hadoop.fs.Path(basePath));
 
+    if (fs.exists(new org.apache.hadoop.fs.Path(basePath + "/.hoodie"))) {
+      return HoodieTableMetaClient.builder()
+          .setConf(conf)
+          .setBasePath(basePath)
+          .setLoadActiveTimelineOnLoad(true)
+          .build();
+    }
     Properties properties =
         HoodieTableMetaClient.withPropertyBuilder()
             .fromProperties(keyGenProperties)
@@ -630,5 +719,42 @@ public abstract class TestAbstractHudiTable implements Closeable {
       record.put(fieldName, value);
     }
     return record;
+  }
+
+  @Override
+  public List<HoodieRecord<HoodieAvroPayload>> insertRows(int numRecords) {
+    List<HoodieRecord<HoodieAvroPayload>> inserts = generateRecords(numRecords);
+    return insertRecords(true, inserts);
+  }
+
+  @Override
+  public void upsertRows(List<HoodieRecord<HoodieAvroPayload>> records) {
+    String instant = getStartCommitInstant();
+    upsertRecordsWithCommitAlreadyStarted(records, instant, true);
+  }
+
+  @Override
+  public List<HoodieRecord<HoodieAvroPayload>> insertRecordsForSpecialPartition(int numRecords) {
+    return insertRecords(numRecords, SPECIAL_PARTITION_VALUE, true);
+  }
+
+  @Override
+  public List<String> getColumnsToSelect() {
+    return schema.getFields().stream().map(Schema.Field::name).collect(Collectors.toList());
+  }
+
+  @Override
+  public void deleteRows(List<HoodieRecord<HoodieAvroPayload>> records) {
+    deleteRecords(records, true);
+  }
+
+  @Override
+  public void reload() {
+    // no-op.
+  }
+
+  @Override
+  public String getOrderByColumn() {
+    return "_hoodie_record_key";
   }
 }

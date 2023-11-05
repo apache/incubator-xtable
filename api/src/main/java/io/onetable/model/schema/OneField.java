@@ -19,38 +19,46 @@
 package io.onetable.model.schema;
 
 import lombok.Builder;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.ToString;
+import lombok.Value;
 
 /**
  * Represents logical information about an entry in the Schema.
  *
  * @since 0.1
  */
-@Getter
+@Value
 @Builder(toBuilder = true)
-@EqualsAndHashCode
-@ToString
 public class OneField {
-  // The name of this field
-  private final String name;
-  // A dot separated path to the parent of this field. Null if this is a top level field.
-  private final String parentPath;
-  private final OneSchema schema;
-  private final Object defaultValue;
-  private final Integer fieldId;
+  private static final String PATH_DELIMITER = "\\.";
 
-  /**
-   * Represents the fully qualified path to the field.
-   *
-   * @return fully qualified path of the field.
-   */
-  public String getPath() {
+  // The name of this field
+  String name;
+  // A dot separated path to the parent of this field. Null if this is a top level field.
+  String parentPath;
+  // Schema for the field
+  OneSchema schema;
+  // Default value for the field
+  Object defaultValue;
+  // The id field for the field. This is used to identify the field in the schema even after
+  // renames.
+  Integer fieldId;
+  // represents the fully qualified path to the field (dot separated)
+  @Getter(lazy = true)
+  String path = createPath();
+  // splits the dot separated path into parts
+  @Getter(lazy = true)
+  String[] pathParts = splitPath();
+
+  private String createPath() {
     if (parentPath == null || parentPath.isEmpty()) {
       return name;
     }
     return parentPath + "." + name;
+  }
+
+  private String[] splitPath() {
+    return getPath().split(PATH_DELIMITER);
   }
 
   public static class Constants {

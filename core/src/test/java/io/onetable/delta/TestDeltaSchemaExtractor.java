@@ -324,6 +324,9 @@ public class TestDeltaSchemaExtractor {
 
   @Test
   public void testTimestamps() {
+    Map<OneSchema.MetadataKey, Object> metadata =
+        Collections.singletonMap(
+            OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
     OneSchema oneSchemaRepresentationTimestamp =
         OneSchema.builder()
             .name("struct")
@@ -338,6 +341,7 @@ public class TestDeltaSchemaExtractor {
                                 .name("timestamp")
                                 .dataType(OneType.TIMESTAMP)
                                 .isNullable(false)
+                                .metadata(metadata)
                                 .build())
                         .build(),
                     OneField.builder()
@@ -347,6 +351,7 @@ public class TestDeltaSchemaExtractor {
                                 .name("timestamp")
                                 .dataType(OneType.TIMESTAMP)
                                 .isNullable(true)
+                                .metadata(metadata)
                                 .build())
                         .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
@@ -610,7 +615,7 @@ public class TestDeltaSchemaExtractor {
                             OneSchema.builder()
                                 .name("array")
                                 .isNullable(false)
-                                .dataType(OneType.ARRAY)
+                                .dataType(OneType.LIST)
                                 .fields(
                                     Collections.singletonList(
                                         OneField.builder()
@@ -631,7 +636,7 @@ public class TestDeltaSchemaExtractor {
                             OneSchema.builder()
                                 .name("array")
                                 .isNullable(true)
-                                .dataType(OneType.ARRAY)
+                                .dataType(OneType.LIST)
                                 .fields(
                                     Collections.singletonList(
                                         OneField.builder()
@@ -848,6 +853,40 @@ public class TestDeltaSchemaExtractor {
                                                     .build())
                                             .build()))
                                 .build())
+                        .build()))
+            .build();
+    Assertions.assertEquals(
+        oneSchemaRepresentation,
+        DeltaSchemaExtractor.getInstance().toOneSchema(structRepresentation));
+  }
+
+  @Test
+  void generateColumnsAreNotTranslatedToInternalSchema() {
+    StructType structRepresentation =
+        new StructType()
+            .add("birthDate", DataTypes.TimestampType, false)
+            .add(
+                "birthYear",
+                DataTypes.TimestampType,
+                true,
+                Metadata.fromJson("{\"delta.generationExpression\":\"YEAR(birthDate)\"}"));
+    OneSchema oneSchemaRepresentation =
+        OneSchema.builder()
+            .dataType(OneType.RECORD)
+            .name("struct")
+            .fields(
+                Collections.singletonList(
+                    OneField.builder()
+                        .schema(
+                            OneSchema.builder()
+                                .name("timestamp")
+                                .dataType(OneType.TIMESTAMP)
+                                .metadata(
+                                    Collections.singletonMap(
+                                        OneSchema.MetadataKey.TIMESTAMP_PRECISION,
+                                        OneSchema.MetadataValue.MICROS))
+                                .build())
+                        .name("birthDate")
                         .build()))
             .build();
     Assertions.assertEquals(

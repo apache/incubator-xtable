@@ -23,7 +23,6 @@ import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Properties;
-import java.util.UUID;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -42,6 +41,7 @@ import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
 import org.apache.hudi.common.model.HoodieDeltaWriteStat;
 import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.config.HoodieArchivalConfig;
@@ -54,14 +54,11 @@ import io.onetable.model.schema.SchemaVersion;
 public class HudiTestUtil {
   static final SchemaVersion SCHEMA_VERSION = new SchemaVersion(1, "");
 
-  public static String getTableName() {
-    return "test-" + UUID.randomUUID();
-  }
-
   @SneakyThrows
   static HoodieTableMetaClient initTableAndGetMetaClient(
       String tableBasePath, String partitionFields) {
     return HoodieTableMetaClient.withPropertyBuilder()
+        .setCommitTimezone(HoodieTimelineTimeZone.UTC)
         .setTableType(HoodieTableType.COPY_ON_WRITE)
         .setTableName("test_table")
         .setPayloadClass(HoodieAvroPayload.class)
@@ -125,17 +122,18 @@ public class HudiTestUtil {
         .set("spark.sql.catalog.default_iceberg", "org.apache.iceberg.spark.SparkCatalog")
         .set("spark.sql.catalog.default_iceberg.type", "hadoop")
         .set("spark.sql.catalog.default_iceberg.warehouse", tempDir.toString())
-        .set("spark.sql.catalog.hadoop_prod", "org.apache.iceberg.spark.SparkCatalog")
-        .set("spark.sql.catalog.hadoop_prod.type", "hadoop")
-        .set("spark.sql.catalog.hadoop_prod.warehouse", tempDir.toString())
         .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
         .set("parquet.avro.write-old-list-structure", "false")
         // Needed for ignoring not nullable constraints on nested columns in Delta.
         .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
-        .set("spark.sql.shuffle.partitions", "4")
-        .set("spark.default.parallelism", "4")
+        .set("spark.sql.shuffle.partitions", "1")
+        .set("spark.default.parallelism", "1")
         .set("spark.sql.session.timeZone", "UTC")
         .set("spark.sql.iceberg.handle-timestamp-without-timezone", "true")
+        .set("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .set("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        .set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
+        .set("spark.databricks.delta.schema.autoMerge.enabled", "true")
         .setMaster("local[4]");
   }
 

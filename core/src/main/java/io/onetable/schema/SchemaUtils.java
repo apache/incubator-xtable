@@ -16,31 +16,17 @@
  * limitations under the License.
  */
  
-package io.onetable.spi;
+package io.onetable.schema;
 
-import io.onetable.model.OneSnapshot;
-import io.onetable.model.OneTable;
-import io.onetable.model.schema.OneSchema;
-import io.onetable.model.schema.SchemaCatalog;
-import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
-/**
- * Visitor to visit the {@link OneDataFile} hierarchy in the Canonical model and perform actions at
- * various levels of the hierarchy. Useful in syncing the partition groups
- *
- * @since 0.1
- */
-public interface OneTableSnapshotVisitor {
-  void visit(OneSnapshot snapshot);
-
-  void visit(OneTable table);
-
-  void visit(SchemaCatalog schemaCatalog);
-
-  void visit(OneDataFiles collection);
-
-  void visit(OneDataFile dataFile);
-
-  void visit(OneSchema tableReadSchema);
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public class SchemaUtils {
+  public static String getFullyQualifiedPath(String path, String fieldName) {
+    if (path == null || path.isEmpty()) {
+      return fieldName;
+    }
+    return path + "." + fieldName;
+  }
 }

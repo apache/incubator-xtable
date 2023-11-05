@@ -21,9 +21,12 @@ package io.onetable.delta;
 import java.time.Instant;
 import java.util.List;
 
-import javax.inject.Singleton;
+import lombok.Builder;
 
+import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.Snapshot;
+
+import scala.Option;
 
 import io.onetable.model.OneTable;
 import io.onetable.model.schema.OnePartitionField;
@@ -32,15 +35,13 @@ import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.TableFormat;
 
 /** Extracts {@link OneTable} canonical representation of a table at a point in time for Delta. */
-@Singleton
+@Builder
 public class DeltaTableExtractor {
-  private final DeltaSchemaExtractor schemaExtractor;
+  @Builder.Default
+  private static final DeltaSchemaExtractor schemaExtractor = DeltaSchemaExtractor.getInstance();
 
-  public DeltaTableExtractor() {
-    this.schemaExtractor = DeltaSchemaExtractor.getInstance();
-  }
-
-  public OneTable table(String tableName, Snapshot snapshot) {
+  public OneTable table(DeltaLog deltaLog, String tableName, Long version) {
+    Snapshot snapshot = deltaLog.getSnapshotAt(version, Option.empty(), Option.empty());
     OneSchema schema = schemaExtractor.toOneSchema(snapshot.metadata().schema());
     List<OnePartitionField> partitionFields =
         DeltaPartitionExtractor.getInstance()

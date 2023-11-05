@@ -18,7 +18,8 @@
  
 package io.onetable.delta;
 
-import static io.onetable.delta.DeltaValueSerializer.getFormattedValueForPartition;
+import static io.onetable.delta.DeltaValueConverter.convertFromDeltaPartitionValue;
+import static io.onetable.delta.DeltaValueConverter.convertToDeltaPartitionValue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -43,6 +45,8 @@ import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
+import scala.collection.JavaConverters;
+
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
@@ -57,7 +61,7 @@ import io.onetable.schema.SchemaFieldFinder;
 /**
  * DeltaPartitionExtractor handles extracting partition columns, also creating generated columns in
  * the certain cases. It is also responsible for PartitionValue Serialization leveraging {@link
- * DeltaValueSerializer}.
+ * DeltaValueConverter}.
  */
 @Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -73,7 +77,7 @@ public class DeltaPartitionExtractor {
   // For timestamp partition fields, actual partition column names in delta format will be of type
   // generated & and with a name like `delta_partition_col_{transform_type}_{source_field_name}`.
   private static final String DELTA_PARTITION_COL_NAME_FORMAT = "onetable_partition_col_%s_%s";
-  private static final String DELTA_GENERATION_EXPRESSION = "delta.generationExpression";
+  static final String DELTA_GENERATION_EXPRESSION = "delta.generationExpression";
   private static final List<ParsedGeneratedExpr.GeneratedExprType> GRANULARITIES =
       Arrays.asList(
           ParsedGeneratedExpr.GeneratedExprType.YEAR,
@@ -131,13 +135,18 @@ public class DeltaPartitionExtractor {
         // if it starts with year we should consume until we hit field with no generated expression
         // or we hit a field with generated expression that is of cast or date format.
         String expr = currPartitionField.metadata().getString(DELTA_GENERATION_EXPRESSION);
-        ParsedGeneratedExpr parsedGeneratedExpr = ParsedGeneratedExpr.buildFromString(expr);
+        ParsedGeneratedExpr parsedGeneratedExpr =
+            ParsedGeneratedExpr.buildFromString(currPartitionField.name(), expr);
         if (ParsedGeneratedExpr.GeneratedExprType.CAST == parsedGeneratedExpr.generatedExprType) {
-          partitionFields.add(getPartitionWithDateTransform(parsedGeneratedExpr, oneSchema));
+          partitionFields.add(
+              getPartitionWithDateTransform(
+                  currPartitionField.name(), parsedGeneratedExpr, oneSchema));
           itr.next(); // consume the field.
         } else if (ParsedGeneratedExpr.GeneratedExprType.DATE_FORMAT
             == parsedGeneratedExpr.generatedExprType) {
-          partitionFields.add(getPartitionWithDateFormatTransform(parsedGeneratedExpr, oneSchema));
+          partitionFields.add(
+              getPartitionWithDateFormatTransform(
+                  currPartitionField.name(), parsedGeneratedExpr, oneSchema));
           itr.next(); // consume the field.
         } else {
           // consume until we hit field with no generated expression or genearated expression
@@ -146,7 +155,8 @@ public class DeltaPartitionExtractor {
           while (itr.hasNext()
               && currPartitionField.metadata().contains(DELTA_GENERATION_EXPRESSION)) {
             expr = currPartitionField.metadata().getString(DELTA_GENERATION_EXPRESSION);
-            parsedGeneratedExpr = ParsedGeneratedExpr.buildFromString(expr);
+            parsedGeneratedExpr =
+                ParsedGeneratedExpr.buildFromString(currPartitionField.name(), expr);
 
             if (ParsedGeneratedExpr.GeneratedExprType.CAST == parsedGeneratedExpr.generatedExprType
                 || ParsedGeneratedExpr.GeneratedExprType.DATE_FORMAT
@@ -176,9 +186,14 @@ public class DeltaPartitionExtractor {
         parsedGeneratedExprs, new HashSet<>(GRANULARITIES.subList(0, parsedGeneratedExprs.size())));
 
     ParsedGeneratedExpr transform = parsedGeneratedExprs.get(0);
+    List<String> partitionColumns =
+        parsedGeneratedExprs.stream()
+            .map(parsedGeneratedExpr -> parsedGeneratedExpr.partitionColumnName)
+            .collect(Collectors.toList());
     return OnePartitionField.builder()
         .sourceField(
             SchemaFieldFinder.getInstance().findFieldByPath(oneSchema, transform.sourceColumn))
+        .partitionFieldNames(partitionColumns)
         .transformType(
             parsedGeneratedExprs.get(parsedGeneratedExprs.size() - 1)
                 .internalPartitionTransformType)
@@ -187,21 +202,23 @@ public class DeltaPartitionExtractor {
 
   // Cast has default format of yyyy-MM-dd.
   private OnePartitionField getPartitionWithDateTransform(
-      ParsedGeneratedExpr parsedGeneratedExpr, OneSchema oneSchema) {
+      String partitionColumnName, ParsedGeneratedExpr parsedGeneratedExpr, OneSchema oneSchema) {
     return OnePartitionField.builder()
         .sourceField(
             SchemaFieldFinder.getInstance()
                 .findFieldByPath(oneSchema, parsedGeneratedExpr.sourceColumn))
+        .partitionFieldNames(Collections.singletonList(partitionColumnName))
         .transformType(PartitionTransformType.DAY)
         .build();
   }
 
   private OnePartitionField getPartitionWithDateFormatTransform(
-      ParsedGeneratedExpr parsedGeneratedExpr, OneSchema oneSchema) {
+      String partitionColumnName, ParsedGeneratedExpr parsedGeneratedExpr, OneSchema oneSchema) {
     return OnePartitionField.builder()
         .sourceField(
             SchemaFieldFinder.getInstance()
                 .findFieldByPath(oneSchema, parsedGeneratedExpr.sourceColumn))
+        .partitionFieldNames(Collections.singletonList(partitionColumnName))
         .transformType(parsedGeneratedExpr.internalPartitionTransformType)
         .build();
   }
@@ -239,7 +256,7 @@ public class DeltaPartitionExtractor {
       String partitionValueSerialized;
       if (transformType == PartitionTransformType.VALUE) {
         partitionValueSerialized =
-            getFormattedValueForPartition(
+            convertToDeltaPartitionValue(
                 e.getValue().getMaxValue(),
                 e.getKey().getSourceField().getSchema().getDataType(),
                 transformType,
@@ -249,7 +266,7 @@ public class DeltaPartitionExtractor {
       } else {
         // use appropriate date formatter for value serialization.
         partitionValueSerialized =
-            getFormattedValueForPartition(
+            convertToDeltaPartitionValue(
                 e.getValue().getMaxValue(),
                 e.getKey().getSourceField().getSchema().getDataType(),
                 transformType,
@@ -258,6 +275,45 @@ public class DeltaPartitionExtractor {
       }
     }
     return partitionValuesSerialized;
+  }
+
+  public Map<OnePartitionField, Range> partitionValueExtraction(
+      scala.collection.Map<String, String> values, List<OnePartitionField> partitionFields) {
+    return partitionFields.stream()
+        .collect(
+            Collectors.toMap(
+                Function.identity(),
+                partitionField -> {
+                  PartitionTransformType partitionTransformType = partitionField.getTransformType();
+                  String dateFormat =
+                      partitionTransformType.isTimeBased()
+                          ? getDateFormat(partitionTransformType)
+                          : null;
+                  String serializedValue =
+                      getSerializedPartitionValue(convertScalaMapToJavaMap(values), partitionField);
+                  Object partitionValue =
+                      convertFromDeltaPartitionValue(
+                          serializedValue,
+                          partitionField.getSourceField().getSchema().getDataType(),
+                          partitionField.getTransformType(),
+                          dateFormat);
+                  return Range.scalar(partitionValue);
+                }));
+  }
+
+  private String getSerializedPartitionValue(
+      Map<String, String> values, OnePartitionField partitionField) {
+    if (partitionField.getPartitionFieldNames() == null
+        || partitionField.getPartitionFieldNames().isEmpty()) {
+      return values.getOrDefault(partitionField.getSourceField().getName(), null);
+    }
+    List<String> partitionFieldNames = partitionField.getPartitionFieldNames();
+    if (partitionFieldNames.size() == 1) {
+      return values.getOrDefault(partitionFieldNames.get(0), null);
+    }
+    return partitionFieldNames.stream()
+        .map(name -> values.get(name))
+        .collect(Collectors.joining("-"));
   }
 
   private String getGeneratedColumnName(OnePartitionField onePartitionField) {
@@ -345,6 +401,11 @@ public class DeltaPartitionExtractor {
     }
   }
 
+  private Map<String, String> convertScalaMapToJavaMap(
+      scala.collection.Map<String, String> scalaMap) {
+    return JavaConverters.mapAsJavaMapConverter(scalaMap).asJava();
+  }
+
   @Builder
   static class ParsedGeneratedExpr {
     private static final Pattern YEAR_PATTERN = Pattern.compile("YEAR\\(([^)]+)\\)");
@@ -363,37 +424,43 @@ public class DeltaPartitionExtractor {
     }
 
     String sourceColumn;
+    String partitionColumnName;
     GeneratedExprType generatedExprType;
     PartitionTransformType internalPartitionTransformType;
 
-    private static ParsedGeneratedExpr buildFromString(String expr) {
+    private static ParsedGeneratedExpr buildFromString(String partitionColumnName, String expr) {
       if (expr.contains("YEAR")) {
         return ParsedGeneratedExpr.builder()
             .generatedExprType(GeneratedExprType.YEAR)
+            .partitionColumnName(partitionColumnName)
             .sourceColumn(extractColumnName(expr, YEAR_PATTERN))
             .internalPartitionTransformType(PartitionTransformType.YEAR)
             .build();
       } else if (expr.contains("MONTH")) {
         return ParsedGeneratedExpr.builder()
             .generatedExprType(GeneratedExprType.MONTH)
+            .partitionColumnName(partitionColumnName)
             .sourceColumn(extractColumnName(expr, MONTH_PATTERN))
             .internalPartitionTransformType(PartitionTransformType.MONTH)
             .build();
       } else if (expr.contains("DAY")) {
         return ParsedGeneratedExpr.builder()
             .generatedExprType(GeneratedExprType.DAY)
+            .partitionColumnName(partitionColumnName)
             .sourceColumn(extractColumnName(expr, DAY_PATTERN))
             .internalPartitionTransformType(PartitionTransformType.DAY)
             .build();
       } else if (expr.contains("HOUR")) {
         return ParsedGeneratedExpr.builder()
             .generatedExprType(GeneratedExprType.HOUR)
+            .partitionColumnName(partitionColumnName)
             .sourceColumn(extractColumnName(expr, HOUR_PATTERN))
             .internalPartitionTransformType(PartitionTransformType.HOUR)
             .build();
       } else if (expr.contains("CAST")) {
         return ParsedGeneratedExpr.builder()
             .generatedExprType(GeneratedExprType.CAST)
+            .partitionColumnName(partitionColumnName)
             .sourceColumn(extractColumnName(expr, CAST_PATTERN))
             .internalPartitionTransformType(PartitionTransformType.DAY)
             .build();
@@ -409,6 +476,7 @@ public class DeltaPartitionExtractor {
               expr.substring(commaPos + 1, lastParenthesisPos).trim().replaceAll("^'|'$", "");
           return ParsedGeneratedExpr.builder()
               .generatedExprType(GeneratedExprType.DATE_FORMAT)
+              .partitionColumnName(partitionColumnName)
               .sourceColumn(expr.substring(firstParenthesisPos + 1, commaPos).trim())
               .internalPartitionTransformType(computeInternalPartitionTransform(dateFormatExpr))
               .build();

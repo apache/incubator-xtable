@@ -27,10 +27,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 
@@ -101,6 +105,9 @@ public class TestHudiTableManager {
         Arrays.asList(metaClient.getTableConfig().getRecordKeyFields().get()));
     assertEquals(tableBasePath, metaClient.getBasePath());
     assertEquals(tableName, metaClient.getTableConfig().getTableName());
+    assertEquals(
+        "org.apache.hudi.keygen.ComplexKeyGenerator",
+        metaClient.getTableConfig().getKeyGeneratorClassName());
   }
 
   @Test
@@ -119,5 +126,63 @@ public class TestHudiTableManager {
   @Test
   void loadTableThatDoesNotExist() {
     assertFalse(tableManager.loadTableMetaClientIfExists(tableBasePath).isPresent());
+  }
+
+  @ParameterizedTest
+  @MethodSource("keyGeneratorTestDataProvider")
+  void testKeyGenerator(
+      List<OnePartitionField> partitionFields,
+      List<OneField> keyFields,
+      String expectedKeyGeneratorClass) {
+    assertEquals(
+        expectedKeyGeneratorClass,
+        HudiTableManager.getKeyGeneratorClass(partitionFields, keyFields));
+  }
+
+  private static Stream<Arguments> keyGeneratorTestDataProvider() {
+    OneField keyField1 = OneField.builder().name("key1").build();
+    OneField keyField2 = OneField.builder().name("key2").build();
+    OneField field1 = OneField.builder().name("field1").build();
+    OnePartitionField field1ValuePartition =
+        OnePartitionField.builder()
+            .sourceField(field1)
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    OnePartitionField field1DatePartition =
+        OnePartitionField.builder()
+            .sourceField(field1)
+            .transformType(PartitionTransformType.YEAR)
+            .build();
+    OneField field2 = OneField.builder().name("field2").build();
+    OnePartitionField field2ValuePartition =
+        OnePartitionField.builder()
+            .sourceField(field2)
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    return Stream.of(
+        Arguments.of(
+            Collections.emptyList(),
+            Collections.singletonList(keyField1),
+            "org.apache.hudi.keygen.NonpartitionedKeyGenerator"),
+        Arguments.of(
+            Collections.singletonList(field1ValuePartition),
+            Arrays.asList(keyField1, keyField2),
+            "org.apache.hudi.keygen.ComplexKeyGenerator"),
+        Arguments.of(
+            Arrays.asList(field1ValuePartition, field2ValuePartition),
+            Collections.singletonList(keyField1),
+            "org.apache.hudi.keygen.ComplexKeyGenerator"),
+        Arguments.of(
+            Collections.singletonList(field1ValuePartition),
+            Collections.singletonList(keyField1),
+            "org.apache.hudi.keygen.SimpleKeyGenerator"),
+        Arguments.of(
+            Collections.singletonList(field1DatePartition),
+            Collections.singletonList(keyField1),
+            "org.apache.hudi.keygen.TimestampBasedKeyGenerator"),
+        Arguments.of(
+            Arrays.asList(field1DatePartition, field2ValuePartition),
+            Collections.singletonList(keyField1),
+            "org.apache.hudi.keygen.CustomKeyGenerator"));
   }
 }

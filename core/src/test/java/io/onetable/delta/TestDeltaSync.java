@@ -88,7 +88,7 @@ import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.model.storage.OneDataFiles;
+import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.schema.SchemaFieldFinder;
 import io.onetable.spi.sync.TableFormatSync;
@@ -149,9 +149,9 @@ public class TestDeltaSync {
     OneTable table1 = getOneTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
     OneTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
 
-    OneDataFile dataFile1 = getOneDataFile(1, null, basePath);
-    OneDataFile dataFile2 = getOneDataFile(2, null, basePath);
-    OneDataFile dataFile3 = getOneDataFile(3, null, basePath);
+    OneDataFile dataFile1 = getOneDataFile(1, Collections.emptyMap(), basePath);
+    OneDataFile dataFile2 = getOneDataFile(2, Collections.emptyMap(), basePath);
+    OneDataFile dataFile3 = getOneDataFile(3, Collections.emptyMap(), basePath);
 
     OneSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
@@ -358,7 +358,7 @@ public class TestDeltaSync {
   private OneSnapshot buildSnapshot(OneTable table, OneDataFile... dataFiles) {
     return OneSnapshot.builder()
         .table(table)
-        .dataFiles(OneDataFiles.collectionBuilder().files(Arrays.asList(dataFiles)).build())
+        .partitionedDataFiles(OneFileGroup.fromFiles(Arrays.asList(dataFiles)))
         .build();
   }
 

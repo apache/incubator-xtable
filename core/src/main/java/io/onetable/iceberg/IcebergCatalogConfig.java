@@ -16,13 +16,19 @@
  * limitations under the License.
  */
  
-package io.onetable.spi.extractor;
+package io.onetable.iceberg;
 
-import java.util.Iterator;
+import java.util.Collections;
+import java.util.Map;
 
-import io.onetable.model.storage.OneDataFiles;
+import lombok.Builder;
+import lombok.NonNull;
+import lombok.Value;
 
-/**
- * PartitionedDataFileIterator lets the consumer iterate over partitions (along with the FileSlices)
- */
-public interface PartitionedDataFileIterator extends Iterator<OneDataFiles>, AutoCloseable {}
+@Value
+@Builder
+public class IcebergCatalogConfig {
+  @NonNull String catalogImpl;
+  @NonNull String catalogName;
+  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
+}
