@@ -417,6 +417,22 @@
                             <goals>
                                 <goal>shade</goal>
                             </goals>
+                            <configuration>
+                                <createDependencyReducedPom>false</createDependencyReducedPom>
+                                <filters>
+                                    <filter>
+                                        <artifact>*:*</artifact>
+                                        <excludes>
+                                            <exclude>META-INF/*.SF</exclude>
+                                            <exclude>META-INF/*.DSA</exclude>
+                                            <exclude>META-INF/*.RSA</exclude>
+                                            <exclude>**/Log4j2Plugins.dat</exclude>
+                                        </excludes>
+                                    </filter>
+                                </filters>
+                                <shadedArtifactAttached>true</shadedArtifactAttached>
+                                <shadedClassifierName>bundled</shadedClassifierName>
+                            </configuration>
                         </execution>
                     </executions>
                 </plugin>
