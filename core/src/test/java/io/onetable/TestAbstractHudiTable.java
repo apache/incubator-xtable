@@ -409,6 +409,7 @@ public abstract class TestAbstractHudiTable
         .withMetadataConfig(metadataConfig)
         .withWriteConcurrencyMode(WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL)
         .withMarkersType(MarkerType.DIRECT.name())
+        .withStorageConfig(storageConfig)
         .withLockConfig(
             HoodieLockConfig.newBuilder().withLockProvider(InProcessLockProvider.class).build())
         .withProperties(lockProperties)

@@ -28,6 +28,7 @@ import org.apache.parquet.schema.MessageType;
 import org.apache.hudi.avro.HoodieAvroWriteSupport;
 import org.apache.hudi.common.bloom.BloomFilter;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.config.HoodieWriteConfig;
 
 import org.apache.iceberg.mapping.MappedField;
 import org.apache.iceberg.mapping.MappedFields;
@@ -36,6 +37,7 @@ import org.apache.iceberg.parquet.ParquetSchemaUtil;
 
 import io.onetable.hudi.idtracking.IdTracker;
 import io.onetable.hudi.idtracking.models.IdMapping;
+import io.onetable.hudi.idtracking.models.IdTracking;
 
 /**
  * An extension of the standard {@link HoodieAvroWriteSupport} that adds field IDs to the parquet
@@ -44,19 +46,40 @@ import io.onetable.hudi.idtracking.models.IdMapping;
  * field id mapping.
  */
 public class HoodieAvroWriteSupportWithFieldIds extends HoodieAvroWriteSupport {
+  private static final IdTracker ID_TRACKER = IdTracker.getInstance();
 
   public HoodieAvroWriteSupportWithFieldIds(
       MessageType schema,
       Schema avroSchema,
       Option<BloomFilter> bloomFilterOpt,
       Properties properties) {
-    super(addFieldIdsToParquetSchema(schema, avroSchema), avroSchema, bloomFilterOpt, properties);
+    super(
+        addFieldIdsToParquetSchema(schema, avroSchema, properties),
+        avroSchema,
+        bloomFilterOpt,
+        properties);
   }
 
-  private static MessageType addFieldIdsToParquetSchema(MessageType messageType, Schema schema) {
-    // apply field IDs if present
-    return IdTracker.getInstance()
-        .getIdTracking(schema)
+  private static MessageType addFieldIdsToParquetSchema(
+      MessageType messageType, Schema schema, Properties properties) {
+    Option<IdTracking> idTrackingOption = ID_TRACKER.getIdTracking(schema);
+    if (!idTrackingOption.isPresent()) {
+      HoodieWriteConfig writeConfig =
+          HoodieWriteConfig.newBuilder().withProperties(properties).build();
+      String writeSchemaStr = writeConfig.getWriteSchema();
+      // if there is a schema with ID tracking specified in the properties, fall back to inferring
+      // the proper ID tracking on provided schema
+      if (writeSchemaStr != null && !writeSchemaStr.isEmpty()) {
+        Schema writeSchema = new Schema.Parser().parse(writeSchemaStr);
+        if (ID_TRACKER.hasIdTracking(writeSchema)) {
+          idTrackingOption =
+              Option.of(
+                  ID_TRACKER.getIdTracking(
+                      schema, Option.of(writeSchema), writeConfig.populateMetaFields()));
+        }
+      }
+    }
+    return idTrackingOption
         .map(
             idTracking -> {
               List<IdMapping> idMappings = idTracking.getIdMappings();
