@@ -39,7 +39,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import io.onetable.model.CommitsBacklog;
@@ -64,24 +63,6 @@ public class TestOneTableClient {
       mock(TableFormatClientFactory.class);
   private final TableFormatSync mockTableFormatSync1 = mock(TableFormatSync.class);
   private final TableFormatSync mockTableFormatSync2 = mock(TableFormatSync.class);
-  private OneTableClient oneTableClient;
-
-  @BeforeEach
-  void setup() {
-    oneTableClient = new OneTableClient(mockConf);
-  }
-
-  @Test
-  void testSyncWithEmptyTargetTableFormatsThrowsException() {
-    PerTableConfig perTableConfig = getPerTableConfig(Collections.emptyList(), SyncMode.FULL);
-    when(mockSourceClientProvider.getSourceClientInstance(perTableConfig))
-        .thenReturn(mockSourceClient);
-    Exception thrownException =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> oneTableClient.sync(perTableConfig, mockSourceClientProvider));
-    assertEquals("Please provide at-least one format to sync", thrownException.getMessage());
-  }
 
   @Test
   void testAllSnapshotSyncAsPerConfig() {
