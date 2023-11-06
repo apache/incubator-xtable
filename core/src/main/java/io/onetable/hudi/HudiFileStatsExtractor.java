@@ -60,7 +60,7 @@ public class HudiFileStatsExtractor {
    * This is a workaround for a known issue tracked at https://issues.apache.org/jira/browse/HUDI-7037.
    *
    * Due to the use of Avro 1.11 in this project and to avoid packaging issues, the scale value is hardcoded
-   * instead of being dynamically retrieved. In typical cases, the scale would be obtained using:
+   * instead of being dynamically retrieved. Otherwise, scale can be obtained using:
    *
    *   ((LogicalTypes.Decimal) DecimalWrapper.SCHEMA$.getField("value").schema().getLogicalType()).getScale();
    */
