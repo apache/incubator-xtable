@@ -245,11 +245,20 @@ public class TestDeltaHelper {
     }
   }
 
+  private int generateRandomInRange(int minVal, int maxVal) {
+    if (minVal > maxVal) {
+      throw new IllegalArgumentException(
+          "Max value must be greater than min value for random number generation.");
+    }
+    return RANDOM.nextInt((maxVal - minVal) + 1) + minVal;
+  }
+
   private Timestamp generateRandomTimeGivenYear(int yearValue) {
     int month = RANDOM.nextInt(12) + 1;
     // Adjust days to avoid timezone issues with Delta generated columns check constraint for tests.
     int daysToConsider = YearMonth.of(yearValue, month).lengthOfMonth() - 5;
-    int day = RANDOM.nextInt(daysToConsider) + 1;
+    // Generate a random day between 5th and last day of the month avoiding wrap around issues.
+    int day = generateRandomInRange(5, daysToConsider);
 
     LocalDateTime localDateTime =
         LocalDateTime.of(

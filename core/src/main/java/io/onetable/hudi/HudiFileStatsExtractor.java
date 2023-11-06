@@ -33,12 +33,10 @@ import java.util.stream.Stream;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 
-import org.apache.avro.LogicalTypes;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.io.api.Binary;
 
 import org.apache.hudi.avro.HoodieAvroUtils;
-import org.apache.hudi.avro.model.DecimalWrapper;
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -57,9 +55,16 @@ import io.onetable.model.storage.OneDataFile;
 /** Responsible for Column stats extraction for Hudi. */
 @AllArgsConstructor
 public class HudiFileStatsExtractor {
-  private static final int DECIMAL_WRAPPER_SCALE =
-      ((LogicalTypes.Decimal) DecimalWrapper.SCHEMA$.getField("value").schema().getLogicalType())
-          .getScale();
+  /*
+   * The column stats for a decimal field are read back as bytes, requiring conversion here.
+   * This is a workaround for a known issue tracked at https://issues.apache.org/jira/browse/HUDI-7037.
+   *
+   * Due to the use of Avro 1.11 in this project and to avoid packaging issues, the scale value is hardcoded
+   * instead of being dynamically retrieved. Otherwise, scale can be obtained using:
+   *
+   *   ((LogicalTypes.Decimal) DecimalWrapper.SCHEMA$.getField("value").schema().getLogicalType()).getScale();
+   */
+  private static final int DECIMAL_WRAPPER_SCALE = 15;
 
   private static final ParquetUtils UTILS = new ParquetUtils();
   private static final String ARRAY_DOT_FIELD = ".array.";
