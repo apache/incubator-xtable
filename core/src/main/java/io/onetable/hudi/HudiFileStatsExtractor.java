@@ -18,8 +18,6 @@
  
 package io.onetable.hudi;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.util.ArrayList;
@@ -33,18 +31,16 @@ import java.util.stream.Stream;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 
-import org.apache.avro.LogicalTypes;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.io.api.Binary;
 
-import org.apache.hudi.avro.HoodieAvroUtils;
-import org.apache.hudi.avro.model.DecimalWrapper;
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.ParquetUtils;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.metadata.HoodieTableMetadataUtil;
 import org.apache.hudi.metadata.MetadataPartitionType;
 
 import io.onetable.model.schema.OneField;
@@ -189,35 +185,8 @@ public class HudiFileStatsExtractor {
 
   private static ColumnStat getColumnStatFromHudiStat(
       OneField field, HoodieMetadataColumnStats columnStats) {
-    if (columnStats == null) {
-      return ColumnStat.builder().build();
-    }
-    Comparable<?> minValue = HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMinValue());
-    Comparable<?> maxValue = HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMaxValue());
-    if (field.getSchema().getDataType() == OneType.DECIMAL) {
-      int decimalScale = (int)field.getSchema().getMetadata().get(OneSchema.MetadataKey.DECIMAL_SCALE);
-      minValue =
-          minValue instanceof ByteBuffer
-              ? convertBytesToBigDecimal((ByteBuffer) minValue, decimalScale)
-              : minValue;
-      maxValue =
-          maxValue instanceof ByteBuffer
-              ? convertBytesToBigDecimal((ByteBuffer) maxValue, decimalScale)
-              : maxValue;
-    }
-    return getColumnStatFromValues(
-        minValue,
-        maxValue,
-        field,
-        columnStats.getNullCount(),
-        columnStats.getValueCount(),
-        columnStats.getTotalSize());
-  }
-
-  private static BigDecimal convertBytesToBigDecimal(ByteBuffer value, int scale) {
-    byte[] bytes = new byte[value.remaining()];
-    value.duplicate().get(bytes);
-    return new BigDecimal(new BigInteger(bytes), scale);
+    return getColumnStatFromColRange(
+        field, HoodieTableMetadataUtil.convertColumnStatsRecordToColumnRangeMetadata(columnStats));
   }
 
   private static ColumnStat getColumnStatFromColRange(
