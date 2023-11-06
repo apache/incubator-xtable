@@ -28,9 +28,10 @@ for creating Iceberg BigLake tables. Follow the guide on [Syncing to BigLake Met
 :::
 
 :::danger Important: For Hudi source format to Iceberg target format use cases
-The Hudi extensions provide the ability to add field IDs to the parquet schema when writing with Hudi.
-This is a requirement for some engines, like BigQuery and Snowflake, when reading an Iceberg table.
+1. The Hudi extensions provide the ability to add field IDs to the parquet schema when writing with Hudi. 
+This is a requirement for some engines, like BigQuery and Snowflake, when reading an Iceberg table. 
 If you are not planning on using Iceberg, then you do not need to add these to your Hudi writers.
+2. To avoid inserts going through row writer, we need to disable it manually. Support for row writer will be added soon.  
 :::
 
 #### Steps to add additional configurations to the Hudi writers:
@@ -41,6 +42,7 @@ If you are not planning on using Iceberg, then you do not need to add these to y
    ```shell md title="shell"
    hoodie.avro.write.support.class: io.onetable.hudi.extensions.HoodieAvroWriteSupportWithFieldIds
    hoodie.client.init.callback.classes: io.onetable.hudi.extensions.AddFieldIdsClientInitCallback
+   hoodie.datasource.write.row.writer.enable : false
    ```
 3. Run your existing code that use Hudi writers
 
