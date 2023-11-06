@@ -356,7 +356,7 @@ public class TestIcebergSync {
             .load(basePath.toString())
             .currentSnapshot()
             .manifestListLocation();
-    Files.delete(Paths.get(URI.create("file://" + manifestFile)));
+    Files.delete(Paths.get(URI.create(manifestFile)));
 
     // get a new iceberg sync to make sure table is re-read from disk and no metadata is cached
     getIcebergSync().syncSnapshot(snapshot3);
