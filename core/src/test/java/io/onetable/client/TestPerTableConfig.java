@@ -69,7 +69,7 @@ class TestPerTableConfig {
             .build();
 
     assertEquals(24 * 7, perTableConfig.getTargetMetadataRetentionInHours());
-    assertEquals(SyncMode.FULL, perTableConfig.getSyncMode());
+    assertEquals(SyncMode.INCREMENTAL, perTableConfig.getSyncMode());
     assertEquals(HudiSourceConfig.builder().build(), perTableConfig.getHudiSourceConfig());
     assertNull(perTableConfig.getNamespace());
     assertNull(perTableConfig.getIcebergCatalogConfig());

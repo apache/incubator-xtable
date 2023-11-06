@@ -118,7 +118,7 @@ public class PerTableConfig {
         targetTableFormats.size() > 0, "Please provide at-least one format to sync");
     this.targetTableFormats = targetTableFormats;
     this.icebergCatalogConfig = icebergCatalogConfig;
-    this.syncMode = syncMode == null ? SyncMode.FULL : syncMode;
+    this.syncMode = syncMode == null ? SyncMode.INCREMENTAL : syncMode;
     this.targetMetadataRetentionInHours =
         targetMetadataRetentionInHours == null ? 24 * 7 : targetMetadataRetentionInHours;
   }
