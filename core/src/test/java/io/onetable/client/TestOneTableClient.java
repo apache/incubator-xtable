@@ -20,8 +20,11 @@ package io.onetable.client;
 
 import static io.onetable.GenericTable.getTableName;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
@@ -58,8 +61,8 @@ public class TestOneTableClient {
   private final SourceClient mockSourceClient = mock(SourceClient.class);
   private final TableFormatClientFactory mockTableFormatClientFactory =
       mock(TableFormatClientFactory.class);
-  private final TableFormatSync mockTableFormatSync = mock(TableFormatSync.class);
   private final TableFormatSync mockTableFormatSync1 = mock(TableFormatSync.class);
+  private final TableFormatSync mockTableFormatSync2 = mock(TableFormatSync.class);
 
   @Test
   void testAllSnapshotSyncAsPerConfig() {
@@ -74,11 +77,11 @@ public class TestOneTableClient {
         .thenReturn(mockSourceClient);
     when(mockTableFormatClientFactory.createForFormat(
             TableFormat.ICEBERG, perTableConfig, mockConf))
-        .thenReturn(mockTableFormatSync);
+        .thenReturn(mockTableFormatSync1);
     when(mockTableFormatClientFactory.createForFormat(TableFormat.DELTA, perTableConfig, mockConf))
-        .thenReturn(mockTableFormatSync);
+        .thenReturn(mockTableFormatSync1);
     when(mockSourceClient.getCurrentSnapshot()).thenReturn(oneSnapshot);
-    when(mockTableFormatSync.syncSnapshot(eq(oneSnapshot))).thenReturn(syncResult);
+    when(mockTableFormatSync1.syncSnapshot(eq(oneSnapshot))).thenReturn(syncResult);
     OneTableClient oneTableClient = new OneTableClient(mockConf, mockTableFormatClientFactory);
     Map<TableFormat, SyncResult> expectedResult = new HashMap<>();
     expectedResult.put(TableFormat.ICEBERG, syncResult);
@@ -97,9 +100,9 @@ public class TestOneTableClient {
         .thenReturn(mockSourceClient);
     when(mockTableFormatClientFactory.createForFormat(
             TableFormat.ICEBERG, perTableConfig, mockConf))
-        .thenReturn(mockTableFormatSync);
-    when(mockTableFormatClientFactory.createForFormat(TableFormat.DELTA, perTableConfig, mockConf))
         .thenReturn(mockTableFormatSync1);
+    when(mockTableFormatClientFactory.createForFormat(TableFormat.DELTA, perTableConfig, mockConf))
+        .thenReturn(mockTableFormatSync2);
 
     Instant instantAsOfNow = Instant.now();
     Instant instantAt15 = getInstantAtLastNMinutes(instantAsOfNow, 15);
@@ -129,11 +132,11 @@ public class TestOneTableClient {
         Arrays.asList(instantAt15, instantAt14, instantAt10, instantAt8, instantAt5, instantAt2);
     CommitsBacklog<Instant> commitsBacklog =
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
-    when(mockTableFormatSync.getLastSyncInstant()).thenReturn(Optional.of(icebergLastSyncInstant));
-    when(mockTableFormatSync1.getLastSyncInstant()).thenReturn(Optional.of(deltaLastSyncInstant));
-    when(mockTableFormatSync.getPendingInstantsToConsiderForNextSync())
-        .thenReturn(pendingInstantsForIceberg);
+    when(mockTableFormatSync1.getLastSyncInstant()).thenReturn(Optional.of(icebergLastSyncInstant));
+    when(mockTableFormatSync2.getLastSyncInstant()).thenReturn(Optional.of(deltaLastSyncInstant));
     when(mockTableFormatSync1.getPendingInstantsToConsiderForNextSync())
+        .thenReturn(pendingInstantsForIceberg);
+    when(mockTableFormatSync2.getPendingInstantsToConsiderForNextSync())
         .thenReturn(pendingInstantsForDelta);
     when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync)).thenReturn(commitsBacklog);
     Map<Instant, TableChange> instantTableChangeMap = new HashMap<>();
@@ -147,14 +150,14 @@ public class TestOneTableClient {
     // which is instantAt10 and so i.e. instantAt8, instantAt5, instantAt2.
     List<SyncResult> icebergSyncResults =
         mockForSyncChanges(
-            mockTableFormatSync,
+            mockTableFormatSync1,
             instantTableChangeMap,
             Arrays.asList(instantAt15, instantAt8, instantAt5, instantAt2));
     // Delta needs to sync last pending instant at instantAt8 and instants after last sync instant
     // which is instantAt5 and so i.e. instantAt2.
     List<SyncResult> deltaSyncResults =
         mockForSyncChanges(
-            mockTableFormatSync1, instantTableChangeMap, Arrays.asList(instantAt8, instantAt2));
+            mockTableFormatSync2, instantTableChangeMap, Arrays.asList(instantAt8, instantAt2));
     Map<TableFormat, SyncResult> expectedSyncResult = new HashMap<>();
     expectedSyncResult.put(TableFormat.ICEBERG, getLastSyncResult(icebergSyncResults));
     expectedSyncResult.put(TableFormat.DELTA, getLastSyncResult(deltaSyncResults));
@@ -177,21 +180,21 @@ public class TestOneTableClient {
         .thenReturn(mockSourceClient);
     when(mockTableFormatClientFactory.createForFormat(
             TableFormat.ICEBERG, perTableConfig, mockConf))
-        .thenReturn(mockTableFormatSync);
+        .thenReturn(mockTableFormatSync1);
     when(mockTableFormatClientFactory.createForFormat(TableFormat.DELTA, perTableConfig, mockConf))
-        .thenReturn(mockTableFormatSync);
+        .thenReturn(mockTableFormatSync1);
 
     Instant instantAsOfNow = Instant.now();
     Instant instantAt5 = getInstantAtLastNMinutes(instantAsOfNow, 5);
     when(mockSourceClient.isIncrementalSyncSafeFrom(eq(instantAt5))).thenReturn(false);
 
     // Both Iceberg and Delta last synced at instantAt5 and have no pending instants.
-    when(mockTableFormatSync.getLastSyncInstant()).thenReturn(Optional.of(instantAt5));
-    when(mockTableFormatSync.getPendingInstantsToConsiderForNextSync())
+    when(mockTableFormatSync1.getLastSyncInstant()).thenReturn(Optional.of(instantAt5));
+    when(mockTableFormatSync1.getPendingInstantsToConsiderForNextSync())
         .thenReturn(Collections.emptyList());
 
     when(mockSourceClient.getCurrentSnapshot()).thenReturn(oneSnapshot);
-    when(mockTableFormatSync.syncSnapshot(eq(oneSnapshot))).thenReturn(syncResult);
+    when(mockTableFormatSync1.syncSnapshot(eq(oneSnapshot))).thenReturn(syncResult);
     OneTableClient oneTableClient = new OneTableClient(mockConf, mockTableFormatClientFactory);
     Map<TableFormat, SyncResult> expectedSyncResult = new HashMap<>();
     expectedSyncResult.put(TableFormat.ICEBERG, syncResult);
@@ -210,9 +213,9 @@ public class TestOneTableClient {
         .thenReturn(mockSourceClient);
     when(mockTableFormatClientFactory.createForFormat(
             TableFormat.ICEBERG, perTableConfig, mockConf))
-        .thenReturn(mockTableFormatSync);
-    when(mockTableFormatClientFactory.createForFormat(TableFormat.DELTA, perTableConfig, mockConf))
         .thenReturn(mockTableFormatSync1);
+    when(mockTableFormatClientFactory.createForFormat(TableFormat.DELTA, perTableConfig, mockConf))
+        .thenReturn(mockTableFormatSync2);
 
     Instant instantAsOfNow = Instant.now();
     Instant instantAt15 = getInstantAtLastNMinutes(instantAsOfNow, 15);
@@ -238,11 +241,11 @@ public class TestOneTableClient {
     List<Instant> instantsToProcess = Arrays.asList(instantAt8, instantAt2);
     CommitsBacklog<Instant> commitsBacklog =
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
-    when(mockTableFormatSync.getLastSyncInstant()).thenReturn(Optional.of(icebergLastSyncInstant));
-    when(mockTableFormatSync1.getLastSyncInstant()).thenReturn(Optional.of(deltaLastSyncInstant));
-    when(mockTableFormatSync.getPendingInstantsToConsiderForNextSync())
-        .thenReturn(pendingInstantsForIceberg);
+    when(mockTableFormatSync1.getLastSyncInstant()).thenReturn(Optional.of(icebergLastSyncInstant));
+    when(mockTableFormatSync2.getLastSyncInstant()).thenReturn(Optional.of(deltaLastSyncInstant));
     when(mockTableFormatSync1.getPendingInstantsToConsiderForNextSync())
+        .thenReturn(pendingInstantsForIceberg);
+    when(mockTableFormatSync2.getPendingInstantsToConsiderForNextSync())
         .thenReturn(pendingInstantsForDelta);
     when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync)).thenReturn(commitsBacklog);
     Map<Instant, TableChange> instantTableChangeMap = new HashMap<>();
@@ -257,12 +260,12 @@ public class TestOneTableClient {
     OneSnapshot oneSnapshot = buildOneSnapshot(oneTable, "v1");
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
     when(mockSourceClient.getCurrentSnapshot()).thenReturn(oneSnapshot);
-    when(mockTableFormatSync.syncSnapshot(eq(oneSnapshot))).thenReturn(syncResult);
+    when(mockTableFormatSync1.syncSnapshot(eq(oneSnapshot))).thenReturn(syncResult);
     // Delta needs to sync last pending instant at instantAt8 and instants after last sync instant
     // which is instantAt5 and so i.e. instantAt2.
     List<SyncResult> deltaSyncResults =
         mockForSyncChanges(
-            mockTableFormatSync1, instantTableChangeMap, Arrays.asList(instantAt8, instantAt2));
+            mockTableFormatSync2, instantTableChangeMap, Arrays.asList(instantAt8, instantAt2));
     Map<TableFormat, SyncResult> expectedSyncResult = new HashMap<>();
     expectedSyncResult.put(TableFormat.ICEBERG, syncResult);
     expectedSyncResult.put(TableFormat.DELTA, getLastSyncResult(deltaSyncResults));
@@ -270,6 +273,108 @@ public class TestOneTableClient {
     Map<TableFormat, SyncResult> result =
         oneTableClient.sync(perTableConfig, mockSourceClientProvider);
     assertEquals(expectedSyncResult, result);
+  }
+
+  @Test
+  void incrementalSyncWithNoPendingInstantsForOneFormat() {
+    SyncMode syncMode = SyncMode.INCREMENTAL;
+    PerTableConfig perTableConfig =
+        getPerTableConfig(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), syncMode);
+    when(mockSourceClientProvider.getSourceClientInstance(perTableConfig))
+        .thenReturn(mockSourceClient);
+    when(mockTableFormatClientFactory.createForFormat(
+            TableFormat.ICEBERG, perTableConfig, mockConf))
+        .thenReturn(mockTableFormatSync1);
+    when(mockTableFormatClientFactory.createForFormat(TableFormat.DELTA, perTableConfig, mockConf))
+        .thenReturn(mockTableFormatSync2);
+
+    Instant instantAsOfNow = Instant.now();
+    Instant instantAt10 = getInstantAtLastNMinutes(instantAsOfNow, 10);
+    Instant instantAt8 = getInstantAtLastNMinutes(instantAsOfNow, 8);
+    Instant instantAt5 = getInstantAtLastNMinutes(instantAsOfNow, 5);
+
+    when(mockSourceClient.isIncrementalSyncSafeFrom(eq(instantAt10))).thenReturn(true);
+    when(mockSourceClient.isIncrementalSyncSafeFrom(eq(instantAt5))).thenReturn(true);
+
+    // Iceberg last synced at instantAt5, the last instant in the source
+    Instant icebergLastSyncInstant = instantAt5;
+    // Delta last synced at instantAt10
+    Instant deltaLastSyncInstant = instantAt10;
+    InstantsForIncrementalSync instantsForIncrementalSync =
+        InstantsForIncrementalSync.builder().lastSyncInstant(deltaLastSyncInstant).build();
+    List<Instant> instantsToProcess = Arrays.asList(instantAt8, instantAt5);
+    CommitsBacklog<Instant> commitsBacklog =
+        CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
+    when(mockTableFormatSync1.getLastSyncInstant()).thenReturn(Optional.of(icebergLastSyncInstant));
+    when(mockTableFormatSync2.getLastSyncInstant()).thenReturn(Optional.of(deltaLastSyncInstant));
+    when(mockTableFormatSync1.getPendingInstantsToConsiderForNextSync())
+        .thenReturn(Collections.emptyList());
+    when(mockTableFormatSync2.getPendingInstantsToConsiderForNextSync())
+        .thenReturn(Collections.emptyList());
+    when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync)).thenReturn(commitsBacklog);
+    Map<Instant, TableChange> instantTableChangeMap = new HashMap<>();
+    for (Instant instant : instantsToProcess) {
+      TableChange tableChange = getTableChange(instant);
+      instantTableChangeMap.put(instant, tableChange);
+      when(mockSourceClient.getTableChangeForCommit(instant)).thenReturn(tableChange);
+    }
+    // Iceberg has no commits to sync
+    // Delta needs to sync instants 8 and 5
+    List<SyncResult> deltaSyncResults =
+        mockForSyncChanges(
+            mockTableFormatSync2, instantTableChangeMap, Arrays.asList(instantAt8, instantAt5));
+    Map<TableFormat, SyncResult> expectedSyncResult = new HashMap<>();
+    expectedSyncResult.put(TableFormat.DELTA, getLastSyncResult(deltaSyncResults));
+    OneTableClient oneTableClient = new OneTableClient(mockConf, mockTableFormatClientFactory);
+    Map<TableFormat, SyncResult> result =
+        oneTableClient.sync(perTableConfig, mockSourceClientProvider);
+    assertEquals(expectedSyncResult, result);
+    verify(mockTableFormatSync1, never()).syncChanges(any());
+  }
+
+  @Test
+  void incrementalSyncWithNoPendingInstantsForAllFormats() {
+    SyncMode syncMode = SyncMode.INCREMENTAL;
+    PerTableConfig perTableConfig =
+        getPerTableConfig(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), syncMode);
+    when(mockSourceClientProvider.getSourceClientInstance(perTableConfig))
+        .thenReturn(mockSourceClient);
+    when(mockTableFormatClientFactory.createForFormat(
+            TableFormat.ICEBERG, perTableConfig, mockConf))
+        .thenReturn(mockTableFormatSync1);
+    when(mockTableFormatClientFactory.createForFormat(TableFormat.DELTA, perTableConfig, mockConf))
+        .thenReturn(mockTableFormatSync2);
+
+    Instant instantAsOfNow = Instant.now();
+    Instant instantAt5 = getInstantAtLastNMinutes(instantAsOfNow, 5);
+
+    when(mockSourceClient.isIncrementalSyncSafeFrom(eq(instantAt5))).thenReturn(true);
+    when(mockSourceClient.isIncrementalSyncSafeFrom(eq(instantAt5))).thenReturn(true);
+
+    // Iceberg last synced at instantAt5, the last instant in the source
+    Instant icebergLastSyncInstant = instantAt5;
+    // Delta last synced at instantAt10
+    Instant deltaLastSyncInstant = instantAt5;
+    InstantsForIncrementalSync instantsForIncrementalSync =
+        InstantsForIncrementalSync.builder().lastSyncInstant(deltaLastSyncInstant).build();
+    List<Instant> instantsToProcess = Collections.emptyList();
+    CommitsBacklog<Instant> commitsBacklog =
+        CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
+    when(mockTableFormatSync1.getLastSyncInstant()).thenReturn(Optional.of(icebergLastSyncInstant));
+    when(mockTableFormatSync2.getLastSyncInstant()).thenReturn(Optional.of(deltaLastSyncInstant));
+    when(mockTableFormatSync1.getPendingInstantsToConsiderForNextSync())
+        .thenReturn(Collections.emptyList());
+    when(mockTableFormatSync2.getPendingInstantsToConsiderForNextSync())
+        .thenReturn(Collections.emptyList());
+    when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync)).thenReturn(commitsBacklog);
+    // Iceberg and Delta have no commits to sync
+    Map<TableFormat, SyncResult> expectedSyncResult = Collections.emptyMap();
+    OneTableClient oneTableClient = new OneTableClient(mockConf, mockTableFormatClientFactory);
+    Map<TableFormat, SyncResult> result =
+        oneTableClient.sync(perTableConfig, mockSourceClientProvider);
+    assertEquals(expectedSyncResult, result);
+    verify(mockTableFormatSync1, never()).syncChanges(any());
+    verify(mockTableFormatSync2, never()).syncChanges(any());
   }
 
   private SyncResult getLastSyncResult(List<SyncResult> syncResults) {

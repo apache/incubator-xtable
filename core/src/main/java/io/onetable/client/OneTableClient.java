@@ -193,35 +193,42 @@ public class OneTableClient {
             lastSyncInstantByFormat, pendingInstantsToConsiderForNextSyncByFormat);
     IncrementalTableChanges incrementalTableChanges =
         source.extractTableChanges(instantsForIncrementalSync);
-    for (Map.Entry<TableFormat, TableFormatSync> entry : syncClientByFormat.entrySet()) {
-      TableFormat tableFormat = entry.getKey();
-      TableFormatSync tableFormatSync = entry.getValue();
-      List<Instant> pendingSyncsByFormat =
-          pendingInstantsToConsiderForNextSyncByFormat.getOrDefault(
-              tableFormat, Collections.emptyList());
-      Set<Instant> pendingInstantsSet = new HashSet<>(pendingSyncsByFormat);
-      // extract the changes that happened since this format was last synced
-      List<TableChange> filteredTableChanges =
-          incrementalTableChanges.getTableChanges().stream()
-              .filter(
-                  change ->
-                      change
-                              .getTableAsOfChange()
-                              .getLatestCommitTime()
-                              .isAfter(lastSyncInstantByFormat.get(tableFormat).get())
-                          || pendingInstantsSet.contains(
-                              change.getTableAsOfChange().getLatestCommitTime()))
-              .collect(Collectors.toList());
-      IncrementalTableChanges tableFormatIncrementalChanges =
-          IncrementalTableChanges.builder()
-              .tableChanges(filteredTableChanges)
-              .pendingCommits(incrementalTableChanges.getPendingCommits())
-              .build();
-      List<SyncResult> syncResultList = tableFormatSync.syncChanges(tableFormatIncrementalChanges);
-
-      syncedTable = filteredTableChanges.get(filteredTableChanges.size() - 1).getTableAsOfChange();
-      SyncResult latestSyncResult = syncResultList.get(syncResultList.size() - 1);
-      syncResultsByFormat.put(tableFormat, latestSyncResult);
+    if (!incrementalTableChanges.getTableChanges().isEmpty()) {
+      for (Map.Entry<TableFormat, TableFormatSync> entry : syncClientByFormat.entrySet()) {
+        TableFormat tableFormat = entry.getKey();
+        TableFormatSync tableFormatSync = entry.getValue();
+        List<Instant> pendingSyncsByFormat =
+            pendingInstantsToConsiderForNextSyncByFormat.getOrDefault(
+                tableFormat, Collections.emptyList());
+        Set<Instant> pendingInstantsSet = new HashSet<>(pendingSyncsByFormat);
+        // extract the changes that happened since this format was last synced
+        List<TableChange> filteredTableChanges =
+            incrementalTableChanges.getTableChanges().stream()
+                .filter(
+                    change ->
+                        change
+                                .getTableAsOfChange()
+                                .getLatestCommitTime()
+                                .isAfter(lastSyncInstantByFormat.get(tableFormat).get())
+                            || pendingInstantsSet.contains(
+                                change.getTableAsOfChange().getLatestCommitTime()))
+                .collect(Collectors.toList());
+        if (filteredTableChanges.isEmpty()) {
+          // no updates to sync
+          continue;
+        }
+        IncrementalTableChanges tableFormatIncrementalChanges =
+            IncrementalTableChanges.builder()
+                .tableChanges(filteredTableChanges)
+                .pendingCommits(incrementalTableChanges.getPendingCommits())
+                .build();
+        List<SyncResult> syncResultList =
+            tableFormatSync.syncChanges(tableFormatIncrementalChanges);
+        syncedTable =
+            filteredTableChanges.get(filteredTableChanges.size() - 1).getTableAsOfChange();
+        SyncResult latestSyncResult = syncResultList.get(syncResultList.size() - 1);
+        syncResultsByFormat.put(tableFormat, latestSyncResult);
+      }
     }
     return SyncResultForTableFormats.builder()
         .lastSyncResult(syncResultsByFormat)
