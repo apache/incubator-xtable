@@ -18,6 +18,8 @@
  
 package io.onetable.hudi;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.util.ArrayList;
@@ -31,16 +33,18 @@ import java.util.stream.Stream;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
 
+import org.apache.avro.LogicalTypes;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.io.api.Binary;
 
+import org.apache.hudi.avro.HoodieAvroUtils;
+import org.apache.hudi.avro.model.DecimalWrapper;
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.ParquetUtils;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.metadata.HoodieTableMetadata;
-import org.apache.hudi.metadata.HoodieTableMetadataUtil;
 import org.apache.hudi.metadata.MetadataPartitionType;
 
 import io.onetable.model.schema.OneField;
@@ -53,6 +57,9 @@ import io.onetable.model.storage.OneDataFile;
 /** Responsible for Column stats extraction for Hudi. */
 @AllArgsConstructor
 public class HudiFileStatsExtractor {
+  private static final int DECIMAL_WRAPPER_SCALE =
+      ((LogicalTypes.Decimal) DecimalWrapper.SCHEMA$.getField("value").schema().getLogicalType())
+          .getScale();
 
   private static final ParquetUtils UTILS = new ParquetUtils();
   private static final String ARRAY_DOT_FIELD = ".array.";
@@ -185,8 +192,34 @@ public class HudiFileStatsExtractor {
 
   private static ColumnStat getColumnStatFromHudiStat(
       OneField field, HoodieMetadataColumnStats columnStats) {
-    return getColumnStatFromColRange(
-        field, HoodieTableMetadataUtil.convertColumnStatsRecordToColumnRangeMetadata(columnStats));
+    if (columnStats == null) {
+      return ColumnStat.builder().build();
+    }
+    Comparable<?> minValue = HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMinValue());
+    Comparable<?> maxValue = HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMaxValue());
+    if (field.getSchema().getDataType() == OneType.DECIMAL) {
+      minValue =
+          minValue instanceof ByteBuffer
+              ? convertBytesToBigDecimal((ByteBuffer) minValue, DECIMAL_WRAPPER_SCALE)
+              : minValue;
+      maxValue =
+          maxValue instanceof ByteBuffer
+              ? convertBytesToBigDecimal((ByteBuffer) maxValue, DECIMAL_WRAPPER_SCALE)
+              : maxValue;
+    }
+    return getColumnStatFromValues(
+        minValue,
+        maxValue,
+        field,
+        columnStats.getNullCount(),
+        columnStats.getValueCount(),
+        columnStats.getTotalSize());
+  }
+
+  private static BigDecimal convertBytesToBigDecimal(ByteBuffer value, int scale) {
+    byte[] bytes = new byte[value.remaining()];
+    value.duplicate().get(bytes);
+    return new BigDecimal(new BigInteger(bytes), scale);
   }
 
   private static ColumnStat getColumnStatFromColRange(
