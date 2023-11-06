@@ -248,7 +248,7 @@ public class TestDeltaHelper {
   private int generateRandomInRange(int minVal, int maxVal) {
     if (minVal > maxVal) {
       throw new IllegalArgumentException(
-          "Max value must be greater than " + "min value for random number generation.");
+          "Max value must be greater than min value for random number generation.");
     }
     return RANDOM.nextInt((maxVal - minVal) + 1) + minVal;
   }
