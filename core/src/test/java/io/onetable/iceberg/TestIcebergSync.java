@@ -32,6 +32,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -68,6 +69,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.hadoop.HadoopCatalog;
+import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.types.Types;
 
@@ -172,50 +174,38 @@ public class TestIcebergSync {
     tableName = "test-" + UUID.randomUUID();
     basePath = tempDir.resolve(tableName);
     Files.createDirectories(basePath);
-    icebergSync =
-        TableFormatSync.of(
-            new IcebergClient(
-                PerTableConfig.builder()
-                    .tableBasePath(basePath.toString())
-                    .tableName(tableName)
-                    .targetMetadataRetentionInHours(1)
-                    .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
-                    .build(),
-                new Configuration(),
-                mockSchemaExtractor,
-                mockSchemaSync,
-                mockPartitionSpecExtractor,
-                mockPartitionSpecSync,
-                IcebergDataFileUpdatesSync.of(
-                    mockColumnStatsConverter, IcebergPartitionValueConverter.getInstance()),
-                IcebergTableManager.of(new Configuration())));
+    icebergSync = getIcebergSync();
+  }
+
+  private TableFormatSync getIcebergSync() {
+    return TableFormatSync.of(
+        new IcebergClient(
+            PerTableConfig.builder()
+                .tableBasePath(basePath.toString())
+                .tableName(tableName)
+                .targetMetadataRetentionInHours(1)
+                .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+                .build(),
+            new Configuration(),
+            mockSchemaExtractor,
+            mockSchemaSync,
+            mockPartitionSpecExtractor,
+            mockPartitionSpecSync,
+            IcebergDataFileUpdatesSync.of(
+                mockColumnStatsConverter, IcebergPartitionValueConverter.getInstance()),
+            IcebergTableManager.of(new Configuration())));
   }
 
   @Test
   public void testCreateSnapshotControlFlow() throws Exception {
     // Test two iterations of the iceberg snapshot flow
-    OneSchema schema1 =
-        OneSchema.builder()
-            .dataType(OneType.RECORD)
-            .name("record")
-            .fields(
-                Arrays.asList(
-                    OneField.builder()
-                        .name("int_field")
-                        .schema(OneSchema.builder().name("int").dataType(OneType.INT).build())
-                        .build(),
-                    OneField.builder()
-                        .name("string_field")
-                        .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
-                        .build()))
-            .build();
-    List<OneField> fields2 = new ArrayList<>(schema1.getFields());
+    List<OneField> fields2 = new ArrayList<>(oneSchema.getFields());
     fields2.add(
         OneField.builder()
             .name("long_field")
             .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
             .build());
-    OneSchema schema2 = schema1.toBuilder().fields(fields2).build();
+    OneSchema schema2 = oneSchema.toBuilder().fields(fields2).build();
     Schema icebergSchema1 =
         new Schema(
             Arrays.asList(
@@ -227,11 +217,11 @@ public class TestIcebergSync {
                 Types.NestedField.of(1, false, "int_field", Types.IntegerType.get()),
                 Types.NestedField.of(2, false, "string_field", Types.StringType.get()),
                 Types.NestedField.of(3, false, "long_field", Types.LongType.get())));
-    OneTable table1 = getOneTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
+    OneTable table1 = getOneTable(tableName, basePath, oneSchema, null, LAST_COMMIT_TIME);
     OneTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
     Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion1 = new SchemaVersion(1, "");
-    schemas.put(schemaVersion1, schema1);
+    schemas.put(schemaVersion1, oneSchema);
     SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
     schemas.put(schemaVersion2, schema2);
 
@@ -240,7 +230,7 @@ public class TestIcebergSync {
     OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyMap());
     OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
-    when(mockSchemaExtractor.toIceberg(schema1)).thenReturn(icebergSchema1);
+    when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema1);
     when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
     ArgumentCaptor<Schema> partitionSpecSchemaArgumentCaptor =
         ArgumentCaptor.forClass(Schema.class);
@@ -308,6 +298,69 @@ public class TestIcebergSync {
     assertNotSame(
         transactionArgumentCaptor.getAllValues().get(1),
         transactionArgumentCaptor.getAllValues().get(2));
+  }
+
+  @Test
+  public void testIncompleteWriteRollback() throws Exception {
+    List<OneField> fields2 = new ArrayList<>(oneSchema.getFields());
+    fields2.add(
+        OneField.builder()
+            .name("long_field")
+            .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
+            .build());
+    OneSchema schema2 = oneSchema.toBuilder().fields(fields2).build();
+    Schema icebergSchema1 =
+        new Schema(
+            Arrays.asList(
+                Types.NestedField.of(1, false, "int_field", Types.IntegerType.get()),
+                Types.NestedField.of(2, false, "string_field", Types.StringType.get())));
+    Schema icebergSchema2 =
+        new Schema(
+            Arrays.asList(
+                Types.NestedField.of(1, false, "int_field", Types.IntegerType.get()),
+                Types.NestedField.of(2, false, "string_field", Types.StringType.get()),
+                Types.NestedField.of(3, false, "long_field", Types.LongType.get())));
+    OneTable table1 = getOneTable(tableName, basePath, oneSchema, null, LAST_COMMIT_TIME);
+    OneTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
+    Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
+    SchemaVersion schemaVersion1 = new SchemaVersion(1, "");
+    schemas.put(schemaVersion1, oneSchema);
+    SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
+    schemas.put(schemaVersion2, schema2);
+
+    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, Collections.emptyMap());
+    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, Collections.emptyMap());
+    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyMap());
+    OneDataFile dataFile4 = getOneDataFile(schemaVersion2, 4, Collections.emptyMap());
+    OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
+    OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
+    OneSnapshot snapshot3 = buildSnapshot(table2, schemas, dataFile3, dataFile4);
+    when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema1);
+    when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
+    ArgumentCaptor<Schema> partitionSpecSchemaArgumentCaptor =
+        ArgumentCaptor.forClass(Schema.class);
+    when(mockPartitionSpecExtractor.toIceberg(
+            eq(null), partitionSpecSchemaArgumentCaptor.capture()))
+        .thenReturn(PartitionSpec.unpartitioned())
+        .thenReturn(PartitionSpec.unpartitioned())
+        .thenReturn(PartitionSpec.unpartitioned());
+    mockColStatsForFile(dataFile1, 2);
+    mockColStatsForFile(dataFile2, 2);
+    mockColStatsForFile(dataFile3, 2);
+    mockColStatsForFile(dataFile4, 1);
+
+    icebergSync.syncSnapshot(snapshot1);
+    icebergSync.syncSnapshot(snapshot2);
+    String manifestFile =
+        new HadoopTables(new Configuration())
+            .load(basePath.toString())
+            .currentSnapshot()
+            .manifestListLocation();
+    Files.delete(Paths.get(URI.create("file://" + manifestFile)));
+
+    // get a new iceberg sync to make sure table is re-read from disk and no metadata is cached
+    getIcebergSync().syncSnapshot(snapshot3);
+    validateIcebergTable(tableName, table2, Sets.newHashSet(dataFile3, dataFile4), null);
   }
 
   @Test

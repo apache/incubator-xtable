@@ -35,6 +35,7 @@ import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NotFoundException;
 
 import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneTable;
@@ -111,6 +112,15 @@ public class IcebergClient implements TargetClient {
   @Override
   public void beginSync(OneTable oneTable) {
     initializeTableIfRequired(oneTable);
+    // There are cases when using the HadoopTables API where the table metadata json is updated but
+    // the manifest file is not written, causing corruption. This is a workaround to fix the issue.
+    if (catalogConfig == null && table.currentSnapshot() != null) {
+      try {
+        table.currentSnapshot().allManifests(table.io());
+      } catch (NotFoundException ex) {
+        table.manageSnapshots().rollbackTo(table.currentSnapshot().parentId()).commit();
+      }
+    }
     transaction = table.newTransaction();
     internalTableState = oneTable;
   }
