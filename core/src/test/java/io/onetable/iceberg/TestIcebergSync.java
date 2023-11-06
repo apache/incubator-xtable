@@ -206,17 +206,9 @@ public class TestIcebergSync {
             .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
             .build());
     OneSchema schema2 = oneSchema.toBuilder().fields(fields2).build();
-    Schema icebergSchema1 =
-        new Schema(
-            Arrays.asList(
-                Types.NestedField.of(1, false, "int_field", Types.IntegerType.get()),
-                Types.NestedField.of(2, false, "string_field", Types.StringType.get())));
-    Schema icebergSchema2 =
-        new Schema(
-            Arrays.asList(
-                Types.NestedField.of(1, false, "int_field", Types.IntegerType.get()),
-                Types.NestedField.of(2, false, "string_field", Types.StringType.get()),
-                Types.NestedField.of(3, false, "long_field", Types.LongType.get())));
+    List<Types.NestedField> fields = new ArrayList<>(icebergSchema.columns());
+    fields.add(Types.NestedField.of(6, false, "long_field", Types.LongType.get()));
+    Schema icebergSchema2 = new Schema(fields);
     OneTable table1 = getOneTable(tableName, basePath, oneSchema, null, LAST_COMMIT_TIME);
     OneTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
     Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
@@ -230,7 +222,7 @@ public class TestIcebergSync {
     OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyMap());
     OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
-    when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema1);
+    when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
     when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
     ArgumentCaptor<Schema> partitionSpecSchemaArgumentCaptor =
         ArgumentCaptor.forClass(Schema.class);
@@ -272,13 +264,13 @@ public class TestIcebergSync {
     // sync to actually change
     assertTrue(
         partitionSpecSchemaArgumentCaptor.getAllValues().stream()
-            .allMatch(capturedSchema -> capturedSchema.sameSchema(icebergSchema1)));
+            .allMatch(capturedSchema -> capturedSchema.sameSchema(icebergSchema)));
     // schema sync args for first iteration
     assertTrue(
         schemaArgumentCaptor.getAllValues().subList(0, 2).stream()
-            .allMatch(capturedSchema -> capturedSchema.sameSchema(icebergSchema1)));
+            .allMatch(capturedSchema -> capturedSchema.sameSchema(icebergSchema)));
     // second snapshot sync will evolve the schema
-    assertTrue(schemaArgumentCaptor.getAllValues().get(2).sameSchema(icebergSchema1));
+    assertTrue(schemaArgumentCaptor.getAllValues().get(2).sameSchema(icebergSchema));
     assertTrue(schemaArgumentCaptor.getAllValues().get(3).sameSchema(icebergSchema2));
     // check that the correct partition spec is used in calls to the mocks
     assertTrue(
@@ -309,17 +301,9 @@ public class TestIcebergSync {
             .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
             .build());
     OneSchema schema2 = oneSchema.toBuilder().fields(fields2).build();
-    Schema icebergSchema1 =
-        new Schema(
-            Arrays.asList(
-                Types.NestedField.of(1, false, "int_field", Types.IntegerType.get()),
-                Types.NestedField.of(2, false, "string_field", Types.StringType.get())));
-    Schema icebergSchema2 =
-        new Schema(
-            Arrays.asList(
-                Types.NestedField.of(1, false, "int_field", Types.IntegerType.get()),
-                Types.NestedField.of(2, false, "string_field", Types.StringType.get()),
-                Types.NestedField.of(3, false, "long_field", Types.LongType.get())));
+    List<Types.NestedField> fields = new ArrayList<>(icebergSchema.columns());
+    fields.add(Types.NestedField.of(6, false, "long_field", Types.LongType.get()));
+    Schema icebergSchema2 = new Schema(fields);
     OneTable table1 = getOneTable(tableName, basePath, oneSchema, null, LAST_COMMIT_TIME);
     OneTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
     Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
@@ -335,7 +319,7 @@ public class TestIcebergSync {
     OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
     OneSnapshot snapshot3 = buildSnapshot(table2, schemas, dataFile3, dataFile4);
-    when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema1);
+    when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
     when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
     ArgumentCaptor<Schema> partitionSpecSchemaArgumentCaptor =
         ArgumentCaptor.forClass(Schema.class);
