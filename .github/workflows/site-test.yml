@@ -1,4 +1,4 @@
-name: Test deployment
+name: Site Test
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   test-deploy:
-    name: Test deployment
+    name: Site Test
     runs-on: ubuntu-latest
     defaults:
       run:
