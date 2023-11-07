@@ -48,7 +48,6 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -61,7 +60,6 @@ import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
-import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import org.apache.iceberg.Table;
 import org.apache.iceberg.hadoop.HadoopTables;
@@ -77,6 +75,7 @@ import io.onetable.delta.DeltaSourceClientProvider;
 import io.onetable.hudi.HudiSourceClientProvider;
 import io.onetable.hudi.HudiSourceConfig;
 import io.onetable.hudi.HudiTestUtil;
+import io.onetable.iceberg.IcebergSourceClientProvider;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 
@@ -87,8 +86,6 @@ public class ITOneTableClient {
 
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;
-  private SourceClientProvider<HoodieInstant> hudiSourceClientProvider;
-  private SourceClientProvider<Long> deltaSourceClientProvider;
 
   @BeforeAll
   public static void setupOnce() {
@@ -100,14 +97,6 @@ public class ITOneTableClient {
         .hadoopConfiguration()
         .set("parquet.avro.write-old-list-structure", "false");
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
-  }
-
-  @BeforeEach
-  public void setup() {
-    hudiSourceClientProvider = new HudiSourceClientProvider();
-    hudiSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
-    deltaSourceClientProvider = new DeltaSourceClientProvider();
-    deltaSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
   }
 
   @AfterAll
@@ -141,13 +130,22 @@ public class ITOneTableClient {
   }
 
   private SourceClientProvider<?> getSourceClientProvider(TableFormat sourceTableFormat) {
-    if (sourceTableFormat == TableFormat.HUDI) {
-      return hudiSourceClientProvider;
-    } else if (sourceTableFormat == TableFormat.DELTA) {
-      return deltaSourceClientProvider;
-    } else {
-      throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
+    SourceClientProvider<?> sourceClientProvider;
+    switch (sourceTableFormat) {
+      case HUDI:
+        sourceClientProvider = new HudiSourceClientProvider();
+        break;
+      case DELTA:
+        sourceClientProvider = new DeltaSourceClientProvider();
+        break;
+      case ICEBERG:
+        sourceClientProvider = new IcebergSourceClientProvider();
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
     }
+    sourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
+    return sourceClientProvider;
   }
 
   /*
@@ -253,6 +251,7 @@ public class ITOneTableClient {
       SyncMode syncMode, PartitionConfig partitionConfig) {
     String tableName = getTableName();
     List<TableFormat> targetTableFormats = getOtherFormats(TableFormat.HUDI);
+    SourceClientProvider<?> hudiSourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, partitionConfig.getHudiConfig(), HoodieTableType.COPY_ON_WRITE)) {
@@ -291,9 +290,9 @@ public class ITOneTableClient {
   public void testConcurrentInsertsAndTableServiceWrites(
       SyncMode syncMode, PartitionConfig partitionConfig) {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
-
     List<TableFormat> targetTableFormats = getOtherFormats(TableFormat.HUDI);
     String tableName = getTableName();
+    SourceClientProvider<?> hudiSourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
     try (TestSparkHudiTable table =
         TestSparkHudiTable.forStandardSchema(
             tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
@@ -460,6 +459,7 @@ public class ITOneTableClient {
       String hudiPartitionConfig,
       String filter) {
     String tableName = getTableName();
+    SourceClientProvider<?> hudiSourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, hudiPartitionConfig, HoodieTableType.COPY_ON_WRITE)) {
@@ -489,6 +489,7 @@ public class ITOneTableClient {
   @EnumSource(value = SyncMode.class)
   public void testSyncWithSingleFormat(SyncMode syncMode) {
     String tableName = getTableName();
+    SourceClientProvider<?> hudiSourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
@@ -531,6 +532,7 @@ public class ITOneTableClient {
   @Test
   public void testOutOfSyncIncrementalSyncs() {
     String tableName = getTableName();
+    SourceClientProvider<?> hudiSourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
@@ -584,6 +586,7 @@ public class ITOneTableClient {
   @Test
   public void testMetadataRetention() {
     String tableName = getTableName();
+    SourceClientProvider<?> hudiSourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
