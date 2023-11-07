@@ -38,22 +38,22 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.hudi.common.util.ReflectionUtils;
-import org.apache.hudi.common.util.VisibleForTesting;
-
 import com.fasterxml.jackson.annotation.JsonMerge;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.google.common.annotations.VisibleForTesting;
 
 import io.onetable.client.OneTableClient;
 import io.onetable.client.PerTableConfig;
 import io.onetable.client.SourceClientProvider;
 import io.onetable.hudi.ConfigurationBasedPartitionSpecExtractor;
 import io.onetable.hudi.HudiSourceConfig;
+import io.onetable.iceberg.IcebergCatalogConfig;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
+import io.onetable.reflection.ReflectionUtils;
 import io.onetable.utilities.RunSync.TableFormatClients.ClientConfig;
 
 /**
@@ -63,9 +63,11 @@ import io.onetable.utilities.RunSync.TableFormatClients.ClientConfig;
 @Log4j2
 public class RunSync {
 
+  public static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
   private static final String DATASET_CONFIG_OPTION = "d";
   private static final String HADOOP_CONFIG_PATH = "p";
   private static final String CLIENTS_CONFIG_PATH = "c";
+  private static final String ICEBERG_CATALOG_CONFIG_PATH = "i";
   private static final String HELP_OPTION = "h";
 
   private static final Options OPTIONS =
@@ -87,6 +89,11 @@ public class RunSync {
               true,
               "The path to a yaml file containing onetable client configurations. "
                   + "These configs will override the default")
+          .addOption(
+              ICEBERG_CATALOG_CONFIG_PATH,
+              "icebergCatalogConfig",
+              true,
+              "The path to a yaml file containing iceberg catalog configuration.")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   public static void main(String[] args) throws IOException, ParseException {
@@ -101,13 +108,14 @@ public class RunSync {
     DatasetConfig datasetConfig = new DatasetConfig();
     try (InputStream inputStream =
         Files.newInputStream(Paths.get(cmd.getOptionValue(DATASET_CONFIG_OPTION)))) {
-      ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-      ObjectReader objectReader = mapper.readerForUpdating(datasetConfig);
+      ObjectReader objectReader = YAML_MAPPER.readerForUpdating(datasetConfig);
       objectReader.readValue(inputStream);
     }
 
     byte[] customConfig = getCustomConfigurations(cmd, HADOOP_CONFIG_PATH);
     Configuration hadoopConf = loadHadoopConf(customConfig);
+    byte[] icebergCatalogConfigInput = getCustomConfigurations(cmd, ICEBERG_CATALOG_CONFIG_PATH);
+    IcebergCatalogConfig icebergCatalogConfig = loadIcebergCatalogConfig(icebergCatalogConfigInput);
 
     String sourceFormat = datasetConfig.sourceFormat;
     customConfig = getCustomConfigurations(cmd, CLIENTS_CONFIG_PATH);
@@ -120,7 +128,8 @@ public class RunSync {
               sourceFormat, tableFormatClients.getTableFormatsClients().keySet()));
     }
     String sourceProviderClass = sourceClientConfig.sourceClientProviderClass;
-    SourceClientProvider<?> sourceClientProvider = ReflectionUtils.loadClass(sourceProviderClass);
+    SourceClientProvider<?> sourceClientProvider =
+        ReflectionUtils.createInstanceOfClass(sourceProviderClass);
     sourceClientProvider.init(hadoopConf, sourceClientConfig.configuration);
 
     List<io.onetable.model.storage.TableFormat> tableFormatList =
@@ -137,6 +146,8 @@ public class RunSync {
           PerTableConfig.builder()
               .tableBasePath(table.getTableBasePath())
               .tableName(table.getTableName())
+              .namespace(table.getNamespace().split("\\."))
+              .icebergCatalogConfig(icebergCatalogConfig)
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
                       .partitionSpecExtractorClass(
@@ -184,13 +195,19 @@ public class RunSync {
     // get resource stream from default client config yaml file
     try (InputStream inputStream =
         RunSync.class.getClassLoader().getResourceAsStream("onetable-client-defaults.yaml")) {
-      ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-      TableFormatClients clients = mapper.readValue(inputStream, TableFormatClients.class);
+      TableFormatClients clients = YAML_MAPPER.readValue(inputStream, TableFormatClients.class);
       if (customConfigs != null) {
-        mapper.readerForUpdating(clients).readValue(customConfigs);
+        YAML_MAPPER.readerForUpdating(clients).readValue(customConfigs);
       }
       return clients;
     }
+  }
+
+  @VisibleForTesting
+  static IcebergCatalogConfig loadIcebergCatalogConfig(byte[] customConfigs) throws IOException {
+    return customConfigs == null
+        ? null
+        : YAML_MAPPER.readValue(customConfigs, IcebergCatalogConfig.class);
   }
 
   @Data
@@ -219,6 +236,7 @@ public class RunSync {
 
       String tableName;
       String partitionSpec;
+      String namespace;
     }
   }
 
