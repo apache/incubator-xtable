@@ -85,7 +85,7 @@ public class IcebergSchemaExtractor {
               .collect(Collectors.toList());
       log.error("Missing field IDs for record key field paths: " + missingFieldPaths);
       throw new SchemaExtractorException(
-          String.format("Mismatches in converting record key fields: %", missingFieldPaths));
+          String.format("Mismatches in converting record key fields: %s", missingFieldPaths));
     }
     return new Schema(nestedFields, recordKeyIds);
   }
@@ -100,6 +100,7 @@ public class IcebergSchemaExtractor {
     return OneSchema.builder()
         .dataType(OneType.RECORD)
         .fields(fromIceberg(iceSchema.columns(), null))
+        .name("record")
         .build();
   }
 

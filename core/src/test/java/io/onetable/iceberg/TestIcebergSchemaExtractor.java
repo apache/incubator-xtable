@@ -54,6 +54,7 @@ public class TestIcebergSchemaExtractor {
         OneSchema.builder()
             .dataType(OneType.RECORD)
             .isNullable(false)
+            .name("record")
             .fields(
                 Arrays.asList(
                     OneField.builder()
@@ -360,6 +361,7 @@ public class TestIcebergSchemaExtractor {
     OneSchema expectedSchema =
         OneSchema.builder()
             .dataType(OneType.RECORD)
+            .name("record")
             .fields(
                 Arrays.asList(
                     OneField.builder()
@@ -401,6 +403,7 @@ public class TestIcebergSchemaExtractor {
 
     OneSchema irSchema =
         OneSchema.builder()
+            .name("record")
             .dataType(OneType.RECORD)
             .fields(
                 Arrays.asList(
@@ -518,6 +521,7 @@ public class TestIcebergSchemaExtractor {
     OneSchema expectedIrSchema =
         OneSchema.builder()
             .dataType(OneType.RECORD)
+            .name("record")
             .fields(
                 Arrays.asList(
                     OneField.builder()
@@ -605,6 +609,7 @@ public class TestIcebergSchemaExtractor {
             .build();
     OneSchema oneSchemaRepresentation =
         OneSchema.builder()
+            .name("record")
             .dataType(OneType.RECORD)
             .isNullable(false)
             .fields(
@@ -733,6 +738,7 @@ public class TestIcebergSchemaExtractor {
     OneSchema oneSchemaRepresentation =
         OneSchema.builder()
             .dataType(OneType.RECORD)
+            .name("record")
             .isNullable(false)
             .fields(
                 Arrays.asList(
@@ -803,6 +809,7 @@ public class TestIcebergSchemaExtractor {
     OneSchema oneSchemaRepresentation =
         OneSchema.builder()
             .dataType(OneType.RECORD)
+            .name("record")
             .isNullable(false)
             .fields(
                 Arrays.asList(
