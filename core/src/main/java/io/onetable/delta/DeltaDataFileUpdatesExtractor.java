@@ -28,10 +28,6 @@ import java.util.stream.Stream;
 
 import lombok.Builder;
 
-import org.apache.hadoop.fs.Path;
-
-import org.apache.hudi.hadoop.CachingPath;
-
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.actions.Action;
 import org.apache.spark.sql.delta.actions.AddFile;
@@ -84,21 +80,20 @@ public class DeltaDataFileUpdatesExtractor {
   public Seq<Action> applyDiff(
       OneDataFilesDiff oneDataFilesDiff, OneSchema tableSchema, String tableBasePath) {
     List<Action> allActions = new ArrayList<>();
-    Path tableBaseAsPath = new CachingPath(tableBasePath);
     allActions.addAll(
         oneDataFilesDiff.getFilesAdded().stream()
-            .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBaseAsPath))
+            .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath))
             .collect(Collectors.toList()));
     allActions.addAll(
         oneDataFilesDiff.getFilesRemoved().stream()
-            .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBaseAsPath))
+            .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath))
             .map(AddFile::remove)
             .collect(Collectors.toList()));
     return JavaConverters.asScalaBuffer(allActions).toSeq();
   }
 
   private Stream<AddFile> createAddFileAction(
-      OneDataFile dataFile, OneSchema schema, Path tableBasePath) {
+      OneDataFile dataFile, OneSchema schema, String tableBasePath) {
     return Stream.of(
         new AddFile(
             // Delta Lake supports relative and absolute paths in theory but relative paths seem
@@ -121,12 +116,9 @@ public class DeltaDataFileUpdatesExtractor {
     }
   }
 
-  private String getRelativePath(String fullFilePath, Path tableBasePath) {
-    if (fullFilePath.startsWith(tableBasePath.toString())) {
-      return fullFilePath.substring(tableBasePath.toString().length() + 1);
-    }
-    if (fullFilePath.startsWith(tableBasePath.toUri().getPath())) {
-      return fullFilePath.substring(tableBasePath.toUri().getPath().length() + 1);
+  private String getRelativePath(String fullFilePath, String tableBasePath) {
+    if (fullFilePath.startsWith(tableBasePath)) {
+      return fullFilePath.substring(tableBasePath.length() + 1);
     }
     return fullFilePath;
   }
