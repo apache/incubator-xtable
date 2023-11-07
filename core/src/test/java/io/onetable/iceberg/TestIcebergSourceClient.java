@@ -86,7 +86,7 @@ class TestIcebergSourceClient {
     IcebergSourceClient client = clientProvider.getSourceClientInstance(sourceTableConfig);
 
     Snapshot snapshot = catalogSales.currentSnapshot();
-    OneTable oneTable = client.getTable(snapshot);
+    OneTable oneTable = client.getTable(snapshot.snapshotId());
     Assertions.assertNotNull(oneTable);
     Assertions.assertEquals(TableFormat.ICEBERG, oneTable.getTableFormat());
     Assertions.assertTrue(oneTable.getName().endsWith("catalog_sales"));
@@ -121,7 +121,7 @@ class TestIcebergSourceClient {
     IcebergSourceClient client = clientProvider.getSourceClientInstance(sourceTableConfig);
     IcebergSourceClient spyClient = spy(client);
 
-    SchemaCatalog schemaCatalog = spyClient.getSchemaCatalog(null, iceCurrentSnapshot);
+    SchemaCatalog schemaCatalog = spyClient.getSchemaCatalog(null, iceCurrentSnapshot.snapshotId());
     Assertions.assertNotNull(schemaCatalog);
     Map<SchemaVersion, OneSchema> schemas = schemaCatalog.getSchemas();
     Assertions.assertEquals(1, schemas.size());
@@ -156,8 +156,9 @@ class TestIcebergSourceClient {
     Assertions.assertEquals(
         String.valueOf(iceCurrentSnapshot.snapshotId()), oneSnapshot.getVersion());
     Assertions.assertNotNull(oneSnapshot.getTable());
-    verify(spyClient, times(1)).getTable(iceCurrentSnapshot);
-    verify(spyClient, times(1)).getSchemaCatalog(oneSnapshot.getTable(), iceCurrentSnapshot);
+    verify(spyClient, times(1)).getTable(iceCurrentSnapshot.snapshotId());
+    verify(spyClient, times(1))
+        .getSchemaCatalog(oneSnapshot.getTable(), iceCurrentSnapshot.snapshotId());
     verify(spyPartitionConverter, times(5)).toOneTable(any(), any(), any());
     verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any(), any());
 
@@ -315,9 +316,11 @@ class TestIcebergSourceClient {
             .lastSyncInstant(Instant.ofEpochMilli(lastSync.timestampMillis()))
             .build();
     IcebergSourceClient sourceClient = getIcebergSourceClient(table);
-    CommitsBacklog<Snapshot> commitsBacklog = sourceClient.getCommitsBacklog(instant);
+    CommitsBacklog<Long> commitsBacklog = sourceClient.getCommitsBacklog(instant);
     Assertions.assertEquals(0, commitsBacklog.getInFlightInstants().size());
-    Assertions.assertArrayEquals(snapshots, commitsBacklog.getCommitsToProcess().toArray());
+    Long[] snapshotIds =
+        Arrays.stream(snapshots).map(snapshot -> snapshot.snapshotId()).toArray(Long[]::new);
+    Assertions.assertArrayEquals(snapshotIds, commitsBacklog.getCommitsToProcess().toArray());
   }
 
   private static long getDataFileCount(Table catalogSales) throws IOException {
@@ -329,7 +332,7 @@ class TestIcebergSourceClient {
   private void validateTableChangeDiffSize(
       Table table, Snapshot snapshot, int addedFiles, int removedFiles) {
     IcebergSourceClient sourceClient = getIcebergSourceClient(table);
-    TableChange tableChange = sourceClient.getTableChangeForCommit(snapshot);
+    TableChange tableChange = sourceClient.getTableChangeForCommit(snapshot.snapshotId());
     Assertions.assertEquals(addedFiles, tableChange.getFilesDiff().getFilesAdded().size());
     Assertions.assertEquals(removedFiles, tableChange.getFilesDiff().getFilesRemoved().size());
   }

@@ -52,7 +52,7 @@ import io.onetable.spi.extractor.SourceClient;
 
 @Log4j2
 @Builder
-public class IcebergSourceClient implements SourceClient<Snapshot> {
+public class IcebergSourceClient implements SourceClient<Long> {
   @NonNull private final Configuration hadoopConf;
   @NonNull private final PerTableConfig sourceTableConfig;
 
@@ -89,8 +89,9 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   }
 
   @Override
-  public OneTable getTable(Snapshot snapshot) {
+  public OneTable getTable(Long snapshotId) {
     Table iceTable = getSourceTable();
+    Snapshot snapshot = iceTable.snapshot(snapshotId);
 
     Schema iceSchema = iceTable.schemas().get(snapshot.schemaId());
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
@@ -113,8 +114,9 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   }
 
   @Override
-  public SchemaCatalog getSchemaCatalog(OneTable table, Snapshot snapshot) {
+  public SchemaCatalog getSchemaCatalog(OneTable table, Long snapshotId) {
     Table iceTable = getSourceTable();
+    Snapshot snapshot = iceTable.snapshot(snapshotId);
     Integer iceSchemaId = snapshot.schemaId();
     Schema iceSchema = iceTable.schemas().get(iceSchemaId);
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
@@ -129,8 +131,8 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     Table iceTable = getSourceTable();
 
     Snapshot currentSnapshot = iceTable.currentSnapshot();
-    OneTable irTable = getTable(currentSnapshot);
-    SchemaCatalog schemaCatalog = getSchemaCatalog(irTable, currentSnapshot);
+    OneTable irTable = getTable(currentSnapshot.snapshotId());
+    SchemaCatalog schemaCatalog = getSchemaCatalog(irTable, currentSnapshot.snapshotId());
 
     TableScan scan = iceTable.newScan().useSnapshot(currentSnapshot.snapshotId());
     PartitionSpec partitionSpec = iceTable.spec();
@@ -162,11 +164,12 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   }
 
   @Override
-  public TableChange getTableChangeForCommit(Snapshot snapshot) {
+  public TableChange getTableChangeForCommit(Long snapshotId) {
     FileIO fileIO = getTableOps();
     Table iceTable = getSourceTable();
     PartitionSpec partitionSpec = iceTable.spec();
-    OneTable irTable = getTable(snapshot);
+    Snapshot snapshot = iceTable.snapshot(snapshotId);
+    OneTable irTable = getTable(snapshotId);
 
     Set<OneDataFile> dataFilesAdded =
         StreamSupport.stream(snapshot.addedDataFiles(fileIO).spliterator(), false)
@@ -184,12 +187,12 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
             .filesRemoved(dataFilesRemoved)
             .build();
 
-    OneTable table = getTable(snapshot);
+    OneTable table = getTable(snapshot.snapshotId());
     return TableChange.builder().tableAsOfChange(table).filesDiff(filesDiff).build();
   }
 
   @Override
-  public CommitsBacklog<Snapshot> getCommitsBacklog(InstantsForIncrementalSync lastSyncInstant) {
+  public CommitsBacklog<Long> getCommitsBacklog(InstantsForIncrementalSync lastSyncInstant) {
 
     long epochMilli = lastSyncInstant.getLastSyncInstant().toEpochMilli();
     Table iceTable = getSourceTable();
@@ -204,18 +207,18 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     if (pendingSnapshot.timestampMillis() <= epochMilli) {
       // Even the latest snapshot was committed before the lastSyncInstant. No new commits were made
       // and no new snapshots need to be synced. Return empty state.
-      return CommitsBacklog.<Snapshot>builder().build();
+      return CommitsBacklog.<Long>builder().build();
     }
 
-    List<Snapshot> snapshots = new ArrayList<>();
+    List<Long> snapshotIds = new ArrayList<>();
     while (pendingSnapshot != null && pendingSnapshot.timestampMillis() > epochMilli) {
-      snapshots.add(pendingSnapshot);
+      snapshotIds.add(pendingSnapshot.snapshotId());
       pendingSnapshot =
           pendingSnapshot.parentId() != null ? iceTable.snapshot(pendingSnapshot.parentId()) : null;
     }
     // reverse the list to process the oldest snapshot first
-    Collections.reverse(snapshots);
-    return CommitsBacklog.<Snapshot>builder().commitsToProcess(snapshots).build();
+    Collections.reverse(snapshotIds);
+    return CommitsBacklog.<Long>builder().commitsToProcess(snapshotIds).build();
   }
 
   // TODO(https://github.com/onetable-io/onetable/issues/147): Handle this.
