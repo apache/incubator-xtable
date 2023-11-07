@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -35,10 +36,12 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.encoders.RowEncoder;
 
+import scala.collection.JavaConverters;
+
 import io.onetable.delta.TestDeltaHelper;
 
 public class TestSparkIcebergTable implements GenericTable<Row, String> {
-  private static final String NAMESPACE = "iceberg";
+  private static final String NAMESPACE = "default";
   private final SparkSession sparkSession;
   private final TestDeltaHelper testDeltaHelper;
   private final String tableFQN;
@@ -78,31 +81,31 @@ public class TestSparkIcebergTable implements GenericTable<Row, String> {
 
   @SneakyThrows
   private void initializeTable(boolean isPartitioned) {
+    setCatalog();
     CreateTableWriter<Row> createTableWriter =
         sparkSession
             .emptyDataset(RowEncoder.apply(testDeltaHelper.getTableStructSchema()))
             .writeTo(tableFQN)
             .using("iceberg");
     if (isPartitioned) {
-      createTableWriter = createTableWriter.partitionedBy(new Column("level"), null);
+      createTableWriter =
+          createTableWriter.partitionedBy(
+              new Column("level"),
+              JavaConverters.<Column>asScalaBuffer(Collections.emptyList()).seq());
     }
     createTableWriter.create();
   }
 
-  @SneakyThrows
   @Override
   public List<Row> insertRows(int numRows) {
     List<Row> rows = testDeltaHelper.generateRows(numRows);
-    Dataset<Row> df = sparkSession.createDataFrame(rows, testDeltaHelper.getTableStructSchema());
-    df.writeTo(tableFQN).append();
+    insertRows(rows);
     return rows;
   }
 
-  @SneakyThrows
   private List<Row> insertRowsForPartition(int numRows, String level) {
     List<Row> rows = testDeltaHelper.generateRowsForSpecificPartition(numRows, 1990, level);
-    Dataset<Row> df = sparkSession.createDataFrame(rows, testDeltaHelper.getTableStructSchema());
-    df.writeTo(tableFQN).append();
+    insertRows(rows);
     return rows;
   }
 
@@ -111,9 +114,18 @@ public class TestSparkIcebergTable implements GenericTable<Row, String> {
     return insertRowsForPartition(numRows, SPECIAL_PARTITION_VALUE);
   }
 
+  @SneakyThrows
+  private void insertRows(List<Row> rows) {
+    setCatalog();
+    Dataset<Row> dataset =
+        sparkSession.createDataFrame(rows, testDeltaHelper.getTableStructSchema());
+    dataset.writeTo(tableFQN).append();
+  }
+
   @Override
   @SneakyThrows
   public void upsertRows(List<Row> rows) {
+    setCatalog();
     List<Row> upserts = testDeltaHelper.transformForUpsertsOrDeletes(rows, true);
     Dataset<Row> upsertDataset =
         sparkSession.createDataFrame(upserts, testDeltaHelper.getTableStructSchema());
@@ -129,6 +141,7 @@ public class TestSparkIcebergTable implements GenericTable<Row, String> {
 
   @Override
   public void deleteRows(List<Row> rows) {
+    setCatalog();
     List<Row> deletes = testDeltaHelper.transformForUpsertsOrDeletes(rows, false);
     List<Integer> ids = deletes.stream().map(row -> row.getInt(0)).collect(Collectors.toList());
     sparkSession.sql(
@@ -166,5 +179,9 @@ public class TestSparkIcebergTable implements GenericTable<Row, String> {
   @Override
   public List<String> getColumnsToSelect() {
     return Arrays.asList(testDeltaHelper.getTableStructSchema().fieldNames());
+  }
+
+  private void setCatalog() {
+    sparkSession.sql("USE default_iceberg.default");
   }
 }
