@@ -99,6 +99,7 @@ public class IcebergSchemaExtractor {
   public OneSchema fromIceberg(Schema iceSchema) {
     return OneSchema.builder()
         .dataType(OneType.RECORD)
+        .name("record")
         .fields(fromIceberg(iceSchema.columns(), null))
         .name("record")
         .build();
