@@ -93,7 +93,7 @@ public class RunSync {
               ICEBERG_CATALOG_CONFIG_PATH,
               "icebergCatalogConfig",
               true,
-              "The path to a yaml file containing iceberg catalog configuration.")
+              "The path to a yaml file containing iceberg catalog configuration. The configuration will be used for any Iceberg source or target.")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   public static void main(String[] args) throws IOException, ParseException {
