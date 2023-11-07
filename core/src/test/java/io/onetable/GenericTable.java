@@ -70,6 +70,9 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       case DELTA:
         return TestSparkDeltaTable.forStandardSchemaAndPartitioning(
             tableName, tempDir, sparkSession, isPartitioned ? "level" : null);
+      case ICEBERG:
+        return TestSparkIcebergTable.forStandardSchemaAndPartitioning(
+            tableName, tempDir, sparkSession, isPartitioned);
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
     }
@@ -89,6 +92,9 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       case DELTA:
         return TestSparkDeltaTable.forSchemaWithAdditionalColumnsAndPartitioning(
             tableName, tempDir, sparkSession, isPartitioned ? "level" : null);
+      case ICEBERG:
+        return TestSparkIcebergTable.forSchemaWithAdditionalColumnsAndPartitioning(
+            tableName, tempDir, sparkSession, isPartitioned);
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
     }
