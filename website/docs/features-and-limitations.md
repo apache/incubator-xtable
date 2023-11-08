@@ -14,7 +14,7 @@ OneTable provides two sync modes, "incremental" and "full." The incremental mode
 This sync provides users with the following: the following information in sync between the source and target tables:  
 1. Syncing of data files along with their column level statistics and partition metadata 
 2. Schema updates in the source are reflected in the target table metadata
-3. Metadata maintenance for the target table formats
+3. Metadata maintenance for the target table formats. For Hudi, unreferenced files will be marked as cleaned to control the size of the metadata table. For Iceberg, snapshots will be expired after a configured amount of time. For Delta, the transaction log will be retained for a configured amount of time.
 
 ## Limitations
 ### General
