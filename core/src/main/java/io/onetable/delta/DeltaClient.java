@@ -80,7 +80,7 @@ public class DeltaClient implements TargetClient {
 
   public DeltaClient(PerTableConfig perTableConfig, SparkSession sparkSession) {
     this(
-        perTableConfig.getDataBasePath(),
+        perTableConfig.getTableDataPath(),
         perTableConfig.getTableName(),
         perTableConfig.getTargetMetadataRetentionInHours(),
         sparkSession,
@@ -90,14 +90,14 @@ public class DeltaClient implements TargetClient {
   }
 
   DeltaClient(
-      String dataBasePath,
+      String tableDataPath,
       String tableName,
       int logRetentionInHours,
       SparkSession sparkSession,
       DeltaSchemaExtractor schemaExtractor,
       DeltaPartitionExtractor partitionExtractor,
       DeltaDataFileUpdatesExtractor dataFileUpdatesExtractor) {
-    DeltaLog deltaLog = DeltaLog.forTable(sparkSession, dataBasePath);
+    DeltaLog deltaLog = DeltaLog.forTable(sparkSession, tableDataPath);
     boolean deltaTableExists = deltaLog.tableExists();
     if (!deltaTableExists) {
       deltaLog.ensureLogDirectoryExist();
