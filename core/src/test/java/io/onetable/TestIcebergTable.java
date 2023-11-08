@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -52,12 +53,16 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.GenericAppenderFactory;
 import org.apache.iceberg.data.Record;
+import org.apache.iceberg.data.parquet.GenericParquetReaders;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.iceberg.hadoop.HadoopInputFile;
 import org.apache.iceberg.hadoop.HadoopOutputFile;
+import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileAppender;
+import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.io.OutputFile;
+import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 
 import io.onetable.iceberg.TestIcebergDataHelper;
@@ -161,46 +166,75 @@ public class TestIcebergTable implements GenericTable<Record, String> {
 
   @SneakyThrows
   @Override
-  public void upsertRows(List<Record> records) {
-    List<Record> upsertRecords = icebergDataHelper.generateUpsertRecords(records);
+  public void upsertRows(List<Record> recordsToUpdate) {
+    Set<String> idsToUpdate =
+        recordsToUpdate.stream()
+            .map(r -> r.getField(DEFAULT_RECORD_KEY_FIELD).toString())
+            .collect(Collectors.toSet());
+    List<Record> allRecordsInTable = getAllRecordsInTable();
+    List<Record> recordsWithNoUpdates =
+        allRecordsInTable.stream()
+            .filter(r -> !idsToUpdate.contains(r.getField(DEFAULT_RECORD_KEY_FIELD).toString()))
+            .collect(Collectors.toList());
+    List<Record> updatedRecords = icebergDataHelper.generateUpsertRecords(recordsToUpdate);
+    List<Record> combinedRecords = new ArrayList<>(recordsWithNoUpdates);
+    combinedRecords.addAll(updatedRecords);
+
+    OverwriteFiles overwrite = icebergTable.newOverwrite();
     GenericAppenderFactory appenderFactory = new GenericAppenderFactory(icebergTable.schema());
     PartitionSpec spec = icebergTable.spec();
 
     // Group records by partition
     Map<StructLike, List<Record>> recordsByPartition = new HashMap<>();
     PartitionKey partitionKey = new PartitionKey(spec, icebergTable.schema());
-    for (Record record : upsertRecords) {
+    for (Record record : combinedRecords) {
       partitionKey.partition(record);
       recordsByPartition.computeIfAbsent(partitionKey.copy(), k -> new ArrayList<>()).add(record);
     }
-    List<DataFile> newDataFiles = new ArrayList<>();
+
+    // Delete existing files in table.
+    getCurrentFilesInTable().forEach(dataFile -> overwrite.deleteFile(dataFile));
+
     for (Map.Entry<StructLike, List<Record>> entry : recordsByPartition.entrySet()) {
       DataFile dataFile = writeAndGetDataFile(appenderFactory, entry.getValue(), entry.getKey());
-      newDataFiles.add(dataFile);
-    }
-
-    OverwriteFiles overwrite = icebergTable.newOverwrite();
-    String[] idsToDelete =
-        records.stream()
-            .map(r -> r.getField(DEFAULT_RECORD_KEY_FIELD).toString())
-            .toArray(String[]::new);
-    overwrite.overwriteByRowFilter(Expressions.in(DEFAULT_RECORD_KEY_FIELD, idsToDelete));
-    for (DataFile dataFile : newDataFiles) {
       overwrite.addFile(dataFile);
     }
     overwrite.commit();
   }
 
   @Override
-  public void deleteRows(List<Record> rows) {
-    List<Object> idsToDelete =
-        rows.stream()
-            .map(row -> row.getField(DEFAULT_RECORD_KEY_FIELD))
+  @SneakyThrows
+  public void deleteRows(List<Record> recordsToDelete) {
+    Set<String> idsToDelete =
+        recordsToDelete.stream()
+            .map(r -> r.getField(DEFAULT_RECORD_KEY_FIELD).toString())
+            .collect(Collectors.toSet());
+    List<Record> allRecordsInTable = getAllRecordsInTable();
+    List<Record> recordsToRetain =
+        allRecordsInTable.stream()
+            .filter(r -> !idsToDelete.contains(r.getField(DEFAULT_RECORD_KEY_FIELD).toString()))
             .collect(Collectors.toList());
-    icebergTable
-        .newDelete()
-        .deleteFromRowFilter(Expressions.in(DEFAULT_RECORD_KEY_FIELD, idsToDelete))
-        .commit();
+
+    OverwriteFiles overwrite = icebergTable.newOverwrite();
+    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(icebergTable.schema());
+    PartitionSpec spec = icebergTable.spec();
+
+    // Group records by partition
+    Map<StructLike, List<Record>> recordsByPartition = new HashMap<>();
+    PartitionKey partitionKey = new PartitionKey(spec, icebergTable.schema());
+    for (Record record : recordsToRetain) {
+      partitionKey.partition(record);
+      recordsByPartition.computeIfAbsent(partitionKey.copy(), k -> new ArrayList<>()).add(record);
+    }
+
+    // Delete existing files in table.
+    getCurrentFilesInTable().forEach(dataFile -> overwrite.deleteFile(dataFile));
+
+    for (Map.Entry<StructLike, List<Record>> entry : recordsByPartition.entrySet()) {
+      DataFile dataFile = writeAndGetDataFile(appenderFactory, entry.getValue(), entry.getKey());
+      overwrite.addFile(dataFile);
+    }
+    overwrite.commit();
   }
 
   @Override
@@ -220,8 +254,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
 
   @Override
   public String getBasePath() {
-    // TODO(vamshigv): Check if customization needs to be done as we have "data" folder etc..
-    return basePath;
+    return basePath + "/" + tableName;
   }
 
   @Override
@@ -293,5 +326,34 @@ public class TestIcebergTable implements GenericTable<Record, String> {
         .withPartition(partitionKey)
         .withRecordCount(records.size())
         .build();
+  }
+
+  private List<DataFile> getCurrentFilesInTable() {
+    List<DataFile> allFiles = new ArrayList<>();
+    Iterable<FileScanTask> fileScanTasks = icebergTable.newScan().planFiles();
+    fileScanTasks.forEach(fileScanTask -> allFiles.add(fileScanTask.file()));
+    return allFiles;
+  }
+
+  private List<Record> getAllRecordsInTable() throws IOException {
+    List<Record> allRecords = new ArrayList<>();
+    Iterable<FileScanTask> fileScanTasks = icebergTable.newScan().planFiles();
+    for (FileScanTask fileScanTask : fileScanTasks) {
+      DataFile dataFile = fileScanTask.file();
+      InputFile inputFile = icebergTable.io().newInputFile(dataFile.path().toString());
+
+      try (CloseableIterable<Record> reader =
+          Parquet.read(inputFile)
+              .project(icebergTable.schema())
+              .createReaderFunc(
+                  fileSchema ->
+                      GenericParquetReaders.buildReader(icebergTable.schema(), fileSchema))
+              .build()) {
+        for (Record record : reader) {
+          allRecords.add(record);
+        }
+      }
+    }
+    return allRecords;
   }
 }

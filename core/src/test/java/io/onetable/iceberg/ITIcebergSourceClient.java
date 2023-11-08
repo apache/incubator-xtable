@@ -23,7 +23,6 @@ import static io.onetable.ValidationTestHelper.validateOneSnapshot;
 import static io.onetable.ValidationTestHelper.validateTableChanges;
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,7 +30,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -54,9 +53,15 @@ public class ITIcebergSourceClient {
   @TempDir public static Path tempDir;
   private IcebergSourceClientProvider clientProvider;
 
+  @BeforeEach
+  void setup() {
+    clientProvider = new IcebergSourceClientProvider();
+    clientProvider.init(hadoopConf, null);
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  public void testIcebergSourceClient(boolean isPartitioned) throws IOException {
+  public void testIcebergSourceClient(boolean isPartitioned) {
     String tableName = getTableName();
     try (TestIcebergTable testIcebergTable =
         TestIcebergTable.forStandardSchemaAndPartitioning(
@@ -64,6 +69,7 @@ public class ITIcebergSourceClient {
       List<List<String>> allActiveFiles = new ArrayList<>();
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
+
       List<Record> records = testIcebergTable.insertRows(50);
       Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
@@ -78,65 +84,6 @@ public class ITIcebergSourceClient {
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
       testIcebergTable.deleteRows(records1.subList(0, 20));
-      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
-
-      testIcebergTable.insertRows(50);
-      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
-
-      PerTableConfig tableConfig =
-          PerTableConfig.builder()
-              .tableName(testIcebergTable.getTableName())
-              .tableBasePath(testIcebergTable.getBasePath())
-              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
-              .build();
-      IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
-      assertEquals(180L, testIcebergTable.getNumRows());
-      OneSnapshot oneSnapshot = icebergSourceClient.getCurrentSnapshot();
-
-      if (isPartitioned) {
-        validateIcebergPartitioning(oneSnapshot);
-      }
-      validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
-      // Get changes in incremental format.
-      InstantsForIncrementalSync instantsForIncrementalSync =
-          InstantsForIncrementalSync.builder()
-              .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
-              .build();
-      CommitsBacklog<Long> commitsBacklog =
-          icebergSourceClient.getCommitsBacklog(instantsForIncrementalSync);
-      for (Long snapshotId : commitsBacklog.getCommitsToProcess()) {
-        TableChange tableChange = icebergSourceClient.getTableChangeForCommit(snapshotId);
-        allTableChanges.add(tableChange);
-      }
-      validateTableChanges(allActiveFiles, allTableChanges);
-    }
-  }
-
-  @Test
-  public void canDelete() throws IOException {
-    boolean isPartitioned = false;
-    String tableName = getTableName();
-    try (TestIcebergTable testIcebergTable =
-        TestIcebergTable.forStandardSchemaAndPartitioning(
-            tableName, isPartitioned ? "level" : null, tempDir, hadoopConf)) {
-      List<List<String>> allActiveFiles = new ArrayList<>();
-      List<List<String>> allBaseFilePaths = new ArrayList<>();
-      List<TableChange> allTableChanges = new ArrayList<>();
-      List<Record> records = testIcebergTable.insertRows(50);
-      Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
-      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
-
-      // TODO(vamshigv): can't find a way to do partial updates/deletes for now, explore.
-      testIcebergTable.upsertRows(records);
-      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
-
-      testIcebergTable.deleteRows(records);
-      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
-
-      testIcebergTable.insertRows(50);
-      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
-
-      testIcebergTable.insertRows(50);
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
       testIcebergTable.insertRows(50);
