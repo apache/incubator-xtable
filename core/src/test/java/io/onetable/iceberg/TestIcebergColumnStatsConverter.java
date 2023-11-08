@@ -270,16 +270,31 @@ public class TestIcebergColumnStatsConverter {
     Map<Integer, Long> valueCounts = new HashMap<>();
     valueCounts.put(1, 123L);
     valueCounts.put(3, 456L);
+    valueCounts.put(4, 1000L);
+    valueCounts.put(5, 1000L);
+    valueCounts.put(6, 1000L);
     Map<Integer, Long> nullCounts = new HashMap<>();
     nullCounts.put(1, 32L);
     nullCounts.put(3, 456L);
+    nullCounts.put(4, 789L);
+    nullCounts.put(5, 789L);
+    nullCounts.put(6, 789L);
     Map<Integer, Long> columnSizes = new HashMap<>();
     columnSizes.put(1, 13L);
     columnSizes.put(3, 31L);
+    columnSizes.put(4, 42L);
+    columnSizes.put(5, 42L);
+    columnSizes.put(6, 42L);
     Map<Integer, ByteBuffer> lowerBounds = new HashMap<>();
     lowerBounds.put(1, Conversions.toByteBuffer(Types.IntegerType.get(), 1));
+    lowerBounds.put(4, Conversions.toByteBuffer(Types.StringType.get(), "a"));
+    lowerBounds.put(5, Conversions.toByteBuffer(Types.DateType.get(), 18181));
+    lowerBounds.put(6, Conversions.toByteBuffer(Types.TimestampType.withZone(), 10000000L));
     Map<Integer, ByteBuffer> upperBounds = new HashMap<>();
     upperBounds.put(1, Conversions.toByteBuffer(Types.IntegerType.get(), 2));
+    upperBounds.put(4, Conversions.toByteBuffer(Types.StringType.get(), "zzz"));
+    upperBounds.put(5, Conversions.toByteBuffer(Types.DateType.get(), 18182));
+    upperBounds.put(6, Conversions.toByteBuffer(Types.TimestampType.withZone(), 20000000L));
 
     List<OneField> fields =
         Arrays.asList(
@@ -297,6 +312,21 @@ public class TestIcebergColumnStatsConverter {
                 .fieldId(3)
                 .name("null_field")
                 .schema(OneSchema.builder().dataType(OneType.INT).build())
+                .build(),
+            OneField.builder()
+                .fieldId(4)
+                .name("string_field")
+                .schema(OneSchema.builder().dataType(OneType.STRING).build())
+                .build(),
+            OneField.builder()
+                .fieldId(5)
+                .name("date_field")
+                .schema(OneSchema.builder().dataType(OneType.DATE).build())
+                .build(),
+            OneField.builder()
+                .fieldId(6)
+                .name("timestamp_field")
+                .schema(OneSchema.builder().dataType(OneType.TIMESTAMP).build())
                 .build());
 
     Map<OneField, ColumnStat> actual =
@@ -318,6 +348,30 @@ public class TestIcebergColumnStatsConverter {
             .numNulls(456)
             .totalSize(31)
             .range(Range.vector(null, null))
+            .build());
+    expected.put(
+        fields.get(3),
+        ColumnStat.builder()
+            .numValues(1000L)
+            .numNulls(789L)
+            .totalSize(42)
+            .range(Range.vector("a", "zzz"))
+            .build());
+    expected.put(
+        fields.get(4),
+        ColumnStat.builder()
+            .numValues(1000L)
+            .numNulls(789L)
+            .totalSize(42)
+            .range(Range.vector(18181, 18182))
+            .build());
+    expected.put(
+        fields.get(5),
+        ColumnStat.builder()
+            .numValues(1000L)
+            .numNulls(789L)
+            .totalSize(42)
+            .range(Range.vector(10000000L, 20000000L))
             .build());
     assertEquals(expected, actual);
   }

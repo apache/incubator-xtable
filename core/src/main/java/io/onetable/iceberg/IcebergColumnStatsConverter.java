@@ -108,8 +108,8 @@ public class IcebergColumnStatsConverter {
                   long numNulls = nullCounts.get(fieldId);
                   long totalSize = size.get(fieldId);
                   Type fieldType = SCHEMA_EXTRACTOR.toIcebergType(field, new AtomicInteger(1));
-                  Object minValue = Conversions.fromByteBuffer(fieldType, minValues.get(fieldId));
-                  Object maxValue = Conversions.fromByteBuffer(fieldType, maxValues.get(fieldId));
+                  Object minValue = convertFromIcebergValue(fieldType, minValues.get(fieldId));
+                  Object maxValue = convertFromIcebergValue(fieldType, maxValues.get(fieldId));
                   Range range = Range.vector(minValue, maxValue);
                   return ColumnStat.builder()
                       .numValues(numValues)
@@ -118,5 +118,17 @@ public class IcebergColumnStatsConverter {
                       .range(range)
                       .build();
                 }));
+  }
+
+  private Object convertFromIcebergValue(Type fieldType, ByteBuffer value) {
+    if (value == null) {
+      return null;
+    }
+    Object convertedValue = Conversions.fromByteBuffer(fieldType, value);
+    if (fieldType.typeId() == Type.TypeID.STRING) {
+      // occasionally the string is returned as HeapCharBuffer so just convert to string
+      return convertedValue.toString();
+    }
+    return convertedValue;
   }
 }
