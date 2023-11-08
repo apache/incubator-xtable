@@ -65,6 +65,8 @@ import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 
+import com.google.common.base.Preconditions;
+
 import io.onetable.iceberg.TestIcebergDataHelper;
 
 @Getter
@@ -140,11 +142,10 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return records;
   }
 
-  @Override
   @SneakyThrows
-  public List<Record> insertRecordsForSpecialPartition(int numRows) {
+  public List<Record> insertRecordsForPartition(int numRows, String partitionValue) {
     List<Record> records =
-        icebergDataHelper.generateInsertRecordForPartition(numRows, SPECIAL_PARTITION_VALUE);
+        icebergDataHelper.generateInsertRecordForPartition(numRows, partitionValue);
     GenericAppenderFactory appenderFactory = new GenericAppenderFactory(icebergTable.schema());
     PartitionSpec spec = icebergTable.spec();
 
@@ -162,6 +163,12 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     }
     append.commit();
     return records;
+  }
+
+  @Override
+  @SneakyThrows
+  public List<Record> insertRecordsForSpecialPartition(int numRows) {
+    return insertRecordsForPartition(numRows, SPECIAL_PARTITION_VALUE);
   }
 
   @SneakyThrows
@@ -260,6 +267,17 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   @Override
   public String getOrderByColumn() {
     return DEFAULT_RECORD_KEY_FIELD;
+  }
+
+  public Map<String, List<Record>> groupRecordsByPartition(List<Record> records) {
+    Preconditions.checkArgument(
+        icebergDataHelper.getPartitionFieldNames().size() == 1,
+        "Only single partition field is supported for grouping records by partition");
+    Preconditions.checkArgument(
+        icebergDataHelper.getPartitionFieldNames().get(0).equals("level"),
+        "Only level partition field is supported for grouping records by partition");
+    return records.stream()
+        .collect(Collectors.groupingBy(record -> record.getField("level").toString()));
   }
 
   @Override

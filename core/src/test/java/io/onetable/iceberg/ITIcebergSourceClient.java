@@ -28,9 +28,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -61,13 +63,12 @@ public class ITIcebergSourceClient {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  public void testIcebergSourceClient(boolean isPartitioned) {
+  public void testInsertsUpsertsAndDeletes(boolean isPartitioned) {
     String tableName = getTableName();
     try (TestIcebergTable testIcebergTable =
         TestIcebergTable.forStandardSchemaAndPartitioning(
             tableName, isPartitioned ? "level" : null, tempDir, hadoopConf)) {
       List<List<String>> allActiveFiles = new ArrayList<>();
-      List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
       List<Record> records = testIcebergTable.insertRows(50);
@@ -112,6 +113,65 @@ public class ITIcebergSourceClient {
           icebergSourceClient.getCommitsBacklog(instantsForIncrementalSync);
       for (Long snapshotId : commitsBacklog.getCommitsToProcess()) {
         TableChange tableChange = icebergSourceClient.getTableChangeForCommit(snapshotId);
+        allTableChanges.add(tableChange);
+      }
+      validateTableChanges(allActiveFiles, allTableChanges);
+    }
+  }
+
+  @Test
+  public void testDropPartition() {
+    String tableName = getTableName();
+    try (TestIcebergTable testIcebergTable =
+        TestIcebergTable.forStandardSchemaAndPartitioning(
+            tableName, "level", tempDir, hadoopConf)) {
+      List<List<String>> allActiveFiles = new ArrayList<>();
+      List<TableChange> allTableChanges = new ArrayList<>();
+
+      List<Record> records = testIcebergTable.insertRows(50);
+      Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
+      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
+
+      List<Record> records1 = testIcebergTable.insertRows(50);
+      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
+
+      List<Record> allRecords = new ArrayList<>();
+      allRecords.addAll(records);
+      allRecords.addAll(records1);
+
+      Map<String, List<Record>> recordsByPartition =
+          testIcebergTable.groupRecordsByPartition(allRecords);
+      String partitionValueToDelete = recordsByPartition.keySet().iterator().next();
+      testIcebergTable.deletePartition(partitionValueToDelete);
+      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
+
+      // Insert few records again for the deleted partition.
+      testIcebergTable.insertRecordsForPartition(20, partitionValueToDelete);
+      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
+
+      PerTableConfig tableConfig =
+          PerTableConfig.builder()
+              .tableName(testIcebergTable.getTableName())
+              .tableBasePath(testIcebergTable.getBasePath())
+              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+              .build();
+      IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+      assertEquals(
+          120 - recordsByPartition.get(partitionValueToDelete).size(),
+          testIcebergTable.getNumRows());
+      OneSnapshot oneSnapshot = icebergSourceClient.getCurrentSnapshot();
+
+      validateIcebergPartitioning(oneSnapshot);
+      validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+      // Get changes in incremental format.
+      InstantsForIncrementalSync instantsForIncrementalSync =
+          InstantsForIncrementalSync.builder()
+              .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+              .build();
+      CommitsBacklog<Long> commitsBacklog =
+          icebergSourceClient.getCommitsBacklog(instantsForIncrementalSync);
+      for (Long version : commitsBacklog.getCommitsToProcess()) {
+        TableChange tableChange = icebergSourceClient.getTableChangeForCommit(version);
         allTableChanges.add(tableChange);
       }
       validateTableChanges(allActiveFiles, allTableChanges);
