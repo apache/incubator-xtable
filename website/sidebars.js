@@ -17,6 +17,7 @@ module.exports = {
             label: 'Quick Start',
             collapsed: false,
             items: [
+                'features-and-limitations',
                 'how-to'
             ],
         },
