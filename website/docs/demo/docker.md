@@ -35,4 +35,4 @@ To access the notebook, look for a log line during startup that contains `To acc
 browser: ...  Or copy and paste one of these URLs: ...` and use the link that starts with http://127.0.0.1:8888/
 to open the notebook in your browser. 
 
-The demo is located at `work/demo.ipynb`. It also includes helpful markdowns explaining the steps.
+The demo is located at `work/demo.ipynb`. The notebook also includes helpful markdowns explaining the steps.
