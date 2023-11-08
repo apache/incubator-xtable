@@ -1,0 +1,39 @@
+name: Site Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/site-deploy.yml'
+      - 'website/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+            node-version: '20'
+            cache: 'npm'
+            cache-dependency-path: ./website/package-lock.json
+
+      - run: npm install --frozen-lockfile
+      - run: npm run build
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./website/build
