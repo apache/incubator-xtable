@@ -27,3 +27,4 @@ jobs:
 
       - run: npm install --frozen-lockfile
       - run: npm run build
+
