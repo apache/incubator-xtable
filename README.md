@@ -86,30 +86,6 @@ catalogOptions: # all other options are passed through in a map
   key1: value1
   key2: value2
 ```
-Here's an example `my_config.yaml` and `catalog.yaml` files to sync with BigLake Metastore:
-
-1. my_config.yaml
-```yaml
-sourceFormat: HUDI
-targetFormats:
-  - ICEBERG
-datasets:
-  -
-    tableBasePath: gs://path/to/source/data
-    tableName: table_name
-    namespace: database_name
-```
-
-2. catalog.yaml
-```yaml
-catalogImpl: org.apache.iceberg.gcp.biglake.BigLakeCatalog
-catalogName: catalog_name
-catalogOptions:
-  gcp_project: gcp_project_name
-  gcp_location: location # example us-west1
-  warehouse: gs://path/to/warehouse
-```
-
 5. run with `java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--clientsConfig clients.yaml] [--icebergCatalogConfig catalog.yaml]`
 The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Authentication for AWS is done with 
 `com.amazonaws.auth.DefaultAWSCredentialsProviderChain`. To override this setting, specify a different implementation 
