@@ -78,7 +78,7 @@ tableFormatsClients:
         spark.master: local[2]
         spark.app.name: onetableclient
 ```
-4. A catalog can be used when reading and updating Iceberg tables. The catalog can be specified in the config yaml file as follows:
+4. A catalog can be used when reading and updating Iceberg tables. The catalog can be specified in a yaml file and passed in with the `--icebergCatalogConfig` option. The format of the catalog config file is:
 ```yaml
 catalogImpl: io.my.CatalogImpl
 catalogName: name
