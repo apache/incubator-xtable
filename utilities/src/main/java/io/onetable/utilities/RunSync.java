@@ -147,6 +147,7 @@ public class RunSync {
               .tableBasePath(table.getTableBasePath())
               .tableName(table.getTableName())
               .namespace(table.getNamespace().split("\\."))
+              .tableDataPath(table.getTableDataPath())
               .icebergCatalogConfig(icebergCatalogConfig)
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
@@ -233,6 +234,8 @@ public class RunSync {
        * can be provided using hadoop config file
        */
       String tableBasePath;
+
+      String tableDataPath;
 
       String tableName;
       String partitionSpec;
