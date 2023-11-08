@@ -1,0 +1,33 @@
+version: "3.9"
+services:
+  trino:
+    container_name: trino
+    ports:
+      - '8080:8080'
+    image: 'trinodb/trino:428'
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog
+      - ./data:/home/data
+
+  hive-metastore:
+    container_name: hive-metastore
+    hostname: hive-metastore
+    image: 'apache/hive:4.0.0-alpha-2'
+    ports:
+      - '9083:9083' # Metastore Thrift
+    environment:
+      SERVICE_NAME: metastore
+      HIVE_METASTORE_WAREHOUSE_DIR: /home/data
+    volumes:
+      - ./data:/home/data
+
+  jupyter:
+    container_name: jupyter
+    hostname: jupyter
+    image: 'almondsh/almond:latest'
+    ports:
+      - '8888:8888'
+    volumes:
+      - ./notebook:/home/jovyan/work
+      - ./jars:/home/jars
+      - ./data:/home/data

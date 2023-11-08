@@ -101,12 +101,13 @@ public class HudiTargetClient implements TargetClient {
   private final CommitStateCreator commitStateCreator;
   private final int timelineRetentionInHours;
   private final int maxNumDeltaCommitsBeforeCompaction;
+  private final String tableDataPath;
   private Optional<HoodieTableMetaClient> metaClient;
   private CommitState commitState;
 
   public HudiTargetClient(PerTableConfig perTableConfig, Configuration configuration) {
     this(
-        perTableConfig.getTableBasePath(),
+        perTableConfig.getTableDataPath(),
         perTableConfig.getTargetMetadataRetentionInHours(),
         HoodieMetadataConfig.COMPACT_NUM_DELTA_COMMITS.defaultValue(),
         BaseFileUpdatesExtractor.of(
@@ -123,7 +124,7 @@ public class HudiTargetClient implements TargetClient {
       Configuration configuration,
       int maxNumDeltaCommitsBeforeCompaction) {
     this(
-        perTableConfig.getTableBasePath(),
+        perTableConfig.getTableDataPath(),
         perTableConfig.getTargetMetadataRetentionInHours(),
         maxNumDeltaCommitsBeforeCompaction,
         BaseFileUpdatesExtractor.of(
@@ -136,20 +137,21 @@ public class HudiTargetClient implements TargetClient {
 
   @VisibleForTesting
   HudiTargetClient(
-      String basePath,
+      String tableDataPath,
       int timelineRetentionInHours,
       int maxNumDeltaCommitsBeforeCompaction,
       BaseFileUpdatesExtractor baseFileUpdatesExtractor,
       AvroSchemaConverter avroSchemaConverter,
       HudiTableManager hudiTableManager,
       CommitStateCreator commitStateCreator) {
+    this.tableDataPath = tableDataPath;
     this.baseFileUpdatesExtractor = baseFileUpdatesExtractor;
     this.timelineRetentionInHours = timelineRetentionInHours;
     this.maxNumDeltaCommitsBeforeCompaction = maxNumDeltaCommitsBeforeCompaction;
     this.avroSchemaConverter = avroSchemaConverter;
     this.hudiTableManager = hudiTableManager;
     // create meta client if table already exists
-    this.metaClient = hudiTableManager.loadTableMetaClientIfExists(basePath);
+    this.metaClient = hudiTableManager.loadTableMetaClientIfExists(tableDataPath);
     this.commitStateCreator = commitStateCreator;
   }
 
@@ -237,7 +239,7 @@ public class HudiTargetClient implements TargetClient {
   @Override
   public void beginSync(OneTable table) {
     if (!metaClient.isPresent()) {
-      metaClient = Optional.of(hudiTableManager.initializeHudiTable(table));
+      metaClient = Optional.of(hudiTableManager.initializeHudiTable(tableDataPath, table));
     } else {
       // make sure meta client has up-to-date view of the timeline
       getMetaClient().reloadActiveTimeline();
