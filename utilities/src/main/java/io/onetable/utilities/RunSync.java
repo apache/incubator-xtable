@@ -146,7 +146,7 @@ public class RunSync {
           PerTableConfig.builder()
               .tableBasePath(table.getTableBasePath())
               .tableName(table.getTableName())
-              .namespace(table.getNamespace().split("\\."))
+              .namespace(table.getNamespace() == null ? null : table.getNamespace().split("\\."))
               .tableDataPath(table.getTableDataPath())
               .icebergCatalogConfig(icebergCatalogConfig)
               .hudiSourceConfig(
