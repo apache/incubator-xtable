@@ -19,6 +19,7 @@
 package io.onetable.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -43,6 +44,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -305,7 +307,8 @@ public class TestIcebergSync {
     fields.add(Types.NestedField.of(6, false, "long_field", Types.LongType.get()));
     Schema icebergSchema2 = new Schema(fields);
     OneTable table1 = getOneTable(tableName, basePath, oneSchema, null, LAST_COMMIT_TIME);
-    OneTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
+    OneTable table2 =
+        getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME.plusMillis(100000L));
     Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion1 = new SchemaVersion(1, "");
     schemas.put(schemaVersion1, oneSchema);
@@ -342,6 +345,9 @@ public class TestIcebergSync {
             .manifestListLocation();
     Files.delete(Paths.get(URI.create(manifestFile)));
 
+    Optional<Instant> actual = getIcebergSync().getLastSyncInstant();
+    // assert that the last commit is rolled back and the metadata is removed
+    assertFalse(actual.isPresent());
     // get a new iceberg sync to make sure table is re-read from disk and no metadata is cached
     getIcebergSync().syncSnapshot(snapshot3);
     validateIcebergTable(tableName, table2, Sets.newHashSet(dataFile3, dataFile4), null);

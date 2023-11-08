@@ -18,6 +18,9 @@
  
 package io.onetable.iceberg;
 
+import static io.onetable.model.OneTableMetadata.INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP;
+import static io.onetable.model.OneTableMetadata.ONETABLE_LAST_INSTANT_SYNCED_PROP;
+
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -112,15 +115,6 @@ public class IcebergClient implements TargetClient {
   @Override
   public void beginSync(OneTable oneTable) {
     initializeTableIfRequired(oneTable);
-    // There are cases when using the HadoopTables API where the table metadata json is updated but
-    // the manifest file is not written, causing corruption. This is a workaround to fix the issue.
-    if (catalogConfig == null && table.currentSnapshot() != null) {
-      try {
-        table.currentSnapshot().allManifests(table.io());
-      } catch (NotFoundException ex) {
-        table.manageSnapshots().rollbackTo(table.currentSnapshot().parentId()).commit();
-      }
-    }
     transaction = table.newTransaction();
     internalTableState = oneTable;
   }
@@ -216,6 +210,33 @@ public class IcebergClient implements TargetClient {
     if (table == null) {
       return Optional.empty();
     }
+    rollbackCorruptCommits();
     return OneTableMetadata.fromMap(table.properties());
+  }
+
+  private void rollbackCorruptCommits() {
+    // There are cases when using the HadoopTables API where the table metadata json is updated but
+    // the manifest file is not written, causing corruption. This is a workaround to fix the issue.
+    if (catalogConfig == null && table.currentSnapshot() != null) {
+      boolean validSnapshot = false;
+      while (!validSnapshot) {
+        try {
+          table.currentSnapshot().allManifests(table.io());
+          validSnapshot = true;
+        } catch (NotFoundException ex) {
+          // if we need to rollback, we must also clear the last sync state since that sync is no
+          // longer considered valid. This will force OneTable to fall back to a snapshot sync in
+          // the subsequent sync round.
+          table.manageSnapshots().rollbackTo(table.currentSnapshot().parentId()).commit();
+          Transaction transaction = table.newTransaction();
+          transaction
+              .updateProperties()
+              .remove(ONETABLE_LAST_INSTANT_SYNCED_PROP)
+              .remove(INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP)
+              .commit();
+          transaction.commitTransaction();
+        }
+      }
+    }
   }
 }
