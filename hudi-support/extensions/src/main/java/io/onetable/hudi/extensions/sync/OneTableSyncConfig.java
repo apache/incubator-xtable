@@ -31,8 +31,8 @@ public class OneTableSyncConfig extends HoodieSyncConfig implements Serializable
           .defaultValue("DELTA,ICEBERG")
           .withDocumentation("Comma separated list of formats to sync.");
 
-  public static final ConfigProperty<Integer> ONE_TABLE_TARGET_METADATA_RETENTION =
-      ConfigProperty.key("hoodie.onetable.target.metadata.retention")
+  public static final ConfigProperty<Integer> ONE_TABLE_TARGET_METADATA_RETENTION_HOURS =
+      ConfigProperty.key("hoodie.onetable.target.metadata.retention.hr")
           .defaultValue(24 * 7)
           .withDocumentation("Retention in hours for metadata in target table.");
 

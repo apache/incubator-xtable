@@ -71,7 +71,7 @@ public class OneTableSyncTool extends HoodieSyncTool {
                     .build())
             .syncMode(SyncMode.INCREMENTAL)
             .targetMetadataRetentionInHours(
-                config.getInt(OneTableSyncConfig.ONE_TABLE_TARGET_METADATA_RETENTION))
+                config.getInt(OneTableSyncConfig.ONE_TABLE_TARGET_METADATA_RETENTION_HOURS))
             .build();
     HudiSourceClientProvider hudiSourceClientProvider = new HudiSourceClientProvider();
     hudiSourceClientProvider.init(hadoopConf, Collections.emptyMap());
