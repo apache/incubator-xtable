@@ -31,3 +31,4 @@ This sync provides users with the following:
 
 ### Delta
 - When using Delta as the source for an Iceberg target, you may require field IDs set in the parquet schema. To enable that, follow the instructions for enabling column mapping [here](https://docs.delta.io/latest/delta-column-mapping.html).
+- When Delta is the source, Generated Columns are not synced to the target schema. For tables that are partitioned on Generated Columns, there is limited support. For example, we support date functions like transforming a timestamp to `yyyy-MM-dd` format. Please file a GitHub issue or pull-request for any cases that you think should be supported.
