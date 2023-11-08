@@ -29,7 +29,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import lombok.Getter;
 import lombok.SneakyThrows;
@@ -41,6 +43,7 @@ import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DataFiles;
 import org.apache.iceberg.FileFormat;
 import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.OverwriteFiles;
 import org.apache.iceberg.PartitionKey;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Snapshot;
@@ -49,11 +52,13 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.GenericAppenderFactory;
 import org.apache.iceberg.data.Record;
+import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.hadoop.HadoopCatalog;
 import org.apache.iceberg.hadoop.HadoopInputFile;
 import org.apache.iceberg.hadoop.HadoopOutputFile;
 import org.apache.iceberg.io.FileAppender;
 import org.apache.iceberg.io.OutputFile;
+import org.apache.iceberg.types.Types;
 
 import io.onetable.iceberg.TestIcebergDataHelper;
 
@@ -68,6 +73,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   private final TestIcebergDataHelper icebergDataHelper;
   private final Table icebergTable;
   private final Configuration hadoopConf;
+  private final HadoopCatalog hadoopCatalog;
 
   public static TestIcebergTable forStandardSchemaAndPartitioning(
       String tableName, String partitionField, Path tempDir, Configuration hadoopConf) {
@@ -90,19 +96,19 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     this.icebergDataHelper =
         TestIcebergDataHelper.builder()
             .recordKeyField(recordKeyField)
-            .partitionFieldNames(partitionFields)
+            .partitionFieldNames(filterNullFields(partitionFields))
             .build();
     this.schema = icebergDataHelper.getTableSchema();
     this.hadoopConf = hadoopConf;
-    PartitionSpec partitionSpec = generatePartitionSpec(schema, partitionFields);
+    PartitionSpec partitionSpec = icebergDataHelper.getPartitionSpec();
 
-    HadoopCatalog catalog = new HadoopCatalog(hadoopConf, basePath);
+    hadoopCatalog = new HadoopCatalog(hadoopConf, basePath);
     // No namespace specified.
     TableIdentifier tableIdentifier = TableIdentifier.of("", tableName);
-    if (!catalog.tableExists(tableIdentifier)) {
-      icebergTable = catalog.createTable(tableIdentifier, schema, partitionSpec);
+    if (!hadoopCatalog.tableExists(tableIdentifier)) {
+      icebergTable = hadoopCatalog.createTable(tableIdentifier, schema, partitionSpec);
     } else {
-      icebergTable = catalog.loadTable(tableIdentifier);
+      icebergTable = hadoopCatalog.loadTable(tableIdentifier);
     }
   }
 
@@ -130,41 +136,115 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   }
 
   @Override
+  @SneakyThrows
   public List<Record> insertRecordsForSpecialPartition(int numRows) {
-    return null;
+    List<Record> records =
+        icebergDataHelper.generateInsertRecordForPartition(numRows, SPECIAL_PARTITION_VALUE);
+    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(icebergTable.schema());
+    PartitionSpec spec = icebergTable.spec();
+
+    // Group records by partition
+    Map<StructLike, List<Record>> recordsByPartition = new HashMap<>();
+    PartitionKey partitionKey = new PartitionKey(spec, icebergTable.schema());
+    for (Record record : records) {
+      partitionKey.partition(record);
+      recordsByPartition.computeIfAbsent(partitionKey.copy(), k -> new ArrayList<>()).add(record);
+    }
+    AppendFiles append = icebergTable.newAppend();
+    for (Map.Entry<StructLike, List<Record>> entry : recordsByPartition.entrySet()) {
+      DataFile dataFile = writeAndGetDataFile(appenderFactory, entry.getValue(), entry.getKey());
+      append.appendFile(dataFile);
+    }
+    append.commit();
+    return records;
+  }
+
+  @SneakyThrows
+  @Override
+  public void upsertRows(List<Record> records) {
+    List<Record> upsertRecords = icebergDataHelper.generateUpsertRecords(records);
+    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(icebergTable.schema());
+    PartitionSpec spec = icebergTable.spec();
+
+    // Group records by partition
+    Map<StructLike, List<Record>> recordsByPartition = new HashMap<>();
+    PartitionKey partitionKey = new PartitionKey(spec, icebergTable.schema());
+    for (Record record : upsertRecords) {
+      partitionKey.partition(record);
+      recordsByPartition.computeIfAbsent(partitionKey.copy(), k -> new ArrayList<>()).add(record);
+    }
+    List<DataFile> newDataFiles = new ArrayList<>();
+    for (Map.Entry<StructLike, List<Record>> entry : recordsByPartition.entrySet()) {
+      DataFile dataFile = writeAndGetDataFile(appenderFactory, entry.getValue(), entry.getKey());
+      newDataFiles.add(dataFile);
+    }
+
+    OverwriteFiles overwrite = icebergTable.newOverwrite();
+    String[] idsToDelete =
+        records.stream()
+            .map(r -> r.getField(DEFAULT_RECORD_KEY_FIELD).toString())
+            .toArray(String[]::new);
+    overwrite.overwriteByRowFilter(Expressions.in(DEFAULT_RECORD_KEY_FIELD, idsToDelete));
+    for (DataFile dataFile : newDataFiles) {
+      overwrite.addFile(dataFile);
+    }
+    overwrite.commit();
   }
 
   @Override
-  public void upsertRows(List<Record> rows) {}
+  public void deleteRows(List<Record> rows) {
+    List<Object> idsToDelete =
+        rows.stream()
+            .map(row -> row.getField(DEFAULT_RECORD_KEY_FIELD))
+            .collect(Collectors.toList());
+    icebergTable
+        .newDelete()
+        .deleteFromRowFilter(Expressions.in(DEFAULT_RECORD_KEY_FIELD, idsToDelete))
+        .commit();
+  }
 
   @Override
-  public void deleteRows(List<Record> rows) {}
+  public void deletePartition(String partitionValue) {
+    // Here it is assumed that the partition value is identity and for level field, need to extend
+    // to be generic to be used for timestamp and date.
+    icebergTable
+        .newDelete()
+        .deleteFromRowFilter(Expressions.equal("level", partitionValue))
+        .commit();
+  }
 
   @Override
-  public void deletePartition(String partitionValue) {}
-
-  @Override
-  public void deleteSpecialPartition() {}
+  public void deleteSpecialPartition() {
+    deletePartition(SPECIAL_PARTITION_VALUE);
+  }
 
   @Override
   public String getBasePath() {
-    return null;
+    // TODO(vamshigv): Check if customization needs to be done as we have "data" folder etc..
+    return basePath;
   }
 
   @Override
   public String getOrderByColumn() {
-    return null;
+    return DEFAULT_RECORD_KEY_FIELD;
   }
 
   @Override
-  public void close() {}
+  @SneakyThrows
+  public void close() {
+    hadoopCatalog.close();
+  }
 
   @Override
-  public void reload() {}
+  public void reload() {
+    icebergTable.refresh();
+  }
 
   @Override
   public List<String> getColumnsToSelect() {
-    return null;
+    return icebergDataHelper.getTableSchema().columns().stream()
+        .map(Types.NestedField::name)
+        .collect(Collectors.toList());
   }
 
   public Long getLastCommitTimestamp() {
@@ -179,6 +259,10 @@ public class TestIcebergTable implements GenericTable<Record, String> {
       filePaths.add(dataFile.path().toString());
     }
     return filePaths;
+  }
+
+  private List<String> filterNullFields(List<String> partitionFields) {
+    return partitionFields.stream().filter(Objects::nonNull).collect(Collectors.toList());
   }
 
   public long getNumRows() {
@@ -209,18 +293,5 @@ public class TestIcebergTable implements GenericTable<Record, String> {
         .withPartition(partitionKey)
         .withRecordCount(records.size())
         .build();
-  }
-
-  private PartitionSpec generatePartitionSpec(
-      org.apache.iceberg.Schema icebergSchema, List<String> partitionColumns) {
-    if (partitionColumns.size() != 1) {
-      throw new IllegalArgumentException(
-          "Please modify the test to support multiple partition columns");
-    }
-    if (!partitionColumns.get(0).equals("level")) {
-      throw new IllegalArgumentException(
-          "Please modify the test to support partitioning on " + partitionColumns.get(0));
-    }
-    return PartitionSpec.builderFor(icebergSchema).identity("level").build();
   }
 }

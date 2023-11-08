@@ -44,6 +44,7 @@ import lombok.Value;
 
 import org.apache.commons.lang3.RandomStringUtils;
 
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.data.GenericRecord;
 import org.apache.iceberg.data.Record;
@@ -57,7 +58,7 @@ public class TestIcebergDataHelper {
   private static final Random RANDOM = new Random();
   private static final Schema TABLE_SCHEMA =
       new Schema(
-          NestedField.optional(1, "key", Types.StringType.get()),
+          NestedField.optional(1, "id", Types.StringType.get()),
           NestedField.optional(2, "ts", Types.LongType.get()),
           NestedField.optional(3, "level", Types.StringType.get()),
           NestedField.optional(4, "severity", Types.IntegerType.get()),
@@ -128,6 +129,29 @@ public class TestIcebergDataHelper {
         .collect(Collectors.toList());
   }
 
+  public List<Record> generateInsertRecordForPartition(int numRecords, Object partitionValue) {
+    Instant currentTime = Instant.now().truncatedTo(ChronoUnit.DAYS);
+    List<Instant> startTimeWindows =
+        Arrays.asList(
+            currentTime.minus(2, ChronoUnit.DAYS),
+            currentTime.minus(3, ChronoUnit.DAYS),
+            currentTime.minus(4, ChronoUnit.DAYS));
+    List<Instant> endTimeWindows =
+        Arrays.asList(
+            currentTime.minus(1, ChronoUnit.DAYS),
+            currentTime.minus(2, ChronoUnit.DAYS),
+            currentTime.minus(3, ChronoUnit.DAYS));
+    return IntStream.range(0, numRecords)
+        .mapToObj(
+            index ->
+                generateInsertRecordForPartition(
+                    startTimeWindows.get(index % 3),
+                    endTimeWindows.get(index % 3),
+                    tableSchema.asStruct(),
+                    partitionValue))
+        .collect(Collectors.toList());
+  }
+
   public List<Record> generateUpsertRecords(List<Record> inputRecords) {
     Instant currentTime = Instant.now().truncatedTo(ChronoUnit.DAYS);
     List<Instant> startTimeWindows =
@@ -148,6 +172,25 @@ public class TestIcebergDataHelper {
                     startTimeWindows.get(index % 3),
                     endTimeWindows.get(index % 3)))
         .collect(Collectors.toList());
+  }
+
+  public boolean isPartitioned() {
+    return partitionFieldNames != null && !partitionFieldNames.isEmpty();
+  }
+
+  public PartitionSpec getPartitionSpec() {
+    if (partitionFieldNames.isEmpty()) {
+      return PartitionSpec.unpartitioned();
+    }
+    if (partitionFieldNames.size() > 1) {
+      throw new IllegalArgumentException(
+          "Please modify the code to support multiple partition columns");
+    }
+    if (!partitionFieldNames.get(0).equals("level")) {
+      throw new IllegalArgumentException(
+          "Please modify the test to support partitioning on " + partitionFieldNames.get(0));
+    }
+    return PartitionSpec.builderFor(tableSchema).identity("level").build();
   }
 
   private Record generateUpsertRecord(
