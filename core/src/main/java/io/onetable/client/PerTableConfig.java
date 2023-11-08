@@ -40,6 +40,8 @@ import io.onetable.model.sync.SyncMode;
 public class PerTableConfig {
   /** table base path in local file system or HDFS or object stores like S3, GCS etc. */
   @Nonnull String tableBasePath;
+  /** the base path for the data folder, defaults to the tableBasePath if not specified */
+  @Nonnull String tableDataPath;
 
   /** The name of the table */
   @Nonnull String tableName;
@@ -101,6 +103,7 @@ public class PerTableConfig {
   @Builder
   PerTableConfig(
       @NonNull String tableBasePath,
+      String tableDataPath,
       @NonNull String tableName,
       String[] namespace,
       HudiSourceConfig hudiSourceConfig,
@@ -110,6 +113,7 @@ public class PerTableConfig {
       Integer targetMetadataRetentionInHours) {
     // sanitize source path
     this.tableBasePath = sanitizeBasePath(tableBasePath);
+    this.tableDataPath = tableDataPath == null ? tableBasePath : sanitizeBasePath(tableDataPath);
     this.tableName = tableName;
     this.namespace = namespace;
     this.hudiSourceConfig =

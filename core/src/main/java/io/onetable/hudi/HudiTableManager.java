@@ -57,14 +57,14 @@ class HudiTableManager {
   /**
    * Loads the meta client for the table at the base path if it exists
    *
-   * @param basePath the path for the table
+   * @param tableDataPath the path for the table
    * @return {@link HoodieTableMetaClient} if table exists, otherwise null
    */
-  Optional<HoodieTableMetaClient> loadTableMetaClientIfExists(String basePath) {
+  Optional<HoodieTableMetaClient> loadTableMetaClientIfExists(String tableDataPath) {
     try {
       return Optional.of(
           HoodieTableMetaClient.builder()
-              .setBasePath(basePath)
+              .setBasePath(tableDataPath)
               .setConf(configuration)
               .setLoadActiveTimelineOnLoad(false)
               .build());
@@ -77,10 +77,11 @@ class HudiTableManager {
   /**
    * Initializes a Hudi table with properties matching the provided {@link OneTable}
    *
+   * @param tableDataPath the base path for the data files in the table
    * @param table the table to initialize
    * @return {@link HoodieTableMetaClient} for the table that was created
    */
-  HoodieTableMetaClient initializeHudiTable(OneTable table) {
+  HoodieTableMetaClient initializeHudiTable(String tableDataPath, OneTable table) {
     String recordKeyField = "";
     if (table.getReadSchema() != null) {
       List<String> recordKeys =
@@ -110,7 +111,7 @@ class HudiTableManager {
                   .map(OnePartitionField::getSourceField)
                   .map(OneField::getPath)
                   .collect(Collectors.joining(",")))
-          .initTable(configuration, table.getBasePath());
+          .initTable(configuration, tableDataPath);
     } catch (IOException ex) {
       throw new OneIOException("Unable to initialize Hudi table", ex);
     }
