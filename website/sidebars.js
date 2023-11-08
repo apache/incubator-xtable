@@ -12,12 +12,12 @@
 module.exports = {
     docs: [
         "setup",
+        "features-and-limitations",
         {
             type: 'category',
             label: 'Quick Start',
             collapsed: false,
             items: [
-                'features-and-limitations',
                 'how-to'
             ],
         },
