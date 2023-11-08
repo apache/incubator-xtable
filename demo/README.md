@@ -5,6 +5,6 @@ Use `./start_demo.sh` to spin up a local notebook with a scala interpreter, Hive
 
 ## Accessing Services
 ### Jupyter Notebook
-To access the notebook, look for a log line during startup that contains `To access the server, open this file in a browser: ...  Or copy and paste one of these URLs: ...` and use one of those to open the notebook in your browser. The demo is located at `work/demo.ipynb`. 
+To access the notebook, look for a log line during startup that contains `To access the server, open this file in a browser: ...  Or copy and paste one of these URLs: ...` and use the `http://127.0.0.1:8888/...` url to open the notebook in your browser. The demo is located at `work/demo.ipynb`. 
 ### Trino
 You can access the local Trino container by running `docker exec -it trino trino`
