@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package io.onetable.hudi.extensions.sync;
+package io.onetable.hudi.sync;
 
 import java.io.Serializable;
 import java.util.Properties;

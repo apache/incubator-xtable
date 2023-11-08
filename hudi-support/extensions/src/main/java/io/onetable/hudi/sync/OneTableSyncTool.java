@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package io.onetable.hudi.extensions.sync;
+package io.onetable.hudi.sync;
 
 import java.util.Arrays;
 import java.util.Collections;
