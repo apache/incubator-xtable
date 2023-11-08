@@ -82,7 +82,7 @@ tableFormatsClients:
 ```yaml
 catalogImpl: io.my.CatalogImpl
 catalogName: name
-catalogOptions:
+catalogOptions: # all other options are passed through in a map
   key1: value1
   key2: value2
 ```
