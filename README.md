@@ -1,4 +1,7 @@
-# onetable
+# OneTable
+
+[![Build Status](https://dev.azure.com/onetable-io/onetable-io/_apis/build/status%2Fonetable-io.onetable?branchName=main)](https://dev.azure.com/onetable-io/onetable-io/_build/latest?definitionId=1&branchName=main)
+
 OneTable is an omni-directional converter for table formats that facilitates interoperability across data processing systems
 and query engines.
 Currently, OneTable supports widely adopted open-source table formats such as Apache Hudi, Apache Iceberg, and Delta Lake.
