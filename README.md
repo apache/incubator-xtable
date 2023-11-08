@@ -16,7 +16,7 @@ which we believe will facilitate the expansion of supported source and target fo
 2. Build the project using `mvn clean package`. Use `mvn clean package -DskipTests` to skip tests while building.
 3. Use `mvn clean test` or `mvn test` to run all unit tests. If you need to run only a specific test you can do this
    by something like `mvn test -Dtest=TestDeltaSync -pl core`.
-4. Similarly use `mvn clean verify` or `mvn verify` to run integration tests.
+4. Similarly, use `mvn clean verify` or `mvn verify` to run integration tests.
 
 # Style guide
 1. We use [Maven Spotless plugin](https://github.com/diffplug/spotless/tree/main/plugin-maven) and 
@@ -29,13 +29,13 @@ which we believe will facilitate the expansion of supported source and target fo
 2. create a yaml file that follows the format below:
 ```yaml
 sourceFormat: HUDI
-tableFormats:
+targetFormats:
   - DELTA
   - ICEBERG
 datasets:
   -
     tableBasePath: s3://tpc-ds-datasets/1GB/hudi/call_center
-    dataBasePath: s3://tpc-ds-datasets/1GB/hudi/call_center/data
+    tableDataPath: s3://tpc-ds-datasets/1GB/hudi/call_center/data
     tableName: call_center
     namespace: my.db
   -
@@ -49,7 +49,7 @@ datasets:
 ```
 - `tableFormats` is a list of formats you want to create from your source tables
 - `tableBasePath` is the basePath of the table
-- `dataBasePath` is an optional field specifying the path to the data files. If not specified, the tableBasePath will be used. For Iceberg source tables, you will need to specify the `/data` path.
+- `tableDataPath` is an optional field specifying the path to the data files. If not specified, the tableBasePath will be used. For Iceberg source tables, you will need to specify the `/data` path.
 - `namespace` is an optional field specifying the namespace of the table and will be used when syncing to a catalog.
 - `partitionSpec` is a spec that allows us to infer partition values. This is only required for Hudi source tables. If the table is not partitioned, leave it blank. If it is partitioned, you can specify a spec with a comma separated list with format `path:type:format`
   - `path` is a dot separated path to the partition field
