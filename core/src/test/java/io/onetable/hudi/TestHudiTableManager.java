@@ -84,11 +84,12 @@ public class TestHudiTableManager {
             .name(tableName)
             .partitioningFields(inputPartitionFields)
             .readSchema(tableSchema)
-            .basePath(tableBasePath)
+            // we will use the provided data path as the location so this path should be ignored
+            .basePath("file://fake_path")
             .tableFormat(TableFormat.ICEBERG)
             .build();
 
-    tableManager.initializeHudiTable(table);
+    tableManager.initializeHudiTable(tableBasePath, table);
 
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder()
