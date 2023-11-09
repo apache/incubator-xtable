@@ -159,6 +159,7 @@ public class IcebergDataFileExtractor {
                     dataFile.upperBounds())
             : Collections.emptyMap();
     String filePath = dataFile.path().toString();
+    // assume path without scheme is local file
     if (!filePath.contains(":")) {
       filePath = "file:" + filePath;
     }
