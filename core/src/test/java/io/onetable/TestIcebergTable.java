@@ -64,7 +64,6 @@ import org.apache.iceberg.io.FileAppender;
 import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.parquet.Parquet;
-import org.apache.iceberg.types.Types;
 
 import com.google.common.base.Preconditions;
 
@@ -280,10 +279,14 @@ public class TestIcebergTable implements GenericTable<Record, String> {
 
   @Override
   public List<String> getColumnsToSelect() {
+    return Arrays.asList("level", "timestamp_micros_nullable_field");
+    /*
     return icebergDataHelper.getTableSchema().columns().stream()
         .map(Types.NestedField::name)
-        .filter(name -> !name.equals("timestamp_local_micros_nullable_field"))
+        //.filter(name -> !name.equals("timestamp_local_micros_nullable_field"))
         .collect(Collectors.toList());
+
+     */
   }
 
   public Long getLastCommitTimestamp() {
@@ -319,7 +322,8 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   private DataFile writeAndGetDataFile(
       GenericAppenderFactory appenderFactory, List<Record> records, StructLike partitionKey)
       throws IOException {
-    String fileName = "data/" + UUID.randomUUID() + ".parquet";
+    String partitionPath = getPartitionPath(partitionKey.get(0, String.class));
+    String fileName = "data/" + partitionPath + "/" + UUID.randomUUID() + ".parquet";
     OutputFile outputFile =
         HadoopOutputFile.fromPath(
             new org.apache.hadoop.fs.Path(icebergTable.location(), fileName), hadoopConf);
@@ -389,5 +393,15 @@ public class TestIcebergTable implements GenericTable<Record, String> {
               }
             })
         .collect(Collectors.toList());
+  }
+
+  private String getPartitionPath(Object partitionValue) {
+    Preconditions.checkArgument(
+        icebergDataHelper.getPartitionFieldNames().size() == 1,
+        "Only single partition field is supported for grouping records by partition");
+    Preconditions.checkArgument(
+        icebergDataHelper.getPartitionFieldNames().get(0).equals("level"),
+        "Only level partition field is supported for grouping records by partition");
+    return "level=" + partitionValue;
   }
 }

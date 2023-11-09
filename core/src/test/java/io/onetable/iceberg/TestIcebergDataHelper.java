@@ -58,6 +58,7 @@ public class TestIcebergDataHelper {
   private static final Random RANDOM = new Random();
   private static final Schema DEFAULT_TABLE_SCHEMA =
       new Schema(
+          /*
           NestedField.optional(1, "id", Types.StringType.get()),
           NestedField.optional(2, "ts", Types.LongType.get()),
           NestedField.optional(3, "level", Types.StringType.get()),
@@ -96,6 +97,9 @@ public class TestIcebergDataHelper {
                       NestedField.optional(24, "level", Types.StringType.get())))),
           NestedField.optional(25, "enum_field", Types.StringType.get()),
           NestedField.optional(26, "date_nullable_field", Types.DateType.get()),
+           */
+          NestedField.optional(1, "id", Types.StringType.get()),
+          NestedField.optional(3, "level", Types.StringType.get()),
           NestedField.optional(
               28, "timestamp_micros_nullable_field", Types.TimestampType.withZone()),
           NestedField.optional(

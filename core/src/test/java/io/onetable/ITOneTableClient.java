@@ -23,7 +23,6 @@ import static io.onetable.hudi.HudiTestUtil.PartitionConfig;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import io.onetable.iceberg.IcebergSourceClientProvider;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -41,7 +40,6 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import org.apache.iceberg.Snapshot;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
@@ -65,6 +63,7 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 
+import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.hadoop.HadoopTables;
 
@@ -79,6 +78,7 @@ import io.onetable.delta.DeltaSourceClientProvider;
 import io.onetable.hudi.HudiSourceClientProvider;
 import io.onetable.hudi.HudiSourceConfig;
 import io.onetable.hudi.HudiTestUtil;
+import io.onetable.iceberg.IcebergSourceClientProvider;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 
@@ -259,7 +259,7 @@ public class ITOneTableClient {
     // TODO(vamshigv): Partitioned failing with Empty partition column value in 'level='
     TableFormat sourceTableFormat = TableFormat.ICEBERG;
     SyncMode syncMode = SyncMode.FULL;
-    boolean isPartitioned = false;
+    boolean isPartitioned = true;
     String tableName = getTableName();
     OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
     List<TableFormat> targetTableFormats = getOtherFormats(sourceTableFormat);
@@ -818,15 +818,17 @@ public class ITOneTableClient {
                       if (targetFormat.equals(TableFormat.HUDI)) {
                         finalTargetOptions = new HashMap<>(finalTargetOptions);
                         finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
-                        //finalTargetOptions.put(
-                            //"hoodie.datasource.read.extract.partition.values.from.path", "true");
+                        // finalTargetOptions.put(
+                        // "hoodie.datasource.read.extract.partition.values.from.path", "true");
                       }
                       return sparkSession
                           .read()
                           .options(finalTargetOptions)
                           .format(targetFormat.name().toLowerCase())
-                          .load(sourceFormat == TableFormat.ICEBERG ? sourceTable.getBasePath() + "/data" :
-                              sourceTable.getBasePath())
+                          .load(
+                              sourceFormat == TableFormat.ICEBERG
+                                  ? sourceTable.getBasePath() + "/data"
+                                  : sourceTable.getBasePath())
                           .orderBy(sourceTable.getOrderByColumn())
                           .filter(filterCondition);
                     }));
