@@ -158,8 +158,12 @@ public class IcebergDataFileExtractor {
                     dataFile.lowerBounds(),
                     dataFile.upperBounds())
             : Collections.emptyMap();
+    String filePath = dataFile.path().toString();
+    if (!filePath.contains(":")) {
+      filePath = "file:" + filePath;
+    }
     return OneDataFile.builder()
-        .physicalPath(dataFile.path().toString())
+        .physicalPath(filePath)
         .fileFormat(fromIcebergFileFormat(dataFile.format()))
         .fileSizeBytes(dataFile.fileSizeInBytes())
         .recordCount(dataFile.recordCount())

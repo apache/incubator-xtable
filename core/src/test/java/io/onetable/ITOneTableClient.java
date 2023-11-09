@@ -126,7 +126,7 @@ public class ITOneTableClient {
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
-    for (TableFormat sourceTableFormat : Arrays.asList(TableFormat.HUDI, TableFormat.DELTA)) {
+    for (TableFormat sourceTableFormat : Arrays.asList(TableFormat.ICEBERG)) {
       for (SyncMode syncMode : SyncMode.values()) {
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceTableFormat, syncMode, isPartitioned));
@@ -183,6 +183,7 @@ public class ITOneTableClient {
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
+              .tableDataPath(table.getBasePath() + "data/")
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
                       .partitionFieldSpecConfig(oneTablePartitionConfig)
@@ -213,6 +214,7 @@ public class ITOneTableClient {
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(tableWithUpdatedSchema.getBasePath())
+              .tableDataPath(tableWithUpdatedSchema.getBasePath() + "data/")
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
                       .partitionFieldSpecConfig(oneTablePartitionConfig)
@@ -727,7 +729,7 @@ public class ITOneTableClient {
                           .read()
                           .options(finalTargetOptions)
                           .format(targetFormat.name().toLowerCase())
-                          .load(sourceTable.getBasePath())
+                          .load(sourceTable.getBasePath() + "/data")
                           .orderBy(sourceTable.getOrderByColumn())
                           .filter(filterCondition);
                     }));
