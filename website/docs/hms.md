@@ -44,7 +44,6 @@ datasets:
   -
     tableBasePath: file:///path/to/source/data
     tableName: table_name
-    partitionSpec: partitionpath:VALUE
 ```
 
 </TabItem>
@@ -58,7 +57,7 @@ datasets:
   -
     tableBasePath: file:///path/to/source/data
     tableName: table_name
-    partitionSpec: partitionpath:VALUE
+    partitionSpec: partitionpath:VALUE # you only need to specify partitionSpec for HUDI sourceFormat
 ```
 
 </TabItem>
@@ -72,7 +71,7 @@ datasets:
   -
     tableBasePath: file:///path/to/source/data
     tableName: table_name
-    partitionSpec: partitionpath:VALUE
+    partitionSpec: partitionpath:VALUE # you only need to specify partitionSpec for HUDI sourceFormat
 ```
 
 </TabItem>

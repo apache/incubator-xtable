@@ -257,7 +257,6 @@ datasets:
   -
     tableBasePath: file:///tmp/delta-dataset/people
     tableName: people
-    partitionSpec: city:VALUE
 ```
 </TabItem>
 
@@ -271,8 +270,8 @@ targetFormats:
 datasets:
   -
     tableBasePath: file:///tmp/iceberg-dataset/people
+    dataBasePath: file:///tmp/iceberg-dataset/people/data
     tableName: people
-    partitionSpec: city:VALUE
 ```
 </TabItem>
 </Tabs>
@@ -306,30 +305,29 @@ datasets:
 <TabItem value="delta">
 
 ```yaml  md title="yaml"
-sourceFormat: HUDI
+sourceFormat: DELTA
 targetFormats:
-  - DELTA
+  - HUDI
   - ICEBERG
 datasets:
   -
     tableBasePath: s3://path/to/delta-data  # replace this with gs://path/to/delta_data if your data is in GCS. 
     tableName: people
-    partitionSpec: city:VALUE
 ```
 
 </TabItem>
 <TabItem value="iceberg">
 
 ```yaml  md title="yaml"
-sourceFormat: HUDI
+sourceFormat: ICEBERG
 targetFormats:
+  - HUDI
   - DELTA
-  - ICEBERG
 datasets:
   -
-    tableBasePath: s3://path/to/iceberg-data  # replace this with gs://path/to/iceberg_data if your data is in GCS. 
+    tableBasePath: s3://path/to/iceberg  # replace this with gs://path/to/iceberg_data if your data is in GCS.
+    tableDataPath: s3://path/to/iceberg/data
     tableName: people
-    partitionSpec: city:VALUE
 ```
 
 </TabItem>
