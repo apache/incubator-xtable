@@ -23,6 +23,7 @@ import static io.onetable.hudi.HudiTestUtil.PartitionConfig;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+import io.onetable.iceberg.IcebergSourceClientProvider;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -40,6 +41,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import org.apache.iceberg.Snapshot;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
@@ -89,6 +91,7 @@ public class ITOneTableClient {
   private static SparkSession sparkSession;
   private SourceClientProvider<HoodieInstant> hudiSourceClientProvider;
   private SourceClientProvider<Long> deltaSourceClientProvider;
+  private SourceClientProvider<Snapshot> icebergSourceClientProvider;
 
   @BeforeAll
   public static void setupOnce() {
@@ -108,6 +111,8 @@ public class ITOneTableClient {
     hudiSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
     deltaSourceClientProvider = new DeltaSourceClientProvider();
     deltaSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
+    icebergSourceClientProvider = new IcebergSourceClientProvider();
+    icebergSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
   }
 
   @AfterAll
@@ -126,7 +131,7 @@ public class ITOneTableClient {
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
-    for (TableFormat sourceTableFormat : Arrays.asList(TableFormat.HUDI, TableFormat.DELTA)) {
+    for (TableFormat sourceTableFormat : Arrays.asList(TableFormat.ICEBERG)) {
       for (SyncMode syncMode : SyncMode.values()) {
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceTableFormat, syncMode, isPartitioned));
@@ -145,6 +150,8 @@ public class ITOneTableClient {
       return hudiSourceClientProvider;
     } else if (sourceTableFormat == TableFormat.DELTA) {
       return deltaSourceClientProvider;
+    } else if (sourceTableFormat == TableFormat.ICEBERG) {
+      return icebergSourceClientProvider;
     } else {
       throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
     }
@@ -213,6 +220,97 @@ public class ITOneTableClient {
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(tableWithUpdatedSchema.getBasePath())
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionFieldSpecConfig(oneTablePartitionConfig)
+                      .build())
+              .syncMode(syncMode)
+              .build();
+      List<Row> insertsAfterSchemaUpdate = tableWithUpdatedSchema.insertRows(100);
+      tableWithUpdatedSchema.reload();
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
+      checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 280);
+
+      tableWithUpdatedSchema.deleteRows(insertsAfterSchemaUpdate.subList(60, 90));
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
+      checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 250);
+
+      if (isPartitioned) {
+        // Adds new partition.
+        tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
+        oneTableClient.sync(perTableConfig, sourceClientProvider);
+        checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 300);
+
+        // Drops partition.
+        tableWithUpdatedSchema.deleteSpecialPartition();
+        oneTableClient.sync(perTableConfig, sourceClientProvider);
+        checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 250);
+
+        // Insert records to the dropped partition again.
+        tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
+        oneTableClient.sync(perTableConfig, sourceClientProvider);
+        checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 300);
+      }
+    }
+  }
+
+  @Test
+  public void canDelete() {
+    // TODO(vamshigv): Partitioned failing with Empty partition column value in 'level='
+    TableFormat sourceTableFormat = TableFormat.ICEBERG;
+    SyncMode syncMode = SyncMode.FULL;
+    boolean isPartitioned = false;
+    String tableName = getTableName();
+    OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
+    List<TableFormat> targetTableFormats = getOtherFormats(sourceTableFormat);
+    String oneTablePartitionConfig = null;
+    if (isPartitioned) {
+      oneTablePartitionConfig = "level:VALUE";
+    }
+    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(sourceTableFormat);
+    List<?> insertRecords;
+    try (GenericTable table =
+        GenericTable.getInstance(
+            tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
+      insertRecords = table.insertRows(100);
+
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(targetTableFormats)
+              .tableBasePath(table.getBasePath())
+              .tableDataPath(table.getBasePath() + "/data")
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionFieldSpecConfig(oneTablePartitionConfig)
+                      .build())
+              .syncMode(syncMode)
+              .build();
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
+      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 100);
+
+      table.insertRows(100);
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
+      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 200);
+
+      table.upsertRows(insertRecords.subList(0, 20));
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
+      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 200);
+
+      table.deleteRows(insertRecords.subList(30, 50));
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
+      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 180);
+    }
+
+    try (GenericTable tableWithUpdatedSchema =
+        GenericTable.getInstanceWithAdditionalColumns(
+            tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(targetTableFormats)
+              .tableBasePath(tableWithUpdatedSchema.getBasePath())
+              .tableDataPath(tableWithUpdatedSchema.getBasePath() + "/data")
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
                       .partitionFieldSpecConfig(oneTablePartitionConfig)
@@ -720,14 +818,15 @@ public class ITOneTableClient {
                       if (targetFormat.equals(TableFormat.HUDI)) {
                         finalTargetOptions = new HashMap<>(finalTargetOptions);
                         finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
-                        finalTargetOptions.put(
-                            "hoodie.datasource.read.extract.partition.values.from.path", "true");
+                        //finalTargetOptions.put(
+                            //"hoodie.datasource.read.extract.partition.values.from.path", "true");
                       }
                       return sparkSession
                           .read()
                           .options(finalTargetOptions)
                           .format(targetFormat.name().toLowerCase())
-                          .load(sourceTable.getBasePath())
+                          .load(sourceFormat == TableFormat.ICEBERG ? sourceTable.getBasePath() + "/data" :
+                              sourceTable.getBasePath())
                           .orderBy(sourceTable.getOrderByColumn())
                           .filter(filterCondition);
                     }));

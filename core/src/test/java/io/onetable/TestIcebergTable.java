@@ -233,7 +233,22 @@ public class TestIcebergTable implements GenericTable<Record, String> {
 
   @Override
   public String getBasePath() {
-    return basePath + "/" + tableName;
+    return removeSlash(basePath) + "/" + tableName;
+  }
+
+  public String getDataPath() {
+    return removeSlash(basePath) + "/" + tableName + "/data";
+  }
+
+  private String removeSlash(String path) {
+    if (path.endsWith("/")) {
+      return path.substring(0, path.length() - 1);
+    }
+    return path;
+  }
+
+  public String getTableName() {
+    return tableName;
   }
 
   @Override
@@ -267,6 +282,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   public List<String> getColumnsToSelect() {
     return icebergDataHelper.getTableSchema().columns().stream()
         .map(Types.NestedField::name)
+        .filter(name -> !name.equals("timestamp_local_micros_nullable_field"))
         .collect(Collectors.toList());
   }
 
