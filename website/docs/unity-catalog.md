@@ -31,7 +31,7 @@ datasets:
   -
     tableBasePath: s3://path/to/source/data
     tableName: table_name
-    partitionSpec: partitionpath:VALUE
+    partitionSpec: partitionpath:VALUE # you only need to specify partitionSpec for HUDI sourceFormat
 ```
 :::note Note:
 1. Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have your source table in GCS
