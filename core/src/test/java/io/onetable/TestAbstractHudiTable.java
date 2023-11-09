@@ -755,6 +755,11 @@ public abstract class TestAbstractHudiTable
   }
 
   @Override
+  public String getFilterQuery() {
+    return String.format("%s > aaa", RECORD_KEY_FIELD_NAME);
+  }
+
+  @Override
   public String getOrderByColumn() {
     return "_hoodie_record_key";
   }

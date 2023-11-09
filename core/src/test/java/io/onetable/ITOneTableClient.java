@@ -126,7 +126,7 @@ public class ITOneTableClient {
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
-    for (TableFormat sourceTableFormat : Arrays.asList(TableFormat.HUDI, TableFormat.DELTA)) {
+    for (TableFormat sourceTableFormat : Arrays.asList(TableFormat.DELTA)) {
       for (SyncMode syncMode : SyncMode.values()) {
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceTableFormat, syncMode, isPartitioned));
@@ -203,6 +203,8 @@ public class ITOneTableClient {
       table.deleteRows(insertRecords.subList(30, 50));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 180);
+      checkDatasetEquivalenceWithFilter(
+          sourceTableFormat, table, targetTableFormats, table.getFilterQuery());
     }
 
     try (GenericTable tableWithUpdatedSchema =

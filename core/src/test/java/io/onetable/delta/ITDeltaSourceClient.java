@@ -72,7 +72,6 @@ import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
-import io.onetable.testutil.Issues;
 
 public class ITDeltaSourceClient {
 
@@ -682,9 +681,7 @@ public class ITDeltaSourceClient {
     Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
     Assertions.assertEquals(expected.getPartitionPath(), actual.getPartitionPath());
     Assertions.assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
-    if (Issues.ISSUE_102_FIXED) {
-      Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
-    }
+    Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
     Instant now = Instant.now();
     long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
     long maxRange = now.toEpochMilli();
