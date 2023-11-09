@@ -149,13 +149,47 @@ From your terminal, run the glue crawler.
 Once the crawler succeeds, you’ll be able to query this Iceberg table from Athena,
 EMR and/or Redshift query engines.
 
+<Tabs
+groupId="table-format"
+defaultValue="hudi"
+values={[
+{ label: 'targetFormat: HUDI', value: 'hudi', },
+{ label: 'targetFormat: DELTA', value: 'delta', },
+{ label: 'targetFormat: ICEBERG', value: 'iceberg', },
+]}
+>
+
+<TabItem value="hudi">
+
+:::danger LIMITATION for HUDI targetFormat:
+To validate the Hudi targetFormat table results, you need to ensure that the query engine that you're using
+supports Hudi version 0.14.0 according to limitations mentioned [here](/docs/features-and-limitations#hudi)
+:::
+
+</TabItem>
+<TabItem value="delta">
+
 ### Validating the results
-After the crawler runs successfully, you can inspect the catalogued tables in Glue 
+After the crawler runs successfully, you can inspect the catalogued tables in Glue
 and also query the table in Amazon Athena like below:
 
 ```sql
 SELECT * FROM onetable_synced_db.<table_name>;
 ```
+
+</TabItem>
+<TabItem value="iceberg">
+
+### Validating the results
+After the crawler runs successfully, you can inspect the catalogued tables in Glue
+and also query the table in Amazon Athena like below:
+
+```sql
+SELECT * FROM onetable_synced_db.<table_name>;
+```
+
+</TabItem>
+</Tabs>
 
 ## Conclusion
 In this guide we saw how to,

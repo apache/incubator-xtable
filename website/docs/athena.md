@@ -14,3 +14,10 @@ you can create the table either by:
 
 For an end to end tutorial that walks through S3, Glue Data Catalog and Athena to query a OneTable synced table,
 you can refer to the OneTable [Glue Data Catalog Guide](/docs/glue-catalog).
+
+:::danger LIMITATION for HUDI targetFormat:
+To validate the Hudi targetFormat table results, you need to ensure that the query engine that you're using
+supports Hudi version 0.14.0 according to limitations mentioned [here](/docs/features-and-limitations#hudi). 
+Currently, Athena [only supports 0.12.2](https://docs.aws.amazon.com/athena/latest/ug/querying-hudi.html) 
+in Athena engine version 3, so querying Hudi targetFormat tables from Athena will not work. 
+:::
