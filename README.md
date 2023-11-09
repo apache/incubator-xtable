@@ -93,4 +93,4 @@ You have found a bug, or have a cool idea you that want to contribute to the pro
 Adding a new target format requires a developer implement [TargetClient](./api/src/main/java/io/onetable/spi/sync/TargetClient.java). Once you have implemented that interface, you can integrate it into the [OneTableClient](./core/src/main/java/io/onetable/client/OneTableClient.java). If you think others may find that target useful, please raise a Pull Request to add it to the project.
 
 ## Overview of the sync process
-![img.png](docs/images/sync_flow.jpg)
+![img.png](assets/images/sync_flow.jpg)
