@@ -238,6 +238,65 @@ public class ITIcebergSourceClient {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testExpireSnapshots(boolean isPartitioned) throws InterruptedException {
+    String tableName = getTableName();
+    try (TestIcebergTable testIcebergTable =
+        TestIcebergTable.forStandardSchemaAndPartitioning(
+            tableName, isPartitioned ? "level" : null, tempDir, hadoopConf)) {
+      List<List<String>> allActiveFiles = new ArrayList<>();
+      List<TableChange> allTableChanges = new ArrayList<>();
+
+      List<Record> records = testIcebergTable.insertRows(50);
+      Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
+
+      testIcebergTable.upsertRows(records.subList(0, 20));
+      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
+      Thread.sleep(5 * 1000L);
+      Instant instantAfterUpsert = Instant.now();
+
+      testIcebergTable.insertRows(50);
+      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
+
+      // Since only snapshots are expired, nothing is added to AllActiveFiles.
+      testIcebergTable.expireSnapshotsOlderThan(instantAfterUpsert);
+
+      testIcebergTable.insertRows(50);
+      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
+
+      testIcebergTable.insertRows(50);
+      allActiveFiles.add(testIcebergTable.getAllActiveFiles());
+
+      PerTableConfig tableConfig =
+          PerTableConfig.builder()
+              .tableName(testIcebergTable.getTableName())
+              .tableBasePath(testIcebergTable.getBasePath())
+              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+              .build();
+      IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+      assertEquals(200L, testIcebergTable.getNumRows());
+      OneSnapshot oneSnapshot = icebergSourceClient.getCurrentSnapshot();
+
+      if (isPartitioned) {
+        validateIcebergPartitioning(oneSnapshot);
+      }
+      validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+      // Get changes in incremental format.
+      InstantsForIncrementalSync instantsForIncrementalSync =
+          InstantsForIncrementalSync.builder()
+              .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+              .build();
+      CommitsBacklog<Snapshot> commitsBacklog =
+          icebergSourceClient.getCommitsBacklog(instantsForIncrementalSync);
+      for (Snapshot snapshot : commitsBacklog.getCommitsToProcess()) {
+        TableChange tableChange = icebergSourceClient.getTableChangeForCommit(snapshot);
+        allTableChanges.add(tableChange);
+      }
+      validateTableChanges(allActiveFiles, allTableChanges);
+    }
+  }
+
   private void validateIcebergPartitioning(OneSnapshot oneSnapshot) {
     List<OnePartitionField> partitionFields = oneSnapshot.getTable().getPartitioningFields();
     assertEquals(1, partitionFields.size());

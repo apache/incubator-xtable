@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -283,16 +284,20 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return filePaths;
   }
 
-  private List<String> filterNullFields(List<String> partitionFields) {
-    return partitionFields.stream().filter(Objects::nonNull).collect(Collectors.toList());
-  }
-
   public long getNumRows() {
     Snapshot currentSnapshot = icebergTable.currentSnapshot();
     Long totalRecords =
         Long.parseLong(currentSnapshot.summary().getOrDefault(TOTAL_RECORDS_PROP, "0"));
     assertTrue(totalRecords > 0, "Total records is expected to be greater than 0");
     return totalRecords;
+  }
+
+  public void expireSnapshotsOlderThan(Instant instant) {
+    icebergTable.expireSnapshots().expireOlderThan(instant.toEpochMilli()).commit();
+  }
+
+  private List<String> filterNullFields(List<String> partitionFields) {
+    return partitionFields.stream().filter(Objects::nonNull).collect(Collectors.toList());
   }
 
   private DataFile writeAndGetDataFile(
