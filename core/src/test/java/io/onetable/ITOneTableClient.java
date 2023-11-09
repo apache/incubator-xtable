@@ -126,7 +126,7 @@ public class ITOneTableClient {
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
-    for (TableFormat sourceTableFormat : Arrays.asList(TableFormat.DELTA)) {
+    for (TableFormat sourceTableFormat : Arrays.asList(TableFormat.HUDI, TableFormat.DELTA)) {
       for (SyncMode syncMode : SyncMode.values()) {
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceTableFormat, syncMode, isPartitioned));
