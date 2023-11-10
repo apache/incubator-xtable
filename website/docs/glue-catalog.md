@@ -163,7 +163,7 @@ values={[
 
 :::danger LIMITATION for HUDI targetFormat:
 To validate the Hudi targetFormat table results, you need to ensure that the query engine that you're using
-supports Hudi version 0.14.0 according to limitations mentioned [here](/docs/features-and-limitations#hudi)
+supports Hudi version 0.14.0 as mentioned [here](/docs/features-and-limitations#hudi)
 :::
 
 </TabItem>
