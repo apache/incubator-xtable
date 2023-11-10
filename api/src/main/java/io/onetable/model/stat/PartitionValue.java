@@ -21,19 +21,12 @@ package io.onetable.model.stat;
 import lombok.Builder;
 import lombok.Value;
 
-import io.onetable.model.schema.OneField;
+import io.onetable.model.schema.OnePartitionField;
 
-/**
- * Captures column level statistics for a field.
- *
- * @since 0.1
- */
+/** Associates the partition value with the partition field. */
 @Value
-@Builder(toBuilder = true)
-public class ColumnStat {
-  OneField field;
+@Builder
+public class PartitionValue {
+  OnePartitionField partitionField;
   Range range;
-  long numNulls;
-  long numValues;
-  long totalSize;
 }

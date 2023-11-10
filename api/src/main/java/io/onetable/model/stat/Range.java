@@ -18,15 +18,6 @@
  
 package io.onetable.model.stat;
 
-import java.math.BigDecimal;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 import lombok.Value;
 
 import io.onetable.model.schema.OneSchema;
@@ -63,44 +54,14 @@ import io.onetable.model.storage.OneDataFile;
  */
 @Value
 public class Range {
-  RangeType rangeType;
   Object minValue;
   Object maxValue;
 
-  private Range(RangeType rangeType, Object minValue, Object maxValue) {
-    this.rangeType = rangeType;
-    this.minValue = minValue;
-    this.maxValue = maxValue;
-  }
-
   public static Range scalar(Object value) {
-    return new Range(RangeType.SCALAR, value, value);
+    return new Range(value, value);
   }
 
   public static Range vector(Object minValue, Object maxValue) {
-    return new Range(RangeType.VECTOR, minValue, maxValue);
+    return new Range(minValue, maxValue);
   }
-
-  private enum RangeType {
-    SCALAR,
-    VECTOR
-  }
-
-  @AllArgsConstructor
-  private enum ValueType {
-    STRING(String.class),
-    INTEGER(Integer.class),
-    LONG(Long.class),
-    DOUBLE(Double.class),
-    FLOAT(Float.class),
-    BIG_DECIMAL(BigDecimal.class),
-    BYTE_BUFFER(ByteBuffer.class),
-    BOOLEAN(Boolean.class);
-
-    @Getter private final Class<?> typeClass;
-  }
-
-  private static final Map<Class<?>, ValueType> VALUE_TYPE_MAP =
-      Arrays.stream(ValueType.values())
-          .collect(Collectors.toMap(ValueType::getTypeClass, Function.identity()));
 }
