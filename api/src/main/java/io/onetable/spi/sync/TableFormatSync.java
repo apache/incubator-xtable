@@ -22,9 +22,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
+import io.onetable.model.storage.TableFormat;
 import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
@@ -38,30 +43,35 @@ import io.onetable.model.sync.SyncResult;
 
 /** Provides the functionality to sync from the OneTable format to the target format. */
 @Log4j2
-@AllArgsConstructor(staticName = "of")
 public class TableFormatSync {
-  private final TargetClient client;
 
   /**
    * Syncs the provided snapshot to the target table format.
    *
+   * @param targetClients the targets to sync with the snapshot
    * @param snapshot the snapshot to sync
    * @return the result of the sync process
    */
-  public SyncResult syncSnapshot(OneSnapshot snapshot) {
+  public Map<TableFormat, SyncResult> syncSnapshot(List<TargetClient> targetClients, OneSnapshot snapshot) {
     Instant startTime = Instant.now();
-    try {
-      OneTable oneTable = snapshot.getTable();
-      return getSyncResult(
-          SyncMode.FULL,
-          oneTable,
-          client -> client.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
-          startTime,
-          snapshot.getPendingCommits());
-    } catch (Exception e) {
-      log.error("Failed to sync snapshot", e);
-      return buildResultForError(SyncMode.FULL, startTime, e);
+    Map<TableFormat, SyncResult> results = new HashMap<>();
+    for (TargetClient targetClient : targetClients) {
+      try {
+        OneTable oneTable = snapshot.getTable();
+        results.put(targetClient.getTableFormat(),
+            getSyncResult(
+            targetClient,
+            SyncMode.FULL,
+            oneTable,
+            client -> client.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
+            startTime,
+            snapshot.getPendingCommits()));
+      } catch (Exception e) {
+        log.error("Failed to sync snapshot", e);
+        results.put(targetClient.getTableFormat(), buildResultForError(SyncMode.FULL, startTime, e));
+      }
     }
+    return results;
   }
 
   /**
@@ -70,35 +80,37 @@ public class TableFormatSync {
    * @param changes the changes from the source table format that need to be applied
    * @return the results of trying to sync each change
    */
-  public List<SyncResult> syncChanges(IncrementalTableChanges changes) {
-    List<SyncResult> results = new ArrayList<>();
+  public Map<TableFormat, List<SyncResult>> syncChanges(List<TargetClient> clients, IncrementalTableChanges changes) {
+    Map<TableFormat, List<SyncResult>> results = new HashMap<>();
+    Set<TargetClient> clientsWithFailures = new HashSet<>();
     for (TableChange change : changes.getTableChanges()) {
-      Instant startTime = Instant.now();
-      try {
-        results.add(
-            getSyncResult(
-                SyncMode.INCREMENTAL,
-                change.getTableAsOfChange(),
-                client -> client.syncFilesForDiff(change.getFilesDiff()),
-                startTime,
-                changes.getPendingCommits()));
-      } catch (Exception e) {
-        // Fallback to a sync where table changes are from changes.getInstant() to latest, write a
-        // test case for this.
-        // (OR) Progress with empty col stats to mirror the timeline.
-        log.error("Failed to sync table changes", e);
-        results.add(buildResultForError(SyncMode.INCREMENTAL, startTime, e));
-        break;
+      for (TargetClient targetClient : clients) {
+        if (clientsWithFailures.contains(targetClient)) {
+          continue;
+        }
+        Instant startTime = Instant.now();
+        List<SyncResult> resultsForFormat = results.computeIfAbsent(targetClient.getTableFormat(), key -> new ArrayList<>());
+        try {
+          resultsForFormat.add(
+              getSyncResult(
+                  targetClient,
+                  SyncMode.INCREMENTAL,
+                  change.getTableAsOfChange(),
+                  client -> client.syncFilesForDiff(change.getFilesDiff()),
+                  startTime,
+                  changes.getPendingCommits()));
+        } catch (Exception e) {
+          log.error("Failed to sync table changes", e);
+          resultsForFormat.add(buildResultForError(SyncMode.INCREMENTAL, startTime, e));
+          clientsWithFailures.add(targetClient);
+        }
       }
     }
     return results;
   }
 
-  public Optional<OneTableMetadata> getTableMetadata() {
-    return client.getTableMetadata();
-  }
-
   private SyncResult getSyncResult(
+      TargetClient client,
       SyncMode mode,
       OneTable tableState,
       SyncFiles fileSyncMethod,

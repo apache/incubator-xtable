@@ -31,6 +31,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.onetable.spi.sync.TargetClient;
 import lombok.Builder;
 import lombok.Value;
 import lombok.extern.log4j.Log4j2;
@@ -174,7 +175,7 @@ public class OneTableClient {
   }
 
   private <COMMIT> SyncResultForTableFormats syncIncrementalChanges(
-      Map<TableFormat, TableFormatSync> syncClientByFormat,
+      Map<TableFormat, TargetClient> syncClientByFormat,
       Map<TableFormat, Optional<OneTableMetadata>> lastSyncMetadataByFormat,
       ExtractFromSource<COMMIT> source) {
     Map<TableFormat, SyncResult> syncResultsByFormat = new HashMap<>();
