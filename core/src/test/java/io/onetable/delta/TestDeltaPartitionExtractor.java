@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.onetable.model.stat.PartitionValue;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
@@ -324,17 +325,13 @@ public class TestDeltaPartitionExtractor {
             .build();
     Range rangeForPartitionField1 = Range.scalar("partition_value1");
     Range rangeForPartitionField2 = Range.scalar("partition_value2");
-    Map<OnePartitionField, Range> expectedPartitionFieldRangeMap =
-        new HashMap<OnePartitionField, Range>() {
-          {
-            put(onePartitionField1, rangeForPartitionField1);
-            put(onePartitionField2, rangeForPartitionField2);
-          }
-        };
-    Map<OnePartitionField, Range> partitionFieldRangeMap =
+    List<PartitionValue> expectedPartitionValues =
+        Arrays.asList(PartitionValue.builder().partitionField(onePartitionField1).range(rangeForPartitionField1).build(),
+            PartitionValue.builder().partitionField(onePartitionField2).range(rangeForPartitionField2).build());
+    List<PartitionValue> partitionValues =
         deltaPartitionExtractor.partitionValueExtraction(
             scalaMap, Arrays.asList(onePartitionField1, onePartitionField2));
-    assertEquals(expectedPartitionFieldRangeMap, partitionFieldRangeMap);
+    assertEquals(expectedPartitionValues, partitionValues);
   }
 
   @Test
@@ -380,10 +377,10 @@ public class TestDeltaPartitionExtractor {
             put(onePartitionField2, rangeForPartitionField2);
           }
         };
-    Map<OnePartitionField, Range> partitionFieldRangeMap =
+    List<PartitionValue> partitionValues =
         deltaPartitionExtractor.partitionValueExtraction(
             scalaMap, Arrays.asList(onePartitionField1, onePartitionField2));
-    assertEquals(expectedPartitionFieldRangeMap, partitionFieldRangeMap);
+    assertEquals(expectedPartitionFieldRangeMap, partitionValues);
   }
 
   @Test
@@ -432,10 +429,10 @@ public class TestDeltaPartitionExtractor {
             put(onePartitionField2, rangeForPartitionField2);
           }
         };
-    Map<OnePartitionField, Range> partitionFieldRangeMap =
+    List<PartitionValue> partitionValues =
         deltaPartitionExtractor.partitionValueExtraction(
             scalaMap, Arrays.asList(onePartitionField1, onePartitionField2));
-    assertEquals(expectedPartitionFieldRangeMap, partitionFieldRangeMap);
+    assertEquals(expectedPartitionFieldRangeMap, partitionValues);
   }
 
   private scala.collection.mutable.Map<String, String> convertJavaMapToScalaMap(

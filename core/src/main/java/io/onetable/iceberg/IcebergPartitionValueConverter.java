@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import io.onetable.model.stat.PartitionValue;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -172,54 +173,55 @@ public class IcebergPartitionValueConverter {
   }
 
   public PartitionKey toIceberg(
-      PartitionSpec partitionSpec, Schema schema, Map<OnePartitionField, Range> partitionValues) {
+      PartitionSpec partitionSpec, Schema schema, List<PartitionValue> partitionValues) {
     if (partitionValues == null || partitionValues.isEmpty()) {
       return null;
     }
-    Map<String, Map.Entry<OnePartitionField, Range>> nameToPartitionInfo =
-        partitionValues.entrySet().stream()
+    Map<String, PartitionValue> nameToPartitionInfo =
+        partitionValues.stream()
             .collect(
                 Collectors.toMap(
-                    entry -> entry.getKey().getSourceField().getName(), Function.identity()));
+                    entry -> entry.getPartitionField().getSourceField().getName(), Function.identity()));
     PartitionKey partitionKey = new PartitionKey(partitionSpec, schema);
     for (int i = 0; i < partitionSpec.fields().size(); i++) {
       PartitionField icebergPartitionField = partitionSpec.fields().get(i);
       String sourceFieldName = schema.findField(icebergPartitionField.sourceId()).name();
-      Map.Entry<OnePartitionField, Range> partitionInfo = nameToPartitionInfo.get(sourceFieldName);
-      switch (partitionInfo.getKey().getTransformType()) {
+      PartitionValue partitionValue = nameToPartitionInfo.get(sourceFieldName);
+      Object value = partitionValue.getRange().getMaxValue();
+      switch (partitionValue.getPartitionField().getTransformType()) {
         case YEAR:
           partitionKey.set(
               i,
               Transforms.year(Types.TimestampType.withoutZone())
-                  .apply(millisToMicros((Long) partitionInfo.getValue().getMaxValue())));
+                  .apply(millisToMicros((Long) value)));
           break;
         case MONTH:
           partitionKey.set(
               i,
               Transforms.month(Types.TimestampType.withoutZone())
-                  .apply(millisToMicros((Long) partitionInfo.getValue().getMaxValue())));
+                  .apply(millisToMicros((Long) value)));
           break;
         case DAY:
           partitionKey.set(
               i,
               Transforms.day(Types.TimestampType.withoutZone())
-                  .apply(millisToMicros((Long) partitionInfo.getValue().getMaxValue())));
+                  .apply(millisToMicros((Long) value)));
           break;
         case HOUR:
           partitionKey.set(
               i,
               Transforms.hour(Types.TimestampType.withoutZone())
-                  .apply(millisToMicros((Long) partitionInfo.getValue().getMaxValue())));
+                  .apply(millisToMicros((Long) value)));
           break;
         case VALUE:
           partitionKey.set(
               i,
               Transforms.identity(Types.StringType.get())
-                  .apply(partitionInfo.getValue().getMaxValue()));
+                  .apply(value));
           break;
         default:
           throw new IllegalArgumentException(
-              "Unsupported type: " + partitionInfo.getKey().getTransformType());
+              "Unsupported type: " + partitionValue.getPartitionField().getTransformType());
       }
     }
     return partitionKey;

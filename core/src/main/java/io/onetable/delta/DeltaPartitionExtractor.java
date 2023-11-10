@@ -34,6 +34,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import io.onetable.model.stat.PartitionValue;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
@@ -251,38 +252,37 @@ public class DeltaPartitionExtractor {
     if (oneDataFile.getPartitionValues() == null || oneDataFile.getPartitionValues().isEmpty()) {
       return partitionValuesSerialized;
     }
-    for (Map.Entry<OnePartitionField, Range> e : oneDataFile.getPartitionValues().entrySet()) {
-      PartitionTransformType transformType = e.getKey().getTransformType();
+    for (PartitionValue partitionValue : oneDataFile.getPartitionValues()) {
+      OnePartitionField partitionField = partitionValue.getPartitionField();
+      PartitionTransformType transformType = partitionField.getTransformType();
       String partitionValueSerialized;
       if (transformType == PartitionTransformType.VALUE) {
         partitionValueSerialized =
             convertToDeltaPartitionValue(
-                e.getValue().getMaxValue(),
-                e.getKey().getSourceField().getSchema().getDataType(),
+                partitionValue.getRange().getMaxValue(),
+                partitionField.getSourceField().getSchema().getDataType(),
                 transformType,
                 "");
         partitionValuesSerialized.put(
-            e.getKey().getSourceField().getName(), partitionValueSerialized);
+            partitionField.getSourceField().getName(), partitionValueSerialized);
       } else {
         // use appropriate date formatter for value serialization.
         partitionValueSerialized =
             convertToDeltaPartitionValue(
-                e.getValue().getMaxValue(),
-                e.getKey().getSourceField().getSchema().getDataType(),
+                partitionValue.getRange().getMaxValue(),
+                partitionField.getSourceField().getSchema().getDataType(),
                 transformType,
-                getDateFormat(e.getKey().getTransformType()));
-        partitionValuesSerialized.put(getGeneratedColumnName(e.getKey()), partitionValueSerialized);
+                getDateFormat(partitionField.getTransformType()));
+        partitionValuesSerialized.put(getGeneratedColumnName(partitionField), partitionValueSerialized);
       }
     }
     return partitionValuesSerialized;
   }
 
-  public Map<OnePartitionField, Range> partitionValueExtraction(
+  public List<PartitionValue> partitionValueExtraction(
       scala.collection.Map<String, String> values, List<OnePartitionField> partitionFields) {
     return partitionFields.stream()
-        .collect(
-            Collectors.toMap(
-                Function.identity(),
+        .map(
                 partitionField -> {
                   PartitionTransformType partitionTransformType = partitionField.getTransformType();
                   String dateFormat =
@@ -297,8 +297,8 @@ public class DeltaPartitionExtractor {
                           partitionField.getSourceField().getSchema().getDataType(),
                           partitionField.getTransformType(),
                           dateFormat);
-                  return Range.scalar(partitionValue);
-                }));
+                  return PartitionValue.builder().partitionField(partitionField).range(Range.scalar(partitionValue)).build();
+                }).collect(Collectors.toList());
   }
 
   private String getSerializedPartitionValue(

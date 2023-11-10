@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.onetable.model.stat.PartitionValue;
 import lombok.Builder;
 import lombok.Value;
 
@@ -33,7 +34,7 @@ import io.onetable.model.stat.Range;
 @Value
 @Builder
 public class OneFileGroup {
-  Map<OnePartitionField, Range> partitionValues;
+  List<PartitionValue> partitionValues;
   List<OneDataFile> files;
 
   public static List<OneFileGroup> fromFiles(List<OneDataFile> files) {
@@ -41,7 +42,7 @@ public class OneFileGroup {
   }
 
   public static List<OneFileGroup> fromFiles(Stream<OneDataFile> files) {
-    Map<Map<OnePartitionField, Range>, List<OneDataFile>> filesGrouped =
+    Map<List<PartitionValue>, List<OneDataFile>> filesGrouped =
         files.collect(Collectors.groupingBy(OneDataFile::getPartitionValues));
     return filesGrouped.entrySet().stream()
         .map(
