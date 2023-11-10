@@ -18,15 +18,10 @@
  
 package io.onetable.model.stat;
 
-import lombok.Builder;
 import lombok.Value;
 
-import io.onetable.model.schema.OnePartitionField;
-
-/** Associates the partition value with the partition field. */
 @Value
-@Builder
-public class PartitionValue {
-  OnePartitionField partitionField;
-  Scalar range;
+class Vector implements Range {
+  Object minValue;
+  Object maxValue;
 }

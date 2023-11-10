@@ -258,7 +258,7 @@ public class DeltaPartitionExtractor {
       if (transformType == PartitionTransformType.VALUE) {
         partitionValueSerialized =
             convertToDeltaPartitionValue(
-                partitionValue.getRange().getMaxValue(),
+                partitionValue.getRange().getValue(),
                 partitionField.getSourceField().getSchema().getDataType(),
                 transformType,
                 "");
@@ -268,7 +268,7 @@ public class DeltaPartitionExtractor {
         // use appropriate date formatter for value serialization.
         partitionValueSerialized =
             convertToDeltaPartitionValue(
-                partitionValue.getRange().getMaxValue(),
+                partitionValue.getRange().getValue(),
                 partitionField.getSourceField().getSchema().getDataType(),
                 transformType,
                 getDateFormat(partitionField.getTransformType()));
