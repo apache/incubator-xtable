@@ -270,7 +270,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
               }
             })
         .map(HoodieBaseFile::new)
-        .map(baseFile -> buildFileWithoutStats(partitionPath, partitionValues, baseFile))
+        .map(baseFile -> buildFileWithoutStats(partitionValues, baseFile))
         .collect(Collectors.toList());
   }
 
@@ -297,12 +297,11 @@ public class HudiDataFileExtractor implements AutoCloseable {
               for (HoodieBaseFile baseFile : baseFiles) {
                 if (baseFile.getCommitTime().equals(instantToConsider.getTimestamp())) {
                   newBaseFileAdded = true;
-                  filesToAdd.add(buildFileWithoutStats(partitionPath, partitionValues, baseFile));
+                  filesToAdd.add(buildFileWithoutStats(partitionValues, baseFile));
                 } else if (newBaseFileAdded) {
                   // if a new base file was added, then the previous base file for the group needs
                   // to be removed
-                  filesToRemove.add(
-                      buildFileWithoutStats(partitionPath, partitionValues, baseFile));
+                  filesToRemove.add(buildFileWithoutStats(partitionValues, baseFile));
                   break;
                 }
               }
@@ -332,11 +331,9 @@ public class HudiDataFileExtractor implements AutoCloseable {
           String fileId = fileGroup.getFileGroupId().getFileId();
           if (newFileIds.contains(fileId)) {
             filesToAdd.add(
-                buildFileWithoutStats(
-                    partitionPath, partitionValues, baseFiles.get(baseFiles.size() - 1)));
+                buildFileWithoutStats(partitionValues, baseFiles.get(baseFiles.size() - 1)));
           } else if (replacedFileIds.contains(fileId)) {
-            filesToRemove.add(
-                buildFileWithoutStats(partitionPath, partitionValues, baseFiles.get(0)));
+            filesToRemove.add(buildFileWithoutStats(partitionValues, baseFiles.get(0)));
           }
         });
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
@@ -356,9 +353,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                           table.getPartitioningFields(), partitionPath);
                   return fsView
                       .getLatestBaseFiles(partitionPath)
-                      .map(
-                          baseFile ->
-                              buildFileWithoutStats(partitionPath, partitionValues, baseFile));
+                      .map(baseFile -> buildFileWithoutStats(partitionValues, baseFile));
                 });
     Stream<OneDataFile> files =
         fileStatsExtractor.addStatsToFiles(tableMetadata, filesWithoutStats, table.getReadSchema());
@@ -388,13 +383,12 @@ public class HudiDataFileExtractor implements AutoCloseable {
   /**
    * Builds a {@link OneDataFile} without any statistics or rowCount value set.
    *
-   * @param partitionPath partition path for the file
    * @param partitionValues values extracted from the partition path
    * @param hoodieBaseFile the base file from Hudi
    * @return {@link OneDataFile} without any statistics or rowCount value set.
    */
   private OneDataFile buildFileWithoutStats(
-      String partitionPath, List<PartitionValue> partitionValues, HoodieBaseFile hoodieBaseFile) {
+      List<PartitionValue> partitionValues, HoodieBaseFile hoodieBaseFile) {
     long rowCount = 0L;
     return OneDataFile.builder()
         .schemaVersion(DEFAULT_SCHEMA_VERSION)
