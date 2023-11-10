@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.onetable.model.stat.PartitionValue;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
@@ -40,6 +39,7 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 
 /** Validates the partition extraction logic from Delta tables. */
@@ -326,8 +326,15 @@ public class TestDeltaPartitionExtractor {
     Range rangeForPartitionField1 = Range.scalar("partition_value1");
     Range rangeForPartitionField2 = Range.scalar("partition_value2");
     List<PartitionValue> expectedPartitionValues =
-        Arrays.asList(PartitionValue.builder().partitionField(onePartitionField1).range(rangeForPartitionField1).build(),
-            PartitionValue.builder().partitionField(onePartitionField2).range(rangeForPartitionField2).build());
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(onePartitionField1)
+                .range(rangeForPartitionField1)
+                .build(),
+            PartitionValue.builder()
+                .partitionField(onePartitionField2)
+                .range(rangeForPartitionField2)
+                .build());
     List<PartitionValue> partitionValues =
         deltaPartitionExtractor.partitionValueExtraction(
             scalaMap, Arrays.asList(onePartitionField1, onePartitionField2));

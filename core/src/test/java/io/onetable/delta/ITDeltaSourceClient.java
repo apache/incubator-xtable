@@ -65,6 +65,7 @@ import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
@@ -192,12 +193,12 @@ public class ITDeltaSourceClient {
                     OneDataFile.builder()
                         .physicalPath("file:/fake/path")
                         .fileFormat(FileFormat.APACHE_PARQUET)
-                        .partitionValues(Collections.emptyMap())
+                        .partitionValues(Collections.emptyList())
                         .fileSizeBytes(684)
                         .recordCount(1)
                         .columnStats(columnStats)
                         .build()))
-            .partitionValues(Collections.emptyMap())
+            .partitionValues(Collections.emptyList())
             .build(),
         snapshot.getPartitionedDataFiles().get(0));
   }
@@ -258,13 +259,16 @@ public class ITDeltaSourceClient {
     // Validate data files
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
-    Map<OnePartitionField, Range> partitionValue =
-        Collections.singletonMap(
-            OnePartitionField.builder()
-                .sourceField(partCol)
-                .transformType(PartitionTransformType.VALUE)
-                .build(),
-            Range.scalar("SingleValue"));
+    List<PartitionValue> partitionValue =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(
+                    OnePartitionField.builder()
+                        .sourceField(partCol)
+                        .transformType(PartitionTransformType.VALUE)
+                        .build())
+                .range(Range.scalar("SingleValue"))
+                .build());
     validatePartitionDataFiles(
         OneFileGroup.builder()
             .partitionValues(partitionValue)

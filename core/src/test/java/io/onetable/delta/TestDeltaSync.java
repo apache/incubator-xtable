@@ -84,6 +84,7 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
@@ -149,9 +150,9 @@ public class TestDeltaSync {
     OneTable table1 = getOneTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
     OneTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
 
-    OneDataFile dataFile1 = getOneDataFile(1, Collections.emptyMap(), basePath);
-    OneDataFile dataFile2 = getOneDataFile(2, Collections.emptyMap(), basePath);
-    OneDataFile dataFile3 = getOneDataFile(3, Collections.emptyMap(), basePath);
+    OneDataFile dataFile1 = getOneDataFile(1, Collections.emptyList(), basePath);
+    OneDataFile dataFile2 = getOneDataFile(2, Collections.emptyList(), basePath);
+    OneDataFile dataFile3 = getOneDataFile(3, Collections.emptyList(), basePath);
 
     OneSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
@@ -183,10 +184,18 @@ public class TestDeltaSync {
             Collections.singletonList(onePartitionField),
             LAST_COMMIT_TIME);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(onePartitionField, Range.scalar("level"));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(onePartitionField, Range.scalar("warning"));
+    List<PartitionValue> partitionValues1 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(onePartitionField)
+                .range(Range.scalar("level"))
+                .build());
+    List<PartitionValue> partitionValues2 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(onePartitionField)
+                .range(Range.scalar("warning"))
+                .build());
     OneDataFile dataFile1 = getOneDataFile(1, partitionValues1, basePath);
     OneDataFile dataFile2 = getOneDataFile(2, partitionValues1, basePath);
     OneDataFile dataFile3 = getOneDataFile(3, partitionValues2, basePath);
@@ -229,15 +238,36 @@ public class TestDeltaSync {
             Arrays.asList(onePartitionField1, onePartitionField2),
             LAST_COMMIT_TIME);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(onePartitionField1, Range.scalar("level"));
-    partitionValues1.put(onePartitionField2, Range.scalar(10));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(onePartitionField1, Range.scalar("level"));
-    partitionValues2.put(onePartitionField2, Range.scalar(20));
-    Map<OnePartitionField, Range> partitionValues3 = new HashMap<>();
-    partitionValues3.put(onePartitionField1, Range.scalar("warning"));
-    partitionValues3.put(onePartitionField2, Range.scalar(20));
+    List<PartitionValue> partitionValues1 =
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(onePartitionField1)
+                .range(Range.scalar("level"))
+                .build(),
+            PartitionValue.builder()
+                .partitionField(onePartitionField2)
+                .range(Range.scalar(10))
+                .build());
+    List<PartitionValue> partitionValues2 =
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(onePartitionField1)
+                .range(Range.scalar("level"))
+                .build(),
+            PartitionValue.builder()
+                .partitionField(onePartitionField2)
+                .range(Range.scalar(20))
+                .build());
+    List<PartitionValue> partitionValues3 =
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(onePartitionField1)
+                .range(Range.scalar("warning"))
+                .build(),
+            PartitionValue.builder()
+                .partitionField(onePartitionField2)
+                .range(Range.scalar(20))
+                .build());
 
     OneDataFile dataFile1 = getOneDataFile(1, partitionValues1, basePath);
     OneDataFile dataFile2 = getOneDataFile(2, partitionValues2, basePath);
@@ -274,12 +304,18 @@ public class TestDeltaSync {
             Collections.singletonList(partitionField),
             LAST_COMMIT_TIME);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(
-        partitionField, Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(
-        partitionField, Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()));
+    List<PartitionValue> partitionValues1 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()))
+                .build());
+    List<PartitionValue> partitionValues2 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
+                .build());
     OneDataFile dataFile1 = getOneDataFile(1, partitionValues1, basePath);
     OneDataFile dataFile2 = getOneDataFile(2, partitionValues1, basePath);
     OneDataFile dataFile3 = getOneDataFile(3, partitionValues2, basePath);
@@ -380,7 +416,7 @@ public class TestDeltaSync {
   }
 
   private OneDataFile getOneDataFile(
-      int index, Map<OnePartitionField, Range> partitionValues, Path basePath) {
+      int index, List<PartitionValue> partitionValues, Path basePath) {
     String physicalPath =
         new org.apache.hadoop.fs.Path(basePath.toUri() + "physical" + index + ".parquet")
             .toString();

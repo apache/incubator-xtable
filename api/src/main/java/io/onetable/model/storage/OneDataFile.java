@@ -20,17 +20,14 @@ package io.onetable.model.storage;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
-import io.onetable.model.stat.PartitionValue;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Value;
 
-import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.ColumnStat;
-import io.onetable.model.stat.Range;
+import io.onetable.model.stat.PartitionValue;
 
 /**
  * Represents a data file in the table.

@@ -85,6 +85,7 @@ import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
@@ -235,9 +236,9 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
     schemas.put(schemaVersion2, schema2);
 
-    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, Collections.emptyMap());
-    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, Collections.emptyMap());
-    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyMap());
+    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, Collections.emptyList());
+    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, Collections.emptyList());
+    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyList());
     OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
     when(mockSchemaExtractor.toIceberg(schema1)).thenReturn(icebergSchema1);
@@ -331,12 +332,18 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
     schemas.put(schemaVersion, oneSchema);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(
-        partitionField, Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(
-        partitionField, Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()));
+    List<PartitionValue> partitionValues1 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()))
+                .build());
+    List<PartitionValue> partitionValues2 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
+                .build());
     OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
     OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues1);
     OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues2);
@@ -389,12 +396,18 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
     schemas.put(schemaVersion, oneSchema);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(
-        partitionField, Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(
-        partitionField, Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()));
+    List<PartitionValue> partitionValues1 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()))
+                .build());
+    List<PartitionValue> partitionValues2 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
+                .build());
     OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
     OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues1);
     OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues2);
@@ -444,10 +457,12 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
     schemas.put(schemaVersion, oneSchema);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(partitionField, Range.scalar(1));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(partitionField, Range.scalar(2));
+    List<PartitionValue> partitionValues1 =
+        Collections.singletonList(
+            PartitionValue.builder().partitionField(partitionField).range(Range.scalar(1)).build());
+    List<PartitionValue> partitionValues2 =
+        Collections.singletonList(
+            PartitionValue.builder().partitionField(partitionField).range(Range.scalar(2)).build());
     OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
     OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues1);
     OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues2);
@@ -503,18 +518,27 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
     schemas.put(schemaVersion, oneSchema);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(partitionField1, Range.scalar(1));
-    partitionValues1.put(
-        partitionField2, Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(partitionField1, Range.scalar(2));
-    partitionValues2.put(
-        partitionField2, Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()));
-    Map<OnePartitionField, Range> partitionValues3 = new HashMap<>();
-    partitionValues3.put(partitionField1, Range.scalar(2));
-    partitionValues3.put(
-        partitionField2, Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()));
+    List<PartitionValue> partitionValues1 =
+        Arrays.asList(
+            PartitionValue.builder().partitionField(partitionField1).range(Range.scalar(1)).build(),
+            PartitionValue.builder()
+                .partitionField(partitionField2)
+                .range(Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()))
+                .build());
+    List<PartitionValue> partitionValues2 =
+        Arrays.asList(
+            PartitionValue.builder().partitionField(partitionField1).range(Range.scalar(2)).build(),
+            PartitionValue.builder()
+                .partitionField(partitionField2)
+                .range(Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()))
+                .build());
+    List<PartitionValue> partitionValues3 =
+        Arrays.asList(
+            PartitionValue.builder().partitionField(partitionField1).range(Range.scalar(2)).build(),
+            PartitionValue.builder()
+                .partitionField(partitionField2)
+                .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
+                .build());
     OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
     OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues2);
     OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues3);
@@ -570,10 +594,18 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
     schemas.put(schemaVersion, oneSchema);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(partitionField, Range.scalar("value1"));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(partitionField, Range.scalar("value2"));
+    List<PartitionValue> partitionValues1 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar("value1"))
+                .build());
+    List<PartitionValue> partitionValues2 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar("value2"))
+                .build());
     OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
     OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues1);
     OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues2);
@@ -611,7 +643,7 @@ public class TestIcebergSync {
   }
 
   private OneDataFile getOneDataFile(
-      SchemaVersion schemaVersion, int index, Map<OnePartitionField, Range> partitionValues) {
+      SchemaVersion schemaVersion, int index, List<PartitionValue> partitionValues) {
     String physicalPath = "file:/physical" + index + ".parquet";
     return OneDataFile.builder()
         .fileFormat(FileFormat.APACHE_PARQUET)

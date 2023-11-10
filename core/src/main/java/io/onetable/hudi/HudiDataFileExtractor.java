@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -63,7 +62,7 @@ import io.onetable.exception.OneIOException;
 import io.onetable.model.OneTable;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.SchemaVersion;
-import io.onetable.model.stat.Range;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
@@ -255,7 +254,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
   private List<OneDataFile> getRemovedFiles(
       String partitionPath, List<String> deletedPaths, List<OnePartitionField> partitioningFields) {
-    Map<OnePartitionField, Range> partitionValues =
+    List<PartitionValue> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
     return deletedPaths.stream()
         .map(
@@ -283,7 +282,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
       List<OnePartitionField> partitioningFields) {
     List<OneDataFile> filesToAdd = new ArrayList<>(affectedFileIds.size());
     List<OneDataFile> filesToRemove = new ArrayList<>(affectedFileIds.size());
-    Map<OnePartitionField, Range> partitionValues =
+    List<PartitionValue> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
     Stream<HoodieFileGroup> fileGroups =
         Stream.concat(
@@ -320,7 +319,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
       List<OnePartitionField> partitioningFields) {
     List<OneDataFile> filesToAdd = new ArrayList<>(newFileIds.size());
     List<OneDataFile> filesToRemove = new ArrayList<>(replacedFileIds.size());
-    Map<OnePartitionField, Range> partitionValues =
+    List<PartitionValue> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
     Stream<HoodieFileGroup> fileGroups =
         Stream.concat(
@@ -352,7 +351,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
             .parallel()
             .flatMap(
                 partitionPath -> {
-                  Map<OnePartitionField, Range> partitionValues =
+                  List<PartitionValue> partitionValues =
                       partitionValuesExtractor.extractPartitionValues(
                           table.getPartitioningFields(), partitionPath);
                   return fsView
@@ -395,9 +394,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
    * @return {@link OneDataFile} without any statistics or rowCount value set.
    */
   private OneDataFile buildFileWithoutStats(
-      String partitionPath,
-      Map<OnePartitionField, Range> partitionValues,
-      HoodieBaseFile hoodieBaseFile) {
+      String partitionPath, List<PartitionValue> partitionValues, HoodieBaseFile hoodieBaseFile) {
     long rowCount = 0L;
     return OneDataFile.builder()
         .schemaVersion(DEFAULT_SCHEMA_VERSION)

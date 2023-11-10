@@ -21,15 +21,14 @@ package io.onetable.iceberg;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import io.onetable.model.stat.PartitionValue;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -49,6 +48,7 @@ import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.PartitionTransformType;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 import io.onetable.schema.SchemaFieldFinder;
 
@@ -71,12 +71,12 @@ public class IcebergPartitionValueConverter {
     return INSTANCE;
   }
 
-  public Map<OnePartitionField, Range> toOneTable(
+  public List<PartitionValue> toOneTable(
       OneTable oneTable, StructLike structLike, PartitionSpec partitionSpec) {
     if (!partitionSpec.isPartitioned()) {
-      return Collections.emptyMap();
+      return Collections.emptyList();
     }
-    Map<OnePartitionField, Range> partitionValues = new HashMap<>();
+    List<PartitionValue> partitionValues = new ArrayList<>(partitionSpec.fields().size());
     Map<OneField, Map<PartitionTransformType, OnePartitionField>> onePartitionFieldMap =
         getOnePartitionFieldMap(oneTable);
     IndexedRecord partitionData = ((IndexedRecord) structLike);
@@ -135,7 +135,11 @@ public class IcebergPartitionValueConverter {
       // This helps reduce creating these objects for each file processed and re-using them.
       OnePartitionField onePartitionField =
           getFromOnePartitionFieldMap(onePartitionFieldMap, sourceField, transformType);
-      partitionValues.put(onePartitionField, Range.scalar(value));
+      partitionValues.add(
+          PartitionValue.builder()
+              .partitionField(onePartitionField)
+              .range(Range.scalar(value))
+              .build());
     }
     return partitionValues;
   }
@@ -181,7 +185,8 @@ public class IcebergPartitionValueConverter {
         partitionValues.stream()
             .collect(
                 Collectors.toMap(
-                    entry -> entry.getPartitionField().getSourceField().getName(), Function.identity()));
+                    entry -> entry.getPartitionField().getSourceField().getName(),
+                    Function.identity()));
     PartitionKey partitionKey = new PartitionKey(partitionSpec, schema);
     for (int i = 0; i < partitionSpec.fields().size(); i++) {
       PartitionField icebergPartitionField = partitionSpec.fields().get(i);
@@ -214,10 +219,7 @@ public class IcebergPartitionValueConverter {
                   .apply(millisToMicros((Long) value)));
           break;
         case VALUE:
-          partitionKey.set(
-              i,
-              Transforms.identity(Types.StringType.get())
-                  .apply(value));
+          partitionKey.set(i, Transforms.identity(Types.StringType.get()).apply(value));
           break;
         default:
           throw new IllegalArgumentException(

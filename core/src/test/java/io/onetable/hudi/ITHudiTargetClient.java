@@ -79,6 +79,7 @@ import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
@@ -228,7 +229,11 @@ public class ITHudiTargetClient {
             OneFileGroup.builder()
                 .files(Collections.singletonList(getTestFile(partitionPath, fileName)))
                 .partitionValues(
-                    Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
+                    Collections.singletonList(
+                        PartitionValue.builder()
+                            .partitionField(PARTITION_FIELD)
+                            .range(Range.scalar("partitionPath"))
+                            .build()))
                 .build());
     // sync snapshot and metadata
     OneTable initialState = getState(Instant.now());
@@ -269,7 +274,11 @@ public class ITHudiTargetClient {
                         getTestFile(partitionPath, fileName0),
                         getTestFile(partitionPath, fileName1)))
                 .partitionValues(
-                    Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
+                    Collections.singletonList(
+                        PartitionValue.builder()
+                            .partitionField(PARTITION_FIELD)
+                            .range(Range.scalar("partitionPath"))
+                            .build()))
                 .build());
     // sync snapshot and metadata
     OneTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));

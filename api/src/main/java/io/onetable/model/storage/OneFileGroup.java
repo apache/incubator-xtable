@@ -23,12 +23,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import io.onetable.model.stat.PartitionValue;
 import lombok.Builder;
 import lombok.Value;
 
-import io.onetable.model.schema.OnePartitionField;
-import io.onetable.model.stat.Range;
+import io.onetable.model.stat.PartitionValue;
 
 /** Represents a grouping of {@link OneDataFile} with the same partition values. */
 @Value

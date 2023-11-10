@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.avro.generic.IndexedRecord;
@@ -38,6 +39,7 @@ import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.PartitionTransformType;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 
 public class TestIcebergPartitionValueConverter {
@@ -67,7 +69,7 @@ public class TestIcebergPartitionValueConverter {
   @Test
   public void testToOneTableNotPartitioned() {
     PartitionSpec partitionSpec = PartitionSpec.unpartitioned();
-    Map<OnePartitionField, Range> partitionValues =
+    List<PartitionValue> partitionValues =
         partitionValueConverter.toOneTable(buildOnetable(false), STRUCT_LIKE_RECORD, partitionSpec);
     assertTrue(partitionValues.isEmpty());
   }
@@ -81,7 +83,7 @@ public class TestIcebergPartitionValueConverter {
           }
         };
     PartitionSpec partitionSpec = PartitionSpec.builderFor(SCHEMA).identity("name").build();
-    Map<OnePartitionField, Range> partitionValues =
+    List<PartitionValue> partitionValues =
         partitionValueConverter.toOneTable(
             buildOnetable(true, "name", PartitionTransformType.VALUE),
             STRUCT_LIKE_RECORD,
@@ -101,7 +103,7 @@ public class TestIcebergPartitionValueConverter {
           }
         };
     PartitionSpec partitionSpec = PartitionSpec.builderFor(SCHEMA).year("birthDate").build();
-    Map<OnePartitionField, Range> partitionValues =
+    List<PartitionValue> partitionValues =
         partitionValueConverter.toOneTable(
             buildOnetable(true, "birthDate", PartitionTransformType.YEAR),
             STRUCT_LIKE_RECORD,

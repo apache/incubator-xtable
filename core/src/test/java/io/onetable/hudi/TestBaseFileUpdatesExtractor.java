@@ -58,6 +58,7 @@ import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
@@ -194,12 +195,20 @@ public class TestBaseFileUpdatesExtractor {
         Arrays.asList(
             OneFileGroup.builder()
                 .partitionValues(
-                    Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath1)))
+                    Collections.singletonList(
+                        PartitionValue.builder()
+                            .partitionField(PARTITION_FIELD)
+                            .range(Range.scalar(partitionPath1))
+                            .build()))
                 .files(Arrays.asList(addedFile1, addedFile2))
                 .build(),
             OneFileGroup.builder()
                 .partitionValues(
-                    Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
+                    Collections.singletonList(
+                        PartitionValue.builder()
+                            .partitionField(PARTITION_FIELD)
+                            .range(Range.scalar(partitionPath2))
+                            .build()))
                 .files(Arrays.asList(addedFile3))
                 .build());
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
@@ -281,12 +290,20 @@ public class TestBaseFileUpdatesExtractor {
             OneFileGroup.builder()
                 .files(Arrays.asList(addedFile1, existingFile))
                 .partitionValues(
-                    Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
+                    Collections.singletonList(
+                        PartitionValue.builder()
+                            .partitionField(PARTITION_FIELD)
+                            .range(Range.scalar(partitionPath2))
+                            .build()))
                 .build(),
             OneFileGroup.builder()
                 .files(Collections.singletonList(addedFile2))
                 .partitionValues(
-                    Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath3)))
+                    Collections.singletonList(
+                        PartitionValue.builder()
+                            .partitionField(PARTITION_FIELD)
+                            .range(Range.scalar(partitionPath3))
+                            .build()))
                 .build());
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
@@ -357,7 +374,7 @@ public class TestBaseFileUpdatesExtractor {
         Collections.singletonList(
             OneFileGroup.builder()
                 .files(Arrays.asList(addedFile1, existingFile))
-                .partitionValues(Collections.emptyMap())
+                .partitionValues(Collections.emptyList())
                 .build());
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
