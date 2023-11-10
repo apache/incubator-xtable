@@ -18,7 +18,7 @@
  
 package io.onetable.model.stat;
 
-import java.util.Objects;
+import lombok.Value;
 
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
@@ -52,22 +52,16 @@ import io.onetable.model.storage.OneDataFile;
  *
  * @since 0.1
  */
-public interface Range {
-  Object getMinValue();
+@Value
+public class Range {
+  Object minValue;
+  Object maxValue;
 
-  Object getMaxValue();
-
-  static Scalar scalar(Object value) {
-    if (value == null) {
-      return Scalar.EMPTY;
-    }
-    return new Scalar(value);
+  public static Range scalar(Object value) {
+    return new Range(value, value);
   }
 
-  static Range vector(Object minValue, Object maxValue) {
-    if (Objects.equals(minValue, maxValue)) {
-      return new Scalar(minValue);
-    }
-    return new Vector(minValue, maxValue);
+  public static Range vector(Object minValue, Object maxValue) {
+    return new Range(minValue, maxValue);
   }
 }

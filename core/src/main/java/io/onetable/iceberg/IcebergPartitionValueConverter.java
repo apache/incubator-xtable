@@ -192,7 +192,7 @@ public class IcebergPartitionValueConverter {
       PartitionField icebergPartitionField = partitionSpec.fields().get(i);
       String sourceFieldName = schema.findField(icebergPartitionField.sourceId()).name();
       PartitionValue partitionValue = nameToPartitionInfo.get(sourceFieldName);
-      Object value = partitionValue.getRange().getValue();
+      Object value = partitionValue.getRange().getMaxValue();
       switch (partitionValue.getPartitionField().getTransformType()) {
         case YEAR:
           partitionKey.set(

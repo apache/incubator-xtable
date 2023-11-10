@@ -41,7 +41,6 @@ import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
-import io.onetable.model.stat.Scalar;
 
 /** Validates the partition extraction logic from Delta tables. */
 public class TestDeltaPartitionExtractor {
@@ -324,8 +323,8 @@ public class TestDeltaPartitionExtractor {
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
-    Scalar rangeForPartitionField1 = Range.scalar("partition_value1");
-    Scalar rangeForPartitionField2 = Range.scalar("partition_value2");
+    Range rangeForPartitionField1 = Range.scalar("partition_value1");
+    Range rangeForPartitionField2 = Range.scalar("partition_value2");
     List<PartitionValue> expectedPartitionValues =
         Arrays.asList(
             PartitionValue.builder()
@@ -376,8 +375,8 @@ public class TestDeltaPartitionExtractor {
             .partitionFieldNames(Collections.singletonList("date_partition_column"))
             .transformType(PartitionTransformType.HOUR)
             .build();
-    Scalar rangeForPartitionField1 = Range.scalar("partition_value1");
-    Scalar rangeForPartitionField2 = Range.scalar(1376992800000L);
+    Range rangeForPartitionField1 = Range.scalar("partition_value1");
+    Range rangeForPartitionField2 = Range.scalar(1376992800000L);
     List<PartitionValue> expectedPartitionValues =
         Arrays.asList(
             PartitionValue.builder()
@@ -431,8 +430,8 @@ public class TestDeltaPartitionExtractor {
                     "year_partition_column", "month_partition_column", "day_partition_column"))
             .transformType(PartitionTransformType.DAY)
             .build();
-    Scalar rangeForPartitionField1 = Range.scalar("partition_value1");
-    Scalar rangeForPartitionField2 = Range.scalar(1376956800000L);
+    Range rangeForPartitionField1 = Range.scalar("partition_value1");
+    Range rangeForPartitionField2 = Range.scalar(1376956800000L);
     List<PartitionValue> expectedPartitionValues =
         Arrays.asList(
             PartitionValue.builder()

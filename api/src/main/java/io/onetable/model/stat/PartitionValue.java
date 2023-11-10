@@ -28,5 +28,5 @@ import io.onetable.model.schema.OnePartitionField;
 @Builder
 public class PartitionValue {
   OnePartitionField partitionField;
-  Scalar range;
+  Range range;
 }
