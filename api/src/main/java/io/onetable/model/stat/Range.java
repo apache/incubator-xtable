@@ -18,6 +18,8 @@
  
 package io.onetable.model.stat;
 
+import java.util.Objects;
+
 import lombok.Value;
 
 import io.onetable.model.schema.OneSchema;
@@ -54,14 +56,23 @@ import io.onetable.model.storage.OneDataFile;
  */
 @Value
 public class Range {
+  // define a reusable range for null values in case of sparse data
+  private static final Range NULL_RANGE = new Range(null, null);
+
   Object minValue;
   Object maxValue;
 
   public static Range scalar(Object value) {
+    if (value == null) {
+      return NULL_RANGE;
+    }
     return new Range(value, value);
   }
 
   public static Range vector(Object minValue, Object maxValue) {
+    if (Objects.equals(minValue, maxValue)) {
+      return scalar(minValue);
+    }
     return new Range(minValue, maxValue);
   }
 }
