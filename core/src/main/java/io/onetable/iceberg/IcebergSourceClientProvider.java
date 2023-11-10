@@ -18,13 +18,11 @@
  
 package io.onetable.iceberg;
 
-import org.apache.iceberg.Snapshot;
-
 import io.onetable.client.PerTableConfig;
 import io.onetable.client.SourceClientProvider;
 
 /** A concrete implementation of {@link SourceClientProvider} for Hudi table format. */
-public class IcebergSourceClientProvider extends SourceClientProvider<Snapshot> {
+public class IcebergSourceClientProvider extends SourceClientProvider<Long> {
   @Override
   public IcebergSourceClient getSourceClientInstance(PerTableConfig sourceTableConfig) {
     return IcebergSourceClient.builder()
