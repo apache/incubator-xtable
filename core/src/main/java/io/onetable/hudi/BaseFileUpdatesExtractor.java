@@ -51,7 +51,6 @@ import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.hadoop.CachingPath;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
-import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
@@ -232,24 +231,21 @@ public class BaseFileUpdatesExtractor {
   }
 
   private Map<String, HoodieColumnRangeMetadata<Comparable>> convertColStats(
-      String fileName, Map<OneField, ColumnStat> columnStatMap) {
-    return columnStatMap.entrySet().stream()
+      String fileName, List<ColumnStat> columnStatMap) {
+    return columnStatMap.stream()
         .filter(
-            entry -> !OneType.NON_SCALAR_TYPES.contains(entry.getKey().getSchema().getDataType()))
+            entry -> !OneType.NON_SCALAR_TYPES.contains(entry.getField().getSchema().getDataType()))
         .map(
-            entry -> {
-              OneField field = entry.getKey();
-              ColumnStat columnStat = entry.getValue();
-              return HoodieColumnRangeMetadata.<Comparable>create(
-                  fileName,
-                  convertFromOneTablePath(field.getPath()),
-                  (Comparable) columnStat.getRange().getMinValue(),
-                  (Comparable) columnStat.getRange().getMaxValue(),
-                  columnStat.getNumNulls(),
-                  columnStat.getNumValues(),
-                  columnStat.getTotalSize(),
-                  -1L);
-            })
+            columnStat ->
+                HoodieColumnRangeMetadata.<Comparable>create(
+                    fileName,
+                    convertFromOneTablePath(columnStat.getField().getPath()),
+                    (Comparable) columnStat.getRange().getMinValue(),
+                    (Comparable) columnStat.getRange().getMaxValue(),
+                    columnStat.getNumNulls(),
+                    columnStat.getNumValues(),
+                    columnStat.getTotalSize(),
+                    -1L))
         .collect(Collectors.toMap(HoodieColumnRangeMetadata::getColumnName, Function.identity()));
   }
 

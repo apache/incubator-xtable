@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
@@ -51,16 +50,16 @@ public class IcebergColumnStatsConverter {
     return INSTANCE;
   }
 
-  public Metrics toIceberg(
-      Schema schema, long totalRowCount, Map<OneField, ColumnStat> fieldColumnStatMap) {
+  public Metrics toIceberg(Schema schema, long totalRowCount, List<ColumnStat> fieldColumnStats) {
     Map<Integer, Long> columnSizes = new HashMap<>();
     Map<Integer, Long> valueCounts = new HashMap<>();
     Map<Integer, Long> nullValueCounts = new HashMap<>();
     Map<Integer, Long> nanValueCounts = null; // OneTable currently doesn't track this
     Map<Integer, ByteBuffer> lowerBounds = new HashMap<>();
     Map<Integer, ByteBuffer> upperBounds = new HashMap<>();
-    fieldColumnStatMap.forEach(
-        (field, columnStats) -> {
+    fieldColumnStats.forEach(
+        columnStats -> {
+          OneField field = columnStats.getField();
           Types.NestedField icebergField =
               schema.findField(IcebergSchemaExtractor.convertFromOneTablePath(field.getPath()));
           int fieldId = icebergField.fieldId();
@@ -87,7 +86,7 @@ public class IcebergColumnStatsConverter {
         upperBounds);
   }
 
-  public Map<OneField, ColumnStat> fromIceberg(
+  public List<ColumnStat> fromIceberg(
       List<OneField> fields,
       Map<Integer, Long> valueCounts,
       Map<Integer, Long> nullCounts,
@@ -95,29 +94,29 @@ public class IcebergColumnStatsConverter {
       Map<Integer, ByteBuffer> minValues,
       Map<Integer, ByteBuffer> maxValues) {
     if (valueCounts == null || valueCounts.isEmpty()) {
-      return Collections.emptyMap();
+      return Collections.emptyList();
     }
     return fields.stream()
         .filter(field -> valueCounts.containsKey(field.getFieldId()))
-        .collect(
-            Collectors.toMap(
-                Function.identity(),
-                field -> {
-                  Integer fieldId = field.getFieldId();
-                  long numValues = valueCounts.get(fieldId);
-                  long numNulls = nullCounts.get(fieldId);
-                  long totalSize = size.get(fieldId);
-                  Type fieldType = SCHEMA_EXTRACTOR.toIcebergType(field, new AtomicInteger(1));
-                  Object minValue = convertFromIcebergValue(fieldType, minValues.get(fieldId));
-                  Object maxValue = convertFromIcebergValue(fieldType, maxValues.get(fieldId));
-                  Range range = Range.vector(minValue, maxValue);
-                  return ColumnStat.builder()
-                      .numValues(numValues)
-                      .numNulls(numNulls)
-                      .totalSize(totalSize)
-                      .range(range)
-                      .build();
-                }));
+        .map(
+            field -> {
+              Integer fieldId = field.getFieldId();
+              long numValues = valueCounts.get(fieldId);
+              long numNulls = nullCounts.get(fieldId);
+              long totalSize = size.get(fieldId);
+              Type fieldType = SCHEMA_EXTRACTOR.toIcebergType(field, new AtomicInteger(1));
+              Object minValue = convertFromIcebergValue(fieldType, minValues.get(fieldId));
+              Object maxValue = convertFromIcebergValue(fieldType, maxValues.get(fieldId));
+              Range range = Range.vector(minValue, maxValue);
+              return ColumnStat.builder()
+                  .field(field)
+                  .numValues(numValues)
+                  .numNulls(numNulls)
+                  .totalSize(totalSize)
+                  .range(range)
+                  .build();
+            })
+        .collect(Collectors.toList());
   }
 
   private Object convertFromIcebergValue(Type fieldType, ByteBuffer value) {

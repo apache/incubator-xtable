@@ -20,6 +20,7 @@ package io.onetable.iceberg;
 
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 import lombok.Builder;
@@ -31,7 +32,6 @@ import org.apache.iceberg.io.CloseableIterator;
 
 import io.onetable.exception.NotSupportedException;
 import io.onetable.model.OneTable;
-import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
@@ -147,7 +147,7 @@ public class IcebergDataFileExtractor {
       Map<OnePartitionField, Range> partitionsInfo,
       OneSchema schema,
       boolean includeColumnStats) {
-    Map<OneField, ColumnStat> columnStatMap =
+    List<ColumnStat> columnStats =
         includeColumnStats
             ? IcebergColumnStatsConverter.getInstance()
                 .fromIceberg(
@@ -157,7 +157,7 @@ public class IcebergDataFileExtractor {
                     dataFile.columnSizes(),
                     dataFile.lowerBounds(),
                     dataFile.upperBounds())
-            : Collections.emptyMap();
+            : Collections.emptyList();
     String filePath = dataFile.path().toString();
     // assume path without scheme is local file
     if (!filePath.contains(":")) {
@@ -170,7 +170,7 @@ public class IcebergDataFileExtractor {
         .recordCount(dataFile.recordCount())
         .partitionValues(partitionsInfo)
         .partitionPath(dataFile.partition().toString())
-        .columnStats(columnStatMap)
+        .columnStats(columnStats)
         .build();
   }
 

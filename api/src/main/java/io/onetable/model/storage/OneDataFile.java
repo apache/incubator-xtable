@@ -19,13 +19,13 @@
 package io.onetable.model.storage;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Value;
 
-import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.ColumnStat;
@@ -52,7 +52,7 @@ public class OneDataFile {
   long fileSizeBytes;
   long recordCount;
   // column stats for each column in the data file
-  @Builder.Default @NonNull Map<OneField, ColumnStat> columnStats = Collections.emptyMap();
+  @Builder.Default @NonNull List<ColumnStat> columnStats = Collections.emptyList();
   // last modified time in millis since epoch
   long lastModified;
 }

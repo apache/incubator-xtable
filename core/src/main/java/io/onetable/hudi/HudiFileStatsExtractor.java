@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -152,22 +153,21 @@ public class HudiFileStatsExtractor {
               OneDataFile file = pathToDataFile.getValue();
               List<Pair<OneField, HoodieMetadataColumnStats>> fileStats =
                   stats.getOrDefault(filePath, Collections.emptyList());
-              Map<OneField, ColumnStat> columnStats =
+              List<ColumnStat> columnStats =
                   fileStats.stream()
-                      .collect(
-                          Collectors.toMap(
-                              Pair::getKey,
-                              pair -> getColumnStatFromHudiStat(pair.getLeft(), pair.getRight())));
-              long recordCount =
-                  columnStats.entrySet().stream()
-                      .filter(entry -> entry.getKey().getParentPath() == null)
-                      .map(Map.Entry::getValue)
-                      .map(ColumnStat::getNumValues)
-                      .filter(numValues -> numValues > 0)
-                      .findFirst()
-                      .orElse(0L);
+                      .map(pair -> getColumnStatFromHudiStat(pair.getLeft(), pair.getRight()))
+                      .collect(Collectors.toList());
+              long recordCount = getMaxFromColumnStats(columnStats).orElse(0L);
               return file.toBuilder().columnStats(columnStats).recordCount(recordCount).build();
             });
+  }
+
+  private Optional<Long> getMaxFromColumnStats(List<ColumnStat> columnStats) {
+    return columnStats.stream()
+        .filter(entry -> entry.getField().getParentPath() == null)
+        .map(ColumnStat::getNumValues)
+        .filter(numValues -> numValues > 0)
+        .max(Long::compareTo);
   }
 
   private HudiFileStats computeColumnStatsForFile(
@@ -175,24 +175,17 @@ public class HudiFileStatsExtractor {
     List<HoodieColumnRangeMetadata<Comparable>> columnRanges =
         UTILS.readRangeFromParquetMetadata(
             metaClient.getHadoopConf(), filePath, new ArrayList<>(nameFieldMap.keySet()));
-    Map<OneField, ColumnStat> columnStatMap =
+    List<ColumnStat> columnStats =
         columnRanges.stream()
-            .collect(
-                Collectors.toMap(
-                    colRange -> nameFieldMap.get(colRange.getColumnName()),
-                    colRange ->
-                        getColumnStatFromColRange(
-                            nameFieldMap.get(colRange.getColumnName()), colRange)));
-    Long rowCount = null;
-    for (Map.Entry<OneField, ColumnStat> entry : columnStatMap.entrySet()) {
-      if (entry.getKey().getParentPath() == null) {
-        rowCount = entry.getValue().getNumValues();
-      }
-    }
+            .map(
+                colRange ->
+                    getColumnStatFromColRange(nameFieldMap.get(colRange.getColumnName()), colRange))
+            .collect(Collectors.toList());
+    Long rowCount = getMaxFromColumnStats(columnStats).orElse(null);
     if (rowCount == null) {
       rowCount = UTILS.getRowCount(metaClient.getHadoopConf(), filePath);
     }
-    return new HudiFileStats(columnStatMap, rowCount);
+    return new HudiFileStats(columnStats, rowCount);
   }
 
   private static ColumnStat getColumnStatFromHudiStat(
@@ -264,6 +257,7 @@ public class HudiFileStatsExtractor {
     boolean isScalar = minValue == null || minValue.compareTo(maxValue) == 0;
     Range range = isScalar ? Range.scalar(minValue) : Range.vector(minValue, maxValue);
     return ColumnStat.builder()
+        .field(field)
         .range(range)
         .numNulls(nullCount)
         .numValues(valueCount)

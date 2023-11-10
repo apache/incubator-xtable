@@ -390,7 +390,7 @@ public class TestDeltaSync {
         .physicalPath(physicalPath)
         .recordCount(RANDOM.nextInt(10000))
         .partitionValues(partitionValues)
-        .columnStats(Collections.emptyMap())
+        .columnStats(Collections.emptyList())
         .build();
   }
 

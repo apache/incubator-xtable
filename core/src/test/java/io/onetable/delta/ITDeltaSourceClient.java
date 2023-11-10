@@ -33,7 +33,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -83,7 +82,13 @@ public class ITDeltaSourceClient {
           .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
           .build();
   private static final ColumnStat COL1_COLUMN_STAT =
-      ColumnStat.builder().range(Range.vector(1, 1)).numNulls(0).numValues(1).totalSize(0).build();
+      ColumnStat.builder()
+          .field(COL1_INT_FIELD)
+          .range(Range.vector(1, 1))
+          .numNulls(0)
+          .numValues(1)
+          .totalSize(0)
+          .build();
 
   private static final OneField COL2_INT_FIELD =
       OneField.builder()
@@ -93,7 +98,13 @@ public class ITDeltaSourceClient {
           .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
           .build();
   private static final ColumnStat COL2_COLUMN_STAT =
-      ColumnStat.builder().range(Range.vector(2, 2)).numNulls(0).numValues(1).totalSize(0).build();
+      ColumnStat.builder()
+          .field(COL2_INT_FIELD)
+          .range(Range.vector(2, 2))
+          .numNulls(0)
+          .numValues(1)
+          .totalSize(0)
+          .build();
 
   @TempDir private static Path tempDir;
   private static SparkSession sparkSession;
@@ -172,9 +183,7 @@ public class ITDeltaSourceClient {
         oneSchemaCatalog,
         Collections.singletonMap(new SchemaVersion(1, ""), snapshot.getTable().getReadSchema()));
     // Validate data files
-    Map<OneField, ColumnStat> columnStats = new HashMap<>();
-    columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
-    columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
+    List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
     validatePartitionDataFiles(
         OneFileGroup.builder()
@@ -247,9 +256,7 @@ public class ITDeltaSourceClient {
         oneSchemaCatalog,
         Collections.singletonMap(new SchemaVersion(1, ""), snapshot.getTable().getReadSchema()));
     // Validate data files
-    Map<OneField, ColumnStat> columnStats = new HashMap<>();
-    columnStats.put(COL1_INT_FIELD, COL1_COLUMN_STAT);
-    columnStats.put(COL2_INT_FIELD, COL2_COLUMN_STAT);
+    List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
     Map<OnePartitionField, Range> partitionValue =
         Collections.singletonMap(

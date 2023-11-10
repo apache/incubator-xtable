@@ -61,10 +61,8 @@ import org.apache.hudi.metadata.HoodieTableMetadata;
 
 import io.onetable.exception.OneIOException;
 import io.onetable.model.OneTable;
-import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.SchemaVersion;
-import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
@@ -401,7 +399,6 @@ public class HudiDataFileExtractor implements AutoCloseable {
       Map<OnePartitionField, Range> partitionValues,
       HoodieBaseFile hoodieBaseFile) {
     long rowCount = 0L;
-    Map<OneField, ColumnStat> columnStatMap = Collections.emptyMap();
     return OneDataFile.builder()
         .schemaVersion(DEFAULT_SCHEMA_VERSION)
         .physicalPath(hoodieBaseFile.getPath())
@@ -410,7 +407,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
         .partitionValues(partitionValues)
         .fileSizeBytes(Math.max(0, hoodieBaseFile.getFileSize()))
         .recordCount(rowCount)
-        .columnStats(columnStatMap)
+        .columnStats(Collections.emptyList())
         .lastModified(
             hoodieBaseFile.getFileStatus() == null
                 ? 0L
