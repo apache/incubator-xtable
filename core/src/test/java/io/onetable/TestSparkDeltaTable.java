@@ -170,7 +170,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
 
   @Override
   public String getFilterQuery() {
-    return "id < 25";
+    return "id % 2 = 0";
   }
 
   public void runCompaction() {
