@@ -161,7 +161,7 @@ values={[
 
 <TabItem value="hudi">
 
-:::danger LIMITATION for HUDI targetFormat:
+:::danger LIMITATION for Hudi target format:
 To validate the Hudi targetFormat table results, you need to ensure that the query engine that you're using
 supports Hudi version 0.14.0 as mentioned [here](/docs/features-and-limitations#hudi)
 :::
