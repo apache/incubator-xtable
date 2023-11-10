@@ -20,6 +20,7 @@ package io.onetable.delta;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -33,6 +34,7 @@ import org.apache.spark.sql.delta.actions.RemoveFile;
 import io.onetable.exception.NotSupportedException;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
+import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 
@@ -55,6 +57,15 @@ public class DeltaActionsConverter {
       DeltaPartitionExtractor partitionExtractor,
       DeltaStatsExtractor fileStatsExtractor) {
     String tableBasePath = deltaSnapshot.deltaLog().dataPath().toUri().toString();
+    Map<OneField, ColumnStat> columnStatMap =
+        includeColumnStats
+            ? fileStatsExtractor.getColumnStatsForFile(addFile, fields)
+            : Collections.emptyMap();
+    long recordCount =
+        columnStatMap.values().stream()
+            .map(ColumnStat::getNumValues)
+            .max(Long::compareTo)
+            .orElse(0L);
     // TODO(https://github.com/onetable-io/onetable/issues/102): removed record count.
     return OneDataFile.builder()
         .physicalPath(getFullPathToFile(tableBasePath, addFile.path()))
@@ -63,10 +74,8 @@ public class DeltaActionsConverter {
         .lastModified(addFile.modificationTime())
         .partitionValues(
             partitionExtractor.partitionValueExtraction(addFile.partitionValues(), partitionFields))
-        .columnStats(
-            includeColumnStats
-                ? fileStatsExtractor.getColumnStatsForFile(addFile, fields)
-                : Collections.emptyMap())
+        .columnStats(columnStatMap)
+        .recordCount(recordCount)
         .build();
   }
 
