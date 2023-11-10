@@ -46,7 +46,6 @@ public class OneDataFile {
   // partition ranges for the data file
   @Builder.Default @NonNull List<PartitionValue> partitionValues = Collections.emptyList();
 
-  String partitionPath;
   long fileSizeBytes;
   long recordCount;
   // column stats for each column in the data file

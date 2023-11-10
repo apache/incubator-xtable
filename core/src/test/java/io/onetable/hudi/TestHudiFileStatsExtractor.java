@@ -146,7 +146,6 @@ public class TestHudiFileStatsExtractor {
         OneDataFile.builder()
             .physicalPath(parquetFile.toString())
             .schemaVersion(new SchemaVersion(1, null))
-            .partitionPath("")
             .columnStats(Collections.emptyList())
             .fileFormat(FileFormat.APACHE_PARQUET)
             .lastModified(1234L)
@@ -183,7 +182,6 @@ public class TestHudiFileStatsExtractor {
     OneDataFile inputFile =
         OneDataFile.builder()
             .physicalPath(file.toString())
-            .partitionPath("")
             .schemaVersion(new SchemaVersion(1, null))
             .columnStats(Collections.emptyList())
             .fileFormat(FileFormat.APACHE_PARQUET)

@@ -690,7 +690,6 @@ public class ITDeltaSourceClient {
         () -> "path == " + actual.getPhysicalPath() + " is not absolute");
     Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
     Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
-    Assertions.assertEquals(expected.getPartitionPath(), actual.getPartitionPath());
     Assertions.assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
     Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
     Instant now = Instant.now();

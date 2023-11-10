@@ -400,7 +400,6 @@ public class HudiDataFileExtractor implements AutoCloseable {
         .schemaVersion(DEFAULT_SCHEMA_VERSION)
         .physicalPath(hoodieBaseFile.getPath())
         .fileFormat(getFileFormat(FSUtils.getFileExtension(hoodieBaseFile.getPath())))
-        .partitionPath(partitionPath)
         .partitionValues(partitionValues)
         .fileSizeBytes(Math.max(0, hoodieBaseFile.getFileSize()))
         .recordCount(rowCount)

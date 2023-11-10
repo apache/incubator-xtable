@@ -61,11 +61,8 @@ public class TestExtractFromSource {
 
   @Test
   public void extractTableChanges() {
-    String partition1 = "partition1";
-    String partition2 = "partition2";
-    String partition3 = "partition3";
-    OneDataFile initialFile2 = getOneDataFile(partition1, "file2.parquet");
-    OneDataFile initialFile3 = getOneDataFile(partition2, "file3.parquet");
+    OneDataFile initialFile2 = getOneDataFile("file2.parquet");
+    OneDataFile initialFile3 = getOneDataFile("file3.parquet");
 
     Instant lastSyncTime = Instant.now().minus(2, ChronoUnit.DAYS);
     TestCommit firstCommitToSync = TestCommit.of("first_commit");
@@ -80,7 +77,7 @@ public class TestExtractFromSource {
         .thenReturn(commitsBacklogToReturn);
 
     // drop a file and add a file in an existing partition
-    OneDataFile newFile1 = getOneDataFile(partition1, "file4.parquet");
+    OneDataFile newFile1 = getOneDataFile("file4.parquet");
     OneTable tableAtFirstInstant =
         OneTable.builder().latestCommitTime(Instant.now().minus(1, ChronoUnit.DAYS)).build();
     TableChange tableChangeToReturnAtFirstInstant =
@@ -99,8 +96,8 @@ public class TestExtractFromSource {
             .build();
 
     // add new file in a new partition, remove file from existing partition, remove partition
-    OneDataFile newFile2 = getOneDataFile(partition1, "file5.parquet");
-    OneDataFile newFile3 = getOneDataFile(partition3, "file6.parquet");
+    OneDataFile newFile2 = getOneDataFile("file5.parquet");
+    OneDataFile newFile3 = getOneDataFile("file6.parquet");
 
     OneTable tableAtSecondInstant = OneTable.builder().latestCommitTime(Instant.now()).build();
     TableChange tableChangeToReturnAtSecondInstant =
@@ -133,8 +130,8 @@ public class TestExtractFromSource {
         ExtractFromSource.of(mockSourceClient).extractTableChanges(instantsForIncrementalSync));
   }
 
-  private OneDataFile getOneDataFile(String partitionPath, String physicalPath) {
-    return OneDataFile.builder().partitionPath(partitionPath).physicalPath(physicalPath).build();
+  private OneDataFile getOneDataFile(String physicalPath) {
+    return OneDataFile.builder().physicalPath(physicalPath).build();
   }
 
   @AllArgsConstructor(staticName = "of")

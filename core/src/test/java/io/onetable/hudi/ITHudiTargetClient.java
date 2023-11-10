@@ -181,7 +181,6 @@ public class ITHudiTargetClient {
             .lastModified(System.currentTimeMillis())
             .fileSizeBytes(100L)
             .columnStats(Collections.emptyList())
-            .partitionPath(partitionPath)
             .physicalPath(
                 String.format("file://%s/%s/%s", tableBasePath, partitionPath, existingFileName1))
             .recordCount(2)
@@ -554,7 +553,6 @@ public class ITHudiTargetClient {
                 .build());
     return OneDataFile.builder()
         .schemaVersion(SCHEMA_VERSION)
-        .partitionPath(partitionPath)
         .physicalPath(String.format("file://%s/%s/%s", tableBasePath, partitionPath, fileName))
         .fileSizeBytes(FILE_SIZE)
         .fileFormat(FileFormat.APACHE_PARQUET)

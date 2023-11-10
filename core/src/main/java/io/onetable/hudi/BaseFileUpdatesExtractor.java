@@ -269,14 +269,7 @@ public class BaseFileUpdatesExtractor {
   }
 
   private String getPartitionPath(Path tableBasePath, List<OneDataFile> files) {
-    return getPartitionPath(tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
-  }
-
-  private String getPartitionPath(Path tableBasePath, Path filePath) {
-    String fileName = filePath.getName();
-    String pathStr = filePath.toUri().getPath();
-    int startIndex = tableBasePath.toUri().getPath().length() + 1;
-    int endIndex = pathStr.length() - fileName.length() - 1;
-    return endIndex <= startIndex ? "" : pathStr.substring(startIndex, endIndex);
+    return HudiPathUtils.getPartitionPath(
+        tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
   }
 }

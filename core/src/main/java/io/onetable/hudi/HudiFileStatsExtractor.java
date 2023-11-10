@@ -43,6 +43,7 @@ import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.ParquetUtils;
 import org.apache.hudi.common.util.collection.Pair;
+import org.apache.hudi.hadoop.CachingPath;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 import org.apache.hudi.metadata.MetadataPartitionType;
 
@@ -112,8 +113,10 @@ public class HudiFileStatsExtractor {
         });
   }
 
-  private Pair<String, String> getPartitionAndFileName(String partition, String path) {
-    return Pair.of(partition, new Path(path).getName());
+  private Pair<String, String> getPartitionAndFileName(String path) {
+    Path filePath = new CachingPath(path);
+    String partitionPath = HudiPathUtils.getPartitionPath(metaClient.getBasePathV2(), filePath);
+    return Pair.of(partitionPath, filePath.getName());
   }
 
   private Stream<OneDataFile> computeColumnStatsFromMetadataTable(
@@ -123,8 +126,7 @@ public class HudiFileStatsExtractor {
     Map<Pair<String, String>, OneDataFile> filePathsToDataFile =
         files.collect(
             Collectors.toMap(
-                file -> getPartitionAndFileName(file.getPartitionPath(), file.getPhysicalPath()),
-                Function.identity()));
+                file -> getPartitionAndFileName(file.getPhysicalPath()), Function.identity()));
     if (filePathsToDataFile.isEmpty()) {
       return Stream.empty();
     }
