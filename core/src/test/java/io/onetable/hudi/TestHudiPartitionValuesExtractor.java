@@ -208,8 +208,12 @@ public class TestHudiPartitionValuesExtractor {
             .transformType(partitionTransformType)
             .build();
 
-    Map<OnePartitionField, Range> expected = new HashMap<>();
-    expected.put(column, Range.scalar(partitionValue));
+    List<PartitionValue> expected =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(column)
+                .range(Range.scalar(partitionValue))
+                .build());
 
     Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
     pathToPartitionFieldFormat.put(column.getSourceField().getPath(), format);
@@ -257,11 +261,14 @@ public class TestHudiPartitionValuesExtractor {
             .transformType(PartitionTransformType.VALUE)
             .build();
 
-    Map<OnePartitionField, Range> expected = new HashMap<>();
-    expected.put(column1, Range.scalar("foo"));
-    Instant instant = Instant.parse("2022-10-02T00:00:00.00Z");
-    expected.put(column2, Range.scalar(instant.toEpochMilli()));
-    expected.put(column3, Range.scalar(32));
+    List<PartitionValue> expected =
+        Arrays.asList(
+            PartitionValue.builder().partitionField(column1).range(Range.scalar("foo")).build(),
+            PartitionValue.builder()
+                .partitionField(column2)
+                .range(Range.scalar(Instant.parse("2022-10-02T00:00:00.00Z").toEpochMilli()))
+                .build(),
+            PartitionValue.builder().partitionField(column3).range(Range.scalar(32)).build());
 
     Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
     pathToPartitionFieldFormat.put(column2.getSourceField().getPath(), "yyyy/MM/dd");
@@ -301,10 +308,11 @@ public class TestHudiPartitionValuesExtractor {
             .transformType(PartitionTransformType.VALUE)
             .build();
 
-    Map<OnePartitionField, Range> expected = new HashMap<>();
-    expected.put(column1, Range.scalar("foo"));
-    expected.put(column2, Range.scalar(null));
-    expected.put(column3, Range.scalar(32));
+    List<PartitionValue> expected =
+        Arrays.asList(
+            PartitionValue.builder().partitionField(column1).range(Range.scalar("foo")).build(),
+            PartitionValue.builder().partitionField(column2).range(Range.scalar(null)).build(),
+            PartitionValue.builder().partitionField(column3).range(Range.scalar(32)).build());
 
     Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
     pathToPartitionFieldFormat.put(column2.getSourceField().getPath(), "yyyy-MM-dd");
@@ -337,9 +345,10 @@ public class TestHudiPartitionValuesExtractor {
             .transformType(PartitionTransformType.VALUE)
             .build();
 
-    Map<OnePartitionField, Range> expected = new HashMap<>();
-    expected.put(column1, Range.scalar("foo"));
-    expected.put(column2, Range.scalar(32L));
+    List<PartitionValue> expected =
+        Arrays.asList(
+            PartitionValue.builder().partitionField(column1).range(Range.scalar("foo")).build(),
+            PartitionValue.builder().partitionField(column2).range(Range.scalar(32L)).build());
 
     List<PartitionValue> actual =
         new HudiPartitionValuesExtractor(Collections.emptyMap())
@@ -369,9 +378,10 @@ public class TestHudiPartitionValuesExtractor {
             .transformType(PartitionTransformType.VALUE)
             .build();
 
-    Map<OnePartitionField, Range> expected = new HashMap<>();
-    expected.put(column1, Range.scalar(null));
-    expected.put(column2, Range.scalar(32L));
+    List<PartitionValue> expected =
+        Arrays.asList(
+            PartitionValue.builder().partitionField(column2).range(Range.scalar(32L)).build(),
+            PartitionValue.builder().partitionField(column1).range(Range.scalar(null)).build());
 
     List<PartitionValue> actual =
         new HudiPartitionValuesExtractor(Collections.emptyMap())

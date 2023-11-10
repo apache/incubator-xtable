@@ -22,11 +22,12 @@ import static io.onetable.testutil.ColumnStatMapUtil.getColumnStats;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -123,7 +124,7 @@ public class TestDeltaStatsExtractor {
     DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
     List<ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
 
-    List<ColumnStat> expected = new ArrayList<>();
+    Set<ColumnStat> expected = new HashSet<>();
     columnStats.forEach(
         stat -> {
           OneType dataType = stat.getField().getSchema().getDataType();
@@ -132,7 +133,7 @@ public class TestDeltaStatsExtractor {
             expected.add(columnStatWithoutSize);
           }
         });
-    assertEquals(expected, actual);
+    assertEquals(expected, new HashSet<>(actual));
   }
 
   @Test

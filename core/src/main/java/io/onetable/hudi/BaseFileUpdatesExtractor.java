@@ -172,7 +172,7 @@ public class BaseFileUpdatesExtractor {
             .map(file -> new CachingPath(file.getPhysicalPath()))
             .collect(
                 Collectors.groupingBy(
-                    path -> getPartitionPath(tableBasePath, path),
+                    path -> HudiPathUtils.getPartitionPath(tableBasePath, path),
                     Collectors.mapping(this::getFileId, Collectors.toList())));
     // For all added files, group by partition and extract the file id
     List<WriteStatus> writeStatuses =
@@ -210,7 +210,7 @@ public class BaseFileUpdatesExtractor {
     WriteStatus writeStatus = new WriteStatus();
     Path path = new CachingPath(file.getPhysicalPath());
     String partitionPath =
-        partitionPathOptional.orElseGet(() -> getPartitionPath(tableBasePath, path));
+        partitionPathOptional.orElseGet(() -> HudiPathUtils.getPartitionPath(tableBasePath, path));
     String fileId = getFileId(path);
     String filePath =
         path.toUri().getPath().substring(tableBasePath.toUri().getPath().length() + 1);
