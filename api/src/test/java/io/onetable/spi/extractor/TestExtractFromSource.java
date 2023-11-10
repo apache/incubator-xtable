@@ -76,7 +76,7 @@ public class TestExtractFromSource {
     when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync))
         .thenReturn(commitsBacklogToReturn);
 
-    // drop a file and add a file in an existing partition
+    // drop a file and add a file
     OneDataFile newFile1 = getOneDataFile("file4.parquet");
     OneTable tableAtFirstInstant =
         OneTable.builder().latestCommitTime(Instant.now().minus(1, ChronoUnit.DAYS)).build();
@@ -95,7 +95,7 @@ public class TestExtractFromSource {
                 OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
             .build();
 
-    // add new file in a new partition, remove file from existing partition, remove partition
+    // add 2 new files, remove 2 files
     OneDataFile newFile2 = getOneDataFile("file5.parquet");
     OneDataFile newFile3 = getOneDataFile("file6.parquet");
 
