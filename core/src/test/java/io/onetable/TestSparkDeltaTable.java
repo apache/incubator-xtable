@@ -225,6 +225,11 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
   }
 
   @Override
+  public String getBasePath() {
+    return basePath;
+  }
+
+  @Override
   public void close() {
     // no-op as spark session lifecycle is managed by the caller
   }

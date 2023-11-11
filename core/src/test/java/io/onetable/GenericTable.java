@@ -48,6 +48,10 @@ public interface GenericTable<T, Q> extends AutoCloseable {
 
   String getBasePath();
 
+  default String getDataPath() {
+    return getBasePath();
+  }
+
   String getOrderByColumn();
 
   void close();

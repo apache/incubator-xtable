@@ -191,6 +191,7 @@ public class ITOneTableClient {
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
+              .tableDataPath(table.getDataPath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
                       .partitionFieldSpecConfig(oneTablePartitionConfig)
@@ -223,6 +224,7 @@ public class ITOneTableClient {
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(tableWithUpdatedSchema.getBasePath())
+              .tableDataPath(tableWithUpdatedSchema.getDataPath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
                       .partitionFieldSpecConfig(oneTablePartitionConfig)
@@ -828,10 +830,7 @@ public class ITOneTableClient {
                           .read()
                           .options(finalTargetOptions)
                           .format(targetFormat.name().toLowerCase())
-                          .load(
-                              sourceFormat == TableFormat.ICEBERG
-                                  ? sourceTable.getBasePath() + "/data"
-                                  : sourceTable.getBasePath())
+                          .load(sourceTable.getDataPath())
                           .orderBy(sourceTable.getOrderByColumn())
                           .filter(filterCondition);
                     }));

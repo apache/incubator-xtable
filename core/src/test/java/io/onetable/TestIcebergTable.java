@@ -212,7 +212,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   }
 
   public String getDataPath() {
-    return removeSlash(basePath) + "/" + tableName + "/data";
+    return getBasePath() + "/data";
   }
 
   private String removeSlash(String path) {
