@@ -21,12 +21,10 @@ package io.onetable;
 import static org.apache.iceberg.SnapshotSummary.TOTAL_RECORDS_PROP;
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -69,7 +67,7 @@ import io.onetable.iceberg.TestIcebergDataHelper;
 @Getter
 public class TestIcebergTable implements GenericTable<Record, String> {
   private static final String DEFAULT_RECORD_KEY_FIELD = "id";
-  private static final List<String> DEFAULT_PARTITION_FIELDS = Arrays.asList("level");
+  private static final List<String> DEFAULT_PARTITION_FIELDS = Collections.singletonList("level");
 
   private final String tableName;
   private final String basePath;
@@ -117,7 +115,6 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   }
 
   @Override
-  @SneakyThrows
   public List<Record> insertRows(int numRows) {
     List<Record> records = icebergDataHelper.generateInsertRecords(numRows);
     // Group records by partition
@@ -126,7 +123,6 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return records;
   }
 
-  @SneakyThrows
   public List<Record> insertRecordsForPartition(int numRows, String partitionValue) {
     List<Record> records =
         icebergDataHelper.generateInsertRecordForPartition(numRows, partitionValue);
@@ -136,12 +132,10 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   }
 
   @Override
-  @SneakyThrows
   public List<Record> insertRecordsForSpecialPartition(int numRows) {
     return insertRecordsForPartition(numRows, SPECIAL_PARTITION_VALUE);
   }
 
-  @SneakyThrows
   @Override
   public void upsertRows(List<Record> recordsToUpdate) {
     Set<String> idsToUpdate =
@@ -162,7 +156,6 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   }
 
   @Override
-  @SneakyThrows
   public void deleteRows(List<Record> recordsToDelete) {
     Set<String> idsToDelete =
         recordsToDelete.stream()
@@ -189,7 +182,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     OverwriteFiles overwrite = icebergTable.newOverwrite();
 
     // Delete existing files in table.
-    getCurrentFilesInTable().forEach(dataFile -> overwrite.deleteFile(dataFile));
+    getCurrentFilesInTable().forEach(overwrite::deleteFile);
 
     // Write new files.
     List<DataFile> dataFiles = writeAllDataFiles(recordsByPartition);
@@ -280,19 +273,21 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return icebergTable.currentSnapshot().timestampMillis();
   }
 
+  @SneakyThrows
   public List<String> getAllActiveFiles() {
     List<String> filePaths = new ArrayList<>();
-    Iterable<FileScanTask> fileScanTasks = icebergTable.newScan().planFiles();
-    for (FileScanTask fileScanTask : fileScanTasks) {
-      DataFile dataFile = fileScanTask.file();
-      filePaths.add(dataFile.path().toString());
+    try (CloseableIterable<FileScanTask> fileScanTasks = icebergTable.newScan().planFiles()) {
+      for (FileScanTask fileScanTask : fileScanTasks) {
+        DataFile dataFile = fileScanTask.file();
+        filePaths.add(dataFile.path().toString());
+      }
+      return filePaths;
     }
-    return filePaths;
   }
 
   public long getNumRows() {
     Snapshot currentSnapshot = icebergTable.currentSnapshot();
-    Long totalRecords =
+    long totalRecords =
         Long.parseLong(currentSnapshot.summary().getOrDefault(TOTAL_RECORDS_PROP, "0"));
     assertTrue(totalRecords > 0, "Total records is expected to be greater than 0");
     return totalRecords;
@@ -306,8 +301,8 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return partitionFields.stream().filter(Objects::nonNull).collect(Collectors.toList());
   }
 
-  private DataFile writeAndGetDataFile(List<Record> records, StructLike partitionKey)
-      throws IOException {
+  @SneakyThrows
+  private DataFile writeAndGetDataFile(List<Record> records, StructLike partitionKey) {
     Path baseDataPath = Paths.get(icebergTable.location(), "data");
     String filePath;
     if (icebergDataHelper.getPartitionSpec().isPartitioned()) {
@@ -338,33 +333,43 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return dataWriter.toDataFile();
   }
 
+  @SneakyThrows
   private List<DataFile> getCurrentFilesInTable() {
     List<DataFile> allFiles = new ArrayList<>();
-    Iterable<FileScanTask> fileScanTasks = icebergTable.newScan().planFiles();
-    fileScanTasks.forEach(fileScanTask -> allFiles.add(fileScanTask.file()));
+    try (CloseableIterable<FileScanTask> fileScanTasks = icebergTable.newScan().planFiles()) {
+      fileScanTasks.forEach(fileScanTask -> allFiles.add(fileScanTask.file()));
+    }
     return allFiles;
   }
 
-  private List<Record> getAllRecordsInTable() throws IOException {
+  @SneakyThrows
+  private List<Record> getAllRecordsInTable() {
     List<Record> allRecords = new ArrayList<>();
-    Iterable<FileScanTask> fileScanTasks = icebergTable.newScan().planFiles();
-    for (FileScanTask fileScanTask : fileScanTasks) {
-      DataFile dataFile = fileScanTask.file();
-      InputFile inputFile = icebergTable.io().newInputFile(dataFile.path().toString());
-
-      try (CloseableIterable<Record> reader =
-          Parquet.read(inputFile)
-              .project(icebergTable.schema())
-              .createReaderFunc(
-                  fileSchema ->
-                      GenericParquetReaders.buildReader(icebergTable.schema(), fileSchema))
-              .build()) {
-        for (Record record : reader) {
-          allRecords.add(record);
-        }
-      }
+    try (CloseableIterable<FileScanTask> fileScanTasks = icebergTable.newScan().planFiles()) {
+      fileScanTasks.forEach(
+          fileScanTask -> {
+            DataFile dataFile = fileScanTask.file();
+            allRecords.addAll(readRecordsFromFile(dataFile));
+          });
     }
     return allRecords;
+  }
+
+  @SneakyThrows
+  private List<Record> readRecordsFromFile(DataFile dataFile) {
+    List<Record> recordsInFile = new ArrayList<>();
+    InputFile inputFile = icebergTable.io().newInputFile(dataFile.path().toString());
+    try (CloseableIterable<Record> reader =
+        Parquet.read(inputFile)
+            .project(icebergTable.schema())
+            .createReaderFunc(
+                fileSchema -> GenericParquetReaders.buildReader(icebergTable.schema(), fileSchema))
+            .build()) {
+      for (Record record : reader) {
+        recordsInFile.add(record);
+      }
+    }
+    return recordsInFile;
   }
 
   private Map<StructLike, List<Record>> groupRecordsForWritingByPartition(List<Record> records) {
@@ -377,16 +382,10 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return recordsByPartition;
   }
 
+  @SneakyThrows
   private List<DataFile> writeAllDataFiles(Map<StructLike, List<Record>> recordsByPartition) {
     return recordsByPartition.entrySet().stream()
-        .map(
-            entry -> {
-              try {
-                return writeAndGetDataFile(entry.getValue(), entry.getKey());
-              } catch (IOException e) {
-                throw new RuntimeException(e);
-              }
-            })
+        .map(entry -> writeAndGetDataFile(entry.getValue(), entry.getKey()))
         .collect(Collectors.toList());
   }
 
