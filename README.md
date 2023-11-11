@@ -19,7 +19,7 @@ which we believe will facilitate the expansion of supported source and target fo
 2. Build the project using `mvn clean package`. Use `mvn clean package -DskipTests` to skip tests while building.
 3. Use `mvn clean test` or `mvn test` to run all unit tests. If you need to run only a specific test you can do this
    by something like `mvn test -Dtest=TestDeltaSync -pl core`.
-4. Similarly use `mvn clean verify` or `mvn verify` to run integration tests.
+4. Similarly, use `mvn clean verify` or `mvn verify` to run integration tests.
 
 # Style guide
 1. We use [Maven Spotless plugin](https://github.com/diffplug/spotless/tree/main/plugin-maven) and 
@@ -32,25 +32,29 @@ which we believe will facilitate the expansion of supported source and target fo
 2. create a yaml file that follows the format below:
 ```yaml
 sourceFormat: HUDI
-tableFormats:
+targetFormats:
   - DELTA
   - ICEBERG
 datasets:
   -
     tableBasePath: s3://tpc-ds-datasets/1GB/hudi/call_center
-    tablename: call_center
+    tableDataPath: s3://tpc-ds-datasets/1GB/hudi/call_center/data
+    tableName: call_center
+    namespace: my.db
   -
     tableBasePath: s3://tpc-ds-datasets/1GB/hudi/catalog_sales
-    tablename: catalog_sales
+    tableName: catalog_sales
     partitionSpec: cs_sold_date_sk:VALUE
   -
     tableBasePath: s3://hudi/multi-partition-dataset
-    tablename: multi_partition_dataset
+    tableName: multi_partition_dataset
     partitionSpec: time_millis:DAY:yyyy-MM-dd,type:VALUE
 ```
-- `tableFormats` is a list of formats you want to create from your source Hudi tables
-- `tableBasePath` is the basePath of the Hudi table
-- `partitionSpec` is a spec that allows us to infer partition values. If the table is not partitioned, leave it blank. If it is partitioned, you can specify a spec with a comma separated list with format `path:type:format`
+- `tableFormats` is a list of formats you want to create from your source tables
+- `tableBasePath` is the basePath of the table
+- `tableDataPath` is an optional field specifying the path to the data files. If not specified, the tableBasePath will be used. For Iceberg source tables, you will need to specify the `/data` path.
+- `namespace` is an optional field specifying the namespace of the table and will be used when syncing to a catalog.
+- `partitionSpec` is a spec that allows us to infer partition values. This is only required for Hudi source tables. If the table is not partitioned, leave it blank. If it is partitioned, you can specify a spec with a comma separated list with format `path:type:format`
   - `path` is a dot separated path to the partition field
   - `type` describes how the partition value was generated from the column value
     - `VALUE`: an identity transform of field value to partition value
@@ -77,8 +81,16 @@ tableFormatsClients:
         spark.master: local[2]
         spark.app.name: onetableclient
 ```
-4. run with `java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [ --hadoopConfig hdfs-site.xml ] [--clientsConfig clients.yaml]`
-The bundled jar includes hadoop dependencies for AWS and GCP. Authentication for AWS is done with 
+4. A catalog can be used when reading and updating Iceberg tables. The catalog can be specified in a yaml file and passed in with the `--icebergCatalogConfig` option. The format of the catalog config file is:
+```yaml
+catalogImpl: io.my.CatalogImpl
+catalogName: name
+catalogOptions: # all other options are passed through in a map
+  key1: value1
+  key2: value2
+```
+5. run with `java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--clientsConfig clients.yaml] [--icebergCatalogConfig catalog.yaml]`
+The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Authentication for AWS is done with 
 `com.amazonaws.auth.DefaultAWSCredentialsProviderChain`. To override this setting, specify a different implementation 
 with the `--awsCredentialsProvider` option.
 
@@ -93,4 +105,4 @@ You have found a bug, or have a cool idea you that want to contribute to the pro
 Adding a new target format requires a developer implement [TargetClient](./api/src/main/java/io/onetable/spi/sync/TargetClient.java). Once you have implemented that interface, you can integrate it into the [OneTableClient](./core/src/main/java/io/onetable/client/OneTableClient.java). If you think others may find that target useful, please raise a Pull Request to add it to the project.
 
 ## Overview of the sync process
-![img.png](docs/images/sync_flow.jpg)
+![img.png](assets/images/sync_flow.jpg)

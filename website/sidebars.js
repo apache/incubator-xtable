@@ -12,6 +12,7 @@
 module.exports = {
     docs: [
         "setup",
+        "features-and-limitations",
         {
             type: 'category',
             label: 'Quick Start',

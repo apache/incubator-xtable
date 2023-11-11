@@ -41,7 +41,7 @@ import io.onetable.model.stat.Range;
 public class OneDataFile {
   // written schema version
   SchemaVersion schemaVersion;
-  // physical path of the file (absolute)
+  // physical path of the file (absolute with scheme)
   @NonNull String physicalPath;
   // file format
   @Builder.Default @NonNull FileFormat fileFormat = FileFormat.APACHE_PARQUET;
