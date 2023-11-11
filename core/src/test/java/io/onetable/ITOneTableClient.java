@@ -131,7 +131,8 @@ public class ITOneTableClient {
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
-    for (TableFormat sourceTableFormat : Arrays.asList(TableFormat.ICEBERG)) {
+    for (TableFormat sourceTableFormat :
+        Arrays.asList(TableFormat.HUDI, TableFormat.DELTA, TableFormat.ICEBERG)) {
       for (SyncMode syncMode : SyncMode.values()) {
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceTableFormat, syncMode, isPartitioned));
@@ -820,8 +821,8 @@ public class ITOneTableClient {
                       if (targetFormat.equals(TableFormat.HUDI)) {
                         finalTargetOptions = new HashMap<>(finalTargetOptions);
                         finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
-                        // finalTargetOptions.put(
-                        // "hoodie.datasource.read.extract.partition.values.from.path", "true");
+                        finalTargetOptions.put(
+                            "hoodie.datasource.read.extract.partition.values.from.path", "true");
                       }
                       return sparkSession
                           .read()

@@ -59,6 +59,7 @@ import org.apache.iceberg.io.DataWriter;
 import org.apache.iceberg.io.InputFile;
 import org.apache.iceberg.io.OutputFile;
 import org.apache.iceberg.parquet.Parquet;
+import org.apache.iceberg.types.Types;
 
 import com.google.common.base.Preconditions;
 
@@ -254,14 +255,12 @@ public class TestIcebergTable implements GenericTable<Record, String> {
 
   @Override
   public List<String> getColumnsToSelect() {
-    return Arrays.asList("level", "timestamp_micros_nullable_field");
-    /*
+    // There is representation difference in hudi and iceberg for local timestamp micros field.
+    // and hence excluding it from the list of columns to select.
     return icebergDataHelper.getTableSchema().columns().stream()
         .map(Types.NestedField::name)
-        //.filter(name -> !name.equals("timestamp_local_micros_nullable_field"))
+        .filter(name -> !name.equals("timestamp_local_micros_nullable_field"))
         .collect(Collectors.toList());
-
-     */
   }
 
   @Override
