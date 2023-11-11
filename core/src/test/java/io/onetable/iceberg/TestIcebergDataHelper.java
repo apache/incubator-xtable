@@ -151,10 +151,6 @@ public class TestIcebergDataHelper {
         .collect(Collectors.toList());
   }
 
-  public boolean isPartitioned() {
-    return partitionFieldNames != null && !partitionFieldNames.isEmpty();
-  }
-
   public PartitionSpec getPartitionSpec() {
     if (partitionFieldNames.isEmpty()) {
       return PartitionSpec.unpartitioned();

@@ -210,6 +210,8 @@ public class ITOneTableClient {
       table.deleteRows(insertRecords.subList(30, 50));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 180);
+      checkDatasetEquivalenceWithFilter(
+          sourceTableFormat, table, targetTableFormats, table.getFilterQuery());
     }
 
     try (GenericTable tableWithUpdatedSchema =
