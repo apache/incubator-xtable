@@ -26,6 +26,8 @@ import java.util.UUID;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 
+import org.apache.hudi.common.model.HoodieTableType;
+
 import io.onetable.model.storage.TableFormat;
 
 public interface GenericTable<T, Q> extends AutoCloseable {
@@ -91,6 +93,23 @@ public interface GenericTable<T, Q> extends AutoCloseable {
             tableName, tempDir, sparkSession, isPartitioned ? "level" : null);
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
+    }
+  }
+
+  static GenericTable getInstanceWithCustomPartitionConfig(
+      String tableName,
+      Path tempDir,
+      JavaSparkContext jsc,
+      TableFormat sourceFormat,
+      String partitionConfig) {
+    switch (sourceFormat) {
+      case HUDI:
+        return TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig, HoodieTableType.COPY_ON_WRITE);
+      default:
+        throw new IllegalArgumentException(
+            String.format(
+                "Unsupported source format: %s for custom partition config", sourceFormat));
     }
   }
 

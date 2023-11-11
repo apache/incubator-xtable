@@ -99,6 +99,7 @@ class HudiTableManager {
     try {
       return HoodieTableMetaClient.withPropertyBuilder()
           .setCommitTimezone(HoodieTimelineTimeZone.UTC)
+          .setHiveStylePartitioningEnable(true)
           .setTableType(HoodieTableType.COPY_ON_WRITE)
           .setTableName(table.getName())
           .setPayloadClass(HoodieAvroPayload.class)
