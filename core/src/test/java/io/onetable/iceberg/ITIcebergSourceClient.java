@@ -72,7 +72,7 @@ public class ITIcebergSourceClient {
       List<List<String>> allActiveFiles = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
-      List<Record> records = testIcebergTable.insertRows(50);
+      testIcebergTable.insertRows(50);
       Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
@@ -129,16 +129,16 @@ public class ITIcebergSourceClient {
       List<List<String>> allActiveFiles = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
-      List<Record> records = testIcebergTable.insertRows(50);
+      List<Record> records1 = testIcebergTable.insertRows(50);
       Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
-      List<Record> records1 = testIcebergTable.insertRows(50);
+      List<Record> records2 = testIcebergTable.insertRows(50);
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
       List<Record> allRecords = new ArrayList<>();
-      allRecords.addAll(records);
       allRecords.addAll(records1);
+      allRecords.addAll(records2);
 
       Map<String, List<Record>> recordsByPartition =
           testIcebergTable.groupRecordsByPartition(allRecords);
@@ -188,16 +188,16 @@ public class ITIcebergSourceClient {
       List<List<String>> allActiveFiles = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
-      List<Record> records = testIcebergTable.insertRows(50);
+      List<Record> records1 = testIcebergTable.insertRows(50);
       Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
-      List<Record> records1 = testIcebergTable.insertRows(50);
+      List<Record> records2 = testIcebergTable.insertRows(50);
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
       List<Record> allRecords = new ArrayList<>();
-      allRecords.addAll(records);
       allRecords.addAll(records1);
+      allRecords.addAll(records2);
 
       Map<String, List<Record>> recordsByPartition =
           testIcebergTable.groupRecordsByPartition(allRecords);
@@ -248,10 +248,10 @@ public class ITIcebergSourceClient {
       List<List<String>> allActiveFiles = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
-      List<Record> records = testIcebergTable.insertRows(50);
+      List<Record> records1 = testIcebergTable.insertRows(50);
       Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
 
-      testIcebergTable.upsertRows(records.subList(0, 20));
+      testIcebergTable.upsertRows(records1.subList(0, 20));
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
       Thread.sleep(5 * 1000L);
       Instant instantAfterUpsert = Instant.now();

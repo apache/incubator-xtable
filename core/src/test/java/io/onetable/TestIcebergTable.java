@@ -112,7 +112,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
 
     hadoopCatalog = new HadoopCatalog(hadoopConf, basePath);
     // No namespace specified.
-    TableIdentifier tableIdentifier = TableIdentifier.of("", tableName);
+    TableIdentifier tableIdentifier = TableIdentifier.of(tableName);
     if (!hadoopCatalog.tableExists(tableIdentifier)) {
       icebergTable = hadoopCatalog.createTable(tableIdentifier, schema, partitionSpec);
     } else {
@@ -124,14 +124,9 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   @SneakyThrows
   public List<Record> insertRows(int numRows) {
     List<Record> records = icebergDataHelper.generateInsertRecords(numRows);
-    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(icebergTable.schema());
-
     // Group records by partition
     Map<StructLike, List<Record>> recordsByPartition = groupRecordsForWritingByPartition(records);
-    AppendFiles append = icebergTable.newAppend();
-    List<DataFile> dataFiles = writeAllDataFiles(appenderFactory, recordsByPartition);
-    dataFiles.forEach(append::appendFile);
-    append.commit();
+    writeAllFilesByAppending(recordsByPartition);
     return records;
   }
 
@@ -139,13 +134,8 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   public List<Record> insertRecordsForPartition(int numRows, String partitionValue) {
     List<Record> records =
         icebergDataHelper.generateInsertRecordForPartition(numRows, partitionValue);
-    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(icebergTable.schema());
-
     Map<StructLike, List<Record>> recordsByPartition = groupRecordsForWritingByPartition(records);
-    AppendFiles append = icebergTable.newAppend();
-    List<DataFile> dataFiles = writeAllDataFiles(appenderFactory, recordsByPartition);
-    dataFiles.forEach(append::appendFile);
-    append.commit();
+    writeAllFilesByAppending(recordsByPartition);
     return records;
   }
 
@@ -170,21 +160,9 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     List<Record> updatedRecords = icebergDataHelper.generateUpsertRecords(recordsToUpdate);
     List<Record> combinedRecords = new ArrayList<>(recordsWithNoUpdates);
     combinedRecords.addAll(updatedRecords);
-
-    OverwriteFiles overwrite = icebergTable.newOverwrite();
-    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(icebergTable.schema());
-
-    // Group records by partition
     Map<StructLike, List<Record>> recordsByPartition =
         groupRecordsForWritingByPartition(combinedRecords);
-
-    // Delete existing files in table.
-    getCurrentFilesInTable().forEach(dataFile -> overwrite.deleteFile(dataFile));
-
-    // Write new files.
-    List<DataFile> dataFiles = writeAllDataFiles(appenderFactory, recordsByPartition);
-    dataFiles.forEach(overwrite::addFile);
-    overwrite.commit();
+    writeAllFilesByOverWriting(recordsByPartition);
   }
 
   @Override
@@ -199,13 +177,22 @@ public class TestIcebergTable implements GenericTable<Record, String> {
         allRecordsInTable.stream()
             .filter(r -> !idsToDelete.contains(r.getField(DEFAULT_RECORD_KEY_FIELD).toString()))
             .collect(Collectors.toList());
-
-    OverwriteFiles overwrite = icebergTable.newOverwrite();
-    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(icebergTable.schema());
-
-    // Group records by partition
     Map<StructLike, List<Record>> recordsByPartition =
         groupRecordsForWritingByPartition(recordsToRetain);
+    writeAllFilesByOverWriting(recordsByPartition);
+  }
+
+  private void writeAllFilesByAppending(Map<StructLike, List<Record>> recordsByPartition) {
+    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(icebergTable.schema());
+    AppendFiles append = icebergTable.newAppend();
+    List<DataFile> dataFiles = writeAllDataFiles(appenderFactory, recordsByPartition);
+    dataFiles.forEach(append::appendFile);
+    append.commit();
+  }
+
+  private void writeAllFilesByOverWriting(Map<StructLike, List<Record>> recordsByPartition) {
+    OverwriteFiles overwrite = icebergTable.newOverwrite();
+    GenericAppenderFactory appenderFactory = new GenericAppenderFactory(icebergTable.schema());
 
     // Delete existing files in table.
     getCurrentFilesInTable().forEach(dataFile -> overwrite.deleteFile(dataFile));
@@ -268,6 +255,11 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return icebergDataHelper.getTableSchema().columns().stream()
         .map(Types.NestedField::name)
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public String getFilterQuery() {
+    return String.format("%s > 'aaa'", icebergDataHelper.getRecordKeyField());
   }
 
   public Long getLastCommitTimestamp() {
