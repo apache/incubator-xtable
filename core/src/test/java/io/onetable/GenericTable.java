@@ -99,7 +99,7 @@ public interface GenericTable<T, Q> extends AutoCloseable {
         return TestSparkDeltaTable.forSchemaWithAdditionalColumnsAndPartitioning(
             tableName, tempDir, sparkSession, isPartitioned ? "level" : null);
       case ICEBERG:
-        return TestIcebergTable.forStandardSchemaAndPartitioning(
+        return TestIcebergTable.forSchemaWithAdditionalColumnsAndPartitioning(
             tableName, isPartitioned ? "level" : null, tempDir, jsc.hadoopConfiguration());
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);

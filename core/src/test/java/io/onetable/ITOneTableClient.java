@@ -259,97 +259,6 @@ public class ITOneTableClient {
     }
   }
 
-  @Test
-  public void canDelete() {
-    // TODO(vamshigv): Partitioned failing with Empty partition column value in 'level='
-    TableFormat sourceTableFormat = TableFormat.ICEBERG;
-    SyncMode syncMode = SyncMode.FULL;
-    boolean isPartitioned = true;
-    String tableName = getTableName();
-    OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-    List<TableFormat> targetTableFormats = getOtherFormats(sourceTableFormat);
-    String oneTablePartitionConfig = null;
-    if (isPartitioned) {
-      oneTablePartitionConfig = "level:VALUE";
-    }
-    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(sourceTableFormat);
-    List<?> insertRecords;
-    try (GenericTable table =
-        GenericTable.getInstance(
-            tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
-      insertRecords = table.insertRows(100);
-
-      PerTableConfig perTableConfig =
-          PerTableConfig.builder()
-              .tableName(tableName)
-              .targetTableFormats(targetTableFormats)
-              .tableBasePath(table.getBasePath())
-              .tableDataPath(table.getBasePath() + "/data")
-              .hudiSourceConfig(
-                  HudiSourceConfig.builder()
-                      .partitionFieldSpecConfig(oneTablePartitionConfig)
-                      .build())
-              .syncMode(syncMode)
-              .build();
-      oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 100);
-
-      table.insertRows(100);
-      oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 200);
-
-      table.upsertRows(insertRecords.subList(0, 20));
-      oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 200);
-
-      table.deleteRows(insertRecords.subList(30, 50));
-      oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 180);
-    }
-
-    try (GenericTable tableWithUpdatedSchema =
-        GenericTable.getInstanceWithAdditionalColumns(
-            tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
-      PerTableConfig perTableConfig =
-          PerTableConfig.builder()
-              .tableName(tableName)
-              .targetTableFormats(targetTableFormats)
-              .tableBasePath(tableWithUpdatedSchema.getBasePath())
-              .tableDataPath(tableWithUpdatedSchema.getBasePath() + "/data")
-              .hudiSourceConfig(
-                  HudiSourceConfig.builder()
-                      .partitionFieldSpecConfig(oneTablePartitionConfig)
-                      .build())
-              .syncMode(syncMode)
-              .build();
-      List<Row> insertsAfterSchemaUpdate = tableWithUpdatedSchema.insertRows(100);
-      tableWithUpdatedSchema.reload();
-      oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 280);
-
-      tableWithUpdatedSchema.deleteRows(insertsAfterSchemaUpdate.subList(60, 90));
-      oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 250);
-
-      if (isPartitioned) {
-        // Adds new partition.
-        tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
-        oneTableClient.sync(perTableConfig, sourceClientProvider);
-        checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 300);
-
-        // Drops partition.
-        tableWithUpdatedSchema.deleteSpecialPartition();
-        oneTableClient.sync(perTableConfig, sourceClientProvider);
-        checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 250);
-
-        // Insert records to the dropped partition again.
-        tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
-        oneTableClient.sync(perTableConfig, sourceClientProvider);
-        checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 300);
-      }
-    }
-  }
-
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndSyncModes")
   public void testConcurrentInsertWritesInSource(
@@ -454,7 +363,7 @@ public class ITOneTableClient {
   @ParameterizedTest
   @EnumSource(
       value = TableFormat.class,
-      names = {"HUDI", "DELTA"})
+      names = {"HUDI", "DELTA", "ICEBERG"})
   public void testTimeTravelQueries(TableFormat sourceTableFormat) throws Exception {
     String tableName = getTableName();
     try (GenericTable table =
@@ -466,6 +375,7 @@ public class ITOneTableClient {
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
+              .tableDataPath(table.getDataPath())
               .syncMode(SyncMode.INCREMENTAL)
               .build();
       SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(sourceTableFormat);
