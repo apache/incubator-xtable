@@ -226,4 +226,9 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     // 2. Check if expiring of snapshots has impacted the provided instant.
     return true;
   }
+
+  @Override
+  public void close() {
+    tableOps.close();
+  }
 }
