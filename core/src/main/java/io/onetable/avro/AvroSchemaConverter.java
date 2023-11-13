@@ -18,6 +18,7 @@
  
 package io.onetable.avro;
 
+import static io.onetable.collectors.CustomCollectors.toList;
 import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
 
 import java.util.ArrayList;
@@ -30,6 +31,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import io.onetable.collectors.CustomCollectors;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -325,7 +327,7 @@ public class AvroSchemaConverter {
                             OneField.Constants.NULL_DEFAULT_VALUE == field.getDefaultValue()
                                 ? Schema.Field.NULL_VALUE
                                 : field.getDefaultValue()))
-                .collect(Collectors.toList());
+                .collect(toList(oneSchema.getFields().size()));
         return finalizeSchema(
             Schema.createRecord(
                 oneSchema.getName(), oneSchema.getComment(), currentPath, false, fields),

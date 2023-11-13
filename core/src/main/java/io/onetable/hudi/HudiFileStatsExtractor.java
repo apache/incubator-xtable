@@ -52,6 +52,8 @@ import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.OneDataFile;
 
+import static io.onetable.collectors.CustomCollectors.toList;
+
 /** Responsible for Column stats extraction for Hudi. */
 @AllArgsConstructor
 public class HudiFileStatsExtractor {
@@ -144,7 +146,7 @@ public class HudiFileStatsExtractor {
             .collect(
                 Collectors.groupingBy(
                     Map.Entry::getKey,
-                    Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
+                    Collectors.mapping(Map.Entry::getValue, toList(nameFieldMap.size()))));
     return filePathsToDataFile.entrySet().stream()
         .map(
             pathToDataFile -> {

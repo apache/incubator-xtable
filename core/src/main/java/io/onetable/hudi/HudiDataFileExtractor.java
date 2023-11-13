@@ -71,6 +71,8 @@ import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
 
+import static io.onetable.collectors.CustomCollectors.toList;
+
 /** Extracts all the files for Hudi table represented by {@link OneTable}. */
 public class HudiDataFileExtractor implements AutoCloseable {
   private static final SchemaVersion DEFAULT_SCHEMA_VERSION = new SchemaVersion(1, null);
@@ -274,7 +276,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
             })
         .map(HoodieBaseFile::new)
         .map(baseFile -> buildFileWithoutStats(partitionPath, partitionValues, baseFile))
-        .collect(Collectors.toList());
+        .collect(toList(deletedPaths.size()));
   }
 
   private AddedAndRemovedFiles getUpdatesToPartition(

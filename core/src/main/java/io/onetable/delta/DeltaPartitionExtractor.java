@@ -18,6 +18,7 @@
  
 package io.onetable.delta;
 
+import static io.onetable.collectors.CustomCollectors.toList;
 import static io.onetable.delta.DeltaValueConverter.convertFromDeltaPartitionValue;
 import static io.onetable.delta.DeltaValueConverter.convertToDeltaPartitionValue;
 
@@ -189,7 +190,7 @@ public class DeltaPartitionExtractor {
     List<String> partitionColumns =
         parsedGeneratedExprs.stream()
             .map(parsedGeneratedExpr -> parsedGeneratedExpr.partitionColumnName)
-            .collect(Collectors.toList());
+            .collect(toList(parsedGeneratedExprs.size()));
     return OnePartitionField.builder()
         .sourceField(
             SchemaFieldFinder.getInstance().findFieldByPath(oneSchema, transform.sourceColumn))
