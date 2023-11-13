@@ -280,14 +280,11 @@ public class TestIcebergDataHelper {
         return LocalDate.ofEpochDay(randomDay);
       case TIME:
         long totalMicrosInDay = ChronoUnit.DAYS.getDuration().toMillis() * 1000;
-        long randomTimeInMicros = ThreadLocalRandom.current().nextLong(totalMicrosInDay);
-        return randomTimeInMicros;
+        return ThreadLocalRandom.current().nextLong(totalMicrosInDay);
       case DECIMAL:
         Types.DecimalType decimalType = (Types.DecimalType) fieldType;
-        BigDecimal randomDecimal =
-            new BigDecimal(RANDOM.nextDouble() * Math.pow(10, decimalType.scale()))
-                .setScale(decimalType.scale(), RoundingMode.HALF_UP);
-        return randomDecimal;
+        return new BigDecimal(RANDOM.nextDouble() * Math.pow(10, decimalType.scale()))
+            .setScale(decimalType.scale(), RoundingMode.HALF_UP);
       case TIMESTAMP:
         Types.TimestampType timestampType = (Types.TimestampType) fieldType;
 

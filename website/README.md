@@ -39,6 +39,8 @@ It is important to test your build locally before deploying to production.
 cd website
 npm run serve
 ```
+> [!NOTE]  
+> If you make changes to the contents inside `docs` directory, you can verify the changes locally by visiting https://localhost:3000/docs/setup after running `npm run serve`. 
 
 ## Docs
 ### Creating new docs
