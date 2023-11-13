@@ -41,7 +41,8 @@ public class ExtractFromSource<COMMIT> {
     CommitsBacklog<COMMIT> commitsBacklog =
         sourceClient.getCommitsBacklog(instantsForIncrementalSync);
     // No overlap between updatedPendingCommits and commitList, process separately.
-    List<TableChange> tableChangeList = new ArrayList<>();
+    List<TableChange> tableChangeList =
+        new ArrayList<>(commitsBacklog.getCommitsToProcess().size());
     for (COMMIT commit : commitsBacklog.getCommitsToProcess()) {
       TableChange tableChange = sourceClient.getTableChangeForCommit(commit);
       tableChangeList.add(tableChange);

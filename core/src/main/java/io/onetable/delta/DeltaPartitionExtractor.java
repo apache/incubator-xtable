@@ -118,7 +118,7 @@ public class DeltaPartitionExtractor {
       StructType partitionSchema, OneSchema oneSchema) {
     PeekingIterator<StructField> itr =
         Iterators.peekingIterator(Arrays.stream(partitionSchema.fields()).iterator());
-    List<OnePartitionField> partitionFields = new ArrayList<>();
+    List<OnePartitionField> partitionFields = new ArrayList<>(partitionSchema.fields().length);
     while (itr.hasNext()) {
       StructField currPartitionField = itr.peek();
       if (!currPartitionField.metadata().contains(DELTA_GENERATION_EXPRESSION)) {
@@ -149,7 +149,7 @@ public class DeltaPartitionExtractor {
                   currPartitionField.name(), parsedGeneratedExpr, oneSchema));
           itr.next(); // consume the field.
         } else {
-          // consume until we hit field with no generated expression or genearated expression
+          // consume until we hit field with no generated expression or generated expression
           // that is not of type cast or date format.
           List<ParsedGeneratedExpr> parsedGeneratedExprs = new ArrayList<>();
           while (itr.hasNext()
