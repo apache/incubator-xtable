@@ -48,7 +48,6 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -105,16 +104,6 @@ public class ITOneTableClient {
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
   }
 
-  @BeforeEach
-  public void setup() {
-    hudiSourceClientProvider = new HudiSourceClientProvider();
-    hudiSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
-    deltaSourceClientProvider = new DeltaSourceClientProvider();
-    deltaSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
-    icebergSourceClientProvider = new IcebergSourceClientProvider();
-    icebergSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
-  }
-
   @AfterAll
   public static void teardown() {
     if (jsc != null) {
@@ -148,10 +137,16 @@ public class ITOneTableClient {
 
   private SourceClientProvider<?> getSourceClientProvider(TableFormat sourceTableFormat) {
     if (sourceTableFormat == TableFormat.HUDI) {
+      hudiSourceClientProvider = new HudiSourceClientProvider();
+      hudiSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
       return hudiSourceClientProvider;
     } else if (sourceTableFormat == TableFormat.DELTA) {
+      deltaSourceClientProvider = new DeltaSourceClientProvider();
+      deltaSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
       return deltaSourceClientProvider;
     } else if (sourceTableFormat == TableFormat.ICEBERG) {
+      icebergSourceClientProvider = new IcebergSourceClientProvider();
+      icebergSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
       return icebergSourceClientProvider;
     } else {
       throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
