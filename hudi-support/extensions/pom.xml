@@ -16,6 +16,10 @@
             <groupId>io.onetable</groupId>
             <artifactId>hudi-utils</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.onetable</groupId>
+            <artifactId>onetable-core</artifactId>
+        </dependency>
 
         <!-- Logging API -->
         <dependency>
@@ -26,6 +30,11 @@
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-client-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-utilities_2.12</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -85,12 +94,25 @@
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.version.prefix}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-java-client</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.esotericsoftware</groupId>
             <artifactId>kryo</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-core_${scala.version.prefix}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-sql_${scala.version.prefix}</artifactId>
         </dependency>
 
         <!-- Junit -->
