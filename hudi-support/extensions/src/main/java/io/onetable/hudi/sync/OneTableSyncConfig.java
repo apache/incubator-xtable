@@ -27,7 +27,7 @@ import org.apache.hudi.sync.common.HoodieSyncConfig;
 public class OneTableSyncConfig extends HoodieSyncConfig implements Serializable {
 
   public static final ConfigProperty<String> ONE_TABLE_FORMATS =
-      ConfigProperty.key("hoodie.onetable.formats")
+      ConfigProperty.key("hoodie.onetable.formats.to.sync")
           .defaultValue("DELTA,ICEBERG")
           .withDocumentation("Comma separated list of formats to sync.");
 
