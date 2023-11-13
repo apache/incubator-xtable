@@ -46,10 +46,13 @@ import io.onetable.model.sync.SyncResult;
 /** A HoodieSyncTool for syncing a Hudi table to other formats (Delta and Iceberg) with OneTable. */
 public class OneTableSyncTool extends HoodieSyncTool {
   private final OneTableSyncConfig config;
+  private final HudiSourceClientProvider hudiSourceClientProvider;
 
   public OneTableSyncTool(Properties props, Configuration hadoopConf) {
     super(props, hadoopConf);
     this.config = new OneTableSyncConfig(props);
+    this.hudiSourceClientProvider = new HudiSourceClientProvider();
+    hudiSourceClientProvider.init(hadoopConf, Collections.emptyMap());
   }
 
   @Override
@@ -73,8 +76,6 @@ public class OneTableSyncTool extends HoodieSyncTool {
             .targetMetadataRetentionInHours(
                 config.getInt(OneTableSyncConfig.ONE_TABLE_TARGET_METADATA_RETENTION_HOURS))
             .build();
-    HudiSourceClientProvider hudiSourceClientProvider = new HudiSourceClientProvider();
-    hudiSourceClientProvider.init(hadoopConf, Collections.emptyMap());
     Map<TableFormat, SyncResult> results =
         new OneTableClient(hadoopConf).sync(perTableConfig, hudiSourceClientProvider);
     String failingFormats =
