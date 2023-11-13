@@ -112,7 +112,7 @@ public class HudiTargetClient implements TargetClient {
         HoodieMetadataConfig.COMPACT_NUM_DELTA_COMMITS.defaultValue(),
         BaseFileUpdatesExtractor.of(
             new HoodieJavaEngineContext(configuration),
-            new CachingPath(perTableConfig.getTableBasePath())),
+            new CachingPath(perTableConfig.getTableDataPath())),
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);
@@ -129,7 +129,7 @@ public class HudiTargetClient implements TargetClient {
         maxNumDeltaCommitsBeforeCompaction,
         BaseFileUpdatesExtractor.of(
             new HoodieJavaEngineContext(configuration),
-            new CachingPath(perTableConfig.getTableBasePath())),
+            new CachingPath(perTableConfig.getTableDataPath())),
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);
