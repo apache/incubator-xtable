@@ -181,7 +181,9 @@ public class OneTableClient {
     OneTable syncedTable = null;
 
     Map<TableFormat, Optional<OneTableMetadata>> filteredSyncMetadataByFormat =
-        lastSyncMetadataByFormat.entrySet().stream().filter(entry -> syncClientByFormat.containsKey(entry.getKey())).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        lastSyncMetadataByFormat.entrySet().stream()
+            .filter(entry -> syncClientByFormat.containsKey(entry.getKey()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
     InstantsForIncrementalSync instantsForIncrementalSync =
         getMostOutOfSyncCommitAndPendingCommits(filteredSyncMetadataByFormat);
