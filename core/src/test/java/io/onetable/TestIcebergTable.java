@@ -285,6 +285,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   public List<String> getColumnsToSelect() {
     // There is representation difference in hudi and iceberg for local timestamp micros field.
     // and hence excluding it from the list of columns to select.
+    // TODO(HUDI-7088): Remove filter after bug is fixed.
     return icebergDataHelper.getTableSchema().columns().stream()
         .map(Types.NestedField::name)
         .filter(name -> !name.equals("timestamp_local_micros_nullable_field"))
