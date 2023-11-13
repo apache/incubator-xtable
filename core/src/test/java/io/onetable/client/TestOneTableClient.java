@@ -38,7 +38,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import io.onetable.model.OneTableMetadata;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 
@@ -47,6 +46,7 @@ import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
+import io.onetable.model.OneTableMetadata;
 import io.onetable.model.TableChange;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
@@ -133,8 +133,12 @@ public class TestOneTableClient {
         Arrays.asList(instantAt15, instantAt14, instantAt10, instantAt8, instantAt5, instantAt2);
     CommitsBacklog<Instant> commitsBacklog =
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
-    when(mockTableFormatSync1.getTableMetadata()).thenReturn(Optional.of(OneTableMetadata.of(icebergLastSyncInstant, pendingInstantsForIceberg)));
-    when(mockTableFormatSync2.getTableMetadata()).thenReturn(Optional.of(OneTableMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta)));
+    when(mockTableFormatSync1.getTableMetadata())
+        .thenReturn(
+            Optional.of(OneTableMetadata.of(icebergLastSyncInstant, pendingInstantsForIceberg)));
+    when(mockTableFormatSync2.getTableMetadata())
+        .thenReturn(
+            Optional.of(OneTableMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta)));
     when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync)).thenReturn(commitsBacklog);
     Map<Instant, TableChange> instantTableChangeMap = new HashMap<>();
     for (Instant instant : instantsToProcess) {
@@ -186,7 +190,8 @@ public class TestOneTableClient {
     when(mockSourceClient.isIncrementalSyncSafeFrom(eq(instantAt5))).thenReturn(false);
 
     // Both Iceberg and Delta last synced at instantAt5 and have no pending instants.
-    when(mockTableFormatSync1.getTableMetadata()).thenReturn(Optional.of(OneTableMetadata.of(instantAt5, Collections.emptyList())));
+    when(mockTableFormatSync1.getTableMetadata())
+        .thenReturn(Optional.of(OneTableMetadata.of(instantAt5, Collections.emptyList())));
 
     when(mockSourceClient.getCurrentSnapshot()).thenReturn(oneSnapshot);
     when(mockTableFormatSync1.syncSnapshot(eq(oneSnapshot))).thenReturn(syncResult);
@@ -236,8 +241,12 @@ public class TestOneTableClient {
     List<Instant> instantsToProcess = Arrays.asList(instantAt8, instantAt2);
     CommitsBacklog<Instant> commitsBacklog =
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
-    when(mockTableFormatSync1.getTableMetadata()).thenReturn(Optional.of(OneTableMetadata.of(icebergLastSyncInstant, pendingInstantsForIceberg)));
-    when(mockTableFormatSync2.getTableMetadata()).thenReturn(Optional.of(OneTableMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta)));
+    when(mockTableFormatSync1.getTableMetadata())
+        .thenReturn(
+            Optional.of(OneTableMetadata.of(icebergLastSyncInstant, pendingInstantsForIceberg)));
+    when(mockTableFormatSync2.getTableMetadata())
+        .thenReturn(
+            Optional.of(OneTableMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta)));
     when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync)).thenReturn(commitsBacklog);
     Map<Instant, TableChange> instantTableChangeMap = new HashMap<>();
     for (Instant instant : instantsToProcess) {
@@ -296,8 +305,12 @@ public class TestOneTableClient {
     List<Instant> instantsToProcess = Arrays.asList(instantAt8, instantAt5);
     CommitsBacklog<Instant> commitsBacklog =
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
-    when(mockTableFormatSync1.getTableMetadata()).thenReturn(Optional.of(OneTableMetadata.of(icebergLastSyncInstant, Collections.emptyList())));
-    when(mockTableFormatSync2.getTableMetadata()).thenReturn(Optional.of(OneTableMetadata.of(deltaLastSyncInstant, Collections.emptyList())));
+    when(mockTableFormatSync1.getTableMetadata())
+        .thenReturn(
+            Optional.of(OneTableMetadata.of(icebergLastSyncInstant, Collections.emptyList())));
+    when(mockTableFormatSync2.getTableMetadata())
+        .thenReturn(
+            Optional.of(OneTableMetadata.of(deltaLastSyncInstant, Collections.emptyList())));
     when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync)).thenReturn(commitsBacklog);
     Map<Instant, TableChange> instantTableChangeMap = new HashMap<>();
     for (Instant instant : instantsToProcess) {
@@ -347,8 +360,12 @@ public class TestOneTableClient {
     List<Instant> instantsToProcess = Collections.emptyList();
     CommitsBacklog<Instant> commitsBacklog =
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
-    when(mockTableFormatSync1.getTableMetadata()).thenReturn(Optional.of(OneTableMetadata.of(icebergLastSyncInstant, Collections.emptyList())));
-    when(mockTableFormatSync2.getTableMetadata()).thenReturn(Optional.of(OneTableMetadata.of(deltaLastSyncInstant, Collections.emptyList())));
+    when(mockTableFormatSync1.getTableMetadata())
+        .thenReturn(
+            Optional.of(OneTableMetadata.of(icebergLastSyncInstant, Collections.emptyList())));
+    when(mockTableFormatSync2.getTableMetadata())
+        .thenReturn(
+            Optional.of(OneTableMetadata.of(deltaLastSyncInstant, Collections.emptyList())));
     when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync)).thenReturn(commitsBacklog);
     // Iceberg and Delta have no commits to sync
     Map<TableFormat, SyncResult> expectedSyncResult = Collections.emptyMap();

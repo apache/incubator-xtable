@@ -213,7 +213,8 @@ public class BaseFileUpdatesExtractor {
     String partitionPath =
         partitionPathOptional.orElseGet(() -> getPartitionPath(tableBasePath, path));
     String fileId = getFileId(path);
-    String filePath = path.toString().substring(tableBasePath.toString().length() + 1);
+    String filePath =
+        path.toUri().getPath().substring(tableBasePath.toUri().getPath().length() + 1);
     String fileName = path.getName();
     writeStatus.setFileId(fileId);
     writeStatus.setPartitionPath(partitionPath);
@@ -277,8 +278,8 @@ public class BaseFileUpdatesExtractor {
 
   private String getPartitionPath(Path tableBasePath, Path filePath) {
     String fileName = filePath.getName();
-    String pathStr = filePath.toString();
-    int startIndex = tableBasePath.toString().length() + 1;
+    String pathStr = filePath.toUri().getPath();
+    int startIndex = tableBasePath.toUri().getPath().length() + 1;
     int endIndex = pathStr.length() - fileName.length() - 1;
     return endIndex <= startIndex ? "" : pathStr.substring(startIndex, endIndex);
   }
