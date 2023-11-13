@@ -113,7 +113,7 @@ public class TestIcebergSync {
       Mockito.mock(IcebergPartitionSpecSync.class);
   private final IcebergColumnStatsConverter mockColumnStatsConverter =
       Mockito.mock(IcebergColumnStatsConverter.class);
-  private TableFormatSync icebergSync;
+  private IcebergClient icebergClient;
 
   private final OneSchema oneSchema =
       OneSchema.builder()
@@ -172,23 +172,22 @@ public class TestIcebergSync {
     tableName = "test-" + UUID.randomUUID();
     basePath = tempDir.resolve(tableName);
     Files.createDirectories(basePath);
-    icebergSync =
-        TableFormatSync.of(
-            new IcebergClient(
-                PerTableConfig.builder()
-                    .tableBasePath(basePath.toString())
-                    .tableName(tableName)
-                    .targetMetadataRetentionInHours(1)
-                    .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
-                    .build(),
-                new Configuration(),
-                mockSchemaExtractor,
-                mockSchemaSync,
-                mockPartitionSpecExtractor,
-                mockPartitionSpecSync,
-                IcebergDataFileUpdatesSync.of(
-                    mockColumnStatsConverter, IcebergPartitionValueConverter.getInstance()),
-                IcebergTableManager.of(new Configuration())));
+    icebergClient =
+        new IcebergClient(
+            PerTableConfig.builder()
+                .tableBasePath(basePath.toString())
+                .tableName(tableName)
+                .targetMetadataRetentionInHours(1)
+                .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+                .build(),
+            new Configuration(),
+            mockSchemaExtractor,
+            mockSchemaSync,
+            mockPartitionSpecExtractor,
+            mockPartitionSpecSync,
+            IcebergDataFileUpdatesSync.of(
+                mockColumnStatsConverter, IcebergPartitionValueConverter.getInstance()),
+            IcebergTableManager.of(new Configuration()));
   }
 
   @Test
@@ -253,10 +252,10 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile2, 2);
     mockColStatsForFile(dataFile3, 1);
 
-    icebergSync.syncSnapshot(snapshot1);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot1);
     validateIcebergTable(tableName, table1, Sets.newHashSet(dataFile1, dataFile2), null);
 
-    icebergSync.syncSnapshot(snapshot2);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot2);
     validateIcebergTable(tableName, table2, Sets.newHashSet(dataFile2, dataFile3), null);
 
     ArgumentCaptor<Transaction> transactionArgumentCaptor =
@@ -356,7 +355,7 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile1, 1);
     mockColStatsForFile(dataFile2, 1);
     mockColStatsForFile(dataFile3, 1);
-    icebergSync.syncSnapshot(snapshot);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot);
 
     assertTrue(schemaArgumentCaptor.getValue().sameSchema(icebergSchema));
     validateIcebergTable(
@@ -412,7 +411,7 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile1, 1);
     mockColStatsForFile(dataFile2, 1);
     mockColStatsForFile(dataFile3, 1);
-    icebergSync.syncSnapshot(snapshot);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot);
 
     assertTrue(schemaArgumentCaptor.getValue().sameSchema(icebergSchema));
     validateIcebergTable(
@@ -465,7 +464,7 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile1, 1);
     mockColStatsForFile(dataFile2, 1);
     mockColStatsForFile(dataFile3, 1);
-    icebergSync.syncSnapshot(snapshot);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot);
 
     assertTrue(schemaArgumentCaptor.getValue().sameSchema(icebergSchema));
     validateIcebergTable(
@@ -533,7 +532,7 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile1, 1);
     mockColStatsForFile(dataFile2, 1);
     mockColStatsForFile(dataFile3, 1);
-    icebergSync.syncSnapshot(snapshot);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot);
 
     assertTrue(schemaArgumentCaptor.getValue().sameSchema(icebergSchema));
     validateIcebergTable(
@@ -591,7 +590,7 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile1, 1);
     mockColStatsForFile(dataFile2, 1);
     mockColStatsForFile(dataFile3, 1);
-    icebergSync.syncSnapshot(snapshot);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot);
 
     assertTrue(schemaArgumentCaptor.getValue().sameSchema(icebergSchema));
     validateIcebergTable(

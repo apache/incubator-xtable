@@ -29,13 +29,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import lombok.AccessLevel;
 import lombok.Builder;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
-
-import com.google.common.annotations.VisibleForTesting;
 
 import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.InstantsForIncrementalSync;
@@ -61,20 +61,14 @@ import io.onetable.spi.sync.TargetClient;
  * </ul>
  */
 @Log4j2
+@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
 public class OneTableClient {
   private final Configuration conf;
   private final TableFormatClientFactory tableFormatClientFactory;
-  private final TableFormatSync tableFormatSync = new TableFormatSync();
+  private final TableFormatSync tableFormatSync;
 
   public OneTableClient(Configuration conf) {
-    this.conf = conf;
-    this.tableFormatClientFactory = TableFormatClientFactory.getInstance();
-  }
-
-  @VisibleForTesting
-  OneTableClient(Configuration conf, TableFormatClientFactory tableFormatClientFactory) {
-    this.conf = conf;
-    this.tableFormatClientFactory = tableFormatClientFactory;
+    this(conf, TableFormatClientFactory.getInstance(), TableFormatSync.getInstance());
   }
 
   /**

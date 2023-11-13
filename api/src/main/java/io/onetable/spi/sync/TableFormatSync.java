@@ -30,6 +30,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 import io.onetable.model.IncrementalTableChanges;
@@ -43,7 +45,13 @@ import io.onetable.model.sync.SyncResult;
 
 /** Provides the functionality to sync from the OneTable format to the target format. */
 @Log4j2
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class TableFormatSync {
+  private static final TableFormatSync INSTANCE = new TableFormatSync();
+
+  public static TableFormatSync getInstance() {
+    return INSTANCE;
+  }
 
   /**
    * Syncs the provided snapshot to the target table format.
