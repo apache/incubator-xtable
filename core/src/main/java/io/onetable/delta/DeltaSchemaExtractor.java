@@ -88,6 +88,7 @@ public class DeltaSchemaExtractor {
       case INT:
         return DataTypes.IntegerType;
       case LONG:
+      case TIMESTAMP_NTZ:
         return DataTypes.LongType;
       case BYTES:
       case FIXED:
@@ -99,7 +100,6 @@ public class DeltaSchemaExtractor {
       case DATE:
         return DataTypes.DateType;
       case TIMESTAMP:
-      case TIMESTAMP_NTZ:
         return DataTypes.TimestampType;
       case DOUBLE:
         return DataTypes.DoubleType;
