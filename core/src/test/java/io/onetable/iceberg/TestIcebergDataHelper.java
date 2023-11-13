@@ -35,7 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -280,7 +279,7 @@ public class TestIcebergDataHelper {
         return LocalDate.ofEpochDay(randomDay);
       case TIME:
         long totalMicrosInDay = ChronoUnit.DAYS.getDuration().toMillis() * 1000;
-        return ThreadLocalRandom.current().nextLong(totalMicrosInDay);
+        return (long) (RANDOM.nextDouble() * (totalMicrosInDay));
       case DECIMAL:
         Types.DecimalType decimalType = (Types.DecimalType) fieldType;
         return new BigDecimal(RANDOM.nextDouble() * Math.pow(10, decimalType.scale()))
@@ -291,8 +290,7 @@ public class TestIcebergDataHelper {
         long lowerBoundMillis = timeLowerBound.toEpochMilli();
         long upperBoundMillis = timeUpperBound.toEpochMilli();
         long randomMillisInRange =
-            lowerBoundMillis
-                + ThreadLocalRandom.current().nextLong(upperBoundMillis - lowerBoundMillis);
+            lowerBoundMillis + (long) (RANDOM.nextDouble() * (upperBoundMillis - lowerBoundMillis));
         if (timestampType.shouldAdjustToUTC()) {
           return EPOCH.plus(randomMillisInRange, ChronoUnit.MILLIS);
         } else {
