@@ -229,6 +229,6 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
 
   @Override
   public void close() {
-    tableOps.close();
+    getTableOps().close();
   }
 }
