@@ -21,16 +21,15 @@ package io.onetable.spi.sync;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-import io.onetable.model.storage.TableFormat;
-import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 import io.onetable.model.IncrementalTableChanges;
@@ -38,6 +37,7 @@ import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.TableChange;
+import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 import io.onetable.model.sync.SyncResult;
 
@@ -52,23 +52,26 @@ public class TableFormatSync {
    * @param snapshot the snapshot to sync
    * @return the result of the sync process
    */
-  public Map<TableFormat, SyncResult> syncSnapshot(List<TargetClient> targetClients, OneSnapshot snapshot) {
+  public Map<TableFormat, SyncResult> syncSnapshot(
+      Collection<TargetClient> targetClients, OneSnapshot snapshot) {
     Instant startTime = Instant.now();
     Map<TableFormat, SyncResult> results = new HashMap<>();
     for (TargetClient targetClient : targetClients) {
       try {
         OneTable oneTable = snapshot.getTable();
-        results.put(targetClient.getTableFormat(),
+        results.put(
+            targetClient.getTableFormat(),
             getSyncResult(
-            targetClient,
-            SyncMode.FULL,
-            oneTable,
-            client -> client.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
-            startTime,
-            snapshot.getPendingCommits()));
+                targetClient,
+                SyncMode.FULL,
+                oneTable,
+                client -> client.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
+                startTime,
+                snapshot.getPendingCommits()));
       } catch (Exception e) {
         log.error("Failed to sync snapshot", e);
-        results.put(targetClient.getTableFormat(), buildResultForError(SyncMode.FULL, startTime, e));
+        results.put(
+            targetClient.getTableFormat(), buildResultForError(SyncMode.FULL, startTime, e));
       }
     }
     return results;
@@ -80,16 +83,35 @@ public class TableFormatSync {
    * @param changes the changes from the source table format that need to be applied
    * @return the results of trying to sync each change
    */
-  public Map<TableFormat, List<SyncResult>> syncChanges(List<TargetClient> clients, IncrementalTableChanges changes) {
+  public Map<TableFormat, List<SyncResult>> syncChanges(
+      Map<TargetClient, Optional<OneTableMetadata>> filteredSyncMetadataByClient,
+      IncrementalTableChanges changes) {
     Map<TableFormat, List<SyncResult>> results = new HashMap<>();
     Set<TargetClient> clientsWithFailures = new HashSet<>();
     for (TableChange change : changes.getTableChanges()) {
-      for (TargetClient targetClient : clients) {
+      Collection<TargetClient> clientsToSync =
+          filteredSyncMetadataByClient.entrySet().stream()
+              .filter(
+                  entry -> {
+                    // metadata must be present for incremental sync
+                    OneTableMetadata metadata = entry.getValue().get();
+                    return change
+                            .getTableAsOfChange()
+                            .getLatestCommitTime()
+                            .isAfter(metadata.getLastInstantSynced())
+                        || metadata
+                            .getInstantsToConsiderForNextSync()
+                            .contains(change.getTableAsOfChange().getLatestCommitTime());
+                  })
+              .map(Map.Entry::getKey)
+              .collect(Collectors.toList());
+      for (TargetClient targetClient : clientsToSync) {
         if (clientsWithFailures.contains(targetClient)) {
           continue;
         }
         Instant startTime = Instant.now();
-        List<SyncResult> resultsForFormat = results.computeIfAbsent(targetClient.getTableFormat(), key -> new ArrayList<>());
+        List<SyncResult> resultsForFormat =
+            results.computeIfAbsent(targetClient.getTableFormat(), key -> new ArrayList<>());
         try {
           resultsForFormat.add(
               getSyncResult(

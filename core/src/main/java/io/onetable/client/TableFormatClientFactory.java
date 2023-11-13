@@ -28,7 +28,7 @@ import io.onetable.exception.NotSupportedException;
 import io.onetable.hudi.HudiTargetClient;
 import io.onetable.iceberg.IcebergClient;
 import io.onetable.model.storage.TableFormat;
-import io.onetable.spi.sync.TableFormatSync;
+import io.onetable.spi.sync.TargetClient;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class TableFormatClientFactory {
@@ -38,15 +38,15 @@ public class TableFormatClientFactory {
     return INSTANCE;
   }
 
-  public TableFormatSync createForFormat(
+  public TargetClient createForFormat(
       TableFormat tableFormat, PerTableConfig perTableConfig, Configuration configuration) {
     switch (tableFormat) {
       case ICEBERG:
-        return TableFormatSync.of(new IcebergClient(perTableConfig, configuration));
+        return new IcebergClient(perTableConfig, configuration);
       case DELTA:
-        return TableFormatSync.of(new DeltaClient(perTableConfig, configuration));
+        return new DeltaClient(perTableConfig, configuration);
       case HUDI:
-        return TableFormatSync.of(new HudiTargetClient(perTableConfig, configuration));
+        return new HudiTargetClient(perTableConfig, configuration);
       default:
         throw new NotSupportedException("Target format is not yet supported: " + tableFormat);
     }
