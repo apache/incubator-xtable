@@ -21,7 +21,6 @@ package io.onetable.iceberg;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import io.onetable.model.storage.DataLayoutStrategy;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -50,6 +49,7 @@ import io.onetable.client.PerTableConfig;
 import io.onetable.model.*;
 import io.onetable.model.schema.*;
 import io.onetable.model.stat.Range;
+import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneFileGroup;
@@ -94,8 +94,7 @@ class TestIcebergSourceClient {
     Assertions.assertTrue(oneTable.getName().endsWith("catalog_sales"));
     assertEquals(catalogSales.location(), oneTable.getBasePath());
     assertEquals(DataLayoutStrategy.HIVE_STYLE_PARTITION, oneTable.getLayoutStrategy());
-    assertEquals(
-        snapshot.timestampMillis(), oneTable.getLatestCommitTime().toEpochMilli());
+    assertEquals(snapshot.timestampMillis(), oneTable.getLatestCommitTime().toEpochMilli());
     Assertions.assertNotNull(oneTable.getReadSchema());
 
     assertEquals(7, oneTable.getReadSchema().getFields().size());
@@ -156,8 +155,7 @@ class TestIcebergSourceClient {
 
     OneSnapshot oneSnapshot = spyClient.getCurrentSnapshot();
     Assertions.assertNotNull(oneSnapshot);
-    assertEquals(
-        String.valueOf(iceCurrentSnapshot.snapshotId()), oneSnapshot.getVersion());
+    assertEquals(String.valueOf(iceCurrentSnapshot.snapshotId()), oneSnapshot.getVersion());
     Assertions.assertNotNull(oneSnapshot.getTable());
     verify(spyClient, times(1)).getTable(iceCurrentSnapshot);
     verify(spyClient, times(1)).getSchemaCatalog(oneSnapshot.getTable(), iceCurrentSnapshot);
@@ -179,8 +177,7 @@ class TestIcebergSourceClient {
       assertEquals(1, partitionValues.size());
       Map.Entry<OnePartitionField, Range> partitionEntry =
           partitionValues.entrySet().iterator().next();
-      assertEquals(
-          "cs_sold_date_sk", partitionEntry.getKey().getSourceField().getName());
+      assertEquals("cs_sold_date_sk", partitionEntry.getKey().getSourceField().getName());
       // TODO generate test with column stats
       assertEquals(0, oneDataFile.getColumnStats().size());
     }

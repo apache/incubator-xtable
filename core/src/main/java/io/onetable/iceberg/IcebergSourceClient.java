@@ -18,7 +18,6 @@
  
 package io.onetable.iceberg;
 
-import io.onetable.model.storage.DataLayoutStrategy;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
@@ -45,6 +44,7 @@ import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.Range;
+import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
@@ -92,7 +92,6 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   @Override
   public OneTable getTable(Snapshot snapshot) {
     Table iceTable = getSourceTable();
-
     Schema iceSchema = iceTable.schemas().get(snapshot.schemaId());
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     OneSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
@@ -101,6 +100,8 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     IcebergPartitionSpecExtractor partitionExtractor = IcebergPartitionSpecExtractor.getInstance();
     List<OnePartitionField> irPartitionFields =
         partitionExtractor.fromIceberg(iceTable.spec(), iceSchema, irSchema);
+    // Data layout is hive storage for partitioned by default. See
+    // (https://github.com/apache/iceberg/blob/main/docs/aws.md)
     DataLayoutStrategy dataLayoutStrategy =
         irPartitionFields.size() > 0
             ? DataLayoutStrategy.HIVE_STYLE_PARTITION
