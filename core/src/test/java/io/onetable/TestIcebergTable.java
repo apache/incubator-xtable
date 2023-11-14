@@ -298,7 +298,11 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   }
 
   public Long getLastCommitTimestamp() {
-    return icebergTable.currentSnapshot().timestampMillis();
+    return getLatestSnapshot().timestampMillis();
+  }
+
+  public Snapshot getLatestSnapshot() {
+    return icebergTable.currentSnapshot();
   }
 
   @SneakyThrows
