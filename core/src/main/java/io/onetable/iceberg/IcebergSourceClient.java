@@ -218,9 +218,11 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     return CommitsBacklog.<Snapshot>builder().commitsToProcess(snapshots).build();
   }
 
-  // Following checks are to be performed:
-  // 1. Check if snapshot at or before the provided instant exists.
-  // 2. Check if expiring of snapshots has impacted the provided instant.
+  /*
+   * Following checks are to be performed:
+   * 1. Check if snapshot at or before the provided instant exists.
+   * 2. Check if expiring of snapshots has impacted the provided instant.
+   */
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
     long timeInMillis = instant.toEpochMilli();
@@ -239,7 +241,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
       return false;
     }
     // Go from latest snapshot until targetSnapshotId through parent reference.
-    // nothing has to be null in this chain.
+    // nothing has to be null in this chain to guarantee safety of incremental sync.
     Long currentSnapshotId = iceTable.currentSnapshot().snapshotId();
     while (currentSnapshotId != null && currentSnapshotId != targetSnapshotId) {
       Snapshot currentSnapshot = iceTable.snapshot(currentSnapshotId);
