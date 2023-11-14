@@ -612,7 +612,7 @@ public class TestIcebergSync {
 
   private OneDataFile getOneDataFile(
       SchemaVersion schemaVersion, int index, Map<OnePartitionField, Range> partitionValues) {
-    String physicalPath = "/physical" + index + ".parquet";
+    String physicalPath = "file:/physical" + index + ".parquet";
     return OneDataFile.builder()
         .fileFormat(FileFormat.APACHE_PARQUET)
         .fileSizeBytes(RANDOM.nextInt(10000))
