@@ -18,7 +18,7 @@
 
     <properties>
         <java.version>8</java.version>
-        <avro.version>1.11.0</avro.version>
+        <avro.version>1.11.3</avro.version>
         <log4j.version>2.17.2</log4j.version>
         <junit.version>5.9.0</junit.version>
         <lombok.version>1.18.30</lombok.version>
@@ -170,6 +170,12 @@
             </dependency>
             <dependency>
                 <groupId>org.apache.hudi</groupId>
+                <artifactId>hudi-utilities_2.12</artifactId>
+                <version>${hudi.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hudi</groupId>
                 <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.version.prefix}</artifactId>
                 <version>${hudi.version}</version>
                 <scope>test</scope>
@@ -258,7 +264,7 @@
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-common</artifactId>
-                <version>3.3.2</version>
+                <version>3.3.6</version>
                 <scope>provided</scope>
                 <exclusions>
                     <exclusion>
@@ -329,7 +335,7 @@
             <dependency>
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
-                <version>31.1-jre</version>
+                <version>32.1.3-jre</version>
             </dependency>
 
             <!-- Kryo -->
@@ -515,7 +521,7 @@
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <skip>${skipITs}</skip>
                     <reuseForks>false</reuseForks>
-                    <forkCount>4</forkCount>
+                    <forkCount>6</forkCount>
                     <trimStackTrace>false</trimStackTrace>
                     <argLine>-Xmx1024m</argLine>
                 </configuration>

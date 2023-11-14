@@ -244,7 +244,7 @@ public class ITDeltaSourceClient {
         tableName,
         TableFormat.DELTA,
         OneSchema.builder().name("struct").dataType(OneType.RECORD).fields(fields).build(),
-        DataLayoutStrategy.DIR_HIERARCHY_PARTITION_VALUES,
+        DataLayoutStrategy.HIVE_STYLE_PARTITION,
         "file:" + basePath,
         Collections.singletonList(
             OnePartitionField.builder()

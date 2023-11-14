@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -67,11 +68,13 @@ public class TestExtractFromSource {
     Instant lastSyncTime = Instant.now().minus(2, ChronoUnit.DAYS);
     TestCommit firstCommitToSync = TestCommit.of("first_commit");
     TestCommit secondCommitToSync = TestCommit.of("second_commit");
+    Instant inflightInstant = Instant.now().minus(1, ChronoUnit.HOURS);
     InstantsForIncrementalSync instantsForIncrementalSync =
         InstantsForIncrementalSync.builder().lastSyncInstant(lastSyncTime).build();
     CommitsBacklog<TestCommit> commitsBacklogToReturn =
         CommitsBacklog.<TestCommit>builder()
             .commitsToProcess(Arrays.asList(firstCommitToSync, secondCommitToSync))
+            .inFlightInstants(Collections.singletonList(inflightInstant))
             .build();
     when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync))
         .thenReturn(commitsBacklogToReturn);
@@ -121,13 +124,13 @@ public class TestExtractFromSource {
                     .build())
             .build();
 
-    IncrementalTableChanges expected =
-        IncrementalTableChanges.builder()
-            .tableChanges(Arrays.asList(expectedFirstTableChange, expectedSecondTableChange))
-            .build();
+    IncrementalTableChanges actual =
+        ExtractFromSource.of(mockSourceClient).extractTableChanges(instantsForIncrementalSync);
+    assertEquals(Collections.singletonList(inflightInstant), actual.getPendingCommits());
+    List<TableChange> actualTableChanges = new ArrayList<>();
+    actual.getTableChanges().forEachRemaining(actualTableChanges::add);
     assertEquals(
-        expected,
-        ExtractFromSource.of(mockSourceClient).extractTableChanges(instantsForIncrementalSync));
+        Arrays.asList(expectedFirstTableChange, expectedSecondTableChange), actualTableChanges);
   }
 
   private OneDataFile getOneDataFile(String physicalPath) {

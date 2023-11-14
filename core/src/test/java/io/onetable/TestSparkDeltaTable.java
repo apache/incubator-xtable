@@ -101,7 +101,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
   }
 
   public List<Row> insertRowsForPartition(int numRows, Integer partitionValue) {
-    return insertRowsForPartition(numRows, partitionValue, partitionField);
+    return insertRowsForPartition(numRows, partitionValue, SPECIAL_PARTITION_VALUE);
   }
 
   public List<Row> insertRowsForPartition(int numRows, Integer year, String level) {
@@ -222,6 +222,11 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
         .collect(
             Collectors.groupingBy(
                 row -> row.getTimestamp(4).toInstant().atZone(ZoneId.of("UTC")).getYear()));
+  }
+
+  @Override
+  public String getBasePath() {
+    return basePath;
   }
 
   @Override

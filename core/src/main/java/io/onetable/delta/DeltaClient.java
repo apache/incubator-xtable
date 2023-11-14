@@ -58,6 +58,7 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
+import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.sync.TargetClient;
 
 public class DeltaClient implements TargetClient {
@@ -167,6 +168,11 @@ public class DeltaClient implements TargetClient {
   public Optional<OneTableMetadata> getTableMetadata() {
     return OneTableMetadata.fromMap(
         JavaConverters.mapAsJavaMapConverter(deltaLog.metadata().configuration()).asJava());
+  }
+
+  @Override
+  public TableFormat getTableFormat() {
+    return TableFormat.DELTA;
   }
 
   @EqualsAndHashCode

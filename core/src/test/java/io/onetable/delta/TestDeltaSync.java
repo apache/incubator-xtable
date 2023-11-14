@@ -105,7 +105,7 @@ public class TestDeltaSync {
   private static SparkSession sparkSession;
 
   @TempDir public static java.nio.file.Path tempDir;
-  private TableFormatSync deltaSync;
+  private DeltaClient deltaClient;
   private Path basePath;
   private String tableName;
 
@@ -124,16 +124,15 @@ public class TestDeltaSync {
     tableName = "test-" + UUID.randomUUID();
     basePath = tempDir.resolve(tableName);
     Files.createDirectories(basePath);
-    deltaSync =
-        TableFormatSync.of(
-            new DeltaClient(
-                PerTableConfig.builder()
-                    .tableName(tableName)
-                    .tableBasePath(basePath.toString())
-                    .targetMetadataRetentionInHours(1)
-                    .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
-                    .build(),
-                sparkSession));
+    deltaClient =
+        new DeltaClient(
+            PerTableConfig.builder()
+                .tableName(tableName)
+                .tableBasePath(basePath.toString())
+                .targetMetadataRetentionInHours(1)
+                .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
+                .build(),
+            sparkSession);
   }
 
   @Test
@@ -157,10 +156,10 @@ public class TestDeltaSync {
     OneSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
 
-    deltaSync.syncSnapshot(snapshot1);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(deltaClient), snapshot1);
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2)), null);
 
-    deltaSync.syncSnapshot(snapshot2);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(deltaClient), snapshot2);
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile2, dataFile3)), null);
   }
 
@@ -205,7 +204,7 @@ public class TestDeltaSync {
 
     OneSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
 
-    deltaSync.syncSnapshot(snapshot1);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(deltaClient), snapshot1);
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile3)), equalToExpr);
   }
 
@@ -279,7 +278,7 @@ public class TestDeltaSync {
     And CombinedExpr = new And(equalToExpr1, equalToExpr2);
 
     OneSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
-    deltaSync.syncSnapshot(snapshot1);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(deltaClient), snapshot1);
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile2)), CombinedExpr);
   }
 
@@ -322,7 +321,7 @@ public class TestDeltaSync {
 
     OneSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
 
-    deltaSync.syncSnapshot(snapshot1);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(deltaClient), snapshot1);
 
     Dataset<Row> dataset = sparkSession.read().format("delta").load(basePath.toString());
     org.apache.spark.sql.catalyst.expressions.Expression expression =

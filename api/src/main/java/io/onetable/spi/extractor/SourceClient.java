@@ -18,6 +18,7 @@
  
 package io.onetable.spi.extractor;
 
+import java.io.Closeable;
 import java.time.Instant;
 
 import io.onetable.model.*;
@@ -29,7 +30,7 @@ import io.onetable.model.schema.SchemaCatalog;
  * source system. The client uses {@link Instant} to represent the point in time a commit was made
  * to be as generic as possible across source table formats.
  */
-public interface SourceClient<COMMIT> {
+public interface SourceClient<COMMIT> extends Closeable {
   /**
    * Extracts the {@link OneTable} definition as of the provided commit.
    *
