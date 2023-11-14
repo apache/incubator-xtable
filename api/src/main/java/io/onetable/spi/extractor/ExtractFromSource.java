@@ -18,9 +18,7 @@
  
 package io.onetable.spi.extractor;
 
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -42,7 +40,10 @@ public class ExtractFromSource<COMMIT> {
     CommitsBacklog<COMMIT> commitsBacklog =
         sourceClient.getCommitsBacklog(instantsForIncrementalSync);
     // No overlap between updatedPendingCommits and commitList, process separately.
-    Iterator<TableChange> tableChangeIterator = commitsBacklog.getCommitsToProcess().stream().map(sourceClient::getTableChangeForCommit).iterator();
+    Iterator<TableChange> tableChangeIterator =
+        commitsBacklog.getCommitsToProcess().stream()
+            .map(sourceClient::getTableChangeForCommit)
+            .iterator();
     return IncrementalTableChanges.builder()
         .tableChanges(tableChangeIterator)
         .pendingCommits(commitsBacklog.getInFlightInstants())

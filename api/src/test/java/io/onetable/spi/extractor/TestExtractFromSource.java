@@ -28,8 +28,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Spliterator;
-import java.util.stream.StreamSupport;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -129,11 +127,13 @@ public class TestExtractFromSource {
                     .build())
             .build();
 
-    IncrementalTableChanges actual = ExtractFromSource.of(mockSourceClient).extractTableChanges(instantsForIncrementalSync);
+    IncrementalTableChanges actual =
+        ExtractFromSource.of(mockSourceClient).extractTableChanges(instantsForIncrementalSync);
     assertEquals(Collections.singletonList(inflightInstant), actual.getPendingCommits());
     List<TableChange> actualTableChanges = new ArrayList<>();
     actual.getTableChanges().forEachRemaining(actualTableChanges::add);
-    assertEquals(Arrays.asList(expectedFirstTableChange, expectedSecondTableChange), actualTableChanges);
+    assertEquals(
+        Arrays.asList(expectedFirstTableChange, expectedSecondTableChange), actualTableChanges);
   }
 
   private OneDataFile getOneDataFile(String partitionPath, String physicalPath) {

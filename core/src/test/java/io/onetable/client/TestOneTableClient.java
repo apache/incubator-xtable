@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
@@ -64,7 +63,8 @@ import io.onetable.spi.sync.TargetClient;
 public class TestOneTableClient {
 
   private final Configuration mockConf = mock(Configuration.class);
-  private final SourceClientProvider<Instant> mockSourceClientProvider = mock(SourceClientProvider.class);
+  private final SourceClientProvider<Instant> mockSourceClientProvider =
+      mock(SourceClientProvider.class);
   private final SourceClient<Instant> mockSourceClient = mock(SourceClient.class);
   private final TableFormatClientFactory mockTableFormatClientFactory =
       mock(TableFormatClientFactory.class);
@@ -173,7 +173,8 @@ public class TestOneTableClient {
     Map<TargetClient, Optional<OneTableMetadata>> clientToMetadata = new HashMap<>();
     clientToMetadata.put(mockTargetClient1, targetClient1Metadata);
     clientToMetadata.put(mockTargetClient2, targetClient2Metadata);
-    when(tableFormatSync.syncChanges(eq(clientToMetadata), argThat(matches(incrementalTableChanges))))
+    when(tableFormatSync.syncChanges(
+            eq(clientToMetadata), argThat(matches(incrementalTableChanges))))
         .thenReturn(allResults);
     Map<TableFormat, SyncResult> expectedSyncResult = new HashMap<>();
     expectedSyncResult.put(TableFormat.ICEBERG, getLastSyncResult(icebergSyncResults));
@@ -400,9 +401,11 @@ public class TestOneTableClient {
     return actual -> actual.size() == expected.size() && actual.containsAll(expected);
   }
 
-  private static ArgumentMatcher<IncrementalTableChanges> matches(IncrementalTableChanges expected) {
-    return actual -> actual.getPendingCommits().equals(expected.getPendingCommits())
-        && iteratorsMatch(actual.getTableChanges(), expected.getTableChanges());
+  private static ArgumentMatcher<IncrementalTableChanges> matches(
+      IncrementalTableChanges expected) {
+    return actual ->
+        actual.getPendingCommits().equals(expected.getPendingCommits())
+            && iteratorsMatch(actual.getTableChanges(), expected.getTableChanges());
   }
 
   private static <T> boolean iteratorsMatch(Iterator<T> first, Iterator<T> second) {

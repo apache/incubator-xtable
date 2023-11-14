@@ -40,7 +40,6 @@ import org.apache.hadoop.conf.Configuration;
 import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
-import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
@@ -156,9 +155,7 @@ public class OneTableClient {
     OneSnapshot snapshot = source.extractSnapshot();
     Map<TableFormat, SyncResult> syncResultsByFormat =
         tableFormatSync.syncSnapshot(syncClientByFormat.values(), snapshot);
-    return SyncResultForTableFormats.builder()
-        .lastSyncResult(syncResultsByFormat)
-        .build();
+    return SyncResultForTableFormats.builder().lastSyncResult(syncResultsByFormat).build();
   }
 
   private <COMMIT> SyncResultForTableFormats syncIncrementalChanges(
@@ -188,9 +185,7 @@ public class OneTableClient {
                       Map.Entry::getKey,
                       entry -> entry.getValue().get(entry.getValue().size() - 1)));
     }
-    return SyncResultForTableFormats.builder()
-        .lastSyncResult(syncResultsByFormat)
-        .build();
+    return SyncResultForTableFormats.builder().lastSyncResult(syncResultsByFormat).build();
   }
 
   /**
