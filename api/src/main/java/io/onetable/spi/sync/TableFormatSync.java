@@ -162,8 +162,7 @@ public class TableFormatSync {
 
     return SyncResult.builder()
         .mode(mode)
-        .status(
-            SyncResult.SyncStatus.builder().statusCode(SyncResult.SyncStatusCode.SUCCESS).build())
+        .status(SyncResult.SyncStatus.SUCCESS)
         .syncStartTime(startTime)
         .syncDuration(Duration.between(startTime, Instant.now()))
         .lastInstantSynced(tableState.getLatestCommitTime())

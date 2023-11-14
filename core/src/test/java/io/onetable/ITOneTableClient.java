@@ -192,10 +192,8 @@ public class ITOneTableClient {
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 100);
 
+      // make multiple commits and then sync
       table.insertRows(100);
-      oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 200);
-
       table.upsertRows(insertRecords.subList(0, 20));
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 200);
