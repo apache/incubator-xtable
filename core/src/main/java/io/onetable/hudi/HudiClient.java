@@ -285,6 +285,11 @@ public class HudiClient implements SourceClient<HoodieInstant> {
     return mergedList;
   }
 
+  @Override
+  public void close() {
+    dataFileExtractor.close();
+  }
+
   @Value
   @Builder
   private static class CommitsPair {
