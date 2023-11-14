@@ -435,38 +435,49 @@ public class ITOneTableClient {
     String severityFilter = "severity = 1";
     String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
     return Stream.of(
-        /*Arguments.of(
-        buildArgsForPartition(TableFormat.HUDI,
-            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-            "level:SIMPLE",
-            "level:VALUE",
-            levelFilter)),*/
+        Arguments.of(
+            buildArgsForPartition(
+                TableFormat.HUDI,
+                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+                "level:SIMPLE",
+                "level:VALUE",
+                levelFilter)),
         Arguments.of(
             buildArgsForPartition(
                 TableFormat.DELTA,
                 Arrays.asList(TableFormat.ICEBERG, TableFormat.HUDI),
                 null,
                 "level:VALUE",
-                levelFilter)) /*,
-                              Arguments.of(
-                                  // Delta Lake does not currently support nested partition columns
-                                  buildArgsForPartition(TableFormat.HUDI,
-                                      Arrays.asList(TableFormat.ICEBERG),
-                                      "nested_record.level:SIMPLE",
-                                      "nested_record.level:VALUE",
-                                      nestedLevelFilter)),
-                              Arguments.of(
-                                  buildArgsForPartition(TableFormat.HUDI,
-                                      Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-                                      "severity:SIMPLE",
-                                      "severity:VALUE",
-                                       severityFilter)),
-                              Arguments.of(
-                                  buildArgsForPartition(TableFormat.HUDI,
-                                    Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-                                  "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-                                  "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
-                                    timestampAndLevelFilter))*/);
+                levelFilter)),
+        Arguments.of(
+            buildArgsForPartition(
+                TableFormat.ICEBERG,
+                Arrays.asList(TableFormat.DELTA, TableFormat.HUDI),
+                null,
+                "level:VALUE",
+                levelFilter)),
+        Arguments.of(
+            // Delta Lake does not currently support nested partition columns
+            buildArgsForPartition(
+                TableFormat.HUDI,
+                Arrays.asList(TableFormat.ICEBERG),
+                "nested_record.level:SIMPLE",
+                "nested_record.level:VALUE",
+                nestedLevelFilter)),
+        Arguments.of(
+            buildArgsForPartition(
+                TableFormat.HUDI,
+                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+                "severity:SIMPLE",
+                "severity:VALUE",
+                severityFilter)),
+        Arguments.of(
+            buildArgsForPartition(
+                TableFormat.HUDI,
+                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
+                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
+                timestampAndLevelFilter)));
   }
 
   @ParameterizedTest
