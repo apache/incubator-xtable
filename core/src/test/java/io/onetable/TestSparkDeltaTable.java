@@ -101,7 +101,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
   }
 
   public List<Row> insertRowsForPartition(int numRows, Integer partitionValue) {
-    return insertRowsForPartition(numRows, partitionValue, partitionField);
+    return insertRowsForPartition(numRows, partitionValue, SPECIAL_PARTITION_VALUE);
   }
 
   public List<Row> insertRowsForPartition(int numRows, Integer year, String level) {

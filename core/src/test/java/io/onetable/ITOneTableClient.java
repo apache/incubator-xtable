@@ -34,11 +34,15 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import lombok.Builder;
+import lombok.Value;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -432,64 +436,91 @@ public class ITOneTableClient {
     String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
     return Stream.of(
         Arguments.of(
-            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-            "level:VALUE",
-            "level:SIMPLE",
-            levelFilter),
+            buildArgsForPartition(
+                TableFormat.HUDI,
+                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+                "level:SIMPLE",
+                "level:VALUE",
+                levelFilter)),
+        Arguments.of(
+            buildArgsForPartition(
+                TableFormat.DELTA,
+                Arrays.asList(TableFormat.ICEBERG, TableFormat.HUDI),
+                null,
+                "level:VALUE",
+                levelFilter)),
+        Arguments.of(
+            buildArgsForPartition(
+                TableFormat.ICEBERG,
+                Arrays.asList(TableFormat.DELTA, TableFormat.HUDI),
+                null,
+                "level:VALUE",
+                levelFilter)),
         Arguments.of(
             // Delta Lake does not currently support nested partition columns
-            Arrays.asList(TableFormat.ICEBERG),
-            "nested_record.level:VALUE",
-            "nested_record.level:SIMPLE",
-            nestedLevelFilter),
+            buildArgsForPartition(
+                TableFormat.HUDI,
+                Arrays.asList(TableFormat.ICEBERG),
+                "nested_record.level:SIMPLE",
+                "nested_record.level:VALUE",
+                nestedLevelFilter)),
         Arguments.of(
-            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-            "level:VALUE",
-            "level:SIMPLE",
-            levelFilter),
+            buildArgsForPartition(
+                TableFormat.HUDI,
+                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+                "severity:SIMPLE",
+                "severity:VALUE",
+                severityFilter)),
         Arguments.of(
-            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-            "severity:VALUE",
-            "severity:SIMPLE",
-            severityFilter),
-        Arguments.of(
-            Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-            "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
-            "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-            timestampAndLevelFilter));
+            buildArgsForPartition(
+                TableFormat.HUDI,
+                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
+                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
+                timestampAndLevelFilter)));
   }
 
   @ParameterizedTest
   @MethodSource("provideArgsForPartitionTesting")
-  public void testPartitionedData(
-      List<TableFormat> targetTableFormats,
-      String oneTablePartitionConfig,
-      String hudiPartitionConfig,
-      String filter) {
+  public void testPartitionedData(TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
     String tableName = getTableName();
-    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, hudiPartitionConfig, HoodieTableType.COPY_ON_WRITE)) {
+    TableFormat sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
+    List<TableFormat> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
+    Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
+    String oneTablePartitionConfig = tableFormatPartitionDataHolder.getOneTablePartitionConfig();
+    String filter = tableFormatPartitionDataHolder.getFilter();
+    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(sourceTableFormat);
+    GenericTable table;
+    if (hudiPartitionConfig.isPresent()) {
+      table =
+          GenericTable.getInstanceWithCustomPartitionConfig(
+              tableName, tempDir, jsc, sourceTableFormat, hudiPartitionConfig.get());
+    } else {
+      table =
+          GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, true);
+    }
+    try (GenericTable tableToClose = table) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
-              .tableBasePath(table.getBasePath())
+              .tableBasePath(tableToClose.getBasePath())
+              .tableDataPath(tableToClose.getDataPath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
                       .partitionFieldSpecConfig(oneTablePartitionConfig)
                       .build())
               .syncMode(SyncMode.INCREMENTAL)
               .build();
-      table.insertRecords(100, true);
+      tableToClose.insertRows(100);
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       // Do a second sync to force the test to read back the metadata it wrote earlier
-      table.insertRecords(100, true);
+      tableToClose.insertRows(100);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
 
-      checkDatasetEquivalenceWithFilter(TableFormat.HUDI, table, targetTableFormats, filter);
+      checkDatasetEquivalenceWithFilter(
+          sourceTableFormat, tableToClose, targetTableFormats, filter);
     }
   }
 
@@ -785,5 +816,30 @@ public class ITOneTableClient {
           return Stream.of(
               Arguments.arguments(unpartitionedArgs), Arguments.arguments(partitionedArgs));
         });
+  }
+
+  private static TableFormatPartitionDataHolder buildArgsForPartition(
+      TableFormat sourceFormat,
+      List<TableFormat> targetFormats,
+      String hudiPartitionConfig,
+      String oneTablePartitionConfig,
+      String filter) {
+    return TableFormatPartitionDataHolder.builder()
+        .sourceTableFormat(sourceFormat)
+        .targetTableFormats(targetFormats)
+        .hudiSourceConfig(Optional.ofNullable(hudiPartitionConfig))
+        .oneTablePartitionConfig(oneTablePartitionConfig)
+        .filter(filter)
+        .build();
+  }
+
+  @Builder
+  @Value
+  private static class TableFormatPartitionDataHolder {
+    TableFormat sourceTableFormat;
+    List<TableFormat> targetTableFormats;
+    String oneTablePartitionConfig;
+    Optional<String> hudiSourceConfig;
+    String filter;
   }
 }
