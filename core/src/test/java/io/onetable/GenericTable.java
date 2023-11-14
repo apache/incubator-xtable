@@ -48,6 +48,10 @@ public interface GenericTable<T, Q> extends AutoCloseable {
 
   String getBasePath();
 
+  default String getDataPath() {
+    return getBasePath();
+  }
+
   String getOrderByColumn();
 
   void close();
@@ -72,6 +76,9 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       case DELTA:
         return TestSparkDeltaTable.forStandardSchemaAndPartitioning(
             tableName, tempDir, sparkSession, isPartitioned ? "level" : null);
+      case ICEBERG:
+        return TestIcebergTable.forStandardSchemaAndPartitioning(
+            tableName, isPartitioned ? "level" : null, tempDir, jsc.hadoopConfiguration());
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
     }
@@ -91,6 +98,9 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       case DELTA:
         return TestSparkDeltaTable.forSchemaWithAdditionalColumnsAndPartitioning(
             tableName, tempDir, sparkSession, isPartitioned ? "level" : null);
+      case ICEBERG:
+        return TestIcebergTable.forSchemaWithAdditionalColumnsAndPartitioning(
+            tableName, isPartitioned ? "level" : null, tempDir, jsc.hadoopConfiguration());
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
     }
