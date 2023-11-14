@@ -96,7 +96,8 @@ public class TableFormatSync {
       IncrementalTableChanges changes) {
     Map<TableFormat, List<SyncResult>> results = new HashMap<>();
     Set<TargetClient> clientsWithFailures = new HashSet<>();
-    for (TableChange change : changes.getTableChanges()) {
+    while (changes.getTableChanges().hasNext()) {
+      TableChange change = changes.getTableChanges().next();
       Collection<TargetClient> clientsToSync =
           filteredSyncMetadataByClient.entrySet().stream()
               .filter(

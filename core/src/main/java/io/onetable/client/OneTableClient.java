@@ -158,7 +158,6 @@ public class OneTableClient {
         tableFormatSync.syncSnapshot(syncClientByFormat.values(), snapshot);
     return SyncResultForTableFormats.builder()
         .lastSyncResult(syncResultsByFormat)
-        .syncedTable(snapshot.getTable())
         .build();
   }
 
@@ -167,8 +166,6 @@ public class OneTableClient {
       Map<TableFormat, Optional<OneTableMetadata>> lastSyncMetadataByFormat,
       ExtractFromSource<COMMIT> source) {
     Map<TableFormat, SyncResult> syncResultsByFormat = Collections.emptyMap();
-    OneTable syncedTable = null;
-
     Map<TargetClient, Optional<OneTableMetadata>> filteredSyncMetadataByFormat =
         lastSyncMetadataByFormat.entrySet().stream()
             .filter(entry -> syncClientByFormat.containsKey(entry.getKey()))
@@ -180,12 +177,7 @@ public class OneTableClient {
         getMostOutOfSyncCommitAndPendingCommits(filteredSyncMetadataByFormat);
     IncrementalTableChanges incrementalTableChanges =
         source.extractTableChanges(instantsForIncrementalSync);
-    if (!incrementalTableChanges.getTableChanges().isEmpty()) {
-      syncedTable =
-          incrementalTableChanges
-              .getTableChanges()
-              .get(incrementalTableChanges.getTableChanges().size() - 1)
-              .getTableAsOfChange();
+    if (incrementalTableChanges.getTableChanges().hasNext()) {
       Map<TableFormat, List<SyncResult>> allResults =
           tableFormatSync.syncChanges(filteredSyncMetadataByFormat, incrementalTableChanges);
       // return only the last sync result in the list of results for each format
@@ -198,7 +190,6 @@ public class OneTableClient {
     }
     return SyncResultForTableFormats.builder()
         .lastSyncResult(syncResultsByFormat)
-        .syncedTable(syncedTable)
         .build();
   }
 
@@ -269,6 +260,5 @@ public class OneTableClient {
   @Builder
   private static class SyncResultForTableFormats {
     @Builder.Default Map<TableFormat, SyncResult> lastSyncResult = Collections.emptyMap();
-    @Builder.Default OneTable syncedTable = null;
   }
 }

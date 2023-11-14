@@ -35,10 +35,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
@@ -59,12 +61,11 @@ import io.onetable.spi.extractor.SourceClient;
 import io.onetable.spi.sync.TableFormatSync;
 import io.onetable.spi.sync.TargetClient;
 
-@SuppressWarnings("rawtypes")
 public class TestOneTableClient {
 
   private final Configuration mockConf = mock(Configuration.class);
-  private final SourceClientProvider mockSourceClientProvider = mock(SourceClientProvider.class);
-  private final SourceClient mockSourceClient = mock(SourceClient.class);
+  private final SourceClientProvider<Instant> mockSourceClientProvider = mock(SourceClientProvider.class);
+  private final SourceClient<Instant> mockSourceClient = mock(SourceClient.class);
   private final TableFormatClientFactory mockTableFormatClientFactory =
       mock(TableFormatClientFactory.class);
   private final TableFormatSync tableFormatSync = mock(TableFormatSync.class);
@@ -165,14 +166,14 @@ public class TestOneTableClient {
     // which is instantAt5 and so i.e. instantAt2.
     List<SyncResult> deltaSyncResults = buildSyncResults(Arrays.asList(instantAt8, instantAt2));
     IncrementalTableChanges incrementalTableChanges =
-        IncrementalTableChanges.builder().tableChanges(tableChanges).build();
+        IncrementalTableChanges.builder().tableChanges(tableChanges.iterator()).build();
     Map<TableFormat, List<SyncResult>> allResults = new HashMap<>();
     allResults.put(TableFormat.ICEBERG, icebergSyncResults);
     allResults.put(TableFormat.DELTA, deltaSyncResults);
     Map<TargetClient, Optional<OneTableMetadata>> clientToMetadata = new HashMap<>();
     clientToMetadata.put(mockTargetClient1, targetClient1Metadata);
     clientToMetadata.put(mockTargetClient2, targetClient2Metadata);
-    when(tableFormatSync.syncChanges(clientToMetadata, incrementalTableChanges))
+    when(tableFormatSync.syncChanges(eq(clientToMetadata), argThat(matches(incrementalTableChanges))))
         .thenReturn(allResults);
     Map<TableFormat, SyncResult> expectedSyncResult = new HashMap<>();
     expectedSyncResult.put(TableFormat.ICEBERG, getLastSyncResult(icebergSyncResults));
@@ -291,10 +292,10 @@ public class TestOneTableClient {
     // which is instantAt5 and so i.e. instantAt2.
     List<SyncResult> deltaSyncResults = buildSyncResults(Arrays.asList(instantAt8, instantAt2));
     IncrementalTableChanges incrementalTableChanges =
-        IncrementalTableChanges.builder().tableChanges(tableChanges).build();
+        IncrementalTableChanges.builder().tableChanges(tableChanges.iterator()).build();
     when(tableFormatSync.syncChanges(
-            Collections.singletonMap(mockTargetClient2, targetClient2Metadata),
-            incrementalTableChanges))
+            eq(Collections.singletonMap(mockTargetClient2, targetClient2Metadata)),
+            argThat(matches(incrementalTableChanges))))
         .thenReturn(Collections.singletonMap(TableFormat.DELTA, deltaSyncResults));
     Map<TableFormat, SyncResult> expectedSyncResult = new HashMap<>();
     expectedSyncResult.put(TableFormat.ICEBERG, syncResult);
@@ -397,5 +398,19 @@ public class TestOneTableClient {
 
   private static <T> ArgumentMatcher<Collection<T>> containsAll(Collection<T> expected) {
     return actual -> actual.size() == expected.size() && actual.containsAll(expected);
+  }
+
+  private static ArgumentMatcher<IncrementalTableChanges> matches(IncrementalTableChanges expected) {
+    return actual -> actual.getPendingCommits().equals(expected.getPendingCommits())
+        && iteratorsMatch(actual.getTableChanges(), expected.getTableChanges());
+  }
+
+  private static <T> boolean iteratorsMatch(Iterator<T> first, Iterator<T> second) {
+    while (first.hasNext() && second.hasNext()) {
+      if (!first.next().equals(second.next())) {
+        return false;
+      }
+    }
+    return !first.hasNext() && !second.hasNext();
   }
 }

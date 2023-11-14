@@ -143,7 +143,7 @@ public class TestTableFormatSync {
     IncrementalTableChanges incrementalTableChanges =
         IncrementalTableChanges.builder()
             .pendingCommits(pendingCommitInstants)
-            .tableChanges(tableChanges)
+            .tableChanges(tableChanges.iterator())
             .build();
 
     Map<TargetClient, Optional<OneTableMetadata>> clientWithMetadata = new HashMap<>();
@@ -231,7 +231,7 @@ public class TestTableFormatSync {
     IncrementalTableChanges incrementalTableChanges =
         IncrementalTableChanges.builder()
             .pendingCommits(pendingCommitInstants)
-            .tableChanges(tableChanges)
+            .tableChanges(tableChanges.iterator())
             .build();
 
     Map<TargetClient, Optional<OneTableMetadata>> clientWithMetadata = new HashMap<>();
@@ -312,7 +312,7 @@ public class TestTableFormatSync {
     IncrementalTableChanges incrementalTableChanges =
         IncrementalTableChanges.builder()
             .pendingCommits(pendingCommitInstants)
-            .tableChanges(tableChanges)
+            .tableChanges(tableChanges.iterator())
             .build();
 
     Map<TargetClient, Optional<OneTableMetadata>> clientWithMetadata = new HashMap<>();
