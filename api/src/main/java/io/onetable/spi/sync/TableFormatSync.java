@@ -21,7 +21,6 @@ package io.onetable.spi.sync;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -94,15 +93,8 @@ public class TableFormatSync {
     return results;
   }
 
-  public Optional<Instant> getLastSyncInstant() {
-    return client.getTableMetadata().map(OneTableMetadata::getLastInstantSynced);
-  }
-
-  public List<Instant> getPendingInstantsToConsiderForNextSync() {
-    return client
-        .getTableMetadata()
-        .map(OneTableMetadata::getInstantsToConsiderForNextSync)
-        .orElse(Collections.emptyList());
+  public Optional<OneTableMetadata> getTableMetadata() {
+    return client.getTableMetadata();
   }
 
   private SyncResult getSyncResult(

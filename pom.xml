@@ -170,6 +170,12 @@
             </dependency>
             <dependency>
                 <groupId>org.apache.hudi</groupId>
+                <artifactId>hudi-utilities_2.12</artifactId>
+                <version>${hudi.version}</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hudi</groupId>
                 <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.version.prefix}</artifactId>
                 <version>${hudi.version}</version>
                 <scope>test</scope>
@@ -515,7 +521,7 @@
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <skip>${skipITs}</skip>
                     <reuseForks>false</reuseForks>
-                    <forkCount>4</forkCount>
+                    <forkCount>6</forkCount>
                     <trimStackTrace>false</trimStackTrace>
                     <argLine>-Xmx1024m</argLine>
                 </configuration>

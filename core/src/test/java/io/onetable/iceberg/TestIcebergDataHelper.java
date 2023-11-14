@@ -35,9 +35,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import lombok.Builder;
 import lombok.Value;
@@ -56,8 +56,8 @@ import org.apache.iceberg.types.Types.NestedField;
 @Value
 public class TestIcebergDataHelper {
   private static final Random RANDOM = new Random();
-  private static final Schema DEFAULT_TABLE_SCHEMA =
-      new Schema(
+  private static final List<Types.NestedField> COMMON_FIELDS =
+      Arrays.asList(
           NestedField.optional(1, "id", Types.StringType.get()),
           NestedField.optional(2, "ts", Types.LongType.get()),
           NestedField.optional(3, "level", Types.StringType.get()),
@@ -100,12 +100,36 @@ public class TestIcebergDataHelper {
               28, "timestamp_micros_nullable_field", Types.TimestampType.withZone()),
           NestedField.optional(
               30, "timestamp_local_micros_nullable_field", Types.TimestampType.withoutZone()));
+  private static final List<Types.NestedField> ADDITIONAL_FIELDS =
+      Arrays.asList(
+          NestedField.optional(31, "additional_column1", Types.StringType.get()),
+          NestedField.optional(32, "additional_column2", Types.LongType.get()));
+  private static final Schema BASE_SCHEMA = new Schema(COMMON_FIELDS);
+  private static final Schema SCHEMA_WITH_ADDITIONAL_COLUMNS =
+      new Schema(
+          Stream.concat(COMMON_FIELDS.stream(), ADDITIONAL_FIELDS.stream())
+              .collect(Collectors.toList()));
+
   private static final OffsetDateTime EPOCH = Instant.ofEpochSecond(0).atOffset(ZoneOffset.UTC);
   private static final LocalDate EPOCH_DAY = EPOCH.toLocalDate();
 
-  @Builder.Default Schema tableSchema = DEFAULT_TABLE_SCHEMA;
+  Schema tableSchema;
   String recordKeyField;
   List<String> partitionFieldNames;
+
+  public static TestIcebergDataHelper createIcebergDataHelper(
+      String recordKeyField, List<String> partitionFields, boolean includeAdditionalColumns) {
+    Schema tableSchema = getSchema(includeAdditionalColumns);
+    return TestIcebergDataHelper.builder()
+        .tableSchema(tableSchema)
+        .recordKeyField(recordKeyField)
+        .partitionFieldNames(partitionFields)
+        .build();
+  }
+
+  private static Schema getSchema(boolean includeAdditionalColumns) {
+    return includeAdditionalColumns ? SCHEMA_WITH_ADDITIONAL_COLUMNS : BASE_SCHEMA;
+  }
 
   public List<Record> generateInsertRecords(int numRecords) {
     List<Instant> startTimeWindows = getStartTimeWindows();
@@ -255,22 +279,18 @@ public class TestIcebergDataHelper {
         return LocalDate.ofEpochDay(randomDay);
       case TIME:
         long totalMicrosInDay = ChronoUnit.DAYS.getDuration().toMillis() * 1000;
-        long randomTimeInMicros = ThreadLocalRandom.current().nextLong(totalMicrosInDay);
-        return randomTimeInMicros;
+        return (long) (RANDOM.nextDouble() * (totalMicrosInDay));
       case DECIMAL:
         Types.DecimalType decimalType = (Types.DecimalType) fieldType;
-        BigDecimal randomDecimal =
-            new BigDecimal(RANDOM.nextDouble() * Math.pow(10, decimalType.scale()))
-                .setScale(decimalType.scale(), RoundingMode.HALF_UP);
-        return randomDecimal;
+        return new BigDecimal(RANDOM.nextDouble() * Math.pow(10, decimalType.scale()))
+            .setScale(decimalType.scale(), RoundingMode.HALF_UP);
       case TIMESTAMP:
         Types.TimestampType timestampType = (Types.TimestampType) fieldType;
 
         long lowerBoundMillis = timeLowerBound.toEpochMilli();
         long upperBoundMillis = timeUpperBound.toEpochMilli();
         long randomMillisInRange =
-            lowerBoundMillis
-                + ThreadLocalRandom.current().nextLong(upperBoundMillis - lowerBoundMillis);
+            lowerBoundMillis + (long) (RANDOM.nextDouble() * (upperBoundMillis - lowerBoundMillis));
         if (timestampType.shouldAdjustToUTC()) {
           return EPOCH.plus(randomMillisInRange, ChronoUnit.MILLIS);
         } else {
