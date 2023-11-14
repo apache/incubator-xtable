@@ -322,7 +322,6 @@ public class ITIcebergSourceClient {
       // Upsert all rows inserted before, so all files are replaced.
       testIcebergTable.upsertRows(commit1Rows.subList(0, 50));
       long snapshotIdAfterCommit2 = testIcebergTable.getLatestSnapshot().snapshotId();
-      Thread.sleep(5 * 1000);
 
       // Insert 50 rows to different (ERROR) partition.
       testIcebergTable.insertRecordsForPartition(50, "ERROR");
