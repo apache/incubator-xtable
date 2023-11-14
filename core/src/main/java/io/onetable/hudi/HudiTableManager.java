@@ -39,6 +39,7 @@ import io.onetable.exception.OneIOException;
 import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
+import io.onetable.model.storage.DataLayoutStrategy;
 
 /** A class used to initialize new Hudi tables and load the metadata of existing tables. */
 @Log4j2
@@ -96,10 +97,12 @@ class HudiTableManager {
     keyGeneratorClass =
         getKeyGeneratorClass(
             table.getPartitioningFields(), table.getReadSchema().getRecordKeyFields());
+    boolean hiveStylePartitioningEnabled =
+        DataLayoutStrategy.HIVE_STYLE_PARTITION == table.getLayoutStrategy();
     try {
       return HoodieTableMetaClient.withPropertyBuilder()
           .setCommitTimezone(HoodieTimelineTimeZone.UTC)
-          .setHiveStylePartitioningEnable(true)
+          .setHiveStylePartitioningEnable(hiveStylePartitioningEnabled)
           .setTableType(HoodieTableType.COPY_ON_WRITE)
           .setTableName(table.getName())
           .setPayloadClass(HoodieAvroPayload.class)
