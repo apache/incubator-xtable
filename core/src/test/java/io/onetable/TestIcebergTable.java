@@ -298,7 +298,11 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   }
 
   public Long getLastCommitTimestamp() {
-    return icebergTable.currentSnapshot().timestampMillis();
+    return getLatestSnapshot().timestampMillis();
+  }
+
+  public Snapshot getLatestSnapshot() {
+    return icebergTable.currentSnapshot();
   }
 
   @SneakyThrows
@@ -323,6 +327,10 @@ public class TestIcebergTable implements GenericTable<Record, String> {
 
   public void expireSnapshotsOlderThan(Instant instant) {
     icebergTable.expireSnapshots().expireOlderThan(instant.toEpochMilli()).commit();
+  }
+
+  public void expireSnapshot(Long snapshotId) {
+    icebergTable.expireSnapshots().expireSnapshotId(snapshotId).commit();
   }
 
   private List<String> filterNullFields(List<String> partitionFields) {

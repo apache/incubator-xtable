@@ -49,6 +49,9 @@ datasets:
     tableBasePath: s3://hudi/multi-partition-dataset
     tableName: multi_partition_dataset
     partitionSpec: time_millis:DAY:yyyy-MM-dd,type:VALUE
+  -
+    tableBasePath: abfs://container@storage.dfs.core.windows.net/multi-partition-dataset
+    tableName: multi_partition_dataset
 ```
 - `tableFormats` is a list of formats you want to create from your source tables
 - `tableBasePath` is the basePath of the table

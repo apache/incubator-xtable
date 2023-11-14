@@ -19,6 +19,6 @@ jobs:
       - name: Set Version
         run: mvn versions:set -DnewVersion="$VERSION"
       - name: Publish package
-        run: mvn --batch-mode deploy
+        run: mvn -ntp --batch-mode deploy -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
