@@ -36,7 +36,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
@@ -146,17 +145,13 @@ public class TestTableFormatSync {
             .tableChanges(tableChanges.iterator())
             .build();
 
-    Map<TargetClient, Optional<OneTableMetadata>> clientWithMetadata = new HashMap<>();
+    Map<TargetClient, OneTableMetadata> clientWithMetadata = new HashMap<>();
     clientWithMetadata.put(
         mockTargetClient1,
-        Optional.of(
-            OneTableMetadata.of(
-                Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList())));
+        OneTableMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
     clientWithMetadata.put(
         mockTargetClient2,
-        Optional.of(
-            OneTableMetadata.of(
-                Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList())));
+        OneTableMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
 
     Map<TableFormat, List<SyncResult>> result =
         TableFormatSync.getInstance().syncChanges(clientWithMetadata, incrementalTableChanges);
@@ -234,22 +229,19 @@ public class TestTableFormatSync {
             .tableChanges(tableChanges.iterator())
             .build();
 
-    Map<TargetClient, Optional<OneTableMetadata>> clientWithMetadata = new HashMap<>();
+    Map<TargetClient, OneTableMetadata> clientWithMetadata = new HashMap<>();
     // mockTargetClient1 will have the first table change as a previously pending instant and
     // otherwise be synced up to the 2nd change
     clientWithMetadata.put(
         mockTargetClient1,
-        Optional.of(
-            OneTableMetadata.of(
-                tableChange2.getTableAsOfChange().getLatestCommitTime(),
-                Collections.singletonList(
-                    tableChange1.getTableAsOfChange().getLatestCommitTime()))));
+        OneTableMetadata.of(
+            tableChange2.getTableAsOfChange().getLatestCommitTime(),
+            Collections.singletonList(tableChange1.getTableAsOfChange().getLatestCommitTime())));
     // mockTargetClient2 will have synced the first table change previously
     clientWithMetadata.put(
         mockTargetClient2,
-        Optional.of(
-            OneTableMetadata.of(
-                tableChange1.getTableAsOfChange().getLatestCommitTime(), Collections.emptyList())));
+        OneTableMetadata.of(
+            tableChange1.getTableAsOfChange().getLatestCommitTime(), Collections.emptyList()));
 
     Map<TableFormat, List<SyncResult>> result =
         TableFormatSync.getInstance().syncChanges(clientWithMetadata, incrementalTableChanges);
@@ -315,17 +307,14 @@ public class TestTableFormatSync {
             .tableChanges(tableChanges.iterator())
             .build();
 
-    Map<TargetClient, Optional<OneTableMetadata>> clientWithMetadata = new HashMap<>();
+    Map<TargetClient, OneTableMetadata> clientWithMetadata = new HashMap<>();
     // mockTargetClient1 will have nothing to sync
     clientWithMetadata.put(
-        mockTargetClient1,
-        Optional.of(OneTableMetadata.of(Instant.now(), Collections.emptyList())));
+        mockTargetClient1, OneTableMetadata.of(Instant.now(), Collections.emptyList()));
     // mockTargetClient2 will have synced the first table change previously
     clientWithMetadata.put(
         mockTargetClient2,
-        Optional.of(
-            OneTableMetadata.of(
-                Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList())));
+        OneTableMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
 
     Map<TableFormat, List<SyncResult>> result =
         TableFormatSync.getInstance().syncChanges(clientWithMetadata, incrementalTableChanges);

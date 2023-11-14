@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -54,7 +53,7 @@ public class TableFormatSync {
   }
 
   /**
-   * Syncs the provided snapshot to the target table format.
+   * Syncs the provided snapshot to the target table formats.
    *
    * @param targetClients the targets to sync with the snapshot
    * @param snapshot the snapshot to sync
@@ -86,31 +85,25 @@ public class TableFormatSync {
   }
 
   /**
-   * Syncs a set of changes to the target table format.
+   * Syncs a set of changes to the target table formats.
    *
+   * @param targetClientWithMetadata a map of target clients to their last sync metadata
    * @param changes the changes from the source table format that need to be applied
    * @return the results of trying to sync each change
    */
   public Map<TableFormat, List<SyncResult>> syncChanges(
-      Map<TargetClient, Optional<OneTableMetadata>> filteredSyncMetadataByClient,
+      Map<TargetClient, OneTableMetadata> targetClientWithMetadata,
       IncrementalTableChanges changes) {
     Map<TableFormat, List<SyncResult>> results = new HashMap<>();
     Set<TargetClient> clientsWithFailures = new HashSet<>();
     while (changes.getTableChanges().hasNext()) {
       TableChange change = changes.getTableChanges().next();
       Collection<TargetClient> clientsToSync =
-          filteredSyncMetadataByClient.entrySet().stream()
+          targetClientWithMetadata.entrySet().stream()
               .filter(
                   entry -> {
-                    // metadata must be present for incremental sync
-                    OneTableMetadata metadata = entry.getValue().get();
-                    return change
-                            .getTableAsOfChange()
-                            .getLatestCommitTime()
-                            .isAfter(metadata.getLastInstantSynced())
-                        || metadata
-                            .getInstantsToConsiderForNextSync()
-                            .contains(change.getTableAsOfChange().getLatestCommitTime());
+                    OneTableMetadata metadata = entry.getValue();
+                    return isChangeApplicableForLastSyncMetadata(change, metadata);
                   })
               .map(Map.Entry::getKey)
               .collect(Collectors.toList());
@@ -138,6 +131,17 @@ public class TableFormatSync {
       }
     }
     return results;
+  }
+
+  private static boolean isChangeApplicableForLastSyncMetadata(
+      TableChange change, OneTableMetadata metadata) {
+    return change
+            .getTableAsOfChange()
+            .getLatestCommitTime()
+            .isAfter(metadata.getLastInstantSynced())
+        || metadata
+            .getInstantsToConsiderForNextSync()
+            .contains(change.getTableAsOfChange().getLatestCommitTime());
   }
 
   private SyncResult getSyncResult(

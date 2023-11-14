@@ -171,12 +171,13 @@ public class OneTableClient {
       Map<TableFormat, Optional<OneTableMetadata>> lastSyncMetadataByFormat,
       ExtractFromSource<COMMIT> source) {
     Map<TableFormat, SyncResult> syncResultsByFormat = Collections.emptyMap();
-    Map<TargetClient, Optional<OneTableMetadata>> filteredSyncMetadataByFormat =
+    Map<TargetClient, OneTableMetadata> filteredSyncMetadataByFormat =
         lastSyncMetadataByFormat.entrySet().stream()
             .filter(entry -> syncClientByFormat.containsKey(entry.getKey()))
             .collect(
                 Collectors.toMap(
-                    entry -> syncClientByFormat.get(entry.getKey()), Map.Entry::getValue));
+                    entry -> syncClientByFormat.get(entry.getKey()),
+                    entry -> entry.getValue().get()));
 
     InstantsForIncrementalSync instantsForIncrementalSync =
         getMostOutOfSyncCommitAndPendingCommits(filteredSyncMetadataByFormat);
@@ -234,21 +235,15 @@ public class OneTableClient {
   }
 
   private InstantsForIncrementalSync getMostOutOfSyncCommitAndPendingCommits(
-      Map<TargetClient, Optional<OneTableMetadata>> lastSyncMetadataByFormat) {
+      Map<TargetClient, OneTableMetadata> lastSyncMetadataByFormat) {
     Optional<Instant> mostOutOfSyncCommit =
         lastSyncMetadataByFormat.values().stream()
-            .filter(Optional::isPresent)
-            .map(Optional::get)
             .map(OneTableMetadata::getLastInstantSynced)
             .sorted()
             .findFirst();
     List<Instant> allPendingInstants =
         lastSyncMetadataByFormat.values().stream()
-            .map(
-                oneTableMetadata ->
-                    oneTableMetadata
-                        .map(OneTableMetadata::getInstantsToConsiderForNextSync)
-                        .orElse(Collections.emptyList()))
+            .map(OneTableMetadata::getInstantsToConsiderForNextSync)
             .flatMap(Collection::stream)
             .distinct()
             .sorted()

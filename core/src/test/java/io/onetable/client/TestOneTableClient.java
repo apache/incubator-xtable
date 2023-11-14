@@ -170,9 +170,9 @@ public class TestOneTableClient {
     Map<TableFormat, List<SyncResult>> allResults = new HashMap<>();
     allResults.put(TableFormat.ICEBERG, icebergSyncResults);
     allResults.put(TableFormat.DELTA, deltaSyncResults);
-    Map<TargetClient, Optional<OneTableMetadata>> clientToMetadata = new HashMap<>();
-    clientToMetadata.put(mockTargetClient1, targetClient1Metadata);
-    clientToMetadata.put(mockTargetClient2, targetClient2Metadata);
+    Map<TargetClient, OneTableMetadata> clientToMetadata = new HashMap<>();
+    clientToMetadata.put(mockTargetClient1, targetClient1Metadata.get());
+    clientToMetadata.put(mockTargetClient2, targetClient2Metadata.get());
     when(tableFormatSync.syncChanges(
             eq(clientToMetadata), argThat(matches(incrementalTableChanges))))
         .thenReturn(allResults);
@@ -295,7 +295,7 @@ public class TestOneTableClient {
     IncrementalTableChanges incrementalTableChanges =
         IncrementalTableChanges.builder().tableChanges(tableChanges.iterator()).build();
     when(tableFormatSync.syncChanges(
-            eq(Collections.singletonMap(mockTargetClient2, targetClient2Metadata)),
+            eq(Collections.singletonMap(mockTargetClient2, targetClient2Metadata.get())),
             argThat(matches(incrementalTableChanges))))
         .thenReturn(Collections.singletonMap(TableFormat.DELTA, deltaSyncResults));
     Map<TableFormat, SyncResult> expectedSyncResult = new HashMap<>();
