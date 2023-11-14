@@ -592,7 +592,7 @@ public class ITOneTableClient {
   }
 
   @Test
-  public void testMetadataRetention() {
+  public void testMetadataRetention() throws Exception {
     String tableName = getTableName();
     SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
     try (TestJavaHudiTable table =
@@ -612,6 +612,8 @@ public class ITOneTableClient {
       // later we will ensure we can still read the source table at this instant to ensure that
       // neither target cleaned up the underlying parquet files in the table
       Instant instantAfterFirstCommit = Instant.now();
+      // Ensure gap between commits for time-travel query
+      Thread.sleep(1000);
       // create 5 total commits to ensure Delta Log cleanup is
       IntStream.range(0, 4)
           .forEach(
