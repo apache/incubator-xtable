@@ -107,11 +107,14 @@ public class OneTableClient {
                       tableFormat ->
                           tableFormatClientFactory.createForFormat(tableFormat, config, conf)));
       // State for each TableFormat
-    Map<TableFormat, Optional<OneTableMetadata>> lastSyncMetadataByFormat =
-        syncClientByFormat.entrySet().stream()
-            .collect(
-                Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getTableMetadata()));Map<TableFormat, TableFormatSync> formatsToSyncIncrementally =
-          getFormatsToSyncIncrementally(config, syncClientByFormat, lastSyncMetadataByFormat,source.getSourceClient());
+      Map<TableFormat, Optional<OneTableMetadata>> lastSyncMetadataByFormat =
+          syncClientByFormat.entrySet().stream()
+              .collect(
+                  Collectors.toMap(
+                      Map.Entry::getKey, entry -> entry.getValue().getTableMetadata()));
+      Map<TableFormat, TableFormatSync> formatsToSyncIncrementally =
+          getFormatsToSyncIncrementally(
+              config, syncClientByFormat, lastSyncMetadataByFormat, source.getSourceClient());
       Map<TableFormat, TableFormatSync> formatsToSyncBySnapshot =
           syncClientByFormat.entrySet().stream()
               .filter(entry -> !formatsToSyncIncrementally.containsKey(entry.getKey()))
@@ -123,7 +126,8 @@ public class OneTableClient {
       SyncResultForTableFormats syncResultForIncrementalSync =
           formatsToSyncIncrementally.isEmpty()
               ? SyncResultForTableFormats.builder().build()
-              : syncIncrementalChanges(formatsToSyncIncrementally, lastSyncMetadataByFormat,source);
+              : syncIncrementalChanges(
+                  formatsToSyncIncrementally, lastSyncMetadataByFormat, source);
       log.info(
           "OneTable Sync is successful for the following formats "
               + config.getTargetTableFormats());
