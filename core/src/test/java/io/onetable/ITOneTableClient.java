@@ -505,6 +505,7 @@ public class ITOneTableClient {
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(tableToClose.getBasePath())
+              .tableDataPath(tableToClose.getDataPath())
               .hudiSourceConfig(
                   HudiSourceConfig.builder()
                       .partitionFieldSpecConfig(oneTablePartitionConfig)
