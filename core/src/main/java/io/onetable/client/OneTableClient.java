@@ -183,17 +183,14 @@ public class OneTableClient {
         getMostOutOfSyncCommitAndPendingCommits(filteredSyncMetadataByFormat);
     IncrementalTableChanges incrementalTableChanges =
         source.extractTableChanges(instantsForIncrementalSync);
-    if (incrementalTableChanges.getTableChanges().hasNext()) {
-      Map<TableFormat, List<SyncResult>> allResults =
-          tableFormatSync.syncChanges(filteredSyncMetadataByFormat, incrementalTableChanges);
-      // return only the last sync result in the list of results for each format
-      syncResultsByFormat =
-          allResults.entrySet().stream()
-              .collect(
-                  Collectors.toMap(
-                      Map.Entry::getKey,
-                      entry -> entry.getValue().get(entry.getValue().size() - 1)));
-    }
+    Map<TableFormat, List<SyncResult>> allResults =
+        tableFormatSync.syncChanges(filteredSyncMetadataByFormat, incrementalTableChanges);
+    // return only the last sync result in the list of results for each format
+    syncResultsByFormat =
+        allResults.entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    Map.Entry::getKey, entry -> entry.getValue().get(entry.getValue().size() - 1)));
     return SyncResultForTableFormats.builder().lastSyncResult(syncResultsByFormat).build();
   }
 

@@ -20,12 +20,9 @@ package io.onetable.client;
 
 import static io.onetable.GenericTable.getTableName;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
@@ -336,13 +333,24 @@ public class TestOneTableClient {
     List<Instant> instantsToProcess = Collections.emptyList();
     CommitsBacklog<Instant> commitsBacklog =
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
-    when(mockTargetClient1.getTableMetadata())
-        .thenReturn(
-            Optional.of(OneTableMetadata.of(icebergLastSyncInstant, Collections.emptyList())));
-    when(mockTargetClient2.getTableMetadata())
-        .thenReturn(
-            Optional.of(OneTableMetadata.of(deltaLastSyncInstant, Collections.emptyList())));
+    Optional<OneTableMetadata> targetClient1Metadata =
+        Optional.of(OneTableMetadata.of(icebergLastSyncInstant, Collections.emptyList()));
+    when(mockTargetClient1.getTableMetadata()).thenReturn(targetClient1Metadata);
+    Optional<OneTableMetadata> targetClient2Metadata =
+        Optional.of(OneTableMetadata.of(deltaLastSyncInstant, Collections.emptyList()));
+    when(mockTargetClient2.getTableMetadata()).thenReturn(targetClient2Metadata);
     when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync)).thenReturn(commitsBacklog);
+    Map<TargetClient, OneTableMetadata> clientsWithMetadata = new HashMap<>();
+    clientsWithMetadata.put(mockTargetClient1, targetClient1Metadata.get());
+    clientsWithMetadata.put(mockTargetClient2, targetClient2Metadata.get());
+    when(tableFormatSync.syncChanges(
+            eq(clientsWithMetadata),
+            argThat(
+                matches(
+                    IncrementalTableChanges.builder()
+                        .tableChanges(Collections.<TableChange>emptyList().iterator())
+                        .build()))))
+        .thenReturn(Collections.emptyMap());
     // Iceberg and Delta have no commits to sync
     Map<TableFormat, SyncResult> expectedSyncResult = Collections.emptyMap();
     OneTableClient oneTableClient =
@@ -350,7 +358,6 @@ public class TestOneTableClient {
     Map<TableFormat, SyncResult> result =
         oneTableClient.sync(perTableConfig, mockSourceClientProvider);
     assertEquals(expectedSyncResult, result);
-    verify(tableFormatSync, never()).syncChanges(any(), any());
   }
 
   private SyncResult getLastSyncResult(List<SyncResult> syncResults) {
