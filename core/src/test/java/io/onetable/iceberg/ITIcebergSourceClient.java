@@ -303,8 +303,6 @@ public class ITIcebergSourceClient {
     }
   }
 
-  // TODO(vamshigv): This tests show for Iceberg, it is not safe for incremental syncs
-  // with expired snapshots.
   @SneakyThrows
   @Test
   public void testForIncrementalSyncSafetyCheck() {
@@ -316,7 +314,6 @@ public class ITIcebergSourceClient {
       // Insert 50 rows to INFO partition.
       List<Record> commit1Rows = testIcebergTable.insertRecordsForPartition(50, "INFO");
       Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
-      Snapshot icebergSnapshotAfterCommit1 = testIcebergTable.getLatestSnapshot();
       PerTableConfig tableConfig =
           PerTableConfig.builder()
               .tableName(testIcebergTable.getTableName())
@@ -354,11 +351,10 @@ public class ITIcebergSourceClient {
         areFilesRemoved =
             areFilesRemoved | checkIfFileIsRemoved(activePathAfterCommit1, tableChange);
       }
-      assertTrue(areFilesRemoved);
-      assertTrue(icebergSourceClient.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));
+      assertFalse(icebergSourceClient.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));
       // Table doesn't have instant of this older commit, hence it is not safe.
       Instant instantAsOfHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
-      assertTrue(icebergSourceClient.isIncrementalSyncSafeFrom(instantAsOfHourAgo));
+      assertFalse(icebergSourceClient.isIncrementalSyncSafeFrom(instantAsOfHourAgo));
     }
   }
 

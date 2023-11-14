@@ -218,12 +218,37 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     return CommitsBacklog.<Snapshot>builder().commitsToProcess(snapshots).build();
   }
 
-  // TODO(https://github.com/onetable-io/onetable/issues/147): Handle this.
+  // Following checks are to be performed:
+  // 1. Check if snapshot at or before the provided instant exists.
+  // 2. Check if expiring of snapshots has impacted the provided instant.
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
-    // Two checks to be performed:
-    // 1. Check if snapshot at or before the provided instant exists.
-    // 2. Check if expiring of snapshots has impacted the provided instant.
+    long timeInMillis = instant.toEpochMilli();
+    Table iceTable = getSourceTable();
+    boolean doesInstantOfAgeExists = false;
+    Long targetSnapshotId = null;
+    for (Snapshot snapshot : iceTable.snapshots()) {
+      if (snapshot.timestampMillis() <= timeInMillis) {
+        doesInstantOfAgeExists = true;
+        targetSnapshotId = snapshot.snapshotId();
+      } else {
+        break;
+      }
+    }
+    if (!doesInstantOfAgeExists) {
+      return false;
+    }
+    // Go from latest snapshot until targetSnapshotId through parent reference.
+    // nothing has to be null in this chain.
+    Long currentSnapshotId = iceTable.currentSnapshot().snapshotId();
+    while (currentSnapshotId != null && currentSnapshotId != targetSnapshotId) {
+      Snapshot currentSnapshot = iceTable.snapshot(currentSnapshotId);
+      if (currentSnapshot == null) {
+        // The snapshot is expired.
+        return false;
+      }
+      currentSnapshotId = currentSnapshot.parentId();
+    }
     return true;
   }
 }
