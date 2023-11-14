@@ -19,7 +19,6 @@
 package io.onetable.iceberg;
 
 import static io.onetable.GenericTable.getTableName;
-import static io.onetable.ValidationTestHelper.getAllFilePaths;
 import static io.onetable.ValidationTestHelper.validateOneSnapshot;
 import static io.onetable.ValidationTestHelper.validateTableChanges;
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,8 +30,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import lombok.SneakyThrows;
 
@@ -304,13 +301,13 @@ public class ITIcebergSourceClient {
   }
 
   @SneakyThrows
-  @Test
-  public void testForIncrementalSyncSafetyCheck() {
-    boolean isPartitioned = true;
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testForIncrementalSyncSafetyCheck(boolean shouldExpireSnapshots) {
     String tableName = getTableName();
     try (TestIcebergTable testIcebergTable =
         TestIcebergTable.forStandardSchemaAndPartitioning(
-            tableName, isPartitioned ? "level" : null, tempDir, hadoopConf)) {
+            tableName, "level", tempDir, hadoopConf)) {
       // Insert 50 rows to INFO partition.
       List<Record> commit1Rows = testIcebergTable.insertRecordsForPartition(50, "INFO");
       Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
@@ -321,37 +318,26 @@ public class ITIcebergSourceClient {
               .tableDataPath(testIcebergTable.getDataPath())
               .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
               .build();
-      IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
-      OneSnapshot snapshotAfterCommit1 = icebergSourceClient.getCurrentSnapshot();
-      List<String> allActivePaths = getAllFilePaths(snapshotAfterCommit1);
-      assertEquals(1, allActivePaths.size());
-      String activePathAfterCommit1 = allActivePaths.get(0);
 
       // Upsert all rows inserted before, so all files are replaced.
       testIcebergTable.upsertRows(commit1Rows.subList(0, 50));
+      long snapshotIdAfterCommit2 = testIcebergTable.getLatestSnapshot().snapshotId();
       Thread.sleep(5 * 1000);
-      Instant instantAfterCommit2 = Instant.now();
 
       // Insert 50 rows to different (ERROR) partition.
       testIcebergTable.insertRecordsForPartition(50, "ERROR");
 
-      // Expire two snapshots.
-      testIcebergTable.expireSnapshotsOlderThan(instantAfterCommit2);
-
-      InstantsForIncrementalSync instantsForIncrementalSync =
-          InstantsForIncrementalSync.builder()
-              .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
-              .build();
-      icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
-      CommitsBacklog<Snapshot> instantCurrentCommitState =
-          icebergSourceClient.getCommitsBacklog(instantsForIncrementalSync);
-      boolean areFilesRemoved = false;
-      for (Snapshot snapshot : instantCurrentCommitState.getCommitsToProcess()) {
-        TableChange tableChange = icebergSourceClient.getTableChangeForCommit(snapshot);
-        areFilesRemoved =
-            areFilesRemoved | checkIfFileIsRemoved(activePathAfterCommit1, tableChange);
+      if (shouldExpireSnapshots) {
+        // Expire snapshotAfterCommit2.
+        testIcebergTable.expireSnapshot(snapshotIdAfterCommit2);
       }
-      assertFalse(icebergSourceClient.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));
+      IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+      if (shouldExpireSnapshots) {
+        assertFalse(
+            icebergSourceClient.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));
+      } else {
+        assertTrue(icebergSourceClient.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));
+      }
       // Table doesn't have instant of this older commit, hence it is not safe.
       Instant instantAsOfHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
       assertFalse(icebergSourceClient.isIncrementalSyncSafeFrom(instantAsOfHourAgo));
@@ -364,13 +350,5 @@ public class ITIcebergSourceClient {
     OnePartitionField partitionField = partitionFields.get(0);
     assertEquals("level", partitionField.getSourceField().getName());
     assertEquals(PartitionTransformType.VALUE, partitionField.getTransformType());
-  }
-
-  private boolean checkIfFileIsRemoved(String activePath, TableChange tableChange) {
-    Set<String> filePathsRemoved =
-        tableChange.getFilesDiff().getFilesRemoved().stream()
-            .map(oneDf -> oneDf.getPhysicalPath())
-            .collect(Collectors.toSet());
-    return filePathsRemoved.contains(activePath);
   }
 }

@@ -329,6 +329,10 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     icebergTable.expireSnapshots().expireOlderThan(instant.toEpochMilli()).commit();
   }
 
+  public void expireSnapshot(Long snapshotId) {
+    icebergTable.expireSnapshots().expireSnapshotId(snapshotId).commit();
+  }
+
   private List<String> filterNullFields(List<String> partitionFields) {
     return partitionFields.stream().filter(Objects::nonNull).collect(Collectors.toList());
   }
