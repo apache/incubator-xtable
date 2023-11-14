@@ -18,6 +18,7 @@
  
 package io.onetable.iceberg;
 
+import io.onetable.model.storage.DataLayoutStrategy;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
@@ -100,7 +101,10 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     IcebergPartitionSpecExtractor partitionExtractor = IcebergPartitionSpecExtractor.getInstance();
     List<OnePartitionField> irPartitionFields =
         partitionExtractor.fromIceberg(iceTable.spec(), iceSchema, irSchema);
-
+    DataLayoutStrategy dataLayoutStrategy =
+        irPartitionFields.size() > 0
+            ? DataLayoutStrategy.HIVE_STYLE_PARTITION
+            : DataLayoutStrategy.FLAT;
     return OneTable.builder()
         .tableFormat(TableFormat.ICEBERG)
         .basePath(iceTable.location())
@@ -108,7 +112,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         .partitioningFields(irPartitionFields)
         .latestCommitTime(Instant.ofEpochMilli(snapshot.timestampMillis()))
         .readSchema(irSchema)
-        // .layoutStrategy(dataLayoutStrategy)
+        .layoutStrategy(dataLayoutStrategy)
         .build();
   }
 
