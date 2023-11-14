@@ -176,7 +176,8 @@ class TestIcebergSourceClient {
       List<PartitionValue> partitionValues = oneDataFile.getPartitionValues();
       assertEquals(1, partitionValues.size());
       PartitionValue partitionEntry = partitionValues.iterator().next();
-      assertEquals("cs_sold_date_sk", partitionEntry.getPartitionField().getSourceField().getName());
+      assertEquals(
+          "cs_sold_date_sk", partitionEntry.getPartitionField().getSourceField().getName());
       // TODO generate test with column stats
       assertEquals(0, oneDataFile.getColumnStats().size());
     }
