@@ -160,7 +160,7 @@ public class HudiFileStatsExtractor {
               List<ColumnStat> columnStats =
                   fileStats.stream()
                       .map(pair -> getColumnStatFromHudiStat(pair.getLeft(), pair.getRight()))
-                      .collect(Collectors.toList());
+                      .collect(toList(fileStats.size()));
               long recordCount = getMaxFromColumnStats(columnStats).orElse(0L);
               return file.toBuilder().columnStats(columnStats).recordCount(recordCount).build();
             });
@@ -184,7 +184,7 @@ public class HudiFileStatsExtractor {
             .map(
                 colRange ->
                     getColumnStatFromColRange(nameFieldMap.get(colRange.getColumnName()), colRange))
-            .collect(Collectors.toList());
+            .collect(toList(columnRanges.size()));
     Long rowCount = getMaxFromColumnStats(columnStats).orElse(null);
     if (rowCount == null) {
       rowCount = UTILS.getRowCount(metaClient.getHadoopConf(), filePath);

@@ -44,8 +44,6 @@ import lombok.ToString;
 @EqualsAndHashCode
 @ToString
 public class OneSchema {
-  private static final Set<String> METADATA_VALUES =
-      Arrays.stream(MetadataValue.values()).map(MetadataValue::name).collect(Collectors.toSet());
   // The name of this schema
   private final String name;
   // The data type of this schema

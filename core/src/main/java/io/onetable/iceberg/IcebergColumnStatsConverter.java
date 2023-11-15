@@ -39,6 +39,8 @@ import io.onetable.model.schema.OneField;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 
+import static io.onetable.collectors.CustomCollectors.toList;
+
 /** Column stats extractor for iceberg table format. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class IcebergColumnStatsConverter {
@@ -116,7 +118,7 @@ public class IcebergColumnStatsConverter {
                   .range(range)
                   .build();
             })
-        .collect(Collectors.toList());
+        .collect(toList(fields.size()));
   }
 
   private Object convertFromIcebergValue(Type fieldType, ByteBuffer value) {

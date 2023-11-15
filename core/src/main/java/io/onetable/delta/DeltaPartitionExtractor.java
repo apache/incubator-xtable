@@ -303,7 +303,7 @@ public class DeltaPartitionExtractor {
                   .range(Range.scalar(partitionValue))
                   .build();
             })
-        .collect(Collectors.toList());
+        .collect(toList(partitionFields.size()));
   }
 
   private String getSerializedPartitionValue(
