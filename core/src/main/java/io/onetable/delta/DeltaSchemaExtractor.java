@@ -18,6 +18,7 @@
  
 package io.onetable.delta;
 
+import static io.onetable.collectors.CustomCollectors.toList;
 import static io.onetable.delta.DeltaPartitionExtractor.DELTA_GENERATION_EXPRESSION;
 import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
 
@@ -26,7 +27,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -213,7 +213,7 @@ public class DeltaSchemaExtractor {
                               field.nullable() ? OneField.Constants.NULL_DEFAULT_VALUE : null)
                           .build();
                     })
-                .collect(Collectors.toList());
+                .collect(toList(structType.fields().length));
         type = OneType.RECORD;
         break;
       case "decimal":

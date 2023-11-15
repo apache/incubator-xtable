@@ -18,6 +18,7 @@
  
 package io.onetable.delta;
 
+import static io.onetable.collectors.CustomCollectors.toList;
 import static io.onetable.delta.DeltaValueConverter.convertToDeltaColumnStatValue;
 
 import java.io.IOException;
@@ -199,7 +200,7 @@ public class DeltaStatsExtractor {
                     .range(range)
                     .build();
               })
-          .collect(Collectors.toList());
+          .collect(toList(fields.size()));
     } catch (IOException ex) {
       throw new OneIOException("Unable to parse stats json", ex);
     }

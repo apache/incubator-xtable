@@ -18,6 +18,7 @@
  
 package io.onetable.delta;
 
+import static io.onetable.collectors.CustomCollectors.toList;
 import static io.onetable.delta.ScalaUtils.convertJavaMapToScala;
 
 import java.util.ArrayList;
@@ -77,16 +78,19 @@ public class DeltaDataFileUpdatesExtractor {
 
   public Seq<Action> applyDiff(
       OneDataFilesDiff oneDataFilesDiff, OneSchema tableSchema, String tableBasePath) {
-    List<Action> allActions = new ArrayList<>();
-    allActions.addAll(
+    Stream<Action> addActions =
         oneDataFilesDiff.getFilesAdded().stream()
-            .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath))
-            .collect(Collectors.toList()));
-    allActions.addAll(
+            .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath));
+    Stream<Action> removeActions =
         oneDataFilesDiff.getFilesRemoved().stream()
             .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath))
-            .map(AddFile::remove)
-            .collect(Collectors.toList()));
+            .map(AddFile::remove);
+    List<Action> allActions =
+        Stream.concat(addActions, removeActions)
+            .collect(
+                toList(
+                    oneDataFilesDiff.getFilesAdded().size()
+                        + oneDataFilesDiff.getFilesRemoved().size()));
     return JavaConverters.asScalaBuffer(allActions).toSeq();
   }
 

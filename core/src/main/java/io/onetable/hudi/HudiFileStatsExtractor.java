@@ -18,6 +18,8 @@
  
 package io.onetable.hudi;
 
+import static io.onetable.collectors.CustomCollectors.toList;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -147,7 +149,7 @@ public class HudiFileStatsExtractor {
             .collect(
                 Collectors.groupingBy(
                     Map.Entry::getKey,
-                    Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
+                    Collectors.mapping(Map.Entry::getValue, toList(nameFieldMap.size()))));
     return filePathsToDataFile.entrySet().stream()
         .map(
             pathToDataFile -> {
@@ -158,7 +160,7 @@ public class HudiFileStatsExtractor {
               List<ColumnStat> columnStats =
                   fileStats.stream()
                       .map(pair -> getColumnStatFromHudiStat(pair.getLeft(), pair.getRight()))
-                      .collect(Collectors.toList());
+                      .collect(toList(fileStats.size()));
               long recordCount = getMaxFromColumnStats(columnStats).orElse(0L);
               return file.toBuilder().columnStats(columnStats).recordCount(recordCount).build();
             });
@@ -182,7 +184,7 @@ public class HudiFileStatsExtractor {
             .map(
                 colRange ->
                     getColumnStatFromColRange(nameFieldMap.get(colRange.getColumnName()), colRange))
-            .collect(Collectors.toList());
+            .collect(toList(columnRanges.size()));
     Long rowCount = getMaxFromColumnStats(columnStats).orElse(null);
     if (rowCount == null) {
       rowCount = UTILS.getRowCount(metaClient.getHadoopConf(), filePath);

@@ -18,6 +18,8 @@
  
 package io.onetable.hudi;
 
+import static io.onetable.collectors.CustomCollectors.toList;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -271,7 +273,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
             })
         .map(HoodieBaseFile::new)
         .map(baseFile -> buildFileWithoutStats(partitionValues, baseFile))
-        .collect(Collectors.toList());
+        .collect(toList(deletedPaths.size()));
   }
 
   private AddedAndRemovedFiles getUpdatesToPartition(

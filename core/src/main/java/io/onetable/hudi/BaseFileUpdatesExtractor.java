@@ -18,6 +18,7 @@
  
 package io.onetable.hudi;
 
+import static io.onetable.collectors.CustomCollectors.toList;
 import static io.onetable.hudi.HudiSchemaExtractor.convertFromOneTablePath;
 
 import java.util.ArrayList;
@@ -178,7 +179,7 @@ public class BaseFileUpdatesExtractor {
     List<WriteStatus> writeStatuses =
         oneDataFilesDiff.getFilesAdded().stream()
             .map(file -> toWriteStatus(tableBasePath, commit, file, Optional.empty()))
-            .collect(Collectors.toList());
+            .collect(toList(oneDataFilesDiff.getFilesAdded().size()));
     return ReplaceMetadata.of(partitionToReplacedFileIds, writeStatuses);
   }
 

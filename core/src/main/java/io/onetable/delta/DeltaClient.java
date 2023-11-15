@@ -20,6 +20,7 @@ package io.onetable.delta;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -247,9 +248,9 @@ public class DeltaClient implements TargetClient {
         }
         if (path != null) {
           if (path.contains(".parquet")) {
-            return new Format("parquet", ScalaUtils.convertJavaMapToScala(new HashMap<>()));
+            return new Format("parquet", ScalaUtils.convertJavaMapToScala(Collections.emptyMap()));
           } else if (path.contains(".orc")) {
-            return new Format("orc", ScalaUtils.convertJavaMapToScala(new HashMap<>()));
+            return new Format("orc", ScalaUtils.convertJavaMapToScala(Collections.emptyMap()));
           }
           throw new NotSupportedException("Fileformat is not supported for delta sync");
         }

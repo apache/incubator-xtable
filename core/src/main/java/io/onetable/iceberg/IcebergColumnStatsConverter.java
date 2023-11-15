@@ -18,13 +18,14 @@
  
 package io.onetable.iceberg;
 
+import static io.onetable.collectors.CustomCollectors.toList;
+
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -116,7 +117,7 @@ public class IcebergColumnStatsConverter {
                   .range(range)
                   .build();
             })
-        .collect(Collectors.toList());
+        .collect(toList(fields.size()));
   }
 
   private Object convertFromIcebergValue(Type fieldType, ByteBuffer value) {
