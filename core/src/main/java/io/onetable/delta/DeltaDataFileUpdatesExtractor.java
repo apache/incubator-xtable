@@ -43,6 +43,7 @@ import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
+import io.onetable.paths.PathUtils;
 import io.onetable.spi.extractor.DataFileIterator;
 
 @Builder
@@ -100,7 +101,7 @@ public class DeltaDataFileUpdatesExtractor {
         new AddFile(
             // Delta Lake supports relative and absolute paths in theory but relative paths seem
             // more commonly supported by query engines in our testing
-            getRelativePath(dataFile.getPhysicalPath(), tableBasePath),
+            PathUtils.getRelativePath(dataFile.getPhysicalPath(), tableBasePath),
             convertJavaMapToScala(deltaPartitionExtractor.partitionValueSerialization(dataFile)),
             dataFile.getFileSizeBytes(),
             dataFile.getLastModified(),
@@ -115,12 +116,5 @@ public class DeltaDataFileUpdatesExtractor {
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Exception during delta stats generation", e);
     }
-  }
-
-  private String getRelativePath(String fullFilePath, String tableBasePath) {
-    if (fullFilePath.startsWith(tableBasePath)) {
-      return fullFilePath.substring(tableBasePath.length() + 1);
-    }
-    return fullFilePath;
   }
 }
