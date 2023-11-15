@@ -37,7 +37,15 @@ public class TestPathUtils {
   private static Stream<Arguments> inputs() {
     return Stream.of(
         Arguments.of("/relative/path", "file:///absolute/path", "relative/path"),
+        Arguments.of(
+            "file:///absolute/path/to/file.parquet", "file:///absolute/path", "to/file.parquet"),
+        Arguments.of(
+            "file:///absolute/path/to/file.parquet", "file:/absolute/path", "to/file.parquet"),
+        Arguments.of(
+            "file:/absolute/path/to/file.parquet", "file:///absolute/path", "to/file.parquet"),
         Arguments.of("s3://absolute/path/to/file.parquet", "s3://absolute/path", "to/file.parquet"),
+        Arguments.of(
+            "s3a://absolute/path/to/file.parquet", "s3a://absolute/path", "to/file.parquet"),
         Arguments.of(
             "s3a://absolute/path/to/file.parquet", "s3://absolute/path", "to/file.parquet"),
         Arguments.of(

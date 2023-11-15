@@ -36,13 +36,29 @@ public class PathUtils {
       return path.substring(basePath.length() + 1);
     } else if (path.contains(":")) {
       // handle differences in scheme like s3 vs s3a
-      int schemeIndex = path.indexOf(":");
-      int basePathSchemeIndex = basePath.indexOf(":");
-      return path.substring(basePath.length() + 1 + (schemeIndex - basePathSchemeIndex));
+      int pathStartIndex = getLastLeadingSlashIndex(path);
+      int basePathStartIndex = getLastLeadingSlashIndex(basePath);
+      return path.substring(basePath.length() + 1 + (pathStartIndex - basePathStartIndex));
     } else {
       result = path;
     }
     // trim leading slash
     return result.startsWith("/") ? result.substring(1) : result;
+  }
+
+  /**
+   * Finds the index of the last '/' character after the file scheme.
+   *
+   * @param path input path, assumed to contain a scheme
+   * @return the index or throws exception if not found
+   */
+  private static int getLastLeadingSlashIndex(String path) {
+    int i = path.indexOf(':') + 1;
+    for (; i < path.length(); i++) {
+      if (path.charAt(i) != '/') {
+        return i;
+      }
+    }
+    throw new IllegalArgumentException("Invalid path: " + path);
   }
 }
