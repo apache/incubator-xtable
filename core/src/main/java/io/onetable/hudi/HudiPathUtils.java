@@ -18,14 +18,14 @@
  
 package io.onetable.hudi;
 
-import java.util.List;
+import org.apache.hadoop.fs.Path;
 
-import lombok.Value;
-
-import io.onetable.model.stat.ColumnStat;
-
-@Value
-public class HudiFileStats {
-  List<ColumnStat> columnStats;
-  long rowCount;
+public class HudiPathUtils {
+  public static String getPartitionPath(Path tableBasePath, Path filePath) {
+    String fileName = filePath.getName();
+    String pathStr = filePath.toUri().getPath();
+    int startIndex = tableBasePath.toUri().getPath().length() + 1;
+    int endIndex = pathStr.length() - fileName.length() - 1;
+    return endIndex <= startIndex ? "" : pathStr.substring(startIndex, endIndex);
+  }
 }

@@ -21,8 +21,7 @@ package io.onetable.iceberg;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 import org.apache.avro.generic.IndexedRecord;
 import org.junit.jupiter.api.Test;
@@ -38,6 +37,7 @@ import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.PartitionTransformType;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 
 public class TestIcebergPartitionValueConverter {
@@ -67,21 +67,21 @@ public class TestIcebergPartitionValueConverter {
   @Test
   public void testToOneTableNotPartitioned() {
     PartitionSpec partitionSpec = PartitionSpec.unpartitioned();
-    Map<OnePartitionField, Range> partitionValues =
+    List<PartitionValue> partitionValues =
         partitionValueConverter.toOneTable(buildOnetable(false), STRUCT_LIKE_RECORD, partitionSpec);
     assertTrue(partitionValues.isEmpty());
   }
 
   @Test
   public void testToOneTableValuePartitioned() {
-    Map<OnePartitionField, Range> expectedPartitionValues =
-        new HashMap() {
-          {
-            put(getPartitionField("name", PartitionTransformType.VALUE), Range.scalar("abc"));
-          }
-        };
+    List<PartitionValue> expectedPartitionValues =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(getPartitionField("name", PartitionTransformType.VALUE))
+                .range(Range.scalar("abc"))
+                .build());
     PartitionSpec partitionSpec = PartitionSpec.builderFor(SCHEMA).identity("name").build();
-    Map<OnePartitionField, Range> partitionValues =
+    List<PartitionValue> partitionValues =
         partitionValueConverter.toOneTable(
             buildOnetable(true, "name", PartitionTransformType.VALUE),
             STRUCT_LIKE_RECORD,
@@ -92,16 +92,14 @@ public class TestIcebergPartitionValueConverter {
 
   @Test
   public void testToOneTableYearPartitioned() {
-    Map<OnePartitionField, Range> expectedPartitionValues =
-        new HashMap() {
-          {
-            put(
-                getPartitionField("birthDate", PartitionTransformType.YEAR),
-                Range.scalar(1609459200000L));
-          }
-        };
+    List<PartitionValue> expectedPartitionValues =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(getPartitionField("birthDate", PartitionTransformType.YEAR))
+                .range(Range.scalar(1609459200000L))
+                .build());
     PartitionSpec partitionSpec = PartitionSpec.builderFor(SCHEMA).year("birthDate").build();
-    Map<OnePartitionField, Range> partitionValues =
+    List<PartitionValue> partitionValues =
         partitionValueConverter.toOneTable(
             buildOnetable(true, "birthDate", PartitionTransformType.YEAR),
             STRUCT_LIKE_RECORD,

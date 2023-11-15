@@ -48,7 +48,7 @@ import org.apache.iceberg.types.Types;
 import io.onetable.client.PerTableConfig;
 import io.onetable.model.*;
 import io.onetable.model.schema.*;
-import io.onetable.model.stat.Range;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
@@ -173,11 +173,11 @@ class TestIcebergSourceClient {
       assertEquals(1, oneDataFile.getRecordCount());
       Assertions.assertTrue(oneDataFile.getPhysicalPath().startsWith("file:" + workingDir));
 
-      Map<OnePartitionField, Range> partitionValues = oneDataFile.getPartitionValues();
+      List<PartitionValue> partitionValues = oneDataFile.getPartitionValues();
       assertEquals(1, partitionValues.size());
-      Map.Entry<OnePartitionField, Range> partitionEntry =
-          partitionValues.entrySet().iterator().next();
-      assertEquals("cs_sold_date_sk", partitionEntry.getKey().getSourceField().getName());
+      PartitionValue partitionEntry = partitionValues.iterator().next();
+      assertEquals(
+          "cs_sold_date_sk", partitionEntry.getPartitionField().getSourceField().getName());
       // TODO generate test with column stats
       assertEquals(0, oneDataFile.getColumnStats().size());
     }

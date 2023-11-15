@@ -22,7 +22,7 @@ import static io.onetable.hudi.HudiTestUtil.SCHEMA_VERSION;
 import static io.onetable.hudi.HudiTestUtil.createWriteStatus;
 import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static io.onetable.hudi.HudiTestUtil.initTableAndGetMetaClient;
-import static io.onetable.testutil.ColumnStatMapUtil.getColumnStatMap;
+import static io.onetable.testutil.ColumnStatMapUtil.getColumnStats;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
@@ -58,6 +58,7 @@ import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
@@ -90,40 +91,33 @@ public class TestBaseFileUpdatesExtractor {
     // create file with empty stats to test edge case
     OneDataFile addedFile1 =
         createFile(
-            partitionPath1,
             String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName1),
-            Collections.emptyMap());
+            Collections.emptyList());
     // create file with stats
     String partitionPath2 = "partition2";
     String fileName2 = "file2.parquet";
     OneDataFile addedFile2 =
         createFile(
-            partitionPath2,
-            String.format("%s/%s/%s", tableBasePath, partitionPath2, fileName2),
-            getColumnStatMap());
+            String.format("%s/%s/%s", tableBasePath, partitionPath2, fileName2), getColumnStats());
 
     // remove files 3 files from two different partitions
     String fileName3 = "file3.parquet";
     OneDataFile removedFile1 =
         createFile(
-            partitionPath1,
-            String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName3),
-            getColumnStatMap());
+            String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName3), getColumnStats());
     // create file that matches hudi format to mimic that a file create by hudi is now being removed
     // by another system
     String fileIdForFile4 = "d1cf0980-445c-4c74-bdeb-b7e5d18779f5-0";
     String fileName4 = fileIdForFile4 + "_0-1116-142216_20231003013807542.parquet";
     OneDataFile removedFile2 =
         createFile(
-            partitionPath1,
             String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName4),
-            Collections.emptyMap());
+            Collections.emptyList());
     String fileName5 = "file5.parquet";
     OneDataFile removedFile3 =
         createFile(
-            partitionPath2,
             String.format("%s/%s/%s", tableBasePath, partitionPath2, fileName5),
-            Collections.emptyMap());
+            Collections.emptyList());
 
     OneDataFilesDiff diff =
         OneDataFilesDiff.builder()
@@ -168,24 +162,19 @@ public class TestBaseFileUpdatesExtractor {
     // create file with empty stats to test edge case
     OneDataFile addedFile1 =
         createFile(
-            partitionPath1,
             String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName1),
-            Collections.emptyMap());
+            Collections.emptyList());
     // create file with stats
     String fileName2 = "file2.parquet";
     OneDataFile addedFile2 =
         createFile(
-            partitionPath1,
-            String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName2),
-            getColumnStatMap());
+            String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName2), getColumnStats());
     // create file in a second partition
     String partitionPath2 = "partition2";
     String fileName3 = "file3.parquet";
     OneDataFile addedFile3 =
         createFile(
-            partitionPath2,
-            String.format("%s/%s/%s", tableBasePath, partitionPath2, fileName3),
-            getColumnStatMap());
+            String.format("%s/%s/%s", tableBasePath, partitionPath2, fileName3), getColumnStats());
 
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
@@ -194,12 +183,20 @@ public class TestBaseFileUpdatesExtractor {
         Arrays.asList(
             OneFileGroup.builder()
                 .partitionValues(
-                    Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath1)))
+                    Collections.singletonList(
+                        PartitionValue.builder()
+                            .partitionField(PARTITION_FIELD)
+                            .range(Range.scalar(partitionPath1))
+                            .build()))
                 .files(Arrays.asList(addedFile1, addedFile2))
                 .build(),
             OneFileGroup.builder()
                 .partitionValues(
-                    Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
+                    Collections.singletonList(
+                        PartitionValue.builder()
+                            .partitionField(PARTITION_FIELD)
+                            .range(Range.scalar(partitionPath2))
+                            .build()))
                 .files(Arrays.asList(addedFile3))
                 .build());
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
@@ -261,32 +258,37 @@ public class TestBaseFileUpdatesExtractor {
     String newFileName1 = "new_file_1.parquet";
     OneDataFile addedFile1 =
         createFile(
-            partitionPath2,
             String.format("%s/%s/%s", tableBasePath, partitionPath2, newFileName1),
-            Collections.emptyMap());
+            Collections.emptyList());
     String newFileName2 = "new_file_2.parquet";
     OneDataFile addedFile2 =
         createFile(
-            partitionPath3,
             String.format("%s/%s/%s", tableBasePath, partitionPath3, newFileName2),
-            getColumnStatMap());
+            getColumnStats());
     // OneDataFile for one of the existing files in partition2
     OneDataFile existingFile =
         createFile(
-            partitionPath2,
             String.format("%s/%s/%s", tableBasePath, partitionPath2, existingFileName2),
-            Collections.emptyMap());
+            Collections.emptyList());
     List<OneFileGroup> partitionedDataFiles =
         Arrays.asList(
             OneFileGroup.builder()
                 .files(Arrays.asList(addedFile1, existingFile))
                 .partitionValues(
-                    Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath2)))
+                    Collections.singletonList(
+                        PartitionValue.builder()
+                            .partitionField(PARTITION_FIELD)
+                            .range(Range.scalar(partitionPath2))
+                            .build()))
                 .build(),
             OneFileGroup.builder()
                 .files(Collections.singletonList(addedFile2))
                 .partitionValues(
-                    Collections.singletonMap(PARTITION_FIELD, Range.scalar(partitionPath3)))
+                    Collections.singletonList(
+                        PartitionValue.builder()
+                            .partitionField(PARTITION_FIELD)
+                            .range(Range.scalar(partitionPath3))
+                            .build()))
                 .build());
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
@@ -348,16 +350,16 @@ public class TestBaseFileUpdatesExtractor {
     // create a snapshot with a new file added along with one of the existing files
     String newFileName1 = "new_file_1.parquet";
     OneDataFile addedFile1 =
-        createFile("", String.format("%s/%s", tableBasePath, newFileName1), getColumnStatMap());
+        createFile(String.format("%s/%s", tableBasePath, newFileName1), getColumnStats());
     // OneDataFile for one of the existing files in partition2
     OneDataFile existingFile =
         createFile(
-            "", String.format("%s/%s", tableBasePath, existingFileName2), Collections.emptyMap());
+            String.format("%s/%s", tableBasePath, existingFileName2), Collections.emptyList());
     List<OneFileGroup> partitionedDataFiles =
         Collections.singletonList(
             OneFileGroup.builder()
                 .files(Arrays.asList(addedFile1, existingFile))
-                .partitionValues(Collections.emptyMap())
+                .partitionValues(Collections.emptyList())
                 .build());
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
@@ -385,11 +387,9 @@ public class TestBaseFileUpdatesExtractor {
         actual.stream().map(WriteStatus::toString).collect(Collectors.toSet()));
   }
 
-  private OneDataFile createFile(
-      String partitionPath, String physicalPath, Map<OneField, ColumnStat> columnStats) {
+  private OneDataFile createFile(String physicalPath, List<ColumnStat> columnStats) {
     return OneDataFile.builder()
         .schemaVersion(SCHEMA_VERSION)
-        .partitionPath(partitionPath)
         .physicalPath(physicalPath)
         .fileSizeBytes(FILE_SIZE)
         .fileFormat(FileFormat.APACHE_PARQUET)
@@ -412,7 +412,7 @@ public class TestBaseFileUpdatesExtractor {
    *
    * @param fileName name of the file
    * @return stats matching the column stats in {@link
-   *     io.onetable.testutil.ColumnStatMapUtil#getColumnStatMap()}
+   *     io.onetable.testutil.ColumnStatMapUtil#getColumnStats()}
    */
   private Map<String, HoodieColumnRangeMetadata<Comparable>> getExpectedColumnStats(
       String fileName) {

@@ -27,6 +27,7 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +93,7 @@ public class TestIcebergColumnStatsConverter {
             .build();
     ColumnStat timestampColumnStats =
         ColumnStat.builder()
+            .field(timestampField)
             .numValues(123)
             .numNulls(32)
             .totalSize(13)
@@ -99,6 +101,7 @@ public class TestIcebergColumnStatsConverter {
             .build();
     ColumnStat dateColumnStats =
         ColumnStat.builder()
+            .field(dateField)
             .numValues(555)
             .numNulls(15)
             .totalSize(53)
@@ -106,6 +109,7 @@ public class TestIcebergColumnStatsConverter {
             .build();
     ColumnStat groupIdStats =
         ColumnStat.builder()
+            .field(groupId)
             .numValues(510)
             .numNulls(200)
             .totalSize(10)
@@ -113,6 +117,7 @@ public class TestIcebergColumnStatsConverter {
             .build();
     ColumnStat stringFieldStats =
         ColumnStat.builder()
+            .field(stringField)
             .numValues(50)
             .numNulls(0)
             .totalSize(12)
@@ -120,6 +125,7 @@ public class TestIcebergColumnStatsConverter {
             .build();
     ColumnStat mapFieldKeyStats =
         ColumnStat.builder()
+            .field(mapFieldKey)
             .numValues(10)
             .numNulls(0)
             .totalSize(12)
@@ -127,6 +133,7 @@ public class TestIcebergColumnStatsConverter {
             .build();
     ColumnStat mapFieldValueStats =
         ColumnStat.builder()
+            .field(mapFieldValue)
             .numValues(10)
             .numNulls(0)
             .totalSize(24)
@@ -134,19 +141,21 @@ public class TestIcebergColumnStatsConverter {
             .build();
     ColumnStat arrayFieldElementStats =
         ColumnStat.builder()
+            .field(arrayFieldElement)
             .numValues(5)
             .numNulls(0)
             .totalSize(48)
             .range(Range.vector(100, 1000))
             .build();
-    Map<OneField, ColumnStat> columnStatMap = new HashMap<>();
-    columnStatMap.put(timestampField, timestampColumnStats);
-    columnStatMap.put(dateField, dateColumnStats);
-    columnStatMap.put(groupId, groupIdStats);
-    columnStatMap.put(stringField, stringFieldStats);
-    columnStatMap.put(mapFieldKey, mapFieldKeyStats);
-    columnStatMap.put(mapFieldValue, mapFieldValueStats);
-    columnStatMap.put(arrayFieldElement, arrayFieldElementStats);
+    List<ColumnStat> columnStats =
+        Arrays.asList(
+            timestampColumnStats,
+            dateColumnStats,
+            groupIdStats,
+            stringFieldStats,
+            mapFieldKeyStats,
+            mapFieldValueStats,
+            arrayFieldElementStats);
 
     Map<Integer, Long> columnSizes =
         getStatMap(
@@ -205,7 +214,7 @@ public class TestIcebergColumnStatsConverter {
 
     Metrics actual =
         IcebergColumnStatsConverter.getInstance()
-            .toIceberg(icebergSchema, totalRowCount, columnStatMap);
+            .toIceberg(icebergSchema, totalRowCount, columnStats);
     // Metrics does not implement equals, so we need to manually compare fields
     assertEquals(expected.columnSizes(), actual.columnSizes());
     assertEquals(expected.nanValueCounts(), actual.nanValueCounts());
@@ -229,13 +238,13 @@ public class TestIcebergColumnStatsConverter {
             .build();
     ColumnStat dateColumnStats =
         ColumnStat.builder()
+            .field(dateField)
             .numValues(555)
             .numNulls(15)
             .totalSize(53)
             .range(Range.vector(null, null))
             .build();
-    Map<OneField, ColumnStat> columnStatMap = new HashMap<>();
-    columnStatMap.put(dateField, dateColumnStats);
+    List<ColumnStat> columnStats = Collections.singletonList(dateColumnStats);
 
     Map<Integer, Long> columnSizes = getStatMap(dateColumnStats.getTotalSize());
     Map<Integer, Long> expectedValueCounts = getStatMap(dateColumnStats.getNumValues());
@@ -254,7 +263,7 @@ public class TestIcebergColumnStatsConverter {
 
     Metrics actual =
         IcebergColumnStatsConverter.getInstance()
-            .toIceberg(icebergSchema, totalRowCount, columnStatMap);
+            .toIceberg(icebergSchema, totalRowCount, columnStats);
     // Metrics does not implement equals, so we need to manually compare fields
     assertEquals(expected.columnSizes(), actual.columnSizes());
     assertEquals(expected.nanValueCounts(), actual.nanValueCounts());
@@ -329,50 +338,46 @@ public class TestIcebergColumnStatsConverter {
                 .schema(OneSchema.builder().dataType(OneType.TIMESTAMP).build())
                 .build());
 
-    Map<OneField, ColumnStat> actual =
+    List<ColumnStat> actual =
         IcebergColumnStatsConverter.getInstance()
             .fromIceberg(fields, valueCounts, nullCounts, columnSizes, lowerBounds, upperBounds);
-    Map<OneField, ColumnStat> expected = new HashMap<>();
-    expected.put(
-        fields.get(0),
-        ColumnStat.builder()
-            .numValues(123)
-            .numNulls(32)
-            .totalSize(13)
-            .range(Range.vector(1, 2))
-            .build());
-    expected.put(
-        fields.get(2),
-        ColumnStat.builder()
-            .numValues(456)
-            .numNulls(456)
-            .totalSize(31)
-            .range(Range.vector(null, null))
-            .build());
-    expected.put(
-        fields.get(3),
-        ColumnStat.builder()
-            .numValues(1000L)
-            .numNulls(789L)
-            .totalSize(42)
-            .range(Range.vector("a", "zzz"))
-            .build());
-    expected.put(
-        fields.get(4),
-        ColumnStat.builder()
-            .numValues(1000L)
-            .numNulls(789L)
-            .totalSize(42)
-            .range(Range.vector(18181, 18182))
-            .build());
-    expected.put(
-        fields.get(5),
-        ColumnStat.builder()
-            .numValues(1000L)
-            .numNulls(789L)
-            .totalSize(42)
-            .range(Range.vector(10000000L, 20000000L))
-            .build());
+    List<ColumnStat> expected =
+        Arrays.asList(
+            ColumnStat.builder()
+                .field(fields.get(0))
+                .numValues(123)
+                .numNulls(32)
+                .totalSize(13)
+                .range(Range.vector(1, 2))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(2))
+                .numValues(456)
+                .numNulls(456)
+                .totalSize(31)
+                .range(Range.vector(null, null))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(3))
+                .numValues(1000L)
+                .numNulls(789L)
+                .totalSize(42)
+                .range(Range.vector("a", "zzz"))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(4))
+                .numValues(1000L)
+                .numNulls(789L)
+                .totalSize(42)
+                .range(Range.vector(18181, 18182))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(5))
+                .numValues(1000L)
+                .numNulls(789L)
+                .totalSize(42)
+                .range(Range.vector(10000000L, 20000000L))
+                .build());
     assertEquals(expected, actual);
   }
 

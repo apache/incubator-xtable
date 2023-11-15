@@ -30,7 +30,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -80,6 +79,7 @@ import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
@@ -180,8 +180,7 @@ public class ITHudiTargetClient {
             .fileFormat(FileFormat.APACHE_PARQUET)
             .lastModified(System.currentTimeMillis())
             .fileSizeBytes(100L)
-            .columnStats(Collections.emptyMap())
-            .partitionPath(partitionPath)
+            .columnStats(Collections.emptyList())
             .physicalPath(
                 String.format("file://%s/%s/%s", tableBasePath, partitionPath, existingFileName1))
             .recordCount(2)
@@ -229,7 +228,11 @@ public class ITHudiTargetClient {
             OneFileGroup.builder()
                 .files(Collections.singletonList(getTestFile(partitionPath, fileName)))
                 .partitionValues(
-                    Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
+                    Collections.singletonList(
+                        PartitionValue.builder()
+                            .partitionField(PARTITION_FIELD)
+                            .range(Range.scalar("partitionPath"))
+                            .build()))
                 .build());
     // sync snapshot and metadata
     OneTable initialState = getState(Instant.now());
@@ -270,7 +273,11 @@ public class ITHudiTargetClient {
                         getTestFile(partitionPath, fileName0),
                         getTestFile(partitionPath, fileName1)))
                 .partitionValues(
-                    Collections.singletonMap(PARTITION_FIELD, Range.scalar("partitionPath")))
+                    Collections.singletonList(
+                        PartitionValue.builder()
+                            .partitionField(PARTITION_FIELD)
+                            .range(Range.scalar("partitionPath"))
+                            .build()))
                 .build());
     // sync snapshot and metadata
     OneTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));
@@ -521,34 +528,31 @@ public class ITHudiTargetClient {
   }
 
   private OneDataFile getTestFile(String partitionPath, String fileName) {
-    Map<OneField, ColumnStat> columnStats = new HashMap<>();
-    columnStats.put(
-        SCHEMA.getFields().get(0),
-        ColumnStat.builder()
-            .range(Range.vector("id1", "id2"))
-            .numNulls(0)
-            .numValues(2)
-            .totalSize(5)
-            .build());
-    columnStats.put(
-        SCHEMA.getFields().get(1),
-        ColumnStat.builder()
-            .range(Range.vector("a", "b"))
-            .numNulls(1)
-            .numValues(3)
-            .totalSize(10)
-            .build());
-    columnStats.put(
-        SCHEMA.getFields().get(2),
-        ColumnStat.builder()
-            .range(Range.vector("content1", "content2"))
-            .numNulls(0)
-            .numValues(2)
-            .totalSize(5)
-            .build());
+    List<ColumnStat> columnStats =
+        Arrays.asList(
+            ColumnStat.builder()
+                .field(SCHEMA.getFields().get(0))
+                .range(Range.vector("id1", "id2"))
+                .numNulls(0)
+                .numValues(2)
+                .totalSize(5)
+                .build(),
+            ColumnStat.builder()
+                .field(SCHEMA.getFields().get(1))
+                .range(Range.vector("a", "b"))
+                .numNulls(1)
+                .numValues(3)
+                .totalSize(10)
+                .build(),
+            ColumnStat.builder()
+                .field(SCHEMA.getFields().get(2))
+                .range(Range.vector("content1", "content2"))
+                .numNulls(0)
+                .numValues(2)
+                .totalSize(5)
+                .build());
     return OneDataFile.builder()
         .schemaVersion(SCHEMA_VERSION)
-        .partitionPath(partitionPath)
         .physicalPath(String.format("file://%s/%s/%s", tableBasePath, partitionPath, fileName))
         .fileSizeBytes(FILE_SIZE)
         .fileFormat(FileFormat.APACHE_PARQUET)

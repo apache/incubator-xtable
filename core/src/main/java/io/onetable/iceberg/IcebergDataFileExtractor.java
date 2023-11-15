@@ -20,7 +20,7 @@ package io.onetable.iceberg;
 
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.Map;
+import java.util.List;
 
 import lombok.Builder;
 
@@ -31,11 +31,9 @@ import org.apache.iceberg.io.CloseableIterator;
 
 import io.onetable.exception.NotSupportedException;
 import io.onetable.model.OneTable;
-import io.onetable.model.schema.OneField;
-import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
-import io.onetable.model.stat.Range;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.spi.extractor.DataFileIterator;
@@ -107,10 +105,10 @@ public class IcebergDataFileExtractor {
           .map(
               fileScanTask -> {
                 DataFile dataFile = fileScanTask.file();
-                Map<OnePartitionField, Range> onePartitionFieldRangeMap =
+                List<PartitionValue> partitionValues =
                     partitionValueConverter.toOneTable(
                         oneTable, dataFile.partition(), iceTable.spec());
-                return fromIcebergWithoutColumnStats(dataFile, onePartitionFieldRangeMap);
+                return fromIcebergWithoutColumnStats(dataFile, partitionValues);
               })
           .iterator();
     }
@@ -121,33 +119,33 @@ public class IcebergDataFileExtractor {
    * statistics set. This can be used to reduce memory overhead when statistics are not required.
    *
    * @param dataFile Iceberg data file
-   * @param partitionsInfo representation of partition fields and ranges
+   * @param partitionValues representation of partition fields and ranges
    * @return corresponding OneTable data file
    */
   OneDataFile fromIcebergWithoutColumnStats(
-      DataFile dataFile, Map<OnePartitionField, Range> partitionsInfo) {
-    return fromIceberg(dataFile, partitionsInfo, null, false);
+      DataFile dataFile, List<PartitionValue> partitionValues) {
+    return fromIceberg(dataFile, partitionValues, null, false);
   }
 
   /**
    * Builds {@link OneDataFile} representation from Iceberg {@link DataFile}.
    *
    * @param dataFile Iceberg data file
-   * @param partitionsInfo representation of partition fields and ranges
+   * @param partitionValues representation of partition fields and ranges
    * @param schema current schema for the table, used for mapping field IDs to stats
    * @return corresponding OneTable data file
    */
   OneDataFile fromIceberg(
-      DataFile dataFile, Map<OnePartitionField, Range> partitionsInfo, OneSchema schema) {
-    return fromIceberg(dataFile, partitionsInfo, schema, true);
+      DataFile dataFile, List<PartitionValue> partitionValues, OneSchema schema) {
+    return fromIceberg(dataFile, partitionValues, schema, true);
   }
 
   private OneDataFile fromIceberg(
       DataFile dataFile,
-      Map<OnePartitionField, Range> partitionsInfo,
+      List<PartitionValue> partitionValues,
       OneSchema schema,
       boolean includeColumnStats) {
-    Map<OneField, ColumnStat> columnStatMap =
+    List<ColumnStat> columnStats =
         includeColumnStats
             ? IcebergColumnStatsConverter.getInstance()
                 .fromIceberg(
@@ -157,7 +155,7 @@ public class IcebergDataFileExtractor {
                     dataFile.columnSizes(),
                     dataFile.lowerBounds(),
                     dataFile.upperBounds())
-            : Collections.emptyMap();
+            : Collections.emptyList();
     String filePath = dataFile.path().toString();
     // assume path without scheme is local file
     if (!filePath.contains(":")) {
@@ -168,9 +166,8 @@ public class IcebergDataFileExtractor {
         .fileFormat(fromIcebergFileFormat(dataFile.format()))
         .fileSizeBytes(dataFile.fileSizeInBytes())
         .recordCount(dataFile.recordCount())
-        .partitionValues(partitionsInfo)
-        .partitionPath(dataFile.partition().toString())
-        .columnStats(columnStatMap)
+        .partitionValues(partitionValues)
+        .columnStats(columnStats)
         .build();
   }
 

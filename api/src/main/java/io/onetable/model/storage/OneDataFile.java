@@ -19,17 +19,15 @@
 package io.onetable.model.storage;
 
 import java.util.Collections;
-import java.util.Map;
+import java.util.List;
 
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Value;
 
-import io.onetable.model.schema.OneField;
-import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.SchemaVersion;
 import io.onetable.model.stat.ColumnStat;
-import io.onetable.model.stat.Range;
+import io.onetable.model.stat.PartitionValue;
 
 /**
  * Represents a data file in the table.
@@ -46,13 +44,12 @@ public class OneDataFile {
   // file format
   @Builder.Default @NonNull FileFormat fileFormat = FileFormat.APACHE_PARQUET;
   // partition ranges for the data file
-  @Builder.Default @NonNull Map<OnePartitionField, Range> partitionValues = Collections.emptyMap();
+  @Builder.Default @NonNull List<PartitionValue> partitionValues = Collections.emptyList();
 
-  String partitionPath;
   long fileSizeBytes;
   long recordCount;
   // column stats for each column in the data file
-  @Builder.Default @NonNull Map<OneField, ColumnStat> columnStats = Collections.emptyMap();
+  @Builder.Default @NonNull List<ColumnStat> columnStats = Collections.emptyList();
   // last modified time in millis since epoch
   long lastModified;
 }

@@ -43,7 +43,7 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
-import io.onetable.model.stat.Range;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
@@ -161,9 +161,9 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   }
 
   private OneDataFile fromIceberg(DataFile file, PartitionSpec partitionSpec, OneTable oneTable) {
-    Map<OnePartitionField, Range> onePartitionFieldRangeMap =
+    List<PartitionValue> partitionValues =
         partitionConverter.toOneTable(oneTable, file.partition(), partitionSpec);
-    return dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap, oneTable.getReadSchema());
+    return dataFileExtractor.fromIceberg(file, partitionValues, oneTable.getReadSchema());
   }
 
   @Override

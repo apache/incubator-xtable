@@ -20,7 +20,6 @@ package io.onetable.delta;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -57,15 +56,12 @@ public class DeltaActionsConverter {
       DeltaPartitionExtractor partitionExtractor,
       DeltaStatsExtractor fileStatsExtractor) {
     String tableBasePath = deltaSnapshot.deltaLog().dataPath().toUri().toString();
-    Map<OneField, ColumnStat> columnStatMap =
+    List<ColumnStat> columnStats =
         includeColumnStats
             ? fileStatsExtractor.getColumnStatsForFile(addFile, fields)
-            : Collections.emptyMap();
+            : Collections.emptyList();
     long recordCount =
-        columnStatMap.values().stream()
-            .map(ColumnStat::getNumValues)
-            .max(Long::compareTo)
-            .orElse(0L);
+        columnStats.stream().map(ColumnStat::getNumValues).max(Long::compareTo).orElse(0L);
     // TODO(https://github.com/onetable-io/onetable/issues/102): removed record count.
     return OneDataFile.builder()
         .physicalPath(getFullPathToFile(tableBasePath, addFile.path()))
@@ -74,7 +70,7 @@ public class DeltaActionsConverter {
         .lastModified(addFile.modificationTime())
         .partitionValues(
             partitionExtractor.partitionValueExtraction(addFile.partitionValues(), partitionFields))
-        .columnStats(columnStatMap)
+        .columnStats(columnStats)
         .recordCount(recordCount)
         .build();
   }

@@ -119,7 +119,7 @@ public class IcebergPartitionSpecExtractor {
       return Collections.emptyList();
     }
 
-    List<OnePartitionField> irPartitionFields = new ArrayList<>();
+    List<OnePartitionField> irPartitionFields = new ArrayList<>(iceSpec.fields().size());
     for (PartitionField iceField : iceSpec.fields()) {
       // fetch the ice field from the schema to properly handle hidden partition fields
       int sourceColumnId = iceField.sourceId();

@@ -57,8 +57,8 @@ public class HudiSourceConfig {
     if (input == null || input.isEmpty()) {
       return Collections.emptyList();
     }
-    List<PartitionFieldSpec> partitionFields = new ArrayList<>();
     String[] perFieldConfigs = input.split(",");
+    List<PartitionFieldSpec> partitionFields = new ArrayList<>(perFieldConfigs.length);
     for (String fieldConfig : perFieldConfigs) {
       String[] parts = fieldConfig.split(":");
       String path = parts[0];

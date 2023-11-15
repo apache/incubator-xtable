@@ -21,8 +21,7 @@ package io.onetable.testutil;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -212,9 +211,10 @@ public class ColumnStatMapUtil {
         .build();
   }
 
-  public static Map<OneField, ColumnStat> getColumnStatMap() {
+  public static List<ColumnStat> getColumnStats() {
     ColumnStat longColumnStats =
         ColumnStat.builder()
+            .field(LONG_FIELD)
             .numNulls(4)
             .range(Range.vector(10L, 20L))
             .numValues(50)
@@ -222,6 +222,7 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat stringColumnStats =
         ColumnStat.builder()
+            .field(STRING_FIELD)
             .numNulls(1)
             .range(Range.vector("a", "c"))
             .numValues(50)
@@ -229,6 +230,7 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat nullStringColumnStats =
         ColumnStat.builder()
+            .field(NULL_STRING_FIELD)
             .numNulls(3)
             .range(Range.vector(null, null))
             .numValues(50)
@@ -236,6 +238,7 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat timeStampColumnStats =
         ColumnStat.builder()
+            .field(TIMESTAMP_FIELD)
             .numNulls(105)
             .range(Range.vector(1665263297000L, 1665436097000L))
             .numValues(50)
@@ -243,6 +246,7 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat timeStampMicrosColumnStats =
         ColumnStat.builder()
+            .field(TIMESTAMP_MICROS_FIELD)
             .numNulls(1)
             .range(Range.vector(1665263297000000L, 1665436097000000L))
             .numValues(50)
@@ -250,6 +254,7 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat localTimeStampColumnStats =
         ColumnStat.builder()
+            .field(LOCAL_TIMESTAMP_FIELD)
             .numNulls(1)
             .range(Range.vector(1665263297000L, 1665436097000L))
             .numValues(50)
@@ -257,15 +262,15 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat dateColumnStats =
         ColumnStat.builder()
+            .field(DATE_FIELD)
             .numNulls(250)
             .range(Range.vector(18181, 18547))
             .numValues(50)
             .totalSize(12345)
             .build();
-    ColumnStat ignoredColumnStats =
-        ColumnStat.builder().numNulls(0).range(Range.scalar("IGNORED")).build();
     ColumnStat arrayLongElementColumnStats =
         ColumnStat.builder()
+            .field(ARRAY_LONG_FIELD)
             .numNulls(2)
             .range(Range.vector(50L, 100L))
             .numValues(50)
@@ -273,6 +278,7 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat mapKeyStringColumnStats =
         ColumnStat.builder()
+            .field(MAP_KEY_STRING_FIELD)
             .numNulls(3)
             .range(Range.vector("key1", "key2"))
             .numValues(50)
@@ -280,6 +286,7 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat mapValueLongColumnStats =
         ColumnStat.builder()
+            .field(MAP_VALUE_LONG_FIELD)
             .numNulls(3)
             .range(Range.vector(200L, 300L))
             .numValues(50)
@@ -287,6 +294,7 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat nestedArrayStringElementColumnStats =
         ColumnStat.builder()
+            .field(NESTED_ARRAY_STRING_FIELD_ELEMENT)
             .numNulls(7)
             .range(Range.vector("nested1", "nested2"))
             .numValues(50)
@@ -294,6 +302,7 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat nestedLongColumnStats =
         ColumnStat.builder()
+            .field(NESTED_LONG_FIELD)
             .numNulls(4)
             .range(Range.vector(500L, 600L))
             .numValues(50)
@@ -301,6 +310,7 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat decimalColumnStats =
         ColumnStat.builder()
+            .field(DECIMAL_FIELD)
             .numNulls(1)
             .range(Range.vector(new BigDecimal("1.0"), new BigDecimal("2.0")))
             .numValues(50)
@@ -308,6 +318,7 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat floatColumnStats =
         ColumnStat.builder()
+            .field(FLOAT_FIELD)
             .numNulls(2)
             .range(Range.vector(1.23f, 6.54321f))
             .numValues(50)
@@ -315,32 +326,57 @@ public class ColumnStatMapUtil {
             .build();
     ColumnStat doubleColumnStats =
         ColumnStat.builder()
+            .field(DOUBLE_FIELD)
             .numNulls(3)
             .range(Range.vector(1.23, 6.54321))
             .numValues(50)
             .totalSize(123)
             .build();
 
-    Map<OneField, ColumnStat> columnStatMap = new HashMap<>();
-    columnStatMap.put(LONG_FIELD, longColumnStats);
-    columnStatMap.put(STRING_FIELD, stringColumnStats);
-    columnStatMap.put(NULL_STRING_FIELD, nullStringColumnStats);
-    columnStatMap.put(TIMESTAMP_FIELD, timeStampColumnStats);
-    columnStatMap.put(TIMESTAMP_MICROS_FIELD, timeStampMicrosColumnStats);
-    columnStatMap.put(LOCAL_TIMESTAMP_FIELD, localTimeStampColumnStats);
-    columnStatMap.put(DATE_FIELD, dateColumnStats);
-    columnStatMap.put(ARRAY_LONG_FIELD, ignoredColumnStats);
-    columnStatMap.put(ARRAY_LONG_FIELD_ELEMENT, arrayLongElementColumnStats);
-    columnStatMap.put(MAP_STRING_LONG_FIELD, ignoredColumnStats);
-    columnStatMap.put(MAP_KEY_STRING_FIELD, mapKeyStringColumnStats);
-    columnStatMap.put(MAP_VALUE_LONG_FIELD, mapValueLongColumnStats);
-    columnStatMap.put(NESTED_STRUCT_FIELD, ignoredColumnStats);
-    columnStatMap.put(NESTED_ARRAY_STRING_FIELD, ignoredColumnStats);
-    columnStatMap.put(NESTED_ARRAY_STRING_FIELD_ELEMENT, nestedArrayStringElementColumnStats);
-    columnStatMap.put(NESTED_LONG_FIELD, nestedLongColumnStats);
-    columnStatMap.put(DECIMAL_FIELD, decimalColumnStats);
-    columnStatMap.put(FLOAT_FIELD, floatColumnStats);
-    columnStatMap.put(DOUBLE_FIELD, doubleColumnStats);
-    return columnStatMap;
+    ColumnStat ignoredColumnStatsArrayLongField =
+        ColumnStat.builder()
+            .field(ARRAY_LONG_FIELD)
+            .numNulls(0)
+            .range(Range.scalar("IGNORED"))
+            .build();
+    ColumnStat ignoredColumnStatsMapStringField =
+        ColumnStat.builder()
+            .field(MAP_STRING_LONG_FIELD)
+            .numNulls(0)
+            .range(Range.scalar("IGNORED"))
+            .build();
+    ColumnStat ignoredColumnStatsNestedStructField =
+        ColumnStat.builder()
+            .field(NESTED_STRUCT_FIELD)
+            .numNulls(0)
+            .range(Range.scalar("IGNORED"))
+            .build();
+    ColumnStat ignoredColumnStatsNestedArrayStringField =
+        ColumnStat.builder()
+            .field(NESTED_ARRAY_STRING_FIELD)
+            .numNulls(0)
+            .range(Range.scalar("IGNORED"))
+            .build();
+
+    return Arrays.asList(
+        longColumnStats,
+        stringColumnStats,
+        nullStringColumnStats,
+        timeStampColumnStats,
+        timeStampMicrosColumnStats,
+        localTimeStampColumnStats,
+        dateColumnStats,
+        arrayLongElementColumnStats,
+        mapKeyStringColumnStats,
+        mapValueLongColumnStats,
+        nestedArrayStringElementColumnStats,
+        nestedLongColumnStats,
+        decimalColumnStats,
+        floatColumnStats,
+        doubleColumnStats,
+        ignoredColumnStatsArrayLongField,
+        ignoredColumnStatsMapStringField,
+        ignoredColumnStatsNestedStructField,
+        ignoredColumnStatsNestedArrayStringField);
   }
 }

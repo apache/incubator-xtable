@@ -16,16 +16,17 @@
  * limitations under the License.
  */
  
-package io.onetable.hudi;
+package io.onetable.model.stat;
 
-import java.util.List;
-
+import lombok.Builder;
 import lombok.Value;
 
-import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.schema.OnePartitionField;
 
+/** Associates the partition value with the partition field. */
 @Value
-public class HudiFileStats {
-  List<ColumnStat> columnStats;
-  long rowCount;
+@Builder
+public class PartitionValue {
+  OnePartitionField partitionField;
+  Range range;
 }

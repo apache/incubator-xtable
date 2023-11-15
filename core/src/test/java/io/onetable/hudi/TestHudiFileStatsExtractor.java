@@ -146,8 +146,7 @@ public class TestHudiFileStatsExtractor {
         OneDataFile.builder()
             .physicalPath(parquetFile.toString())
             .schemaVersion(new SchemaVersion(1, null))
-            .partitionPath("")
-            .columnStats(Collections.emptyMap())
+            .columnStats(Collections.emptyList())
             .fileFormat(FileFormat.APACHE_PARQUET)
             .lastModified(1234L)
             .fileSizeBytes(4321L)
@@ -183,9 +182,8 @@ public class TestHudiFileStatsExtractor {
     OneDataFile inputFile =
         OneDataFile.builder()
             .physicalPath(file.toString())
-            .partitionPath("")
             .schemaVersion(new SchemaVersion(1, null))
-            .columnStats(Collections.emptyMap())
+            .columnStats(Collections.emptyList())
             .fileFormat(FileFormat.APACHE_PARQUET)
             .lastModified(1234L)
             .fileSizeBytes(4321L)
@@ -206,32 +204,39 @@ public class TestHudiFileStatsExtractor {
     assertEquals(1, output.size());
     OneDataFile fileWithStats = output.get(0);
     assertEquals(2, fileWithStats.getRecordCount());
-    Map<OneField, ColumnStat> columnStats = fileWithStats.getColumnStats();
+    List<ColumnStat> columnStats = fileWithStats.getColumnStats();
 
     assertEquals(9, columnStats.size());
 
-    ColumnStat longColumnStat = columnStats.get(longField);
+    ColumnStat longColumnStat =
+        columnStats.stream().filter(stat -> stat.getField().equals(longField)).findFirst().get();
     assertEquals(1, longColumnStat.getNumNulls());
     assertEquals(2, longColumnStat.getNumValues());
     assertTrue(longColumnStat.getTotalSize() > 0);
     assertEquals(-25L, (Long) longColumnStat.getRange().getMinValue());
     assertEquals(-25L, (Long) longColumnStat.getRange().getMaxValue());
 
-    ColumnStat stringColumnStat = columnStats.get(stringField);
+    ColumnStat stringColumnStat =
+        columnStats.stream().filter(stat -> stat.getField().equals(stringField)).findFirst().get();
     assertEquals(0, stringColumnStat.getNumNulls());
     assertEquals(2, stringColumnStat.getNumValues());
     assertTrue(stringColumnStat.getTotalSize() > 0);
     assertEquals("another_example_string", stringColumnStat.getRange().getMinValue());
     assertEquals("example_string", stringColumnStat.getRange().getMaxValue());
 
-    ColumnStat dateColumnStat = columnStats.get(dateField);
+    ColumnStat dateColumnStat =
+        columnStats.stream().filter(stat -> stat.getField().equals(dateField)).findFirst().get();
     assertEquals(0, dateColumnStat.getNumNulls());
     assertEquals(2, dateColumnStat.getNumValues());
     assertTrue(dateColumnStat.getTotalSize() > 0);
     assertEquals(18181, dateColumnStat.getRange().getMinValue());
     assertEquals(18547, dateColumnStat.getRange().getMaxValue());
 
-    ColumnStat timestampColumnStat = columnStats.get(timestampField);
+    ColumnStat timestampColumnStat =
+        columnStats.stream()
+            .filter(stat -> stat.getField().equals(timestampField))
+            .findFirst()
+            .get();
     assertEquals(0, timestampColumnStat.getNumNulls());
     assertEquals(2, timestampColumnStat.getNumValues());
     assertTrue(timestampColumnStat.getTotalSize() > 0);
@@ -240,31 +245,45 @@ public class TestHudiFileStatsExtractor {
     assertEquals(
         getInstant("2020-10-12").toEpochMilli(), timestampColumnStat.getRange().getMaxValue());
 
-    ColumnStat nestedColumnStat = columnStats.get(nestedSchema.getFields().get(0));
+    ColumnStat nestedColumnStat =
+        columnStats.stream()
+            .filter(stat -> stat.getField().equals(nestedSchema.getFields().get(0)))
+            .findFirst()
+            .get();
     assertEquals(1, nestedColumnStat.getNumNulls());
     assertEquals(2, nestedColumnStat.getNumValues());
     assertEquals(2, nestedColumnStat.getRange().getMinValue());
     assertEquals(2, nestedColumnStat.getRange().getMaxValue());
 
-    ColumnStat mapKeyColumnStat = columnStats.get(mapKeyField);
+    ColumnStat mapKeyColumnStat =
+        columnStats.stream().filter(stat -> stat.getField().equals(mapKeyField)).findFirst().get();
     assertEquals(1, mapKeyColumnStat.getNumNulls());
     assertEquals(3, mapKeyColumnStat.getNumValues());
     assertEquals("key1", mapKeyColumnStat.getRange().getMinValue());
     assertEquals("key2", mapKeyColumnStat.getRange().getMaxValue());
 
-    ColumnStat mapValueColumnStat = columnStats.get(mapValueField.getSchema().getFields().get(0));
+    ColumnStat mapValueColumnStat =
+        columnStats.stream()
+            .filter(stat -> stat.getField().equals(mapValueField.getSchema().getFields().get(0)))
+            .findFirst()
+            .get();
     assertEquals(1, mapValueColumnStat.getNumNulls());
     assertEquals(3, mapValueColumnStat.getNumValues());
     assertEquals(13, mapValueColumnStat.getRange().getMinValue());
     assertEquals(23, mapValueColumnStat.getRange().getMaxValue());
 
-    ColumnStat arrayElementColumnStat = columnStats.get(arrayField.getSchema().getFields().get(0));
+    ColumnStat arrayElementColumnStat =
+        columnStats.stream()
+            .filter(stat -> stat.getField().equals(arrayField.getSchema().getFields().get(0)))
+            .findFirst()
+            .get();
     assertEquals(0, arrayElementColumnStat.getNumNulls());
     assertEquals(6, arrayElementColumnStat.getNumValues());
     assertEquals(1, arrayElementColumnStat.getRange().getMinValue());
     assertEquals(6, arrayElementColumnStat.getRange().getMaxValue());
 
-    ColumnStat decimalColumnStat = columnStats.get(decimalField);
+    ColumnStat decimalColumnStat =
+        columnStats.stream().filter(stat -> stat.getField().equals(decimalField)).findFirst().get();
     assertEquals(1, decimalColumnStat.getNumNulls());
     assertEquals(2, decimalColumnStat.getNumValues());
     assertTrue(decimalColumnStat.getTotalSize() > 0);

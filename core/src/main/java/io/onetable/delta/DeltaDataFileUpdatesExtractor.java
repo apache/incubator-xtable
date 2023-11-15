@@ -22,7 +22,6 @@ import static io.onetable.delta.ScalaUtils.convertJavaMapToScala;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -38,7 +37,6 @@ import scala.collection.Seq;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import io.onetable.exception.OneIOException;
-import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
@@ -107,8 +105,7 @@ public class DeltaDataFileUpdatesExtractor {
             null));
   }
 
-  private String getColumnStats(
-      OneSchema schema, long recordCount, Map<OneField, ColumnStat> columnStats) {
+  private String getColumnStats(OneSchema schema, long recordCount, List<ColumnStat> columnStats) {
     try {
       return deltaStatsExtractor.convertStatsToDeltaFormat(schema, recordCount, columnStats);
     } catch (JsonProcessingException e) {
