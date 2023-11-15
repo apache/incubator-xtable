@@ -21,8 +21,8 @@ package io.onetable.iceberg;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -48,6 +48,7 @@ import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.PartitionTransformType;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 import io.onetable.schema.SchemaFieldFinder;
 
@@ -70,12 +71,12 @@ public class IcebergPartitionValueConverter {
     return INSTANCE;
   }
 
-  public Map<OnePartitionField, Range> toOneTable(
+  public List<PartitionValue> toOneTable(
       OneTable oneTable, StructLike structLike, PartitionSpec partitionSpec) {
     if (!partitionSpec.isPartitioned()) {
-      return Collections.emptyMap();
+      return Collections.emptyList();
     }
-    Map<OnePartitionField, Range> partitionValues = new HashMap<>();
+    List<PartitionValue> partitionValues = new ArrayList<>(partitionSpec.fields().size());
     Map<OneField, Map<PartitionTransformType, OnePartitionField>> onePartitionFieldMap =
         getOnePartitionFieldMap(oneTable);
     IndexedRecord partitionData = ((IndexedRecord) structLike);
@@ -134,7 +135,11 @@ public class IcebergPartitionValueConverter {
       // This helps reduce creating these objects for each file processed and re-using them.
       OnePartitionField onePartitionField =
           getFromOnePartitionFieldMap(onePartitionFieldMap, sourceField, transformType);
-      partitionValues.put(onePartitionField, Range.scalar(value));
+      partitionValues.add(
+          PartitionValue.builder()
+              .partitionField(onePartitionField)
+              .range(Range.scalar(value))
+              .build());
     }
     return partitionValues;
   }
@@ -172,54 +177,53 @@ public class IcebergPartitionValueConverter {
   }
 
   public PartitionKey toIceberg(
-      PartitionSpec partitionSpec, Schema schema, Map<OnePartitionField, Range> partitionValues) {
+      PartitionSpec partitionSpec, Schema schema, List<PartitionValue> partitionValues) {
     if (partitionValues == null || partitionValues.isEmpty()) {
       return null;
     }
-    Map<String, Map.Entry<OnePartitionField, Range>> nameToPartitionInfo =
-        partitionValues.entrySet().stream()
+    Map<String, PartitionValue> nameToPartitionInfo =
+        partitionValues.stream()
             .collect(
                 Collectors.toMap(
-                    entry -> entry.getKey().getSourceField().getName(), Function.identity()));
+                    entry -> entry.getPartitionField().getSourceField().getName(),
+                    Function.identity()));
     PartitionKey partitionKey = new PartitionKey(partitionSpec, schema);
     for (int i = 0; i < partitionSpec.fields().size(); i++) {
       PartitionField icebergPartitionField = partitionSpec.fields().get(i);
       String sourceFieldName = schema.findField(icebergPartitionField.sourceId()).name();
-      Map.Entry<OnePartitionField, Range> partitionInfo = nameToPartitionInfo.get(sourceFieldName);
-      switch (partitionInfo.getKey().getTransformType()) {
+      PartitionValue partitionValue = nameToPartitionInfo.get(sourceFieldName);
+      Object value = partitionValue.getRange().getMaxValue();
+      switch (partitionValue.getPartitionField().getTransformType()) {
         case YEAR:
           partitionKey.set(
               i,
               Transforms.year(Types.TimestampType.withoutZone())
-                  .apply(millisToMicros((Long) partitionInfo.getValue().getMaxValue())));
+                  .apply(millisToMicros((Long) value)));
           break;
         case MONTH:
           partitionKey.set(
               i,
               Transforms.month(Types.TimestampType.withoutZone())
-                  .apply(millisToMicros((Long) partitionInfo.getValue().getMaxValue())));
+                  .apply(millisToMicros((Long) value)));
           break;
         case DAY:
           partitionKey.set(
               i,
               Transforms.day(Types.TimestampType.withoutZone())
-                  .apply(millisToMicros((Long) partitionInfo.getValue().getMaxValue())));
+                  .apply(millisToMicros((Long) value)));
           break;
         case HOUR:
           partitionKey.set(
               i,
               Transforms.hour(Types.TimestampType.withoutZone())
-                  .apply(millisToMicros((Long) partitionInfo.getValue().getMaxValue())));
+                  .apply(millisToMicros((Long) value)));
           break;
         case VALUE:
-          partitionKey.set(
-              i,
-              Transforms.identity(Types.StringType.get())
-                  .apply(partitionInfo.getValue().getMaxValue()));
+          partitionKey.set(i, Transforms.identity(Types.StringType.get()).apply(value));
           break;
         default:
           throw new IllegalArgumentException(
-              "Unsupported type: " + partitionInfo.getKey().getTransformType());
+              "Unsupported type: " + partitionValue.getPartitionField().getTransformType());
       }
     }
     return partitionKey;

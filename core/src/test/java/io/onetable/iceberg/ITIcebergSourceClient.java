@@ -25,10 +25,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+
+import lombok.SneakyThrows;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.BeforeEach;
@@ -294,6 +297,49 @@ public class ITIcebergSourceClient {
         allTableChanges.add(tableChange);
       }
       validateTableChanges(allActiveFiles, allTableChanges);
+    }
+  }
+
+  @SneakyThrows
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testForIncrementalSyncSafetyCheck(boolean shouldExpireSnapshots) {
+    String tableName = getTableName();
+    try (TestIcebergTable testIcebergTable =
+        TestIcebergTable.forStandardSchemaAndPartitioning(
+            tableName, "level", tempDir, hadoopConf)) {
+      // Insert 50 rows to INFO partition.
+      List<Record> commit1Rows = testIcebergTable.insertRecordsForPartition(50, "INFO");
+      Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
+      PerTableConfig tableConfig =
+          PerTableConfig.builder()
+              .tableName(testIcebergTable.getTableName())
+              .tableBasePath(testIcebergTable.getBasePath())
+              .tableDataPath(testIcebergTable.getDataPath())
+              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+              .build();
+
+      // Upsert all rows inserted before, so all files are replaced.
+      testIcebergTable.upsertRows(commit1Rows.subList(0, 50));
+      long snapshotIdAfterCommit2 = testIcebergTable.getLatestSnapshot().snapshotId();
+
+      // Insert 50 rows to different (ERROR) partition.
+      testIcebergTable.insertRecordsForPartition(50, "ERROR");
+
+      if (shouldExpireSnapshots) {
+        // Expire snapshotAfterCommit2.
+        testIcebergTable.expireSnapshot(snapshotIdAfterCommit2);
+      }
+      IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+      if (shouldExpireSnapshots) {
+        assertFalse(
+            icebergSourceClient.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));
+      } else {
+        assertTrue(icebergSourceClient.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));
+      }
+      // Table doesn't have instant of this older commit, hence it is not safe.
+      Instant instantAsOfHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
+      assertFalse(icebergSourceClient.isIncrementalSyncSafeFrom(instantAsOfHourAgo));
     }
   }
 

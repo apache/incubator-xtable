@@ -53,6 +53,8 @@ public class SyncResult {
   @Value
   @Builder
   public static class SyncStatus {
+    public static SyncStatus SUCCESS =
+        SyncStatus.builder().statusCode(SyncStatusCode.SUCCESS).build();
     // Status code
     SyncStatusCode statusCode;
     // error Message if any

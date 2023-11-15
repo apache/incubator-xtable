@@ -52,7 +52,6 @@ import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.hadoop.CachingPath;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
-import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
@@ -174,7 +173,7 @@ public class BaseFileUpdatesExtractor {
             .map(file -> new CachingPath(file.getPhysicalPath()))
             .collect(
                 Collectors.groupingBy(
-                    path -> getPartitionPath(tableBasePath, path),
+                    path -> HudiPathUtils.getPartitionPath(tableBasePath, path),
                     Collectors.mapping(this::getFileId, Collectors.toList())));
     // For all added files, group by partition and extract the file id
     List<WriteStatus> writeStatuses =
@@ -212,7 +211,7 @@ public class BaseFileUpdatesExtractor {
     WriteStatus writeStatus = new WriteStatus();
     Path path = new CachingPath(file.getPhysicalPath());
     String partitionPath =
-        partitionPathOptional.orElseGet(() -> getPartitionPath(tableBasePath, path));
+        partitionPathOptional.orElseGet(() -> HudiPathUtils.getPartitionPath(tableBasePath, path));
     String fileId = getFileId(path);
     String filePath =
         path.toUri().getPath().substring(tableBasePath.toUri().getPath().length() + 1);
@@ -233,24 +232,21 @@ public class BaseFileUpdatesExtractor {
   }
 
   private Map<String, HoodieColumnRangeMetadata<Comparable>> convertColStats(
-      String fileName, Map<OneField, ColumnStat> columnStatMap) {
-    return columnStatMap.entrySet().stream()
+      String fileName, List<ColumnStat> columnStatMap) {
+    return columnStatMap.stream()
         .filter(
-            entry -> !OneType.NON_SCALAR_TYPES.contains(entry.getKey().getSchema().getDataType()))
+            entry -> !OneType.NON_SCALAR_TYPES.contains(entry.getField().getSchema().getDataType()))
         .map(
-            entry -> {
-              OneField field = entry.getKey();
-              ColumnStat columnStat = entry.getValue();
-              return HoodieColumnRangeMetadata.<Comparable>create(
-                  fileName,
-                  convertFromOneTablePath(field.getPath()),
-                  (Comparable) columnStat.getRange().getMinValue(),
-                  (Comparable) columnStat.getRange().getMaxValue(),
-                  columnStat.getNumNulls(),
-                  columnStat.getNumValues(),
-                  columnStat.getTotalSize(),
-                  -1L);
-            })
+            columnStat ->
+                HoodieColumnRangeMetadata.<Comparable>create(
+                    fileName,
+                    convertFromOneTablePath(columnStat.getField().getPath()),
+                    (Comparable) columnStat.getRange().getMinValue(),
+                    (Comparable) columnStat.getRange().getMaxValue(),
+                    columnStat.getNumNulls(),
+                    columnStat.getNumValues(),
+                    columnStat.getTotalSize(),
+                    -1L))
         .collect(Collectors.toMap(HoodieColumnRangeMetadata::getColumnName, Function.identity()));
   }
 
@@ -274,14 +270,7 @@ public class BaseFileUpdatesExtractor {
   }
 
   private String getPartitionPath(Path tableBasePath, List<OneDataFile> files) {
-    return getPartitionPath(tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
-  }
-
-  private String getPartitionPath(Path tableBasePath, Path filePath) {
-    String fileName = filePath.getName();
-    String pathStr = filePath.toUri().getPath();
-    int startIndex = tableBasePath.toUri().getPath().length() + 1;
-    int endIndex = pathStr.length() - fileName.length() - 1;
-    return endIndex <= startIndex ? "" : pathStr.substring(startIndex, endIndex);
+    return HudiPathUtils.getPartitionPath(
+        tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
   }
 }

@@ -16,21 +16,16 @@
  * limitations under the License.
  */
  
-package io.onetable.model;
+package io.onetable.hudi;
 
-import java.time.Instant;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
+import org.apache.hadoop.fs.Path;
 
-import lombok.Builder;
-import lombok.Value;
-
-/** Captures Incremental table changes. */
-@Value
-@Builder
-public class IncrementalTableChanges {
-  Iterator<TableChange> tableChanges;
-  // pending commits before latest commit(write) on the table.
-  @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
+public class HudiPathUtils {
+  public static String getPartitionPath(Path tableBasePath, Path filePath) {
+    String fileName = filePath.getName();
+    String pathStr = filePath.toUri().getPath();
+    int startIndex = tableBasePath.toUri().getPath().length() + 1;
+    int endIndex = pathStr.length() - fileName.length() - 1;
+    return endIndex <= startIndex ? "" : pathStr.substring(startIndex, endIndex);
+  }
 }

@@ -171,7 +171,7 @@ public class AvroSchemaConverter {
         newDataType = OneType.NULL;
         break;
       case RECORD:
-        List<OneField> subFields = new ArrayList<>();
+        List<OneField> subFields = new ArrayList<>(schema.getFields().size());
         for (Schema.Field avroField : schema.getFields()) {
           IdMapping idMapping = fieldNameToIdMapping.get(avroField.name());
           OneSchema subFieldSchema =

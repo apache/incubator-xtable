@@ -18,6 +18,7 @@
  
 package io.onetable.iceberg;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
@@ -47,7 +48,8 @@ import org.apache.iceberg.types.Types;
 import io.onetable.client.PerTableConfig;
 import io.onetable.model.*;
 import io.onetable.model.schema.*;
-import io.onetable.model.stat.Range;
+import io.onetable.model.stat.PartitionValue;
+import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneFileGroup;
@@ -88,21 +90,21 @@ class TestIcebergSourceClient {
     Snapshot snapshot = catalogSales.currentSnapshot();
     OneTable oneTable = client.getTable(snapshot);
     Assertions.assertNotNull(oneTable);
-    Assertions.assertEquals(TableFormat.ICEBERG, oneTable.getTableFormat());
+    assertEquals(TableFormat.ICEBERG, oneTable.getTableFormat());
     Assertions.assertTrue(oneTable.getName().endsWith("catalog_sales"));
-    Assertions.assertEquals(catalogSales.location(), oneTable.getBasePath());
-    Assertions.assertEquals(
-        snapshot.timestampMillis(), oneTable.getLatestCommitTime().toEpochMilli());
+    assertEquals(catalogSales.location(), oneTable.getBasePath());
+    assertEquals(DataLayoutStrategy.HIVE_STYLE_PARTITION, oneTable.getLayoutStrategy());
+    assertEquals(snapshot.timestampMillis(), oneTable.getLatestCommitTime().toEpochMilli());
     Assertions.assertNotNull(oneTable.getReadSchema());
 
-    Assertions.assertEquals(7, oneTable.getReadSchema().getFields().size());
+    assertEquals(7, oneTable.getReadSchema().getFields().size());
     validateSchema(oneTable.getReadSchema(), catalogSales.schema());
 
-    Assertions.assertEquals(1, oneTable.getPartitioningFields().size());
+    assertEquals(1, oneTable.getPartitioningFields().size());
     OneField partitionField = oneTable.getPartitioningFields().get(0).getSourceField();
-    Assertions.assertEquals("cs_sold_date_sk", partitionField.getName());
-    Assertions.assertEquals(7, partitionField.getFieldId());
-    Assertions.assertEquals(
+    assertEquals("cs_sold_date_sk", partitionField.getName());
+    assertEquals(7, partitionField.getFieldId());
+    assertEquals(
         PartitionTransformType.VALUE, oneTable.getPartitioningFields().get(0).getTransformType());
   }
 
@@ -113,8 +115,8 @@ class TestIcebergSourceClient {
 
     // add extra schema to test current schema is returned
     catalogSales.updateSchema().addColumn("new_column", Types.IntegerType.get()).commit();
-    Assertions.assertEquals(2, catalogSales.schemas().size());
-    Assertions.assertEquals(0, iceCurrentSnapshot.schemaId());
+    assertEquals(2, catalogSales.schemas().size());
+    assertEquals(0, iceCurrentSnapshot.schemaId());
 
     PerTableConfig sourceTableConfig = getPerTableConfig(catalogSales);
 
@@ -124,7 +126,7 @@ class TestIcebergSourceClient {
     SchemaCatalog schemaCatalog = spyClient.getSchemaCatalog(null, iceCurrentSnapshot);
     Assertions.assertNotNull(schemaCatalog);
     Map<SchemaVersion, OneSchema> schemas = schemaCatalog.getSchemas();
-    Assertions.assertEquals(1, schemas.size());
+    assertEquals(1, schemas.size());
     SchemaVersion expectedSchemaVersion = new SchemaVersion(iceCurrentSnapshot.schemaId(), "");
     OneSchema irSchemaOfCommit = schemas.get(expectedSchemaVersion);
     Assertions.assertNotNull(irSchemaOfCommit);
@@ -153,8 +155,7 @@ class TestIcebergSourceClient {
 
     OneSnapshot oneSnapshot = spyClient.getCurrentSnapshot();
     Assertions.assertNotNull(oneSnapshot);
-    Assertions.assertEquals(
-        String.valueOf(iceCurrentSnapshot.snapshotId()), oneSnapshot.getVersion());
+    assertEquals(String.valueOf(iceCurrentSnapshot.snapshotId()), oneSnapshot.getVersion());
     Assertions.assertNotNull(oneSnapshot.getTable());
     verify(spyClient, times(1)).getTable(iceCurrentSnapshot);
     verify(spyClient, times(1)).getSchemaCatalog(oneSnapshot.getTable(), iceCurrentSnapshot);
@@ -163,23 +164,22 @@ class TestIcebergSourceClient {
 
     Assertions.assertNotNull(oneSnapshot.getPartitionedDataFiles());
     List<OneFileGroup> dataFileChunks = oneSnapshot.getPartitionedDataFiles();
-    Assertions.assertEquals(5, dataFileChunks.size());
+    assertEquals(5, dataFileChunks.size());
     for (OneFileGroup dataFilesChunk : dataFileChunks) {
       List<OneDataFile> oneDataFiles = dataFilesChunk.getFiles();
-      Assertions.assertEquals(1, oneDataFiles.size());
+      assertEquals(1, oneDataFiles.size());
       OneDataFile oneDataFile = oneDataFiles.get(0);
-      Assertions.assertEquals(FileFormat.APACHE_PARQUET, oneDataFile.getFileFormat());
-      Assertions.assertEquals(1, oneDataFile.getRecordCount());
+      assertEquals(FileFormat.APACHE_PARQUET, oneDataFile.getFileFormat());
+      assertEquals(1, oneDataFile.getRecordCount());
       Assertions.assertTrue(oneDataFile.getPhysicalPath().startsWith("file:" + workingDir));
 
-      Map<OnePartitionField, Range> partitionValues = oneDataFile.getPartitionValues();
-      Assertions.assertEquals(1, partitionValues.size());
-      Map.Entry<OnePartitionField, Range> partitionEntry =
-          partitionValues.entrySet().iterator().next();
-      Assertions.assertEquals(
-          "cs_sold_date_sk", partitionEntry.getKey().getSourceField().getName());
+      List<PartitionValue> partitionValues = oneDataFile.getPartitionValues();
+      assertEquals(1, partitionValues.size());
+      PartitionValue partitionEntry = partitionValues.iterator().next();
+      assertEquals(
+          "cs_sold_date_sk", partitionEntry.getPartitionField().getSourceField().getName());
       // TODO generate test with column stats
-      Assertions.assertEquals(0, oneDataFile.getColumnStats().size());
+      assertEquals(0, oneDataFile.getColumnStats().size());
     }
   }
 
@@ -187,14 +187,14 @@ class TestIcebergSourceClient {
   public void testGetTableChangeForCommit(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestTableWithData(workingDir.toString());
     String tableLocation = catalogSales.location();
-    Assertions.assertEquals(5, getDataFileCount(catalogSales));
+    assertEquals(5, getDataFileCount(catalogSales));
     Snapshot snapshot1 = catalogSales.currentSnapshot();
 
     catalogSales
         .newDelete()
         .deleteFromRowFilter(Expressions.lessThan("cs_sold_date_sk", 3))
         .commit();
-    Assertions.assertEquals(2, getDataFileCount(catalogSales));
+    assertEquals(2, getDataFileCount(catalogSales));
     Snapshot snapshot2 = catalogSales.currentSnapshot();
 
     AppendFiles appendAction = catalogSales.newAppend();
@@ -203,7 +203,7 @@ class TestIcebergSourceClient {
       appendAction.appendFile(generateTestDataFile(partition, catalogSales, dataFilePath));
     }
     appendAction.commit();
-    Assertions.assertEquals(7, getDataFileCount(catalogSales));
+    assertEquals(7, getDataFileCount(catalogSales));
     Snapshot snapshot3 = catalogSales.currentSnapshot();
 
     Transaction tx = catalogSales.newTransaction();
@@ -215,7 +215,7 @@ class TestIcebergSourceClient {
     }
     appendAction.commit();
     tx.commitTransaction();
-    Assertions.assertEquals(7, getDataFileCount(catalogSales));
+    assertEquals(7, getDataFileCount(catalogSales));
     // the transaction would result in 2 snapshots
     Snapshot snapshot5 = catalogSales.currentSnapshot();
     Snapshot snapshot4 = catalogSales.snapshot(snapshot5.parentId());
@@ -227,13 +227,13 @@ class TestIcebergSourceClient {
     validateTableChangeDiffSize(catalogSales, snapshot4, 0, 1);
     validateTableChangeDiffSize(catalogSales, snapshot5, 1, 0);
 
-    Assertions.assertEquals(4, catalogSales.history().size());
+    assertEquals(4, catalogSales.history().size());
     catalogSales.expireSnapshots().expireSnapshotId(snapshot1.snapshotId()).commit();
-    Assertions.assertEquals(3, catalogSales.history().size());
+    assertEquals(3, catalogSales.history().size());
     Assertions.assertNull(catalogSales.snapshot(snapshot1.snapshotId()));
     Snapshot snapshot6 = catalogSales.currentSnapshot();
     // expire does not generate a new snapshot
-    Assertions.assertEquals(snapshot6, snapshot5);
+    assertEquals(snapshot6, snapshot5);
 
     TableScan scan =
         catalogSales.newScan().filter(Expressions.lessThanOrEqual("cs_sold_date_sk", 3));
@@ -242,7 +242,7 @@ class TestIcebergSourceClient {
           StreamSupport.stream(files.spliterator(), false)
               .map(ContentScanTask::file)
               .collect(Collectors.toList());
-      Assertions.assertEquals(2, dataFiles.size());
+      assertEquals(2, dataFiles.size());
 
       String dataFilePath = String.join("/", tableLocation, "data", UUID.randomUUID() + ".parquet");
       DataFile newFile = generateTestDataFile(3, catalogSales, dataFilePath);
@@ -259,7 +259,7 @@ class TestIcebergSourceClient {
     Snapshot snapshot8 = catalogSales.currentSnapshot();
 
     validateTableChangeDiffSize(catalogSales, snapshot7, 1, 2);
-    Assertions.assertEquals(snapshot7, snapshot8);
+    assertEquals(snapshot7, snapshot8);
   }
 
   @Test
@@ -316,7 +316,7 @@ class TestIcebergSourceClient {
             .build();
     IcebergSourceClient sourceClient = getIcebergSourceClient(table);
     CommitsBacklog<Snapshot> commitsBacklog = sourceClient.getCommitsBacklog(instant);
-    Assertions.assertEquals(0, commitsBacklog.getInFlightInstants().size());
+    assertEquals(0, commitsBacklog.getInFlightInstants().size());
     Assertions.assertArrayEquals(snapshots, commitsBacklog.getCommitsToProcess().toArray());
   }
 
@@ -330,15 +330,15 @@ class TestIcebergSourceClient {
       Table table, Snapshot snapshot, int addedFiles, int removedFiles) {
     IcebergSourceClient sourceClient = getIcebergSourceClient(table);
     TableChange tableChange = sourceClient.getTableChangeForCommit(snapshot);
-    Assertions.assertEquals(addedFiles, tableChange.getFilesDiff().getFilesAdded().size());
-    Assertions.assertEquals(removedFiles, tableChange.getFilesDiff().getFilesRemoved().size());
+    assertEquals(addedFiles, tableChange.getFilesDiff().getFilesAdded().size());
+    assertEquals(removedFiles, tableChange.getFilesDiff().getFilesRemoved().size());
   }
 
   private void validateSchema(OneSchema readSchema, Schema expectedSchema) {
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     Schema result = schemaExtractor.toIceberg(readSchema);
 
-    Assertions.assertEquals(result.columns().size(), expectedSchema.columns().size());
+    assertEquals(result.columns().size(), expectedSchema.columns().size());
 
     Map<String, Types.NestedField> columnMap =
         result.columns().stream().collect(Collectors.toMap(Types.NestedField::name, f -> f));
@@ -346,10 +346,10 @@ class TestIcebergSourceClient {
     for (Types.NestedField expectedField : expectedSchema.columns()) {
       Types.NestedField column = columnMap.get(expectedField.name());
       Assertions.assertNotNull(column);
-      Assertions.assertEquals(expectedField.fieldId(), column.fieldId());
-      Assertions.assertEquals(expectedField.type(), column.type());
-      Assertions.assertEquals(expectedField.isOptional(), column.isOptional());
-      Assertions.assertEquals(expectedField.doc(), column.doc());
+      assertEquals(expectedField.fieldId(), column.fieldId());
+      assertEquals(expectedField.type(), column.type());
+      assertEquals(expectedField.isOptional(), column.isOptional());
+      assertEquals(expectedField.doc(), column.doc());
     }
   }
 

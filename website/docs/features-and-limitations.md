@@ -25,7 +25,9 @@ This sync provides users with the following:
 - Only Copy-on-Write or Read-Optimized views of tables are currently supported. This means that only the underlying parquet files are synced but log files from Hudi and [delete vectors](https://docs.delta.io/latest/delta-deletion-vectors.html#:~:text=Deletion%20vectors%20indicate%20changes%20to,is%20run%20on%20the%20table.) from Delta and Iceberg are not captured by the sync.
 
 ### Hudi
-- Hudi 0.14.0 is required when reading a Hudi target table. Users will also need to enable the metadata table (`hoodie.metadata.enable=true`) when reading the data.
+- Hudi 0.14.0 is required when reading a Hudi target table. Users will also need to enable 
+  - the metadata table (`hoodie.metadata.enable=true`) and 
+  - hive style partitioning (`hoodie.datasource.write.hive_style_partitioning=true`) wherever applicable when reading the data.
 - Be sure to enable `parquet.avro.write-old-list-structure=false` for proper compatibility with lists when syncing from Hudi to Iceberg.
 - When using Hudi as the source for an Iceberg target, you may require field IDs set in the parquet schema. To enable that, follow the instructions [here](https://github.com/onetable-io/onetable/tree/main/hudi-support/extensions).
 

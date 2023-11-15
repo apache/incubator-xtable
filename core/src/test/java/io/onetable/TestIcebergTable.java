@@ -18,6 +18,7 @@
  
 package io.onetable;
 
+import static io.onetable.iceberg.TestIcebergDataHelper.createIcebergDataHelper;
 import static org.apache.iceberg.SnapshotSummary.TOTAL_RECORDS_PROP;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -45,9 +46,11 @@ import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.OverwriteFiles;
 import org.apache.iceberg.PartitionKey;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.data.parquet.GenericParquetReaders;
@@ -85,7 +88,19 @@ public class TestIcebergTable implements GenericTable<Record, String> {
         tempDir,
         hadoopConf,
         DEFAULT_RECORD_KEY_FIELD,
-        Collections.singletonList(partitionField));
+        Collections.singletonList(partitionField),
+        false);
+  }
+
+  public static TestIcebergTable forSchemaWithAdditionalColumnsAndPartitioning(
+      String tableName, String partitionField, Path tempDir, Configuration hadoopConf) {
+    return new TestIcebergTable(
+        tableName,
+        tempDir,
+        hadoopConf,
+        DEFAULT_RECORD_KEY_FIELD,
+        Collections.singletonList(partitionField),
+        true);
   }
 
   public TestIcebergTable(
@@ -93,18 +108,16 @@ public class TestIcebergTable implements GenericTable<Record, String> {
       Path tempDir,
       Configuration hadoopConf,
       String recordKeyField,
-      List<String> partitionFields) {
+      List<String> partitionFields,
+      boolean includeAdditionalColumns) {
     this.tableName = tableName;
     this.basePath = tempDir.toUri().toString();
     this.icebergDataHelper =
-        TestIcebergDataHelper.builder()
-            .recordKeyField(recordKeyField)
-            .partitionFieldNames(filterNullFields(partitionFields))
-            .build();
+        createIcebergDataHelper(
+            recordKeyField, filterNullFields(partitionFields), includeAdditionalColumns);
     this.schema = icebergDataHelper.getTableSchema();
-    this.hadoopConf = hadoopConf;
-    PartitionSpec partitionSpec = icebergDataHelper.getPartitionSpec();
 
+    PartitionSpec partitionSpec = icebergDataHelper.getPartitionSpec();
     hadoopCatalog = new HadoopCatalog(hadoopConf, basePath);
     // No namespace specified.
     TableIdentifier tableIdentifier = TableIdentifier.of(tableName);
@@ -112,7 +125,22 @@ public class TestIcebergTable implements GenericTable<Record, String> {
       icebergTable = hadoopCatalog.createTable(tableIdentifier, schema, partitionSpec);
     } else {
       icebergTable = hadoopCatalog.loadTable(tableIdentifier);
+      if (!icebergTable.schema().sameSchema(schema)) {
+        updateTableSchema(schema);
+      }
     }
+    this.hadoopConf = hadoopConf;
+  }
+
+  private void updateTableSchema(Schema schema) {
+    Schema currentSchema = icebergTable.schema();
+    UpdateSchema updateSchema = icebergTable.updateSchema();
+    for (Types.NestedField field : schema.columns()) {
+      if (currentSchema.findField(field.name()) == null) {
+        updateSchema.addColumn(field.name(), field.type());
+      }
+    }
+    updateSchema.commit();
   }
 
   @Override
@@ -208,7 +236,22 @@ public class TestIcebergTable implements GenericTable<Record, String> {
 
   @Override
   public String getBasePath() {
-    return basePath + "/" + tableName;
+    return removeSlash(basePath) + "/" + tableName;
+  }
+
+  public String getDataPath() {
+    return getBasePath() + "/data";
+  }
+
+  private String removeSlash(String path) {
+    if (path.endsWith("/")) {
+      return path.substring(0, path.length() - 1);
+    }
+    return path;
+  }
+
+  public String getTableName() {
+    return tableName;
   }
 
   @Override
@@ -240,8 +283,12 @@ public class TestIcebergTable implements GenericTable<Record, String> {
 
   @Override
   public List<String> getColumnsToSelect() {
+    // There is representation difference in hudi and iceberg for local timestamp micros field.
+    // and hence excluding it from the list of columns to select.
+    // TODO(HUDI-7088): Remove filter after bug is fixed.
     return icebergDataHelper.getTableSchema().columns().stream()
         .map(Types.NestedField::name)
+        .filter(name -> !name.equals("timestamp_local_micros_nullable_field"))
         .collect(Collectors.toList());
   }
 
@@ -251,7 +298,11 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   }
 
   public Long getLastCommitTimestamp() {
-    return icebergTable.currentSnapshot().timestampMillis();
+    return getLatestSnapshot().timestampMillis();
+  }
+
+  public Snapshot getLatestSnapshot() {
+    return icebergTable.currentSnapshot();
   }
 
   @SneakyThrows
@@ -276,6 +327,10 @@ public class TestIcebergTable implements GenericTable<Record, String> {
 
   public void expireSnapshotsOlderThan(Instant instant) {
     icebergTable.expireSnapshots().expireOlderThan(instant.toEpochMilli()).commit();
+  }
+
+  public void expireSnapshot(Long snapshotId) {
+    icebergTable.expireSnapshots().expireSnapshotId(snapshotId).commit();
   }
 
   private List<String> filterNullFields(List<String> partitionFields) {

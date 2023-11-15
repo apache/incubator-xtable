@@ -18,14 +18,16 @@
  
 package io.onetable.delta;
 
-import static io.onetable.testutil.ColumnStatMapUtil.getColumnStatMap;
+import static io.onetable.testutil.ColumnStatMapUtil.getColumnStats;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +35,6 @@ import org.apache.spark.sql.delta.actions.AddFile;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableMap;
 
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
@@ -50,10 +51,10 @@ public class TestDeltaStatsExtractor {
   public void testDeltaStats() throws JsonProcessingException {
     OneSchema schema = ColumnStatMapUtil.getSchema();
 
-    Map<OneField, ColumnStat> columnStatMap = getColumnStatMap();
+    List<ColumnStat> columnStats = getColumnStats();
 
     String actualStats =
-        DeltaStatsExtractor.getInstance().convertStatsToDeltaFormat(schema, 50L, columnStatMap);
+        DeltaStatsExtractor.getInstance().convertStatsToDeltaFormat(schema, 50L, columnStats);
     Map<String, Object> actualStatsMap = MAPPER.readValue(actualStats, HashMap.class);
     assertEquals(50, actualStatsMap.get("numRecords"));
 
@@ -115,29 +116,24 @@ public class TestDeltaStatsExtractor {
   void roundTripStatsConversion() throws IOException {
     OneSchema schema = ColumnStatMapUtil.getSchema();
     List<OneField> fields = schema.getAllFields();
-    Map<OneField, ColumnStat> columnStatMap = getColumnStatMap();
+    List<ColumnStat> columnStats = getColumnStats();
 
     String stats =
-        DeltaStatsExtractor.getInstance().convertStatsToDeltaFormat(schema, 50L, columnStatMap);
+        DeltaStatsExtractor.getInstance().convertStatsToDeltaFormat(schema, 50L, columnStats);
     AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null);
     DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
-    Map<OneField, ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
+    List<ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
 
-    Map<OneField, ColumnStat> expected = new HashMap<>();
-    columnStatMap.forEach(
-        (field, stat) -> {
-          OneType dataType = field.getSchema().getDataType();
+    Set<ColumnStat> expected = new HashSet<>();
+    columnStats.forEach(
+        stat -> {
+          OneType dataType = stat.getField().getSchema().getDataType();
           if (dataType != OneType.RECORD && dataType != OneType.LIST && dataType != OneType.MAP) {
             ColumnStat columnStatWithoutSize = stat.toBuilder().totalSize(0).build();
-            expected.put(field, columnStatWithoutSize);
+            expected.add(columnStatWithoutSize);
           }
         });
-    for (OneField field : expected.keySet()) {
-      if (!expected.get(field).equals(actual.get(field))) {
-        System.out.println(field.getName());
-      }
-    }
-    assertEquals(expected, actual);
+    assertEquals(expected, new HashSet<>(actual));
   }
 
   @Test
@@ -154,31 +150,34 @@ public class TestDeltaStatsExtractor {
     String stats = MAPPER.writeValueAsString(deltaStats);
     AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null);
     DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
-    Map<OneField, ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
+    List<ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
 
-    Map<OneField, ColumnStat> expected =
-        ImmutableMap.<OneField, ColumnStat>builder()
-            .put(
-                fields.get(0),
-                ColumnStat.builder()
-                    .numValues(100)
-                    .numNulls(1)
-                    .range(Range.vector("a", "b"))
-                    .build())
-            .put(
-                fields.get(2),
-                ColumnStat.builder().numValues(100).numNulls(2).range(Range.vector(1, 2)).build())
-            .put(
-                fields.get(4),
-                ColumnStat.builder()
-                    .numValues(100)
-                    .numNulls(3)
-                    .range(Range.vector(1.0, 2.0))
-                    .build())
-            .put(
-                fields.get(5),
-                ColumnStat.builder().numValues(100).numNulls(4).range(Range.vector(10, 20)).build())
-            .build();
+    List<ColumnStat> expected =
+        Arrays.asList(
+            ColumnStat.builder()
+                .field(fields.get(0))
+                .numValues(100)
+                .numNulls(1)
+                .range(Range.vector("a", "b"))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(2))
+                .numValues(100)
+                .numNulls(2)
+                .range(Range.vector(1, 2))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(4))
+                .numValues(100)
+                .numNulls(3)
+                .range(Range.vector(1.0, 2.0))
+                .build(),
+            ColumnStat.builder()
+                .field(fields.get(5))
+                .numValues(100)
+                .numNulls(4)
+                .range(Range.vector(10, 20))
+                .build());
     assertEquals(expected, actual);
   }
 

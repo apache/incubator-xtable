@@ -21,7 +21,7 @@
         <avro.version>1.11.3</avro.version>
         <log4j.version>2.17.2</log4j.version>
         <junit.version>5.9.0</junit.version>
-        <lombok.version>1.18.24</lombok.version>
+        <lombok.version>1.18.30</lombok.version>
         <hudi.version>0.14.0</hudi.version>
         <parquet.version>1.12.2</parquet.version>
         <scala.version>2.12.10</scala.version>
@@ -521,7 +521,7 @@
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <skip>${skipITs}</skip>
                     <reuseForks>false</reuseForks>
-                    <forkCount>4</forkCount>
+                    <forkCount>6</forkCount>
                     <trimStackTrace>false</trimStackTrace>
                     <argLine>-Xmx1024m</argLine>
                 </configuration>

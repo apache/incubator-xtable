@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -85,6 +85,7 @@ import io.onetable.model.schema.OneType;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.FileFormat;
@@ -113,7 +114,7 @@ public class TestIcebergSync {
       Mockito.mock(IcebergPartitionSpecSync.class);
   private final IcebergColumnStatsConverter mockColumnStatsConverter =
       Mockito.mock(IcebergColumnStatsConverter.class);
-  private TableFormatSync icebergSync;
+  private IcebergClient icebergClient;
 
   private final OneSchema oneSchema =
       OneSchema.builder()
@@ -172,23 +173,22 @@ public class TestIcebergSync {
     tableName = "test-" + UUID.randomUUID();
     basePath = tempDir.resolve(tableName);
     Files.createDirectories(basePath);
-    icebergSync =
-        TableFormatSync.of(
-            new IcebergClient(
-                PerTableConfig.builder()
-                    .tableBasePath(basePath.toString())
-                    .tableName(tableName)
-                    .targetMetadataRetentionInHours(1)
-                    .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
-                    .build(),
-                new Configuration(),
-                mockSchemaExtractor,
-                mockSchemaSync,
-                mockPartitionSpecExtractor,
-                mockPartitionSpecSync,
-                IcebergDataFileUpdatesSync.of(
-                    mockColumnStatsConverter, IcebergPartitionValueConverter.getInstance()),
-                IcebergTableManager.of(new Configuration())));
+    icebergClient =
+        new IcebergClient(
+            PerTableConfig.builder()
+                .tableBasePath(basePath.toString())
+                .tableName(tableName)
+                .targetMetadataRetentionInHours(1)
+                .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+                .build(),
+            new Configuration(),
+            mockSchemaExtractor,
+            mockSchemaSync,
+            mockPartitionSpecExtractor,
+            mockPartitionSpecSync,
+            IcebergDataFileUpdatesSync.of(
+                mockColumnStatsConverter, IcebergPartitionValueConverter.getInstance()),
+            IcebergTableManager.of(new Configuration()));
   }
 
   @Test
@@ -235,9 +235,9 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
     schemas.put(schemaVersion2, schema2);
 
-    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, Collections.emptyMap());
-    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, Collections.emptyMap());
-    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyMap());
+    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, Collections.emptyList());
+    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, Collections.emptyList());
+    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyList());
     OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
     when(mockSchemaExtractor.toIceberg(schema1)).thenReturn(icebergSchema1);
@@ -253,10 +253,10 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile2, 2);
     mockColStatsForFile(dataFile3, 1);
 
-    icebergSync.syncSnapshot(snapshot1);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot1);
     validateIcebergTable(tableName, table1, Sets.newHashSet(dataFile1, dataFile2), null);
 
-    icebergSync.syncSnapshot(snapshot2);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot2);
     validateIcebergTable(tableName, table2, Sets.newHashSet(dataFile2, dataFile3), null);
 
     ArgumentCaptor<Transaction> transactionArgumentCaptor =
@@ -275,7 +275,7 @@ public class TestIcebergSync {
             partitionSpecArgumentCaptor.capture(),
             partitionSpecArgumentCaptor.capture(),
             transactionArgumentCaptor.capture());
-    verify(mockColumnStatsConverter, times(4)).toIceberg(any(Schema.class), anyLong(), anyMap());
+    verify(mockColumnStatsConverter, times(4)).toIceberg(any(Schema.class), anyLong(), anyList());
 
     // check that the correct schema is used in calls to the mocks
     // Since we're using a mockSchemaSync we don't expect the table schema used by the partition
@@ -331,12 +331,18 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
     schemas.put(schemaVersion, oneSchema);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(
-        partitionField, Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(
-        partitionField, Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()));
+    List<PartitionValue> partitionValues1 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()))
+                .build());
+    List<PartitionValue> partitionValues2 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
+                .build());
     OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
     OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues1);
     OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues2);
@@ -356,7 +362,7 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile1, 1);
     mockColStatsForFile(dataFile2, 1);
     mockColStatsForFile(dataFile3, 1);
-    icebergSync.syncSnapshot(snapshot);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot);
 
     assertTrue(schemaArgumentCaptor.getValue().sameSchema(icebergSchema));
     validateIcebergTable(
@@ -389,12 +395,18 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
     schemas.put(schemaVersion, oneSchema);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(
-        partitionField, Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(
-        partitionField, Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()));
+    List<PartitionValue> partitionValues1 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()))
+                .build());
+    List<PartitionValue> partitionValues2 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
+                .build());
     OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
     OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues1);
     OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues2);
@@ -412,7 +424,7 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile1, 1);
     mockColStatsForFile(dataFile2, 1);
     mockColStatsForFile(dataFile3, 1);
-    icebergSync.syncSnapshot(snapshot);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot);
 
     assertTrue(schemaArgumentCaptor.getValue().sameSchema(icebergSchema));
     validateIcebergTable(
@@ -444,10 +456,12 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
     schemas.put(schemaVersion, oneSchema);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(partitionField, Range.scalar(1));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(partitionField, Range.scalar(2));
+    List<PartitionValue> partitionValues1 =
+        Collections.singletonList(
+            PartitionValue.builder().partitionField(partitionField).range(Range.scalar(1)).build());
+    List<PartitionValue> partitionValues2 =
+        Collections.singletonList(
+            PartitionValue.builder().partitionField(partitionField).range(Range.scalar(2)).build());
     OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
     OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues1);
     OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues2);
@@ -465,7 +479,7 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile1, 1);
     mockColStatsForFile(dataFile2, 1);
     mockColStatsForFile(dataFile3, 1);
-    icebergSync.syncSnapshot(snapshot);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot);
 
     assertTrue(schemaArgumentCaptor.getValue().sameSchema(icebergSchema));
     validateIcebergTable(
@@ -503,18 +517,27 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
     schemas.put(schemaVersion, oneSchema);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(partitionField1, Range.scalar(1));
-    partitionValues1.put(
-        partitionField2, Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(partitionField1, Range.scalar(2));
-    partitionValues2.put(
-        partitionField2, Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()));
-    Map<OnePartitionField, Range> partitionValues3 = new HashMap<>();
-    partitionValues3.put(partitionField1, Range.scalar(2));
-    partitionValues3.put(
-        partitionField2, Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()));
+    List<PartitionValue> partitionValues1 =
+        Arrays.asList(
+            PartitionValue.builder().partitionField(partitionField1).range(Range.scalar(1)).build(),
+            PartitionValue.builder()
+                .partitionField(partitionField2)
+                .range(Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()))
+                .build());
+    List<PartitionValue> partitionValues2 =
+        Arrays.asList(
+            PartitionValue.builder().partitionField(partitionField1).range(Range.scalar(2)).build(),
+            PartitionValue.builder()
+                .partitionField(partitionField2)
+                .range(Range.scalar(Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli()))
+                .build());
+    List<PartitionValue> partitionValues3 =
+        Arrays.asList(
+            PartitionValue.builder().partitionField(partitionField1).range(Range.scalar(2)).build(),
+            PartitionValue.builder()
+                .partitionField(partitionField2)
+                .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
+                .build());
     OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
     OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues2);
     OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues3);
@@ -533,7 +556,7 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile1, 1);
     mockColStatsForFile(dataFile2, 1);
     mockColStatsForFile(dataFile3, 1);
-    icebergSync.syncSnapshot(snapshot);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot);
 
     assertTrue(schemaArgumentCaptor.getValue().sameSchema(icebergSchema));
     validateIcebergTable(
@@ -570,10 +593,18 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
     schemas.put(schemaVersion, oneSchema);
 
-    Map<OnePartitionField, Range> partitionValues1 = new HashMap<>();
-    partitionValues1.put(partitionField, Range.scalar("value1"));
-    Map<OnePartitionField, Range> partitionValues2 = new HashMap<>();
-    partitionValues2.put(partitionField, Range.scalar("value2"));
+    List<PartitionValue> partitionValues1 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar("value1"))
+                .build());
+    List<PartitionValue> partitionValues2 =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(Range.scalar("value2"))
+                .build());
     OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
     OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues1);
     OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues2);
@@ -591,7 +622,7 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile1, 1);
     mockColStatsForFile(dataFile2, 1);
     mockColStatsForFile(dataFile3, 1);
-    icebergSync.syncSnapshot(snapshot);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot);
 
     assertTrue(schemaArgumentCaptor.getValue().sameSchema(icebergSchema));
     validateIcebergTable(
@@ -611,7 +642,7 @@ public class TestIcebergSync {
   }
 
   private OneDataFile getOneDataFile(
-      SchemaVersion schemaVersion, int index, Map<OnePartitionField, Range> partitionValues) {
+      SchemaVersion schemaVersion, int index, List<PartitionValue> partitionValues) {
     String physicalPath = "file:/physical" + index + ".parquet";
     return OneDataFile.builder()
         .fileFormat(FileFormat.APACHE_PARQUET)
@@ -620,7 +651,7 @@ public class TestIcebergSync {
         .recordCount(RANDOM.nextInt(10000))
         .schemaVersion(schemaVersion)
         .partitionValues(partitionValues)
-        .columnStats(Collections.emptyMap())
+        .columnStats(Collections.emptyList())
         .build();
   }
 
@@ -677,7 +708,7 @@ public class TestIcebergSync {
     Metrics[] responses =
         IntStream.of(times - 1).mapToObj(unused -> response).toArray(Metrics[]::new);
     when(mockColumnStatsConverter.toIceberg(
-            any(Schema.class), eq(dataFile.getRecordCount()), eq(Collections.emptyMap())))
+            any(Schema.class), eq(dataFile.getRecordCount()), eq(Collections.emptyList())))
         .thenReturn(response, responses);
   }
 }

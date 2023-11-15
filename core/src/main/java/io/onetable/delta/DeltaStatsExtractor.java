@@ -80,7 +80,7 @@ public class DeltaStatsExtractor {
   }
 
   public String convertStatsToDeltaFormat(
-      OneSchema schema, long numRecords, Map<OneField, ColumnStat> columnStats)
+      OneSchema schema, long numRecords, List<ColumnStat> columnStats)
       throws JsonProcessingException {
     DeltaStats.DeltaStatsBuilder deltaStatsBuilder = DeltaStats.builder();
     deltaStatsBuilder.numRecords(numRecords);
@@ -88,10 +88,10 @@ public class DeltaStatsExtractor {
       return MAPPER.writeValueAsString(deltaStatsBuilder.build());
     }
     Set<String> validPaths = getPathsFromStructSchemaForMinAndMaxStats(schema);
-    Map<OneField, ColumnStat> validColumnStats =
-        columnStats.entrySet().stream()
-            .filter(e -> validPaths.contains(e.getKey().getPath()))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    List<ColumnStat> validColumnStats =
+        columnStats.stream()
+            .filter(stat -> validPaths.contains(stat.getField().getPath()))
+            .collect(Collectors.toList());
     DeltaStats deltaStats =
         deltaStatsBuilder
             .minValues(getMinValues(validColumnStats))
@@ -112,19 +112,20 @@ public class DeltaStatsExtractor {
         .collect(Collectors.toSet());
   }
 
-  private Map<String, Object> getMinValues(Map<OneField, ColumnStat> validColumnStats) {
+  private Map<String, Object> getMinValues(List<ColumnStat> validColumnStats) {
     return getValues(validColumnStats, columnStat -> columnStat.getRange().getMinValue());
   }
 
-  private Map<String, Object> getMaxValues(Map<OneField, ColumnStat> validColumnStats) {
+  private Map<String, Object> getMaxValues(List<ColumnStat> validColumnStats) {
     return getValues(validColumnStats, columnStat -> columnStat.getRange().getMaxValue());
   }
 
   private Map<String, Object> getValues(
-      Map<OneField, ColumnStat> validColumnStats, Function<ColumnStat, Object> valueExtractor) {
+      List<ColumnStat> validColumnStats, Function<ColumnStat, Object> valueExtractor) {
     Map<String, Object> jsonObject = new HashMap<>();
     validColumnStats.forEach(
-        (field, columnStat) -> {
+        columnStat -> {
+          OneField field = columnStat.getField();
           String[] pathParts = field.getPathParts();
           insertValueAtPath(
               jsonObject,
@@ -134,12 +135,12 @@ public class DeltaStatsExtractor {
     return jsonObject;
   }
 
-  private Map<String, Object> getNullCount(Map<OneField, ColumnStat> validColumnStats) {
+  private Map<String, Object> getNullCount(List<ColumnStat> validColumnStats) {
     // TODO: Additional work needed to track nulls maps & arrays.
     Map<String, Object> jsonObject = new HashMap<>();
     validColumnStats.forEach(
-        (field, columnStat) -> {
-          String[] pathParts = field.getPathParts();
+        columnStat -> {
+          String[] pathParts = columnStat.getField().getPathParts();
           insertValueAtPath(jsonObject, pathParts, columnStat.getNumNulls());
         });
     return jsonObject;
@@ -171,7 +172,7 @@ public class DeltaStatsExtractor {
     }
   }
 
-  public Map<OneField, ColumnStat> getColumnStatsForFile(AddFile addFile, List<OneField> fields) {
+  public List<ColumnStat> getColumnStatsForFile(AddFile addFile, List<OneField> fields) {
     // TODO: Additional work needed to track maps & arrays.
     try {
       DeltaStats deltaStats = MAPPER.readValue(addFile.stats(), DeltaStats.class);
@@ -180,25 +181,25 @@ public class DeltaStatsExtractor {
       Map<String, Object> fieldPathToNullCount = flattenStatMap(deltaStats.getNullCount());
       return fields.stream()
           .filter(field -> fieldPathToMaxValue.containsKey(field.getPath()))
-          .collect(
-              Collectors.toMap(
-                  Function.identity(),
-                  field -> {
-                    String fieldPath = field.getPath();
-                    Object minValue =
-                        DeltaValueConverter.convertFromDeltaColumnStatValue(
-                            fieldPathToMinValue.get(fieldPath), field.getSchema());
-                    Object maxValue =
-                        DeltaValueConverter.convertFromDeltaColumnStatValue(
-                            fieldPathToMaxValue.get(fieldPath), field.getSchema());
-                    Number nullCount = (Number) fieldPathToNullCount.get(fieldPath);
-                    Range range = Range.vector(minValue, maxValue);
-                    return ColumnStat.builder()
-                        .numValues(deltaStats.getNumRecords())
-                        .numNulls(nullCount.longValue())
-                        .range(range)
-                        .build();
-                  }));
+          .map(
+              field -> {
+                String fieldPath = field.getPath();
+                Object minValue =
+                    DeltaValueConverter.convertFromDeltaColumnStatValue(
+                        fieldPathToMinValue.get(fieldPath), field.getSchema());
+                Object maxValue =
+                    DeltaValueConverter.convertFromDeltaColumnStatValue(
+                        fieldPathToMaxValue.get(fieldPath), field.getSchema());
+                Number nullCount = (Number) fieldPathToNullCount.get(fieldPath);
+                Range range = Range.vector(minValue, maxValue);
+                return ColumnStat.builder()
+                    .field(field)
+                    .numValues(deltaStats.getNumRecords())
+                    .numNulls(nullCount.longValue())
+                    .range(range)
+                    .build();
+              })
+          .collect(Collectors.toList());
     } catch (IOException ex) {
       throw new OneIOException("Unable to parse stats json", ex);
     }

@@ -28,8 +28,18 @@ values={[
 
 * For Hudi, refer the [Spark Guide](https://hudi.apache.org/docs/quick-start-guide#spark-shellsql) page
 
+:::danger LIMITATION for Hudi target format:
+To validate the Hudi targetFormat table results, you need to ensure that you're using Hudi version 0.14.0 as mentioned [here](/docs/features-and-limitations#hudi)
+:::
+
 ```python md title="python"
-df = spark.read.format("hudi").load("/path/to/source/data")
+
+hudi_options = {
+    "hoodie.metadata.enable": "true",
+    "hoodie.datasource.write.hive_style_partitioning": "true",
+}
+
+df = spark.read.format("hudi").options(**hudi_options).load("/path/to/source/data")
 ```
 
 </TabItem>

@@ -30,7 +30,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -55,6 +54,7 @@ import io.onetable.exception.PartitionSpecException;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.PartitionTransformType;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.schema.SchemaFieldFinder;
@@ -119,7 +119,7 @@ public class DeltaPartitionExtractor {
       StructType partitionSchema, OneSchema oneSchema) {
     PeekingIterator<StructField> itr =
         Iterators.peekingIterator(Arrays.stream(partitionSchema.fields()).iterator());
-    List<OnePartitionField> partitionFields = new ArrayList<>();
+    List<OnePartitionField> partitionFields = new ArrayList<>(partitionSchema.fields().length);
     while (itr.hasNext()) {
       StructField currPartitionField = itr.peek();
       if (!currPartitionField.metadata().contains(DELTA_GENERATION_EXPRESSION)) {
@@ -150,7 +150,7 @@ public class DeltaPartitionExtractor {
                   currPartitionField.name(), parsedGeneratedExpr, oneSchema));
           itr.next(); // consume the field.
         } else {
-          // consume until we hit field with no generated expression or genearated expression
+          // consume until we hit field with no generated expression or generated expression
           // that is not of type cast or date format.
           List<ParsedGeneratedExpr> parsedGeneratedExprs = new ArrayList<>();
           while (itr.hasNext()
@@ -252,54 +252,58 @@ public class DeltaPartitionExtractor {
     if (oneDataFile.getPartitionValues() == null || oneDataFile.getPartitionValues().isEmpty()) {
       return partitionValuesSerialized;
     }
-    for (Map.Entry<OnePartitionField, Range> e : oneDataFile.getPartitionValues().entrySet()) {
-      PartitionTransformType transformType = e.getKey().getTransformType();
+    for (PartitionValue partitionValue : oneDataFile.getPartitionValues()) {
+      OnePartitionField partitionField = partitionValue.getPartitionField();
+      PartitionTransformType transformType = partitionField.getTransformType();
       String partitionValueSerialized;
       if (transformType == PartitionTransformType.VALUE) {
         partitionValueSerialized =
             convertToDeltaPartitionValue(
-                e.getValue().getMaxValue(),
-                e.getKey().getSourceField().getSchema().getDataType(),
+                partitionValue.getRange().getMaxValue(),
+                partitionField.getSourceField().getSchema().getDataType(),
                 transformType,
                 "");
         partitionValuesSerialized.put(
-            e.getKey().getSourceField().getName(), partitionValueSerialized);
+            partitionField.getSourceField().getName(), partitionValueSerialized);
       } else {
         // use appropriate date formatter for value serialization.
         partitionValueSerialized =
             convertToDeltaPartitionValue(
-                e.getValue().getMaxValue(),
-                e.getKey().getSourceField().getSchema().getDataType(),
+                partitionValue.getRange().getMaxValue(),
+                partitionField.getSourceField().getSchema().getDataType(),
                 transformType,
-                getDateFormat(e.getKey().getTransformType()));
-        partitionValuesSerialized.put(getGeneratedColumnName(e.getKey()), partitionValueSerialized);
+                getDateFormat(partitionField.getTransformType()));
+        partitionValuesSerialized.put(
+            getGeneratedColumnName(partitionField), partitionValueSerialized);
       }
     }
     return partitionValuesSerialized;
   }
 
-  public Map<OnePartitionField, Range> partitionValueExtraction(
+  public List<PartitionValue> partitionValueExtraction(
       scala.collection.Map<String, String> values, List<OnePartitionField> partitionFields) {
     return partitionFields.stream()
-        .collect(
-            Collectors.toMap(
-                Function.identity(),
-                partitionField -> {
-                  PartitionTransformType partitionTransformType = partitionField.getTransformType();
-                  String dateFormat =
-                      partitionTransformType.isTimeBased()
-                          ? getDateFormat(partitionTransformType)
-                          : null;
-                  String serializedValue =
-                      getSerializedPartitionValue(convertScalaMapToJavaMap(values), partitionField);
-                  Object partitionValue =
-                      convertFromDeltaPartitionValue(
-                          serializedValue,
-                          partitionField.getSourceField().getSchema().getDataType(),
-                          partitionField.getTransformType(),
-                          dateFormat);
-                  return Range.scalar(partitionValue);
-                }));
+        .map(
+            partitionField -> {
+              PartitionTransformType partitionTransformType = partitionField.getTransformType();
+              String dateFormat =
+                  partitionTransformType.isTimeBased()
+                      ? getDateFormat(partitionTransformType)
+                      : null;
+              String serializedValue =
+                  getSerializedPartitionValue(convertScalaMapToJavaMap(values), partitionField);
+              Object partitionValue =
+                  convertFromDeltaPartitionValue(
+                      serializedValue,
+                      partitionField.getSourceField().getSchema().getDataType(),
+                      partitionField.getTransformType(),
+                      dateFormat);
+              return PartitionValue.builder()
+                  .partitionField(partitionField)
+                  .range(Range.scalar(partitionValue))
+                  .build();
+            })
+        .collect(Collectors.toList());
   }
 
   private String getSerializedPartitionValue(

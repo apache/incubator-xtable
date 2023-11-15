@@ -43,7 +43,8 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.SchemaCatalog;
 import io.onetable.model.schema.SchemaVersion;
-import io.onetable.model.stat.Range;
+import io.onetable.model.stat.PartitionValue;
+import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
@@ -91,7 +92,6 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   @Override
   public OneTable getTable(Snapshot snapshot) {
     Table iceTable = getSourceTable();
-
     Schema iceSchema = iceTable.schemas().get(snapshot.schemaId());
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     OneSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
@@ -100,7 +100,12 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     IcebergPartitionSpecExtractor partitionExtractor = IcebergPartitionSpecExtractor.getInstance();
     List<OnePartitionField> irPartitionFields =
         partitionExtractor.fromIceberg(iceTable.spec(), iceSchema, irSchema);
-
+    // Data layout is hive storage for partitioned by default. See
+    // (https://github.com/apache/iceberg/blob/main/docs/aws.md)
+    DataLayoutStrategy dataLayoutStrategy =
+        irPartitionFields.size() > 0
+            ? DataLayoutStrategy.HIVE_STYLE_PARTITION
+            : DataLayoutStrategy.FLAT;
     return OneTable.builder()
         .tableFormat(TableFormat.ICEBERG)
         .basePath(iceTable.location())
@@ -108,7 +113,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         .partitioningFields(irPartitionFields)
         .latestCommitTime(Instant.ofEpochMilli(snapshot.timestampMillis()))
         .readSchema(irSchema)
-        // .layoutStrategy(dataLayoutStrategy)
+        .layoutStrategy(dataLayoutStrategy)
         .build();
   }
 
@@ -156,9 +161,9 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   }
 
   private OneDataFile fromIceberg(DataFile file, PartitionSpec partitionSpec, OneTable oneTable) {
-    Map<OnePartitionField, Range> onePartitionFieldRangeMap =
+    List<PartitionValue> partitionValues =
         partitionConverter.toOneTable(oneTable, file.partition(), partitionSpec);
-    return dataFileExtractor.fromIceberg(file, onePartitionFieldRangeMap, oneTable.getReadSchema());
+    return dataFileExtractor.fromIceberg(file, partitionValues, oneTable.getReadSchema());
   }
 
   @Override
@@ -218,12 +223,44 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     return CommitsBacklog.<Snapshot>builder().commitsToProcess(snapshots).build();
   }
 
-  // TODO(https://github.com/onetable-io/onetable/issues/147): Handle this.
+  /*
+   * Following checks are to be performed:
+   * 1. Check if snapshot at or before the provided instant exists.
+   * 2. Check if expiring of snapshots has impacted the provided instant.
+   */
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
-    // Two checks to be performed:
-    // 1. Check if snapshot at or before the provided instant exists.
-    // 2. Check if expiring of snapshots has impacted the provided instant.
+    long timeInMillis = instant.toEpochMilli();
+    Table iceTable = getSourceTable();
+    boolean doesInstantOfAgeExists = false;
+    Long targetSnapshotId = null;
+    for (Snapshot snapshot : iceTable.snapshots()) {
+      if (snapshot.timestampMillis() <= timeInMillis) {
+        doesInstantOfAgeExists = true;
+        targetSnapshotId = snapshot.snapshotId();
+      } else {
+        break;
+      }
+    }
+    if (!doesInstantOfAgeExists) {
+      return false;
+    }
+    // Go from latest snapshot until targetSnapshotId through parent reference.
+    // nothing has to be null in this chain to guarantee safety of incremental sync.
+    Long currentSnapshotId = iceTable.currentSnapshot().snapshotId();
+    while (currentSnapshotId != null && currentSnapshotId != targetSnapshotId) {
+      Snapshot currentSnapshot = iceTable.snapshot(currentSnapshotId);
+      if (currentSnapshot == null) {
+        // The snapshot is expired.
+        return false;
+      }
+      currentSnapshotId = currentSnapshot.parentId();
+    }
     return true;
+  }
+
+  @Override
+  public void close() {
+    getTableOps().close();
   }
 }

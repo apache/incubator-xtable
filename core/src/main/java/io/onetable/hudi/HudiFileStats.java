@@ -18,15 +18,14 @@
  
 package io.onetable.hudi;
 
-import java.util.Map;
+import java.util.List;
 
 import lombok.Value;
 
-import io.onetable.model.schema.OneField;
 import io.onetable.model.stat.ColumnStat;
 
 @Value
 public class HudiFileStats {
-  Map<OneField, ColumnStat> columnStats;
+  List<ColumnStat> columnStats;
   long rowCount;
 }

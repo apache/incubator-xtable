@@ -43,6 +43,7 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
+import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.sync.TargetClient;
 
 public class IcebergClient implements TargetClient {
@@ -207,5 +208,10 @@ public class IcebergClient implements TargetClient {
       return Optional.empty();
     }
     return OneTableMetadata.fromMap(table.properties());
+  }
+
+  @Override
+  public TableFormat getTableFormat() {
+    return TableFormat.ICEBERG;
   }
 }

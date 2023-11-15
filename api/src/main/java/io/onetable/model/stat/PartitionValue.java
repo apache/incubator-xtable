@@ -16,21 +16,17 @@
  * limitations under the License.
  */
  
-package io.onetable.model;
-
-import java.time.Instant;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
+package io.onetable.model.stat;
 
 import lombok.Builder;
 import lombok.Value;
 
-/** Captures Incremental table changes. */
+import io.onetable.model.schema.OnePartitionField;
+
+/** Associates the partition value with the partition field. */
 @Value
 @Builder
-public class IncrementalTableChanges {
-  Iterator<TableChange> tableChanges;
-  // pending commits before latest commit(write) on the table.
-  @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
+public class PartitionValue {
+  OnePartitionField partitionField;
+  Range range;
 }
