@@ -18,6 +18,8 @@
  
 package io.onetable.hudi;
 
+import static io.onetable.collectors.CustomCollectors.toList;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -67,8 +69,6 @@ import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
-
-import static io.onetable.collectors.CustomCollectors.toList;
 
 /** Extracts all the files for Hudi table represented by {@link OneTable}. */
 public class HudiDataFileExtractor implements AutoCloseable {

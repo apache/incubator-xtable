@@ -18,6 +18,8 @@
  
 package io.onetable.hudi;
 
+import static io.onetable.collectors.CustomCollectors.toList;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -53,8 +55,6 @@ import io.onetable.model.schema.OneType;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
 import io.onetable.model.storage.OneDataFile;
-
-import static io.onetable.collectors.CustomCollectors.toList;
 
 /** Responsible for Column stats extraction for Hudi. */
 @AllArgsConstructor

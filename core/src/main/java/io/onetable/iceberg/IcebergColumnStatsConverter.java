@@ -18,13 +18,14 @@
  
 package io.onetable.iceberg;
 
+import static io.onetable.collectors.CustomCollectors.toList;
+
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -38,8 +39,6 @@ import org.apache.iceberg.types.Types;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.Range;
-
-import static io.onetable.collectors.CustomCollectors.toList;
 
 /** Column stats extractor for iceberg table format. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)

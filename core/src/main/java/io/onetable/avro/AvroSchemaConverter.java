@@ -31,7 +31,6 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import io.onetable.collectors.CustomCollectors;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

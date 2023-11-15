@@ -78,12 +78,19 @@ public class DeltaDataFileUpdatesExtractor {
 
   public Seq<Action> applyDiff(
       OneDataFilesDiff oneDataFilesDiff, OneSchema tableSchema, String tableBasePath) {
-    Stream<Action> addActions = oneDataFilesDiff.getFilesAdded().stream()
+    Stream<Action> addActions =
+        oneDataFilesDiff.getFilesAdded().stream()
             .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath));
-    Stream<Action> removeActions = oneDataFilesDiff.getFilesRemoved().stream()
+    Stream<Action> removeActions =
+        oneDataFilesDiff.getFilesRemoved().stream()
             .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath))
             .map(AddFile::remove);
-    List<Action> allActions = Stream.concat(addActions, removeActions).collect(toList(oneDataFilesDiff.getFilesAdded().size() + oneDataFilesDiff.getFilesRemoved().size()));
+    List<Action> allActions =
+        Stream.concat(addActions, removeActions)
+            .collect(
+                toList(
+                    oneDataFilesDiff.getFilesAdded().size()
+                        + oneDataFilesDiff.getFilesRemoved().size()));
     return JavaConverters.asScalaBuffer(allActions).toSeq();
   }
 
