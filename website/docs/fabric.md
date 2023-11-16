@@ -30,8 +30,8 @@ format using OneTable. After translation, this table will be accessible for quer
 including T-SQL, Spark, and Power BI.
 
 ### Pre-requisites
-* An active Microsoft Fabric workspace ([ref](https://learn.microsoft.com/en-us/fabric/get-started/workspaces)).
-* A storage account with a container in Azure Data Lake Storage Gen2 ([ref](https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction)).
+* An active [Microsoft Fabric Workspace](https://learn.microsoft.com/en-us/fabric/get-started/workspaces).
+* A storage account with a container in [Azure Data Lake Storage Gen2](https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction) (ADLS).
 
 ### Step 1. Create a source table in ADLS
 This step creates a source table in Iceberg or Hudi format in the ADLS storage account. The primary actions to be 
