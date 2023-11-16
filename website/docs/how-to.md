@@ -270,9 +270,15 @@ targetFormats:
 datasets:
   -
     tableBasePath: file:///tmp/iceberg-dataset/people
-    dataBasePath: file:///tmp/iceberg-dataset/people/data
+    tableDataPath: file:///tmp/iceberg-dataset/people/data
     tableName: people
 ```
+:::note Note:
+Iceberg sourceFormat requires `tableDataPath` to be specified because Hudi expects the partition folders to be first
+in the path. If you ignore the `tableDataPath` in the `yaml` file, Hudi target table's `city` column will have values 
+like `data/city=NYC` instead of `city=NYC`.
+:::
+
 </TabItem>
 </Tabs>
 
@@ -296,7 +302,7 @@ targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: s3://path/to/hudi-data  # replace this with gs://path/to/hudi_data if your data is in GCS. 
+    tableBasePath: s3://path/to/hudi-dataset  # replace this with gs://path/to/hudi_data if your data is in GCS. 
     tableName: people
     partitionSpec: city:VALUE
 ```
@@ -311,7 +317,7 @@ targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: s3://path/to/delta-data  # replace this with gs://path/to/delta_data if your data is in GCS. 
+    tableBasePath: s3://path/to/delta-dataset # replace this with gs://path/to/delta_data if your data is in GCS. 
     tableName: people
 ```
 
@@ -325,8 +331,8 @@ targetFormats:
   - DELTA
 datasets:
   -
-    tableBasePath: s3://path/to/iceberg  # replace this with gs://path/to/iceberg_data if your data is in GCS.
-    tableDataPath: s3://path/to/iceberg/data
+    tableBasePath: s3://path/to/iceberg-dataset  # replace this with gs://path/to/iceberg_data if your data is in GCS.
+    tableDataPath: s3://path/to/iceberg-dataset/data
     tableName: people
 ```
 
