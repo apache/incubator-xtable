@@ -106,12 +106,12 @@ This step creates a shortcut in Fabric to the Delta Lake table created in the pr
 the table's data path in ADLS storage account.
 
 1. Navigate to your Fabric Lakehouse and click on the `Tables` and select `New Shortcut`.
-![Invoke new shortcut](/static/images/fabric/shortcut_1_1.png)
+![Invoke new shortcut](/images/fabric/shortcut_1_1.png)
 2. In the `New Shortcut` dialog, select `Azure Delta Lake Storaget Gen2` as the `External Source`
-![Select external source](/static/images/fabric/shortcut_1_2.png)
+![Select external source](/images/fabric/shortcut_1_2.png)
 3. In the `New Shortcut` dialog, enter the `Connection settings` and authorize Fabric to access the storage account.
-![Enter connection settings](/static/images/fabric/shortcut_1_3.png)
+![Enter connection settings](/images/fabric/shortcut_1_3.png)
 4. In the `New Shortcut` dialog, enter the `Shortcut settings` and click `Create`.
-![Enter shortcut settings](/static/images/fabric/shortcut_1_4.png)
+![Enter shortcut settings](/images/fabric/shortcut_1_4.png)
 5. The shortcut is now created and the table is available for querying from Fabric.
-![Shortcut created](/static/images/fabric/shortcut_1_5.png)
+![Shortcut created](/images/fabric/shortcut_1_5.png)
