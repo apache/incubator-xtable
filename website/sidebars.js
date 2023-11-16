@@ -54,6 +54,7 @@ module.exports = {
                         'redshift',
                         'spark',
                         'bigquery',
+                        'fabric',
                         'presto',
                         'snowflake',
                         'trino',
