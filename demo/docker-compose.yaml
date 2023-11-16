@@ -9,18 +9,6 @@ services:
       - ./trino/catalog:/etc/trino/catalog
       - ./data:/home/data
 
-  presto:
-    container_name: presto
-    ports:
-      - '8082:8082'
-    image: 'prestodb/presto:0.283'
-    volumes:
-      - ./presto/catalog:/opt/presto-server/etc/catalog
-      - ./presto/config.properties:/opt/presto-server/etc/config.properties
-      - ./presto/jvm.config:/opt/presto-server/etc/jvm.config
-      - ./presto/node.properties:/opt/presto-server/etc/node.properties
-      - ./data:/home/data
-
   hive-metastore:
     container_name: hive-metastore
     hostname: hive-metastore
