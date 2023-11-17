@@ -302,7 +302,7 @@ targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: s3://path/to/hudi-dataset  # replace this with gs://path/to/hudi_data if your data is in GCS. 
+    tableBasePath: s3://path/to/hudi-dataset/people  # replace this with gs:////path/to/hudi-dataset/people if your data is in GCS. 
     tableName: people
     partitionSpec: city:VALUE
 ```
@@ -317,7 +317,7 @@ targetFormats:
   - ICEBERG
 datasets:
   -
-    tableBasePath: s3://path/to/delta-dataset # replace this with gs://path/to/delta_data if your data is in GCS. 
+    tableBasePath: s3://path/to/delta-dataset/people # replace this with gs:////path/to/delta-dataset/people if your data is in GCS. 
     tableName: people
 ```
 
@@ -331,8 +331,8 @@ targetFormats:
   - DELTA
 datasets:
   -
-    tableBasePath: s3://path/to/iceberg-dataset  # replace this with gs://path/to/iceberg_data if your data is in GCS.
-    tableDataPath: s3://path/to/iceberg-dataset/data
+    tableBasePath: s3://path/to/iceberg-dataset/people  # replace this with gs://path/to/iceberg-dataset/people if your data is in GCS.
+    tableDataPath: s3://path/to/iceberg-dataset/people/data
     tableName: people
 ```
 
