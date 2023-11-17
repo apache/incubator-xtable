@@ -27,11 +27,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import lombok.extern.log4j.Log4j2;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
@@ -50,6 +53,7 @@ import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.sync.TargetClient;
 
+@Log4j2
 public class IcebergClient implements TargetClient {
   private static final String METADATA_DIR_PATH = "/metadata/";
   private final IcebergSchemaExtractor schemaExtractor;
@@ -111,6 +115,8 @@ public class IcebergClient implements TargetClient {
       // Load the table state if it already exists
       this.table = tableManager.getTable(catalogConfig, tableIdentifier, basePath);
     }
+    // Clear any corrupted state before using the target client
+    rollbackCorruptCommits();
   }
 
   @Override
@@ -211,7 +217,6 @@ public class IcebergClient implements TargetClient {
     if (table == null) {
       return Optional.empty();
     }
-    rollbackCorruptCommits();
     return OneTableMetadata.fromMap(table.properties());
   }
 
@@ -221,6 +226,10 @@ public class IcebergClient implements TargetClient {
   }
 
   private void rollbackCorruptCommits() {
+    if (table == null) {
+      // there is no existing table so exit early
+      return;
+    }
     // There are cases when using the HadoopTables API where the table metadata json is updated but
     // the manifest file is not written, causing corruption. This is a workaround to fix the issue.
     if (catalogConfig == null && table.currentSnapshot() != null) {
@@ -230,10 +239,16 @@ public class IcebergClient implements TargetClient {
           table.currentSnapshot().allManifests(table.io());
           validSnapshot = true;
         } catch (NotFoundException ex) {
+          Snapshot currentSnapshot = table.currentSnapshot();
+          log.warn(
+              "Corrupt snapshot detected for table: {} snapshotId: {}. Rolling back to previous snapshot: {}.",
+              tableIdentifier,
+              currentSnapshot.snapshotId(),
+              currentSnapshot.parentId());
           // if we need to rollback, we must also clear the last sync state since that sync is no
           // longer considered valid. This will force OneTable to fall back to a snapshot sync in
           // the subsequent sync round.
-          table.manageSnapshots().rollbackTo(table.currentSnapshot().parentId()).commit();
+          table.manageSnapshots().rollbackTo(currentSnapshot.parentId()).commit();
           Transaction transaction = table.newTransaction();
           transaction
               .updateProperties()

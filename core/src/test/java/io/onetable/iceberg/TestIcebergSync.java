@@ -52,6 +52,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import lombok.SneakyThrows;
+
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,6 +66,7 @@ import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.Metrics;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Namespace;
@@ -82,6 +85,7 @@ import io.onetable.ITOneTableClient;
 import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
+import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
@@ -106,6 +110,7 @@ import io.onetable.spi.sync.TableFormatSync;
 public class TestIcebergSync {
   private static final Random RANDOM = new Random();
   private static final Instant LAST_COMMIT_TIME = Instant.ofEpochSecond(1000);
+  private static final Configuration CONFIGURATION = new Configuration();
 
   @TempDir public static Path tempDir;
 
@@ -177,22 +182,25 @@ public class TestIcebergSync {
     tableName = "test-" + UUID.randomUUID();
     basePath = tempDir.resolve(tableName);
     Files.createDirectories(basePath);
-    icebergClient =
-        new IcebergClient(
-            PerTableConfig.builder()
-                .tableBasePath(basePath.toString())
-                .tableName(tableName)
-                .targetMetadataRetentionInHours(1)
-                .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
-                .build(),
-            new Configuration(),
-            mockSchemaExtractor,
-            mockSchemaSync,
-            mockPartitionSpecExtractor,
-            mockPartitionSpecSync,
-            IcebergDataFileUpdatesSync.of(
-                mockColumnStatsConverter, IcebergPartitionValueConverter.getInstance()),
-            IcebergTableManager.of(new Configuration()));
+    icebergClient = getIcebergClient();
+  }
+
+  private IcebergClient getIcebergClient() {
+    return new IcebergClient(
+        PerTableConfig.builder()
+            .tableBasePath(basePath.toString())
+            .tableName(tableName)
+            .targetMetadataRetentionInHours(1)
+            .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+            .build(),
+        CONFIGURATION,
+        mockSchemaExtractor,
+        mockSchemaSync,
+        mockPartitionSpecExtractor,
+        mockPartitionSpecSync,
+        IcebergDataFileUpdatesSync.of(
+            mockColumnStatsConverter, IcebergPartitionValueConverter.getInstance()),
+        IcebergTableManager.of(CONFIGURATION));
   }
 
   @Test
@@ -312,10 +320,10 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
     schemas.put(schemaVersion2, schema2);
 
-    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, Collections.emptyMap());
-    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, Collections.emptyMap());
-    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyMap());
-    OneDataFile dataFile4 = getOneDataFile(schemaVersion2, 4, Collections.emptyMap());
+    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, Collections.emptyList());
+    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, Collections.emptyList());
+    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyList());
+    OneDataFile dataFile4 = getOneDataFile(schemaVersion2, 4, Collections.emptyList());
     OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
     OneSnapshot snapshot3 = buildSnapshot(table2, schemas, dataFile3, dataFile4);
@@ -333,21 +341,27 @@ public class TestIcebergSync {
     mockColStatsForFile(dataFile3, 2);
     mockColStatsForFile(dataFile4, 1);
 
-    icebergSync.syncSnapshot(snapshot1);
-    icebergSync.syncSnapshot(snapshot2);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot1);
+    long snapshotIdBeforeCorruption = getTable(basePath).currentSnapshot().snapshotId();
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot2);
     String manifestFile =
-        new HadoopTables(new Configuration())
+        new HadoopTables(CONFIGURATION)
             .load(basePath.toString())
             .currentSnapshot()
             .manifestListLocation();
     Files.delete(Paths.get(URI.create(manifestFile)));
 
-    Optional<Instant> actual = getIcebergSync().getLastSyncInstant();
+    Optional<Instant> actual =
+        getIcebergClient().getTableMetadata().map(OneTableMetadata::getLastInstantSynced);
     // assert that the last commit is rolled back and the metadata is removed
     assertFalse(actual.isPresent());
     // get a new iceberg sync to make sure table is re-read from disk and no metadata is cached
-    getIcebergSync().syncSnapshot(snapshot3);
+    TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(icebergClient), snapshot3);
     validateIcebergTable(tableName, table2, Sets.newHashSet(dataFile3, dataFile4), null);
+    // Validate Iceberg table state
+    Table table = getTable(basePath);
+    assertEquals(4, table.history().size());
+    assertEquals(snapshotIdBeforeCorruption, table.currentSnapshot().parentId());
   }
 
   @Test
@@ -716,8 +730,7 @@ public class TestIcebergSync {
       String tableName, OneTable table, Set<OneDataFile> expectedFiles, Expression filterExpression)
       throws IOException {
     Path warehouseLocation = Paths.get(table.getBasePath()).getParent();
-    try (HadoopCatalog catalog =
-        new HadoopCatalog(new Configuration(), warehouseLocation.toString())) {
+    try (HadoopCatalog catalog = new HadoopCatalog(CONFIGURATION, warehouseLocation.toString())) {
       TableIdentifier tableId = TableIdentifier.of(Namespace.empty(), tableName);
       assertTrue(catalog.tableExists(tableId));
       TableScan scan = catalog.loadTable(tableId).newScan();
@@ -740,6 +753,16 @@ public class TestIcebergSync {
           }
         }
       }
+    }
+  }
+
+  @SneakyThrows
+  private Table getTable(Path basePath) {
+    Path warehouseLocation = basePath.getParent();
+    try (HadoopCatalog catalog = new HadoopCatalog(CONFIGURATION, warehouseLocation.toString())) {
+      TableIdentifier tableId = TableIdentifier.of(Namespace.empty(), tableName);
+      assertTrue(catalog.tableExists(tableId));
+      return catalog.loadTable(tableId);
     }
   }
 
