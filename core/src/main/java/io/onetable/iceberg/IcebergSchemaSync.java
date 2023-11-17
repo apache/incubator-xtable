@@ -23,7 +23,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -75,10 +74,8 @@ public class IcebergSchemaSync {
       String parentPath) {
     Map<Integer, Supplier<UpdateSchema>> updates = new HashMap<>();
     Set<String> allColumnNames = new HashSet<>();
-    allColumnNames.addAll(
-        current.fields().stream().map(Types.NestedField::name).collect(Collectors.toList()));
-    allColumnNames.addAll(
-        latest.fields().stream().map(Types.NestedField::name).collect(Collectors.toList()));
+    current.fields().stream().map(Types.NestedField::name).forEach(allColumnNames::add);
+    latest.fields().stream().map(Types.NestedField::name).forEach(allColumnNames::add);
     for (String columnName : allColumnNames) {
       Types.NestedField latestColumn = latest.field(columnName);
       Types.NestedField currentColumn = current.field(columnName);

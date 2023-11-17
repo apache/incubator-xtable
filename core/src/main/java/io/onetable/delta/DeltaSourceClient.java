@@ -194,4 +194,9 @@ public class DeltaSourceClient implements SourceClient<Long> {
       throw new OneIOException("Failed to iterate through Delta data files", e);
     }
   }
+
+  @Override
+  public void close() {
+    // nothing to close
+  }
 }

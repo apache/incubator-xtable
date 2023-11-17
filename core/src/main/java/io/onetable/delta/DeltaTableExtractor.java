@@ -46,9 +46,11 @@ public class DeltaTableExtractor {
     List<OnePartitionField> partitionFields =
         DeltaPartitionExtractor.getInstance()
             .convertFromDeltaPartitionFormat(schema, snapshot.metadata().partitionSchema());
+    // Delta follows Hive Style partitioning layout
+    // (https://delta.io/blog/2023-01-18-add-remove-partition-delta-lake/)
     DataLayoutStrategy dataLayoutStrategy =
         !partitionFields.isEmpty()
-            ? DataLayoutStrategy.DIR_HIERARCHY_PARTITION_VALUES
+            ? DataLayoutStrategy.HIVE_STYLE_PARTITION
             : DataLayoutStrategy.FLAT;
     return OneTable.builder()
         .tableFormat(TableFormat.DELTA)

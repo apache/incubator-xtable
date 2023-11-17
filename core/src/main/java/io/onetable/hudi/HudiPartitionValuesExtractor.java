@@ -22,8 +22,8 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -35,6 +35,7 @@ import lombok.Value;
 import io.onetable.exception.PartitionValuesExtractorException;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneType;
+import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.stat.Range;
 
 /** Extracts Partition Values for Hudi from Partition Path. */
@@ -43,13 +44,13 @@ public class HudiPartitionValuesExtractor {
   private static final String HIVE_DEFAULT_PARTITION = "__HIVE_DEFAULT_PARTITION__";
   @NonNull private final Map<String, String> pathToPartitionFieldFormat;
 
-  public Map<OnePartitionField, Range> extractPartitionValues(
+  public List<PartitionValue> extractPartitionValues(
       List<OnePartitionField> partitionColumns, String partitionPath) {
     if (partitionColumns == null) {
-      return Collections.emptyMap();
+      return Collections.emptyList();
     }
     int totalNumberOfPartitions = partitionColumns.size();
-    Map<OnePartitionField, Range> result = new HashMap<>();
+    List<PartitionValue> result = new ArrayList<>(totalNumberOfPartitions);
     String remainingPartitionPath = partitionPath;
     for (OnePartitionField partitionField : partitionColumns) {
       String sourceFieldName = partitionField.getSourceField().getName();
@@ -69,7 +70,11 @@ public class HudiPartitionValuesExtractor {
         valueAndRemainingPath =
             parsePartitionPath(partitionField, remainingPartitionPath, totalNumberOfPartitions);
       }
-      result.put(partitionField, Range.scalar(valueAndRemainingPath.getValue()));
+      result.add(
+          PartitionValue.builder()
+              .partitionField(partitionField)
+              .range(Range.scalar(valueAndRemainingPath.getValue()))
+              .build());
       remainingPartitionPath = valueAndRemainingPath.getRemainingPath();
     }
     return result;

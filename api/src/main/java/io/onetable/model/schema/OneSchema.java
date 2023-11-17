@@ -20,13 +20,10 @@ package io.onetable.model.schema;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -44,8 +41,6 @@ import lombok.ToString;
 @EqualsAndHashCode
 @ToString
 public class OneSchema {
-  private static final Set<String> METADATA_VALUES =
-      Arrays.stream(MetadataValue.values()).map(MetadataValue::name).collect(Collectors.toSet());
   // The name of this schema
   private final String name;
   // The data type of this schema

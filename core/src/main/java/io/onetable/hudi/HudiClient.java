@@ -18,6 +18,7 @@
  
 package io.onetable.hudi;
 
+import static io.onetable.collectors.CustomCollectors.toList;
 import static io.onetable.hudi.HudiInstantUtils.convertInstantToCommit;
 import static io.onetable.hudi.HudiInstantUtils.parseFromInstantTime;
 
@@ -104,7 +105,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         .pendingCommits(
             pendingInstants.stream()
                 .map(hoodieInstant -> parseFromInstantTime(hoodieInstant.getTimestamp()))
-                .collect(Collectors.toList()))
+                .collect(toList(pendingInstants.size())))
         .build();
   }
 
@@ -283,6 +284,11 @@ public class HudiClient implements SourceClient<HoodieInstant> {
       }
     }
     return mergedList;
+  }
+
+  @Override
+  public void close() {
+    dataFileExtractor.close();
   }
 
   @Value

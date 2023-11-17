@@ -40,7 +40,8 @@ public class ConfigurationBasedPartitionSpecExtractor implements HudiSourceParti
 
   @Override
   public List<OnePartitionField> spec(OneSchema tableSchema) {
-    List<OnePartitionField> partitionFields = new ArrayList<>();
+    List<OnePartitionField> partitionFields =
+        new ArrayList<>(config.getPartitionFieldSpecs().size());
     for (HudiSourceConfig.PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
       OneField sourceField =
           SchemaFieldFinder.getInstance()

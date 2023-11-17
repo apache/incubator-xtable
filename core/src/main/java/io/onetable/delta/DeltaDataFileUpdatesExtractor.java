@@ -18,11 +18,11 @@
  
 package io.onetable.delta;
 
+import static io.onetable.collectors.CustomCollectors.toList;
 import static io.onetable.delta.ScalaUtils.convertJavaMapToScala;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -38,12 +38,12 @@ import scala.collection.Seq;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import io.onetable.exception.OneIOException;
-import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
+import io.onetable.paths.PathUtils;
 import io.onetable.spi.extractor.DataFileIterator;
 
 @Builder
@@ -79,16 +79,19 @@ public class DeltaDataFileUpdatesExtractor {
 
   public Seq<Action> applyDiff(
       OneDataFilesDiff oneDataFilesDiff, OneSchema tableSchema, String tableBasePath) {
-    List<Action> allActions = new ArrayList<>();
-    allActions.addAll(
+    Stream<Action> addActions =
         oneDataFilesDiff.getFilesAdded().stream()
-            .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath))
-            .collect(Collectors.toList()));
-    allActions.addAll(
+            .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath));
+    Stream<Action> removeActions =
         oneDataFilesDiff.getFilesRemoved().stream()
             .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath))
-            .map(AddFile::remove)
-            .collect(Collectors.toList()));
+            .map(AddFile::remove);
+    List<Action> allActions =
+        Stream.concat(addActions, removeActions)
+            .collect(
+                toList(
+                    oneDataFilesDiff.getFilesAdded().size()
+                        + oneDataFilesDiff.getFilesRemoved().size()));
     return JavaConverters.asScalaBuffer(allActions).toSeq();
   }
 
@@ -98,7 +101,7 @@ public class DeltaDataFileUpdatesExtractor {
         new AddFile(
             // Delta Lake supports relative and absolute paths in theory but relative paths seem
             // more commonly supported by query engines in our testing
-            getRelativePath(dataFile.getPhysicalPath(), tableBasePath),
+            PathUtils.getRelativePath(dataFile.getPhysicalPath(), tableBasePath),
             convertJavaMapToScala(deltaPartitionExtractor.partitionValueSerialization(dataFile)),
             dataFile.getFileSizeBytes(),
             dataFile.getLastModified(),
@@ -107,19 +110,11 @@ public class DeltaDataFileUpdatesExtractor {
             null));
   }
 
-  private String getColumnStats(
-      OneSchema schema, long recordCount, Map<OneField, ColumnStat> columnStats) {
+  private String getColumnStats(OneSchema schema, long recordCount, List<ColumnStat> columnStats) {
     try {
       return deltaStatsExtractor.convertStatsToDeltaFormat(schema, recordCount, columnStats);
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Exception during delta stats generation", e);
     }
-  }
-
-  private String getRelativePath(String fullFilePath, String tableBasePath) {
-    if (fullFilePath.startsWith(tableBasePath)) {
-      return fullFilePath.substring(tableBasePath.length() + 1);
-    }
-    return fullFilePath;
   }
 }

@@ -18,6 +18,7 @@
  
 package io.onetable.iceberg;
 
+import static io.onetable.collectors.CustomCollectors.toList;
 import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
 
 import java.util.ArrayList;
@@ -82,7 +83,7 @@ public class IcebergSchemaExtractor {
           recordKeyFields.stream()
               .map(OneField::getPath)
               .filter(path -> partialSchema.findField(convertFromOneTablePath(path)) == null)
-              .collect(Collectors.toList());
+              .collect(toList(recordKeyFields.size()));
       log.error("Missing field IDs for record key field paths: " + missingFieldPaths);
       throw new SchemaExtractorException(
           String.format("Mismatches in converting record key fields: %s", missingFieldPaths));
@@ -122,7 +123,7 @@ public class IcebergSchemaExtractor {
                       iceField.isOptional() ? OneField.Constants.NULL_DEFAULT_VALUE : null)
                   .build();
             })
-        .collect(Collectors.toList());
+        .collect(toList(iceFields.size()));
   }
 
   static String convertFromOneTablePath(String path) {
@@ -140,7 +141,7 @@ public class IcebergSchemaExtractor {
                     field.getFieldId() == null
                         ? fieldIdTracker.incrementAndGet()
                         : field.getFieldId())
-            .collect(Collectors.toList());
+            .collect(toList(schema.getFields().size()));
     List<Types.NestedField> nestedFields = new ArrayList<>(schema.getFields().size());
     for (int i = 0; i < schema.getFields().size(); i++) {
       OneField field = schema.getFields().get(i);

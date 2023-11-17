@@ -12,6 +12,7 @@
 module.exports = {
     docs: [
         "setup",
+        "features-and-limitations",
         {
             type: 'category',
             label: 'Quick Start',
@@ -53,6 +54,7 @@ module.exports = {
                         'redshift',
                         'spark',
                         'bigquery',
+                        'fabric',
                         'presto',
                         'snowflake',
                         'trino',
@@ -60,5 +62,6 @@ module.exports = {
                 }
             ]
         },
+        'demo/docker',
     ],
 };

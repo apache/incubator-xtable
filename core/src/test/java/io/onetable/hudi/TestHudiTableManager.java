@@ -43,6 +43,7 @@ import io.onetable.model.schema.OneField;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.schema.PartitionTransformType;
+import io.onetable.model.storage.DataLayoutStrategy;
 import io.onetable.model.storage.TableFormat;
 
 public class TestHudiTableManager {
@@ -53,8 +54,10 @@ public class TestHudiTableManager {
 
   private final HudiTableManager tableManager = HudiTableManager.of(CONFIGURATION);
 
-  @Test
-  void validateTableInitializedCorrectly() {
+  @ParameterizedTest
+  @MethodSource("dataLayoutAndHivePartitioningEnabled")
+  void validateTableInitializedCorrectly(
+      DataLayoutStrategy dataLayoutStrategy, boolean expectedHivePartitioningEnabled) {
     String tableName = "testing_123";
     String field1 = "field1";
     String field2 = "field2";
@@ -87,6 +90,7 @@ public class TestHudiTableManager {
             // we will use the provided data path as the location so this path should be ignored
             .basePath("file://fake_path")
             .tableFormat(TableFormat.ICEBERG)
+            .layoutStrategy(dataLayoutStrategy)
             .build();
 
     tableManager.initializeHudiTable(tableBasePath, table);
@@ -99,6 +103,9 @@ public class TestHudiTableManager {
             .build();
     assertFalse(metaClient.getTableConfig().populateMetaFields());
     assertEquals(
+        expectedHivePartitioningEnabled,
+        Boolean.valueOf(metaClient.getTableConfig().getHiveStylePartitioningEnable()));
+    assertEquals(
         Arrays.asList(field1, field2),
         Arrays.asList(metaClient.getTableConfig().getPartitionFields().get()));
     assertEquals(
@@ -109,6 +116,13 @@ public class TestHudiTableManager {
     assertEquals(
         "org.apache.hudi.keygen.ComplexKeyGenerator",
         metaClient.getTableConfig().getKeyGeneratorClassName());
+  }
+
+  public static Stream<Arguments> dataLayoutAndHivePartitioningEnabled() {
+    return Stream.of(
+        Arguments.of(DataLayoutStrategy.HIVE_STYLE_PARTITION, true),
+        Arguments.of(DataLayoutStrategy.DIR_HIERARCHY_PARTITION_VALUES, false),
+        Arguments.of(DataLayoutStrategy.FLAT, false));
   }
 
   @Test

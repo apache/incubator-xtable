@@ -25,6 +25,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import io.onetable.iceberg.IcebergCatalogConfig;
 import io.onetable.utilities.RunSync.TableFormatClients;
 import io.onetable.utilities.RunSync.TableFormatClients.ClientConfig;
 
@@ -116,5 +117,21 @@ class TestRunSync {
     Assertions.assertEquals(3, deltaClientConfigs.size());
     Assertions.assertEquals("local[4]", deltaClientConfigs.get("spark.master"));
     Assertions.assertEquals("bar", deltaClientConfigs.get("foo"));
+  }
+
+  @Test
+  public void testIcebergCatalogConfig() throws IOException {
+    String icebergConfig =
+        "catalogImpl: io.onetable.CatalogImpl\n"
+            + "catalogName: test\n"
+            + "catalogOptions: \n"
+            + "  option1: value1\n"
+            + "  option2: value2";
+    IcebergCatalogConfig catalogConfig = RunSync.loadIcebergCatalogConfig(icebergConfig.getBytes());
+    Assertions.assertEquals("io.onetable.CatalogImpl", catalogConfig.getCatalogImpl());
+    Assertions.assertEquals("test", catalogConfig.getCatalogName());
+    Assertions.assertEquals(2, catalogConfig.getCatalogOptions().size());
+    Assertions.assertEquals("value1", catalogConfig.getCatalogOptions().get("option1"));
+    Assertions.assertEquals("value2", catalogConfig.getCatalogOptions().get("option2"));
   }
 }
