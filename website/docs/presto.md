@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 6
 title: "Presto"
 ---
 
@@ -23,7 +23,7 @@ over other columns in the Delta table. During sync, OneTable uses the same logic
 Currently, the generated columns from OneTable sync shows `NULL` when queried from Presto CLI.
 :::
 
-For hands on experimentation, please follow [Creating your first interoperable table](/docs/setup) tutorial
+For hands on experimentation, please follow [Creating your first interoperable table](/docs/how-to) tutorial
 to create OneTable synced tables followed by [Hive Metastore](/docs/hms) tutorial to register the target table
 in Hive Metastore. Once done, follow the below high level steps:
 1. If you are working with a self-managed Presto service, from the presto-server directory run `./bin/launcher run`
