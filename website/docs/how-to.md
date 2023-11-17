@@ -274,9 +274,7 @@ datasets:
     tableName: people
 ```
 :::note Note:
-Iceberg sourceFormat requires `tableDataPath` to be specified because Hudi expects the partition folders to be first
-in the path. If you ignore the `tableDataPath` in the `yaml` file, Hudi target table's `city` column will have values 
-like `data/city=NYC` instead of `city=NYC`.
+Add `tableDataPath` for ICEBERG sourceFormat if the `tableBasePath` is different from the path to the data.
 :::
 
 </TabItem>
@@ -335,6 +333,9 @@ datasets:
     tableDataPath: s3://path/to/iceberg-dataset/people/data
     tableName: people
 ```
+:::note Note:
+Add `tableDataPath` for ICEBERG sourceFormat if the `tableBasePath` is different from the path to the data.
+:::
 
 </TabItem>
 </Tabs>
