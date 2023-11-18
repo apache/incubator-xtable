@@ -19,7 +19,7 @@ This demo was tested in both x86-64 and AArch64 based macOS operating systems
 ## Setting up Docker cluster
 After cloning the OneTable repository, change directory to `demo` and run the `start_demo.sh` script.
 This script builds OneTable jars required for the demo and then spins up docker containers to start a Jupyter notebook
-with Scala interpreter, Hive Metastore and Trino.
+with Scala interpreter, Hive Metastore, Presto and Trino.
 
 ```shell md title="shell"
 cd demo
@@ -29,6 +29,9 @@ cd demo
 ### Accessing Services
 #### Trino
 You can access the local Trino container by running `docker exec -it trino trino`
+
+#### Presto
+You can access the local Presto container by running `docker exec -it presto presto-cli --server localhost:8082`
 
 #### Jupyter Notebook
 To access the notebook, look for a log line during startup that contains `To access the server, open this file in a 
