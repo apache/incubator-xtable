@@ -5,6 +5,10 @@
 [![Site Deploy Status](https://github.com/onetable-io/onetable/actions/workflows/site-deploy.yml/badge.svg)](https://github.com/onetable-io/onetable/actions/workflows/site-deploy.yml)
 [![Package Deploy Status](https://github.com/onetable-io/onetable/actions/workflows/package-deploy.yml/badge.svg)](https://github.com/onetable-io/onetable/actions/workflows/package-deploy.yml)
 
+
+[![Twitter Follow](https://img.shields.io/badge/Twitter-1D9BF0.svg?style=for-the-badge&logo=Twitter&logoColor=white)](https://twitter.com/OnetableOSS)
+[![Linkedin Follow](https://img.shields.io/badge/LinkedIn-0A66C2.svg?style=for-the-badge&logo=LinkedIn&logoColor=white)](https://www.linkedin.com/company/onetable-oss)
+
 OneTable is an omni-directional converter for table formats that facilitates interoperability across data processing systems
 and query engines.
 Currently, OneTable supports widely adopted open-source table formats such as Apache Hudi, Apache Iceberg, and Delta Lake.
