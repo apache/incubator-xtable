@@ -45,12 +45,12 @@ public class TestIcebergPartitionValueConverter {
       IcebergPartitionValueConverter.getInstance();
   private static final Schema SCHEMA =
       new Schema(
-          Types.NestedField.optional(1, "id", Types.IntegerType.get()),
+          Types.NestedField.optional(1, "key", Types.IntegerType.get()),
           Types.NestedField.optional(2, "name", Types.StringType.get()),
           Types.NestedField.optional(3, "birthDate", Types.TimestampType.withZone()));
   private static final Schema SCHEMA_WITH_PARTITION =
       new Schema(
-          Types.NestedField.optional(1, "id", Types.IntegerType.get()),
+          Types.NestedField.optional(1, "key", Types.IntegerType.get()),
           Types.NestedField.optional(2, "name", Types.StringType.get()),
           Types.NestedField.optional(3, "birthDate", Types.TimestampType.withZone()),
           Types.NestedField.optional(4, "birthDate_year", Types.IntegerType.get()));

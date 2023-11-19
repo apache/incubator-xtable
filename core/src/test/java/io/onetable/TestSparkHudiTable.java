@@ -115,34 +115,23 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
   }
 
   /**
-   * Create a test table instance with a schema that has more fields than an instance returned by
-   * {@link #forStandardSchema(String, Path, JavaSparkContext, String, HoodieTableType)}.
-   * Specifically this instance will add a top level field, nested field, field within a list, and
-   * field within a map to ensure schema evolution is properly handled.
+   * Create a test table instance for general testing with given schema and partitioning(if
+   * enabled).
    *
-   * @param tableName name of the table used in the test, should be unique per test within a shared
-   *     directory
-   * @param tempDir directory where table will be written, typically a temporary directory that will
-   *     be cleaned up after the tests.
-   * @param jsc the {@link JavaSparkContext} to use when writing data with Hudi
-   * @param partitionConfig sets the property `hoodie.datasource.write.partitionpath.field` for the
-   *     {@link CustomKeyGenerator}. If null, {@link NonpartitionedKeyGenerator} will be used.
-   * @param tableType the table type to use (MoR or CoW)
-   * @return an instance of the class with this configuration
+   * @param tableName
+   * @param tempDir
+   * @param jsc
+   * @param partitionConfig
+   * @return
    */
-  public static TestSparkHudiTable withAdditionalColumns(
+  public static TestSparkHudiTable forGivenSchemaAndPartitioning(
       String tableName,
       Path tempDir,
       JavaSparkContext jsc,
-      String partitionConfig,
-      HoodieTableType tableType) {
+      Schema tableSchema,
+      String partitionConfig) {
     return new TestSparkHudiTable(
-        tableName,
-        addSchemaEvolutionFieldsToBase(BASIC_SCHEMA),
-        tempDir,
-        jsc,
-        partitionConfig,
-        tableType);
+        tableName, tableSchema, tempDir, jsc, partitionConfig, HoodieTableType.COPY_ON_WRITE);
   }
 
   private TestSparkHudiTable(

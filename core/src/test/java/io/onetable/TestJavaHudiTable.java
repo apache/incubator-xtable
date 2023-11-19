@@ -36,6 +36,7 @@ import lombok.Getter;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.spark.api.java.JavaSparkContext;
 
 import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.client.HoodieJavaWriteClient;
@@ -96,39 +97,23 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   }
 
   /**
-   * Create a test table instance with a schema that has more fields than an instance returned by
-   * {@link #forStandardSchema(String, Path, String, HoodieTableType)}. Specifically this instance
-   * will add a top level field, nested field, field within a list, and field within a map to ensure
-   * schema evolution is properly handled.
+   * Create a test table instance for general testing with given schema and partitioning(if
+   * enabled).
    *
-   * @param tableName name of the table used in the test, should be unique per test within a shared
-   *     directory
-   * @param tempDir directory where table will be written, typically a temporary directory that will
-   *     be cleaned up after the tests.
-   * @param partitionConfig sets the property `hoodie.datasource.write.partitionpath.field` for the
-   *     {@link CustomKeyGenerator}. If null, {@link NonpartitionedKeyGenerator} will be used.
-   * @param tableType the table type to use (MoR or CoW)
-   * @return an instance of the class with this configuration
+   * @param tableName
+   * @param tempDir
+   * @param jsc
+   * @param partitionConfig
+   * @return
    */
-  public static TestJavaHudiTable withAdditionalColumns(
-      String tableName, Path tempDir, String partitionConfig, HoodieTableType tableType) {
-    return new TestJavaHudiTable(
-        tableName,
-        addSchemaEvolutionFieldsToBase(BASIC_SCHEMA),
-        tempDir,
-        partitionConfig,
-        tableType,
-        null);
-  }
-
-  public static TestJavaHudiTable withAdditionalTopLevelField(
+  public static TestJavaHudiTable forGivenSchemaAndPartitioning(
       String tableName,
       Path tempDir,
-      String partitionConfig,
-      HoodieTableType tableType,
-      Schema previousSchema) {
-    return new TestJavaHudiTable(
-        tableName, addTopLevelField(previousSchema), tempDir, partitionConfig, tableType, null);
+      JavaSparkContext jsc,
+      Schema tableSchema,
+      String partitionConfig) {
+    return withSchema(
+        tableName, tempDir, partitionConfig, HoodieTableType.COPY_ON_WRITE, tableSchema);
   }
 
   public static TestJavaHudiTable withSchema(

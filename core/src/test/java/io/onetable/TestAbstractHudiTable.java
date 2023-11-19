@@ -761,6 +761,6 @@ public abstract class TestAbstractHudiTable
 
   @Override
   public String getOrderByColumn() {
-    return "_hoodie_record_key";
+    return RECORD_KEY_FIELD_NAME;
   }
 }

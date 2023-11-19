@@ -670,6 +670,148 @@ public class ITOneTableClient {
     }
   }
 
+  @Test
+  public void roundTripTesting() {
+    SourceClientProvider<?> hudiSourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
+    SourceClientProvider<?> icebergSourceClientProvider =
+        getSourceClientProvider(TableFormat.ICEBERG);
+    SourceClientProvider<?> deltaSourceClientProvider = getSourceClientProvider(TableFormat.DELTA);
+    String onetablePartitionConfig = "level:VALUE";
+    SyncMode syncMode = SyncMode.INCREMENTAL;
+
+    // Create table in hudi and sync to iceberg and delta.
+    String tableName = getTableName();
+    OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
+    List<?> insertRecords;
+    try (GenericTable table =
+        GenericTable.getInstanceWithCommonSchema(
+            tableName, tempDir, sparkSession, jsc, TableFormat.HUDI)) {
+      insertRecords = table.insertRows(100);
+
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
+              .tableBasePath(table.getBasePath())
+              .tableDataPath(table.getDataPath())
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionFieldSpecConfig(onetablePartitionConfig)
+                      .build())
+              .syncMode(syncMode)
+              .build();
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.HUDI, table, Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), 100);
+
+      // make multiple commits and then sync
+      table.insertRows(100);
+      table.upsertRows(insertRecords.subList(0, 20));
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.HUDI, table, Arrays.asList(TableFormat.DELTA, TableFormat.ICEBERG), 200);
+    }
+
+    // Now Get the table as Delta and do Sync to Hudi and Iceberg.
+    try (GenericTable table =
+        GenericTable.getInstanceWithCommonSchema(
+            tableName, tempDir, sparkSession, jsc, TableFormat.DELTA)) {
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+              .tableBasePath(table.getBasePath())
+              .tableDataPath(table.getDataPath())
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionFieldSpecConfig(onetablePartitionConfig)
+                      .build())
+              .syncMode(syncMode)
+              .build();
+
+      table.insertRows(100);
+      oneTableClient.sync(perTableConfig, deltaSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.DELTA, table, Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG), 300);
+
+      table.insertRows(100);
+      oneTableClient.sync(perTableConfig, deltaSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.DELTA, table, Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG), 400);
+
+      table.upsertRows(insertRecords.subList(0, 20));
+      oneTableClient.sync(perTableConfig, deltaSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.DELTA, table, Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG), 400);
+    }
+
+    // Get table as Iceberg and do Sync to Hudi and Delta.
+    try (GenericTable table =
+        GenericTable.getInstanceWithCommonSchema(
+            tableName, tempDir, sparkSession, jsc, TableFormat.ICEBERG)) {
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+              .tableBasePath(table.getBasePath())
+              .tableDataPath(table.getDataPath())
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionFieldSpecConfig(onetablePartitionConfig)
+                      .build())
+              .syncMode(syncMode)
+              .build();
+
+      table.insertRows(100);
+      oneTableClient.sync(perTableConfig, icebergSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.ICEBERG, table, Arrays.asList(TableFormat.HUDI, TableFormat.DELTA), 500);
+
+      table.insertRows(100);
+      oneTableClient.sync(perTableConfig, icebergSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.ICEBERG, table, Arrays.asList(TableFormat.HUDI, TableFormat.DELTA), 600);
+
+      table.upsertRows(insertRecords.subList(0, 20));
+      oneTableClient.sync(perTableConfig, icebergSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.ICEBERG, table, Arrays.asList(TableFormat.HUDI, TableFormat.DELTA), 600);
+    }
+
+    // Get one last time, table as Hudi and do Sync to Iceberg and Delta.
+    try (GenericTable table =
+        GenericTable.getInstanceWithCommonSchema(
+            tableName, tempDir, sparkSession, jsc, TableFormat.HUDI)) {
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
+              .tableBasePath(table.getBasePath())
+              .tableDataPath(table.getDataPath())
+              .hudiSourceConfig(
+                  HudiSourceConfig.builder()
+                      .partitionFieldSpecConfig(onetablePartitionConfig)
+                      .build())
+              .syncMode(syncMode)
+              .build();
+
+      table.insertRows(100);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.HUDI, table, Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), 700);
+
+      table.insertRows(100);
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.HUDI, table, Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), 800);
+
+      table.upsertRows(insertRecords.subList(0, 20));
+      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.HUDI, table, Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), 800);
+    }
+  }
+
   private Map<String, String> getTimeTravelOption(TableFormat tableFormat, Instant time) {
     Map<String, String> options = new HashMap<>();
     switch (tableFormat) {

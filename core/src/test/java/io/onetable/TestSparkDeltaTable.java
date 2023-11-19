@@ -29,6 +29,7 @@ import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import lombok.Getter;
@@ -39,6 +40,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.functions;
+import org.apache.spark.sql.types.StructType;
 
 import org.apache.spark.sql.delta.DeltaLog;
 
@@ -63,18 +65,31 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
 
   public static TestSparkDeltaTable forStandardSchemaAndPartitioning(
       String tableName, Path tempDir, SparkSession sparkSession, String partitionField) {
-    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, partitionField, false);
+    return new TestSparkDeltaTable(
+        tableName, tempDir, sparkSession, Optional.empty(), partitionField, false);
   }
 
   public static TestSparkDeltaTable forSchemaWithAdditionalColumnsAndPartitioning(
       String tableName, Path tempDir, SparkSession sparkSession, String partitionField) {
-    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, partitionField, true);
+    return new TestSparkDeltaTable(
+        tableName, tempDir, sparkSession, Optional.empty(), partitionField, true);
+  }
+
+  public static TestSparkDeltaTable forGivenSchemaAndPartitioning(
+      String tableName,
+      Path tempDir,
+      SparkSession sparkSession,
+      StructType tableSchema,
+      String partitionField) {
+    return new TestSparkDeltaTable(
+        tableName, tempDir, sparkSession, Optional.of(tableSchema), partitionField, false);
   }
 
   public TestSparkDeltaTable(
       String name,
       Path tempDir,
       SparkSession sparkSession,
+      Optional<StructType> tableSchema,
       String partitionField,
       boolean includeAdditionalColumns) {
     try {
@@ -83,7 +98,8 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
       this.sparkSession = sparkSession;
       this.partitionField = partitionField;
       this.includeAdditionalColumns = includeAdditionalColumns;
-      this.testDeltaHelper = createTestDataHelper(partitionField, includeAdditionalColumns);
+      this.testDeltaHelper =
+          createTestDataHelper(tableSchema, partitionField, includeAdditionalColumns);
       testDeltaHelper.createTable(sparkSession, tableName, basePath);
       this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
       this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
@@ -118,7 +134,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
 
   @Override
   public String getOrderByColumn() {
-    return "id";
+    return "key";
   }
 
   @SneakyThrows
@@ -199,7 +215,8 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
   }
 
   private String initBasePath(Path tempDir, String tableName) throws IOException {
-    Path basePath = tempDir.resolve(tableName);
+    // To decouple table name and base path.
+    Path basePath = tempDir.resolve(tableName + "_v1");
     Files.createDirectories(basePath);
     return basePath.toUri().toString();
   }

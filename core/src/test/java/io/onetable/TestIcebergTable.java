@@ -18,6 +18,7 @@
  
 package io.onetable;
 
+import static io.onetable.iceberg.TestIcebergDataHelper.DEFAULT_RECORD_KEY_FIELD;
 import static io.onetable.iceberg.TestIcebergDataHelper.createIcebergDataHelper;
 import static org.apache.iceberg.SnapshotSummary.TOTAL_RECORDS_PROP;
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -70,7 +72,6 @@ import io.onetable.iceberg.TestIcebergDataHelper;
 
 @Getter
 public class TestIcebergTable implements GenericTable<Record, String> {
-  private static final String DEFAULT_RECORD_KEY_FIELD = "id";
   private static final List<String> DEFAULT_PARTITION_FIELDS = Collections.singletonList("level");
 
   private final String tableName;
@@ -87,7 +88,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
         tableName,
         tempDir,
         hadoopConf,
-        DEFAULT_RECORD_KEY_FIELD,
+        Optional.empty(),
         Collections.singletonList(partitionField),
         false);
   }
@@ -98,23 +99,38 @@ public class TestIcebergTable implements GenericTable<Record, String> {
         tableName,
         tempDir,
         hadoopConf,
-        DEFAULT_RECORD_KEY_FIELD,
+        Optional.empty(),
         Collections.singletonList(partitionField),
         true);
+  }
+
+  public static TestIcebergTable forGivenSchemaAndPartitioning(
+      String tableName,
+      Path tempDir,
+      Configuration hadoopConf,
+      Schema tableSchema,
+      String partitionField) {
+    return new TestIcebergTable(
+        tableName,
+        tempDir,
+        hadoopConf,
+        Optional.of(tableSchema),
+        Collections.singletonList(partitionField),
+        false);
   }
 
   public TestIcebergTable(
       String tableName,
       Path tempDir,
       Configuration hadoopConf,
-      String recordKeyField,
+      Optional<Schema> tableSchema,
       List<String> partitionFields,
       boolean includeAdditionalColumns) {
     this.tableName = tableName;
     this.basePath = tempDir.toUri().toString();
     this.icebergDataHelper =
         createIcebergDataHelper(
-            recordKeyField, filterNullFields(partitionFields), includeAdditionalColumns);
+            tableSchema, filterNullFields(partitionFields), includeAdditionalColumns);
     this.schema = icebergDataHelper.getTableSchema();
 
     PartitionSpec partitionSpec = icebergDataHelper.getPartitionSpec();
@@ -294,7 +310,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
 
   @Override
   public String getFilterQuery() {
-    return String.format("%s > 'aaa'", icebergDataHelper.getRecordKeyField());
+    return String.format("%s > 'aaa'", DEFAULT_RECORD_KEY_FIELD);
   }
 
   public Long getLastCommitTimestamp() {
