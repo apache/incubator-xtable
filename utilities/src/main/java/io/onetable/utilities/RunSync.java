@@ -72,7 +72,7 @@ public class RunSync {
 
   private static final Options OPTIONS =
       new Options()
-          .addOption(
+          .addRequiredOption(
               DATASET_CONFIG_OPTION,
               "datasetConfig",
               true,
@@ -93,12 +93,21 @@ public class RunSync {
               ICEBERG_CATALOG_CONFIG_PATH,
               "icebergCatalogConfig",
               true,
-              "The path to a yaml file containing Iceberg catalog configuration. The configuration will be used for any Iceberg source or target.")
+              "The path to a yaml file containing Iceberg catalog configuration. The configuration will be "
+                  + "used for any Iceberg source or target.")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
-  public static void main(String[] args) throws IOException, ParseException {
+  public static void main(String[] args) throws IOException {
     CommandLineParser parser = new DefaultParser();
-    CommandLine cmd = parser.parse(OPTIONS, args);
+
+    CommandLine cmd;
+    try {
+      cmd = parser.parse(OPTIONS, args);
+    } catch (ParseException e) {
+      new HelpFormatter().printHelp("onetable.jar", OPTIONS, true);
+      return;
+    }
+
     if (cmd.hasOption(HELP_OPTION)) {
       HelpFormatter formatter = new HelpFormatter();
       formatter.printHelp("RunSync", OPTIONS);
