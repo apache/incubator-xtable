@@ -120,16 +120,32 @@ public class OneTableClient {
               ? SyncResultForTableFormats.builder().build()
               : syncIncrementalChanges(
                   formatsToSyncIncrementally, lastSyncMetadataByFormat, source);
-      log.info(
-          "OneTable Sync is successful for the following formats "
-              + config.getTargetTableFormats());
       Map<TableFormat, SyncResult> syncResultsMerged =
           new HashMap<>(syncResultForIncrementalSync.getLastSyncResult());
       syncResultsMerged.putAll(syncResultForSnapshotSync.getLastSyncResult());
+      String successfulSyncs =
+          getFormatsWithStatusCode(syncResultsMerged, SyncResult.SyncStatusCode.SUCCESS);
+      if (!successfulSyncs.isEmpty()) {
+        log.info("Sync is successful for the following formats {}", successfulSyncs);
+      }
+      String failedSyncs =
+          getFormatsWithStatusCode(syncResultsMerged, SyncResult.SyncStatusCode.ERROR);
+      if (!failedSyncs.isEmpty()) {
+        log.error("Sync failed for the following formats {}", failedSyncs);
+      }
       return syncResultsMerged;
     } catch (IOException ioException) {
       throw new OneIOException("Failed to close source client", ioException);
     }
+  }
+
+  private static String getFormatsWithStatusCode(
+      Map<TableFormat, SyncResult> syncResultsMerged, SyncResult.SyncStatusCode statusCode) {
+    return syncResultsMerged.entrySet().stream()
+        .filter(entry -> entry.getValue().getStatus().getStatusCode() == statusCode)
+        .map(Map.Entry::getKey)
+        .map(TableFormat::name)
+        .collect(Collectors.joining(","));
   }
 
   private <COMMIT> Map<TableFormat, TargetClient> getFormatsToSyncIncrementally(
