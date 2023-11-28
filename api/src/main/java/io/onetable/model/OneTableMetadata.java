@@ -37,12 +37,12 @@ public class OneTableMetadata {
    * Property name for the lastInstantSynced field from SyncResult, used for persisting
    * lastInstantSynced in the table metadata/properties
    */
-  private static final String ONETABLE_LAST_INSTANT_SYNCED_PROP = "ONETABLE_LAST_INSTANT_SYNCED";
+  public static final String ONETABLE_LAST_INSTANT_SYNCED_PROP = "ONETABLE_LAST_INSTANT_SYNCED";
   /**
    * Property name for the list of instants to consider during the next sync. This list may include
    * out-of-order instants that could be missed without explicit tracking.
    */
-  private static final String INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP =
+  public static final String INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP =
       "INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC";
 
   Instant lastInstantSynced;

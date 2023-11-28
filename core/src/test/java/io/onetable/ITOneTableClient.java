@@ -23,7 +23,10 @@ import static io.onetable.hudi.HudiTestUtil.PartitionConfig;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -617,6 +620,42 @@ public class ITOneTableClient {
       oneTableClient.sync(dualTableConfig, sourceClientProvider);
       checkDatasetEquivalence(
           TableFormat.HUDI, table, Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), 250);
+    }
+  }
+
+  @Test
+  public void testIcebergCorruptedSnapshotRecovery() throws Exception {
+    String tableName = getTableName();
+    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
+      table.insertRows(20);
+      OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
+      PerTableConfig perTableConfig =
+          PerTableConfig.builder()
+              .tableName(tableName)
+              .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+              .tableBasePath(table.getBasePath())
+              .syncMode(SyncMode.INCREMENTAL)
+              .build();
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
+      table.insertRows(10);
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
+      table.insertRows(10);
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
+      // corrupt last two snapshots
+      Table icebergTable = new HadoopTables(jsc.hadoopConfiguration()).load(table.getBasePath());
+      long currentSnapshotId = icebergTable.currentSnapshot().snapshotId();
+      long previousSnapshotId = icebergTable.currentSnapshot().parentId();
+      Files.delete(
+          Paths.get(URI.create(icebergTable.snapshot(currentSnapshotId).manifestListLocation())));
+      Files.delete(
+          Paths.get(URI.create(icebergTable.snapshot(previousSnapshotId).manifestListLocation())));
+      table.insertRows(10);
+      oneTableClient.sync(perTableConfig, sourceClientProvider);
+      checkDatasetEquivalence(
+          TableFormat.HUDI, table, Collections.singletonList(TableFormat.ICEBERG), 50);
     }
   }
 

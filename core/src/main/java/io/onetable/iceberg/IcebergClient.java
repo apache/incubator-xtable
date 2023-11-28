@@ -18,23 +18,30 @@
  
 package io.onetable.iceberg;
 
+import static io.onetable.model.OneTableMetadata.INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP;
+import static io.onetable.model.OneTableMetadata.ONETABLE_LAST_INSTANT_SYNCED_PROP;
+
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import lombok.extern.log4j.Log4j2;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NotFoundException;
 
 import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneTable;
@@ -46,6 +53,7 @@ import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.spi.sync.TargetClient;
 
+@Log4j2
 public class IcebergClient implements TargetClient {
   private static final String METADATA_DIR_PATH = "/metadata/";
   private final IcebergSchemaExtractor schemaExtractor;
@@ -107,6 +115,8 @@ public class IcebergClient implements TargetClient {
       // Load the table state if it already exists
       this.table = tableManager.getTable(catalogConfig, tableIdentifier, basePath);
     }
+    // Clear any corrupted state before using the target client
+    rollbackCorruptCommits();
   }
 
   @Override
@@ -213,5 +223,41 @@ public class IcebergClient implements TargetClient {
   @Override
   public TableFormat getTableFormat() {
     return TableFormat.ICEBERG;
+  }
+
+  private void rollbackCorruptCommits() {
+    if (table == null) {
+      // there is no existing table so exit early
+      return;
+    }
+    // There are cases when using the HadoopTables API where the table metadata json is updated but
+    // the manifest file is not written, causing corruption. This is a workaround to fix the issue.
+    if (catalogConfig == null && table.currentSnapshot() != null) {
+      boolean validSnapshot = false;
+      while (!validSnapshot) {
+        try {
+          table.currentSnapshot().allManifests(table.io());
+          validSnapshot = true;
+        } catch (NotFoundException ex) {
+          Snapshot currentSnapshot = table.currentSnapshot();
+          log.warn(
+              "Corrupt snapshot detected for table: {} snapshotId: {}. Rolling back to previous snapshot: {}.",
+              tableIdentifier,
+              currentSnapshot.snapshotId(),
+              currentSnapshot.parentId());
+          // if we need to rollback, we must also clear the last sync state since that sync is no
+          // longer considered valid. This will force OneTable to fall back to a snapshot sync in
+          // the subsequent sync round.
+          table.manageSnapshots().rollbackTo(currentSnapshot.parentId()).commit();
+          Transaction transaction = table.newTransaction();
+          transaction
+              .updateProperties()
+              .remove(ONETABLE_LAST_INSTANT_SYNCED_PROP)
+              .remove(INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP)
+              .commit();
+          transaction.commitTransaction();
+        }
+      }
+    }
   }
 }
