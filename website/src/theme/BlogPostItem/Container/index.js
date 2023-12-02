@@ -1,11 +1,12 @@
 import React from 'react';
+import Link from '@docusaurus/Link';
 import {useBaseUrlUtils} from '@docusaurus/useBaseUrl';
 import {useBlogPost} from '@docusaurus/theme-common/internal';
 export default function BlogPostItemContainer({children, className}) {
   const {
     frontMatter,
     assets,
-    metadata: {description},
+    metadata: {description, permalink},
   } = useBlogPost();
   const {withBaseUrl} = useBaseUrlUtils();
   const image = assets.image ?? frontMatter.image;
@@ -19,7 +20,25 @@ export default function BlogPostItemContainer({children, className}) {
       itemType="https://schema.org/BlogPosting">
       {description && <meta itemProp="description" content={description} />}
       {image && (
-        <link itemProp="image" href={withBaseUrl(image, {absolute: true})} />
+        <div className="col blogThumbnail" itemProp="blogThumbnail">
+            {
+            location.pathname.startsWith('/blog') ? <Link itemProp="url" to={permalink}>
+                <img
+                    src={withBaseUrl(image, {
+                        absolute: true,
+                    })}
+                    className="blog-image"
+                />
+                </Link> :
+                <img onClick={() => manageVideoOpen(frontMatter?.navigate)}
+                    src={withBaseUrl(image, {
+                        absolute: true,
+                        })}
+                    className={classNames(styles.videoImage, 'blog-image')}
+                />
+            }
+
+        </div>
       )}
       {keywords.length > 0 && (
         <meta itemProp="keywords" content={keywords.join(',')} />
