@@ -375,7 +375,11 @@ public class TestOneTableClient {
   }
 
   private SyncResult buildSyncResult(SyncMode syncMode, Instant lastSyncedInstant) {
-    return SyncResult.builder().mode(syncMode).lastInstantSynced(lastSyncedInstant).build();
+    return SyncResult.builder()
+        .mode(syncMode)
+        .lastInstantSynced(lastSyncedInstant)
+        .status(SyncResult.SyncStatus.SUCCESS)
+        .build();
   }
 
   private OneSnapshot buildOneSnapshot(OneTable oneTable, String version) {

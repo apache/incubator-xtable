@@ -67,7 +67,15 @@ public class IcebergSchemaExtractor {
     AtomicInteger fieldIdTracker = new AtomicInteger(0);
     List<Types.NestedField> nestedFields = convertFields(oneSchema, fieldIdTracker);
     List<OneField> recordKeyFields = oneSchema.getRecordKeyFields();
-    if (recordKeyFields.isEmpty()) {
+    boolean recordKeyFieldsAreNotRequired =
+        recordKeyFields.stream().anyMatch(f -> f.getSchema().isNullable());
+    // Iceberg requires the identifier fields to be required fields, so if any of the record key
+    // fields are nullable, we cannot add the identifier fields to the schema properties.
+    if (!recordKeyFields.isEmpty() && recordKeyFieldsAreNotRequired) {
+      log.warn(
+          "Record key fields are not required. Not setting record key fields in iceberg schema.");
+    }
+    if (recordKeyFields.isEmpty() || recordKeyFieldsAreNotRequired) {
       return new Schema(nestedFields);
     }
     // Find field in iceberg schema that matches each of the record key path and collect ids.
