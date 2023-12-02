@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from '@docusaurus/Link';
+import {useLocation} from 'react-router-dom';
 import {useBaseUrlUtils} from '@docusaurus/useBaseUrl';
 import {useBlogPost} from '@docusaurus/theme-common/internal';
 
@@ -9,6 +10,7 @@ export default function BlogPostItemContainer({children, className}) {
     assets,
     metadata: {description, permalink},
   } = useBlogPost();
+  const location = useLocation();
   const {withBaseUrl} = useBaseUrlUtils();
   const image = assets.image ?? frontMatter.image;
   const keywords = frontMatter.keywords ?? [];
