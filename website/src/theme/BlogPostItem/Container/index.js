@@ -2,6 +2,7 @@ import React from 'react';
 import Link from '@docusaurus/Link';
 import {useBaseUrlUtils} from '@docusaurus/useBaseUrl';
 import {useBlogPost} from '@docusaurus/theme-common/internal';
+
 export default function BlogPostItemContainer({children, className}) {
   const {
     frontMatter,
@@ -11,6 +12,7 @@ export default function BlogPostItemContainer({children, className}) {
   const {withBaseUrl} = useBaseUrlUtils();
   const image = assets.image ?? frontMatter.image;
   const keywords = frontMatter.keywords ?? [];
+
   return (
     <article
       className={className}
@@ -21,23 +23,16 @@ export default function BlogPostItemContainer({children, className}) {
       {description && <meta itemProp="description" content={description} />}
       {image && (
         <div className="col blogThumbnail" itemProp="blogThumbnail">
-            {
-            location.pathname.startsWith('/blog') ? <Link itemProp="url" to={permalink}>
-                <img
-                    src={withBaseUrl(image, {
-                        absolute: true,
-                    })}
-                    className="blog-image"
-                />
-                </Link> :
-                <img onClick={() => manageVideoOpen(frontMatter?.navigate)}
-                    src={withBaseUrl(image, {
-                        absolute: true,
-                        })}
-                    className={classNames(styles.videoImage, 'blog-image')}
-                />
-            }
-
+          {location.pathname.startsWith('/blog') ? (
+            <Link itemProp="url" to={permalink}>
+              <img
+                src={withBaseUrl(image, {
+                  absolute: true,
+                })}
+                className="blog-image"
+              />
+            </Link>
+          ) : null}
         </div>
       )}
       {keywords.length > 0 && (
