@@ -170,7 +170,7 @@ public class ITOneTableClient {
    */
   @ParameterizedTest
   @MethodSource("generateTestParametersForFormatsSyncModesAndPartitioning")
-  public void testVariousOperations(
+  void testVariousOperations(
       TableFormat sourceTableFormat, SyncMode syncMode, boolean isPartitioned) {
     String tableName = getTableName();
     OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
@@ -259,7 +259,7 @@ public class ITOneTableClient {
 
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndSyncModes")
-  public void testConcurrentInsertWritesInSource(
+  void testConcurrentInsertWritesInSource(
       SyncMode syncMode, PartitionConfig partitionConfig) {
     String tableName = getTableName();
     SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
@@ -299,7 +299,7 @@ public class ITOneTableClient {
 
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndSyncModes")
-  public void testConcurrentInsertsAndTableServiceWrites(
+  void testConcurrentInsertsAndTableServiceWrites(
       SyncMode syncMode, PartitionConfig partitionConfig) {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
     SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
@@ -363,7 +363,7 @@ public class ITOneTableClient {
   @EnumSource(
       value = TableFormat.class,
       names = {"HUDI", "DELTA", "ICEBERG"})
-  public void testTimeTravelQueries(TableFormat sourceTableFormat) throws Exception {
+  void testTimeTravelQueries(TableFormat sourceTableFormat) throws Exception {
     String tableName = getTableName();
     try (GenericTable table =
         GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, false)) {
@@ -483,7 +483,7 @@ public class ITOneTableClient {
 
   @ParameterizedTest
   @MethodSource("provideArgsForPartitionTesting")
-  public void testPartitionedData(TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
+  void testPartitionedData(TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
     String tableName = getTableName();
     TableFormat sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
     List<TableFormat> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
@@ -527,7 +527,7 @@ public class ITOneTableClient {
 
   @ParameterizedTest
   @EnumSource(value = SyncMode.class)
-  public void testSyncWithSingleFormat(SyncMode syncMode) {
+  void testSyncWithSingleFormat(SyncMode syncMode) {
     String tableName = getTableName();
     SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
     try (TestJavaHudiTable table =
@@ -570,7 +570,7 @@ public class ITOneTableClient {
   }
 
   @Test
-  public void testOutOfSyncIncrementalSyncs() {
+  void testOutOfSyncIncrementalSyncs() {
     String tableName = getTableName();
     SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
     try (TestJavaHudiTable table =
@@ -624,7 +624,7 @@ public class ITOneTableClient {
   }
 
   @Test
-  public void testIcebergCorruptedSnapshotRecovery() throws Exception {
+  void testIcebergCorruptedSnapshotRecovery() throws Exception {
     String tableName = getTableName();
     SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
     try (TestJavaHudiTable table =
@@ -660,7 +660,7 @@ public class ITOneTableClient {
   }
 
   @Test
-  public void testMetadataRetention() throws Exception {
+  void testMetadataRetention() throws Exception {
     String tableName = getTableName();
     SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
     try (TestJavaHudiTable table =
