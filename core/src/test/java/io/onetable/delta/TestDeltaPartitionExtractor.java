@@ -113,7 +113,7 @@ public class TestDeltaPartitionExtractor {
   private final DeltaSchemaExtractor deltaSchemaExtractor = DeltaSchemaExtractor.getInstance();
 
   @Test
-  public void testUnpartitionedTable() {
+  void testUnpartitionedTable() {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
@@ -123,7 +123,7 @@ public class TestDeltaPartitionExtractor {
   }
 
   @Test
-  public void testSimplePartitionedTable() {
+  void testSimplePartitionedTable() {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("gender"));
@@ -144,7 +144,7 @@ public class TestDeltaPartitionExtractor {
   }
 
   @Test
-  public void testDatePartitionedGeneratedColumnsTable() {
+  void testDatePartitionedGeneratedColumnsTable() {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateOfBirth"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("dateOfBirth"));
@@ -162,7 +162,7 @@ public class TestDeltaPartitionExtractor {
   }
 
   @Test
-  public void testDateFormatPartitionedGeneratedColumnsTable() {
+  void testDateFormatPartitionedGeneratedColumnsTable() {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateFmt"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("dateFmt"));
@@ -255,7 +255,7 @@ public class TestDeltaPartitionExtractor {
 
   // Test for preserving order of partition columns.
   @Test
-  public void testCombinationOfPlainAndGeneratedColumns() {
+  void testCombinationOfPlainAndGeneratedColumns() {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateFmt"));
     StructType partitionSchema =
@@ -295,7 +295,7 @@ public class TestDeltaPartitionExtractor {
   }
 
   @Test
-  public void testSimplePartitionValueExtraction() {
+  void testSimplePartitionValueExtraction() {
     Map<String, String> partitionValuesMap =
         new HashMap<String, String>() {
           {
@@ -342,7 +342,7 @@ public class TestDeltaPartitionExtractor {
   }
 
   @Test
-  public void testDateFormatGeneratedPartitionValueExtraction() {
+  void testDateFormatGeneratedPartitionValueExtraction() {
     // date_partition_column is generated in the table as DATE_FORMAT(some_date_column,
     // 'yyyy-MM-dd-HH')
     // where some_date_column is of timestamp type.
@@ -394,7 +394,7 @@ public class TestDeltaPartitionExtractor {
   }
 
   @Test
-  public void testYearMonthDayHourGeneratedPartitionValueExtraction() {
+  void testYearMonthDayHourGeneratedPartitionValueExtraction() {
     // year, month and day are generated in the table as based on some_date_column which is of
     // timestamp type.
     Map<String, String> partitionValuesMap =

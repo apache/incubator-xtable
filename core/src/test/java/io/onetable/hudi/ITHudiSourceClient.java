@@ -154,7 +154,7 @@ public class ITHudiSourceClient {
   }
 
   @Test
-  public void testOnlyUpsertsAfterInserts() {
+  void testOnlyUpsertsAfterInserts() {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
     PartitionConfig partitionConfig = PartitionConfig.of(null, null);
     String tableName = "test_table_" + UUID.randomUUID();
@@ -201,7 +201,7 @@ public class ITHudiSourceClient {
   }
 
   @Test
-  public void testForIncrementalSyncSafetyCheck() {
+  void testForIncrementalSyncSafetyCheck() {
     HoodieTableType tableType = HoodieTableType.COPY_ON_WRITE;
     PartitionConfig partitionConfig = PartitionConfig.of(null, null);
     String tableName = getTableName();
@@ -241,7 +241,7 @@ public class ITHudiSourceClient {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypes")
-  public void testsForDropPartition(HoodieTableType tableType) {
+  void testsForDropPartition(HoodieTableType tableType) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
         TestSparkHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
@@ -289,7 +289,7 @@ public class ITHudiSourceClient {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypes")
-  public void testsForDeleteAllRecordsInPartition(HoodieTableType tableType) {
+  void testsForDeleteAllRecordsInPartition(HoodieTableType tableType) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
         TestSparkHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
@@ -340,7 +340,7 @@ public class ITHudiSourceClient {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
-  public void testsForClustering(HoodieTableType tableType, PartitionConfig partitionConfig) {
+  void testsForClustering(HoodieTableType tableType, PartitionConfig partitionConfig) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
@@ -405,7 +405,7 @@ public class ITHudiSourceClient {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
-  public void testsForSavepointRestore(HoodieTableType tableType, PartitionConfig partitionConfig) {
+  void testsForSavepointRestore(HoodieTableType tableType, PartitionConfig partitionConfig) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
@@ -450,7 +450,7 @@ public class ITHudiSourceClient {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
-  public void testsForRollbacks(HoodieTableType tableType, PartitionConfig partitionConfig) {
+  void testsForRollbacks(HoodieTableType tableType, PartitionConfig partitionConfig) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(

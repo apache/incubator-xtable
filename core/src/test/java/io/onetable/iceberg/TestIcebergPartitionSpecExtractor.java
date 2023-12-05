@@ -48,7 +48,7 @@ public class TestIcebergPartitionSpecExtractor {
           Types.NestedField.required(4, "string_field", Types.StringType.get()));
 
   @Test
-  public void testUnpartitioned() {
+  void testUnpartitioned() {
     Schema icebergSchema =
         new Schema(Types.NestedField.required(0, "timestamp", Types.TimestampType.withZone()));
     PartitionSpec actual =
@@ -58,7 +58,7 @@ public class TestIcebergPartitionSpecExtractor {
   }
 
   @Test
-  public void testMultiplePartitions() {
+  void testMultiplePartitions() {
     List<OnePartitionField> partitionFieldList =
         Arrays.asList(
             OnePartitionField.builder()
@@ -88,7 +88,7 @@ public class TestIcebergPartitionSpecExtractor {
   }
 
   @Test
-  public void testYearPartitioning() {
+  void testYearPartitioning() {
     List<OnePartitionField> partitionFieldList =
         Collections.singletonList(
             OnePartitionField.builder()
@@ -106,7 +106,7 @@ public class TestIcebergPartitionSpecExtractor {
   }
 
   @Test
-  public void testMonthPartitioning() {
+  void testMonthPartitioning() {
     List<OnePartitionField> partitionFieldList =
         Collections.singletonList(
             OnePartitionField.builder()
@@ -124,7 +124,7 @@ public class TestIcebergPartitionSpecExtractor {
   }
 
   @Test
-  public void testDayPartitioning() {
+  void testDayPartitioning() {
     List<OnePartitionField> partitionFieldList =
         Collections.singletonList(
             OnePartitionField.builder()
@@ -142,7 +142,7 @@ public class TestIcebergPartitionSpecExtractor {
   }
 
   @Test
-  public void testHourPartitioning() {
+  void testHourPartitioning() {
     List<OnePartitionField> partitionFieldList =
         Collections.singletonList(
             OnePartitionField.builder()
@@ -160,7 +160,7 @@ public class TestIcebergPartitionSpecExtractor {
   }
 
   @Test
-  public void testNestedPartitionField() {
+  void testNestedPartitionField() {
     List<OnePartitionField> partitionFieldList =
         Collections.singletonList(
             OnePartitionField.builder()
@@ -187,7 +187,7 @@ public class TestIcebergPartitionSpecExtractor {
   }
 
   @Test
-  public void testFromIcebergUnPartitioned() {
+  void testFromIcebergUnPartitioned() {
     IcebergPartitionSpecExtractor extractor = IcebergPartitionSpecExtractor.getInstance();
     List<OnePartitionField> fields =
         extractor.fromIceberg(PartitionSpec.unpartitioned(), null, null);
@@ -195,7 +195,7 @@ public class TestIcebergPartitionSpecExtractor {
   }
 
   @Test
-  public void testFromIcebergSingleColumn() {
+  void testFromIcebergSingleColumn() {
     IcebergPartitionSpecExtractor extractor = IcebergPartitionSpecExtractor.getInstance();
 
     Schema iceSchema =
@@ -233,7 +233,7 @@ public class TestIcebergPartitionSpecExtractor {
   }
 
   @Test
-  public void testFromIcebergMultiColumn() {
+  void testFromIcebergMultiColumn() {
     IcebergPartitionSpecExtractor extractor = IcebergPartitionSpecExtractor.getInstance();
 
     Schema iceSchema =

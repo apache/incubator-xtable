@@ -52,7 +52,7 @@ public class TestIcebergPartitionSpecSync {
   }
 
   @Test
-  public void testAddPartitionField() {
+  void testAddPartitionField() {
     PartitionSpec currentPartitionSpec = PartitionSpec.unpartitioned();
     PartitionSpec latestPartitionSpec =
         PartitionSpec.builderFor(IcebergTestUtils.SCHEMA).day("timestamp_field").build();
@@ -72,7 +72,7 @@ public class TestIcebergPartitionSpecSync {
   }
 
   @Test
-  public void testRemovePartitionField() {
+  void testRemovePartitionField() {
     PartitionSpec currentPartitionSpec =
         PartitionSpec.builderFor(IcebergTestUtils.SCHEMA)
             .day("timestamp_field")
@@ -95,7 +95,7 @@ public class TestIcebergPartitionSpecSync {
   }
 
   @Test
-  public void testUpdateExistingPartitionField() {
+  void testUpdateExistingPartitionField() {
     PartitionSpec currentPartitionSpec =
         PartitionSpec.builderFor(IcebergTestUtils.SCHEMA).day("timestamp_field").build();
     PartitionSpec latestPartitionSpec =
@@ -117,7 +117,7 @@ public class TestIcebergPartitionSpecSync {
   }
 
   @Test
-  public void testNoUpdate() {
+  void testNoUpdate() {
     PartitionSpec currentPartitionSpec =
         PartitionSpec.builderFor(IcebergTestUtils.SCHEMA).day("timestamp_field").build();
     PartitionSpec latestPartitionSpec =

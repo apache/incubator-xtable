@@ -39,7 +39,7 @@ public class TestIcebergSchemaExtractor {
       IcebergSchemaExtractor.getInstance();
 
   @Test
-  public void testPrimitiveTypes() {
+  void testPrimitiveTypes() {
     int precision = 10;
     int scale = 5;
     Map<OneSchema.MetadataKey, Object> doubleMetadata = new HashMap<>();
@@ -304,7 +304,7 @@ public class TestIcebergSchemaExtractor {
   }
 
   @Test
-  public void testEnums() {
+  void testEnums() {
     // there are no enums in iceberg so we convert them to string
     Map<OneSchema.MetadataKey, Object> requiredEnumMetadata =
         Collections.singletonMap(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
@@ -348,7 +348,7 @@ public class TestIcebergSchemaExtractor {
   }
 
   @Test
-  public void testUuids() {
+  void testUuids() {
     // UUIDs are represented as fixed length byte arrays
     Schema inputSchema =
         new Schema(
@@ -392,7 +392,7 @@ public class TestIcebergSchemaExtractor {
   }
 
   @Test
-  public void testTimestamps() {
+  void testTimestamps() {
     Map<OneSchema.MetadataKey, Object> millisTimestamp =
         Collections.singletonMap(
             OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
@@ -575,7 +575,7 @@ public class TestIcebergSchemaExtractor {
   }
 
   @Test
-  public void testMaps() {
+  void testMaps() {
     OneSchema recordMapElementSchema =
         OneSchema.builder()
             .name("struct")
@@ -703,7 +703,7 @@ public class TestIcebergSchemaExtractor {
   }
 
   @Test
-  public void testLists() {
+  void testLists() {
     OneSchema recordListElementSchema =
         OneSchema.builder()
             .name("struct")
@@ -805,7 +805,7 @@ public class TestIcebergSchemaExtractor {
   }
 
   @Test
-  public void testNestedRecords() {
+  void testNestedRecords() {
     OneSchema oneSchemaRepresentation =
         OneSchema.builder()
             .dataType(OneType.RECORD)
@@ -898,7 +898,7 @@ public class TestIcebergSchemaExtractor {
   }
 
   @Test
-  public void testToIcebergWithNoFieldIdsSet() {
+  void testToIcebergWithNoFieldIdsSet() {
     OneSchema recordListElementSchema =
         OneSchema.builder()
             .name("element")

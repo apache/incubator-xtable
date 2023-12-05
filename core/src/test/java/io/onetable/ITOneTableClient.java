@@ -259,8 +259,7 @@ public class ITOneTableClient {
 
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndSyncModes")
-  void testConcurrentInsertWritesInSource(
-      SyncMode syncMode, PartitionConfig partitionConfig) {
+  void testConcurrentInsertWritesInSource(SyncMode syncMode, PartitionConfig partitionConfig) {
     String tableName = getTableName();
     SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
     List<TableFormat> targetTableFormats = getOtherFormats(TableFormat.HUDI);

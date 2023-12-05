@@ -36,7 +36,7 @@ import io.onetable.model.schema.OneType;
 public class TestDeltaSchemaExtractor {
 
   @Test
-  public void testPrimitiveTypes() {
+  void testPrimitiveTypes() {
     Map<OneSchema.MetadataKey, Object> decimalMetadata = new HashMap<>();
     decimalMetadata.put(OneSchema.MetadataKey.DECIMAL_PRECISION, 10);
     decimalMetadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, 2);
@@ -253,7 +253,7 @@ public class TestDeltaSchemaExtractor {
   }
 
   @Test
-  public void testFixedBytes() {
+  void testFixedBytes() {
     OneSchema oneSchemaRepresentationOriginal =
         OneSchema.builder()
             .name("struct")
@@ -323,7 +323,7 @@ public class TestDeltaSchemaExtractor {
   }
 
   @Test
-  public void testTimestamps() {
+  void testTimestamps() {
     Map<OneSchema.MetadataKey, Object> metadata =
         Collections.singletonMap(
             OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
@@ -407,7 +407,7 @@ public class TestDeltaSchemaExtractor {
   }
 
   @Test
-  public void testEnums() {
+  void testEnums() {
     Map<OneSchema.MetadataKey, Object> requiredEnumMetadata = new HashMap<>();
     requiredEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
     Map<OneSchema.MetadataKey, Object> optionalEnumMetadata = new HashMap<>();
@@ -454,7 +454,7 @@ public class TestDeltaSchemaExtractor {
   }
 
   @Test
-  public void testMaps() {
+  void testMaps() {
     OneSchema recordMapElementSchema =
         OneSchema.builder()
             .name("struct")
@@ -572,7 +572,7 @@ public class TestDeltaSchemaExtractor {
   }
 
   @Test
-  public void testLists() {
+  void testLists() {
     OneSchema recordListElementSchema =
         OneSchema.builder()
             .name("struct")
@@ -666,7 +666,7 @@ public class TestDeltaSchemaExtractor {
   }
 
   @Test
-  public void testNestedRecords() {
+  void testNestedRecords() {
     OneSchema oneSchemaRepresentation =
         OneSchema.builder()
             .name("struct")
@@ -755,7 +755,7 @@ public class TestDeltaSchemaExtractor {
   }
 
   @Test
-  public void testFieldIdsInDeltaSchema() {
+  void testFieldIdsInDeltaSchema() {
     StructType structRepresentation =
         new StructType()
             .add(

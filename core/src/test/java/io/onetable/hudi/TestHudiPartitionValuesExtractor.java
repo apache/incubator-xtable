@@ -44,7 +44,7 @@ import io.onetable.model.stat.Range;
 public class TestHudiPartitionValuesExtractor {
 
   @Test
-  public void testSingleColumn() {
+  void testSingleColumn() {
     OnePartitionField column =
         OnePartitionField.builder()
             .sourceField(
@@ -66,7 +66,7 @@ public class TestHudiPartitionValuesExtractor {
   }
 
   @Test
-  public void testSingleColumnValueWithSlashes() {
+  void testSingleColumnValueWithSlashes() {
     OnePartitionField column =
         OnePartitionField.builder()
             .sourceField(
@@ -191,7 +191,7 @@ public class TestHudiPartitionValuesExtractor {
 
   @ParameterizedTest
   @MethodSource(value = "dateAndTimeParameters")
-  public void testDateAndTimeFormats(
+  void testDateAndTimeFormats(
       long partitionValue,
       String format,
       String partitionString,
@@ -224,7 +224,7 @@ public class TestHudiPartitionValuesExtractor {
   }
 
   @Test
-  public void testMultipleColumns() {
+  void testMultipleColumns() {
     Map<OneSchema.MetadataKey, Object> timeFieldMetadata = new HashMap<>();
     timeFieldMetadata.put(
         OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
@@ -279,7 +279,7 @@ public class TestHudiPartitionValuesExtractor {
   }
 
   @Test
-  public void testMultipleColumnsWithDefaultHivePartition() {
+  void testMultipleColumnsWithDefaultHivePartition() {
     OnePartitionField column1 =
         OnePartitionField.builder()
             .sourceField(
@@ -324,7 +324,7 @@ public class TestHudiPartitionValuesExtractor {
   }
 
   @Test
-  public void testHiveStyle() {
+  void testHiveStyle() {
     OnePartitionField column1 =
         OnePartitionField.builder()
             .sourceField(
@@ -357,7 +357,7 @@ public class TestHudiPartitionValuesExtractor {
   }
 
   @Test
-  public void testHiveStyleWithDefaultPartition() {
+  void testHiveStyleWithDefaultPartition() {
     OnePartitionField column1 =
         OnePartitionField.builder()
             .sourceField(
@@ -391,7 +391,7 @@ public class TestHudiPartitionValuesExtractor {
   }
 
   @Test
-  public void testPartitionCountMismatch() {
+  void testPartitionCountMismatch() {
     OnePartitionField column1 =
         OnePartitionField.builder()
             .sourceField(
@@ -421,7 +421,7 @@ public class TestHudiPartitionValuesExtractor {
   }
 
   @Test
-  public void testNoPartitionColumnsConfigured() {
+  void testNoPartitionColumnsConfigured() {
     List<PartitionValue> actual =
         new HudiPartitionValuesExtractor(Collections.emptyMap())
             .extractPartitionValues(Collections.emptyList(), "column1=foo/column2=32");
@@ -429,7 +429,7 @@ public class TestHudiPartitionValuesExtractor {
   }
 
   @Test
-  public void testNullPartitionColumns() {
+  void testNullPartitionColumns() {
     List<PartitionValue> actual =
         new HudiPartitionValuesExtractor(Collections.emptyMap())
             .extractPartitionValues(null, "column1=foo/column2=32");
@@ -437,7 +437,7 @@ public class TestHudiPartitionValuesExtractor {
   }
 
   @Test
-  public void testPartitionFormatMismatch() {
+  void testPartitionFormatMismatch() {
     OnePartitionField column =
         OnePartitionField.builder()
             .sourceField(

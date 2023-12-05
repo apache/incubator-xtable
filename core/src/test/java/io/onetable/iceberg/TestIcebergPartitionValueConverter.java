@@ -65,7 +65,7 @@ public class TestIcebergPartitionValueConverter {
       IcebergSchemaExtractor.getInstance().fromIceberg(SCHEMA);
 
   @Test
-  public void testToOneTableNotPartitioned() {
+  void testToOneTableNotPartitioned() {
     PartitionSpec partitionSpec = PartitionSpec.unpartitioned();
     List<PartitionValue> partitionValues =
         partitionValueConverter.toOneTable(buildOnetable(false), STRUCT_LIKE_RECORD, partitionSpec);
@@ -73,7 +73,7 @@ public class TestIcebergPartitionValueConverter {
   }
 
   @Test
-  public void testToOneTableValuePartitioned() {
+  void testToOneTableValuePartitioned() {
     List<PartitionValue> expectedPartitionValues =
         Collections.singletonList(
             PartitionValue.builder()
@@ -91,7 +91,7 @@ public class TestIcebergPartitionValueConverter {
   }
 
   @Test
-  public void testToOneTableYearPartitioned() {
+  void testToOneTableYearPartitioned() {
     List<PartitionValue> expectedPartitionValues =
         Collections.singletonList(
             PartitionValue.builder()

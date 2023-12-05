@@ -76,14 +76,14 @@ public class TestIcebergSchemaSync {
   private final Transaction mockTransaction = Mockito.mock(Transaction.class);
 
   @Test
-  public void testSameSchema() {
+  void testSameSchema() {
     schemaSync.sync(SCHEMA, SCHEMA, mockTransaction);
 
     Mockito.verify(mockTransaction, Mockito.never()).updateSchema();
   }
 
   @Test
-  public void testAddRequiredColumn() {
+  void testAddRequiredColumn() {
     String columnName = "addedColumn";
     String doc = "doc";
     Type type = Types.BooleanType.get();
@@ -97,7 +97,7 @@ public class TestIcebergSchemaSync {
   }
 
   @Test
-  public void testAddOptionalColumn() {
+  void testAddOptionalColumn() {
     String columnName = "addedColumn";
     String doc = "doc";
     Type type = Types.BooleanType.get();
@@ -111,7 +111,7 @@ public class TestIcebergSchemaSync {
   }
 
   @Test
-  public void testFieldOrderingCarriesThroughUpdate() {
+  void testFieldOrderingCarriesThroughUpdate() {
     String columnName = "addedColumn";
     String nestedColumnName = "addedNestedColumn";
     String doc = "doc";
@@ -132,7 +132,7 @@ public class TestIcebergSchemaSync {
   }
 
   @Test
-  public void testDropColumn() {
+  void testDropColumn() {
     UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
     when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
 
@@ -143,7 +143,7 @@ public class TestIcebergSchemaSync {
   }
 
   @Test
-  public void testAddNestedColumn() {
+  void testAddNestedColumn() {
     String columnName = "addedColumn";
     String doc = "doc";
     Type type = Types.BooleanType.get();
@@ -157,7 +157,7 @@ public class TestIcebergSchemaSync {
   }
 
   @Test
-  public void testDropNestedColumn() {
+  void testDropNestedColumn() {
     UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
     when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
 
@@ -168,7 +168,7 @@ public class TestIcebergSchemaSync {
   }
 
   @Test
-  public void testUpdateListElement() {
+  void testUpdateListElement() {
     UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
     when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
 
@@ -181,7 +181,7 @@ public class TestIcebergSchemaSync {
   }
 
   @Test
-  public void testUpdateMapValue() {
+  void testUpdateMapValue() {
     UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
     when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
 
@@ -194,7 +194,7 @@ public class TestIcebergSchemaSync {
   }
 
   @Test
-  public void testUpdateMapKey() {
+  void testUpdateMapKey() {
     // iceberg does not allow the key to be updated
     UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
     when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
@@ -207,7 +207,7 @@ public class TestIcebergSchemaSync {
   }
 
   @Test
-  public void testMakeExistingColumnOptional() {
+  void testMakeExistingColumnOptional() {
     UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
     when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
 
@@ -218,7 +218,7 @@ public class TestIcebergSchemaSync {
   }
 
   @Test
-  public void testMakeExistingColumnRequired() {
+  void testMakeExistingColumnRequired() {
     UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
     when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
 

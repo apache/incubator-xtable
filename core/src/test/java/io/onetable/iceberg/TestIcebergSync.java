@@ -204,7 +204,7 @@ public class TestIcebergSync {
   }
 
   @Test
-  public void testCreateSnapshotControlFlow() throws Exception {
+  void testCreateSnapshotControlFlow() throws Exception {
     // Test two iterations of the iceberg snapshot flow
     List<OneField> fields2 = new ArrayList<>(oneSchema.getFields());
     fields2.add(
@@ -300,7 +300,7 @@ public class TestIcebergSync {
   }
 
   @Test
-  public void testIncompleteWriteRollback() throws Exception {
+  void testIncompleteWriteRollback() throws Exception {
     List<OneField> fields2 = new ArrayList<>(oneSchema.getFields());
     fields2.add(
         OneField.builder()
@@ -365,7 +365,7 @@ public class TestIcebergSync {
   }
 
   @Test
-  public void testTimestampPartitioning() throws Exception {
+  void testTimestampPartitioning() throws Exception {
     // test partition filtering
     OnePartitionField partitionField =
         OnePartitionField.builder()
@@ -430,7 +430,7 @@ public class TestIcebergSync {
   }
 
   @Test
-  public void testDatePartitioning() throws Exception {
+  void testDatePartitioning() throws Exception {
     // test partition filtering
     OnePartitionField partitionField =
         OnePartitionField.builder()
@@ -491,7 +491,7 @@ public class TestIcebergSync {
   }
 
   @Test
-  public void testNumericFieldPartitioning() throws Exception {
+  void testNumericFieldPartitioning() throws Exception {
     // test partition filtering
     OnePartitionField partitionField =
         OnePartitionField.builder()
@@ -546,7 +546,7 @@ public class TestIcebergSync {
   }
 
   @Test
-  public void testMultipleFieldPartitioning() throws Exception {
+  void testMultipleFieldPartitioning() throws Exception {
     // test partition filtering
     OnePartitionField partitionField1 =
         OnePartitionField.builder()
@@ -627,7 +627,7 @@ public class TestIcebergSync {
   }
 
   @Test
-  public void testNestedFieldPartitioning() throws Exception {
+  void testNestedFieldPartitioning() throws Exception {
     // test partition filtering
     OnePartitionField partitionField =
         OnePartitionField.builder()

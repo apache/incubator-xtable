@@ -33,7 +33,7 @@ import io.onetable.model.schema.OneSchema;
 public class TestHudiSchemaExtractor {
 
   @Test
-  public void testHoodieTableSchema() {
+  void testHoodieTableSchema() {
     AvroSchemaConverter mockConverter = mock(AvroSchemaConverter.class);
     OneSchema mockOutput = OneSchema.builder().name("fake schema").build();
     Schema schema = SchemaBuilder.record("fake").fields().requiredString("foo").endRecord();

@@ -134,7 +134,7 @@ class TestIcebergSourceClient {
   }
 
   @Test
-  public void testGetCurrentSnapshot(@TempDir Path workingDir) throws IOException {
+  void testGetCurrentSnapshot(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestTableWithData(workingDir.toString());
     Snapshot iceCurrentSnapshot = catalogSales.currentSnapshot();
 
@@ -184,7 +184,7 @@ class TestIcebergSourceClient {
   }
 
   @Test
-  public void testGetTableChangeForCommit(@TempDir Path workingDir) throws IOException {
+  void testGetTableChangeForCommit(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestTableWithData(workingDir.toString());
     String tableLocation = catalogSales.location();
     assertEquals(5, getDataFileCount(catalogSales));
@@ -263,7 +263,7 @@ class TestIcebergSourceClient {
   }
 
   @Test
-  public void testGetCurrentCommitState(@TempDir Path workingDir) throws IOException {
+  void testGetCurrentCommitState(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestTableWithData(workingDir.toString());
     String tablePath = catalogSales.location();
     Snapshot snapshot1 = catalogSales.currentSnapshot();

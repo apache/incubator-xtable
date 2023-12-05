@@ -51,7 +51,7 @@ public class TestIdTracker {
   private final IdTracker idTracker = IdTracker.getInstance();
 
   @Test
-  public void testIdTrackingBootstrapWithSchema() {
+  void testIdTrackingBootstrapWithSchema() {
     Schema input = new Schema.Parser().parse(COMPLEX_SCHEMA);
     // initially schema does not have id tracking set so must bootstrap even though there is a
     // previous schema
@@ -63,7 +63,7 @@ public class TestIdTracker {
   }
 
   @Test
-  public void testIdTrackingBootstrapWithoutSchema() {
+  void testIdTrackingBootstrapWithoutSchema() {
     Schema input = new Schema.Parser().parse(COMPLEX_SCHEMA);
     Schema schemaWithIdTracking = idTracker.addIdTracking(input, Option.empty(), true);
     IdTracking actual = idTracker.getIdTracking(schemaWithIdTracking).get();
@@ -71,7 +71,7 @@ public class TestIdTracker {
   }
 
   @Test
-  public void testIdTrackingWithIdenticalSchemas() {
+  void testIdTrackingWithIdenticalSchemas() {
     Schema input = new Schema.Parser().parse(COMPLEX_SCHEMA);
     Schema inputWithIdTracking = idTracker.addIdTracking(input, Option.empty(), true);
     // Should be a no-op
@@ -82,7 +82,7 @@ public class TestIdTracker {
   }
 
   @Test
-  public void testIdTrackingWithPreviousSchema() {
+  void testIdTrackingWithPreviousSchema() {
     Schema initial =
         idTracker.addIdTracking(
             new Schema.Parser().parse(COMPLEX_SCHEMA_PRE_EVOLUTION), Option.empty(), true);
@@ -93,7 +93,7 @@ public class TestIdTracker {
   }
 
   @Test
-  public void testIdTrackingWithPreviousSchemaWithoutMetaFields() {
+  void testIdTrackingWithPreviousSchemaWithoutMetaFields() {
     Schema initial =
         idTracker.addIdTracking(
             new Schema.Parser().parse(COMPLEX_SCHEMA_PRE_EVOLUTION), Option.empty(), false);
@@ -104,7 +104,7 @@ public class TestIdTracker {
   }
 
   @Test
-  public void testIdTrackingWithFieldRemoval() {
+  void testIdTrackingWithFieldRemoval() {
     // create initial schema with 2 fields and assign IDs
     Schema initial =
         Schema.createRecord(
@@ -151,7 +151,7 @@ public class TestIdTracker {
   }
 
   @Test
-  public void testIdTrackingAddMetaFields() {
+  void testIdTrackingAddMetaFields() {
     // create initial schema with a meta field manually specified
     Schema initial =
         Schema.createRecord(

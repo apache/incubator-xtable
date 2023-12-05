@@ -319,7 +319,7 @@ public class ITDeltaSourceClient {
 
   @ParameterizedTest
   @MethodSource("testWithPartitionToggle")
-  public void testInsertsUpsertsAndDeletes(boolean isPartitioned) {
+  void testInsertsUpsertsAndDeletes(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(
@@ -373,7 +373,7 @@ public class ITDeltaSourceClient {
   }
 
   @Test
-  public void testsShowingVacuumHasNoEffectOnIncrementalSync() {
+  void testsShowingVacuumHasNoEffectOnIncrementalSync() {
     boolean isPartitioned = true;
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
@@ -424,7 +424,7 @@ public class ITDeltaSourceClient {
 
   @ParameterizedTest
   @MethodSource("testWithPartitionToggle")
-  public void testVacuum(boolean isPartitioned) {
+  void testVacuum(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(
@@ -478,7 +478,7 @@ public class ITDeltaSourceClient {
 
   @ParameterizedTest
   @MethodSource("testWithPartitionToggle")
-  public void testAddColumns(boolean isPartitioned) {
+  void testAddColumns(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(
@@ -523,7 +523,7 @@ public class ITDeltaSourceClient {
   }
 
   @Test
-  public void testDropPartition() {
+  void testDropPartition() {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(tableName, tempDir, sparkSession, "yearOfBirth", false);
@@ -579,7 +579,7 @@ public class ITDeltaSourceClient {
 
   @ParameterizedTest
   @MethodSource("testWithPartitionToggle")
-  public void testOptimizeAndClustering(boolean isPartitioned) {
+  void testOptimizeAndClustering(boolean isPartitioned) {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(

@@ -37,7 +37,7 @@ import io.onetable.model.schema.OneType;
 
 public class TestAvroSchemaConverter {
   @Test
-  public void testPrimitiveTypes() {
+  void testPrimitiveTypes() {
     String schemaName = "testRecord";
     String doc = "What's up doc";
     Schema avroRepresentation =
@@ -225,7 +225,7 @@ public class TestAvroSchemaConverter {
   }
 
   @Test
-  public void testAvroNestedRecords() {
+  void testAvroNestedRecords() {
     Schema avroRepresentation =
         new Schema.Parser()
             .parse(
@@ -306,7 +306,7 @@ public class TestAvroSchemaConverter {
   }
 
   @Test
-  public void testAvroLists() {
+  void testAvroLists() {
     Schema avroRepresentation =
         new Schema.Parser()
             .parse(
@@ -396,7 +396,7 @@ public class TestAvroSchemaConverter {
   }
 
   @Test
-  public void testAvroMaps() {
+  void testAvroMaps() {
     Schema avroRepresentation =
         new Schema.Parser()
             .parse(
@@ -508,7 +508,7 @@ public class TestAvroSchemaConverter {
   }
 
   @Test
-  public void testAvroLogicalTypes() {
+  void testAvroLogicalTypes() {
     Schema avroRepresentation =
         new Schema.Parser()
             .parse(
@@ -630,7 +630,7 @@ public class TestAvroSchemaConverter {
   }
 
   @Test
-  public void testIdSupport() {
+  void testIdSupport() {
     Schema avroRepresentation =
         new Schema.Parser()
             .parse(

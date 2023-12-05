@@ -33,7 +33,7 @@ class TestRunSync {
 
   /** Tests that the default hadoop configs are loaded. */
   @Test
-  public void testLoadDefaultHadoopConfig() {
+  void testLoadDefaultHadoopConfig() {
     Configuration conf;
     conf = new Configuration();
     String value = conf.get("fs.file.impl");
@@ -46,7 +46,7 @@ class TestRunSync {
 
   /** Tests that the custom hadoop configs are loaded and can override defaults. */
   @Test
-  public void testLoadCustomHadoopConfig() {
+  void testLoadCustomHadoopConfig() {
     Configuration conf;
     conf = new Configuration();
     String value = conf.get("fs.azure.account.oauth2.client.endpoint");
@@ -73,7 +73,7 @@ class TestRunSync {
   }
 
   @Test
-  public void testTableFormatClientConfigDefault() throws IOException {
+  void testTableFormatClientConfigDefault() throws IOException {
     TableFormatClients clients = RunSync.loadTableFormatClientConfigs(null);
     Map<String, ClientConfig> tfClients = clients.getTableFormatsClients();
     Assertions.assertEquals(3, tfClients.size());
@@ -93,7 +93,7 @@ class TestRunSync {
   }
 
   @Test
-  public void testTableFormatClientCustom() throws IOException {
+  void testTableFormatClientCustom() throws IOException {
     String customClients =
         "tableFormatsClients:\n"
             + "  HUDI:\n"
@@ -120,7 +120,7 @@ class TestRunSync {
   }
 
   @Test
-  public void testIcebergCatalogConfig() throws IOException {
+  void testIcebergCatalogConfig() throws IOException {
     String icebergConfig =
         "catalogImpl: io.onetable.CatalogImpl\n"
             + "catalogName: test\n"

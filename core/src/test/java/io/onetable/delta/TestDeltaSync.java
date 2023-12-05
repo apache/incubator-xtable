@@ -136,7 +136,7 @@ public class TestDeltaSync {
   }
 
   @Test
-  public void testCreateSnapshotControlFlow() throws Exception {
+  void testCreateSnapshotControlFlow() throws Exception {
     OneSchema schema1 = getOneSchema();
     List<OneField> fields2 = new ArrayList<>(schema1.getFields());
     fields2.add(
@@ -164,7 +164,7 @@ public class TestDeltaSync {
   }
 
   @Test
-  public void testPrimitiveFieldPartitioning() throws Exception {
+  void testPrimitiveFieldPartitioning() throws Exception {
     OneSchema schema = getOneSchema();
     OnePartitionField onePartitionField =
         OnePartitionField.builder()
@@ -209,7 +209,7 @@ public class TestDeltaSync {
   }
 
   @Test
-  public void testMultipleFieldPartitioning() throws Exception {
+  void testMultipleFieldPartitioning() throws Exception {
     OneSchema schema = getOneSchema();
     OnePartitionField onePartitionField1 =
         OnePartitionField.builder()
@@ -288,7 +288,7 @@ public class TestDeltaSync {
   // generated column.
   @ParameterizedTest
   @MethodSource(value = "timestampPartitionTestingArgs")
-  public void testTimestampPartitioning(PartitionTransformType transformType) throws Exception {
+  void testTimestampPartitioning(PartitionTransformType transformType) throws Exception {
     OneSchema schema = getOneSchema();
     OnePartitionField partitionField =
         OnePartitionField.builder()

@@ -49,7 +49,7 @@ public class TestIcebergColumnStatsConverter {
   private static final CharsetEncoder ENCODER = StandardCharsets.UTF_8.newEncoder();
 
   @Test
-  public void testMetricsCreation() throws Exception {
+  void testMetricsCreation() throws Exception {
     long totalRowCount = 98776;
     Schema icebergSchema = IcebergTestUtils.SCHEMA;
     OneField timestampField =
@@ -226,7 +226,7 @@ public class TestIcebergColumnStatsConverter {
   }
 
   @Test
-  public void testNullMinMaxValues() {
+  void testNullMinMaxValues() {
     long totalRowCount = 98776;
     Schema icebergSchema =
         new Schema(Types.NestedField.required(1, "date_field", Types.DateType.get()));

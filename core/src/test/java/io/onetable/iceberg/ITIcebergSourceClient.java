@@ -67,7 +67,7 @@ public class ITIcebergSourceClient {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  public void testInsertsUpsertsAndDeletes(boolean isPartitioned) {
+  void testInsertsUpsertsAndDeletes(boolean isPartitioned) {
     String tableName = getTableName();
     try (TestIcebergTable testIcebergTable =
         TestIcebergTable.forStandardSchemaAndPartitioning(
@@ -124,7 +124,7 @@ public class ITIcebergSourceClient {
   }
 
   @Test
-  public void testDropPartition() {
+  void testDropPartition() {
     String tableName = getTableName();
     try (TestIcebergTable testIcebergTable =
         TestIcebergTable.forStandardSchemaAndPartitioning(
@@ -183,7 +183,7 @@ public class ITIcebergSourceClient {
   }
 
   @Test
-  public void testDeleteAllRecordsInPartition() {
+  void testDeleteAllRecordsInPartition() {
     String tableName = getTableName();
     try (TestIcebergTable testIcebergTable =
         TestIcebergTable.forStandardSchemaAndPartitioning(
@@ -243,7 +243,7 @@ public class ITIcebergSourceClient {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  public void testExpireSnapshots(boolean isPartitioned) throws InterruptedException {
+  void testExpireSnapshots(boolean isPartitioned) throws InterruptedException {
     String tableName = getTableName();
     try (TestIcebergTable testIcebergTable =
         TestIcebergTable.forStandardSchemaAndPartitioning(
@@ -303,7 +303,7 @@ public class ITIcebergSourceClient {
   @SneakyThrows
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  public void testForIncrementalSyncSafetyCheck(boolean shouldExpireSnapshots) {
+  void testForIncrementalSyncSafetyCheck(boolean shouldExpireSnapshots) {
     String tableName = getTableName();
     try (TestIcebergTable testIcebergTable =
         TestIcebergTable.forStandardSchemaAndPartitioning(

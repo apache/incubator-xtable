@@ -48,7 +48,7 @@ public class TestDeltaStatsExtractor {
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Test
-  public void testDeltaStats() throws JsonProcessingException {
+  void testDeltaStats() throws JsonProcessingException {
     OneSchema schema = ColumnStatMapUtil.getSchema();
 
     List<ColumnStat> columnStats = getColumnStats();
