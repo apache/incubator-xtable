@@ -53,7 +53,8 @@ datasets:
     tableBasePath: abfs://container@storage.dfs.core.windows.net/multi-partition-dataset
     tableName: multi_partition_dataset
 ```
-- `tableFormats` is a list of formats you want to create from your source tables
+- `sourceFormat`  is the format of the source table that you want to convert
+- `targetFormats` is a list of formats you want to create from your source tables
 - `tableBasePath` is the basePath of the table
 - `tableDataPath` is an optional field specifying the path to the data files. If not specified, the tableBasePath will be used. For Iceberg source tables, you will need to specify the `/data` path.
 - `namespace` is an optional field specifying the namespace of the table and will be used when syncing to a catalog.
