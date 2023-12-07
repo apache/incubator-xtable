@@ -287,7 +287,7 @@ public class AvroSchemaConverter {
   }
 
   private static Object getDefaultValue(Schema.Field avroField) {
-    return Schema.Field.NULL_VALUE.equals(avroField.defaultVal())
+    return Schema.Field.NULL_DEFAULT_VALUE.equals(avroField.defaultVal())
         ? OneField.Constants.NULL_DEFAULT_VALUE
         : avroField.defaultVal();
   }
