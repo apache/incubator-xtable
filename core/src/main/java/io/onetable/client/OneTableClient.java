@@ -186,7 +186,7 @@ public class OneTableClient {
       Map<TableFormat, TargetClient> syncClientByFormat,
       Map<TableFormat, Optional<OneTableMetadata>> lastSyncMetadataByFormat,
       ExtractFromSource<COMMIT> source) {
-    Map<TableFormat, SyncResult> syncResultsByFormat = Collections.emptyMap();
+    Map<TableFormat, SyncResult> syncResultsByFormat;
     Map<TargetClient, OneTableMetadata> filteredSyncMetadataByFormat =
         lastSyncMetadataByFormat.entrySet().stream()
             .filter(entry -> syncClientByFormat.containsKey(entry.getKey()))

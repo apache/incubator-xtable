@@ -21,13 +21,12 @@ package io.onetable.delta;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
-import java.sql.Date;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +42,9 @@ import io.onetable.model.schema.PartitionTransformType;
  * on the data type and partition transform type.
  */
 public class DeltaValueConverter {
-  private static final String DATE_FORMAT_STR = "yyyy-MM-dd HH:mm:ss";
+  private static final ZoneId UTC = ZoneId.of("UTC");
+  private static final DateTimeFormatter DATE_TIME_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(UTC);
   private static final TimeZone TIME_ZONE = TimeZone.getTimeZone("UTC");
 
   public static Object convertFromDeltaColumnStatValue(Object value, OneSchema fieldSchema) {
@@ -64,11 +65,10 @@ public class DeltaValueConverter {
       instant = OffsetDateTime.parse(value.toString()).toInstant();
     } catch (DateTimeParseException parseException) {
       // fall back to parsing without offset
-      DateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_STR);
-      dateFormat.setTimeZone(TIME_ZONE);
       try {
-        instant = dateFormat.parse(value.toString()).toInstant();
-      } catch (ParseException ex) {
+        instant =
+            LocalDateTime.parse(value.toString(), DATE_TIME_FORMATTER).atZone(UTC).toInstant();
+      } catch (DateTimeParseException ex) {
         throw new OneIOException("Unable to parse time from column stats", ex);
       }
     }
@@ -107,9 +107,7 @@ public class DeltaValueConverter {
         timestampPrecision == OneSchema.MetadataValue.MICROS
             ? TimeUnit.MILLISECONDS.convert((Long) value, TimeUnit.MICROSECONDS)
             : (long) value;
-    DateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_STR);
-    dateFormat.setTimeZone(TIME_ZONE);
-    return dateFormat.format(Date.from(Instant.ofEpochMilli(millis)));
+    return DATE_TIME_FORMATTER.format(Instant.ofEpochMilli(millis));
   }
 
   private static boolean noConversionForSchema(OneSchema fieldSchema) {
@@ -135,9 +133,8 @@ public class DeltaValueConverter {
       }
     } else {
       // use appropriate date formatter for value serialization.
-      DateFormat formatter = new SimpleDateFormat(dateFormat);
-      formatter.setTimeZone(TIME_ZONE);
-      return formatter.format(Date.from(Instant.ofEpochMilli((long) value)));
+      DateTimeFormatter formatter = DateTimeFormatter.ofPattern(dateFormat).withZone(UTC);
+      return formatter.format(Instant.ofEpochMilli((long) value));
     }
   }
 
@@ -177,10 +174,10 @@ public class DeltaValueConverter {
     } else {
       // use appropriate date formatter for value serialization.
       try {
-        DateFormat formatter = new SimpleDateFormat(dateFormat);
-        formatter.setTimeZone(TIME_ZONE);
-        return formatter.parse(value).toInstant().toEpochMilli();
-      } catch (ParseException ex) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern(dateFormat);
+        OffsetDateTime offsetDateTime = OffsetDateTime.parse(value, formatter);
+        return offsetDateTime.toInstant().toEpochMilli();
+      } catch (DateTimeParseException ex) {
         throw new OneIOException("Unable to parse partition value", ex);
       }
     }
