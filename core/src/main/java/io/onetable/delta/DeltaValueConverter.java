@@ -65,6 +65,7 @@ public class DeltaValueConverter {
     } catch (DateTimeParseException parseException) {
       // fall back to parsing without offset
       DateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_STR);
+      dateFormat.setLenient(false);
       dateFormat.setTimeZone(TIME_ZONE);
       try {
         instant = dateFormat.parse(value.toString()).toInstant();
@@ -108,6 +109,7 @@ public class DeltaValueConverter {
             ? TimeUnit.MILLISECONDS.convert((Long) value, TimeUnit.MICROSECONDS)
             : (long) value;
     DateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_STR);
+    dateFormat.setLenient(false);
     dateFormat.setTimeZone(TIME_ZONE);
     return dateFormat.format(Date.from(Instant.ofEpochMilli(millis)));
   }
@@ -136,6 +138,7 @@ public class DeltaValueConverter {
     } else {
       // use appropriate date formatter for value serialization.
       DateFormat formatter = new SimpleDateFormat(dateFormat);
+      formatter.setLenient(false);
       formatter.setTimeZone(TIME_ZONE);
       return formatter.format(Date.from(Instant.ofEpochMilli((long) value)));
     }
@@ -178,6 +181,7 @@ public class DeltaValueConverter {
       // use appropriate date formatter for value serialization.
       try {
         DateFormat formatter = new SimpleDateFormat(dateFormat);
+        formatter.setLenient(false);
         formatter.setTimeZone(TIME_ZONE);
         return formatter.parse(value).toInstant().toEpochMilli();
       } catch (ParseException ex) {
