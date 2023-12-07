@@ -287,7 +287,7 @@ public class AvroSchemaConverter {
   }
 
   private static Object getDefaultValue(Schema.Field avroField) {
-    return Schema.Field.NULL_VALUE.equals(avroField.defaultVal())
+    return Schema.Field.NULL_DEFAULT_VALUE.equals(avroField.defaultVal())
         ? OneField.Constants.NULL_DEFAULT_VALUE
         : avroField.defaultVal();
   }
@@ -324,7 +324,7 @@ public class AvroSchemaConverter {
                                 getFullyQualifiedPath(currentPath, field.getName())),
                             field.getSchema().getComment(),
                             OneField.Constants.NULL_DEFAULT_VALUE == field.getDefaultValue()
-                                ? Schema.Field.NULL_VALUE
+                                ? Schema.Field.NULL_DEFAULT_VALUE
                                 : field.getDefaultValue()))
                 .collect(toList(oneSchema.getFields().size()));
         return finalizeSchema(
