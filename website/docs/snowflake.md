@@ -8,9 +8,9 @@ title: "Snowflake"
 Currently, Snowflake supports [Iceberg tables through External Tables](https://www.snowflake.com/blog/expanding-the-data-cloud-with-apache-iceberg/)
 and also [Native Iceberg Tables](https://www.snowflake.com/blog/iceberg-tables-powering-open-standards-with-snowflake-innovations/).
 
-:::danger LIMITATION:
+:::note NOTE:
 Iceberg on Snowflake is currently supported in
-[private preview](https://www.snowflake.com/guides/what-are-apache-iceberg-tables/#:~:text=Apache%20Iceberg%20is%20currently%20supported,with%20customer%2Dmanaged%20cloud%20storage)
+[public preview](https://www.snowflake.com/blog/build-open-data-lakehouse-iceberg-tables/)
 :::
 
 ## Steps:
