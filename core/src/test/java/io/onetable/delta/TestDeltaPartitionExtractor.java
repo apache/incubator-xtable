@@ -402,7 +402,7 @@ public class TestDeltaPartitionExtractor {
           {
             put("partition_column1", "partition_value1");
             put("year_partition_column", "2013");
-            put("month_partition_column", "8");
+            put("month_partition_column", "08");
             put("day_partition_column", "20");
           }
         };

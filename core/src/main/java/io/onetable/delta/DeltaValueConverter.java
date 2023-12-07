@@ -175,8 +175,8 @@ public class DeltaValueConverter {
       // use appropriate date formatter for value serialization.
       try {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(dateFormat);
-        OffsetDateTime offsetDateTime = OffsetDateTime.parse(value, formatter);
-        return offsetDateTime.toInstant().toEpochMilli();
+        LocalDateTime localDateTime = LocalDateTime.parse(value, formatter);
+        return localDateTime.atZone(UTC).toInstant().toEpochMilli();
       } catch (DateTimeParseException ex) {
         throw new OneIOException("Unable to parse partition value", ex);
       }
