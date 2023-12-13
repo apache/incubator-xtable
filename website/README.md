@@ -52,17 +52,14 @@ npm run serve
 1. Create a `.mdx` file similar to `website/blog/onetable-now-oss.mdx`
 2. Add relevant thumbnail image to `website/static/images/<folder-name>` folder
 3. Make sure to add the appropriate redirection link in the `.mdx` file
+> For thumbnail images, we recommend using **1200x600px** and `.png` format.
 
 ### Adding inline blogs
 1. Create a `.md` file with all the content inline following Markdown syntax
 2. Place relevant images in the `website/static/images/<folder-name>` folder and refer to it in the blog
 
-> [!NOTE: Broken images during tests]  
-> You may see broken thumbnails for the blogs during `npm start` or `npm serve` because the images needs to be rendered
-> from the main repo. This can only be tested after being merged to the main branch.
-
-> [!NOTE: Thumbnail recommendation]  
-> For thumbnail images, we recommend using **1200x600px** and `.png` format.
+> [!NOTE]  
+> You may see broken thumbnails for the blogs during `npm start` or `npm serve` because the images needs to be rendered from the main repo. This can only be tested after being merged to the main branch.
 
 
 ## Maintainers
