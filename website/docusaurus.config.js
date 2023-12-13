@@ -7,7 +7,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'OneTable',
-  favicon: 'img/onetable_favicon.png',
+  favicon: 'images/onetable_favicon.png',
   url: 'https://onetable.dev',
   baseUrl: '/',
 
@@ -50,7 +50,7 @@ const config = {
           alt: 'OneTable Logo',
           href: 'pathname:///',
           target: '_self',
-          src: 'img/OneTableLogo.png',
+          src: 'images/OneTableLogo.png',
         },
         items: [
           {
@@ -64,6 +64,7 @@ const config = {
             label: 'GitHub',
             position: 'right',
           },
+          {to: 'blog', label: 'Blog', position: 'left'},
         ],
       },
       prism: {
