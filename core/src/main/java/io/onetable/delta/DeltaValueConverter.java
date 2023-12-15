@@ -46,6 +46,13 @@ public class DeltaValueConverter {
   private static final String DATE_FORMAT_STR = "yyyy-MM-dd HH:mm:ss";
   private static final TimeZone TIME_ZONE = TimeZone.getTimeZone("UTC");
 
+  static DateFormat getDateFormat(String dataFormatString) {
+    DateFormat dateFormat = new SimpleDateFormat(dataFormatString);
+    dateFormat.setLenient(false);
+    dateFormat.setTimeZone(TIME_ZONE);
+    return dateFormat;
+  }
+
   public static Object convertFromDeltaColumnStatValue(Object value, OneSchema fieldSchema) {
     if (value == null) {
       return null;
@@ -64,8 +71,7 @@ public class DeltaValueConverter {
       instant = OffsetDateTime.parse(value.toString()).toInstant();
     } catch (DateTimeParseException parseException) {
       // fall back to parsing without offset
-      DateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_STR);
-      dateFormat.setTimeZone(TIME_ZONE);
+      DateFormat dateFormat = getDateFormat(DATE_FORMAT_STR);
       try {
         instant = dateFormat.parse(value.toString()).toInstant();
       } catch (ParseException ex) {
@@ -107,8 +113,7 @@ public class DeltaValueConverter {
         timestampPrecision == OneSchema.MetadataValue.MICROS
             ? TimeUnit.MILLISECONDS.convert((Long) value, TimeUnit.MICROSECONDS)
             : (long) value;
-    DateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_STR);
-    dateFormat.setTimeZone(TIME_ZONE);
+    DateFormat dateFormat = getDateFormat(DATE_FORMAT_STR);
     return dateFormat.format(Date.from(Instant.ofEpochMilli(millis)));
   }
 
@@ -135,8 +140,7 @@ public class DeltaValueConverter {
       }
     } else {
       // use appropriate date formatter for value serialization.
-      DateFormat formatter = new SimpleDateFormat(dateFormat);
-      formatter.setTimeZone(TIME_ZONE);
+      DateFormat formatter = getDateFormat(dateFormat);
       return formatter.format(Date.from(Instant.ofEpochMilli((long) value)));
     }
   }
@@ -177,8 +181,7 @@ public class DeltaValueConverter {
     } else {
       // use appropriate date formatter for value serialization.
       try {
-        DateFormat formatter = new SimpleDateFormat(dateFormat);
-        formatter.setTimeZone(TIME_ZONE);
+        DateFormat formatter = getDateFormat(dateFormat);
         return formatter.parse(value).toInstant().toEpochMilli();
       } catch (ParseException ex) {
         throw new OneIOException("Unable to parse partition value", ex);

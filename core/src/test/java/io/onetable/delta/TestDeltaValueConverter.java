@@ -19,10 +19,16 @@
 package io.onetable.delta;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Collections;
+import java.util.TimeZone;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -61,6 +67,19 @@ public class TestDeltaValueConverter {
             deltaRepresentation, oneType, transformType, dateFormat);
     assertEquals(expectedValue, deltaRepresentation);
     assertEquals(fieldValue, internalRepresentation);
+  }
+
+  @Test
+  void parseWrongDateTime() throws ParseException {
+    String dateFormatString = "yyyy-MM-dd HH:mm:ss";
+    String wrongDateTime = "2020-02-30 12:00:00";
+
+    DateFormat lenientDateFormat = new SimpleDateFormat(dateFormatString);
+    lenientDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+    lenientDateFormat.parse(wrongDateTime);
+
+    DateFormat strictDateFormat = DeltaValueConverter.getDateFormat(dateFormatString);
+    assertThrows(ParseException.class, () -> strictDateFormat.parse(wrongDateTime));
   }
 
   private static Stream<Arguments> valuesWithSchemaProviderForColStats() {
