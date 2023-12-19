@@ -24,7 +24,7 @@ import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
@@ -146,7 +146,7 @@ public class DeltaSchemaExtractor {
 
   private OneSchema toOneSchema(
       DataType dataType, String parentPath, boolean nullable, String comment) {
-    Map<OneSchema.MetadataKey, Object> metadata = null;
+    Map<OneSchema.MetadataKey, Object> metadata = new EnumMap<>(OneSchema.MetadataKey.class);
     List<OneField> fields = null;
     OneType type;
     String typeName = dataType.typeName();
@@ -181,9 +181,7 @@ public class DeltaSchemaExtractor {
       case "timestamp":
         type = OneType.TIMESTAMP;
         // Timestamps in Delta are microsecond precision by default
-        metadata =
-            Collections.singletonMap(
-                OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+        metadata.put(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
         break;
       case "struct":
         StructType structType = (StructType) dataType;
@@ -218,7 +216,6 @@ public class DeltaSchemaExtractor {
         break;
       case "decimal":
         DecimalType decimalType = (DecimalType) dataType;
-        metadata = new HashMap<>(2, 1.0f);
         metadata.put(OneSchema.MetadataKey.DECIMAL_PRECISION, decimalType.precision());
         metadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, decimalType.scale());
         type = OneType.DECIMAL;

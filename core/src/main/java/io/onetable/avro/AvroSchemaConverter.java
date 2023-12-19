@@ -24,7 +24,7 @@ import static io.onetable.schema.SchemaUtils.getFullyQualifiedPath;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -100,7 +100,7 @@ public class AvroSchemaConverter {
       Schema schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
     // TODO - Does not handle recursion in Avro schema
     OneType newDataType;
-    Map<OneSchema.MetadataKey, Object> metadata = new HashMap<>();
+    Map<OneSchema.MetadataKey, Object> metadata = new EnumMap<>(OneSchema.MetadataKey.class);
     switch (schema.getType()) {
       case INT:
         LogicalType logicalType = schema.getLogicalType();
