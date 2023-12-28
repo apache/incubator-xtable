@@ -289,7 +289,7 @@ public class HudiTargetClient implements TargetClient {
   }
 
   @Override
-  public TableFormat getTableFormat() {
+  public String getTableFormat() {
     return TableFormat.HUDI;
   }
 

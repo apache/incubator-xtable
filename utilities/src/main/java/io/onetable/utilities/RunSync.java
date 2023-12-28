@@ -141,10 +141,8 @@ public class RunSync {
         ReflectionUtils.createInstanceOfClass(sourceProviderClass);
     sourceClientProvider.init(hadoopConf, sourceClientConfig.configuration);
 
-    List<io.onetable.model.storage.TableFormat> tableFormatList =
-        datasetConfig.getTargetFormats().stream()
-            .map(TableFormat::valueOf)
-            .collect(Collectors.toList());
+    List<String> tableFormatList =
+        datasetConfig.getTargetFormats().stream().map(String::valueOf).collect(Collectors.toList());
     OneTableClient client = new OneTableClient(hadoopConf);
     for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
       log.info(

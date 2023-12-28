@@ -27,7 +27,6 @@ import lombok.Value;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.DataLayoutStrategy;
-import io.onetable.model.storage.TableFormat;
 
 /**
  * Represents a reference to the table in the format {@link #tableFormat}.
@@ -40,7 +39,7 @@ public class OneTable {
   // name of the table
   String name;
   // table format the table currently has data in
-  TableFormat tableFormat;
+  String tableFormat;
   // Schema to use for reading the table
   OneSchema readSchema;
   // Data layout strategy

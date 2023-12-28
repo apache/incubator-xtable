@@ -43,7 +43,6 @@ import io.onetable.model.IncrementalTableChanges;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTableMetadata;
-import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 import io.onetable.model.sync.SyncResult;
 import io.onetable.spi.extractor.ExtractFromSource;
@@ -82,7 +81,7 @@ public class OneTableClient {
    * @return Returns a map containing the table format, and it's sync result. Run sync for a table
    *     with the provided per table level configuration.
    */
-  public <COMMIT> Map<TableFormat, SyncResult> sync(
+  public <COMMIT> Map<String, SyncResult> sync(
       PerTableConfig config, SourceClientProvider<COMMIT> sourceClientProvider) {
     if (config.getTargetTableFormats().isEmpty()) {
       throw new IllegalArgumentException("Please provide at-least one format to sync");
@@ -91,7 +90,7 @@ public class OneTableClient {
     try (SourceClient<COMMIT> sourceClient = sourceClientProvider.getSourceClientInstance(config)) {
       ExtractFromSource<COMMIT> source = ExtractFromSource.of(sourceClient);
 
-      Map<TableFormat, TargetClient> syncClientByFormat =
+      Map<String, TargetClient> syncClientByFormat =
           config.getTargetTableFormats().stream()
               .collect(
                   Collectors.toMap(
@@ -99,15 +98,15 @@ public class OneTableClient {
                       tableFormat ->
                           tableFormatClientFactory.createForFormat(tableFormat, config, conf)));
       // State for each TableFormat
-      Map<TableFormat, Optional<OneTableMetadata>> lastSyncMetadataByFormat =
+      Map<String, Optional<OneTableMetadata>> lastSyncMetadataByFormat =
           syncClientByFormat.entrySet().stream()
               .collect(
                   Collectors.toMap(
                       Map.Entry::getKey, entry -> entry.getValue().getTableMetadata()));
-      Map<TableFormat, TargetClient> formatsToSyncIncrementally =
+      Map<String, TargetClient> formatsToSyncIncrementally =
           getFormatsToSyncIncrementally(
               config, syncClientByFormat, lastSyncMetadataByFormat, source.getSourceClient());
-      Map<TableFormat, TargetClient> formatsToSyncBySnapshot =
+      Map<String, TargetClient> formatsToSyncBySnapshot =
           syncClientByFormat.entrySet().stream()
               .filter(entry -> !formatsToSyncIncrementally.containsKey(entry.getKey()))
               .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
@@ -120,7 +119,7 @@ public class OneTableClient {
               ? SyncResultForTableFormats.builder().build()
               : syncIncrementalChanges(
                   formatsToSyncIncrementally, lastSyncMetadataByFormat, source);
-      Map<TableFormat, SyncResult> syncResultsMerged =
+      Map<String, SyncResult> syncResultsMerged =
           new HashMap<>(syncResultForIncrementalSync.getLastSyncResult());
       syncResultsMerged.putAll(syncResultForSnapshotSync.getLastSyncResult());
       String successfulSyncs =
@@ -140,18 +139,18 @@ public class OneTableClient {
   }
 
   private static String getFormatsWithStatusCode(
-      Map<TableFormat, SyncResult> syncResultsMerged, SyncResult.SyncStatusCode statusCode) {
+      Map<String, SyncResult> syncResultsMerged, SyncResult.SyncStatusCode statusCode) {
     return syncResultsMerged.entrySet().stream()
         .filter(entry -> entry.getValue().getStatus().getStatusCode() == statusCode)
         .map(Map.Entry::getKey)
-        .map(TableFormat::name)
+        .map(String::valueOf)
         .collect(Collectors.joining(","));
   }
 
-  private <COMMIT> Map<TableFormat, TargetClient> getFormatsToSyncIncrementally(
+  private <COMMIT> Map<String, TargetClient> getFormatsToSyncIncrementally(
       PerTableConfig perTableConfig,
-      Map<TableFormat, TargetClient> syncClientByFormat,
-      Map<TableFormat, Optional<OneTableMetadata>> lastSyncMetadataByFormat,
+      Map<String, TargetClient> syncClientByFormat,
+      Map<String, Optional<OneTableMetadata>> lastSyncMetadataByFormat,
       SourceClient<COMMIT> sourceClient) {
     if (perTableConfig.getSyncMode() == SyncMode.FULL) {
       // Full sync requested by config, hence no incremental sync.
@@ -175,18 +174,18 @@ public class OneTableClient {
   }
 
   private <COMMIT> SyncResultForTableFormats syncSnapshot(
-      Map<TableFormat, TargetClient> syncClientByFormat, ExtractFromSource<COMMIT> source) {
+      Map<String, TargetClient> syncClientByFormat, ExtractFromSource<COMMIT> source) {
     OneSnapshot snapshot = source.extractSnapshot();
-    Map<TableFormat, SyncResult> syncResultsByFormat =
+    Map<String, SyncResult> syncResultsByFormat =
         tableFormatSync.syncSnapshot(syncClientByFormat.values(), snapshot);
     return SyncResultForTableFormats.builder().lastSyncResult(syncResultsByFormat).build();
   }
 
   private <COMMIT> SyncResultForTableFormats syncIncrementalChanges(
-      Map<TableFormat, TargetClient> syncClientByFormat,
-      Map<TableFormat, Optional<OneTableMetadata>> lastSyncMetadataByFormat,
+      Map<String, TargetClient> syncClientByFormat,
+      Map<String, Optional<OneTableMetadata>> lastSyncMetadataByFormat,
       ExtractFromSource<COMMIT> source) {
-    Map<TableFormat, SyncResult> syncResultsByFormat = Collections.emptyMap();
+    Map<String, SyncResult> syncResultsByFormat = Collections.emptyMap();
     Map<TargetClient, OneTableMetadata> filteredSyncMetadataByFormat =
         lastSyncMetadataByFormat.entrySet().stream()
             .filter(entry -> syncClientByFormat.containsKey(entry.getKey()))
@@ -199,7 +198,7 @@ public class OneTableClient {
         getMostOutOfSyncCommitAndPendingCommits(filteredSyncMetadataByFormat);
     IncrementalTableChanges incrementalTableChanges =
         source.extractTableChanges(instantsForIncrementalSync);
-    Map<TableFormat, List<SyncResult>> allResults =
+    Map<String, List<SyncResult>> allResults =
         tableFormatSync.syncChanges(filteredSyncMetadataByFormat, incrementalTableChanges);
     // return only the last sync result in the list of results for each format
     syncResultsByFormat =
@@ -270,6 +269,6 @@ public class OneTableClient {
   @Value
   @Builder
   private static class SyncResultForTableFormats {
-    @Builder.Default Map<TableFormat, SyncResult> lastSyncResult = Collections.emptyMap();
+    @Builder.Default Map<String, SyncResult> lastSyncResult = Collections.emptyMap();
   }
 }

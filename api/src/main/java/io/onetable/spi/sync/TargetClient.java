@@ -27,7 +27,6 @@ import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
-import io.onetable.model.storage.TableFormat;
 
 /** A client that provides the major functionality for syncing changes to a target system. */
 public interface TargetClient {
@@ -83,6 +82,6 @@ public interface TargetClient {
   /** Returns the onetable metadata persisted in the target */
   Optional<OneTableMetadata> getTableMetadata();
 
-  /** Returns the {@link io.onetable.model.storage.TableFormat} the client syncs to */
-  TableFormat getTableFormat();
+  /** Returns the TableFormat name the client syncs to */
+  String getTableFormat();
 }
