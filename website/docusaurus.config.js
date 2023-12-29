@@ -64,7 +64,7 @@ const config = {
             label: 'GitHub',
             position: 'right',
           },
-          {to: 'blog', label: 'Blog', position: 'left'},
+          {to: 'blog', label: 'Blogs', position: 'left'},
         ],
       },
       prism: {
