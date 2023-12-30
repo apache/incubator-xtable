@@ -29,6 +29,10 @@ import io.onetable.iceberg.IcebergCatalogConfig;
 import io.onetable.utilities.RunSync.TableFormatClients;
 import io.onetable.utilities.RunSync.TableFormatClients.ClientConfig;
 
+import static io.onetable.model.storage.TableFormat.DELTA;
+import static io.onetable.model.storage.TableFormat.HUDI;
+import static io.onetable.model.storage.TableFormat.ICEBERG;
+
 class TestRunSync {
 
   /** Tests that the default hadoop configs are loaded. */
@@ -77,19 +81,19 @@ class TestRunSync {
     TableFormatClients clients = RunSync.loadTableFormatClientConfigs(null);
     Map<String, ClientConfig> tfClients = clients.getTableFormatsClients();
     Assertions.assertEquals(3, tfClients.size());
-    Assertions.assertNotNull(tfClients.get("DELTA"));
-    Assertions.assertNotNull(tfClients.get("HUDI"));
-    Assertions.assertNotNull(tfClients.get("ICEBERG"));
+    Assertions.assertNotNull(tfClients.get(DELTA));
+    Assertions.assertNotNull(tfClients.get(HUDI));
+    Assertions.assertNotNull(tfClients.get(ICEBERG));
 
     Assertions.assertEquals(
         "io.onetable.hudi.HudiSourceClientProvider",
-        tfClients.get("HUDI").getSourceClientProviderClass());
+        tfClients.get(HUDI).getSourceClientProviderClass());
     Assertions.assertEquals(
         "io.onetable.iceberg.IcebergTargetClient",
-        tfClients.get("ICEBERG").getTargetClientProviderClass());
+        tfClients.get(ICEBERG).getTargetClientProviderClass());
     Assertions.assertEquals(
         "io.onetable.iceberg.IcebergSourceClientProvider",
-        tfClients.get("ICEBERG").getSourceClientProviderClass());
+        tfClients.get(ICEBERG).getSourceClientProviderClass());
   }
 
   @Test
@@ -111,9 +115,9 @@ class TestRunSync {
     Assertions.assertNotNull(tfClients.get("NEW_FORMAT"));
     Assertions.assertEquals("bar", tfClients.get("NEW_FORMAT").getSourceClientProviderClass());
 
-    Assertions.assertEquals("foo", tfClients.get("HUDI").getSourceClientProviderClass());
+    Assertions.assertEquals("foo", tfClients.get(HUDI).getSourceClientProviderClass());
 
-    Map<String, String> deltaClientConfigs = tfClients.get("DELTA").getConfiguration();
+    Map<String, String> deltaClientConfigs = tfClients.get(DELTA).getConfiguration();
     Assertions.assertEquals(3, deltaClientConfigs.size());
     Assertions.assertEquals("local[4]", deltaClientConfigs.get("spark.master"));
     Assertions.assertEquals("bar", deltaClientConfigs.get("foo"));

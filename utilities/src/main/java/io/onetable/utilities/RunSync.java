@@ -142,7 +142,7 @@ public class RunSync {
     sourceClientProvider.init(hadoopConf, sourceClientConfig.configuration);
 
     List<String> tableFormatList =
-        datasetConfig.getTargetFormats().stream().map(String::valueOf).collect(Collectors.toList());
+        datasetConfig.getTargetFormats();
     OneTableClient client = new OneTableClient(hadoopConf);
     for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
       log.info(

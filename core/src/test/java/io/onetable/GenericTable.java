@@ -28,6 +28,10 @@ import org.apache.spark.sql.SparkSession;
 
 import org.apache.hudi.common.model.HoodieTableType;
 
+import static io.onetable.model.storage.TableFormat.DELTA;
+import static io.onetable.model.storage.TableFormat.HUDI;
+import static io.onetable.model.storage.TableFormat.ICEBERG;
+
 public interface GenericTable<T, Q> extends AutoCloseable {
   // A list of values for the level field which serves as a basic field to partition on for tests
   List<String> LEVEL_VALUES = Arrays.asList("INFO", "WARN", "ERROR");
@@ -70,13 +74,13 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       String sourceFormat,
       boolean isPartitioned) {
     switch (sourceFormat) {
-      case "HUDI":
+      case HUDI:
         return TestSparkHudiTable.forStandardSchemaAndPartitioning(
             tableName, tempDir, jsc, isPartitioned);
-      case "DELTA":
+      case DELTA:
         return TestSparkDeltaTable.forStandardSchemaAndPartitioning(
             tableName, tempDir, sparkSession, isPartitioned ? "level" : null);
-      case "ICEBERG":
+      case ICEBERG:
         return TestIcebergTable.forStandardSchemaAndPartitioning(
             tableName, isPartitioned ? "level" : null, tempDir, jsc.hadoopConfiguration());
       default:
@@ -92,13 +96,13 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       String sourceFormat,
       boolean isPartitioned) {
     switch (sourceFormat) {
-      case "HUDI":
+      case HUDI:
         return TestSparkHudiTable.forSchemaWithAdditionalColumnsAndPartitioning(
             tableName, tempDir, jsc, isPartitioned);
-      case "DELTA":
+      case DELTA:
         return TestSparkDeltaTable.forSchemaWithAdditionalColumnsAndPartitioning(
             tableName, tempDir, sparkSession, isPartitioned ? "level" : null);
-      case "ICEBERG":
+      case ICEBERG:
         return TestIcebergTable.forSchemaWithAdditionalColumnsAndPartitioning(
             tableName, isPartitioned ? "level" : null, tempDir, jsc.hadoopConfiguration());
       default:
@@ -113,7 +117,7 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       String sourceFormat,
       String partitionConfig) {
     switch (sourceFormat) {
-      case "HUDI":
+      case HUDI:
         return TestSparkHudiTable.forStandardSchema(
             tableName, tempDir, jsc, partitionConfig, HoodieTableType.COPY_ON_WRITE);
       default:

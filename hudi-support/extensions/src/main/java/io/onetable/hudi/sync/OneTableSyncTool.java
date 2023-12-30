@@ -58,7 +58,7 @@ public class OneTableSyncTool extends HoodieSyncTool {
   public void syncHoodieTable() {
     List<String> formatsToSync =
         Arrays.stream(config.getString(OneTableSyncConfig.ONE_TABLE_FORMATS).split(","))
-            .map(format -> String.valueOf(format.toUpperCase()))
+            .map(format -> format.toUpperCase())
             .collect(Collectors.toList());
     String basePath = config.getString(HoodieSyncConfig.META_SYNC_BASE_PATH);
     String tableName = config.getString(HoodieTableConfig.HOODIE_TABLE_NAME_KEY);

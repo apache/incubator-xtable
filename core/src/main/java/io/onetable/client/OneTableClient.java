@@ -143,7 +143,6 @@ public class OneTableClient {
     return syncResultsMerged.entrySet().stream()
         .filter(entry -> entry.getValue().getStatus().getStatusCode() == statusCode)
         .map(Map.Entry::getKey)
-        .map(String::valueOf)
         .collect(Collectors.joining(","));
   }
 
