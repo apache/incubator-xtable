@@ -18,6 +18,10 @@
  
 package io.onetable.client;
 
+import static io.onetable.model.storage.TableFormat.DELTA;
+import static io.onetable.model.storage.TableFormat.HUDI;
+import static io.onetable.model.storage.TableFormat.ICEBERG;
+
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -28,10 +32,6 @@ import io.onetable.exception.NotSupportedException;
 import io.onetable.hudi.HudiTargetClient;
 import io.onetable.iceberg.IcebergClient;
 import io.onetable.spi.sync.TargetClient;
-
-import static io.onetable.model.storage.TableFormat.DELTA;
-import static io.onetable.model.storage.TableFormat.HUDI;
-import static io.onetable.model.storage.TableFormat.ICEBERG;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class TableFormatClientFactory {

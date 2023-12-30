@@ -18,6 +18,10 @@
  
 package io.onetable;
 
+import static io.onetable.model.storage.TableFormat.DELTA;
+import static io.onetable.model.storage.TableFormat.HUDI;
+import static io.onetable.model.storage.TableFormat.ICEBERG;
+
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -27,10 +31,6 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 
 import org.apache.hudi.common.model.HoodieTableType;
-
-import static io.onetable.model.storage.TableFormat.DELTA;
-import static io.onetable.model.storage.TableFormat.HUDI;
-import static io.onetable.model.storage.TableFormat.ICEBERG;
 
 public interface GenericTable<T, Q> extends AutoCloseable {
   // A list of values for the level field which serves as a basic field to partition on for tests

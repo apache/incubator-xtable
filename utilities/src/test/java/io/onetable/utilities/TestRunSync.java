@@ -18,6 +18,10 @@
  
 package io.onetable.utilities;
 
+import static io.onetable.model.storage.TableFormat.DELTA;
+import static io.onetable.model.storage.TableFormat.HUDI;
+import static io.onetable.model.storage.TableFormat.ICEBERG;
+
 import java.io.IOException;
 import java.util.Map;
 
@@ -28,10 +32,6 @@ import org.junit.jupiter.api.Test;
 import io.onetable.iceberg.IcebergCatalogConfig;
 import io.onetable.utilities.RunSync.TableFormatClients;
 import io.onetable.utilities.RunSync.TableFormatClients.ClientConfig;
-
-import static io.onetable.model.storage.TableFormat.DELTA;
-import static io.onetable.model.storage.TableFormat.HUDI;
-import static io.onetable.model.storage.TableFormat.ICEBERG;
 
 class TestRunSync {
 

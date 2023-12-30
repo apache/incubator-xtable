@@ -128,8 +128,7 @@ public class ITOneTableClient {
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
-    for (String sourceTableFormat :
-        Arrays.asList(HUDI, DELTA, ICEBERG)) {
+    for (String sourceTableFormat : Arrays.asList(HUDI, DELTA, ICEBERG)) {
       for (SyncMode syncMode : SyncMode.values()) {
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceTableFormat, syncMode, isPartitioned));
@@ -339,23 +338,13 @@ public class ITOneTableClient {
           Collections.singletonMap("hoodie.datasource.query.type", "read_optimized");
       // Because compaction is not completed yet and read optimized query, there are 100 records.
       checkDatasetEquivalence(
-          HUDI,
-          table,
-          sourceHudiOptions,
-          targetTableFormats,
-          Collections.emptyMap(),
-          100);
+          HUDI, table, sourceHudiOptions, targetTableFormats, Collections.emptyMap(), 100);
 
       table.insertRecords(50, true);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       // Because compaction is not completed yet and read optimized query, there are 150 records.
       checkDatasetEquivalence(
-          HUDI,
-          table,
-          sourceHudiOptions,
-          targetTableFormats,
-          Collections.emptyMap(),
-          150);
+          HUDI, table, sourceHudiOptions, targetTableFormats, Collections.emptyMap(), 150);
 
       table.completeScheduledCompaction(scheduledCompactionInstant);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
@@ -440,25 +429,13 @@ public class ITOneTableClient {
     return Stream.of(
         Arguments.of(
             buildArgsForPartition(
-                HUDI,
-                Arrays.asList(ICEBERG, DELTA),
-                "level:SIMPLE",
-                "level:VALUE",
-                levelFilter)),
+                HUDI, Arrays.asList(ICEBERG, DELTA), "level:SIMPLE", "level:VALUE", levelFilter)),
         Arguments.of(
             buildArgsForPartition(
-                DELTA,
-                Arrays.asList(ICEBERG, HUDI),
-                null,
-                "level:VALUE",
-                levelFilter)),
+                DELTA, Arrays.asList(ICEBERG, HUDI), null, "level:VALUE", levelFilter)),
         Arguments.of(
             buildArgsForPartition(
-                ICEBERG,
-                Arrays.asList(DELTA, HUDI),
-                null,
-                "level:VALUE",
-                levelFilter)),
+                ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter)),
         Arguments.of(
             // Delta Lake does not currently support nested partition columns
             buildArgsForPartition(
@@ -555,19 +532,15 @@ public class ITOneTableClient {
 
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfigIceberg, sourceClientProvider);
-      checkDatasetEquivalence(
-          HUDI, table, Collections.singletonList(ICEBERG), 100);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 100);
       oneTableClient.sync(perTableConfigDelta, sourceClientProvider);
-      checkDatasetEquivalence(
-          HUDI, table, Collections.singletonList(DELTA), 100);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(DELTA), 100);
 
       table.insertRecords(100, true);
       oneTableClient.sync(perTableConfigIceberg, sourceClientProvider);
-      checkDatasetEquivalence(
-          HUDI, table, Collections.singletonList(ICEBERG), 200);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 200);
       oneTableClient.sync(perTableConfigDelta, sourceClientProvider);
-      checkDatasetEquivalence(
-          HUDI, table, Collections.singletonList(DELTA), 200);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(DELTA), 200);
     }
   }
 
@@ -598,14 +571,12 @@ public class ITOneTableClient {
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       // sync iceberg only
       oneTableClient.sync(singleTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          HUDI, table, Collections.singletonList(ICEBERG), 50);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 50);
       // insert more records
       table.insertRecords(50, true);
       // iceberg will be an incremental sync and delta will need to bootstrap with snapshot sync
       oneTableClient.sync(dualTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          HUDI, table, Arrays.asList(ICEBERG, DELTA), 100);
+      checkDatasetEquivalence(HUDI, table, Arrays.asList(ICEBERG, DELTA), 100);
 
       // insert more records
       table.insertRecords(50, true);
@@ -613,15 +584,13 @@ public class ITOneTableClient {
       table.insertRecords(50, true);
       // incremental sync for two commits for iceberg only
       oneTableClient.sync(singleTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          HUDI, table, Collections.singletonList(ICEBERG), 200);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 200);
 
       // insert more records
       table.insertRecords(50, true);
       // incremental sync for one commit for iceberg and three commits for delta
       oneTableClient.sync(dualTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          HUDI, table, Arrays.asList(ICEBERG, DELTA), 250);
+      checkDatasetEquivalence(HUDI, table, Arrays.asList(ICEBERG, DELTA), 250);
     }
   }
 
@@ -656,8 +625,7 @@ public class ITOneTableClient {
           Paths.get(URI.create(icebergTable.snapshot(previousSnapshotId).manifestListLocation())));
       table.insertRows(10);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          HUDI, table, Collections.singletonList(ICEBERG), 50);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 50);
     }
   }
 

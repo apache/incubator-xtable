@@ -25,7 +25,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
@@ -141,8 +140,7 @@ public class RunSync {
         ReflectionUtils.createInstanceOfClass(sourceProviderClass);
     sourceClientProvider.init(hadoopConf, sourceClientConfig.configuration);
 
-    List<String> tableFormatList =
-        datasetConfig.getTargetFormats();
+    List<String> tableFormatList = datasetConfig.getTargetFormats();
     OneTableClient client = new OneTableClient(hadoopConf);
     for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
       log.info(
