@@ -32,7 +32,6 @@ import com.google.common.base.Preconditions;
 
 import io.onetable.hudi.HudiSourceConfig;
 import io.onetable.iceberg.IcebergCatalogConfig;
-import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 
 /** Represents input configuration to the sync process. */
@@ -77,7 +76,7 @@ public class PerTableConfig {
   @Nonnull HudiSourceConfig hudiSourceConfig;
 
   /** List of table formats to sync. */
-  @Nonnull List<TableFormat> targetTableFormats;
+  @Nonnull List<String> targetTableFormats;
 
   /** Configuration options for integrating with an existing Iceberg Catalog (optional) */
   IcebergCatalogConfig icebergCatalogConfig;
@@ -107,7 +106,7 @@ public class PerTableConfig {
       @NonNull String tableName,
       String[] namespace,
       HudiSourceConfig hudiSourceConfig,
-      @NonNull List<TableFormat> targetTableFormats,
+      @NonNull List<String> targetTableFormats,
       IcebergCatalogConfig icebergCatalogConfig,
       SyncMode syncMode,
       Integer targetMetadataRetentionInHours) {

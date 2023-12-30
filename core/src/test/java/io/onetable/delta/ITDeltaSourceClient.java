@@ -646,7 +646,7 @@ public class ITDeltaSourceClient {
   private static void validateTable(
       OneTable oneTable,
       String tableName,
-      TableFormat tableFormat,
+      String tableFormat,
       OneSchema readSchema,
       DataLayoutStrategy dataLayoutStrategy,
       String basePath,

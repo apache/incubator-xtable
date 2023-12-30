@@ -76,7 +76,7 @@ public class TestOneTableClient {
     OneSnapshot oneSnapshot = buildOneSnapshot(oneTable, "v1");
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
-    Map<TableFormat, SyncResult> perTableResults = new HashMap<>();
+    Map<String, SyncResult> perTableResults = new HashMap<>();
     perTableResults.put(TableFormat.ICEBERG, syncResult);
     perTableResults.put(TableFormat.DELTA, syncResult);
     PerTableConfig perTableConfig =
@@ -95,8 +95,7 @@ public class TestOneTableClient {
         .thenReturn(perTableResults);
     OneTableClient oneTableClient =
         new OneTableClient(mockConf, mockTableFormatClientFactory, tableFormatSync);
-    Map<TableFormat, SyncResult> result =
-        oneTableClient.sync(perTableConfig, mockSourceClientProvider);
+    Map<String, SyncResult> result = oneTableClient.sync(perTableConfig, mockSourceClientProvider);
     assertEquals(perTableResults, result);
   }
 
@@ -164,7 +163,7 @@ public class TestOneTableClient {
     List<SyncResult> deltaSyncResults = buildSyncResults(Arrays.asList(instantAt8, instantAt2));
     IncrementalTableChanges incrementalTableChanges =
         IncrementalTableChanges.builder().tableChanges(tableChanges.iterator()).build();
-    Map<TableFormat, List<SyncResult>> allResults = new HashMap<>();
+    Map<String, List<SyncResult>> allResults = new HashMap<>();
     allResults.put(TableFormat.ICEBERG, icebergSyncResults);
     allResults.put(TableFormat.DELTA, deltaSyncResults);
     Map<TargetClient, OneTableMetadata> clientToMetadata = new HashMap<>();
@@ -173,13 +172,12 @@ public class TestOneTableClient {
     when(tableFormatSync.syncChanges(
             eq(clientToMetadata), argThat(matches(incrementalTableChanges))))
         .thenReturn(allResults);
-    Map<TableFormat, SyncResult> expectedSyncResult = new HashMap<>();
+    Map<String, SyncResult> expectedSyncResult = new HashMap<>();
     expectedSyncResult.put(TableFormat.ICEBERG, getLastSyncResult(icebergSyncResults));
     expectedSyncResult.put(TableFormat.DELTA, getLastSyncResult(deltaSyncResults));
     OneTableClient oneTableClient =
         new OneTableClient(mockConf, mockTableFormatClientFactory, tableFormatSync);
-    Map<TableFormat, SyncResult> result =
-        oneTableClient.sync(perTableConfig, mockSourceClientProvider);
+    Map<String, SyncResult> result = oneTableClient.sync(perTableConfig, mockSourceClientProvider);
     assertEquals(expectedSyncResult, result);
   }
 
@@ -190,7 +188,7 @@ public class TestOneTableClient {
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
     OneSnapshot oneSnapshot = buildOneSnapshot(oneTable, "v1");
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
-    Map<TableFormat, SyncResult> syncResults = new HashMap<>();
+    Map<String, SyncResult> syncResults = new HashMap<>();
     syncResults.put(TableFormat.ICEBERG, syncResult);
     syncResults.put(TableFormat.DELTA, syncResult);
     PerTableConfig perTableConfig =
@@ -220,8 +218,7 @@ public class TestOneTableClient {
         .thenReturn(syncResults);
     OneTableClient oneTableClient =
         new OneTableClient(mockConf, mockTableFormatClientFactory, tableFormatSync);
-    Map<TableFormat, SyncResult> result =
-        oneTableClient.sync(perTableConfig, mockSourceClientProvider);
+    Map<String, SyncResult> result = oneTableClient.sync(perTableConfig, mockSourceClientProvider);
     assertEquals(syncResults, result);
   }
 
@@ -280,7 +277,7 @@ public class TestOneTableClient {
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
     OneSnapshot oneSnapshot = buildOneSnapshot(oneTable, "v1");
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
-    Map<TableFormat, SyncResult> snapshotResult =
+    Map<String, SyncResult> snapshotResult =
         Collections.singletonMap(TableFormat.ICEBERG, syncResult);
     when(mockSourceClient.getCurrentSnapshot()).thenReturn(oneSnapshot);
     when(tableFormatSync.syncSnapshot(
@@ -295,13 +292,12 @@ public class TestOneTableClient {
             eq(Collections.singletonMap(mockTargetClient2, targetClient2Metadata.get())),
             argThat(matches(incrementalTableChanges))))
         .thenReturn(Collections.singletonMap(TableFormat.DELTA, deltaSyncResults));
-    Map<TableFormat, SyncResult> expectedSyncResult = new HashMap<>();
+    Map<String, SyncResult> expectedSyncResult = new HashMap<>();
     expectedSyncResult.put(TableFormat.ICEBERG, syncResult);
     expectedSyncResult.put(TableFormat.DELTA, getLastSyncResult(deltaSyncResults));
     OneTableClient oneTableClient =
         new OneTableClient(mockConf, mockTableFormatClientFactory, tableFormatSync);
-    Map<TableFormat, SyncResult> result =
-        oneTableClient.sync(perTableConfig, mockSourceClientProvider);
+    Map<String, SyncResult> result = oneTableClient.sync(perTableConfig, mockSourceClientProvider);
     assertEquals(expectedSyncResult, result);
   }
 
@@ -352,11 +348,10 @@ public class TestOneTableClient {
                         .build()))))
         .thenReturn(Collections.emptyMap());
     // Iceberg and Delta have no commits to sync
-    Map<TableFormat, SyncResult> expectedSyncResult = Collections.emptyMap();
+    Map<String, SyncResult> expectedSyncResult = Collections.emptyMap();
     OneTableClient oneTableClient =
         new OneTableClient(mockConf, mockTableFormatClientFactory, tableFormatSync);
-    Map<TableFormat, SyncResult> result =
-        oneTableClient.sync(perTableConfig, mockSourceClientProvider);
+    Map<String, SyncResult> result = oneTableClient.sync(perTableConfig, mockSourceClientProvider);
     assertEquals(expectedSyncResult, result);
   }
 
@@ -398,8 +393,7 @@ public class TestOneTableClient {
     return Instant.now().minus(Duration.ofMinutes(n));
   }
 
-  private PerTableConfig getPerTableConfig(
-      List<TableFormat> targetTableFormats, SyncMode syncMode) {
+  private PerTableConfig getPerTableConfig(List<String> targetTableFormats, SyncMode syncMode) {
     return PerTableConfig.builder()
         .tableName(getTableName())
         .tableBasePath("/tmp/doesnt/matter")

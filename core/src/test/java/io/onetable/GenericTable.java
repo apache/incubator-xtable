@@ -18,6 +18,10 @@
  
 package io.onetable;
 
+import static io.onetable.model.storage.TableFormat.DELTA;
+import static io.onetable.model.storage.TableFormat.HUDI;
+import static io.onetable.model.storage.TableFormat.ICEBERG;
+
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -27,8 +31,6 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 
 import org.apache.hudi.common.model.HoodieTableType;
-
-import io.onetable.model.storage.TableFormat;
 
 public interface GenericTable<T, Q> extends AutoCloseable {
   // A list of values for the level field which serves as a basic field to partition on for tests
@@ -69,7 +71,7 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       Path tempDir,
       SparkSession sparkSession,
       JavaSparkContext jsc,
-      TableFormat sourceFormat,
+      String sourceFormat,
       boolean isPartitioned) {
     switch (sourceFormat) {
       case HUDI:
@@ -91,7 +93,7 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       Path tempDir,
       SparkSession sparkSession,
       JavaSparkContext jsc,
-      TableFormat sourceFormat,
+      String sourceFormat,
       boolean isPartitioned) {
     switch (sourceFormat) {
       case HUDI:
@@ -112,7 +114,7 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       String tableName,
       Path tempDir,
       JavaSparkContext jsc,
-      TableFormat sourceFormat,
+      String sourceFormat,
       String partitionConfig) {
     switch (sourceFormat) {
       case HUDI:

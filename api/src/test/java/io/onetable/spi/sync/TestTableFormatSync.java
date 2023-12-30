@@ -80,7 +80,7 @@ public class TestTableFormatSync {
     when(mockTargetClient1.getTableFormat()).thenReturn(TableFormat.ICEBERG);
     when(mockTargetClient2.getTableFormat()).thenReturn(TableFormat.DELTA);
     doThrow(new RuntimeException("Failure")).when(mockTargetClient1).beginSync(startingTableState);
-    Map<TableFormat, SyncResult> result =
+    Map<String, SyncResult> result =
         TableFormatSync.getInstance()
             .syncSnapshot(Arrays.asList(mockTargetClient1, mockTargetClient2), snapshot);
 
@@ -153,7 +153,7 @@ public class TestTableFormatSync {
         mockTargetClient2,
         OneTableMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
 
-    Map<TableFormat, List<SyncResult>> result =
+    Map<String, List<SyncResult>> result =
         TableFormatSync.getInstance().syncChanges(clientWithMetadata, incrementalTableChanges);
 
     assertEquals(2, result.size());
@@ -243,7 +243,7 @@ public class TestTableFormatSync {
         OneTableMetadata.of(
             tableChange1.getTableAsOfChange().getLatestCommitTime(), Collections.emptyList()));
 
-    Map<TableFormat, List<SyncResult>> result =
+    Map<String, List<SyncResult>> result =
         TableFormatSync.getInstance().syncChanges(clientWithMetadata, incrementalTableChanges);
 
     assertEquals(2, result.size());
@@ -316,7 +316,7 @@ public class TestTableFormatSync {
         mockTargetClient2,
         OneTableMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
 
-    Map<TableFormat, List<SyncResult>> result =
+    Map<String, List<SyncResult>> result =
         TableFormatSync.getInstance().syncChanges(clientWithMetadata, incrementalTableChanges);
     assertEquals(1, result.size());
     List<SyncResult> client2Results = result.get(TableFormat.DELTA);

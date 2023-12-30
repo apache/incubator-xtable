@@ -172,7 +172,7 @@ public class DeltaClient implements TargetClient {
   }
 
   @Override
-  public TableFormat getTableFormat() {
+  public String getTableFormat() {
     return TableFormat.DELTA;
   }
 

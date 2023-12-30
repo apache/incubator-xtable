@@ -38,7 +38,6 @@ import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.TableChange;
-import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 import io.onetable.model.sync.SyncResult;
 
@@ -59,10 +58,10 @@ public class TableFormatSync {
    * @param snapshot the snapshot to sync
    * @return the result of the sync process
    */
-  public Map<TableFormat, SyncResult> syncSnapshot(
+  public Map<String, SyncResult> syncSnapshot(
       Collection<TargetClient> targetClients, OneSnapshot snapshot) {
     Instant startTime = Instant.now();
-    Map<TableFormat, SyncResult> results = new HashMap<>();
+    Map<String, SyncResult> results = new HashMap<>();
     for (TargetClient targetClient : targetClients) {
       try {
         OneTable oneTable = snapshot.getTable();
@@ -91,10 +90,10 @@ public class TableFormatSync {
    * @param changes the changes from the source table format that need to be applied
    * @return the results of trying to sync each change
    */
-  public Map<TableFormat, List<SyncResult>> syncChanges(
+  public Map<String, List<SyncResult>> syncChanges(
       Map<TargetClient, OneTableMetadata> targetClientWithMetadata,
       IncrementalTableChanges changes) {
-    Map<TableFormat, List<SyncResult>> results = new HashMap<>();
+    Map<String, List<SyncResult>> results = new HashMap<>();
     Set<TargetClient> clientsWithFailures = new HashSet<>();
     while (changes.getTableChanges().hasNext()) {
       TableChange change = changes.getTableChanges().next();

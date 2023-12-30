@@ -20,6 +20,9 @@ package io.onetable;
 
 import static io.onetable.GenericTable.getTableName;
 import static io.onetable.hudi.HudiTestUtil.PartitionConfig;
+import static io.onetable.model.storage.TableFormat.DELTA;
+import static io.onetable.model.storage.TableFormat.HUDI;
+import static io.onetable.model.storage.TableFormat.ICEBERG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -61,6 +64,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
@@ -124,8 +128,7 @@ public class ITOneTableClient {
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
-    for (TableFormat sourceTableFormat :
-        Arrays.asList(TableFormat.HUDI, TableFormat.DELTA, TableFormat.ICEBERG)) {
+    for (String sourceTableFormat : Arrays.asList(HUDI, DELTA, ICEBERG)) {
       for (SyncMode syncMode : SyncMode.values()) {
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceTableFormat, syncMode, isPartitioned));
@@ -139,16 +142,16 @@ public class ITOneTableClient {
     return Stream.of(Arguments.of(SyncMode.INCREMENTAL), Arguments.of(SyncMode.FULL));
   }
 
-  private SourceClientProvider<?> getSourceClientProvider(TableFormat sourceTableFormat) {
-    if (sourceTableFormat == TableFormat.HUDI) {
+  private SourceClientProvider<?> getSourceClientProvider(String sourceTableFormat) {
+    if (sourceTableFormat.equalsIgnoreCase(HUDI)) {
       SourceClientProvider<HoodieInstant> hudiSourceClientProvider = new HudiSourceClientProvider();
       hudiSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
       return hudiSourceClientProvider;
-    } else if (sourceTableFormat == TableFormat.DELTA) {
+    } else if (sourceTableFormat.equalsIgnoreCase(DELTA)) {
       SourceClientProvider<Long> deltaSourceClientProvider = new DeltaSourceClientProvider();
       deltaSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
       return deltaSourceClientProvider;
-    } else if (sourceTableFormat == TableFormat.ICEBERG) {
+    } else if (sourceTableFormat.equalsIgnoreCase(ICEBERG)) {
       SourceClientProvider<Snapshot> icebergSourceClientProvider =
           new IcebergSourceClientProvider();
       icebergSourceClientProvider.init(jsc.hadoopConfiguration(), Collections.emptyMap());
@@ -171,10 +174,10 @@ public class ITOneTableClient {
   @ParameterizedTest
   @MethodSource("generateTestParametersForFormatsSyncModesAndPartitioning")
   public void testVariousOperations(
-      TableFormat sourceTableFormat, SyncMode syncMode, boolean isPartitioned) {
+      String sourceTableFormat, SyncMode syncMode, boolean isPartitioned) {
     String tableName = getTableName();
     OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
-    List<TableFormat> targetTableFormats = getOtherFormats(sourceTableFormat);
+    List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
     String oneTablePartitionConfig = null;
     if (isPartitioned) {
       oneTablePartitionConfig = "level:VALUE";
@@ -262,8 +265,8 @@ public class ITOneTableClient {
   public void testConcurrentInsertWritesInSource(
       SyncMode syncMode, PartitionConfig partitionConfig) {
     String tableName = getTableName();
-    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
-    List<TableFormat> targetTableFormats = getOtherFormats(TableFormat.HUDI);
+    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(HUDI);
+    List<String> targetTableFormats = getOtherFormats(HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, partitionConfig.getHudiConfig(), HoodieTableType.COPY_ON_WRITE)) {
@@ -290,10 +293,10 @@ public class ITOneTableClient {
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfig, sourceClientProvider);
 
-      checkDatasetEquivalence(TableFormat.HUDI, table, targetTableFormats, 50);
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 50);
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(TableFormat.HUDI, table, targetTableFormats, 100);
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 100);
     }
   }
 
@@ -302,8 +305,8 @@ public class ITOneTableClient {
   public void testConcurrentInsertsAndTableServiceWrites(
       SyncMode syncMode, PartitionConfig partitionConfig) {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
-    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
-    List<TableFormat> targetTableFormats = getOtherFormats(TableFormat.HUDI);
+    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(HUDI);
+    List<String> targetTableFormats = getOtherFormats(HUDI);
     String tableName = getTableName();
     try (TestSparkHudiTable table =
         TestSparkHudiTable.forStandardSchema(
@@ -323,7 +326,7 @@ public class ITOneTableClient {
               .build();
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(TableFormat.HUDI, table, targetTableFormats, 50);
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 50);
 
       table.deleteRecords(insertedRecords1.subList(0, 20), true);
       // At this point table should have 30 records but only after compaction.
@@ -335,40 +338,28 @@ public class ITOneTableClient {
           Collections.singletonMap("hoodie.datasource.query.type", "read_optimized");
       // Because compaction is not completed yet and read optimized query, there are 100 records.
       checkDatasetEquivalence(
-          TableFormat.HUDI,
-          table,
-          sourceHudiOptions,
-          targetTableFormats,
-          Collections.emptyMap(),
-          100);
+          HUDI, table, sourceHudiOptions, targetTableFormats, Collections.emptyMap(), 100);
 
       table.insertRecords(50, true);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
       // Because compaction is not completed yet and read optimized query, there are 150 records.
       checkDatasetEquivalence(
-          TableFormat.HUDI,
-          table,
-          sourceHudiOptions,
-          targetTableFormats,
-          Collections.emptyMap(),
-          150);
+          HUDI, table, sourceHudiOptions, targetTableFormats, Collections.emptyMap(), 150);
 
       table.completeScheduledCompaction(scheduledCompactionInstant);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(TableFormat.HUDI, table, targetTableFormats, 130);
+      checkDatasetEquivalence(HUDI, table, targetTableFormats, 130);
     }
   }
 
   @ParameterizedTest
-  @EnumSource(
-      value = TableFormat.class,
-      names = {"HUDI", "DELTA", "ICEBERG"})
-  public void testTimeTravelQueries(TableFormat sourceTableFormat) throws Exception {
+  @ValueSource(strings = {HUDI, DELTA, ICEBERG})
+  public void testTimeTravelQueries(String sourceTableFormat) throws Exception {
     String tableName = getTableName();
     try (GenericTable table =
         GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, false)) {
       table.insertRows(50);
-      List<TableFormat> targetTableFormats = getOtherFormats(sourceTableFormat);
+      List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
@@ -420,7 +411,7 @@ public class ITOneTableClient {
     }
   }
 
-  private static List<TableFormat> getOtherFormats(TableFormat sourceTableFormat) {
+  private static List<String> getOtherFormats(String sourceTableFormat) {
     return Arrays.stream(TableFormat.values())
         .filter(format -> !format.equals(sourceTableFormat))
         .collect(Collectors.toList());
@@ -438,44 +429,32 @@ public class ITOneTableClient {
     return Stream.of(
         Arguments.of(
             buildArgsForPartition(
-                TableFormat.HUDI,
-                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
-                "level:SIMPLE",
-                "level:VALUE",
-                levelFilter)),
+                HUDI, Arrays.asList(ICEBERG, DELTA), "level:SIMPLE", "level:VALUE", levelFilter)),
         Arguments.of(
             buildArgsForPartition(
-                TableFormat.DELTA,
-                Arrays.asList(TableFormat.ICEBERG, TableFormat.HUDI),
-                null,
-                "level:VALUE",
-                levelFilter)),
+                DELTA, Arrays.asList(ICEBERG, HUDI), null, "level:VALUE", levelFilter)),
         Arguments.of(
             buildArgsForPartition(
-                TableFormat.ICEBERG,
-                Arrays.asList(TableFormat.DELTA, TableFormat.HUDI),
-                null,
-                "level:VALUE",
-                levelFilter)),
+                ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter)),
         Arguments.of(
             // Delta Lake does not currently support nested partition columns
             buildArgsForPartition(
-                TableFormat.HUDI,
-                Arrays.asList(TableFormat.ICEBERG),
+                HUDI,
+                Arrays.asList(ICEBERG),
                 "nested_record.level:SIMPLE",
                 "nested_record.level:VALUE",
                 nestedLevelFilter)),
         Arguments.of(
             buildArgsForPartition(
-                TableFormat.HUDI,
-                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+                HUDI,
+                Arrays.asList(ICEBERG, DELTA),
                 "severity:SIMPLE",
                 "severity:VALUE",
                 severityFilter)),
         Arguments.of(
             buildArgsForPartition(
-                TableFormat.HUDI,
-                Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA),
+                HUDI,
+                Arrays.asList(ICEBERG, DELTA),
                 "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
                 "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
                 timestampAndLevelFilter)));
@@ -485,8 +464,8 @@ public class ITOneTableClient {
   @MethodSource("provideArgsForPartitionTesting")
   public void testPartitionedData(TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
     String tableName = getTableName();
-    TableFormat sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
-    List<TableFormat> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
+    String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
+    List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
     Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
     String oneTablePartitionConfig = tableFormatPartitionDataHolder.getOneTablePartitionConfig();
     String filter = tableFormatPartitionDataHolder.getFilter();
@@ -529,7 +508,7 @@ public class ITOneTableClient {
   @EnumSource(value = SyncMode.class)
   public void testSyncWithSingleFormat(SyncMode syncMode) {
     String tableName = getTableName();
-    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
+    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
@@ -538,7 +517,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfigIceberg =
           PerTableConfig.builder()
               .tableName(tableName)
-              .targetTableFormats(ImmutableList.of(TableFormat.ICEBERG))
+              .targetTableFormats(ImmutableList.of(ICEBERG))
               .tableBasePath(table.getBasePath())
               .syncMode(syncMode)
               .build();
@@ -546,40 +525,36 @@ public class ITOneTableClient {
       PerTableConfig perTableConfigDelta =
           PerTableConfig.builder()
               .tableName(tableName)
-              .targetTableFormats(ImmutableList.of(TableFormat.DELTA))
+              .targetTableFormats(ImmutableList.of(DELTA))
               .tableBasePath(table.getBasePath())
               .syncMode(syncMode)
               .build();
 
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       oneTableClient.sync(perTableConfigIceberg, sourceClientProvider);
-      checkDatasetEquivalence(
-          TableFormat.HUDI, table, Collections.singletonList(TableFormat.ICEBERG), 100);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 100);
       oneTableClient.sync(perTableConfigDelta, sourceClientProvider);
-      checkDatasetEquivalence(
-          TableFormat.HUDI, table, Collections.singletonList(TableFormat.DELTA), 100);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(DELTA), 100);
 
       table.insertRecords(100, true);
       oneTableClient.sync(perTableConfigIceberg, sourceClientProvider);
-      checkDatasetEquivalence(
-          TableFormat.HUDI, table, Collections.singletonList(TableFormat.ICEBERG), 200);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 200);
       oneTableClient.sync(perTableConfigDelta, sourceClientProvider);
-      checkDatasetEquivalence(
-          TableFormat.HUDI, table, Collections.singletonList(TableFormat.DELTA), 200);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(DELTA), 200);
     }
   }
 
   @Test
   public void testOutOfSyncIncrementalSyncs() {
     String tableName = getTableName();
-    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
+    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
       PerTableConfig singleTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .targetTableFormats(ImmutableList.of(TableFormat.ICEBERG))
+              .targetTableFormats(ImmutableList.of(ICEBERG))
               .tableBasePath(table.getBasePath())
               .syncMode(SyncMode.INCREMENTAL)
               .build();
@@ -587,7 +562,7 @@ public class ITOneTableClient {
       PerTableConfig dualTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
+              .targetTableFormats(Arrays.asList(ICEBERG, DELTA))
               .tableBasePath(table.getBasePath())
               .syncMode(SyncMode.INCREMENTAL)
               .build();
@@ -596,14 +571,12 @@ public class ITOneTableClient {
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       // sync iceberg only
       oneTableClient.sync(singleTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          TableFormat.HUDI, table, Collections.singletonList(TableFormat.ICEBERG), 50);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 50);
       // insert more records
       table.insertRecords(50, true);
       // iceberg will be an incremental sync and delta will need to bootstrap with snapshot sync
       oneTableClient.sync(dualTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          TableFormat.HUDI, table, Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), 100);
+      checkDatasetEquivalence(HUDI, table, Arrays.asList(ICEBERG, DELTA), 100);
 
       // insert more records
       table.insertRecords(50, true);
@@ -611,22 +584,20 @@ public class ITOneTableClient {
       table.insertRecords(50, true);
       // incremental sync for two commits for iceberg only
       oneTableClient.sync(singleTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          TableFormat.HUDI, table, Collections.singletonList(TableFormat.ICEBERG), 200);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 200);
 
       // insert more records
       table.insertRecords(50, true);
       // incremental sync for one commit for iceberg and three commits for delta
       oneTableClient.sync(dualTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          TableFormat.HUDI, table, Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA), 250);
+      checkDatasetEquivalence(HUDI, table, Arrays.asList(ICEBERG, DELTA), 250);
     }
   }
 
   @Test
   public void testIcebergCorruptedSnapshotRecovery() throws Exception {
     String tableName = getTableName();
-    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
+    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
@@ -635,7 +606,7 @@ public class ITOneTableClient {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+              .targetTableFormats(Collections.singletonList(ICEBERG))
               .tableBasePath(table.getBasePath())
               .syncMode(SyncMode.INCREMENTAL)
               .build();
@@ -654,22 +625,21 @@ public class ITOneTableClient {
           Paths.get(URI.create(icebergTable.snapshot(previousSnapshotId).manifestListLocation())));
       table.insertRows(10);
       oneTableClient.sync(perTableConfig, sourceClientProvider);
-      checkDatasetEquivalence(
-          TableFormat.HUDI, table, Collections.singletonList(TableFormat.ICEBERG), 50);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 50);
     }
   }
 
   @Test
   public void testMetadataRetention() throws Exception {
     String tableName = getTableName();
-    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(TableFormat.HUDI);
+    SourceClientProvider<?> sourceClientProvider = getSourceClientProvider(HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
       PerTableConfig perTableConfig =
           PerTableConfig.builder()
               .tableName(tableName)
-              .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
+              .targetTableFormats(Arrays.asList(ICEBERG, DELTA))
               .tableBasePath(table.getBasePath())
               .syncMode(SyncMode.INCREMENTAL)
               .targetMetadataRetentionInHours(0) // force cleanup
@@ -694,7 +664,7 @@ public class ITOneTableClient {
           sparkSession
               .read()
               .format("hudi")
-              .options(getTimeTravelOption(TableFormat.HUDI, instantAfterFirstCommit))
+              .options(getTimeTravelOption(HUDI, instantAfterFirstCommit))
               .load(table.getBasePath())
               .collectAsList();
       Assertions.assertEquals(10, rows.size());
@@ -709,7 +679,7 @@ public class ITOneTableClient {
     }
   }
 
-  private Map<String, String> getTimeTravelOption(TableFormat tableFormat, Instant time) {
+  private Map<String, String> getTimeTravelOption(String tableFormat, Instant time) {
     Map<String, String> options = new HashMap<>();
     switch (tableFormat) {
       case HUDI:
@@ -728,9 +698,9 @@ public class ITOneTableClient {
   }
 
   private void checkDatasetEquivalenceWithFilter(
-      TableFormat sourceFormat,
+      String sourceFormat,
       GenericTable<?, ?> sourceTable,
-      List<TableFormat> targetFormats,
+      List<String> targetFormats,
       String filter) {
     checkDatasetEquivalence(
         sourceFormat,
@@ -743,9 +713,9 @@ public class ITOneTableClient {
   }
 
   private void checkDatasetEquivalence(
-      TableFormat sourceFormat,
+      String sourceFormat,
       GenericTable<?, ?> sourceTable,
-      List<TableFormat> targetFormats,
+      List<String> targetFormats,
       Integer expectedCount) {
     checkDatasetEquivalence(
         sourceFormat,
@@ -758,11 +728,11 @@ public class ITOneTableClient {
   }
 
   private void checkDatasetEquivalence(
-      TableFormat sourceFormat,
+      String sourceFormat,
       GenericTable<?, ?> sourceTable,
       Map<String, String> sourceOptions,
-      List<TableFormat> targetFormats,
-      Map<TableFormat, Map<String, String>> targetOptions,
+      List<String> targetFormats,
+      Map<String, Map<String, String>> targetOptions,
       Integer expectedCount) {
     checkDatasetEquivalence(
         sourceFormat,
@@ -775,22 +745,22 @@ public class ITOneTableClient {
   }
 
   private void checkDatasetEquivalence(
-      TableFormat sourceFormat,
+      String sourceFormat,
       GenericTable<?, ?> sourceTable,
       Map<String, String> sourceOptions,
-      List<TableFormat> targetFormats,
-      Map<TableFormat, Map<String, String>> targetOptions,
+      List<String> targetFormats,
+      Map<String, Map<String, String>> targetOptions,
       Integer expectedCount,
       String filterCondition) {
     Dataset<Row> sourceRows =
         sparkSession
             .read()
             .options(sourceOptions)
-            .format(sourceFormat.name().toLowerCase())
+            .format(sourceFormat.toLowerCase())
             .load(sourceTable.getBasePath())
             .orderBy(sourceTable.getOrderByColumn())
             .filter(filterCondition);
-    Map<TableFormat, Dataset<Row>> targetRowsByFormat =
+    Map<String, Dataset<Row>> targetRowsByFormat =
         targetFormats.stream()
             .collect(
                 Collectors.toMap(
@@ -798,7 +768,7 @@ public class ITOneTableClient {
                     targetFormat -> {
                       Map<String, String> finalTargetOptions =
                           targetOptions.getOrDefault(targetFormat, Collections.emptyMap());
-                      if (targetFormat.equals(TableFormat.HUDI)) {
+                      if (targetFormat.equals(HUDI)) {
                         finalTargetOptions = new HashMap<>(finalTargetOptions);
                         finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
                         finalTargetOptions.put(
@@ -807,7 +777,7 @@ public class ITOneTableClient {
                       return sparkSession
                           .read()
                           .options(finalTargetOptions)
-                          .format(targetFormat.name().toLowerCase())
+                          .format(targetFormat.toLowerCase())
                           .load(sourceTable.getDataPath())
                           .orderBy(sourceTable.getOrderByColumn())
                           .filter(filterCondition);
@@ -856,8 +826,8 @@ public class ITOneTableClient {
   }
 
   private static TableFormatPartitionDataHolder buildArgsForPartition(
-      TableFormat sourceFormat,
-      List<TableFormat> targetFormats,
+      String sourceFormat,
+      List<String> targetFormats,
       String hudiPartitionConfig,
       String oneTablePartitionConfig,
       String filter) {
@@ -873,8 +843,8 @@ public class ITOneTableClient {
   @Builder
   @Value
   private static class TableFormatPartitionDataHolder {
-    TableFormat sourceTableFormat;
-    List<TableFormat> targetTableFormats;
+    String sourceTableFormat;
+    List<String> targetTableFormats;
     String oneTablePartitionConfig;
     Optional<String> hudiSourceConfig;
     String filter;
