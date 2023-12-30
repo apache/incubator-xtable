@@ -99,7 +99,7 @@ public class ITHudiTargetClient {
   private static final HoodieEngineContext CONTEXT = new HoodieJavaEngineContext(CONFIGURATION);
 
   private static final String TABLE_NAME = "test_table";
-  private static final String KEY_FIELD_NAME = "id";
+  private static final String KEY_FIELD_NAME = "key";
   private static final String PARTITION_FIELD_NAME = "partition_field";
   private static final String OTHER_FIELD_NAME = "content";
   private static final long FILE_SIZE = 100L;

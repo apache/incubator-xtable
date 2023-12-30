@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -323,7 +324,12 @@ public class ITDeltaSourceClient {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(
-            tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
+            tableName,
+            tempDir,
+            sparkSession,
+            Optional.empty(),
+            isPartitioned ? "yearOfBirth" : null,
+            false);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -378,7 +384,12 @@ public class ITDeltaSourceClient {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(
-            tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
+            tableName,
+            tempDir,
+            sparkSession,
+            Optional.empty(),
+            isPartitioned ? "yearOfBirth" : null,
+            false);
     // Insert 50 rows to 2018 partition.
     List<Row> commit1Rows = testSparkDeltaTable.insertRowsForPartition(50, 2018);
     Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
@@ -428,7 +439,12 @@ public class ITDeltaSourceClient {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(
-            tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
+            tableName,
+            tempDir,
+            sparkSession,
+            Optional.empty(),
+            isPartitioned ? "yearOfBirth" : null,
+            false);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -482,7 +498,12 @@ public class ITDeltaSourceClient {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(
-            tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, true);
+            tableName,
+            tempDir,
+            sparkSession,
+            Optional.empty(),
+            isPartitioned ? "yearOfBirth" : null,
+            true);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -526,7 +547,8 @@ public class ITDeltaSourceClient {
   public void testDropPartition() {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession, "yearOfBirth", false);
+        new TestSparkDeltaTable(
+            tableName, tempDir, sparkSession, Optional.empty(), "yearOfBirth", false);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -583,7 +605,12 @@ public class ITDeltaSourceClient {
     String tableName = getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(
-            tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
+            tableName,
+            tempDir,
+            sparkSession,
+            Optional.empty(),
+            isPartitioned ? "yearOfBirth" : null,
+            false);
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);

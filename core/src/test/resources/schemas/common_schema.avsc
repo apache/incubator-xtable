@@ -1,0 +1,62 @@
+{
+  "type": "record",
+  "name": "CommonSchema",
+  "namespace": "test",
+  "fields": [
+    {
+      "name": "key",
+      "type": "string"
+    },
+    {
+      "name": "ts",
+      "type": "long"
+    },
+    {
+      "name": "level",
+      "type": "string"
+    },
+    {
+      "name": "severity",
+      "type": ["null", "int"],
+      "default": null
+    },
+    {
+      "name": "double_field",
+      "type": "double",
+      "default": 0.0
+    },
+    {
+      "name": "float_field",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "int_field",
+      "type": "int",
+      "default": 0
+    },
+    {
+      "name": "long_field",
+      "type": "long",
+      "default": 0
+    },
+    {
+      "name": "boolean_field",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "name": "string_field",
+      "type": {
+        "type": "string",
+        "avro.java.string": "String"
+      },
+      "default": ""
+    },
+    {
+      "name": "bytes_field",
+      "type": "bytes",
+      "default": ""
+    }
+  ]
+}

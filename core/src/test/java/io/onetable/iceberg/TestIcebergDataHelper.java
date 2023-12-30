@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -55,10 +56,12 @@ import org.apache.iceberg.types.Types.NestedField;
 @Builder
 @Value
 public class TestIcebergDataHelper {
+  public static final String DEFAULT_RECORD_KEY_FIELD = "key";
+
   private static final Random RANDOM = new Random();
   private static final List<Types.NestedField> COMMON_FIELDS =
       Arrays.asList(
-          NestedField.optional(1, "id", Types.StringType.get()),
+          NestedField.optional(1, "key", Types.StringType.get()),
           NestedField.optional(2, "ts", Types.LongType.get()),
           NestedField.optional(3, "level", Types.StringType.get()),
           NestedField.optional(4, "severity", Types.IntegerType.get()),
@@ -114,15 +117,14 @@ public class TestIcebergDataHelper {
   private static final LocalDate EPOCH_DAY = EPOCH.toLocalDate();
 
   Schema tableSchema;
-  String recordKeyField;
   List<String> partitionFieldNames;
 
   public static TestIcebergDataHelper createIcebergDataHelper(
-      String recordKeyField, List<String> partitionFields, boolean includeAdditionalColumns) {
-    Schema tableSchema = getSchema(includeAdditionalColumns);
+      Optional<Schema> tblSchema, List<String> partitionFields, boolean includeAdditionalColumns) {
+
+    Schema schema = tblSchema.orElse(getSchema(includeAdditionalColumns));
     return TestIcebergDataHelper.builder()
-        .tableSchema(tableSchema)
-        .recordKeyField(recordKeyField)
+        .tableSchema(schema)
         .partitionFieldNames(partitionFields)
         .build();
   }
@@ -193,7 +195,7 @@ public class TestIcebergDataHelper {
       String fieldName = field.name();
       Object value;
 
-      if (fieldName.equals(recordKeyField)
+      if (fieldName.equals(DEFAULT_RECORD_KEY_FIELD)
           || (partitionFieldNames != null && partitionFieldNames.contains(fieldName))) {
         value = existingRecord.getField(fieldName);
       } else {
@@ -237,7 +239,7 @@ public class TestIcebergDataHelper {
     Type fieldType = field.type();
     if (partitionValue != null && partitionFieldNames.contains(fieldName)) {
       return partitionValue;
-    } else if (fieldName.equals(recordKeyField)) {
+    } else if (fieldName.equals(DEFAULT_RECORD_KEY_FIELD)) {
       return keyValue;
     } else if (fieldName.equals("ts")) {
       return System.currentTimeMillis();

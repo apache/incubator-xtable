@@ -47,7 +47,7 @@ public class TestDeltaPartitionExtractor {
   private static final Map<String, StructField> STRUCT_FIELD_MAP =
       new HashMap<String, StructField>() {
         {
-          put("id", DataTypes.createStructField("id", DataTypes.IntegerType, false));
+          put("key", DataTypes.createStructField("key", DataTypes.IntegerType, false));
           put("firstName", DataTypes.createStructField("firstName", DataTypes.StringType, false));
           put("gender", DataTypes.createStructField("gender", DataTypes.StringType, false));
           put(
@@ -115,7 +115,7 @@ public class TestDeltaPartitionExtractor {
   @Test
   public void testUnpartitionedTable() {
     StructType tableSchema =
-        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate"));
+        getSchemaWithFields(Arrays.asList("key", "firstName", "gender", "birthDate"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> onePartitionFields =
         deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, new StructType());
@@ -125,7 +125,7 @@ public class TestDeltaPartitionExtractor {
   @Test
   public void testSimplePartitionedTable() {
     StructType tableSchema =
-        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate"));
+        getSchemaWithFields(Arrays.asList("key", "firstName", "gender", "birthDate"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("gender"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> expectedOnePartitionFields =
@@ -146,7 +146,8 @@ public class TestDeltaPartitionExtractor {
   @Test
   public void testDatePartitionedGeneratedColumnsTable() {
     StructType tableSchema =
-        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateOfBirth"));
+        getSchemaWithFields(
+            Arrays.asList("key", "firstName", "gender", "birthDate", "dateOfBirth"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("dateOfBirth"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> expectedOnePartitionFields =
@@ -164,7 +165,7 @@ public class TestDeltaPartitionExtractor {
   @Test
   public void testDateFormatPartitionedGeneratedColumnsTable() {
     StructType tableSchema =
-        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateFmt"));
+        getSchemaWithFields(Arrays.asList("key", "firstName", "gender", "birthDate", "dateFmt"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("dateFmt"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> expectedOnePartitionFields =
@@ -182,7 +183,8 @@ public class TestDeltaPartitionExtractor {
   @Test
   public void yearPartitionedGeneratedColumnsTable() {
     StructType tableSchema =
-        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "yearOfBirth"));
+        getSchemaWithFields(
+            Arrays.asList("key", "firstName", "gender", "birthDate", "yearOfBirth"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("yearOfBirth"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> expectedOnePartitionFields =
@@ -200,8 +202,9 @@ public class TestDeltaPartitionExtractor {
   @Test
   public void yearAndSimpleCombinedPartitionedGeneratedColumnsTable() {
     StructType tableSchema =
-        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "yearOfBirth"));
-    StructType partitionSchema = getSchemaWithFields(Arrays.asList("yearOfBirth", "id"));
+        getSchemaWithFields(
+            Arrays.asList("key", "firstName", "gender", "birthDate", "yearOfBirth"));
+    StructType partitionSchema = getSchemaWithFields(Arrays.asList("yearOfBirth", "key"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> expectedOnePartitionFields =
         Arrays.asList(
@@ -213,7 +216,7 @@ public class TestDeltaPartitionExtractor {
             OnePartitionField.builder()
                 .sourceField(
                     OneField.builder()
-                        .name("id")
+                        .name("key")
                         .schema(OneSchema.builder().name("integer").dataType(OneType.INT).build())
                         .build())
                 .transformType(PartitionTransformType.VALUE)
@@ -228,7 +231,7 @@ public class TestDeltaPartitionExtractor {
     StructType tableSchema =
         getSchemaWithFields(
             Arrays.asList(
-                "id",
+                "key",
                 "firstName",
                 "gender",
                 "birthDate",
@@ -257,16 +260,16 @@ public class TestDeltaPartitionExtractor {
   @Test
   public void testCombinationOfPlainAndGeneratedColumns() {
     StructType tableSchema =
-        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateFmt"));
+        getSchemaWithFields(Arrays.asList("key", "firstName", "gender", "birthDate", "dateFmt"));
     StructType partitionSchema =
-        getSchemaWithFields(Arrays.asList("id", "dateFmt", "gender", "dateOfBirth"));
+        getSchemaWithFields(Arrays.asList("key", "dateFmt", "gender", "dateOfBirth"));
     OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
     List<OnePartitionField> expectedOnePartitionFields =
         Arrays.asList(
             OnePartitionField.builder()
                 .sourceField(
                     OneField.builder()
-                        .name("id")
+                        .name("key")
                         .schema(OneSchema.builder().name("integer").dataType(OneType.INT).build())
                         .build())
                 .transformType(PartitionTransformType.VALUE)

@@ -39,6 +39,7 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -76,7 +77,7 @@ public class TestDeltaHelper {
 
   private static final StructField[] COMMON_FIELDS =
       new StructField[] {
-        new StructField("id", IntegerType, false, Metadata.empty()),
+        new StructField("key", StringType, false, Metadata.empty()),
         new StructField("firstName", StringType, true, Metadata.empty()),
         new StructField("lastName", StringType, true, Metadata.empty()),
         new StructField("gender", StringType, true, Metadata.empty()),
@@ -108,7 +109,13 @@ public class TestDeltaHelper {
   private static final StructField[] ADDITIONAL_FIELDS =
       new StructField[] {new StructField("street", StringType, true, Metadata.empty())};
   private static final StructField[] DATE_PARTITIONED_FIELDS =
-      new StructField[] {new StructField("yearOfBirth", IntegerType, true, Metadata.empty())};
+      new StructField[] {
+        new StructField(
+            "yearOfBirth",
+            IntegerType,
+            true,
+            Metadata.fromJson("{\"delta.generationExpression\": \"YEAR(birthDate)\"}"))
+      };
 
   private static final Random RANDOM = new Random();
   private static final String[] GENDERS = {"Male", "Female"};
@@ -118,8 +125,11 @@ public class TestDeltaHelper {
   boolean includeAdditionalColumns;
 
   public static TestDeltaHelper createTestDataHelper(
-      String partitionField, boolean includeAdditionalColumns) {
-    StructType tableSchema = generateDynamicSchema(partitionField, includeAdditionalColumns);
+      Optional<StructType> tblInputSchema,
+      String partitionField,
+      boolean includeAdditionalColumns) {
+    StructType tableSchema =
+        tblInputSchema.orElse(generateDynamicSchema(partitionField, includeAdditionalColumns));
     return TestDeltaHelper.builder()
         .tableStructSchema(tableSchema)
         .partitionField(partitionField)
@@ -142,24 +152,29 @@ public class TestDeltaHelper {
   public void createTable(SparkSession sparkSession, String tableName, String basePath) {
     DeltaTableBuilder tableBuilder =
         DeltaTable.createIfNotExists(sparkSession).tableName(tableName).location(basePath);
-    Arrays.stream(COMMON_FIELDS).forEach(tableBuilder::addColumn);
-    if ("yearOfBirth".equals(partitionField)) {
-      tableBuilder
-          .addColumn(
-              DeltaTable.columnBuilder("yearOfBirth")
-                  .dataType(IntegerType)
-                  .generatedAlwaysAs("YEAR(birthDate)")
-                  .build())
-          .partitionedBy("yearOfBirth");
-    } else if ("level".equals(partitionField)) {
-      tableBuilder.partitionedBy(partitionField);
+    for (StructField sf : tableStructSchema.fields()) {
+      tableBuilder = addFieldToTableBuilder(tableBuilder, sf);
+    }
+    if ("yearOfBirth".equals(partitionField) || "level".equals(partitionField)) {
+      tableBuilder = tableBuilder.partitionedBy(partitionField);
     } else if (partitionField != null) {
       throw new IllegalArgumentException("Unexpected partition field: " + partitionField);
     }
-    if (includeAdditionalColumns) {
-      tableBuilder.addColumn("street", StringType);
-    }
     tableBuilder.execute();
+  }
+
+  private DeltaTableBuilder addFieldToTableBuilder(DeltaTableBuilder tableBuilder, StructField sf) {
+    if (sf.metadata().contains("delta.generationExpression")) {
+      String generatedExpression = sf.metadata().getString("delta.generationExpression");
+      if (generatedExpression != null) {
+        return tableBuilder.addColumn(
+            DeltaTable.columnBuilder(sf.name())
+                .dataType(sf.dataType())
+                .generatedAlwaysAs(generatedExpression)
+                .build());
+      }
+    }
+    return tableBuilder.addColumn(sf.name(), sf.dataType());
   }
 
   public Row generateRandomRow() {
@@ -186,8 +201,8 @@ public class TestDeltaHelper {
 
   private Object generateValueForField(StructField field, int yearValue, String levelValue) {
     switch (field.name()) {
-      case "id":
-        return ID_GENERATOR.incrementAndGet();
+      case "key":
+        return generateRandomString();
       case "gender":
         return GENDERS[RANDOM.nextInt(GENDERS.length)];
       case "birthDate":

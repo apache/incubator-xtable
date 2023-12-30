@@ -125,6 +125,39 @@ public interface GenericTable<T, Q> extends AutoCloseable {
     }
   }
 
+  static GenericTable getInstanceWithCommonSchema(
+      String tableName,
+      Path tempDir,
+      SparkSession sparkSession,
+      JavaSparkContext jsc,
+      TableFormat sourceFormat) {
+    switch (sourceFormat) {
+      case HUDI:
+        return TestSparkHudiTable.forGivenSchemaAndPartitioning(
+            tableName,
+            tempDir,
+            jsc,
+            TestCommonTableHelper.getCommonSchemaInAvroFormat(),
+            TestCommonTableHelper.getHudiPartitionConfig());
+      case DELTA:
+        return TestSparkDeltaTable.forGivenSchemaAndPartitioning(
+            tableName,
+            tempDir,
+            sparkSession,
+            TestCommonTableHelper.getCommonSchemaInStructFormat(),
+            TestCommonTableHelper.getDeltaPartitionField());
+      case ICEBERG:
+        return TestIcebergTable.forGivenSchemaAndPartitioning(
+            tableName,
+            tempDir,
+            jsc.hadoopConfiguration(),
+            TestCommonTableHelper.getCommonSchemaInIcebergFormat(),
+            TestCommonTableHelper.getIcebergPartitionField());
+      default:
+        throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
+    }
+  }
+
   static String getTableName() {
     return "test_table_" + UUID.randomUUID().toString().replaceAll("-", "_");
   }
