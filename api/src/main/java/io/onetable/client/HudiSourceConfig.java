@@ -16,19 +16,12 @@
  * limitations under the License.
  */
  
-package io.onetable.model.storage;
+package io.onetable.client;
 
-/**
- * Default constants for supported Table Formats
- *
- * @since 0.1
- */
-public class TableFormat {
-  public static final String HUDI = "HUDI";
-  public static final String ICEBERG = "ICEBERG";
-  public static final String DELTA = "DELTA";
+import io.onetable.spi.extractor.SourcePartitionSpecExtractor;
 
-  public static String[] values() {
-    return new String[] {"HUDI", "ICEBERG", "DELTA"};
-  }
+public interface HudiSourceConfig {
+  public String getPartitionSpecExtractorClass();
+
+  SourcePartitionSpecExtractor loadSourcePartitionSpecExtractor();
 }

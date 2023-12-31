@@ -51,8 +51,8 @@ import io.onetable.spi.sync.TableFormatSync;
 import io.onetable.spi.sync.TargetClient;
 
 /**
- * Responsible for completing the entire lifecycle of the sync process given {@link PerTableConfig}.
- * This is done in three steps,
+ * Responsible for completing the entire lifecycle of the sync process given {@link
+ * PerTableConfigImpl}. This is done in three steps,
  *
  * <ul>
  *   <li>1. Extracting snapshot {@link OneSnapshot} from the source table format.
@@ -83,7 +83,7 @@ public class OneTableClient {
    */
   public <COMMIT> Map<String, SyncResult> sync(
       PerTableConfig config, SourceClientProvider<COMMIT> sourceClientProvider) {
-    if (config.getTargetTableFormats().isEmpty()) {
+    if (config.getTargetTableFormats() == null || config.getTargetTableFormats().isEmpty()) {
       throw new IllegalArgumentException("Please provide at-least one format to sync");
     }
 

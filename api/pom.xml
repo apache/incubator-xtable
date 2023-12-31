@@ -18,6 +18,12 @@
             <artifactId>jackson-annotations</artifactId>
         </dependency>
 
+        <!-- Hadoop dependencies -->
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+        </dependency>
+
         <!-- Logging -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>

@@ -16,19 +16,20 @@
  * limitations under the License.
  */
  
-package io.onetable.model.storage;
+package io.onetable.client;
+
+import java.util.Map;
 
 /**
- * Default constants for supported Table Formats
- *
- * @since 0.1
+ * Catologs are responsible for the management of and providing access to the metadata associated
+ * with a given set of Tables, typically within the context of a namespaces. This interface
+ * represents the configuration required to initialize a client for a particualr data engine such
+ * that it can access the necessary metadata for table conversions and semantic details.
  */
-public class TableFormat {
-  public static final String HUDI = "HUDI";
-  public static final String ICEBERG = "ICEBERG";
-  public static final String DELTA = "DELTA";
+public interface CatalogConfig {
+  String getCatalogImpl();
 
-  public static String[] values() {
-    return new String[] {"HUDI", "ICEBERG", "DELTA"};
-  }
+  String getCatalogName();
+
+  Map<String, String> getCatalogOptions();
 }

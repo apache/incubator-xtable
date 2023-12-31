@@ -18,19 +18,14 @@
  
 package io.onetable.client;
 
-import static io.onetable.model.storage.TableFormat.DELTA;
-import static io.onetable.model.storage.TableFormat.HUDI;
-import static io.onetable.model.storage.TableFormat.ICEBERG;
+import java.util.ServiceLoader;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 import org.apache.hadoop.conf.Configuration;
 
-import io.onetable.delta.DeltaClient;
 import io.onetable.exception.NotSupportedException;
-import io.onetable.hudi.HudiTargetClient;
-import io.onetable.iceberg.IcebergClient;
 import io.onetable.spi.sync.TargetClient;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -43,15 +38,21 @@ public class TableFormatClientFactory {
 
   public TargetClient createForFormat(
       String tableFormat, PerTableConfig perTableConfig, Configuration configuration) {
-    switch (tableFormat) {
-      case ICEBERG:
-        return new IcebergClient(perTableConfig, configuration);
-      case DELTA:
-        return new DeltaClient(perTableConfig, configuration);
-      case HUDI:
-        return new HudiTargetClient(perTableConfig, configuration);
-      default:
-        throw new NotSupportedException("Target format is not yet supported: " + tableFormat);
+    TargetClient targetClient = createTargetClientForName(tableFormat);
+    if (targetClient == null) {
+      throw new NotSupportedException("Target format is not yet supported: " + tableFormat);
     }
+    targetClient.init(perTableConfig, configuration);
+    return targetClient;
+  }
+
+  public TargetClient createTargetClientForName(String tableFormatName) {
+    ServiceLoader<TargetClient> loader = ServiceLoader.load(TargetClient.class);
+    for (TargetClient target : loader) {
+      if (target.getTableFormat().equalsIgnoreCase(tableFormatName)) {
+        return target;
+      }
+    }
+    throw new NotSupportedException("Target format is not yet supported: " + tableFormatName);
   }
 }

@@ -45,6 +45,7 @@ import org.apache.iceberg.data.Record;
 
 import io.onetable.TestIcebergTable;
 import io.onetable.client.PerTableConfig;
+import io.onetable.client.PerTableConfigImpl;
 import io.onetable.model.CommitsBacklog;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
@@ -95,7 +96,7 @@ public class ITIcebergSourceClient {
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
       PerTableConfig tableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(testIcebergTable.getTableName())
               .tableBasePath(testIcebergTable.getBasePath())
               .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
@@ -154,7 +155,7 @@ public class ITIcebergSourceClient {
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
       PerTableConfig tableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(testIcebergTable.getTableName())
               .tableBasePath(testIcebergTable.getBasePath())
               .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
@@ -213,7 +214,7 @@ public class ITIcebergSourceClient {
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
       PerTableConfig tableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(testIcebergTable.getTableName())
               .tableBasePath(testIcebergTable.getBasePath())
               .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
@@ -272,7 +273,7 @@ public class ITIcebergSourceClient {
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
       PerTableConfig tableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(testIcebergTable.getTableName())
               .tableBasePath(testIcebergTable.getBasePath())
               .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
@@ -312,7 +313,7 @@ public class ITIcebergSourceClient {
       List<Record> commit1Rows = testIcebergTable.insertRecordsForPartition(50, "INFO");
       Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
       PerTableConfig tableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(testIcebergTable.getTableName())
               .tableBasePath(testIcebergTable.getBasePath())
               .tableDataPath(testIcebergTable.getDataPath())

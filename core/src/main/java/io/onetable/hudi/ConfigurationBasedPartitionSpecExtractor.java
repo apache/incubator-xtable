@@ -36,13 +36,13 @@ import io.onetable.schema.SchemaFieldFinder;
  */
 @AllArgsConstructor
 public class ConfigurationBasedPartitionSpecExtractor implements HudiSourcePartitionSpecExtractor {
-  private final HudiSourceConfig config;
+  private final HudiSourceConfigImpl config;
 
   @Override
   public List<OnePartitionField> spec(OneSchema tableSchema) {
     List<OnePartitionField> partitionFields =
         new ArrayList<>(config.getPartitionFieldSpecs().size());
-    for (HudiSourceConfig.PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
+    for (HudiSourceConfigImpl.PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
       OneField sourceField =
           SchemaFieldFinder.getInstance()
               .findFieldByPath(tableSchema, fieldSpec.getSourceFieldPath());

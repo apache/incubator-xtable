@@ -28,17 +28,18 @@ import lombok.Value;
 
 import com.google.common.base.Preconditions;
 
+import io.onetable.client.HudiSourceConfig;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.reflection.ReflectionUtils;
 
 /** Configuration of Hudi source format for the sync process. */
 @Value
-public class HudiSourceConfig {
+public class HudiSourceConfigImpl implements HudiSourceConfig {
   String partitionSpecExtractorClass;
   List<PartitionFieldSpec> partitionFieldSpecs;
 
   @Builder
-  public HudiSourceConfig(String partitionSpecExtractorClass, String partitionFieldSpecConfig) {
+  public HudiSourceConfigImpl(String partitionSpecExtractorClass, String partitionFieldSpecConfig) {
     this.partitionSpecExtractorClass =
         partitionSpecExtractorClass == null
             ? ConfigurationBasedPartitionSpecExtractor.class.getName()
@@ -47,10 +48,18 @@ public class HudiSourceConfig {
   }
 
   @Value
-  public static class PartitionFieldSpec {
+  static class PartitionFieldSpec {
     String sourceFieldPath;
     PartitionTransformType transformType;
     String format;
+  }
+
+  public String getPartitionSpecExtractorClass() {
+    return partitionSpecExtractorClass;
+  }
+
+  public List<PartitionFieldSpec> getPartitionFieldSpecs() {
+    return partitionFieldSpecs;
   }
 
   private static List<PartitionFieldSpec> parsePartitionFieldSpecs(String input) {
