@@ -73,20 +73,6 @@ public class IcebergClient implements TargetClient {
 
   public IcebergClient() {}
 
-  public IcebergClient(PerTableConfig perTableConfig, Configuration configuration) {
-    this(
-        perTableConfig,
-        configuration,
-        IcebergSchemaExtractor.getInstance(),
-        IcebergSchemaSync.getInstance(),
-        IcebergPartitionSpecExtractor.getInstance(),
-        IcebergPartitionSpecSync.getInstance(),
-        IcebergDataFileUpdatesSync.of(
-            IcebergColumnStatsConverter.getInstance(),
-            IcebergPartitionValueConverter.getInstance()),
-        IcebergTableManager.of(configuration));
-  }
-
   IcebergClient(
       PerTableConfig perTableConfig,
       Configuration configuration,

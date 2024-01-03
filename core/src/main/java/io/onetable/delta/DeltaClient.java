@@ -51,6 +51,8 @@ import scala.Some;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import io.onetable.client.PerTableConfig;
 import io.onetable.exception.NotSupportedException;
 import io.onetable.model.OneTable;
@@ -93,6 +95,7 @@ public class DeltaClient implements TargetClient {
         DeltaDataFileUpdatesExtractor.builder().build());
   }
 
+  @VisibleForTesting
   DeltaClient(
       String tableDataPath,
       String tableName,

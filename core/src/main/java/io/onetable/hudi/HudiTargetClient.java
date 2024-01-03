@@ -108,19 +108,6 @@ public class HudiTargetClient implements TargetClient {
 
   public HudiTargetClient() {}
 
-  public HudiTargetClient(PerTableConfig perTableConfig, Configuration configuration) {
-    _init(
-        perTableConfig.getTableDataPath(),
-        perTableConfig.getTargetMetadataRetentionInHours(),
-        HoodieMetadataConfig.COMPACT_NUM_DELTA_COMMITS.defaultValue(),
-        BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(configuration),
-            new CachingPath(perTableConfig.getTableDataPath())),
-        AvroSchemaConverter.getInstance(),
-        HudiTableManager.of(configuration),
-        CommitState::new);
-  }
-
   @VisibleForTesting
   HudiTargetClient(
       PerTableConfig perTableConfig,
