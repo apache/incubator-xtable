@@ -139,46 +139,4 @@ public class PerTableConfigImpl implements PerTableConfig {
       return path.toString();
     }
   }
-
-  @Nonnull
-  public String getTableBasePath() {
-    return tableBasePath;
-  }
-
-  @Nonnull
-  public String getTableDataPath() {
-    return tableDataPath;
-  }
-
-  @Nonnull
-  public String getTableName() {
-    return tableName;
-  }
-
-  public String[] getNamespace() {
-    return namespace;
-  }
-
-  @Nonnull
-  public HudiSourceConfigImpl getHudiSourceConfig() {
-    return hudiSourceConfig;
-  }
-
-  @Nonnull
-  public List<String> getTargetTableFormats() {
-    return targetTableFormats;
-  }
-
-  public IcebergCatalogConfig getIcebergCatalogConfig() {
-    return icebergCatalogConfig;
-  }
-
-  @Nonnull
-  public SyncMode getSyncMode() {
-    return syncMode;
-  }
-
-  public int getTargetMetadataRetentionInHours() {
-    return targetMetadataRetentionInHours;
-  }
 }

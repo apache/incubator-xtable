@@ -31,16 +31,4 @@ public class IcebergCatalogConfig implements io.onetable.client.CatalogConfig {
   @NonNull String catalogImpl;
   @NonNull String catalogName;
   @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
-
-  public String getCatalogImpl() {
-    return catalogImpl;
-  }
-
-  public String getCatalogName() {
-    return catalogName;
-  }
-
-  public Map<String, String> getCatalogOptions() {
-    return catalogOptions;
-  }
 }

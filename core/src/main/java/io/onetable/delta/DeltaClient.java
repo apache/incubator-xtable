@@ -80,10 +80,6 @@ public class DeltaClient implements TargetClient {
 
   public DeltaClient() {}
 
-  public DeltaClient(PerTableConfig perTableConfig, Configuration configuration) {
-    this(perTableConfig, DeltaClientUtils.buildSparkSession(configuration));
-  }
-
   public DeltaClient(PerTableConfig perTableConfig, SparkSession sparkSession) {
     this(
         perTableConfig.getTableDataPath(),

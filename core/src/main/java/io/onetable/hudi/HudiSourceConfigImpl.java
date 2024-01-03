@@ -54,14 +54,6 @@ public class HudiSourceConfigImpl implements HudiSourceConfig {
     String format;
   }
 
-  public String getPartitionSpecExtractorClass() {
-    return partitionSpecExtractorClass;
-  }
-
-  public List<PartitionFieldSpec> getPartitionFieldSpecs() {
-    return partitionFieldSpecs;
-  }
-
   private static List<PartitionFieldSpec> parsePartitionFieldSpecs(String input) {
     if (input == null || input.isEmpty()) {
       return Collections.emptyList();

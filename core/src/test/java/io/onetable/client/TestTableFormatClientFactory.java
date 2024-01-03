@@ -19,8 +19,10 @@
 package io.onetable.client;
 
 import static io.onetable.GenericTable.getTableName;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.List;
@@ -45,7 +47,7 @@ public class TestTableFormatClientFactory {
     Configuration conf = new Configuration();
     conf.setStrings("spark.master", "local");
     tc.init(perTableConfig, conf);
-    assertNotNull(tc.getTableFormat().equalsIgnoreCase(TableFormat.DELTA));
+    assertEquals(tc.getTableFormat(), TableFormat.DELTA);
   }
 
   @Test
@@ -58,7 +60,7 @@ public class TestTableFormatClientFactory {
     Configuration conf = new Configuration();
     conf.setStrings("spark.master", "local");
     tc.init(perTableConfig, conf);
-    assertNotNull(tc.getTableFormat().equalsIgnoreCase(TableFormat.HUDI));
+    assertEquals(tc.getTableFormat(), TableFormat.HUDI);
   }
 
   @Test
@@ -71,17 +73,17 @@ public class TestTableFormatClientFactory {
     Configuration conf = new Configuration();
     conf.setStrings("spark.master", "local");
     tc.init(perTableConfig, conf);
-    assertNotNull(tc.getTableFormat().equalsIgnoreCase(TableFormat.ICEBERG));
+    assertEquals(tc.getTableFormat(), TableFormat.ICEBERG);
   }
 
   @Test
   public void testTableClientFromNameForUNKOWN() {
-    try {
-      TargetClient tc = TableFormatClientFactory.getInstance().createTargetClientForName("UNKOWN");
-      fail("NotSupportedException expected and operation succeeded inappropriately.");
-    } catch (NotSupportedException e) {
-      // this is expected
-    }
+    NotSupportedException thrown =
+        assertThrows(
+            NotSupportedException.class,
+            () -> TableFormatClientFactory.getInstance().createTargetClientForName("UNKNOWN"),
+            "NotSupportedException expected and operation succeeded inappropriately.");
+    assertTrue(thrown.getMessage().contains("UNKNOWN"));
   }
 
   @Test
@@ -93,7 +95,7 @@ public class TestTableFormatClientFactory {
     TargetClient tc =
         TableFormatClientFactory.getInstance()
             .createForFormat(TableFormat.DELTA, perTableConfig, conf);
-    assertNotNull(tc.getTableFormat().equalsIgnoreCase(TableFormat.DELTA));
+    assertEquals(tc.getTableFormat(), TableFormat.DELTA);
   }
 
   private PerTableConfig getPerTableConfig(List<String> targetTableFormats, SyncMode syncMode) {
