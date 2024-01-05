@@ -55,6 +55,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import io.onetable.TestSparkDeltaTable;
 import io.onetable.client.PerTableConfig;
+import io.onetable.client.PerTableConfigImpl;
 import io.onetable.model.*;
 import io.onetable.model.CommitsBacklog;
 import io.onetable.model.schema.OneField;
@@ -160,7 +161,7 @@ public class ITDeltaSourceClient {
             + "' AS SELECT * FROM VALUES (1, 2)");
     // Create Delta source client
     PerTableConfig tableConfig =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableName(tableName)
             .tableBasePath(basePath.toString())
             .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
@@ -218,7 +219,7 @@ public class ITDeltaSourceClient {
             + "' AS SELECT 'SingleValue' AS part_col, 1 AS col1, 2 AS col2");
     // Create Delta source client
     PerTableConfig tableConfig =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableName(tableName)
             .tableBasePath(basePath.toString())
             .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
@@ -306,7 +307,7 @@ public class ITDeltaSourceClient {
             + "` VALUES(1, CAST('2012-02-12 00:12:34' AS TIMESTAMP))");
     // Create Delta source client
     PerTableConfig tableConfig =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableName(tableName)
             .tableBasePath(basePath.toString())
             .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
@@ -345,7 +346,7 @@ public class ITDeltaSourceClient {
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
     PerTableConfig tableConfig =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableName(testSparkDeltaTable.getTableName())
             .tableBasePath(testSparkDeltaTable.getBasePath())
             .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
@@ -383,7 +384,7 @@ public class ITDeltaSourceClient {
     List<Row> commit1Rows = testSparkDeltaTable.insertRowsForPartition(50, 2018);
     Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
     PerTableConfig tableConfig =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableName(testSparkDeltaTable.getTableName())
             .tableBasePath(testSparkDeltaTable.getBasePath())
             .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
@@ -450,7 +451,7 @@ public class ITDeltaSourceClient {
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
     PerTableConfig tableConfig =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableName(testSparkDeltaTable.getTableName())
             .tableBasePath(testSparkDeltaTable.getBasePath())
             .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
@@ -496,7 +497,7 @@ public class ITDeltaSourceClient {
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
     PerTableConfig tableConfig =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableName(testSparkDeltaTable.getTableName())
             .tableBasePath(testSparkDeltaTable.getBasePath())
             .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
@@ -551,7 +552,7 @@ public class ITDeltaSourceClient {
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
     PerTableConfig tableConfig =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableName(testSparkDeltaTable.getTableName())
             .tableBasePath(testSparkDeltaTable.getBasePath())
             .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
@@ -609,7 +610,7 @@ public class ITDeltaSourceClient {
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
     PerTableConfig tableConfig =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableName(testSparkDeltaTable.getTableName())
             .tableBasePath(testSparkDeltaTable.getBasePath())
             .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))

@@ -56,36 +56,44 @@ import io.onetable.spi.sync.TargetClient;
 @Log4j2
 public class IcebergClient implements TargetClient {
   private static final String METADATA_DIR_PATH = "/metadata/";
-  private final IcebergSchemaExtractor schemaExtractor;
-  private final IcebergSchemaSync schemaSync;
-  private final IcebergPartitionSpecExtractor partitionSpecExtractor;
-  private final IcebergPartitionSpecSync partitionSpecSync;
-  private final IcebergDataFileUpdatesSync dataFileUpdatesExtractor;
-  private final IcebergTableManager tableManager;
-  private final String basePath;
-  private final TableIdentifier tableIdentifier;
-  private final IcebergCatalogConfig catalogConfig;
-  private final Configuration configuration;
-  private final int snapshotRetentionInHours;
+  private IcebergSchemaExtractor schemaExtractor;
+  private IcebergSchemaSync schemaSync;
+  private IcebergPartitionSpecExtractor partitionSpecExtractor;
+  private IcebergPartitionSpecSync partitionSpecSync;
+  private IcebergDataFileUpdatesSync dataFileUpdatesExtractor;
+  private IcebergTableManager tableManager;
+  private String basePath;
+  private TableIdentifier tableIdentifier;
+  private IcebergCatalogConfig catalogConfig;
+  private Configuration configuration;
+  private int snapshotRetentionInHours;
   private Transaction transaction;
   private Table table;
   private OneTable internalTableState;
 
-  public IcebergClient(PerTableConfig perTableConfig, Configuration configuration) {
-    this(
-        perTableConfig,
-        configuration,
-        IcebergSchemaExtractor.getInstance(),
-        IcebergSchemaSync.getInstance(),
-        IcebergPartitionSpecExtractor.getInstance(),
-        IcebergPartitionSpecSync.getInstance(),
-        IcebergDataFileUpdatesSync.of(
-            IcebergColumnStatsConverter.getInstance(),
-            IcebergPartitionValueConverter.getInstance()),
-        IcebergTableManager.of(configuration));
-  }
+  public IcebergClient() {}
 
   IcebergClient(
+      PerTableConfig perTableConfig,
+      Configuration configuration,
+      IcebergSchemaExtractor schemaExtractor,
+      IcebergSchemaSync schemaSync,
+      IcebergPartitionSpecExtractor partitionSpecExtractor,
+      IcebergPartitionSpecSync partitionSpecSync,
+      IcebergDataFileUpdatesSync dataFileUpdatesExtractor,
+      IcebergTableManager tableManager) {
+    _init(
+        perTableConfig,
+        configuration,
+        schemaExtractor,
+        schemaSync,
+        partitionSpecExtractor,
+        partitionSpecSync,
+        dataFileUpdatesExtractor,
+        tableManager);
+  }
+
+  private void _init(
       PerTableConfig perTableConfig,
       Configuration configuration,
       IcebergSchemaExtractor schemaExtractor,
@@ -109,7 +117,7 @@ public class IcebergClient implements TargetClient {
             ? TableIdentifier.of(tableName)
             : TableIdentifier.of(Namespace.of(namespace), tableName);
     this.tableManager = tableManager;
-    this.catalogConfig = perTableConfig.getIcebergCatalogConfig();
+    this.catalogConfig = (IcebergCatalogConfig) perTableConfig.getIcebergCatalogConfig();
 
     if (tableManager.tableExists(catalogConfig, tableIdentifier, basePath)) {
       // Load the table state if it already exists
@@ -117,6 +125,21 @@ public class IcebergClient implements TargetClient {
     }
     // Clear any corrupted state before using the target client
     rollbackCorruptCommits();
+  }
+
+  @Override
+  public void init(PerTableConfig perTableConfig, Configuration configuration) {
+    _init(
+        perTableConfig,
+        configuration,
+        IcebergSchemaExtractor.getInstance(),
+        IcebergSchemaSync.getInstance(),
+        IcebergPartitionSpecExtractor.getInstance(),
+        IcebergPartitionSpecSync.getInstance(),
+        IcebergDataFileUpdatesSync.of(
+            IcebergColumnStatsConverter.getInstance(),
+            IcebergPartitionValueConverter.getInstance()),
+        IcebergTableManager.of(configuration));
   }
 
   @Override

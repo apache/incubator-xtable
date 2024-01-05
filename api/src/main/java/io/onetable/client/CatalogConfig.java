@@ -16,19 +16,20 @@
  * limitations under the License.
  */
  
-package io.onetable.iceberg;
+package io.onetable.client;
 
-import java.util.Collections;
 import java.util.Map;
 
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+/**
+ * Catologs are responsible for the management of and providing access to the metadata associated
+ * with a given set of Tables, typically within the context of a namespaces. This interface
+ * represents the configuration required to initialize a client for a particualr data engine such
+ * that it can access the necessary metadata for table conversions and semantic details.
+ */
+public interface CatalogConfig {
+  String getCatalogImpl();
 
-@Value
-@Builder
-public class IcebergCatalogConfig implements io.onetable.client.CatalogConfig {
-  @NonNull String catalogImpl;
-  @NonNull String catalogName;
-  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
+  String getCatalogName();
+
+  Map<String, String> getCatalogOptions();
 }

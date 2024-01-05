@@ -37,6 +37,7 @@ import org.apache.hudi.config.HoodieArchivalConfig;
 import io.onetable.TestJavaHudiTable;
 import io.onetable.client.OneTableClient;
 import io.onetable.client.PerTableConfig;
+import io.onetable.client.PerTableConfigImpl;
 import io.onetable.client.SourceClientProvider;
 import io.onetable.hudi.HudiSourceClientProvider;
 import io.onetable.model.storage.TableFormat;
@@ -75,7 +76,7 @@ public class LoadTest {
             false);
       }
       PerTableConfig perTableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
               .tableBasePath(table.getBasePath())
@@ -104,7 +105,7 @@ public class LoadTest {
             tableName, tempDir, "level:SIMPLE", HoodieTableType.COPY_ON_WRITE, archivalConfig)) {
       table.insertRecords(1, "partition0", false);
       PerTableConfig perTableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
               .tableBasePath(table.getBasePath())

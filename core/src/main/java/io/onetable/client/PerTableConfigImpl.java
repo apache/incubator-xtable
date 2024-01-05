@@ -30,13 +30,13 @@ import org.apache.hadoop.fs.Path;
 
 import com.google.common.base.Preconditions;
 
-import io.onetable.hudi.HudiSourceConfig;
+import io.onetable.hudi.HudiSourceConfigImpl;
 import io.onetable.iceberg.IcebergCatalogConfig;
 import io.onetable.model.sync.SyncMode;
 
 /** Represents input configuration to the sync process. */
 @Value
-public class PerTableConfig {
+public class PerTableConfigImpl implements PerTableConfig {
   /** table base path in local file system or HDFS or object stores like S3, GCS etc. */
   @Nonnull String tableBasePath;
   /** the base path for the data folder, defaults to the tableBasePath if not specified */
@@ -73,7 +73,7 @@ public class PerTableConfig {
    *           the date string as it appears in your file paths
    *     </ul>
    */
-  @Nonnull HudiSourceConfig hudiSourceConfig;
+  @Nonnull HudiSourceConfigImpl hudiSourceConfig;
 
   /** List of table formats to sync. */
   @Nonnull List<String> targetTableFormats;
@@ -100,12 +100,12 @@ public class PerTableConfig {
   int targetMetadataRetentionInHours;
 
   @Builder
-  PerTableConfig(
+  PerTableConfigImpl(
       @NonNull String tableBasePath,
       String tableDataPath,
       @NonNull String tableName,
       String[] namespace,
-      HudiSourceConfig hudiSourceConfig,
+      HudiSourceConfigImpl hudiSourceConfig,
       @NonNull List<String> targetTableFormats,
       IcebergCatalogConfig icebergCatalogConfig,
       SyncMode syncMode,
@@ -116,7 +116,7 @@ public class PerTableConfig {
     this.tableName = tableName;
     this.namespace = namespace;
     this.hudiSourceConfig =
-        hudiSourceConfig == null ? HudiSourceConfig.builder().build() : hudiSourceConfig;
+        hudiSourceConfig == null ? HudiSourceConfigImpl.builder().build() : hudiSourceConfig;
     Preconditions.checkArgument(
         targetTableFormats.size() > 0, "Please provide at-least one format to sync");
     this.targetTableFormats = targetTableFormats;

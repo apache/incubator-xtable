@@ -394,7 +394,7 @@ public class TestOneTableClient {
   }
 
   private PerTableConfig getPerTableConfig(List<String> targetTableFormats, SyncMode syncMode) {
-    return PerTableConfig.builder()
+    return PerTableConfigImpl.builder()
         .tableName(getTableName())
         .tableBasePath("/tmp/doesnt/matter")
         .targetTableFormats(targetTableFormats)

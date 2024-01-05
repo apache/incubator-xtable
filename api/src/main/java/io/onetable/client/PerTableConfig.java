@@ -16,19 +16,28 @@
  * limitations under the License.
  */
  
-package io.onetable.iceberg;
+package io.onetable.client;
 
-import java.util.Collections;
-import java.util.Map;
+import java.util.List;
 
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+import io.onetable.model.sync.SyncMode;
 
-@Value
-@Builder
-public class IcebergCatalogConfig implements io.onetable.client.CatalogConfig {
-  @NonNull String catalogImpl;
-  @NonNull String catalogName;
-  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
+public interface PerTableConfig {
+  int getTargetMetadataRetentionInHours();
+
+  String getTableBasePath();
+
+  String getTableDataPath();
+
+  String getTableName();
+
+  HudiSourceConfig getHudiSourceConfig();
+
+  List<String> getTargetTableFormats();
+
+  SyncMode getSyncMode();
+
+  String[] getNamespace();
+
+  CatalogConfig getIcebergCatalogConfig();
 }

@@ -26,7 +26,7 @@ import java.util.Collections;
 
 import org.junit.jupiter.api.Test;
 
-import io.onetable.hudi.HudiSourceConfig;
+import io.onetable.hudi.HudiSourceConfigImpl;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 
@@ -35,7 +35,7 @@ class TestPerTableConfig {
   @Test
   void sanitizePath() {
     PerTableConfig tooManySlashes =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableBasePath("s3://bucket//path")
             .tableName("name")
             .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
@@ -43,7 +43,7 @@ class TestPerTableConfig {
     assertEquals("s3://bucket/path", tooManySlashes.getTableBasePath());
 
     PerTableConfig localFilePath =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableBasePath("/local/data//path")
             .tableName("name")
             .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
@@ -51,7 +51,7 @@ class TestPerTableConfig {
     assertEquals("file:///local/data/path", localFilePath.getTableBasePath());
 
     PerTableConfig properLocalFilePath =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableBasePath("file:///local/data//path")
             .tableName("name")
             .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
@@ -62,7 +62,7 @@ class TestPerTableConfig {
   @Test
   void defaultValueSet() {
     PerTableConfig perTableConfig =
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableBasePath("file://bucket/path")
             .tableName("name")
             .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
@@ -70,7 +70,7 @@ class TestPerTableConfig {
 
     assertEquals(24 * 7, perTableConfig.getTargetMetadataRetentionInHours());
     assertEquals(SyncMode.INCREMENTAL, perTableConfig.getSyncMode());
-    assertEquals(HudiSourceConfig.builder().build(), perTableConfig.getHudiSourceConfig());
+    assertEquals(HudiSourceConfigImpl.builder().build(), perTableConfig.getHudiSourceConfig());
     assertNull(perTableConfig.getNamespace());
     assertNull(perTableConfig.getIcebergCatalogConfig());
   }
@@ -80,7 +80,7 @@ class TestPerTableConfig {
     assertThrows(
         NullPointerException.class,
         () ->
-            PerTableConfig.builder()
+            PerTableConfigImpl.builder()
                 .tableName("name")
                 .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
                 .build());
@@ -88,7 +88,7 @@ class TestPerTableConfig {
     assertThrows(
         NullPointerException.class,
         () ->
-            PerTableConfig.builder()
+            PerTableConfigImpl.builder()
                 .tableBasePath("file://bucket/path")
                 .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
                 .build());
@@ -96,7 +96,10 @@ class TestPerTableConfig {
     assertThrows(
         NullPointerException.class,
         () ->
-            PerTableConfig.builder().tableBasePath("file://bucket/path").tableName("name").build());
+            PerTableConfigImpl.builder()
+                .tableBasePath("file://bucket/path")
+                .tableName("name")
+                .build());
   }
 
   @Test
@@ -105,7 +108,7 @@ class TestPerTableConfig {
         assertThrows(
             IllegalArgumentException.class,
             () ->
-                PerTableConfig.builder()
+                PerTableConfigImpl.builder()
                     .tableName("name")
                     .tableBasePath("file://bucket/path")
                     .targetTableFormats(Collections.emptyList())

@@ -21,6 +21,9 @@ package io.onetable.spi.sync;
 import java.util.List;
 import java.util.Optional;
 
+import org.apache.hadoop.conf.Configuration;
+
+import io.onetable.client.PerTableConfig;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OnePartitionField;
@@ -84,4 +87,7 @@ public interface TargetClient {
 
   /** Returns the TableFormat name the client syncs to */
   String getTableFormat();
+
+  /** Initializes the client with provided configuration */
+  void init(PerTableConfig perTableConfig, Configuration configuration);
 }

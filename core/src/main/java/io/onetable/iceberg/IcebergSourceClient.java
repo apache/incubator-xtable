@@ -80,7 +80,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
             ? TableIdentifier.of(tableName)
             : TableIdentifier.of(Namespace.of(namespace), tableName);
     return tableManager.getTable(
-        sourceTableConfig.getIcebergCatalogConfig(),
+        (IcebergCatalogConfig) sourceTableConfig.getIcebergCatalogConfig(),
         tableIdentifier,
         sourceTableConfig.getTableBasePath());
   }

@@ -76,7 +76,7 @@ import io.delta.standalone.expressions.Literal;
 import io.delta.standalone.types.IntegerType;
 import io.delta.standalone.types.StringType;
 
-import io.onetable.client.PerTableConfig;
+import io.onetable.client.PerTableConfigImpl;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneField;
@@ -126,7 +126,7 @@ public class TestDeltaSync {
     Files.createDirectories(basePath);
     deltaClient =
         new DeltaClient(
-            PerTableConfig.builder()
+            PerTableConfigImpl.builder()
                 .tableName(tableName)
                 .tableBasePath(basePath.toString())
                 .targetMetadataRetentionInHours(1)

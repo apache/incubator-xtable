@@ -51,6 +51,8 @@ import scala.Some;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import io.onetable.client.PerTableConfig;
 import io.onetable.exception.NotSupportedException;
 import io.onetable.model.OneTable;
@@ -67,18 +69,16 @@ public class DeltaClient implements TargetClient {
   // gets access to generated columns.
   private static final String MIN_WRITER_VERSION = String.valueOf(4);
 
-  private final DeltaLog deltaLog;
-  private final DeltaSchemaExtractor schemaExtractor;
-  private final DeltaPartitionExtractor partitionExtractor;
-  private final DeltaDataFileUpdatesExtractor dataFileUpdatesExtractor;
+  private DeltaLog deltaLog;
+  private DeltaSchemaExtractor schemaExtractor;
+  private DeltaPartitionExtractor partitionExtractor;
+  private DeltaDataFileUpdatesExtractor dataFileUpdatesExtractor;
 
-  private final String tableName;
-  private final int logRetentionInHours;
+  private String tableName;
+  private int logRetentionInHours;
   private TransactionState transactionState;
 
-  public DeltaClient(PerTableConfig perTableConfig, Configuration configuration) {
-    this(perTableConfig, DeltaClientUtils.buildSparkSession(configuration));
-  }
+  public DeltaClient() {}
 
   public DeltaClient(PerTableConfig perTableConfig, SparkSession sparkSession) {
     this(
@@ -91,7 +91,27 @@ public class DeltaClient implements TargetClient {
         DeltaDataFileUpdatesExtractor.builder().build());
   }
 
+  @VisibleForTesting
   DeltaClient(
+      String tableDataPath,
+      String tableName,
+      int logRetentionInHours,
+      SparkSession sparkSession,
+      DeltaSchemaExtractor schemaExtractor,
+      DeltaPartitionExtractor partitionExtractor,
+      DeltaDataFileUpdatesExtractor dataFileUpdatesExtractor) {
+
+    _init(
+        tableDataPath,
+        tableName,
+        logRetentionInHours,
+        sparkSession,
+        schemaExtractor,
+        partitionExtractor,
+        dataFileUpdatesExtractor);
+  }
+
+  private void _init(
       String tableDataPath,
       String tableName,
       int logRetentionInHours,
@@ -110,6 +130,20 @@ public class DeltaClient implements TargetClient {
     this.deltaLog = deltaLog;
     this.tableName = tableName;
     this.logRetentionInHours = logRetentionInHours;
+  }
+
+  @Override
+  public void init(PerTableConfig perTableConfig, Configuration configuration) {
+    SparkSession sparkSession = DeltaClientUtils.buildSparkSession(configuration);
+
+    _init(
+        perTableConfig.getTableDataPath(),
+        perTableConfig.getTableName(),
+        perTableConfig.getTargetMetadataRetentionInHours(),
+        sparkSession,
+        DeltaSchemaExtractor.getInstance(),
+        DeltaPartitionExtractor.getInstance(),
+        DeltaDataFileUpdatesExtractor.builder().build());
   }
 
   @Override

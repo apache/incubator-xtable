@@ -46,6 +46,7 @@ import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 
 import io.onetable.client.PerTableConfig;
+import io.onetable.client.PerTableConfigImpl;
 import io.onetable.model.*;
 import io.onetable.model.schema.*;
 import io.onetable.model.stat.PartitionValue;
@@ -407,7 +408,7 @@ class TestIcebergSourceClient {
   }
 
   private static PerTableConfig getPerTableConfig(Table catalogSales) {
-    return PerTableConfig.builder()
+    return PerTableConfigImpl.builder()
         .tableName(catalogSales.name())
         .tableBasePath(catalogSales.location())
         .targetTableFormats(Collections.singletonList(TableFormat.DELTA))

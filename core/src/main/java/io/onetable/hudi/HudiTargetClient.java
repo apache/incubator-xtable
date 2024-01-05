@@ -96,28 +96,17 @@ import io.onetable.spi.sync.TargetClient;
 
 @Log4j2
 public class HudiTargetClient implements TargetClient {
-  private final BaseFileUpdatesExtractor baseFileUpdatesExtractor;
-  private final AvroSchemaConverter avroSchemaConverter;
-  private final HudiTableManager hudiTableManager;
-  private final CommitStateCreator commitStateCreator;
-  private final int timelineRetentionInHours;
-  private final int maxNumDeltaCommitsBeforeCompaction;
-  private final String tableDataPath;
+  private BaseFileUpdatesExtractor baseFileUpdatesExtractor;
+  private AvroSchemaConverter avroSchemaConverter;
+  private HudiTableManager hudiTableManager;
+  private CommitStateCreator commitStateCreator;
+  private int timelineRetentionInHours;
+  private int maxNumDeltaCommitsBeforeCompaction;
+  private String tableDataPath;
   private Optional<HoodieTableMetaClient> metaClient;
   private CommitState commitState;
 
-  public HudiTargetClient(PerTableConfig perTableConfig, Configuration configuration) {
-    this(
-        perTableConfig.getTableDataPath(),
-        perTableConfig.getTargetMetadataRetentionInHours(),
-        HoodieMetadataConfig.COMPACT_NUM_DELTA_COMMITS.defaultValue(),
-        BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(configuration),
-            new CachingPath(perTableConfig.getTableDataPath())),
-        AvroSchemaConverter.getInstance(),
-        HudiTableManager.of(configuration),
-        CommitState::new);
-  }
+  public HudiTargetClient() {}
 
   @VisibleForTesting
   HudiTargetClient(
@@ -145,6 +134,25 @@ public class HudiTargetClient implements TargetClient {
       AvroSchemaConverter avroSchemaConverter,
       HudiTableManager hudiTableManager,
       CommitStateCreator commitStateCreator) {
+
+    _init(
+        tableDataPath,
+        timelineRetentionInHours,
+        maxNumDeltaCommitsBeforeCompaction,
+        baseFileUpdatesExtractor,
+        avroSchemaConverter,
+        hudiTableManager,
+        commitStateCreator);
+  }
+
+  private void _init(
+      String tableDataPath,
+      int timelineRetentionInHours,
+      int maxNumDeltaCommitsBeforeCompaction,
+      BaseFileUpdatesExtractor baseFileUpdatesExtractor,
+      AvroSchemaConverter avroSchemaConverter,
+      HudiTableManager hudiTableManager,
+      CommitStateCreator commitStateCreator) {
     this.tableDataPath = tableDataPath;
     this.baseFileUpdatesExtractor = baseFileUpdatesExtractor;
     this.timelineRetentionInHours = timelineRetentionInHours;
@@ -154,6 +162,20 @@ public class HudiTargetClient implements TargetClient {
     // create meta client if table already exists
     this.metaClient = hudiTableManager.loadTableMetaClientIfExists(tableDataPath);
     this.commitStateCreator = commitStateCreator;
+  }
+
+  @Override
+  public void init(PerTableConfig perTableConfig, Configuration configuration) {
+    _init(
+        perTableConfig.getTableDataPath(),
+        perTableConfig.getTargetMetadataRetentionInHours(),
+        HoodieMetadataConfig.COMPACT_NUM_DELTA_COMMITS.defaultValue(),
+        BaseFileUpdatesExtractor.of(
+            new HoodieJavaEngineContext(configuration),
+            new CachingPath(perTableConfig.getTableDataPath())),
+        AvroSchemaConverter.getInstance(),
+        HudiTableManager.of(configuration),
+        CommitState::new);
   }
 
   @FunctionalInterface

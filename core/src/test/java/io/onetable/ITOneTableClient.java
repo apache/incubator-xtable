@@ -83,10 +83,11 @@ import com.google.common.collect.ImmutableList;
 
 import io.onetable.client.OneTableClient;
 import io.onetable.client.PerTableConfig;
+import io.onetable.client.PerTableConfigImpl;
 import io.onetable.client.SourceClientProvider;
 import io.onetable.delta.DeltaSourceClientProvider;
 import io.onetable.hudi.HudiSourceClientProvider;
-import io.onetable.hudi.HudiSourceConfig;
+import io.onetable.hudi.HudiSourceConfigImpl;
 import io.onetable.hudi.HudiTestUtil;
 import io.onetable.iceberg.IcebergSourceClientProvider;
 import io.onetable.model.storage.TableFormat;
@@ -190,13 +191,13 @@ public class ITOneTableClient {
       insertRecords = table.insertRows(100);
 
       PerTableConfig perTableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .tableDataPath(table.getDataPath())
               .hudiSourceConfig(
-                  HudiSourceConfig.builder()
+                  HudiSourceConfigImpl.builder()
                       .partitionFieldSpecConfig(oneTablePartitionConfig)
                       .build())
               .syncMode(syncMode)
@@ -221,13 +222,13 @@ public class ITOneTableClient {
         GenericTable.getInstanceWithAdditionalColumns(
             tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
       PerTableConfig perTableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(tableWithUpdatedSchema.getBasePath())
               .tableDataPath(tableWithUpdatedSchema.getDataPath())
               .hudiSourceConfig(
-                  HudiSourceConfig.builder()
+                  HudiSourceConfigImpl.builder()
                       .partitionFieldSpecConfig(oneTablePartitionConfig)
                       .build())
               .syncMode(syncMode)
@@ -280,12 +281,12 @@ public class ITOneTableClient {
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit2, commitInstant2, true);
 
       PerTableConfig perTableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
-                  HudiSourceConfig.builder()
+                  HudiSourceConfigImpl.builder()
                       .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
                       .build())
               .syncMode(syncMode)
@@ -314,12 +315,12 @@ public class ITOneTableClient {
       List<HoodieRecord<HoodieAvroPayload>> insertedRecords1 = table.insertRecords(50, true);
 
       PerTableConfig perTableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
-                  HudiSourceConfig.builder()
+                  HudiSourceConfigImpl.builder()
                       .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
                       .build())
               .syncMode(syncMode)
@@ -361,7 +362,7 @@ public class ITOneTableClient {
       table.insertRows(50);
       List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
       PerTableConfig perTableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(table.getBasePath())
@@ -481,13 +482,13 @@ public class ITOneTableClient {
     }
     try (GenericTable tableToClose = table) {
       PerTableConfig perTableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(targetTableFormats)
               .tableBasePath(tableToClose.getBasePath())
               .tableDataPath(tableToClose.getDataPath())
               .hudiSourceConfig(
-                  HudiSourceConfig.builder()
+                  HudiSourceConfigImpl.builder()
                       .partitionFieldSpecConfig(oneTablePartitionConfig)
                       .build())
               .syncMode(SyncMode.INCREMENTAL)
@@ -515,7 +516,7 @@ public class ITOneTableClient {
       table.insertRecords(100, true);
 
       PerTableConfig perTableConfigIceberg =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(ImmutableList.of(ICEBERG))
               .tableBasePath(table.getBasePath())
@@ -523,7 +524,7 @@ public class ITOneTableClient {
               .build();
 
       PerTableConfig perTableConfigDelta =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(ImmutableList.of(DELTA))
               .tableBasePath(table.getBasePath())
@@ -552,7 +553,7 @@ public class ITOneTableClient {
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
       PerTableConfig singleTableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(ImmutableList.of(ICEBERG))
               .tableBasePath(table.getBasePath())
@@ -560,7 +561,7 @@ public class ITOneTableClient {
               .build();
 
       PerTableConfig dualTableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(Arrays.asList(ICEBERG, DELTA))
               .tableBasePath(table.getBasePath())
@@ -604,7 +605,7 @@ public class ITOneTableClient {
       table.insertRows(20);
       OneTableClient oneTableClient = new OneTableClient(jsc.hadoopConfiguration());
       PerTableConfig perTableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(Collections.singletonList(ICEBERG))
               .tableBasePath(table.getBasePath())
@@ -637,7 +638,7 @@ public class ITOneTableClient {
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
       PerTableConfig perTableConfig =
-          PerTableConfig.builder()
+          PerTableConfigImpl.builder()
               .tableName(tableName)
               .targetTableFormats(Arrays.asList(ICEBERG, DELTA))
               .tableBasePath(table.getBasePath())

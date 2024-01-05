@@ -82,7 +82,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
 import io.onetable.ITOneTableClient;
-import io.onetable.client.PerTableConfig;
+import io.onetable.client.PerTableConfigImpl;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
@@ -187,7 +187,7 @@ public class TestIcebergSync {
 
   private IcebergClient getIcebergClient() {
     return new IcebergClient(
-        PerTableConfig.builder()
+        PerTableConfigImpl.builder()
             .tableBasePath(basePath.toString())
             .tableName(tableName)
             .targetMetadataRetentionInHours(1)
