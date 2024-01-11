@@ -250,6 +250,7 @@ class TestIcebergSourceClient {
       catalogSales
           .newRewrite()
           .addFile(newFile)
+          .validateFromSnapshot(snapshot2.snapshotId()) // since snapshot1 was expired, validation should exclude it
           .deleteFile(dataFiles.get(0))
           .deleteFile(dataFiles.get(1))
           .commit();
