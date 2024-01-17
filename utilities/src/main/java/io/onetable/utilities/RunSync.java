@@ -51,7 +51,7 @@ import io.onetable.client.SourceClientProvider;
 import io.onetable.client.SourceTable;
 import io.onetable.client.TableSyncConfig;
 import io.onetable.client.TargetTable;
-import io.onetable.hudi.HudiSourceConfigImpl;
+import io.onetable.hudi.HudiSourceConfig;
 import io.onetable.iceberg.IcebergCatalogConfig;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
@@ -184,7 +184,7 @@ public class RunSync {
               .syncMode(SyncMode.INCREMENTAL)
               .properties(
                   Collections.singletonMap(
-                      HudiSourceConfigImpl.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec()))
+                      HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec()))
               .build();
       try {
         client.sync(tableSyncConfig, sourceClientProvider);

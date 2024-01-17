@@ -18,7 +18,7 @@
  
 package io.onetable.loadtest;
 
-import static io.onetable.hudi.HudiSourceConfigImpl.PARTITION_FIELD_SPEC_CONFIG;
+import static io.onetable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
 
 import java.nio.file.Path;
 import java.util.Arrays;

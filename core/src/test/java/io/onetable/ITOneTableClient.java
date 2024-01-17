@@ -19,7 +19,7 @@
 package io.onetable;
 
 import static io.onetable.GenericTable.getTableName;
-import static io.onetable.hudi.HudiSourceConfigImpl.PARTITION_FIELD_SPEC_CONFIG;
+import static io.onetable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
 import static io.onetable.hudi.HudiTestUtil.PartitionConfig;
 import static io.onetable.model.storage.TableFormat.DELTA;
 import static io.onetable.model.storage.TableFormat.HUDI;

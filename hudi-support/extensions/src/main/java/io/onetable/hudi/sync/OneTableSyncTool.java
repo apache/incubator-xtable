@@ -39,7 +39,7 @@ import io.onetable.client.SourceTable;
 import io.onetable.client.TableSyncConfig;
 import io.onetable.client.TargetTable;
 import io.onetable.hudi.HudiSourceClientProvider;
-import io.onetable.hudi.HudiSourceConfigImpl;
+import io.onetable.hudi.HudiSourceConfig;
 import io.onetable.model.schema.PartitionTransformType;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
@@ -91,7 +91,7 @@ public class OneTableSyncTool extends HoodieSyncTool {
             .syncMode(SyncMode.INCREMENTAL)
             .properties(
                 Collections.singletonMap(
-                    HudiSourceConfigImpl.PARTITION_FIELD_SPEC_CONFIG, getPartitionSpecConfig()))
+                    HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, getPartitionSpecConfig()))
             .build();
     Map<String, SyncResult> results =
         new OneTableClient(hadoopConf).sync(tableSyncConfig, hudiSourceClientProvider);

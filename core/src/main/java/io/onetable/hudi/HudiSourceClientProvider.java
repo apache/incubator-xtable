@@ -47,7 +47,7 @@ public class HudiSourceClientProvider extends SourceClientProvider<HoodieInstant
     }
 
     final HudiSourcePartitionSpecExtractor sourcePartitionSpecExtractor =
-        HudiSourceConfigImpl.fromProperties(clientConfigs).loadSourcePartitionSpecExtractor();
+        HudiSourceConfig.fromProperties(clientConfigs).loadSourcePartitionSpecExtractor();
 
     return new HudiClient(metaClient, sourcePartitionSpecExtractor);
   }

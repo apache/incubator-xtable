@@ -33,7 +33,7 @@ import io.onetable.reflection.ReflectionUtils;
 
 /** Configuration of Hudi source format for the sync process. */
 @Value
-public class HudiSourceConfigImpl {
+public class HudiSourceConfig {
   public static final String PARTITION_SPEC_EXTRACTOR_CLASS =
       "onetable.hudi.source.partition_spec_extractor_class";
   public static final String PARTITION_FIELD_SPEC_CONFIG =
@@ -42,13 +42,13 @@ public class HudiSourceConfigImpl {
   String partitionSpecExtractorClass;
   List<PartitionFieldSpec> partitionFieldSpecs;
 
-  public static HudiSourceConfigImpl fromPartitionFieldSpecConfig(String partitionFieldSpecConfig) {
-    return new HudiSourceConfigImpl(
+  public static HudiSourceConfig fromPartitionFieldSpecConfig(String partitionFieldSpecConfig) {
+    return new HudiSourceConfig(
         ConfigurationBasedPartitionSpecExtractor.class.getName(),
         parsePartitionFieldSpecs(partitionFieldSpecConfig));
   }
 
-  public static HudiSourceConfigImpl fromProperties(Map<String, String> properties) {
+  public static HudiSourceConfig fromProperties(Map<String, String> properties) {
     String partitionSpecExtractorClass =
         properties.getOrDefault(
             PARTITION_SPEC_EXTRACTOR_CLASS,
@@ -56,7 +56,7 @@ public class HudiSourceConfigImpl {
     String partitionFieldSpecString = properties.get(PARTITION_FIELD_SPEC_CONFIG);
     List<PartitionFieldSpec> partitionFieldSpecs =
         parsePartitionFieldSpecs(partitionFieldSpecString);
-    return new HudiSourceConfigImpl(partitionSpecExtractorClass, partitionFieldSpecs);
+    return new HudiSourceConfig(partitionSpecExtractorClass, partitionFieldSpecs);
   }
 
   @Value
