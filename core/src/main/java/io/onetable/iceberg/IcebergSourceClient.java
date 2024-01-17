@@ -36,7 +36,7 @@ import org.apache.iceberg.hadoop.HadoopFileIO;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
 
-import io.onetable.client.PerTableConfig;
+import io.onetable.client.SourceTable;
 import io.onetable.exception.OneIOException;
 import io.onetable.model.*;
 import io.onetable.model.schema.OnePartitionField;
@@ -55,7 +55,7 @@ import io.onetable.spi.extractor.SourceClient;
 @Builder
 public class IcebergSourceClient implements SourceClient<Snapshot> {
   @NonNull private final Configuration hadoopConf;
-  @NonNull private final PerTableConfig sourceTableConfig;
+  @NonNull private final SourceTable sourceTableConfig;
 
   @Getter(lazy = true, value = AccessLevel.PACKAGE)
   private final Table sourceTable = initSourceTable();
@@ -74,15 +74,15 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   private Table initSourceTable() {
     IcebergTableManager tableManager = IcebergTableManager.of(hadoopConf);
     String[] namespace = sourceTableConfig.getNamespace();
-    String tableName = sourceTableConfig.getTableName();
+    String tableName = sourceTableConfig.getName();
     TableIdentifier tableIdentifier =
         namespace == null
             ? TableIdentifier.of(tableName)
             : TableIdentifier.of(Namespace.of(namespace), tableName);
     return tableManager.getTable(
-        (IcebergCatalogConfig) sourceTableConfig.getIcebergCatalogConfig(),
+        (IcebergCatalogConfig) sourceTableConfig.getCatalogConfig(),
         tableIdentifier,
-        sourceTableConfig.getTableBasePath());
+        sourceTableConfig.getBasePath());
   }
 
   private FileIO initTableOps() {

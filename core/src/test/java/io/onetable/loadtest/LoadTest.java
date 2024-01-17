@@ -18,9 +18,12 @@
  
 package io.onetable.loadtest;
 
+import static io.onetable.hudi.HudiSourceConfigImpl.PARTITION_FIELD_SPEC_CONFIG;
+
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -34,11 +37,13 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.config.HoodieArchivalConfig;
 
+import io.onetable.GenericTable;
 import io.onetable.TestJavaHudiTable;
 import io.onetable.client.OneTableClient;
-import io.onetable.client.PerTableConfig;
-import io.onetable.client.PerTableConfigImpl;
 import io.onetable.client.SourceClientProvider;
+import io.onetable.client.SourceTable;
+import io.onetable.client.TableSyncConfig;
+import io.onetable.client.TargetTable;
 import io.onetable.hudi.HudiSourceClientProvider;
 import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
@@ -56,7 +61,7 @@ public class LoadTest {
   @BeforeEach
   public void setup() {
     hudiSourceClientProvider = new HudiSourceClientProvider();
-    hudiSourceClientProvider.init(CONFIGURATION, Collections.emptyMap());
+    hudiSourceClientProvider.init(CONFIGURATION);
   }
 
   @Test
@@ -75,16 +80,15 @@ public class LoadTest {
                 .collect(Collectors.toList()),
             false);
       }
-      PerTableConfig perTableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(tableName)
-              .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
-              .tableBasePath(table.getBasePath())
-              .syncMode(SyncMode.FULL)
-              .build();
+      TableSyncConfig tableSyncConfig =
+          getTableSyncConfig(
+              SyncMode.FULL,
+              tableName,
+              table,
+              Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA));
       OneTableClient oneTableClient = new OneTableClient(CONFIGURATION);
       long start = System.currentTimeMillis();
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      oneTableClient.sync(tableSyncConfig, hudiSourceClientProvider);
       long end = System.currentTimeMillis();
       System.out.println("Full sync took " + (end - start) + "ms");
     }
@@ -104,16 +108,15 @@ public class LoadTest {
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, "level:SIMPLE", HoodieTableType.COPY_ON_WRITE, archivalConfig)) {
       table.insertRecords(1, "partition0", false);
-      PerTableConfig perTableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(tableName)
-              .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
-              .tableBasePath(table.getBasePath())
-              .syncMode(SyncMode.INCREMENTAL)
-              .build();
+      TableSyncConfig tableSyncConfig =
+          getTableSyncConfig(
+              SyncMode.INCREMENTAL,
+              tableName,
+              table,
+              Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA));
       // sync once to establish first commit
       OneTableClient oneTableClient = new OneTableClient(CONFIGURATION);
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      oneTableClient.sync(tableSyncConfig, hudiSourceClientProvider);
       for (int i = 0; i < numCommits; i++) {
         table.insertRecords(
             1,
@@ -124,9 +127,38 @@ public class LoadTest {
       }
 
       long start = System.currentTimeMillis();
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      oneTableClient.sync(tableSyncConfig, hudiSourceClientProvider);
       long end = System.currentTimeMillis();
       System.out.println("Incremental sync took " + (end - start) + "ms");
     }
+  }
+
+  private static TableSyncConfig getTableSyncConfig(
+      SyncMode syncMode, String tableName, GenericTable table, List<String> targetTableFormats) {
+    SourceTable sourceTable =
+        SourceTable.builder()
+            .name(tableName)
+            .formatName(TableFormat.HUDI)
+            .basePath(table.getBasePath())
+            .dataPath(table.getDataPath())
+            .build();
+
+    List<TargetTable> targetTables =
+        targetTableFormats.stream()
+            .map(
+                formatName ->
+                    TargetTable.builder()
+                        .name(tableName)
+                        .formatName(formatName)
+                        .basePath(table.getBasePath())
+                        .build())
+            .collect(Collectors.toList());
+
+    return TableSyncConfig.builder()
+        .sourceTable(sourceTable)
+        .targetTables(targetTables)
+        .syncMode(syncMode)
+        .properties(Collections.singletonMap(PARTITION_FIELD_SPEC_CONFIG, "level:VALUE"))
+        .build();
   }
 }

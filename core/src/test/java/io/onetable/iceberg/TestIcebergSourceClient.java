@@ -45,8 +45,7 @@ import org.apache.iceberg.io.DataWriter;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 
-import io.onetable.client.PerTableConfig;
-import io.onetable.client.PerTableConfigImpl;
+import io.onetable.client.SourceTable;
 import io.onetable.model.*;
 import io.onetable.model.schema.*;
 import io.onetable.model.stat.PartitionValue;
@@ -70,7 +69,7 @@ class TestIcebergSourceClient {
     hadoopConf.set("fs.defaultFS", "file:///");
 
     clientProvider = new IcebergSourceClientProvider();
-    clientProvider.init(hadoopConf, null);
+    clientProvider.init(hadoopConf);
 
     tableManager = IcebergTableManager.of(hadoopConf);
 
@@ -84,9 +83,10 @@ class TestIcebergSourceClient {
   @Test
   void getTableTest(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestTableWithData(workingDir.toString());
-    PerTableConfig sourceTableConfig = getPerTableConfig(catalogSales);
+    SourceTable sourceTableConfig = getPerTableConfig(catalogSales);
 
-    IcebergSourceClient client = clientProvider.getSourceClientInstance(sourceTableConfig);
+    IcebergSourceClient client =
+        clientProvider.getSourceClientInstance(sourceTableConfig, Collections.emptyMap());
 
     Snapshot snapshot = catalogSales.currentSnapshot();
     OneTable oneTable = client.getTable(snapshot);
@@ -119,9 +119,10 @@ class TestIcebergSourceClient {
     assertEquals(2, catalogSales.schemas().size());
     assertEquals(0, iceCurrentSnapshot.schemaId());
 
-    PerTableConfig sourceTableConfig = getPerTableConfig(catalogSales);
+    SourceTable sourceTableConfig = getPerTableConfig(catalogSales);
 
-    IcebergSourceClient client = clientProvider.getSourceClientInstance(sourceTableConfig);
+    IcebergSourceClient client =
+        clientProvider.getSourceClientInstance(sourceTableConfig, Collections.emptyMap());
     IcebergSourceClient spyClient = spy(client);
 
     SchemaCatalog schemaCatalog = spyClient.getSchemaCatalog(null, iceCurrentSnapshot);
@@ -139,7 +140,7 @@ class TestIcebergSourceClient {
     Table catalogSales = createTestTableWithData(workingDir.toString());
     Snapshot iceCurrentSnapshot = catalogSales.currentSnapshot();
 
-    PerTableConfig sourceTableConfig = getPerTableConfig(catalogSales);
+    SourceTable sourceTableConfig = getPerTableConfig(catalogSales);
 
     IcebergDataFileExtractor spyDataFileExtractor = spy(IcebergDataFileExtractor.builder().build());
     IcebergPartitionValueConverter spyPartitionConverter =
@@ -399,7 +400,7 @@ class TestIcebergSourceClient {
   }
 
   private IcebergSourceClient getIcebergSourceClient(Table catalogSales) {
-    PerTableConfig tableConfig = getPerTableConfig(catalogSales);
+    SourceTable tableConfig = getPerTableConfig(catalogSales);
 
     return IcebergSourceClient.builder()
         .hadoopConf(hadoopConf)
@@ -407,11 +408,11 @@ class TestIcebergSourceClient {
         .build();
   }
 
-  private static PerTableConfig getPerTableConfig(Table catalogSales) {
-    return PerTableConfigImpl.builder()
-        .tableName(catalogSales.name())
-        .tableBasePath(catalogSales.location())
-        .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
+  private static SourceTable getPerTableConfig(Table catalogSales) {
+    return SourceTable.builder()
+        .name(catalogSales.name())
+        .basePath(catalogSales.location())
+        .formatName(TableFormat.ICEBERG)
         .build();
   }
 

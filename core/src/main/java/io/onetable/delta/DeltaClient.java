@@ -53,7 +53,7 @@ import scala.collection.Seq;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import io.onetable.client.PerTableConfig;
+import io.onetable.client.TargetTable;
 import io.onetable.exception.NotSupportedException;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
@@ -80,11 +80,11 @@ public class DeltaClient implements TargetClient {
 
   public DeltaClient() {}
 
-  public DeltaClient(PerTableConfig perTableConfig, SparkSession sparkSession) {
+  public DeltaClient(TargetTable targetTable, SparkSession sparkSession) {
     this(
-        perTableConfig.getTableDataPath(),
-        perTableConfig.getTableName(),
-        perTableConfig.getTargetMetadataRetentionInHours(),
+        targetTable.getDataPath(),
+        targetTable.getName(),
+        targetTable.getMetadataRetentionInHours(),
         sparkSession,
         DeltaSchemaExtractor.getInstance(),
         DeltaPartitionExtractor.getInstance(),
@@ -133,13 +133,13 @@ public class DeltaClient implements TargetClient {
   }
 
   @Override
-  public void init(PerTableConfig perTableConfig, Configuration configuration) {
+  public void init(TargetTable targetTable, Configuration configuration) {
     SparkSession sparkSession = DeltaClientUtils.buildSparkSession(configuration);
 
     _init(
-        perTableConfig.getTableDataPath(),
-        perTableConfig.getTableName(),
-        perTableConfig.getTargetMetadataRetentionInHours(),
+        targetTable.getDataPath(),
+        targetTable.getName(),
+        targetTable.getMetadataRetentionInHours(),
         sparkSession,
         DeltaSchemaExtractor.getInstance(),
         DeltaPartitionExtractor.getInstance(),

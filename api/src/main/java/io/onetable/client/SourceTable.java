@@ -16,23 +16,21 @@
  * limitations under the License.
  */
  
-package io.onetable.iceberg;
+package io.onetable.client;
 
-import java.util.Map;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
 
-import org.apache.iceberg.Snapshot;
-
-import io.onetable.client.SourceClientProvider;
-import io.onetable.client.SourceTable;
-
-/** A concrete implementation of {@link SourceClientProvider} for Hudi table format. */
-public class IcebergSourceClientProvider extends SourceClientProvider<Snapshot> {
-  @Override
-  public IcebergSourceClient getSourceClientInstance(
-      SourceTable sourceTableConfig, Map<String, String> clientConf) {
-    return IcebergSourceClient.builder()
-        .sourceTableConfig(sourceTableConfig)
-        .hadoopConf(hadoopConf)
-        .build();
+@EqualsAndHashCode(callSuper = true)
+public class SourceTable extends ExternalTable {
+  @Builder(toBuilder = true)
+  public SourceTable(
+      String name,
+      String formatName,
+      String basePath,
+      String dataPath,
+      String[] namespace,
+      CatalogConfig catalogConfig) {
+    super(name, formatName, basePath, dataPath, namespace, catalogConfig);
   }
 }

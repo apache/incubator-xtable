@@ -35,11 +35,13 @@ import org.apache.hudi.sync.common.HoodieSyncConfig;
 import org.apache.hudi.sync.common.HoodieSyncTool;
 
 import io.onetable.client.OneTableClient;
-import io.onetable.client.PerTableConfig;
-import io.onetable.client.PerTableConfigImpl;
+import io.onetable.client.SourceTable;
+import io.onetable.client.TableSyncConfig;
+import io.onetable.client.TargetTable;
 import io.onetable.hudi.HudiSourceClientProvider;
 import io.onetable.hudi.HudiSourceConfigImpl;
 import io.onetable.model.schema.PartitionTransformType;
+import io.onetable.model.storage.TableFormat;
 import io.onetable.model.sync.SyncMode;
 import io.onetable.model.sync.SyncResult;
 
@@ -52,39 +54,54 @@ public class OneTableSyncTool extends HoodieSyncTool {
     super(props, hadoopConf);
     this.config = new OneTableSyncConfig(props);
     this.hudiSourceClientProvider = new HudiSourceClientProvider();
-    hudiSourceClientProvider.init(hadoopConf, Collections.emptyMap());
+    hudiSourceClientProvider.init(hadoopConf);
   }
 
   @Override
   public void syncHoodieTable() {
     List<String> formatsToSync =
         Arrays.stream(config.getString(OneTableSyncConfig.ONE_TABLE_FORMATS).split(","))
-            .map(format -> format.toUpperCase())
+            .map(String::toUpperCase)
             .collect(Collectors.toList());
     String basePath = config.getString(HoodieSyncConfig.META_SYNC_BASE_PATH);
     String tableName = config.getString(HoodieTableConfig.HOODIE_TABLE_NAME_KEY);
-    PerTableConfig perTableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(tableName)
-            .tableBasePath(basePath)
-            .targetTableFormats(formatsToSync)
-            .hudiSourceConfig(
-                HudiSourceConfigImpl.builder()
-                    .partitionFieldSpecConfig(getPartitionSpecConfig())
-                    .build())
+    SourceTable sourceTable =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath)
+            .formatName(TableFormat.HUDI)
+            .build();
+    List<TargetTable> targetTables =
+        formatsToSync.stream()
+            .map(
+                format ->
+                    TargetTable.builder()
+                        .formatName(format)
+                        .name(tableName)
+                        .metadataRetentionInHours(
+                            config.getInt(
+                                OneTableSyncConfig.ONE_TABLE_TARGET_METADATA_RETENTION_HOURS))
+                        .basePath(basePath)
+                        .build())
+            .collect(Collectors.toList());
+    TableSyncConfig tableSyncConfig =
+        TableSyncConfig.builder()
+            .sourceTable(sourceTable)
+            .targetTables(targetTables)
             .syncMode(SyncMode.INCREMENTAL)
-            .targetMetadataRetentionInHours(
-                config.getInt(OneTableSyncConfig.ONE_TABLE_TARGET_METADATA_RETENTION_HOURS))
+            .properties(
+                Collections.singletonMap(
+                    HudiSourceConfigImpl.PARTITION_FIELD_SPEC_CONFIG, getPartitionSpecConfig()))
             .build();
     Map<String, SyncResult> results =
-        new OneTableClient(hadoopConf).sync(perTableConfig, hudiSourceClientProvider);
+        new OneTableClient(hadoopConf).sync(tableSyncConfig, hudiSourceClientProvider);
     String failingFormats =
         results.entrySet().stream()
             .filter(
                 entry ->
                     entry.getValue().getStatus().getStatusCode()
                         != SyncResult.SyncStatusCode.SUCCESS)
-            .map(entry -> entry.getKey().toString())
+            .map(Map.Entry::getKey)
             .collect(Collectors.joining(","));
     if (!failingFormats.isEmpty()) {
       throw new HoodieException("Unable to sync to OneTable for formats: " + failingFormats);

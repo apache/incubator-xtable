@@ -18,10 +18,26 @@
  
 package io.onetable.client;
 
-import io.onetable.spi.extractor.SourcePartitionSpecExtractor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 
-public interface HudiSourceConfig {
-  public String getPartitionSpecExtractorClass();
+@Getter
+@EqualsAndHashCode(callSuper = true)
+public class TargetTable extends ExternalTable {
+  int metadataRetentionInHours;
 
-  SourcePartitionSpecExtractor loadSourcePartitionSpecExtractor();
+  @Builder(toBuilder = true)
+  public TargetTable(
+      String name,
+      String formatName,
+      String basePath,
+      String dataPath,
+      String[] namespace,
+      CatalogConfig catalogConfig,
+      Integer metadataRetentionInHours) {
+    super(name, formatName, basePath, dataPath, namespace, catalogConfig);
+    this.metadataRetentionInHours =
+        metadataRetentionInHours == null ? 24 * 7 : metadataRetentionInHours;
+  }
 }

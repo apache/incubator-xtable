@@ -534,9 +534,7 @@ public class ITHudiSourceClient {
             .build();
     HudiSourcePartitionSpecExtractor partitionSpecExtractor =
         new ConfigurationBasedPartitionSpecExtractor(
-            HudiSourceConfigImpl.builder()
-                .partitionFieldSpecConfig(onetablePartitionConfig)
-                .build());
+            HudiSourceConfigImpl.fromPartitionFieldSpecConfig(onetablePartitionConfig));
     return new HudiClient(hoodieTableMetaClient, partitionSpecExtractor);
   }
 

@@ -43,7 +43,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NotFoundException;
 
-import io.onetable.client.PerTableConfig;
+import io.onetable.client.TargetTable;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OnePartitionField;
@@ -74,7 +74,7 @@ public class IcebergClient implements TargetClient {
   public IcebergClient() {}
 
   IcebergClient(
-      PerTableConfig perTableConfig,
+      TargetTable targetTable,
       Configuration configuration,
       IcebergSchemaExtractor schemaExtractor,
       IcebergSchemaSync schemaSync,
@@ -83,7 +83,7 @@ public class IcebergClient implements TargetClient {
       IcebergDataFileUpdatesSync dataFileUpdatesExtractor,
       IcebergTableManager tableManager) {
     _init(
-        perTableConfig,
+        targetTable,
         configuration,
         schemaExtractor,
         schemaSync,
@@ -94,7 +94,7 @@ public class IcebergClient implements TargetClient {
   }
 
   private void _init(
-      PerTableConfig perTableConfig,
+      TargetTable targetTable,
       Configuration configuration,
       IcebergSchemaExtractor schemaExtractor,
       IcebergSchemaSync schemaSync,
@@ -107,17 +107,17 @@ public class IcebergClient implements TargetClient {
     this.partitionSpecExtractor = partitionSpecExtractor;
     this.partitionSpecSync = partitionSpecSync;
     this.dataFileUpdatesExtractor = dataFileUpdatesExtractor;
-    String tableName = perTableConfig.getTableName();
-    this.basePath = perTableConfig.getTableBasePath();
+    String tableName = targetTable.getName();
+    this.basePath = targetTable.getBasePath();
     this.configuration = configuration;
-    this.snapshotRetentionInHours = perTableConfig.getTargetMetadataRetentionInHours();
-    String[] namespace = perTableConfig.getNamespace();
+    this.snapshotRetentionInHours = targetTable.getMetadataRetentionInHours();
+    String[] namespace = targetTable.getNamespace();
     this.tableIdentifier =
         namespace == null
             ? TableIdentifier.of(tableName)
             : TableIdentifier.of(Namespace.of(namespace), tableName);
     this.tableManager = tableManager;
-    this.catalogConfig = (IcebergCatalogConfig) perTableConfig.getIcebergCatalogConfig();
+    this.catalogConfig = (IcebergCatalogConfig) targetTable.getCatalogConfig();
 
     if (tableManager.tableExists(catalogConfig, tableIdentifier, basePath)) {
       // Load the table state if it already exists
@@ -128,9 +128,9 @@ public class IcebergClient implements TargetClient {
   }
 
   @Override
-  public void init(PerTableConfig perTableConfig, Configuration configuration) {
+  public void init(TargetTable targetTable, Configuration configuration) {
     _init(
-        perTableConfig,
+        targetTable,
         configuration,
         IcebergSchemaExtractor.getInstance(),
         IcebergSchemaSync.getInstance(),

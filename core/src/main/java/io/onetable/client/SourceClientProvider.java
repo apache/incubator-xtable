@@ -33,16 +33,9 @@ public abstract class SourceClientProvider<COMMIT> {
   /** The Hadoop configuration to use when reading from the source table. */
   protected Configuration hadoopConf;
 
-  /** The configuration for the client. */
-  protected Map<String, String> clientConf;
-
-  /** The configuration for the table to read from. */
-  protected PerTableConfig sourceTableConfig;
-
   /** Initializes the provider various client specific configurations. */
-  public void init(Configuration hadoopConf, Map<String, String> clientConf) {
-    this.hadoopConf = hadoopConf;
-    this.clientConf = clientConf;
+  public void init(Configuration hadoopConf) {
+    this.hadoopConf = hadoopConf; // todo can we move this into some other config?
   }
 
   /**
@@ -53,5 +46,6 @@ public abstract class SourceClientProvider<COMMIT> {
    *
    * @return the source client
    */
-  public abstract SourceClient<COMMIT> getSourceClientInstance(PerTableConfig sourceTableConfig);
+  public abstract SourceClient<COMMIT> getSourceClientInstance(
+      SourceTable sourceTableConfig, Map<String, String> clientConf);
 }

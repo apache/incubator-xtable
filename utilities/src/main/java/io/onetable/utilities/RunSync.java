@@ -23,8 +23,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
@@ -45,10 +47,10 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.annotations.VisibleForTesting;
 
 import io.onetable.client.OneTableClient;
-import io.onetable.client.PerTableConfig;
-import io.onetable.client.PerTableConfigImpl;
 import io.onetable.client.SourceClientProvider;
-import io.onetable.hudi.ConfigurationBasedPartitionSpecExtractor;
+import io.onetable.client.SourceTable;
+import io.onetable.client.TableSyncConfig;
+import io.onetable.client.TargetTable;
 import io.onetable.hudi.HudiSourceConfigImpl;
 import io.onetable.iceberg.IcebergCatalogConfig;
 import io.onetable.model.storage.TableFormat;
@@ -139,7 +141,7 @@ public class RunSync {
     String sourceProviderClass = sourceClientConfig.sourceClientProviderClass;
     SourceClientProvider<?> sourceClientProvider =
         ReflectionUtils.createInstanceOfClass(sourceProviderClass);
-    sourceClientProvider.init(hadoopConf, sourceClientConfig.configuration);
+    sourceClientProvider.init(hadoopConf);
 
     List<String> tableFormatList = datasetConfig.getTargetFormats();
     OneTableClient client = new OneTableClient(hadoopConf);
@@ -148,24 +150,44 @@ public class RunSync {
           "Running sync for basePath {} for following table formats {}",
           table.getTableBasePath(),
           tableFormatList);
-      PerTableConfig config =
-          PerTableConfigImpl.builder()
-              .tableBasePath(table.getTableBasePath())
-              .tableName(table.getTableName())
+      SourceTable sourceTable =
+          SourceTable.builder()
+              .name(table.getTableName())
+              .basePath(table.getTableBasePath())
               .namespace(table.getNamespace() == null ? null : table.getNamespace().split("\\."))
-              .tableDataPath(table.getTableDataPath())
-              .icebergCatalogConfig(icebergCatalogConfig)
-              .hudiSourceConfig(
-                  HudiSourceConfigImpl.builder()
-                      .partitionSpecExtractorClass(
-                          ConfigurationBasedPartitionSpecExtractor.class.getName())
-                      .partitionFieldSpecConfig(table.getPartitionSpec())
-                      .build())
-              .targetTableFormats(tableFormatList)
+              .dataPath(table.getTableDataPath())
+              .catalogConfig(icebergCatalogConfig)
+              .formatName(sourceFormat)
+              .build();
+
+      List<TargetTable> targetTables =
+          tableFormatList.stream()
+              .map(
+                  tableFormat ->
+                      TargetTable.builder()
+                          .name(table.getTableName())
+                          .basePath(table.getTableBasePath())
+                          .namespace(
+                              table.getNamespace() == null
+                                  ? null
+                                  : table.getNamespace().split("\\."))
+                          .dataPath(table.getTableDataPath())
+                          .catalogConfig(icebergCatalogConfig)
+                          .formatName(tableFormat)
+                          .build())
+              .collect(Collectors.toList());
+
+      TableSyncConfig tableSyncConfig =
+          TableSyncConfig.builder()
+              .sourceTable(sourceTable)
+              .targetTables(targetTables)
               .syncMode(SyncMode.INCREMENTAL)
+              .properties(
+                  Collections.singletonMap(
+                      HudiSourceConfigImpl.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec()))
               .build();
       try {
-        client.sync(config, sourceClientProvider);
+        client.sync(tableSyncConfig, sourceClientProvider);
       } catch (Exception e) {
         log.error(String.format("Error running sync for %s", table.getTableBasePath()), e);
       }

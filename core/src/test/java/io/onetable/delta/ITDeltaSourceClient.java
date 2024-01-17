@@ -54,8 +54,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import io.onetable.TestSparkDeltaTable;
-import io.onetable.client.PerTableConfig;
-import io.onetable.client.PerTableConfigImpl;
+import io.onetable.client.SourceTable;
 import io.onetable.model.*;
 import io.onetable.model.CommitsBacklog;
 import io.onetable.model.schema.OneField;
@@ -144,7 +143,7 @@ public class ITDeltaSourceClient {
     hadoopConf.set("fs.defaultFS", "file:///");
 
     clientProvider = new DeltaSourceClientProvider();
-    clientProvider.init(hadoopConf, null);
+    clientProvider.init(hadoopConf);
   }
 
   @Test
@@ -160,13 +159,14 @@ public class ITDeltaSourceClient {
             + basePath
             + "' AS SELECT * FROM VALUES (1, 2)");
     // Create Delta source client
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(tableName)
-            .tableBasePath(basePath.toString())
-            .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
             .build();
-    DeltaSourceClient client = clientProvider.getSourceClientInstance(tableConfig);
+    DeltaSourceClient client =
+        clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
     // Get current snapshot
     OneSnapshot snapshot = client.getCurrentSnapshot();
     // Validate table
@@ -218,13 +218,14 @@ public class ITDeltaSourceClient {
             + basePath
             + "' AS SELECT 'SingleValue' AS part_col, 1 AS col1, 2 AS col2");
     // Create Delta source client
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(tableName)
-            .tableBasePath(basePath.toString())
-            .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
             .build();
-    DeltaSourceClient client = clientProvider.getSourceClientInstance(tableConfig);
+    DeltaSourceClient client =
+        clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
     // Get current snapshot
     OneSnapshot snapshot = client.getCurrentSnapshot();
     // Validate table
@@ -306,13 +307,14 @@ public class ITDeltaSourceClient {
             + tableName
             + "` VALUES(1, CAST('2012-02-12 00:12:34' AS TIMESTAMP))");
     // Create Delta source client
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(tableName)
-            .tableBasePath(basePath.toString())
-            .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
             .build();
-    DeltaSourceClient client = clientProvider.getSourceClientInstance(tableConfig);
+    DeltaSourceClient client =
+        clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
     // Get current snapshot
     OneSnapshot snapshot = client.getCurrentSnapshot();
     // TODO: Complete and enable test (see https://github.com/onetable-io/onetable/issues/90)
@@ -345,13 +347,14 @@ public class ITDeltaSourceClient {
 
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(testSparkDeltaTable.getTableName())
-            .tableBasePath(testSparkDeltaTable.getBasePath())
-            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
             .build();
-    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    DeltaSourceClient deltaSourceClient =
+        clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
     assertEquals(180L, testSparkDeltaTable.getNumRows());
     OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
 
@@ -383,13 +386,14 @@ public class ITDeltaSourceClient {
     // Insert 50 rows to 2018 partition.
     List<Row> commit1Rows = testSparkDeltaTable.insertRowsForPartition(50, 2018);
     Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(testSparkDeltaTable.getTableName())
-            .tableBasePath(testSparkDeltaTable.getBasePath())
-            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
             .build();
-    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    DeltaSourceClient deltaSourceClient =
+        clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
     OneSnapshot snapshotAfterCommit1 = deltaSourceClient.getCurrentSnapshot();
     List<String> allActivePaths = getAllFilePaths(snapshotAfterCommit1);
     assertEquals(1, allActivePaths.size());
@@ -408,7 +412,7 @@ public class ITDeltaSourceClient {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-    deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
     CommitsBacklog<Long> instantCurrentCommitState =
         deltaSourceClient.getCommitsBacklog(instantsForIncrementalSync);
     boolean areFilesRemoved = false;
@@ -450,13 +454,14 @@ public class ITDeltaSourceClient {
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(testSparkDeltaTable.getTableName())
-            .tableBasePath(testSparkDeltaTable.getBasePath())
-            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
             .build();
-    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    DeltaSourceClient deltaSourceClient =
+        clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
     assertEquals(130L, testSparkDeltaTable.getNumRows());
     OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
     if (isPartitioned) {
@@ -496,13 +501,14 @@ public class ITDeltaSourceClient {
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(testSparkDeltaTable.getTableName())
-            .tableBasePath(testSparkDeltaTable.getBasePath())
-            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
             .build();
-    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    DeltaSourceClient deltaSourceClient =
+        clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
     assertEquals(150L, testSparkDeltaTable.getNumRows());
     OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
     if (isPartitioned) {
@@ -551,13 +557,14 @@ public class ITDeltaSourceClient {
     testSparkDeltaTable.insertRowsForPartition(20, partitionValueToDelete);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(testSparkDeltaTable.getTableName())
-            .tableBasePath(testSparkDeltaTable.getBasePath())
-            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
             .build();
-    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    DeltaSourceClient deltaSourceClient =
+        clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
     assertEquals(
         120 - rowsByPartition.get(partitionValueToDelete).size(), testSparkDeltaTable.getNumRows());
     OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
@@ -609,13 +616,14 @@ public class ITDeltaSourceClient {
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(testSparkDeltaTable.getTableName())
-            .tableBasePath(testSparkDeltaTable.getBasePath())
-            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
             .build();
-    DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+    DeltaSourceClient deltaSourceClient =
+        clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
     assertEquals(250L, testSparkDeltaTable.getNumRows());
     OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
     if (isPartitioned) {

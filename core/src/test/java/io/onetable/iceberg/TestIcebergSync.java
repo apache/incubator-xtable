@@ -18,6 +18,7 @@
  
 package io.onetable.iceberg;
 
+import static io.onetable.model.storage.TableFormat.ICEBERG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -82,7 +83,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
 import io.onetable.ITOneTableClient;
-import io.onetable.client.PerTableConfigImpl;
+import io.onetable.client.TargetTable;
 import io.onetable.model.OneSnapshot;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
@@ -187,11 +188,11 @@ public class TestIcebergSync {
 
   private IcebergClient getIcebergClient() {
     return new IcebergClient(
-        PerTableConfigImpl.builder()
-            .tableBasePath(basePath.toString())
-            .tableName(tableName)
-            .targetMetadataRetentionInHours(1)
-            .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+        TargetTable.builder()
+            .basePath(basePath.toString())
+            .name(tableName)
+            .formatName(ICEBERG)
+            .metadataRetentionInHours(1)
             .build(),
         CONFIGURATION,
         mockSchemaExtractor,

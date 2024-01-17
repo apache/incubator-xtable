@@ -81,7 +81,7 @@ import org.apache.hudi.table.action.clean.CleanPlanner;
 import com.google.common.annotations.VisibleForTesting;
 
 import io.onetable.avro.AvroSchemaConverter;
-import io.onetable.client.PerTableConfig;
+import io.onetable.client.TargetTable;
 import io.onetable.exception.NotSupportedException;
 import io.onetable.exception.OneIOException;
 import io.onetable.model.OneTable;
@@ -110,16 +110,15 @@ public class HudiTargetClient implements TargetClient {
 
   @VisibleForTesting
   HudiTargetClient(
-      PerTableConfig perTableConfig,
+      TargetTable targetTable,
       Configuration configuration,
       int maxNumDeltaCommitsBeforeCompaction) {
     this(
-        perTableConfig.getTableDataPath(),
-        perTableConfig.getTargetMetadataRetentionInHours(),
+        targetTable.getDataPath(),
+        targetTable.getMetadataRetentionInHours(),
         maxNumDeltaCommitsBeforeCompaction,
         BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(configuration),
-            new CachingPath(perTableConfig.getTableDataPath())),
+            new HoodieJavaEngineContext(configuration), new CachingPath(targetTable.getDataPath())),
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);
@@ -165,14 +164,13 @@ public class HudiTargetClient implements TargetClient {
   }
 
   @Override
-  public void init(PerTableConfig perTableConfig, Configuration configuration) {
+  public void init(TargetTable targetTable, Configuration configuration) {
     _init(
-        perTableConfig.getTableDataPath(),
-        perTableConfig.getTargetMetadataRetentionInHours(),
+        targetTable.getDataPath(),
+        targetTable.getMetadataRetentionInHours(),
         HoodieMetadataConfig.COMPACT_NUM_DELTA_COMMITS.defaultValue(),
         BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(configuration),
-            new CachingPath(perTableConfig.getTableDataPath())),
+            new HoodieJavaEngineContext(configuration), new CachingPath(targetTable.getDataPath())),
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);

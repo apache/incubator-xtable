@@ -70,7 +70,7 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.metadata.HoodieBackedTableMetadata;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
-import io.onetable.client.PerTableConfigImpl;
+import io.onetable.client.TargetTable;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OneField;
@@ -581,11 +581,11 @@ public class ITHudiTargetClient {
 
   private HudiTargetClient getTargetClient() {
     return new HudiTargetClient(
-        PerTableConfigImpl.builder()
-            .tableBasePath(tableBasePath)
-            .targetTableFormats(Collections.singletonList(TableFormat.HUDI))
-            .tableName("test_table")
-            .targetMetadataRetentionInHours(4)
+        TargetTable.builder()
+            .basePath(tableBasePath)
+            .formatName(TableFormat.HUDI)
+            .name("test_table")
+            .metadataRetentionInHours(4)
             .build(),
         CONFIGURATION,
         3);
