@@ -18,6 +18,7 @@
  
 package io.onetable.hudi.sync;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -68,7 +69,7 @@ public class OneTableSyncTool extends HoodieSyncTool {
     SourceTable sourceTable =
         SourceTable.builder()
             .name(tableName)
-            .basePath(basePath)
+            .metadataPath(basePath)
             .formatName(TableFormat.HUDI)
             .build();
     List<TargetTable> targetTables =
@@ -78,10 +79,10 @@ public class OneTableSyncTool extends HoodieSyncTool {
                     TargetTable.builder()
                         .formatName(format)
                         .name(tableName)
-                        .metadataRetentionInHours(
+                        .metadataRetention(Duration.ofHours(
                             config.getInt(
-                                OneTableSyncConfig.ONE_TABLE_TARGET_METADATA_RETENTION_HOURS))
-                        .basePath(basePath)
+                                OneTableSyncConfig.ONE_TABLE_TARGET_METADATA_RETENTION_HOURS)))
+                        .metadataPath(basePath)
                         .build())
             .collect(Collectors.toList());
     TableSyncConfig tableSyncConfig =

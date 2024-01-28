@@ -31,8 +31,7 @@ import com.google.common.base.Preconditions;
 public class ExternalTable {
   @NonNull String name;
   @NonNull String formatName;
-  @NonNull String basePath;
-  @NonNull String dataPath;
+  @NonNull String metadataPath;
   String[] namespace;
   CatalogConfig catalogConfig;
 
@@ -40,18 +39,16 @@ public class ExternalTable {
       @NonNull String name,
       @NonNull String formatName,
       @NonNull String basePath,
-      String dataPath,
       String[] namespace,
       CatalogConfig catalogConfig) {
     this.name = name;
     this.formatName = formatName;
-    this.basePath = sanitizeBasePath(basePath);
-    this.dataPath = dataPath == null ? this.basePath : sanitizeBasePath(dataPath);
+    this.metadataPath = sanitizeBasePath(basePath);
     this.namespace = namespace;
     this.catalogConfig = catalogConfig;
   }
 
-  private String sanitizeBasePath(String tableBasePath) {
+  protected String sanitizeBasePath(String tableBasePath) {
     Path path = new Path(tableBasePath);
     Preconditions.checkArgument(path.isAbsolute(), "Table base path must be absolute");
     if (path.isAbsoluteAndSchemeAuthorityNull()) {

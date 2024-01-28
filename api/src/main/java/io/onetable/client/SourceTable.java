@@ -20,17 +20,21 @@ package io.onetable.client;
 
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
+import lombok.NonNull;
 
 @EqualsAndHashCode(callSuper = true)
 public class SourceTable extends ExternalTable {
+  @NonNull String dataPath;
+
   @Builder(toBuilder = true)
   public SourceTable(
       String name,
       String formatName,
-      String basePath,
+      String metadataPath,
       String dataPath,
       String[] namespace,
       CatalogConfig catalogConfig) {
-    super(name, formatName, basePath, dataPath, namespace, catalogConfig);
+    super(name, formatName, metadataPath, namespace, catalogConfig);
+    this.dataPath = dataPath == null ? this.metadataPath : sanitizeBasePath(dataPath);
   }
 }

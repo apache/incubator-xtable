@@ -33,12 +33,12 @@ public class DeltaSourceClientProvider extends SourceClientProvider<Long> {
   public DeltaSourceClient getSourceClientInstance(
       SourceTable sourceTable, Map<String, String> clientConfigs) {
     SparkSession sparkSession = DeltaClientUtils.buildSparkSession(hadoopConf);
-    DeltaTable deltaTable = DeltaTable.forPath(sparkSession, sourceTable.getBasePath());
+    DeltaTable deltaTable = DeltaTable.forPath(sparkSession, sourceTable.getMetadataPath());
     DeltaSourceClient deltaSourceClient =
         DeltaSourceClient.builder()
             .sparkSession(sparkSession)
             .tableName(sourceTable.getName())
-            .basePath(sourceTable.getBasePath())
+            .basePath(sourceTable.getMetadataPath())
             .deltaTable(deltaTable)
             .deltaLog(deltaTable.deltaLog())
             .build();

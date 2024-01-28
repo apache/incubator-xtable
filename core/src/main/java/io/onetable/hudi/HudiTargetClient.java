@@ -114,11 +114,11 @@ public class HudiTargetClient implements TargetClient {
       Configuration configuration,
       int maxNumDeltaCommitsBeforeCompaction) {
     this(
-        targetTable.getDataPath(),
-        targetTable.getMetadataRetentionInHours(),
+        targetTable.getMetadataPath(),
+        (int) targetTable.getMetadataRetention().toHours(),
         maxNumDeltaCommitsBeforeCompaction,
         BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(configuration), new CachingPath(targetTable.getDataPath())),
+            new HoodieJavaEngineContext(configuration), new CachingPath(targetTable.getMetadataPath())),
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);
@@ -166,11 +166,11 @@ public class HudiTargetClient implements TargetClient {
   @Override
   public void init(TargetTable targetTable, Configuration configuration) {
     _init(
-        targetTable.getDataPath(),
-        targetTable.getMetadataRetentionInHours(),
+        targetTable.getMetadataPath(),
+        (int) targetTable.getMetadataRetention().toHours(),
         HoodieMetadataConfig.COMPACT_NUM_DELTA_COMMITS.defaultValue(),
         BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(configuration), new CachingPath(targetTable.getDataPath())),
+            new HoodieJavaEngineContext(configuration), new CachingPath(targetTable.getMetadataPath())),
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);

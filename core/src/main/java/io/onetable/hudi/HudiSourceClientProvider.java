@@ -39,7 +39,7 @@ public class HudiSourceClientProvider extends SourceClientProvider<HoodieInstant
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder()
             .setConf(hadoopConf)
-            .setBasePath(sourceTableConfig.getBasePath())
+            .setBasePath(sourceTableConfig.getMetadataPath())
             .setLoadActiveTimelineOnLoad(true)
             .build();
     if (!metaClient.getTableConfig().getTableType().equals(HoodieTableType.COPY_ON_WRITE)) {

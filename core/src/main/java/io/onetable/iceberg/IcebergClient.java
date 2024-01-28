@@ -108,9 +108,9 @@ public class IcebergClient implements TargetClient {
     this.partitionSpecSync = partitionSpecSync;
     this.dataFileUpdatesExtractor = dataFileUpdatesExtractor;
     String tableName = targetTable.getName();
-    this.basePath = targetTable.getBasePath();
+    this.basePath = targetTable.getMetadataPath();
     this.configuration = configuration;
-    this.snapshotRetentionInHours = targetTable.getMetadataRetentionInHours();
+    this.snapshotRetentionInHours = (int) targetTable.getMetadataRetention().toHours();
     String[] namespace = targetTable.getNamespace();
     this.tableIdentifier =
         namespace == null

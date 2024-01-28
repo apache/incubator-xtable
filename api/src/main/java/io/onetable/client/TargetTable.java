@@ -22,22 +22,24 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+
 @Getter
 @EqualsAndHashCode(callSuper = true)
 public class TargetTable extends ExternalTable {
-  int metadataRetentionInHours;
+  Duration metadataRetention;
 
   @Builder(toBuilder = true)
   public TargetTable(
       String name,
       String formatName,
-      String basePath,
-      String dataPath,
+      String metadataPath,
       String[] namespace,
       CatalogConfig catalogConfig,
-      Integer metadataRetentionInHours) {
-    super(name, formatName, basePath, dataPath, namespace, catalogConfig);
-    this.metadataRetentionInHours =
-        metadataRetentionInHours == null ? 24 * 7 : metadataRetentionInHours;
+      Duration metadataRetention) {
+    super(name, formatName, metadataPath, namespace, catalogConfig);
+    this.metadataRetention =
+        metadataRetention == null ? Duration.of(7, ChronoUnit.DAYS) : metadataRetention;
   }
 }

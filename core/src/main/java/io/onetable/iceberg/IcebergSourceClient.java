@@ -82,7 +82,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     return tableManager.getTable(
         (IcebergCatalogConfig) sourceTableConfig.getCatalogConfig(),
         tableIdentifier,
-        sourceTableConfig.getBasePath());
+        sourceTableConfig.getMetadataPath());
   }
 
   private FileIO initTableOps() {

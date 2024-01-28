@@ -82,9 +82,9 @@ public class DeltaClient implements TargetClient {
 
   public DeltaClient(TargetTable targetTable, SparkSession sparkSession) {
     this(
-        targetTable.getDataPath(),
+        targetTable.getMetadataPath(),
         targetTable.getName(),
-        targetTable.getMetadataRetentionInHours(),
+        (int) targetTable.getMetadataRetention().toHours(),
         sparkSession,
         DeltaSchemaExtractor.getInstance(),
         DeltaPartitionExtractor.getInstance(),
@@ -137,9 +137,9 @@ public class DeltaClient implements TargetClient {
     SparkSession sparkSession = DeltaClientUtils.buildSparkSession(configuration);
 
     _init(
-        targetTable.getDataPath(),
+        targetTable.getMetadataPath(),
         targetTable.getName(),
-        targetTable.getMetadataRetentionInHours(),
+        (int) targetTable.getMetadataRetention().toHours(),
         sparkSession,
         DeltaSchemaExtractor.getInstance(),
         DeltaPartitionExtractor.getInstance(),

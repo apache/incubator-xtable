@@ -28,11 +28,11 @@ public class TestSourceTable {
   void sanitizePath() {
     SourceTable tooManySlashes =
         SourceTable.builder().basePath("s3://bucket//path").name("name").formatName("hudi").build();
-    assertEquals("s3://bucket/path", tooManySlashes.getBasePath());
+    assertEquals("s3://bucket/path", tooManySlashes.getMetadataPath());
 
     SourceTable localFilePath =
         SourceTable.builder().basePath("/local/data//path").name("name").formatName("hudi").build();
-    assertEquals("file:///local/data/path", localFilePath.getBasePath());
+    assertEquals("file:///local/data/path", localFilePath.getMetadataPath());
 
     SourceTable properLocalFilePath =
         SourceTable.builder()
@@ -40,7 +40,7 @@ public class TestSourceTable {
             .name("name")
             .formatName("hudi")
             .build();
-    assertEquals("file:///local/data/path", properLocalFilePath.getBasePath());
+    assertEquals("file:///local/data/path", properLocalFilePath.getMetadataPath());
   }
 
   @Test
