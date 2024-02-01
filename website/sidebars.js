@@ -57,6 +57,7 @@ module.exports = {
                         'fabric',
                         'presto',
                         'snowflake',
+                        'starrocks',
                         'trino',
                     ],
                 }
