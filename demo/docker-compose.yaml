@@ -1,5 +1,81 @@
 version: "3.9"
 services:
+  starrocks:
+    image: starrocks/allin1-ubuntu
+    hostname: starrocks-fe
+    container_name: allin1-ubuntu
+    ports:
+      - 8030:8030
+      - 8040:8040
+      - 9030:9030
+    healthcheck:
+      test: bash -c "exec 6<> /dev/tcp/localhost/9030"
+    volumes:
+      - ./data:/home/data
+
+  starrocks-toolkit:
+    image: atwong/starrocks-tool-box
+    hostname: starrocks-toolkit
+    container_name: starrocks-toolkit
+    volumes:
+      - ./srtooldata:/home/data
+    depends_on:
+      starrocks:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mysql -P 9030 -h starrocks-fe -u root -e \"create database demo\";
+      exit 0;
+      "
+
+  minio:
+    image: minio/minio
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password
+      - MINIO_DOMAIN=minio
+    networks:
+      default:
+        aliases:
+          - warehouse.minio
+    ports:
+      - 9001:9001
+      - 9000:9000
+    command: ["server", "/data", "--console-address", ":9001"]
+  mc:
+    depends_on:
+      - minio
+    image: minio/mc
+    environment:
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=password
+      - AWS_REGION=us-east-1
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc config host add minio http://minio:9000 admin password) do echo '...waiting...' && sleep 1; done;
+      /usr/bin/mc rm -r --force minio/warehouse;
+      /usr/bin/mc mb minio/warehouse;
+      /usr/bin/mc policy set public minio/warehouse;
+      tail -f /dev/null
+      "
+
+  spark-hudi:
+    image: 'ghcr.io/trinodb/testing/spark3-hudi:latest'
+    platform: linux/amd64
+    hostname: spark-hudi 
+    depends_on:
+      hive-metastore:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    volumes:
+      - ./conf/spark-defaults.conf:/spark-3.2.1-bin-hadoop3.2/conf/spark-defaults.conf:ro
+      - ./conf/core-site.xml:/spark-3.2.1-bin-hadoop3.2/conf/core-site.xml:ro
+    environment:
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: password
+
+
   trino:
     container_name: trino
     ports:
@@ -30,8 +106,17 @@ services:
     environment:
       SERVICE_NAME: metastore
       HIVE_METASTORE_WAREHOUSE_DIR: /home/data
+      HIVE_AUX_JARS_PATH: /home/auxjars/hadoop-aws-3.3.1.jar,/home/auxjars/aws-java-sdk-core-1.12.367.jar,/home/auxjars/aws-java-sdk-s3-1.12.367.jar,/home/auxjars/aws-java-sdk-dynamodb-1.12.367.jar
+      S3_ENDPOINT: http://minio:9000
+      AWS_ACCESS_KEY_ID: admin
+      AWS_SECRET_ACCESS_KEY: password
+      S3_PATH_STYLE_ACCESS: "true"
+      AWS_REGION: "us-east-1"
     volumes:
       - ./data:/home/data
+      - ./auxjars:/home/auxjars
+    healthcheck:
+      test: bash -c "exec 6<> /dev/tcp/localhost/9083"
 
   jupyter:
     container_name: jupyter
@@ -43,3 +128,7 @@ services:
       - ./notebook:/home/jovyan/work
       - ./jars:/home/jars
       - ./data:/home/data
+
+networks:
+  default:
+     name: onetable
