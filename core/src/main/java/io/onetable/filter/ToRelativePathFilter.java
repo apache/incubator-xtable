@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 
 import com.google.auto.service.AutoService;
 import io.onetable.model.storage.OneDataFile;
+import io.onetable.paths.PathUtils;
 import io.onetable.spi.filter.SnapshotFilesFilter;
 
 /**
@@ -64,11 +65,10 @@ public class ToRelativePathFilter implements SnapshotFilesFilter {
             .map(
                 file -> {
                   String oldPath = file.getPhysicalPath();
-                  if (!oldPath.startsWith(basePath)) {
+                  String newPath = PathUtils.getRelativePath(oldPath, basePath);
+                  if (oldPath.equals(newPath)) {
                     return file;
                   }
-
-                  String newPath = oldPath.substring(basePath.length() + 1);
 
                   // create a new data file
                   return OneDataFile.builder()
