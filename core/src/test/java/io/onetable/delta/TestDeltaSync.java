@@ -378,8 +378,10 @@ public class TestDeltaSync {
     try (CloseableIterator<AddFile> fileItr = deltaScan.getFiles()) {
       for (CloseableIterator<AddFile> it = fileItr; it.hasNext(); ) {
         AddFile addFile = it.next();
+//        String fullPath =
+//            new org.apache.hadoop.fs.Path(basePath.resolve(addFile.getPath()).toUri()).toString();
         String fullPath =
-            new org.apache.hadoop.fs.Path(basePath.resolve(addFile.getPath()).toUri()).toString();
+            addFile.getPath();
         OneDataFile expected = pathToFile.get(fullPath);
         assertNotNull(expected);
         assertEquals(addFile.getSize(), expected.getFileSizeBytes());

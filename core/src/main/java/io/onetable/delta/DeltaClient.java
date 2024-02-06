@@ -140,8 +140,8 @@ public class DeltaClient implements TargetClient {
     snapshotFileFilterManager =
         new FilterManager<>(
             Collections.singletonMap("ToRelativePathFilter.basePath", tableDataPath));
-    snapshotFileFilterManager.loadFilters(
-        SnapshotFilesFilter.class, Collections.singleton("ToRelativePathFilter"));
+//    snapshotFileFilterManager.loadFilters(
+//        SnapshotFilesFilter.class, Collections.singleton("ToRelativePathFilter"));
   }
 
   @Override
