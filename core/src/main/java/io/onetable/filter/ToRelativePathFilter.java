@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.google.auto.service.AutoService;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.spi.filter.SnapshotFilesFilter;
 
@@ -35,6 +36,7 @@ import io.onetable.spi.filter.SnapshotFilesFilter;
  * /data/table2/2019-01/abc.parquet, then the output data files will have the same path as the input
  * file, i.e. located at /data/table2/2019-01/abc.parquet.
  */
+@AutoService(SnapshotFilesFilter.class)
 public class ToRelativePathFilter implements SnapshotFilesFilter {
   private static final String BASE_PATH = ToRelativePathFilter.class.getSimpleName() + ".basePath";
   private String basePath;
