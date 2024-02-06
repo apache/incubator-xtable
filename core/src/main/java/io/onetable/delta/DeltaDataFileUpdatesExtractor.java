@@ -28,9 +28,9 @@ import java.util.stream.Stream;
 import lombok.Builder;
 
 import org.apache.spark.sql.delta.DeltaLog;
+import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.Action;
 import org.apache.spark.sql.delta.actions.AddFile;
-import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
@@ -62,10 +62,14 @@ public class DeltaDataFileUpdatesExtractor {
 
     // all files in the current delta snapshot are potential candidates for remove actions, i.e. if
     // the file is not present in the new snapshot (addedFiles) then the file is considered removed
+    Snapshot snapshot = deltaLog.snapshot();
     Map<String, Action> removedFiles =
-        deltaLog.snapshot().allFiles().collectAsList().stream()
+        snapshot.allFiles().collectAsList().stream()
             .map(AddFile::remove)
-            .collect(Collectors.toMap(RemoveFile::path, file -> file));
+            .collect(
+                Collectors.toMap(
+                    file -> DeltaActionsConverter.getFullPathToFile(snapshot, file.path()),
+                    file -> file));
 
     Set<OneDataFile> addedFiles =
         partitionedDataFiles.stream()
