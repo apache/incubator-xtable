@@ -19,12 +19,8 @@
 package io.onetable.delta;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -55,13 +51,16 @@ import com.google.common.annotations.VisibleForTesting;
 
 import io.onetable.client.PerTableConfig;
 import io.onetable.exception.NotSupportedException;
+import io.onetable.filter.FilterManager;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OnePartitionField;
 import io.onetable.model.schema.OneSchema;
+import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
 import io.onetable.model.storage.TableFormat;
+import io.onetable.spi.filter.SnapshotFilesFilter;
 import io.onetable.spi.sync.TargetClient;
 
 public class DeltaClient implements TargetClient {
@@ -77,6 +76,8 @@ public class DeltaClient implements TargetClient {
   private String tableName;
   private int logRetentionInHours;
   private TransactionState transactionState;
+
+  private FilterManager<SnapshotFilesFilter, List<OneDataFile>> snapshotFileFilterManager;
 
   public DeltaClient() {}
 
@@ -130,6 +131,17 @@ public class DeltaClient implements TargetClient {
     this.deltaLog = deltaLog;
     this.tableName = tableName;
     this.logRetentionInHours = logRetentionInHours;
+
+    initializeFilters(tableDataPath);
+  }
+
+  @VisibleForTesting
+  protected void initializeFilters(String tableDataPath) {
+    snapshotFileFilterManager =
+        new FilterManager<>(
+            Collections.singletonMap("ToRelativePathFilter.basePath", tableDataPath));
+//    snapshotFileFilterManager.loadFilters(
+//        SnapshotFilesFilter.class, Collections.singleton("ToRelativePathFilter"));
   }
 
   @Override
@@ -179,16 +191,36 @@ public class DeltaClient implements TargetClient {
 
   @Override
   public void syncFilesForSnapshot(List<OneFileGroup> partitionedDataFiles) {
+    List<OneFileGroup> filteredFileGroups =
+        partitionedDataFiles.stream()
+            .map(
+                group -> {
+                  List<OneDataFile> filteredFiles =
+                      snapshotFileFilterManager.process(group.getFiles());
+                  return OneFileGroup.builder()
+                      .partitionValues(group.getPartitionValues())
+                      .files(filteredFiles)
+                      .build();
+                })
+            .filter(group -> !group.getFiles().isEmpty())
+            .collect(Collectors.toList());
+
     transactionState.setActions(
         dataFileUpdatesExtractor.applySnapshot(
-            deltaLog, partitionedDataFiles, transactionState.getLatestSchemaInternal()));
+            deltaLog, filteredFileGroups, transactionState.getLatestSchemaInternal()));
   }
 
   @Override
   public void syncFilesForDiff(OneDataFilesDiff oneDataFilesDiff) {
+    List<OneDataFile> filesAdded = new ArrayList<>(oneDataFilesDiff.getFilesAdded());
+    filesAdded = snapshotFileFilterManager.process(filesAdded);
+    List<OneDataFile> filesRemoved = new ArrayList<>(oneDataFilesDiff.getFilesRemoved());
+    filesRemoved = snapshotFileFilterManager.process(filesRemoved);
+    OneDataFilesDiff filteredOneDataFilesDiff = OneDataFilesDiff.from(filesAdded, filesRemoved);
+
     transactionState.setActions(
         dataFileUpdatesExtractor.applyDiff(
-            oneDataFilesDiff,
+            filteredOneDataFilesDiff,
             transactionState.getLatestSchemaInternal(),
             deltaLog.dataPath().toString()));
   }

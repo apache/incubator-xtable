@@ -21,14 +21,14 @@ package io.onetable.delta;
 import static io.onetable.collectors.CustomCollectors.toList;
 import static io.onetable.delta.ScalaUtils.convertJavaMapToScala;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import lombok.Builder;
 
 import org.apache.spark.sql.delta.DeltaLog;
+import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.Action;
 import org.apache.spark.sql.delta.actions.AddFile;
 
@@ -37,14 +37,11 @@ import scala.collection.Seq;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
-import io.onetable.exception.OneIOException;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
-import io.onetable.paths.PathUtils;
-import io.onetable.spi.extractor.DataFileIterator;
 
 @Builder
 public class DeltaDataFileUpdatesExtractor {
@@ -61,37 +58,54 @@ public class DeltaDataFileUpdatesExtractor {
 
   public Seq<Action> applySnapshot(
       DeltaLog deltaLog, List<OneFileGroup> partitionedDataFiles, OneSchema tableSchema) {
-    List<OneDataFile> currentDataFiles = new ArrayList<>();
-    try (DataFileIterator fileIterator =
-        deltaDataFileExtractor.iteratorWithoutStats(deltaLog.snapshot(), tableSchema)) {
-      fileIterator.forEachRemaining(currentDataFiles::add);
-      OneDataFilesDiff filesDiff =
-          OneDataFilesDiff.from(
-              partitionedDataFiles.stream()
-                  .flatMap(group -> group.getFiles().stream())
-                  .collect(Collectors.toList()),
-              currentDataFiles);
-      return applyDiff(filesDiff, tableSchema, deltaLog.dataPath().toString());
-    } catch (Exception e) {
-      throw new OneIOException("Failed to iterate through Delta data files", e);
-    }
+
+    // all files in the current delta snapshot are potential candidates for remove actions, i.e. if
+    // the file is not present in the new snapshot (addedFiles) then the file is considered removed
+    Snapshot snapshot = deltaLog.snapshot();
+    Map<String, Action> removedFiles =
+        snapshot.allFiles().collectAsList().stream()
+            .map(AddFile::remove)
+            .collect(
+                Collectors.toMap(
+                    file -> DeltaActionsConverter.getFullPathToFile(snapshot, file.path()),
+                    file -> file));
+
+    Set<OneDataFile> addedFiles =
+        partitionedDataFiles.stream()
+            .flatMap(group -> group.getFiles().stream())
+            .map(
+                file -> {
+                  Action targetFileIfPresent = removedFiles.remove(file.getPhysicalPath());
+                  return targetFileIfPresent == null ? file : null;
+                })
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+
+    return applyDiff(
+        addedFiles, removedFiles.values(), tableSchema, deltaLog.dataPath().toString());
   }
 
   public Seq<Action> applyDiff(
       OneDataFilesDiff oneDataFilesDiff, OneSchema tableSchema, String tableBasePath) {
-    Stream<Action> addActions =
-        oneDataFilesDiff.getFilesAdded().stream()
-            .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath));
-    Stream<Action> removeActions =
+    List<Action> removeActions =
         oneDataFilesDiff.getFilesRemoved().stream()
             .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath))
-            .map(AddFile::remove);
+            .map(AddFile::remove)
+            .collect(toList(oneDataFilesDiff.getFilesRemoved().size()));
+    return applyDiff(oneDataFilesDiff.getFilesAdded(), removeActions, tableSchema, tableBasePath);
+  }
+
+  private Seq<Action> applyDiff(
+      Set<OneDataFile> filesAdded,
+      Collection<Action> removeFileActions,
+      OneSchema tableSchema,
+      String tableBasePath) {
+    Stream<Action> addActions =
+        filesAdded.stream()
+            .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath));
+    int totalActions = filesAdded.size() + removeFileActions.size();
     List<Action> allActions =
-        Stream.concat(addActions, removeActions)
-            .collect(
-                toList(
-                    oneDataFilesDiff.getFilesAdded().size()
-                        + oneDataFilesDiff.getFilesRemoved().size()));
+        Stream.concat(addActions, removeFileActions.stream()).collect(toList(totalActions));
     return JavaConverters.asScalaBuffer(allActions).toSeq();
   }
 
@@ -99,9 +113,7 @@ public class DeltaDataFileUpdatesExtractor {
       OneDataFile dataFile, OneSchema schema, String tableBasePath) {
     return Stream.of(
         new AddFile(
-            // Delta Lake supports relative and absolute paths in theory but relative paths seem
-            // more commonly supported by query engines in our testing
-            PathUtils.getRelativePath(dataFile.getPhysicalPath(), tableBasePath),
+            dataFile.getPhysicalPath(),
             convertJavaMapToScala(deltaPartitionExtractor.partitionValueSerialization(dataFile)),
             dataFile.getFileSizeBytes(),
             dataFile.getLastModified(),

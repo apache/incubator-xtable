@@ -55,7 +55,6 @@ public class DeltaActionsConverter {
       boolean includeColumnStats,
       DeltaPartitionExtractor partitionExtractor,
       DeltaStatsExtractor fileStatsExtractor) {
-    String tableBasePath = deltaSnapshot.deltaLog().dataPath().toUri().toString();
     List<ColumnStat> columnStats =
         includeColumnStats
             ? fileStatsExtractor.getColumnStatsForFile(addFile, fields)
@@ -64,7 +63,7 @@ public class DeltaActionsConverter {
         columnStats.stream().map(ColumnStat::getNumValues).max(Long::compareTo).orElse(0L);
     // TODO(https://github.com/onetable-io/onetable/issues/102): removed record count.
     return OneDataFile.builder()
-        .physicalPath(getFullPathToFile(tableBasePath, addFile.path()))
+        .physicalPath(getFullPathToFile(deltaSnapshot, addFile.path()))
         .fileFormat(fileFormat)
         .fileSizeBytes(addFile.size())
         .lastModified(addFile.modificationTime())
@@ -81,9 +80,8 @@ public class DeltaActionsConverter {
       FileFormat fileFormat,
       List<OnePartitionField> partitionFields,
       DeltaPartitionExtractor partitionExtractor) {
-    String tableBasePath = deltaSnapshot.deltaLog().dataPath().toUri().toString();
     return OneDataFile.builder()
-        .physicalPath(getFullPathToFile(tableBasePath, removeFile.path()))
+        .physicalPath(getFullPathToFile(deltaSnapshot, removeFile.path()))
         .fileFormat(fileFormat)
         .partitionValues(
             partitionExtractor.partitionValueExtraction(
@@ -101,10 +99,11 @@ public class DeltaActionsConverter {
         String.format("delta file format %s is not recognized", provider));
   }
 
-  private String getFullPathToFile(String tableBasePath, String path) {
-    if (path.startsWith(tableBasePath)) {
-      return path;
+  static String getFullPathToFile(Snapshot snapshot, String dataFilePath) {
+    String tableBasePath = snapshot.deltaLog().dataPath().toUri().toString();
+    if (dataFilePath.startsWith(tableBasePath)) {
+      return dataFilePath;
     }
-    return tableBasePath + Path.SEPARATOR + path;
+    return tableBasePath + Path.SEPARATOR + dataFilePath;
   }
 }
