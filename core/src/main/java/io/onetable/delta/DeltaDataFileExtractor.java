@@ -46,17 +46,6 @@ public class DeltaDataFileExtractor {
   private final DeltaActionsConverter actionsConverter = DeltaActionsConverter.getInstance();
 
   /**
-   * Initializes an iterator for Delta Lake files. This should only be used when column stats are
-   * not required.
-   *
-   * @return Delta table file iterator, files returned do not have column stats set to reduce memory
-   *     overhead
-   */
-  public DataFileIterator iteratorWithoutStats(Snapshot deltaSnapshot, OneSchema schema) {
-    return new DeltaDataFileIterator(deltaSnapshot, schema, false);
-  }
-
-  /**
    * Initializes an iterator for Delta Lake files.
    *
    * @return Delta table file iterator
@@ -70,8 +59,6 @@ public class DeltaDataFileExtractor {
     private final List<OneField> fields;
     private final List<OnePartitionField> partitionFields;
     private final Iterator<OneDataFile> dataFilesIterator;
-    private final String tableBasePath;
-    private final boolean includeColumnStats;
 
     private DeltaDataFileIterator(Snapshot snapshot, OneSchema schema, boolean includeColumnStats) {
       this.fileFormat =
@@ -80,8 +67,6 @@ public class DeltaDataFileExtractor {
       this.partitionFields =
           partitionExtractor.convertFromDeltaPartitionFormat(
               schema, snapshot.metadata().partitionSchema());
-      this.tableBasePath = snapshot.deltaLog().dataPath().toUri().toString();
-      this.includeColumnStats = includeColumnStats;
       this.dataFilesIterator =
           snapshot.allFiles().collectAsList().stream()
               .map(
