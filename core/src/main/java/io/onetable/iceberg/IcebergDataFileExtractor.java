@@ -19,24 +19,20 @@
 package io.onetable.iceberg;
 
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 
 import lombok.Builder;
 
-import org.apache.iceberg.CombinedScanTask;
 import org.apache.iceberg.DataFile;
-import org.apache.iceberg.Table;
-import org.apache.iceberg.io.CloseableIterator;
+
+import com.google.common.annotations.VisibleForTesting;
 
 import io.onetable.exception.NotSupportedException;
-import io.onetable.model.OneTable;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
 import io.onetable.model.stat.PartitionValue;
 import io.onetable.model.storage.FileFormat;
 import io.onetable.model.storage.OneDataFile;
-import io.onetable.spi.extractor.DataFileIterator;
 
 /** Extractor of data files for Iceberg */
 @Builder
@@ -47,87 +43,6 @@ public class IcebergDataFileExtractor {
       IcebergPartitionValueConverter.getInstance();
 
   /**
-   * Initializes an iterator for Iceberg files.
-   *
-   * @return Iceberg table file iterator
-   */
-  public DataFileIterator iterator(Table iceTable, OneTable oneTable) {
-    return new IcebergDataFileIterator(iceTable, oneTable);
-  }
-
-  public class IcebergDataFileIterator implements DataFileIterator {
-    private final Table iceTable;
-    private final OneTable oneTable;
-    private final CloseableIterator<CombinedScanTask> iceScan;
-    private Iterator<OneDataFile> currentScanTaskIterator;
-
-    private IcebergDataFileIterator(Table iceTable, OneTable oneTable) {
-      this.iceTable = iceTable;
-      this.oneTable = oneTable;
-      this.iceScan = iceTable.newScan().planTasks().iterator();
-      this.currentScanTaskIterator =
-          iceScan.hasNext() ? getCurrentScanTaskIterator(iceScan.next()) : null;
-    }
-
-    @Override
-    public void close() throws Exception {
-      iceScan.close();
-    }
-
-    @Override
-    public boolean hasNext() {
-      advanceScanTask();
-      return currentScanTaskIterator != null && currentScanTaskIterator.hasNext();
-    }
-
-    @Override
-    public OneDataFile next() {
-      if (currentScanTaskIterator == null) {
-        throw new IllegalStateException("Iterator is not initialized");
-      }
-      advanceScanTask();
-      return currentScanTaskIterator.next();
-    }
-
-    private void advanceScanTask() {
-      if (currentScanTaskIterator != null && currentScanTaskIterator.hasNext()) {
-        return;
-      }
-      if (iceScan.hasNext()) {
-        currentScanTaskIterator = getCurrentScanTaskIterator(iceScan.next());
-      } else {
-        currentScanTaskIterator = null;
-      }
-    }
-
-    private Iterator<OneDataFile> getCurrentScanTaskIterator(CombinedScanTask scanTask) {
-      return scanTask.files().stream()
-          .map(
-              fileScanTask -> {
-                DataFile dataFile = fileScanTask.file();
-                List<PartitionValue> partitionValues =
-                    partitionValueConverter.toOneTable(
-                        oneTable, dataFile.partition(), iceTable.spec());
-                return fromIcebergWithoutColumnStats(dataFile, partitionValues);
-              })
-          .iterator();
-    }
-  }
-
-  /**
-   * Builds {@link OneDataFile} representation from Iceberg {@link DataFile} without any column
-   * statistics set. This can be used to reduce memory overhead when statistics are not required.
-   *
-   * @param dataFile Iceberg data file
-   * @param partitionValues representation of partition fields and ranges
-   * @return corresponding OneTable data file
-   */
-  OneDataFile fromIcebergWithoutColumnStats(
-      DataFile dataFile, List<PartitionValue> partitionValues) {
-    return fromIceberg(dataFile, partitionValues, null, false);
-  }
-
-  /**
    * Builds {@link OneDataFile} representation from Iceberg {@link DataFile}.
    *
    * @param dataFile Iceberg data file
@@ -135,6 +50,7 @@ public class IcebergDataFileExtractor {
    * @param schema current schema for the table, used for mapping field IDs to stats
    * @return corresponding OneTable data file
    */
+  @VisibleForTesting
   OneDataFile fromIceberg(
       DataFile dataFile, List<PartitionValue> partitionValues, OneSchema schema) {
     return fromIceberg(dataFile, partitionValues, schema, true);
