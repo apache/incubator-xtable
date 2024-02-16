@@ -19,8 +19,11 @@
 package io.onetable.model.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
-import java.util.Arrays;
+import java.io.File;
+import java.util.*;
 
 import org.junit.jupiter.api.Test;
 
@@ -48,5 +51,88 @@ public class TestOneDataFilesDiff {
             .filesRemoved(Arrays.asList(targetFile1, targetFile2))
             .build();
     assertEquals(expected, actual);
+  }
+
+  @Test
+  void findDiffFromFileGroups() {
+    OneDataFile file1Group1 = OneDataFile.builder().physicalPath("file1Group1").build();
+    OneDataFile file2Group1 = OneDataFile.builder().physicalPath("file2Group1").build();
+    OneDataFile file1Group2 = OneDataFile.builder().physicalPath("file1Group2").build();
+    OneDataFile file2Group2 = OneDataFile.builder().physicalPath("file2Group2").build();
+
+    List<OneFileGroup> latestFileGroups =
+        OneFileGroup.fromFiles(Arrays.asList(file1Group1, file2Group1, file1Group2, file2Group2));
+
+    Map<String, File> previousFiles = new HashMap<>();
+    File file1 = mock(File.class);
+    File file2 = mock(File.class);
+    File file3 = mock(File.class);
+    previousFiles.put("file1Group1", file1);
+    previousFiles.put("file2NoGroup", file2);
+    previousFiles.put("file2Group2", file3);
+
+    Set<OneDataFile> newFiles =
+        OneDataFilesDiff.findNewAndRemovedFiles(latestFileGroups, previousFiles);
+    assertEquals(1, previousFiles.size());
+    assertEquals(2, newFiles.size());
+    assertTrue(previousFiles.containsKey("file2NoGroup"));
+    assertTrue(newFiles.contains(file2Group1));
+    assertTrue(newFiles.contains(file1Group2));
+  }
+
+  @Test
+  void findDiffFromFilesNoPrevious() {
+    File file1 = mock(File.class);
+    File file2 = mock(File.class);
+
+    Map<String, File> previousFiles = new HashMap<>();
+    Map<String, File> latestFiles = new HashMap<>();
+    latestFiles.put("file1", file1);
+    latestFiles.put("file2", file2);
+
+    Set<File> newFiles = OneDataFilesDiff.findNewAndRemovedFiles(latestFiles, previousFiles);
+    assertEquals(0, previousFiles.size());
+    assertEquals(2, newFiles.size());
+    assertTrue(newFiles.contains(file1));
+    assertTrue(newFiles.contains(file2));
+  }
+
+  @Test
+  void findDiffFromFilesNoNew() {
+    File file1 = mock(File.class);
+    File file2 = mock(File.class);
+
+    Map<String, File> previousFiles = new HashMap<>();
+    previousFiles.put("file1", file1);
+    previousFiles.put("file2", file2);
+
+    Map<String, File> latestFiles = new HashMap<>();
+    latestFiles.put("file1", file1);
+    latestFiles.put("file2", file2);
+
+    Set<File> newFiles = OneDataFilesDiff.findNewAndRemovedFiles(latestFiles, previousFiles);
+    assertEquals(0, previousFiles.size());
+    assertEquals(0, newFiles.size());
+  }
+
+  @Test
+  void findDiffFromFiles() {
+    File file1 = mock(File.class);
+    File file2 = mock(File.class);
+    File file3 = mock(File.class);
+
+    Map<String, File> previousFiles = new HashMap<>();
+    previousFiles.put("file1", file1);
+    previousFiles.put("file2", file2);
+
+    Map<String, File> latestFiles = new HashMap<>();
+    latestFiles.put("file2", file2);
+    latestFiles.put("file3", file3);
+
+    Set<File> newFiles = OneDataFilesDiff.findNewAndRemovedFiles(latestFiles, previousFiles);
+    assertEquals(1, previousFiles.size());
+    assertEquals(1, newFiles.size());
+    assertTrue(previousFiles.containsKey("file1"));
+    assertTrue(newFiles.contains(file3));
   }
 }

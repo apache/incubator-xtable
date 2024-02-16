@@ -25,8 +25,6 @@ import lombok.Builder;
 
 import org.apache.iceberg.DataFile;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import io.onetable.exception.NotSupportedException;
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
@@ -50,7 +48,6 @@ public class IcebergDataFileExtractor {
    * @param schema current schema for the table, used for mapping field IDs to stats
    * @return corresponding OneTable data file
    */
-  @VisibleForTesting
   OneDataFile fromIceberg(
       DataFile dataFile, List<PartitionValue> partitionValues, OneSchema schema) {
     return fromIceberg(dataFile, partitionValues, schema, true);
