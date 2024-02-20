@@ -271,6 +271,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                 throw new OneIOException("Unable to parse path " + path, e);
               }
             })
+        .filter(uri -> !FSUtils.isLogFile(new Path(uri).getName()))
         .map(HoodieBaseFile::new)
         .map(baseFile -> buildFileWithoutStats(partitionValues, baseFile))
         .collect(toList(deletedPaths.size()));
