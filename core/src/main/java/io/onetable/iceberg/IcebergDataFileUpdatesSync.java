@@ -30,6 +30,7 @@ import org.apache.iceberg.io.CloseableIterable;
 import io.onetable.exception.NotSupportedException;
 import io.onetable.exception.OneIOException;
 import io.onetable.model.OneTable;
+import io.onetable.model.storage.DataFilesDiff;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
@@ -56,10 +57,10 @@ public class IcebergDataFileUpdatesSync {
       throw new OneIOException("Failed to iterate through Iceberg data files", e);
     }
 
-    Set<OneDataFile> addedFiles =
+    DataFilesDiff<OneDataFile, DataFile> diff =
         OneDataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
-    applyDiff(transaction, addedFiles, previousFiles.values(), schema, partitionSpec);
+    applyDiff(transaction, diff.getFilesAdded(), diff.getFilesRemoved(), schema, partitionSpec);
   }
 
   public void applyDiff(

@@ -39,6 +39,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.storage.DataFilesDiff;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
@@ -71,11 +72,11 @@ public class DeltaDataFileUpdatesExtractor {
                     file -> DeltaActionsConverter.getFullPathToFile(snapshot, file.path()),
                     file -> file));
 
-    Set<OneDataFile> addedFiles =
+    DataFilesDiff<OneDataFile, Action> diff =
         OneDataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
     return applyDiff(
-        addedFiles, previousFiles.values(), tableSchema, deltaLog.dataPath().toString());
+        diff.getFilesAdded(), diff.getFilesRemoved(), tableSchema, deltaLog.dataPath().toString());
   }
 
   public Seq<Action> applyDiff(
