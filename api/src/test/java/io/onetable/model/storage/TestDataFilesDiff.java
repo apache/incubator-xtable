@@ -48,11 +48,11 @@ public class TestDataFilesDiff {
 
     DataFilesDiff<OneDataFile, File> diff =
         DataFilesDiff.findNewAndRemovedFiles(latestFileGroups, previousFiles);
-    assertEquals(1, previousFiles.size());
-    assertEquals(2, diff.filesAdded().size());
-    assertTrue(previousFiles.containsKey("file2NoGroup"));
-    assertTrue(diff.filesAdded().contains(file1Group2));
-    assertTrue(diff.filesAdded().contains(file2Group1));
+    assertEquals(2, diff.getFilesAdded().size());
+    assertTrue(diff.getFilesAdded().contains(file1Group2));
+    assertTrue(diff.getFilesAdded().contains(file2Group1));
+    assertEquals(1, diff.getFilesRemoved().size());
+    assertTrue(diff.getFilesRemoved().contains(file2));
   }
 
   @Test
@@ -67,10 +67,10 @@ public class TestDataFilesDiff {
 
     DataFilesDiff<File, File> diff =
         DataFilesDiff.findNewAndRemovedFiles(latestFiles, previousFiles);
-    assertEquals(0, previousFiles.size());
-    assertEquals(2, diff.filesAdded().size());
-    assertTrue(diff.filesAdded().contains(file1));
-    assertTrue(diff.filesAdded().contains(file2));
+    assertEquals(0, diff.getFilesRemoved().size());
+    assertEquals(2, diff.getFilesAdded().size());
+    assertTrue(diff.getFilesAdded().contains(file1));
+    assertTrue(diff.getFilesAdded().contains(file2));
   }
 
   @Test
@@ -88,8 +88,8 @@ public class TestDataFilesDiff {
 
     DataFilesDiff<File, File> diff =
         DataFilesDiff.findNewAndRemovedFiles(latestFiles, previousFiles);
-    assertEquals(0, diff.filesRemoved().size());
-    assertEquals(0, diff.filesAdded().size());
+    assertEquals(0, diff.getFilesRemoved().size());
+    assertEquals(0, diff.getFilesAdded().size());
   }
 
   @Test
@@ -108,9 +108,9 @@ public class TestDataFilesDiff {
 
     DataFilesDiff<File, File> diff =
         DataFilesDiff.findNewAndRemovedFiles(latestFiles, previousFiles);
-    assertEquals(1, previousFiles.size());
-    assertEquals(1, diff.filesAdded().size());
-    assertTrue(previousFiles.containsKey("file1"));
-    assertTrue(diff.filesAdded().contains(file3));
+    assertEquals(1, diff.getFilesAdded().size());
+    assertTrue(diff.getFilesAdded().contains(file3));
+    assertEquals(1, diff.getFilesRemoved().size());
+    assertTrue(diff.getFilesRemoved().contains(file1));
   }
 }
