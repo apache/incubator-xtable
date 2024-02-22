@@ -20,7 +20,7 @@ package io.onetable.model.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import java.util.*;
+import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
 
