@@ -18,28 +18,22 @@
  
 package io.onetable.iceberg;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import lombok.AllArgsConstructor;
 
-import org.apache.iceberg.DataFile;
-import org.apache.iceberg.DataFiles;
-import org.apache.iceberg.FileFormat;
-import org.apache.iceberg.OverwriteFiles;
-import org.apache.iceberg.PartitionSpec;
-import org.apache.iceberg.Schema;
-import org.apache.iceberg.Table;
-import org.apache.iceberg.Transaction;
+import org.apache.iceberg.*;
+import org.apache.iceberg.io.CloseableIterable;
 
 import io.onetable.exception.NotSupportedException;
 import io.onetable.exception.OneIOException;
 import io.onetable.model.OneTable;
+import io.onetable.model.storage.DataFilesDiff;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
-import io.onetable.spi.extractor.DataFileIterator;
 
 @AllArgsConstructor(staticName = "of")
 public class IcebergDataFileUpdatesSync {
@@ -53,23 +47,20 @@ public class IcebergDataFileUpdatesSync {
       List<OneFileGroup> partitionedDataFiles,
       Schema schema,
       PartitionSpec partitionSpec) {
-    List<OneDataFile> currentDataFiles = new ArrayList<>();
-    IcebergDataFileExtractor dataFileExtractor =
-        IcebergDataFileExtractor.builder().partitionValueConverter(partitionValueConverter).build();
-    try (DataFileIterator fileIterator = dataFileExtractor.iterator(table, oneTable)) {
-      fileIterator.forEachRemaining(currentDataFiles::add);
+
+    Map<String, DataFile> previousFiles = new HashMap<>();
+    try (CloseableIterable<FileScanTask> iterator = table.newScan().planFiles()) {
+      StreamSupport.stream(iterator.spliterator(), false)
+          .map(FileScanTask::file)
+          .forEach(file -> previousFiles.put(file.path().toString(), file));
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Iceberg data files", e);
     }
 
-    // Sync the files diff
-    OneDataFilesDiff filesDiff =
-        OneDataFilesDiff.from(
-            partitionedDataFiles.stream()
-                .flatMap(group -> group.getFiles().stream())
-                .collect(Collectors.toList()),
-            currentDataFiles);
-    applyDiff(transaction, filesDiff, schema, partitionSpec);
+    DataFilesDiff<OneDataFile, DataFile> diff =
+        OneDataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
+
+    applyDiff(transaction, diff.getFilesAdded(), diff.getFilesRemoved(), schema, partitionSpec);
   }
 
   public void applyDiff(
@@ -77,16 +68,24 @@ public class IcebergDataFileUpdatesSync {
       OneDataFilesDiff oneDataFilesDiff,
       Schema schema,
       PartitionSpec partitionSpec) {
+
+    Collection<DataFile> filesRemoved =
+        oneDataFilesDiff.getFilesRemoved().stream()
+            .map(file -> getDataFile(partitionSpec, schema, file))
+            .collect(Collectors.toList());
+
+    applyDiff(transaction, oneDataFilesDiff.getFilesAdded(), filesRemoved, schema, partitionSpec);
+  }
+
+  private void applyDiff(
+      Transaction transaction,
+      Collection<OneDataFile> filesAdded,
+      Collection<DataFile> filesRemoved,
+      Schema schema,
+      PartitionSpec partitionSpec) {
     OverwriteFiles overwriteFiles = transaction.newOverwrite();
-    oneDataFilesDiff
-        .getFilesAdded()
-        .forEach(f -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, f)));
-    oneDataFilesDiff
-        .getFilesRemoved()
-        .forEach(
-            f ->
-                overwriteFiles.deleteFile(
-                    getDataFile(transaction.table().spec(), transaction.table().schema(), f)));
+    filesAdded.forEach(f -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, f)));
+    filesRemoved.forEach(overwriteFiles::deleteFile);
     overwriteFiles.commit();
   }
 
