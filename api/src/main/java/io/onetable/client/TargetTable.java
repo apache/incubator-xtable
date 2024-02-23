@@ -16,23 +16,30 @@
  * limitations under the License.
  */
  
-package io.onetable.iceberg;
+package io.onetable.client;
 
-import java.util.Map;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 
-import org.apache.iceberg.Snapshot;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 
-import io.onetable.client.SourceClientProvider;
-import io.onetable.client.SourceTable;
+@Getter
+@EqualsAndHashCode(callSuper = true)
+public class TargetTable extends ExternalTable {
+  Duration metadataRetention;
 
-/** A concrete implementation of {@link SourceClientProvider} for Hudi table format. */
-public class IcebergSourceClientProvider extends SourceClientProvider<Snapshot> {
-  @Override
-  public IcebergSourceClient getSourceClientInstance(
-      SourceTable sourceTableConfig, Map<String, String> clientConf) {
-    return IcebergSourceClient.builder()
-        .sourceTableConfig(sourceTableConfig)
-        .hadoopConf(hadoopConf)
-        .build();
+  @Builder(toBuilder = true)
+  public TargetTable(
+      String name,
+      String formatName,
+      String metadataPath,
+      String[] namespace,
+      CatalogConfig catalogConfig,
+      Duration metadataRetention) {
+    super(name, formatName, metadataPath, namespace, catalogConfig);
+    this.metadataRetention =
+        metadataRetention == null ? Duration.of(7, ChronoUnit.DAYS) : metadataRetention;
   }
 }

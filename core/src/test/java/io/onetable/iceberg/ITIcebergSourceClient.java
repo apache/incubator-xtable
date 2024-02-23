@@ -27,7 +27,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -44,8 +44,7 @@ import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.data.Record;
 
 import io.onetable.TestIcebergTable;
-import io.onetable.client.PerTableConfig;
-import io.onetable.client.PerTableConfigImpl;
+import io.onetable.client.SourceTable;
 import io.onetable.model.CommitsBacklog;
 import io.onetable.model.InstantsForIncrementalSync;
 import io.onetable.model.OneSnapshot;
@@ -63,7 +62,7 @@ public class ITIcebergSourceClient {
   @BeforeEach
   void setup() {
     clientProvider = new IcebergSourceClientProvider();
-    clientProvider.init(hadoopConf, null);
+    clientProvider.init(hadoopConf);
   }
 
   @ParameterizedTest
@@ -95,13 +94,14 @@ public class ITIcebergSourceClient {
       testIcebergTable.insertRows(50);
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
-      PerTableConfig tableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(testIcebergTable.getTableName())
-              .tableBasePath(testIcebergTable.getBasePath())
-              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+      SourceTable tableConfig =
+          SourceTable.builder()
+              .name(testIcebergTable.getTableName())
+              .basePath(testIcebergTable.getBasePath())
+              .formatName(TableFormat.ICEBERG)
               .build();
-      IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+      IcebergSourceClient icebergSourceClient =
+          clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
       assertEquals(180L, testIcebergTable.getNumRows());
       OneSnapshot oneSnapshot = icebergSourceClient.getCurrentSnapshot();
 
@@ -154,13 +154,14 @@ public class ITIcebergSourceClient {
       testIcebergTable.insertRecordsForPartition(20, partitionValueToDelete);
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
-      PerTableConfig tableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(testIcebergTable.getTableName())
-              .tableBasePath(testIcebergTable.getBasePath())
-              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+      SourceTable tableConfig =
+          SourceTable.builder()
+              .name(testIcebergTable.getTableName())
+              .basePath(testIcebergTable.getBasePath())
+              .formatName(TableFormat.ICEBERG)
               .build();
-      IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+      IcebergSourceClient icebergSourceClient =
+          clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
       assertEquals(
           120 - recordsByPartition.get(partitionValueToDelete).size(),
           testIcebergTable.getNumRows());
@@ -213,13 +214,14 @@ public class ITIcebergSourceClient {
       testIcebergTable.insertRecordsForPartition(20, partitionValueToDelete);
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
-      PerTableConfig tableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(testIcebergTable.getTableName())
-              .tableBasePath(testIcebergTable.getBasePath())
-              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+      SourceTable tableConfig =
+          SourceTable.builder()
+              .name(testIcebergTable.getTableName())
+              .basePath(testIcebergTable.getBasePath())
+              .formatName(TableFormat.ICEBERG)
               .build();
-      IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+      IcebergSourceClient icebergSourceClient =
+          clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
       assertEquals(
           120 - recordsByPartition.get(partitionValueToDelete).size(),
           testIcebergTable.getNumRows());
@@ -272,13 +274,14 @@ public class ITIcebergSourceClient {
       testIcebergTable.insertRows(50);
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
-      PerTableConfig tableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(testIcebergTable.getTableName())
-              .tableBasePath(testIcebergTable.getBasePath())
-              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+      SourceTable tableConfig =
+          SourceTable.builder()
+              .name(testIcebergTable.getTableName())
+              .basePath(testIcebergTable.getBasePath())
+              .formatName(TableFormat.ICEBERG)
               .build();
-      IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+      IcebergSourceClient icebergSourceClient =
+          clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
       assertEquals(200L, testIcebergTable.getNumRows());
       OneSnapshot oneSnapshot = icebergSourceClient.getCurrentSnapshot();
 
@@ -312,12 +315,12 @@ public class ITIcebergSourceClient {
       // Insert 50 rows to INFO partition.
       List<Record> commit1Rows = testIcebergTable.insertRecordsForPartition(50, "INFO");
       Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
-      PerTableConfig tableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(testIcebergTable.getTableName())
-              .tableBasePath(testIcebergTable.getBasePath())
-              .tableDataPath(testIcebergTable.getDataPath())
-              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+      SourceTable tableConfig =
+          SourceTable.builder()
+              .name(testIcebergTable.getTableName())
+              .basePath(testIcebergTable.getBasePath())
+              .dataPath(testIcebergTable.getDataPath())
+              .formatName(TableFormat.ICEBERG)
               .build();
 
       // Upsert all rows inserted before, so all files are replaced.
@@ -331,7 +334,8 @@ public class ITIcebergSourceClient {
         // Expire snapshotAfterCommit2.
         testIcebergTable.expireSnapshot(snapshotIdAfterCommit2);
       }
-      IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
+      IcebergSourceClient icebergSourceClient =
+          clientProvider.getSourceClientInstance(tableConfig, Collections.emptyMap());
       if (shouldExpireSnapshots) {
         assertFalse(
             icebergSourceClient.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));

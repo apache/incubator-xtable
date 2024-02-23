@@ -23,7 +23,7 @@ import java.util.Optional;
 
 import org.apache.hadoop.conf.Configuration;
 
-import io.onetable.client.PerTableConfig;
+import io.onetable.client.TargetTable;
 import io.onetable.model.OneTable;
 import io.onetable.model.OneTableMetadata;
 import io.onetable.model.schema.OnePartitionField;
@@ -89,5 +89,5 @@ public interface TargetClient {
   String getTableFormat();
 
   /** Initializes the client with provided configuration */
-  void init(PerTableConfig perTableConfig, Configuration configuration);
+  void init(TargetTable targetTable, Configuration configuration);
 }

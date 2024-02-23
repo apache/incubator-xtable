@@ -19,25 +19,19 @@
 package io.onetable.client;
 
 import java.util.List;
+import java.util.Map;
+
+import lombok.Builder;
+import lombok.Value;
 
 import io.onetable.model.sync.SyncMode;
 
-public interface PerTableConfig {
-  int getTargetMetadataRetentionInHours();
-
-  String getTableBasePath();
-
-  String getTableDataPath();
-
-  String getTableName();
-
-  HudiSourceConfig getHudiSourceConfig();
-
-  List<String> getTargetTableFormats();
-
-  SyncMode getSyncMode();
-
-  String[] getNamespace();
-
-  CatalogConfig getIcebergCatalogConfig();
+@Value
+@Builder(toBuilder = true)
+public class TableSyncConfig {
+  // TODO add docs for all fields
+  SourceTable sourceTable;
+  List<TargetTable> targetTables;
+  SyncMode syncMode;
+  Map<String, String> properties;
 }

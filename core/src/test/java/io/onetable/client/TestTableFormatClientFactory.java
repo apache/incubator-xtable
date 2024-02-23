@@ -24,15 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.Arrays;
-import java.util.List;
-
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 
 import io.onetable.exception.NotSupportedException;
 import io.onetable.model.storage.TableFormat;
-import io.onetable.model.sync.SyncMode;
 import io.onetable.spi.sync.TargetClient;
 
 public class TestTableFormatClientFactory {
@@ -42,11 +38,10 @@ public class TestTableFormatClientFactory {
     TargetClient tc =
         TableFormatClientFactory.getInstance().createTargetClientForName(TableFormat.DELTA);
     assertNotNull(tc);
-    PerTableConfig perTableConfig =
-        getPerTableConfig(Arrays.asList(TableFormat.DELTA), SyncMode.INCREMENTAL);
+    TargetTable targetTable = getPerTableConfig(TableFormat.DELTA);
     Configuration conf = new Configuration();
     conf.setStrings("spark.master", "local");
-    tc.init(perTableConfig, conf);
+    tc.init(targetTable, conf);
     assertEquals(tc.getTableFormat(), TableFormat.DELTA);
   }
 
@@ -55,11 +50,10 @@ public class TestTableFormatClientFactory {
     TargetClient tc =
         TableFormatClientFactory.getInstance().createTargetClientForName(TableFormat.HUDI);
     assertNotNull(tc);
-    PerTableConfig perTableConfig =
-        getPerTableConfig(Arrays.asList(TableFormat.HUDI), SyncMode.INCREMENTAL);
+    TargetTable targetTable = getPerTableConfig(TableFormat.HUDI);
     Configuration conf = new Configuration();
     conf.setStrings("spark.master", "local");
-    tc.init(perTableConfig, conf);
+    tc.init(targetTable, conf);
     assertEquals(tc.getTableFormat(), TableFormat.HUDI);
   }
 
@@ -68,8 +62,7 @@ public class TestTableFormatClientFactory {
     TargetClient tc =
         TableFormatClientFactory.getInstance().createTargetClientForName(TableFormat.ICEBERG);
     assertNotNull(tc);
-    PerTableConfig perTableConfig =
-        getPerTableConfig(Arrays.asList(TableFormat.ICEBERG), SyncMode.INCREMENTAL);
+    TargetTable perTableConfig = getPerTableConfig(TableFormat.ICEBERG);
     Configuration conf = new Configuration();
     conf.setStrings("spark.master", "local");
     tc.init(perTableConfig, conf);
@@ -88,22 +81,18 @@ public class TestTableFormatClientFactory {
 
   @Test
   public void testTableClientFromFormatType() {
-    PerTableConfig perTableConfig =
-        getPerTableConfig(Arrays.asList(TableFormat.DELTA), SyncMode.INCREMENTAL);
+    TargetTable perTableConfig = getPerTableConfig(TableFormat.DELTA);
     Configuration conf = new Configuration();
     conf.setStrings("spark.master", "local");
-    TargetClient tc =
-        TableFormatClientFactory.getInstance()
-            .createForFormat(TableFormat.DELTA, perTableConfig, conf);
+    TargetClient tc = TableFormatClientFactory.getInstance().createForFormat(perTableConfig, conf);
     assertEquals(tc.getTableFormat(), TableFormat.DELTA);
   }
 
-  private PerTableConfig getPerTableConfig(List<String> targetTableFormats, SyncMode syncMode) {
-    return PerTableConfigImpl.builder()
-        .tableName(getTableName())
-        .tableBasePath("/tmp/doesnt/matter")
-        .targetTableFormats(targetTableFormats)
-        .syncMode(syncMode)
+  private TargetTable getPerTableConfig(String tableFormat) {
+    return TargetTable.builder()
+        .name(getTableName())
+        .basePath("/tmp/doesnt/matter")
+        .formatName(tableFormat)
         .build();
   }
 }

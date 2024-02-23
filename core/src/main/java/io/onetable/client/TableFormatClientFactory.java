@@ -42,15 +42,14 @@ public class TableFormatClientFactory {
    * params.
    *
    * @param tableFormat
-   * @param perTableConfig
+   * @param targetTable
    * @param configuration
    * @return
    */
-  public TargetClient createForFormat(
-      String tableFormat, PerTableConfig perTableConfig, Configuration configuration) {
-    TargetClient targetClient = createTargetClientForName(tableFormat);
+  public TargetClient createForFormat(TargetTable targetTable, Configuration configuration) {
+    TargetClient targetClient = createTargetClientForName(targetTable.getFormatName());
 
-    targetClient.init(perTableConfig, configuration);
+    targetClient.init(targetTable, configuration);
     return targetClient;
   }
 

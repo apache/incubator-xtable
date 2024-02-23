@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -52,7 +51,7 @@ import io.onetable.spi.sync.TargetClient;
 
 /**
  * Responsible for completing the entire lifecycle of the sync process given {@link
- * PerTableConfigImpl}. This is done in three steps,
+ * TableSyncConfig}. This is done in three steps,
  *
  * <ul>
  *   <li>1. Extracting snapshot {@link OneSnapshot} from the source table format.
@@ -77,26 +76,27 @@ public class OneTableClient {
    * @param config A per table level config containing tableBasePath, partitionFieldSpecConfig,
    *     targetTableFormats and syncMode
    * @param sourceClientProvider A provider for the source client instance, {@link
-   *     SourceClientProvider#init(Configuration, Map)} must be called before calling this method.
+   *     SourceClientProvider#init(Configuration)} must be called before calling this method.
    * @return Returns a map containing the table format, and it's sync result. Run sync for a table
    *     with the provided per table level configuration.
    */
   public <COMMIT> Map<String, SyncResult> sync(
-      PerTableConfig config, SourceClientProvider<COMMIT> sourceClientProvider) {
-    if (config.getTargetTableFormats() == null || config.getTargetTableFormats().isEmpty()) {
+      TableSyncConfig config, SourceClientProvider<COMMIT> sourceClientProvider) {
+    if (config.getTargetTables() == null || config.getTargetTables().isEmpty()) {
       throw new IllegalArgumentException("Please provide at-least one format to sync");
     }
 
-    try (SourceClient<COMMIT> sourceClient = sourceClientProvider.getSourceClientInstance(config)) {
+    try (SourceClient<COMMIT> sourceClient =
+        sourceClientProvider.getSourceClientInstance(
+            config.getSourceTable(), config.getProperties())) {
       ExtractFromSource<COMMIT> source = ExtractFromSource.of(sourceClient);
 
       Map<String, TargetClient> syncClientByFormat =
-          config.getTargetTableFormats().stream()
+          config.getTargetTables().stream()
               .collect(
                   Collectors.toMap(
-                      Function.identity(),
-                      tableFormat ->
-                          tableFormatClientFactory.createForFormat(tableFormat, config, conf)));
+                      TargetTable::getFormatName,
+                      targetTable -> tableFormatClientFactory.createForFormat(targetTable, conf)));
       // State for each TableFormat
       Map<String, Optional<OneTableMetadata>> lastSyncMetadataByFormat =
           syncClientByFormat.entrySet().stream()
@@ -147,11 +147,11 @@ public class OneTableClient {
   }
 
   private <COMMIT> Map<String, TargetClient> getFormatsToSyncIncrementally(
-      PerTableConfig perTableConfig,
+      TableSyncConfig syncConfig,
       Map<String, TargetClient> syncClientByFormat,
       Map<String, Optional<OneTableMetadata>> lastSyncMetadataByFormat,
       SourceClient<COMMIT> sourceClient) {
-    if (perTableConfig.getSyncMode() == SyncMode.FULL) {
+    if (syncConfig.getSyncMode() == SyncMode.FULL) {
       // Full sync requested by config, hence no incremental sync.
       return Collections.emptyMap();
     }
