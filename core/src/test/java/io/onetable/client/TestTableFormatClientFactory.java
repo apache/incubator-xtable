@@ -45,7 +45,7 @@ public class TestTableFormatClientFactory {
     PerTableConfig perTableConfig =
         getPerTableConfig(Arrays.asList(TableFormat.DELTA), SyncMode.INCREMENTAL);
     Configuration conf = new Configuration();
-    conf.setStrings("spark.master", "local");
+    conf.set("spark.master", "local");
     tc.init(perTableConfig, conf);
     assertEquals(tc.getTableFormat(), TableFormat.DELTA);
   }

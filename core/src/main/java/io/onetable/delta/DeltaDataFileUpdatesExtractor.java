@@ -115,6 +115,7 @@ public class DeltaDataFileUpdatesExtractor {
             dataFile.getLastModified(),
             true,
             getColumnStats(schema, dataFile.getRecordCount(), dataFile.getColumnStats()),
+            null,
             null));
   }
 

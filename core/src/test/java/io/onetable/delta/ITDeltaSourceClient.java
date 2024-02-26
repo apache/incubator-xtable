@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
@@ -127,7 +128,7 @@ public class ITDeltaSourceClient {
             .config("spark.databricks.delta.schema.autoMerge.enabled", "true")
             .config("spark.sql.shuffle.partitions", "1")
             .config("spark.default.parallelism", "1")
-            .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+            .config("spark.serializer", KryoSerializer.class.getName())
             .getOrCreate();
   }
 
