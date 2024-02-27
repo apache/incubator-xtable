@@ -129,7 +129,6 @@ public class HudiTestUtil {
         .set("spark.sql.shuffle.partitions", "1")
         .set("spark.default.parallelism", "1")
         .set("spark.sql.session.timeZone", "UTC")
-        .set("spark.sql.iceberg.handle-timestamp-without-timezone", "true")
         .set("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .set("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
         .set("spark.databricks.delta.retentionDurationCheck.enabled", "false")

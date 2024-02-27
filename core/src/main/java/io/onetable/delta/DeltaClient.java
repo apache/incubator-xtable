@@ -33,6 +33,7 @@ import lombok.ToString;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.catalyst.expressions.Literal;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
@@ -202,7 +203,8 @@ public class DeltaClient implements TargetClient {
   @Override
   public Optional<OneTableMetadata> getTableMetadata() {
     return OneTableMetadata.fromMap(
-        JavaConverters.mapAsJavaMapConverter(deltaLog.metadata().configuration()).asJava());
+        JavaConverters.mapAsJavaMapConverter(deltaLog.snapshot().metadata().configuration())
+            .asJava());
   }
 
   @Override
@@ -256,8 +258,10 @@ public class DeltaClient implements TargetClient {
               JavaConverters.asScalaBuffer(partitionColumns).toList(),
               ScalaUtils.convertJavaMapToScala(getConfigurationsForDeltaSync()),
               new Some<>(commitTime.toEpochMilli()));
-      transaction.updateMetadata(metadata);
-      transaction.commit(actions, new DeltaOperations.Update(Option.apply("onetable-delta-sync")));
+      transaction.updateMetadata(metadata, false);
+      transaction.commit(
+          actions,
+          new DeltaOperations.Update(Option.apply(Literal.fromObject("onetable-delta-sync"))));
     }
 
     private Map<String, String> getConfigurationsForDeltaSync() {
@@ -290,7 +294,7 @@ public class DeltaClient implements TargetClient {
         }
       }
       // fallback to existing deltalog value
-      return deltaLog.metadata().format();
+      return deltaLog.snapshot().metadata().format();
     }
   }
 }

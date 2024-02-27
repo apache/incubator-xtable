@@ -120,7 +120,7 @@ public class TestDeltaStatsExtractor {
 
     String stats =
         DeltaStatsExtractor.getInstance().convertStatsToDeltaFormat(schema, 50L, columnStats);
-    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null);
+    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
     DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
     List<ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
 
@@ -148,7 +148,7 @@ public class TestDeltaStatsExtractor {
     deltaStats.put("nullCount", nullValues);
     deltaStats.put("numRecords", 100);
     String stats = MAPPER.writeValueAsString(deltaStats);
-    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null);
+    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
     DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
     List<ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
 
