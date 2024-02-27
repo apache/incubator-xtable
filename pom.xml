@@ -24,12 +24,12 @@
         <lombok.version>1.18.30</lombok.version>
         <hudi.version>0.14.0</hudi.version>
         <parquet.version>1.12.2</parquet.version>
-        <scala.version>2.12.10</scala.version>
+        <scala.version>2.12.12</scala.version>
         <scala.version.prefix>2.12</scala.version.prefix>
-        <spark.version>3.2.1</spark.version>
-        <spark.version.prefix>3.2</spark.version.prefix>
+        <spark.version>3.4.2</spark.version>
+        <spark.version.prefix>3.4</spark.version.prefix>
         <iceberg.version>1.4.2</iceberg.version>
-        <delta.version>2.0.2</delta.version>
+        <delta.version>2.4.0</delta.version>
         <jackson.version>2.14.2</jackson.version>
         <test.plugin.version>2.22.2</test.plugin.version>
         <spotless.version>2.27.2</spotless.version>
@@ -165,7 +165,7 @@
             </dependency>
             <dependency>
                 <groupId>org.apache.hudi</groupId>
-                <artifactId>hudi-utilities_2.12</artifactId>
+                <artifactId>hudi-sync-common</artifactId>
                 <version>${hudi.version}</version>
                 <scope>provided</scope>
             </dependency>

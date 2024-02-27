@@ -107,8 +107,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
     OneTable tableAtVersion = tableExtractor.table(deltaLog, tableName, versionNumber);
     // Client to call getCommitsBacklog and call this method.
     List<Action> actionsForVersion = getChangesState().getActionsForVersion(versionNumber);
-    Snapshot snapshotAtVersion =
-        deltaLog.getSnapshotAt(versionNumber, Option.empty(), Option.empty());
+    Snapshot snapshotAtVersion = deltaLog.getSnapshotAt(versionNumber, Option.empty());
     FileFormat fileFormat =
         actionsConverter.convertToOneTableFileFormat(
             snapshotAtVersion.metadata().format().provider());

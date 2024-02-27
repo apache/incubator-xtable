@@ -34,7 +34,7 @@
         </dependency>
         <dependency>
             <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-utilities_2.12</artifactId>
+            <artifactId>hudi-sync-common</artifactId>
             <scope>provided</scope>
         </dependency>
         <dependency>

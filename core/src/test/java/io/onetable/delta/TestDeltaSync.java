@@ -60,7 +60,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.spark.sql.delta.GeneratedColumn;
 
-import scala.Option;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 import io.delta.standalone.DeltaLog;
@@ -334,8 +333,7 @@ public class TestDeltaSync {
             .expr();
     org.apache.spark.sql.delta.DeltaLog deltaLog =
         org.apache.spark.sql.delta.DeltaLog.forTable(sparkSession, basePath.toString());
-    org.apache.spark.sql.delta.Snapshot snapshot =
-        deltaLog.getSnapshotAtInit(Option.empty()).snapshot();
+    org.apache.spark.sql.delta.Snapshot snapshot = deltaLog.getSnapshotAtInit().snapshot();
     Seq<org.apache.spark.sql.catalyst.expressions.Expression> expressionSeq =
         scala.collection.JavaConversions.asScalaBuffer(Collections.singletonList(expression));
     Seq<org.apache.spark.sql.catalyst.expressions.Expression> translatedExpression =
@@ -485,6 +483,10 @@ public class TestDeltaSync {
             .setAppName("testdeltasync")
             .set("spark.serializer", KryoSerializer.class.getName())
             .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
+            .set("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+            .set(
+                "spark.sql.catalog.spark_catalog",
+                "org.apache.spark.sql.delta.catalog.DeltaCatalog")
             .set("spark.master", "local[2]");
     return SparkSession.builder().config(sparkConf).getOrCreate();
   }

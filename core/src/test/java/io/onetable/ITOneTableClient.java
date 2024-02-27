@@ -676,7 +676,7 @@ public class ITOneTableClient {
       Assertions.assertEquals(1, snapshotCount);
       // assert that proper settings are enabled for delta log
       DeltaLog deltaLog = DeltaLog.forTable(sparkSession, table.getBasePath());
-      Assertions.assertTrue(deltaLog.enableExpiredLogCleanup());
+      Assertions.assertTrue(deltaLog.enableExpiredLogCleanup(deltaLog.snapshot().metadata()));
     }
   }
 
