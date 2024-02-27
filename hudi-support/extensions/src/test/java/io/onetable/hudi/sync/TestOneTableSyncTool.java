@@ -77,6 +77,8 @@ public class TestOneTableSyncTool {
     spark = SparkSession.builder().config(sparkConf).getOrCreate();
   }
 
+  @ParameterizedTest
+  @MethodSource(value = "testCases")
   public void testSync(String partitionPath) {
     String tableName = "table-" + UUID.randomUUID();
     String path = tempDir.toUri() + "/" + tableName;
