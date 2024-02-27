@@ -484,7 +484,9 @@ public class TestDeltaSync {
             .set("spark.serializer", KryoSerializer.class.getName())
             .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
             .set("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
-            .set("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+            .set(
+                "spark.sql.catalog.spark_catalog",
+                "org.apache.spark.sql.delta.catalog.DeltaCatalog")
             .set("spark.master", "local[2]");
     return SparkSession.builder().config(sparkConf).getOrCreate();
   }
