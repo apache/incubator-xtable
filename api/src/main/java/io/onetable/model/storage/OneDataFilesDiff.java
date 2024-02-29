@@ -18,27 +18,20 @@
  
 package io.onetable.model.storage;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import lombok.Builder;
-import lombok.Singular;
+import lombok.EqualsAndHashCode;
 import lombok.Value;
+import lombok.experimental.SuperBuilder;
 
 /** Container for holding the list of files added and files removed between source and target. */
 @Value
-@Builder
-public class OneDataFilesDiff {
-  @Singular("fileAdded")
-  Set<OneDataFile> filesAdded;
-
-  @Singular("fileRemoved")
-  Set<OneDataFile> filesRemoved;
+@EqualsAndHashCode(callSuper = true)
+@SuperBuilder
+public class OneDataFilesDiff extends DataFilesDiff<OneDataFile, OneDataFile> {
 
   /**
    * Creates a OneDataFilesDiff from the list of files in the target table and the list of files in
@@ -52,19 +45,14 @@ public class OneDataFilesDiff {
     Map<String, OneDataFile> targetPaths =
         target.stream()
             .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
-    // Any files in the source that are not in the target are added
-    Set<OneDataFile> addedFiles =
+    Map<String, OneDataFile> sourcePaths =
         source.stream()
-            .map(
-                file -> {
-                  OneDataFile targetFileIfPresent = targetPaths.remove(file.getPhysicalPath());
-                  return targetFileIfPresent == null ? file : null;
-                })
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
-    // Any files remaining in the targetPaths map are not present in the source and should be marked
-    // for removal
-    Set<OneDataFile> removedFiles = new HashSet<>(targetPaths.values());
-    return OneDataFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
+            .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
+
+    DataFilesDiff<OneDataFile, OneDataFile> diff = findNewAndRemovedFiles(sourcePaths, targetPaths);
+    return OneDataFilesDiff.builder()
+        .filesAdded(diff.getFilesAdded())
+        .filesRemoved(diff.getFilesRemoved())
+        .build();
   }
 }

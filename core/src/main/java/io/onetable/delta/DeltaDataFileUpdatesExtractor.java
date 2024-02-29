@@ -39,6 +39,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 
 import io.onetable.model.schema.OneSchema;
 import io.onetable.model.stat.ColumnStat;
+import io.onetable.model.storage.DataFilesDiff;
 import io.onetable.model.storage.OneDataFile;
 import io.onetable.model.storage.OneDataFilesDiff;
 import io.onetable.model.storage.OneFileGroup;
@@ -63,7 +64,7 @@ public class DeltaDataFileUpdatesExtractor {
     // all files in the current delta snapshot are potential candidates for remove actions, i.e. if
     // the file is not present in the new snapshot (addedFiles) then the file is considered removed
     Snapshot snapshot = deltaLog.snapshot();
-    Map<String, Action> removedFiles =
+    Map<String, Action> previousFiles =
         snapshot.allFiles().collectAsList().stream()
             .map(AddFile::remove)
             .collect(
@@ -71,19 +72,11 @@ public class DeltaDataFileUpdatesExtractor {
                     file -> DeltaActionsConverter.getFullPathToFile(snapshot, file.path()),
                     file -> file));
 
-    Set<OneDataFile> addedFiles =
-        partitionedDataFiles.stream()
-            .flatMap(group -> group.getFiles().stream())
-            .map(
-                file -> {
-                  Action targetFileIfPresent = removedFiles.remove(file.getPhysicalPath());
-                  return targetFileIfPresent == null ? file : null;
-                })
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
+    DataFilesDiff<OneDataFile, Action> diff =
+        OneDataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
     return applyDiff(
-        addedFiles, removedFiles.values(), tableSchema, deltaLog.dataPath().toString());
+        diff.getFilesAdded(), diff.getFilesRemoved(), tableSchema, deltaLog.dataPath().toString());
   }
 
   public Seq<Action> applyDiff(
@@ -122,6 +115,7 @@ public class DeltaDataFileUpdatesExtractor {
             dataFile.getLastModified(),
             true,
             getColumnStats(schema, dataFile.getRecordCount(), dataFile.getColumnStats()),
+            null,
             null));
   }
 
