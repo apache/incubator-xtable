@@ -16,7 +16,7 @@ This document walks through the steps to register a XTable synced table on Hive 
 2. A compute instance where you can run Apache Spark. This can be your local machine, docker,
    or a distributed system like Amazon EMR, Google Cloud's Dataproc, Azure HDInsight etc.
    This is a required step to register the table in HMS using a Spark client.
-3. Clone the XTable [repository](https://github.com/onetable-io/onetable) and create the
+3. Clone the XTable [repository](https://github.com/apache/incubator-xtable) and create the
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup) 
 4. This guide also assumes that you have configured the Hive Metastore locally or on EMR/Dataproc/HDInsight
    and is already running.

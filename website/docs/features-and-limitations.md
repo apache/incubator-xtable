@@ -29,7 +29,7 @@ This sync provides users with the following:
   - the metadata table (`hoodie.metadata.enable=true`) and 
   - hive style partitioning (`hoodie.datasource.write.hive_style_partitioning=true`) wherever applicable when reading the data.
 - Be sure to enable `parquet.avro.write-old-list-structure=false` for proper compatibility with lists when syncing from Hudi to Iceberg.
-- When using Hudi as the source for an Iceberg target, you may require field IDs set in the parquet schema. To enable that, follow the instructions [here](https://github.com/onetable-io/onetable/tree/main/hudi-support/extensions).
+- When using Hudi as the source for an Iceberg target, you may require field IDs set in the parquet schema. To enable that, follow the instructions [here](https://github.com/apache/incubator-xtable/tree/main/hudi-support/extensions).
 
 ### Delta
 - When using Delta as the source for an Iceberg target, you may require field IDs set in the parquet schema. To enable that, follow the instructions for enabling column mapping [here](https://docs.delta.io/latest/delta-column-mapping.html).

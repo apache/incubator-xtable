@@ -18,7 +18,7 @@ This document walks through the steps to register a XTable synced table in Glue 
    [AWS docs](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and
    also set up access credentials by following the steps
    [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html)
-3. Clone the XTable [repository](https://github.com/onetable-io/onetable) and create the
+3. Clone the XTable [repository](https://github.com/apache/incubator-xtable) and create the
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 
 ## Steps

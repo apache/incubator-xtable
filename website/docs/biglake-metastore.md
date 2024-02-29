@@ -24,7 +24,7 @@ This document walks through the steps to register a XTable synced Iceberg table 
    ```shell
    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service_account_key.json
    ```
-5. Clone the XTable [repository](https://github.com/onetable-io/onetable) and create the
+5. Clone the XTable [repository](https://github.com/apache/incubator-xtable) and create the
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 6. Download the [BigLake Iceberg JAR](gs://spark-lib/biglake/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar) locally.
    XTable requires the JAR to be present in the classpath.
