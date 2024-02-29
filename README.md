@@ -1,15 +1,15 @@
-# OneTable
+# XTable
 
 [![Build Status](https://dev.azure.com/apache-xtable-ci-org/apache-xtable-ci/_apis/build/status%2Fapachextable-ci.xtable-mirror?branchName=main)](https://dev.azure.com/apache-xtable-ci-org/apache-xtable-ci/_build/latest?definitionId=2&branchName=main)
 
-OneTable is an omni-directional converter for table formats that facilitates interoperability across data processing systems
+XTable is a cross-table converter for table formats that facilitates omni-directional interoperability across data processing systems
 and query engines.
-Currently, OneTable supports widely adopted open-source table formats such as Apache Hudi, Apache Iceberg, and Delta Lake.
+Currently, XTable supports widely adopted open-source table formats such as Apache Hudi, Apache Iceberg, and Delta Lake.
 
-OneTable simplifies data lake operations by leveraging a common model for table representation.
+XTable simplifies data lake operations by leveraging a common model for table representation.
 This allows users to write data in one format while still benefiting from integrations and features available in other
 formats.
-For instance, OneTable enables existing Hudi users to seamlessly work with Databricks's Photon Engine or query Iceberg
+For instance, XTable enables existing Hudi users to seamlessly work with Databricks's Photon Engine or query Iceberg
 tables with Snowflake.
 Creating transformations from one format to another is straightforward and only requires the implementation of a few interfaces,
 which we believe will facilitate the expansion of supported source and target formats in the future.
