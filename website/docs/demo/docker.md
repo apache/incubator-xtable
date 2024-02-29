@@ -3,22 +3,22 @@ sidebar_position: 1
 title: "Docker Demo"
 ---
 
-# Building interoperable tables using OneTable 
-This demo walks you through a fictional use case and the steps to add interoperability between table formats using OneTable.
+# Building interoperable tables using XTable 
+This demo walks you through a fictional use case and the steps to add interoperability between table formats using XTable.
 For this purpose, a self-contained data infrastructure is brought up as Docker containers within your computer.
 
 
 ## Pre-requisites
 * Install Docker in your local machine
-* Clone [OneTable GitHub repository](https://github.com/onetable-io/onetable)
+* Clone [XTable GitHub repository](https://github.com/onetable-io/onetable)
 
 :::note NOTE:
 This demo was tested in both x86-64 and AArch64 based macOS operating systems
 :::
 
 ## Setting up Docker cluster
-After cloning the OneTable repository, change directory to `demo` and run the `start_demo.sh` script.
-This script builds OneTable jars required for the demo and then spins up docker containers to start a Jupyter notebook
+After cloning the XTable repository, change directory to `demo` and run the `start_demo.sh` script.
+This script builds XTable jars required for the demo and then spins up docker containers to start a Jupyter notebook
 with Scala interpreter, Hive Metastore, Presto and Trino.
 
 ```shell md title="shell"

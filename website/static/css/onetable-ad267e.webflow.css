@@ -112,8 +112,8 @@
   background-image: url('../images/GR-BG1.svg'), linear-gradient(135deg, #04548c, #043c74);
   background-position: 0 0, 0 0;
   background-size: auto, auto;
-  padding-top: 130px;
-  padding-bottom: 130px;
+  padding-top: 40px;
+  padding-bottom: 80px;
 }
 
 .hero-container {
@@ -405,6 +405,16 @@
   display: flex;
 }
 
+.callout-section{
+  padding: 10px;
+  background: beige;
+  color: var(--black);
+  text-align: center;
+  /* text-transform: uppercase; */
+  /* margin-bottom: 40px; */
+  font-size: 16px;
+  line-height: 22px;
+}
 .logo-section {
   background-image: linear-gradient(#ecf1f4, #f7f7f8);
   padding-top: 120px;
@@ -874,8 +884,12 @@
 
 .image-8 {
   width: 100%;
+  height: 56px;
 }
-
+.xtable-title{
+  height: 120px;
+  margin-bottom: 10px;
+}
 .main-container-footer {
   max-width: 1200px;
   justify-content: space-between;
@@ -2771,4 +2785,9 @@
   font-weight: 700;
   font-style: italic;
   font-display: swap;
+}
+
+.footer__bottom text--center{
+  margin-left: 50px;
+  margin-right: 50px;
 }
