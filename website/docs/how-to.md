@@ -12,7 +12,7 @@ import TabItem from '@theme/TabItem';
 Using XTable to sync your source tables in different target format involves running sync on your 
 current dataset using a bundled jar. You can create this bundled jar by following the instructions 
 on the [Installation page](/docs/setup). Read through XTable's 
-[GitHub page](https://github.com/onetable-io/onetable#building-the-project-and-running-tests) for more information.
+[GitHub page](https://github.com/apache/incubator-xtable#building-the-project-and-running-tests) for more information.
 :::
 
 In this tutorial we will look at how to use XTable to add interoperability between table formats. 
@@ -23,7 +23,7 @@ history to enable proper point in time queries.
 ## Pre-requisites
 1. A compute instance where you can run Apache Spark. This can be your local machine, docker,
    or a distributed service like Amazon EMR, Google Cloud's Dataproc, Azure HDInsight etc
-2. Clone the XTable [repository](https://github.com/onetable-io/onetable) and create the
+2. Clone the XTable [repository](https://github.com/apache/incubator-xtable) and create the
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 3. Optional: Setup access to write to and/or read from distributed storage services like:
    * Amazon S3 by following the steps 

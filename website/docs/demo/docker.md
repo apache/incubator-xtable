@@ -10,7 +10,7 @@ For this purpose, a self-contained data infrastructure is brought up as Docker c
 
 ## Pre-requisites
 * Install Docker in your local machine
-* Clone [XTable GitHub repository](https://github.com/onetable-io/onetable)
+* Clone [XTable GitHub repository](https://github.com/apache/incubator-xtable)
 
 :::note NOTE:
 This demo was tested in both x86-64 and AArch64 based macOS operating systems

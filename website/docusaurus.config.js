@@ -7,7 +7,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'XTable',
-  favicon: 'images/onetable_favicon.png',
+  favicon: 'images/xtable-favicon.png',
   url: 'https://onetable.dev',
   baseUrl: '/',
 
@@ -50,7 +50,7 @@ const config = {
           alt: 'XTable Logo',
           href: 'pathname:///',
           target: '_self',
-          src: 'images/xtable.png',
+          src: 'images/xtable-icon.png',
         },
         items: [
           {
@@ -60,7 +60,7 @@ const config = {
             label: 'Docs',
           },
           {
-            href: 'https://github.com/onetable-io/onetable',
+            href: 'https://github.com/apache/incubator-xtable',
             label: 'GitHub',
             position: 'right',
           },
