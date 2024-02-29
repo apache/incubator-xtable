@@ -6,7 +6,7 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'OneTable',
+  title: 'XTable',
   favicon: 'images/onetable_favicon.png',
   url: 'https://onetable.dev',
   baseUrl: '/',
@@ -45,12 +45,12 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        title: 'OneTable',
+        title: 'XTable',
         logo: {
-          alt: 'OneTable Logo',
+          alt: 'XTable Logo',
           href: 'pathname:///',
           target: '_self',
-          src: 'images/OneTableLogo.png',
+          src: 'images/xtable.png',
         },
         items: [
           {

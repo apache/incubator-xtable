@@ -1,6 +1,6 @@
-# OneTable Website Source Code
+# XTable Website Source Code
 
-This repo hosts the source code of [OneTable](https://onetable.dev)
+This repo hosts the source code of [XTable](https://onetable.dev)
 
 ## Prerequisite
 
@@ -63,4 +63,4 @@ npm run serve
 
 
 ## Maintainers
-OneTable Community
+XTable Community
