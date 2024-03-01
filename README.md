@@ -1,8 +1,8 @@
-# XTable
+# Apache XTable (Incubating)
 
 [![Build Status](https://dev.azure.com/onetable-io/onetable-io/_apis/build/status%2Fonetable-io.onetable?branchName=main)](https://dev.azure.com/onetable-io/onetable-io/_build/latest?definitionId=1&branchName=main)
 
-XTable is a cross-table converter for table formats that facilitates omni-directional interoperability across data processing systems
+Apache XTable is a cross-table converter for table formats that facilitates omni-directional interoperability across data processing systems
 and query engines.
 Currently, XTable supports widely adopted open-source table formats such as Apache Hudi, Apache Iceberg, and Delta Lake.
 
