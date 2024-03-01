@@ -1,5 +1,5 @@
 ---
-title: "OneTable is now “Apache XTable”"
+title: "OneTable is now “Apache XTable (Incubating)”"
 excerpt: "XTable is now Incubating in the Apache Software Foundation"
 author: Dipankar Mazumdar, JB Onofré
 category: blog
@@ -11,7 +11,7 @@ tags:
 
 # OneTable is now “Apache XTable”
 
-Lakehouse table formats such as [Apache Hudi](https://hudi.apache.org/), [Delta Lake](https://delta.io/), and 
+Data Lakehouse table formats such as [Apache Hudi](https://hudi.apache.org/), [Delta Lake](https://delta.io/), and 
 [Apache Iceberg](https://iceberg.apache.org/) have enabled users to establish open foundations for their data architecture. 
 This 'openness' supports using the right compute engine for the right workload in a cost-efficient way. While this 
 flexibility has been rewarding, navigating the decision to select a single table format has unfolded as a new challenge. 

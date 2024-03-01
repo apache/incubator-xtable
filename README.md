@@ -1,8 +1,8 @@
-# XTable
+# Apache XTable (Incubating)
 
 [![Build Status](https://dev.azure.com/apache-xtable-ci-org/apache-xtable-ci/_apis/build/status%2Fapachextable-ci.xtable-mirror?branchName=main)](https://dev.azure.com/apache-xtable-ci-org/apache-xtable-ci/_build/latest?definitionId=2&branchName=main)
 
-XTable is a cross-table converter for table formats that facilitates omni-directional interoperability across data processing systems
+Apache XTable is a cross-table converter for table formats that facilitates omni-directional interoperability across data processing systems
 and query engines.
 Currently, XTable supports widely adopted open-source table formats such as Apache Hudi, Apache Iceberg, and Delta Lake.
 
