@@ -30,9 +30,9 @@ the project has transitioned the code repository to the Apache infrastructure an
 [community-driven development principles](https://community.apache.org/) of the Apache Foundation.
 
 While XTable is in its early phases, it has quickly been gaining significant momentum within the lakehouse community. 
-The project has already garnered over [560 GitHub stars](https://x.com/OnetableOSS/status/1725247462280196465?s=20), 
+The project has already garnered over [560 GitHub stars](https://x.com/apachextable/status/1725247462280196465?s=20), 
 more than 1000 clones and 70 forks, indicating a rapidly 
-[growing interest](https://x.com/OnetableOSS/status/1725685237215322294?s=20). Additionally, XTable has a diverse set 
+[growing interest](https://x.com/apachextable/status/1725685237215322294?s=20). Additionally, XTable has a diverse set 
 of contributors from organizations such as Microsoft, Onehouse, Google, Walmart, Adobe, Cloudera, and Dremio. With the 
 Apache incubation, we are also looking forward to connecting with more contributors who have similar interests in this space.
 
@@ -63,5 +63,5 @@ phase of the project are going to be critical as we build XTable together. Joini
 [XTable mailing list](mailto:dev-subscribe@xtable.apache.org) is another excellent way to stay informed and engage with 
 the project. We are really excited about the future of Apache XTable and building it together with the vibrant data community.
 
-Follow Apache XTable on [LinkedIn](https://www.linkedin.com/company/onetable-oss/) and [Twitter](https://twitter.com/OnetableOSS) 
+Follow Apache XTable on [LinkedIn](https://www.linkedin.com/company/apache-xtable/) and [Twitter](https://twitter.com/apachextable) 
 to keep up with the latest updates!
