@@ -9,7 +9,7 @@ tags:
 - community
 ---
 
-# OneTable is now “Apache XTable”
+# OneTable is now “Apache XTable (Incubating)”
 
 Data Lakehouse table formats such as [Apache Hudi](https://hudi.apache.org/), [Delta Lake](https://delta.io/), and 
 [Apache Iceberg](https://iceberg.apache.org/) have enabled users to establish open foundations for their data architecture. 
