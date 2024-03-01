@@ -1,6 +1,6 @@
-# XTable Website Source Code
+# Apache XTable (Incubating) Website Source Code
 
-This repo hosts the source code of [XTable](https://onetable.dev)
+This repo hosts the source code of [XTable](https://github.com/apache/incubator-xtable)
 
 ## Prerequisite
 
@@ -63,4 +63,4 @@ npm run serve
 
 
 ## Maintainers
-XTable Community
+[XTable Community](https://incubator.apache.org/projects/xtable.html)
