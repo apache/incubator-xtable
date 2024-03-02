@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.onetable.hudi;
 
 import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
