@@ -1,6 +1,6 @@
 # OneTable
 
-[![Build Status](https://dev.azure.com/onetable-io/onetable-io/_apis/build/status%2Fonetable-io.onetable?branchName=main)](https://dev.azure.com/onetable-io/onetable-io/_build/latest?definitionId=1&branchName=main)
+[![Build Status](https://dev.azure.com/apache-xtable-ci-org/apache-xtable-ci/_apis/build/status%2Fapachextable-ci.xtable-mirror?branchName=main)](https://dev.azure.com/apache-xtable-ci-org/apache-xtable-ci/_build/latest?definitionId=2&branchName=main)
 
 OneTable is an omni-directional converter for table formats that facilitates interoperability across data processing systems
 and query engines.

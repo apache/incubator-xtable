@@ -1,11 +1,7 @@
 trigger:
-- main
-
-pr:
-  autoCancel: true
   branches:
     include:
-    - main
+      - '*'  # must quote since "*" is a YAML reserved character; we want a string
 
 variables:
   MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
