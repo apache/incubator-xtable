@@ -31,10 +31,13 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import lombok.Builder;
@@ -416,12 +419,20 @@ public class ITHudiSourceClient {
       String commitInstant1 = table.startCommit();
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+      allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 
+      // This is the commit we're going to savepoint and restore to
       table.insertRecords(50, true);
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 
-      //  Restore to commitInstant2.
-      table.savepointRestoreForPreviousInstant();
+      List<HoodieRecord<HoodieAvroPayload>> recordList = table.insertRecords(50, true);
+      Set<String> baseFilePaths = new HashSet<>(table.getAllLatestBaseFilePaths());
+      table.upsertRecords(recordList.subList(0, 20), true);
+      baseFilePaths.addAll(table.getAllLatestBaseFilePaths());
+      // Note that restore removes all the new base files added by these two commits
+      allBaseFilePaths.add(new ArrayList<>(baseFilePaths));
+
+      table.savepointRestoreFromNthMostRecentInstant(2);
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 
       table.insertRecords(50, true);
@@ -444,7 +455,19 @@ public class ITHudiSourceClient {
         TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
         allTableChanges.add(tableChange);
       }
-      validateTableChanges(allBaseFilePaths, allTableChanges);
+
+      IntStream.range(0, allTableChanges.size() - 1)
+          .forEach(
+              i -> {
+                if (i == 1) {
+                  // Savepoint: no change
+                  validateTableChange(
+                      allBaseFilePaths.get(i), allBaseFilePaths.get(i), allTableChanges.get(i));
+                } else {
+                  validateTableChange(
+                      allBaseFilePaths.get(i), allBaseFilePaths.get(i + 1), allTableChanges.get(i));
+                }
+              });
     }
   }
 

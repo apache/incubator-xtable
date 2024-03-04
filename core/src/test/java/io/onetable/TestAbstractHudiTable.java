@@ -22,6 +22,7 @@ import static io.onetable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.apache.hudi.keygen.constant.KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -57,9 +58,9 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.LocalFileSystem;
-import org.junit.jupiter.api.Assertions;
 
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
+import org.apache.hudi.avro.model.HoodieRestoreMetadata;
 import org.apache.hudi.client.BaseHoodieWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.transaction.lock.InProcessLockProvider;
@@ -80,7 +81,9 @@ import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.model.WriteConcurrencyMode;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.marker.MarkerType;
+import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.JsonUtils;
 import org.apache.hudi.common.util.Option;
@@ -310,19 +313,27 @@ public abstract class TestAbstractHudiTable
   public void clean() {
     HoodieCleanMetadata metadata = getWriteClient().clean();
     // Assert that files are deleted to ensure test is realistic
-    Assertions.assertTrue(metadata.getTotalFilesDeleted() > 0);
+    assertTrue(metadata.getTotalFilesDeleted() > 0);
   }
 
   public void rollback(String commitInstant) {
     getWriteClient().rollback(commitInstant);
   }
 
-  public void savepointRestoreForPreviousInstant() {
+  /**
+   * Restore to nth latest instant. 1 means restore to the previous instant, 2 would be the instant
+   * before that, and so on. 0 would mean restore to the latest instant which doesn't make sense to
+   * do.
+   *
+   * @param n instant to restore from
+   */
+  public void savepointRestoreFromNthMostRecentInstant(int n) {
     List<HoodieInstant> commitInstants =
         metaClient.getActiveTimeline().reload().getCommitsTimeline().getInstants();
-    HoodieInstant instantToRestore = commitInstants.get(commitInstants.size() - 2);
+    HoodieInstant instantToRestore = commitInstants.get(commitInstants.size() - 1 - n);
     getWriteClient().savepoint(instantToRestore.getTimestamp(), "user", "savepoint-test");
     getWriteClient().restoreToSavepoint(instantToRestore.getTimestamp());
+    assertMergeOnReadRestoreContainsLogFiles();
   }
 
   public List<HoodieBaseFile> getAllLatestBaseFiles(HoodieTableFileSystemView fsView) {
@@ -331,6 +342,37 @@ public abstract class TestAbstractHudiTable
       return fsView.getLatestBaseFiles().collect(Collectors.toList());
     } finally {
       fsView.close();
+    }
+  }
+
+  public void assertMergeOnReadRestoreContainsLogFiles() {
+    if (metaClient.getTableConfig().getTableType() == HoodieTableType.MERGE_ON_READ) {
+      HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline().reload();
+      HoodieInstant restoreInstant = activeTimeline.getRestoreTimeline().firstInstant().get();
+      Option<byte[]> instantDetails = activeTimeline.getInstantDetails(restoreInstant);
+      try {
+        HoodieRestoreMetadata instantMetadata =
+            TimelineMetadataUtils.deserializeAvroMetadata(
+                instantDetails.get(), HoodieRestoreMetadata.class);
+        assertTrue(
+            instantMetadata.getHoodieRestoreMetadata().values().stream()
+                .flatMap(
+                    list ->
+                        list.stream()
+                            .flatMap(
+                                rollbackMetadata ->
+                                    rollbackMetadata.getPartitionMetadata().values().stream()
+                                        .flatMap(
+                                            partitionMetadata ->
+                                                partitionMetadata
+                                                    .getSuccessDeleteFiles()
+                                                    .stream())))
+                .map(uri -> FSUtils.isLogFile(new org.apache.hadoop.fs.Path(uri).getName()))
+                .reduce((a, b) -> a || b)
+                .get());
+      } catch (IOException e) {
+        throw new UncheckedIOException("Cannot deserialize restore metadata", e);
+      }
     }
   }
 
