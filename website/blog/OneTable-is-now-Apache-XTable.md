@@ -1,5 +1,5 @@
 ---
-title: "OneTable is now “Apache XTable (Incubating)”"
+title: "OneTable is now “Apache XTable™ (Incubating)”"
 excerpt: "XTable is now Incubating in the Apache Software Foundation"
 author: Dipankar Mazumdar, JB Onofré
 category: blog
@@ -9,7 +9,7 @@ tags:
 - community
 ---
 
-# OneTable is now “Apache XTable (Incubating)”
+# OneTable is now “Apache XTable™ (Incubating)”
 
 Data Lakehouse table formats such as [Apache Hudi](https://hudi.apache.org/), [Delta Lake](https://delta.io/), and 
 [Apache Iceberg](https://iceberg.apache.org/) have enabled users to establish open foundations for their data architecture. 
@@ -25,7 +25,7 @@ rewrite or duplicate the actual data files.
 The goal of OneTable was to anchor its success in neutrality, guided by strong community values. From the very beginning, 
 the project[ expressed its desire](https://cwiki.apache.org/confluence/display/INCUBATOR/XTable+Proposal) to be incubated 
 under the [Apache Software Foundation](https://www.apache.org/). Today, we are excited to announce that OneTable has been 
-accepted as an incubating project by Apache and will henceforth be known as **Apache XTable**. As part of the incubation, 
+accepted as an incubating project by Apache and will henceforth be known as **Apache XTable™**. As part of the incubation, 
 the project has transitioned the code repository to the Apache infrastructure and adopted the 
 [community-driven development principles](https://community.apache.org/) of the Apache Foundation.
 
@@ -53,7 +53,7 @@ the public good.
 <img src="/images/blog/XTable/xtable-docs.png" alt="drawing" style={{width:'80%', display:'block', marginLeft:'auto', 
 marginRight:'auto', marginTop:'18pt', marginBottom:'18pt'}} />
 
-For those interested in exploring Apache XTable, the official website is a good starting point. The documentation 
+For those interested in exploring Apache XTable™, the official website is a good starting point. The documentation 
 section hosts a great hands-on [quickstart](https://onetable.dev/docs/how-to) guide to getting acquainted with XTable, 
 providing a straightforward way to experience its interoperability capabilities firsthand. If you have specific ideas, 
 questions, or seek direct interaction, the [discussions](https://github.com/onetable-io/onetable/discussions) section 
@@ -61,7 +61,7 @@ is available for more in-depth exchanges. We invite you to contribute to the pro
 filling issues to the [XTable GitHub repository](https://github.com/apache/incubator-xtable). Contributions in the early 
 phase of the project are going to be critical as we build XTable together. Joining the 
 [XTable mailing list](mailto:dev-subscribe@xtable.apache.org) is another excellent way to stay informed and engage with 
-the project. We are really excited about the future of Apache XTable and building it together with the vibrant data community.
+the project. We are really excited about the future of Apache XTable™ and building it together with the vibrant data community.
 
-Follow Apache XTable on [LinkedIn](https://www.linkedin.com/company/apache-xtable/) and [Twitter](https://twitter.com/apachextable) 
+Follow Apache XTable™ on [LinkedIn](https://www.linkedin.com/company/apache-xtable/) and [Twitter](https://twitter.com/apachextable) 
 to keep up with the latest updates!
