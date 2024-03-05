@@ -14,7 +14,7 @@ Iceberg on Snowflake is currently supported in
 :::
 
 ## Steps:
-These are high level steps to help you integrate XTable synced Iceberg tables on Snowflake. For more additional information
+These are high level steps to help you integrate Apache XTable™ (Incubating) synced Iceberg tables on Snowflake. For more additional information
 refer to the [Getting started with Iceberg tables](https://docs.snowflake.com/LIMITEDACCESS/iceberg-2023/tables-iceberg-getting-started).
 
 ### Create an external volume
