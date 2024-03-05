@@ -3,14 +3,14 @@ sidebar_position: 1
 title: "Docker Demo"
 ---
 
-# Building interoperable tables using XTable 
-This demo walks you through a fictional use case and the steps to add interoperability between table formats using XTable.
+# Building interoperable tables using Apache XTable™ (Incubating) 
+This demo walks you through a fictional use case and the steps to add interoperability between table formats using Apache XTable™.
 For this purpose, a self-contained data infrastructure is brought up as Docker containers within your computer.
 
 
 ## Pre-requisites
 * Install Docker in your local machine
-* Clone [XTable GitHub repository](https://github.com/apache/incubator-xtable)
+* Clone [Apache XTable™ GitHub repository](https://github.com/apache/incubator-xtable)
 
 :::note NOTE:
 This demo was tested in both x86-64 and AArch64 based macOS operating systems

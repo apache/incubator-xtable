@@ -7,7 +7,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Syncing to Hive Metastore
-This document walks through the steps to register a XTable synced table on Hive Metastore (HMS).
+This document walks through the steps to register an Apache XTable™ (Incubating) synced table on Hive Metastore (HMS).
 
 ## Pre-requisites
 1. Source table(s) (Hudi/Delta/Iceberg) already written to your local storage or external storage locations like S3/GCS/ADLS. 

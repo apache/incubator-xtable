@@ -8,8 +8,8 @@ import TabItem from '@theme/TabItem';
 
 # Querying from Microsoft Fabric
 This guide offers a short tutorial on how to query Apache Iceberg and Apache Hudi tables in Microsoft Fabric utilizing 
-the translation capabilities of XTable. This tutorial is intended solely for demonstration and to verify the 
-compatibility of XTable's output with Fabric. The tutorial leverages the currently[^1] available features in Fabric, like 
+the translation capabilities of Apache XTable™ (Incubating). This tutorial is intended solely for demonstration and to verify the 
+compatibility of Apache XTable™'s output with Fabric. The tutorial leverages the currently[^1] available features in Fabric, like 
 `Shortcuts`.
 
 
@@ -26,7 +26,7 @@ to data in other file systems.
 
 ## Tutorial
 The objective of the following tutorial is to translate an Iceberg or Hudi table in ADLS storage account into Delta Lake
-format using XTable. After translation, this table will be accessible for querying from various Fabric engines,
+format using Apache XTable™. After translation, this table will be accessible for querying from various Fabric engines,
 including T-SQL, Spark, and Power BI.
 
 ### Pre-requisites
@@ -51,8 +51,8 @@ spark.hadoop.fs.azure.account.oauth2.client.id=<client-id>
 spark.hadoop.fs.azure.account.oauth2.client.secret=<client-secret>
 ```
 
-### Step 2. Translate source table to Delta Lake format using XTable
-This step translates the table `people` originally in Iceberg or Hudi format to Delta Lake format using XTable.
+### Step 2. Translate source table to Delta Lake format using Apache XTable™
+This step translates the table `people` originally in Iceberg or Hudi format to Delta Lake format using Apache XTable™.
 The primary actions for the translation are documented in 
 [Creating your first interoperable table - Running Sync](/docs/how-to#running-sync) tutorial section. 
 However, since the table is in ADLS, you need to update datasets path and hadoop configurations.
