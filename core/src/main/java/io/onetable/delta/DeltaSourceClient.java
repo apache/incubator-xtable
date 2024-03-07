@@ -40,6 +40,7 @@ import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import scala.Option;
+
 import io.delta.tables.DeltaTable;
 
 import io.onetable.exception.OneIOException;

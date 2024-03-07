@@ -61,6 +61,7 @@ import org.apache.spark.sql.delta.GeneratedColumn;
 
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
+
 import io.delta.standalone.DeltaLog;
 import io.delta.standalone.DeltaScan;
 import io.delta.standalone.Snapshot;

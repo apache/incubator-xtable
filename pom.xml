@@ -46,7 +46,7 @@
         <delta.version>2.4.0</delta.version>
         <jackson.version>2.14.2</jackson.version>
         <test.plugin.version>2.22.2</test.plugin.version>
-        <spotless.version>2.27.2</spotless.version>
+        <spotless.version>2.43.0</spotless.version>
         <google.java.format.version>1.8</google.java.format.version>
         <maven-enforcer-plugin.version>3.1.0</maven-enforcer-plugin.version>
         <delta.standalone.version>0.5.0</delta.standalone.version>
@@ -547,7 +547,7 @@
                             <groupArtifact>com.google.googlejavaformat:google-java-format</groupArtifact>
                         </googleJavaFormat>
                         <importOrder>
-                            <order>java,javax,org,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,com,io.onetable</order>
+                            <order>java,javax,lombok,org,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,scala,com,io.delta,io.onetable</order>
                         </importOrder>
                         <removeUnusedImports/>
                         <licenseHeader>
