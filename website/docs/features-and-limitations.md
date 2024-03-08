@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 ## Features
 Apache XTable™ (Incubating) provides users with the ability to translate metadata from one table format to another.  
 
-Apache XTable™ provides two sync modes, "incremental" and "full." The incremental mode is more lightweight and has better performance, especially on large tables. If there is anything that prevents the incremental mode from working properly, the tool will fall back to the full sync mode.
+Apache XTable™ (Incubating) provides two sync modes, "incremental" and "full." The incremental mode is more lightweight and has better performance, especially on large tables. If there is anything that prevents the incremental mode from working properly, the tool will fall back to the full sync mode.
 
 This sync provides users with the following:   
 1. Syncing of data files along with their column level statistics and partition metadata 

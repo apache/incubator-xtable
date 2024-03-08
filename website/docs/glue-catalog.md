@@ -18,12 +18,12 @@ This document walks through the steps to register an Apache XTable™ (Incubatin
    [AWS docs](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and
    also set up access credentials by following the steps
    [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html)
-3. Clone the Apache XTable™ [repository](https://github.com/apache/incubator-xtable) and create the
+3. Clone the Apache XTable™ (Incubating) [repository](https://github.com/apache/incubator-xtable) and create the
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 
 ## Steps
 ### Running sync
-Create `my_config.yaml` in the cloned Apache XTable™ directory.
+Create `my_config.yaml` in the cloned Apache XTable™ (Incubating) directory.
 
 <Tabs
 groupId="table-format"
@@ -193,6 +193,6 @@ SELECT * FROM onetable_synced_db.<table_name>;
 
 ## Conclusion
 In this guide we saw how to,
-1. sync a source table to create metadata for the desired target table formats using Apache XTable™
+1. sync a source table to create metadata for the desired target table formats using Apache XTable™ (Incubating)
 2. catalog the data in the target table format in Glue Data Catalog
 3. query the target table using Amazon Athena
