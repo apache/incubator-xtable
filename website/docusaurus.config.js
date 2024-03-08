@@ -45,9 +45,9 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        title: 'Apache XTable™',
+        title: 'Apache XTable™ (Incubating)',
         logo: {
-          alt: 'XTable Logo',
+          alt: 'Apache XTable™ (Incubating) Logo',
           href: 'pathname:///',
           target: '_self',
           src: 'images/xtable-icon.png',

@@ -4,7 +4,7 @@ title: "Unity Catalog"
 ---
 
 # Syncing to Unity Catalog
-This document walks through the steps to register a XTable synced Delta table in Unity Catalog on Databricks.
+This document walks through the steps to register an Apache XTable™ (Incubating) synced Delta table in Unity Catalog on Databricks.
 
 ## Pre-requisites
 1. Source table(s) (Hudi/Iceberg) already written to external storage locations like S3/GCS/ADLS.
@@ -16,12 +16,12 @@ This document walks through the steps to register a XTable synced Delta table in
    * Follow the steps outlined [here](https://docs.databricks.com/en/storage/azure-storage.html) for Azure Data Lake Storage Gen2 and Blob Storage.
 3. Create a Unity Catalog metastore in Databricks as outlined [here](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html#create-a-unity-catalog-metastore).
 4. Create an external location in Databricks as outlined [here](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-location.html).
-5. Clone the XTable [repository](https://github.com/apache/incubator-xtable) and create the
+5. Clone the Apache XTable™ (Incubating) [repository](https://github.com/apache/incubator-xtable) and create the
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 
 ## Steps
 ### Running sync
-Create `my_config.yaml` in the cloned XTable directory.
+Create `my_config.yaml` in the cloned Apache XTable™ (Incubating) directory.
 
 ```yaml md title="yaml"
 sourceFormat: HUDI|ICEBERG # choose only one
@@ -39,7 +39,7 @@ datasets:
 2. And replace with appropriate values for `sourceFormat`, and `tableName` fields. 
 :::
 
-From your terminal under the cloned XTable directory, run the sync process using the below command.
+From your terminal under the cloned Apache XTable™ (Incubating) directory, run the sync process using the below command.
 
 ```shell md title="shell"
 java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml

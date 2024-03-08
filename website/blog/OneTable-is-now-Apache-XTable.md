@@ -1,6 +1,6 @@
 ---
 title: "OneTable is now “Apache XTable™ (Incubating)”"
-excerpt: "XTable is now Incubating in the Apache Software Foundation"
+excerpt: "Apache XTable™ (Incubating) is now Incubating in the Apache Software Foundation"
 author: Dipankar Mazumdar, JB Onofré
 category: blog
 image: /images/blog/XTable/xtable-cover.png
