@@ -77,6 +77,6 @@ SELECT * FROM onetable.synced_delta_schema.<table_name>;
 
 ## Conclusion
 In this guide we saw how to,
-1. sync a source table to create metadata for the desired target table formats using XTable
+1. sync a source table to create metadata for the desired target table formats using Apache XTable™ (Incubating)
 2. catalog the data in Delta format in Unity Catalog on Databricks
 3. query the Delta table using Databricks SQL editor
