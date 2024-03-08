@@ -33,7 +33,7 @@ history to enable proper point in time queries.
    * Google Cloud Storage by following the steps 
    [here](https://cloud.google.com/iam/docs/keys-create-delete#creating)
 
-For the purpose of this tutorial, we will walk through the steps to using XTable locally.
+For the purpose of this tutorial, we will walk through the steps to using Apache XTable™ (Incubating) locally.
 
 ## Steps
 
@@ -348,7 +348,7 @@ Authentication for GCP requires service account credentials to be exported. i.e.
 `export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service_account_key.json`
 :::
 
-In your terminal under the cloned XTable directory, run the below command.
+In your terminal under the cloned Apache XTable™ (Incubating) directory, run the below command.
 
 ```shell md title="shell"
 java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
@@ -359,9 +359,9 @@ At this point, if you check your local path, you will be able to see the necessa
 commit history, partitions, and column stats that helps query engines to interpret the data in the target table format.
 
 ## Conclusion
-In this tutorial, we saw how to create a source table and use XTable to create the metadata files 
+In this tutorial, we saw how to create a source table and use Apache XTable™ (Incubating) to create the metadata files 
 that can be used to query the source table in different target table formats.
 
 ## Next steps
-Go through the [Catalog Integration guides](/docs/catalogs-index) to register the XTable synced tables
+Go through the [Catalog Integration guides](/docs/catalogs-index) to register the Apache XTable™ (Incubating) synced tables
 in different data catalogs.

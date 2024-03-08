@@ -7,7 +7,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Syncing to BigLake Metastore
-This document walks through the steps to register a XTable synced Iceberg table in BigLake Metastore on GCP.
+This document walks through the steps to register an Apache XTable™ (Incubating) synced Iceberg table in BigLake Metastore on GCP.
 
 ## Pre-requisites
 1. Source (Hudi/Delta) table(s) already written to Google Cloud Storage.
@@ -19,21 +19,21 @@ This document walks through the steps to register a XTable synced Iceberg table 
 3. To ensure that the Storage Account API's caller (your service account used by XTable) has the
    necessary permissions to write log/metadata files in GCS, ask your administrator to grant [Storage Object User](https://cloud.google.com/storage/docs/access-control/iam-roles) (roles/storage.objectUser)
    access to the service account.
-4. If you're running XTable outside GCP, you need to provide the machine access to interact with BigLake and GCS.
+4. If you're running Apache XTable™ (Incubating) outside GCP, you need to provide the machine access to interact with BigLake and GCS.
    To do so, store the permissions key for your service account in your machine using 
    ```shell
    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service_account_key.json
    ```
-5. Clone the XTable [repository](https://github.com/apache/incubator-xtable) and create the
+5. Clone the Apache XTable™ (Incubating) [repository](https://github.com/apache/incubator-xtable) and create the
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 6. Download the [BigLake Iceberg JAR](gs://spark-lib/biglake/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar) locally.
-   XTable requires the JAR to be present in the classpath.
+   Apache XTable™ (Incubating) requires the JAR to be present in the classpath.
 
 ## Steps
 :::danger Important:
 Currently BigLake Metastore is only accessible through Google's 
 [BigLake Rest APIs](https://cloud.google.com/bigquery/docs/reference/biglake/rest), and as such
-XTable requires you to setup the below items prior to running sync on your source dataset.
+Apache XTable™ (Incubating) requires you to setup the below items prior to running sync on your source dataset.
    * BigLake Catalog
    * BigLake Database
 :::
@@ -114,7 +114,7 @@ catalogOptions:
   warehouse: gs://path/to/warehouse
 ```
 
-From your terminal under the cloned XTable directory, run the sync process using the below command.
+From your terminal under the cloned Apache XTable™ (Incubating) directory, run the sync process using the below command.
 
 ```shell md title="shell"
 java -cp utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar:/path/to/downloaded/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar io.onetable.utilities.RunSync  --datasetConfig my_config.yaml --icebergCatalogConfig catalog.yaml
@@ -127,7 +127,7 @@ to interpret the data as an Iceberg table.
 :::
 
 ### Validating the results
-Once the sync succeeds, XTable would have written the table directly to BigLake Metastore.
+Once the sync succeeds, Apache XTable™ (Incubating) would have written the table directly to BigLake Metastore.
 We can use `Try this method` option on Google's REST reference docs for
 [`projects.locations.catalogs.databases.tables.get`](https://cloud.google.com/bigquery/docs/reference/biglake/rest/v1/projects.locations.catalogs.databases.tables/get)
 method to view the created table.

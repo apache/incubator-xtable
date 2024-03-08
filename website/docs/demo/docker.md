@@ -17,8 +17,8 @@ This demo was tested in both x86-64 and AArch64 based macOS operating systems
 :::
 
 ## Setting up Docker cluster
-After cloning the XTable repository, change directory to `demo` and run the `start_demo.sh` script.
-This script builds XTable jars required for the demo and then spins up docker containers to start a Jupyter notebook
+After cloning the Apache XTable™ (Incubating) repository, change directory to `demo` and run the `start_demo.sh` script.
+This script builds Apache XTable™ (Incubating) jars required for the demo and then spins up docker containers to start a Jupyter notebook
 with Scala interpreter, Hive Metastore, Presto and Trino.
 
 ```shell md title="shell"
