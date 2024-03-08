@@ -4,7 +4,7 @@ title: "Amazon Athena"
 ---
 
 # Querying from Amazon Athena
-To read a Apache XTable™ synced target table (regardless of the table format) in Amazon Athena,
+To read an Apache XTable™ synced target table (regardless of the table format) in Amazon Athena,
 you can create the table either by:
 * Using a DDL statement as mentioned in the following AWS docs:
     * [Example](https://docs.aws.amazon.com/athena/latest/ug/querying-hudi.html#querying-hudi-in-athena-creating-hudi-tables) for Hudi
