@@ -17,14 +17,14 @@ future.
 1. Use Java11 for building the project. If you are using some other java version, you can use [jenv](https://github.com/jenv/jenv) to use multiple java versions locally.
 2. Build the project using `mvn clean package`. Use `mvn clean package -DskipTests` to skip tests while building.
 3. Use `mvn clean test` or `mvn test` to run all unit tests. If you need to run only a specific test you can do this
-by something like `mvn test -Dtest=TestDeltaSync -pl core`.
+   by something like `mvn test -Dtest=TestDeltaSync -pl core`.
 4. Similarly, use `mvn clean verify` or `mvn verify` to run integration tests.
 
 # Style guide
 1. We use [Maven Spotless plugin](https://github.com/diffplug/spotless/tree/main/plugin-maven) and 
    [Google java format](https://github.com/google/google-java-format) for code style.
 2. Use `mvn spotless:check` to find out code style violations and `mvn spotless:apply` to fix them. 
-Code style check is tied to compile phase by default, so code style violations will lead to build failures.
+   Code style check is tied to compile phase by default, so code style violations will lead to build failures.
 
 # Running the bundled jar
 1. Get a pre-built bundled jar or create the jar with `mvn install -DskipTests`
@@ -58,14 +58,14 @@ datasets:
 - `tableDataPath` is an optional field specifying the path to the data files. If not specified, the tableBasePath will be used. For Iceberg source tables, you will need to specify the `/data` path.
 - `namespace` is an optional field specifying the namespace of the table and will be used when syncing to a catalog.
 - `partitionSpec` is a spec that allows us to infer partition values. This is only required for Hudi source tables. If the table is not partitioned, leave it blank. If it is partitioned, you can specify a spec with a comma separated list with format `path:type:format`
-    - `path` is a dot separated path to the partition field
-    - `type` describes how the partition value was generated from the column value
-        - `VALUE`: an identity transform of field value to partition value
-        - `YEAR`: data is partitioned by a field representing a date and year granularity is used
-        - `MONTH`: same as `YEAR` but with month granularity
-        - `DAY`: same as `YEAR` but with day granularity
-        - `HOUR`: same as `YEAR` but with hour granularity
-    - `format`: if your partition type is `YEAR`, `MONTH`, `DAY`, or `HOUR` specify the format for the date string as it appears in your file paths
+  - `path` is a dot separated path to the partition field
+  - `type` describes how the partition value was generated from the column value
+      - `VALUE`: an identity transform of field value to partition value
+      - `YEAR`: data is partitioned by a field representing a date and year granularity is used
+      - `MONTH`: same as `YEAR` but with month granularity
+      - `DAY`: same as `YEAR` but with day granularity
+      - `HOUR`: same as `YEAR` but with hour granularity
+  - `format`: if your partition type is `YEAR`, `MONTH`, `DAY`, or `HOUR` specify the format for the date string as it appears in your file paths
 3. The default implementations of table format clients can be replaced with custom implementations by specifying a client configs yaml file in the format below:
 ```yaml
 # sourceClientProviderClass: The class name of a table format's client factory, where the client is
@@ -93,9 +93,9 @@ catalogOptions: # all other options are passed through in a map
   key2: value2
 ```
 5. run with `java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--clientsConfig clients.yaml] [--icebergCatalogConfig catalog.yaml]`
-   The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Authentication for AWS is done with
-   `com.amazonaws.auth.DefaultAWSCredentialsProviderChain`. To override this setting, specify a different implementation
-   with the `--awsCredentialsProvider` option.
+The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Authentication for AWS is done with
+`com.amazonaws.auth.DefaultAWSCredentialsProviderChain`. To override this setting, specify a different implementation
+with the `--awsCredentialsProvider` option.
 
 # Contributing
 ## Setup
