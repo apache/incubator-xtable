@@ -223,6 +223,6 @@ SELECT * FROM iceberg_db.<table_name>;
 
 ## Conclusion
 In this guide we saw how to,
-1. sync a source table to create metadata for the desired target table formats using XTable
+1. sync a source table to create metadata for the desired target table formats using Apache XTable™ (Incubating) 
 2. catalog the data in the target table format in Hive Metastore
 3. query the target table using Spark

@@ -1,6 +1,6 @@
 # Apache XTable™ (Incubating) Website Source Code
 
-This repo hosts the source code of [Apache XTable™](https://github.com/apache/incubator-xtable)
+This repo hosts the source code of [Apache XTable™ (Incubating)](https://github.com/apache/incubator-xtable)
 
 ## Prerequisite
 
@@ -63,4 +63,4 @@ npm run serve
 
 
 ## Maintainers
-[Apache XTable™ Community](https://incubator.apache.org/projects/xtable.html)
+[Apache XTable™ (Incubating) Community](https://incubator.apache.org/projects/xtable.html)

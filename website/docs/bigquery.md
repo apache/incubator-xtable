@@ -10,7 +10,7 @@ To read an Apache XTable™ (Incubating) synced [Iceberg table from BigQuery](ht
 you have two options:
 
 #### [Using Iceberg JSON metadata file to create the Iceberg BigLake tables](https://cloud.google.com/bigquery/docs/iceberg-tables#create-using-metadata-file):
-Apache XTable™ outputs metadata files for Iceberg target format syncs which can be used by BigQuery
+Apache XTable™ (Incubating) outputs metadata files for Iceberg target format syncs which can be used by BigQuery
 to read the BigLake tables.
 
 ```sql md title="sql"
@@ -48,8 +48,8 @@ If you are not planning on using Iceberg, then you do not need to add these to y
 
 
 #### [Using BigLake Metastore to create the Iceberg BigLake tables](https://cloud.google.com/bigquery/docs/iceberg-tables#create-using-biglake-metastore):
-You can use two options to register Apache XTable™ synced Iceberg tables to BigLake Metastore:
-* To directly register the Apache XTable™ synced Iceberg table to BigLake Metastore,
+You can use two options to register Apache XTable™ (Incubating) synced Iceberg tables to BigLake Metastore:
+* To directly register the Apache XTable™ (Incubating) synced Iceberg table to BigLake Metastore,
   follow the [Apache XTable™ guide to integrate with BigLake Metastore](/docs/biglake-metastore)
 * Use [stored procedures for Spark](https://cloud.google.com/bigquery/docs/spark-procedures)
   on BigQuery to register the table in BigLake Metastore and query the tables from BigQuery.
