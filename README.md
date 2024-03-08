@@ -60,11 +60,11 @@ datasets:
 - `partitionSpec` is a spec that allows us to infer partition values. This is only required for Hudi source tables. If the table is not partitioned, leave it blank. If it is partitioned, you can specify a spec with a comma separated list with format `path:type:format`
   - `path` is a dot separated path to the partition field
   - `type` describes how the partition value was generated from the column value
-      - `VALUE`: an identity transform of field value to partition value
-      - `YEAR`: data is partitioned by a field representing a date and year granularity is used
-      - `MONTH`: same as `YEAR` but with month granularity
-      - `DAY`: same as `YEAR` but with day granularity
-      - `HOUR`: same as `YEAR` but with hour granularity
+    - `VALUE`: an identity transform of field value to partition value
+    - `YEAR`: data is partitioned by a field representing a date and year granularity is used
+    - `MONTH`: same as `YEAR` but with month granularity
+    - `DAY`: same as `YEAR` but with day granularity
+    - `HOUR`: same as `YEAR` but with hour granularity
   - `format`: if your partition type is `YEAR`, `MONTH`, `DAY`, or `HOUR` specify the format for the date string as it appears in your file paths
 3. The default implementations of table format clients can be replaced with custom implementations by specifying a client configs yaml file in the format below:
 ```yaml
@@ -93,8 +93,8 @@ catalogOptions: # all other options are passed through in a map
   key2: value2
 ```
 5. run with `java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--clientsConfig clients.yaml] [--icebergCatalogConfig catalog.yaml]`
-The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Authentication for AWS is done with
-`com.amazonaws.auth.DefaultAWSCredentialsProviderChain`. To override this setting, specify a different implementation
+The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Authentication for AWS is done with 
+`com.amazonaws.auth.DefaultAWSCredentialsProviderChain`. To override this setting, specify a different implementation 
 with the `--awsCredentialsProvider` option.
 
 # Contributing
@@ -102,7 +102,7 @@ with the `--awsCredentialsProvider` option.
 For setting up the repo on IntelliJ, open the project and change the java version to Java11 in File->ProjectStructure
 ![img.png](style/IDE.png)
 
-You have found a bug, or have a cool idea you that want to contribute to the project ? Please file a GitHub issue [here](https://github.com/onetable-io/onetable/issues)
+You have found a bug, or have a cool idea you that want to contribute to the project ? Please file a GitHub issue [here](https://github.com/apache/incubator-xtable/issues)
 
 ## Adding a new target format
 Adding a new target format requires a developer implement [TargetClient](./api/src/main/java/io/onetable/spi/sync/TargetClient.java). Once you have implemented that interface, you can integrate it into the [OneTableClient](./core/src/main/java/io/onetable/client/OneTableClient.java). If you think others may find that target useful, please raise a Pull Request to add it to the project.
