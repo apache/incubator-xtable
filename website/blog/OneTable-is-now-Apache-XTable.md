@@ -56,7 +56,7 @@ marginRight:'auto', marginTop:'18pt', marginBottom:'18pt'}} />
 For those interested in exploring Apache XTable™, the official website is a good starting point. The documentation 
 section hosts a great hands-on [quickstart](https://onetable.dev/docs/how-to) guide to getting acquainted with XTable, 
 providing a straightforward way to experience its interoperability capabilities firsthand. If you have specific ideas, 
-questions, or seek direct interaction, the [discussions](https://github.com/onetable-io/onetable/discussions) section 
+questions, or seek direct interaction, the [discussions](https://github.com/apache/incubator-xtable/discussions) section 
 is available for more in-depth exchanges. We invite you to contribute to the project by submitting pull requests or 
 filling issues to the [XTable GitHub repository](https://github.com/apache/incubator-xtable). Contributions in the early 
 phase of the project are going to be critical as we build XTable together. Joining the 
