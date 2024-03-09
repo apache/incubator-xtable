@@ -22,6 +22,7 @@
         <log4j.version>2.22.0</log4j.version>
         <junit.version>5.9.0</junit.version>
         <lombok.version>1.18.30</lombok.version>
+        <hadoop.version>3.3.6</hadoop.version>
         <hudi.version>0.14.0</hudi.version>
         <parquet.version>1.12.2</parquet.version>
         <scala.version>2.12.12</scala.version>
@@ -259,7 +260,7 @@
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-common</artifactId>
-                <version>3.3.6</version>
+                <version>${hadoop.version}</version>
                 <scope>provided</scope>
                 <exclusions>
                     <exclusion>
@@ -279,13 +280,13 @@
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-aws</artifactId>
-                <version>3.3.1</version>
+                <version>${hadoop.version}</version>
                 <scope>runtime</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-azure</artifactId>
-                <version>3.2.2</version>
+                <version>${hadoop.version}</version>
                 <scope>runtime</scope>
             </dependency>
             <dependency>
