@@ -6,7 +6,7 @@
 # (the "License"); you may not use this file except in compliance with
 # the License.  You may obtain a copy of the License at
 #
-#    http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,14 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 version: "3.9"
 services:
   trino:
     container_name: trino
     ports:
-      - '8080:8080'
-    image: 'trinodb/trino:428'
+      - "8080:8080"
+    image: "trinodb/trino:428"
     volumes:
       - ./trino/catalog:/etc/trino/catalog
       - ./data:/home/data
@@ -29,8 +28,8 @@ services:
   presto:
     container_name: presto
     ports:
-      - '8082:8082'
-    image: 'prestodb/presto:0.283'
+      - "8082:8082"
+    image: "prestodb/presto:0.283"
     volumes:
       - ./presto/catalog:/opt/presto-server/etc/catalog
       - ./presto/config.properties:/opt/presto-server/etc/config.properties
@@ -41,9 +40,9 @@ services:
   hive-metastore:
     container_name: hive-metastore
     hostname: hive-metastore
-    image: 'apache/hive:4.0.0-alpha-2'
+    image: "apache/hive:4.0.0-alpha-2"
     ports:
-      - '9083:9083' # Metastore Thrift
+      - "9083:9083" # Metastore Thrift
     environment:
       SERVICE_NAME: metastore
       HIVE_METASTORE_WAREHOUSE_DIR: /home/data
@@ -53,9 +52,9 @@ services:
   jupyter:
     container_name: jupyter
     hostname: jupyter
-    image: 'almondsh/almond:latest'
+    image: "almondsh/almond:latest"
     ports:
-      - '8888:8888'
+      - "8888:8888"
     volumes:
       - ./notebook:/home/jovyan/work
       - ./jars:/home/jars

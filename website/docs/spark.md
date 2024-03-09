@@ -1,14 +1,16 @@
 ---
+
 sidebar_position: 3
 title: "Apache Spark"
----
+---------------------
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Querying from Apache Spark
+
 To read an Apache XTable™ (Incubating) synced target table (regardless of the table format) in Apache Spark locally or on services like
-Amazon EMR, Google Cloud's Dataproc, Azure HDInsight, or Databricks, you do not need additional jars or configs 
+Amazon EMR, Google Cloud's Dataproc, Azure HDInsight, or Databricks, you do not need additional jars or configs
 other than what is needed by the respective table formats.
 
 Refer to the project specific documentation for the required configurations that needs to be passed in when
@@ -20,9 +22,7 @@ defaultValue="hudi"
 values={[
 { label: 'targetFormat: HUDI', value: 'hudi', },
 { label: 'targetFormat: DELTA', value: 'delta', },
-{ label: 'targetFormat: ICEBERG', value: 'iceberg', },
-]}
->
+{ label: 'targetFormat: ICEBERG', value: 'iceberg', },]}
 
 <TabItem value="hudi">
 

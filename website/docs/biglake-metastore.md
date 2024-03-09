@@ -1,15 +1,18 @@
 ---
+
 sidebar_position: 4
 title: "BigLake Metastore"
----
+--------------------------
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Syncing to BigLake Metastore
+
 This document walks through the steps to register an Apache XTable™ (Incubating) synced Iceberg table in BigLake Metastore on GCP.
 
 ## Pre-requisites
+
 1. Source (Hudi/Delta) table(s) already written to Google Cloud Storage.
    If you don't have the source table written in GCS,
    you can follow the steps in [this](/docs/how-to#create-dataset) tutorial to set it up.
@@ -20,7 +23,8 @@ This document walks through the steps to register an Apache XTable™ (Incubatin
    necessary permissions to write log/metadata files in GCS, ask your administrator to grant [Storage Object User](https://cloud.google.com/storage/docs/access-control/iam-roles) (roles/storage.objectUser)
    access to the service account.
 4. If you're running Apache XTable™ (Incubating) outside GCP, you need to provide the machine access to interact with BigLake and GCS.
-   To do so, store the permissions key for your service account in your machine using 
+   To do so, store the permissions key for your service account in your machine using
+
    ```shell
    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service_account_key.json
    ```
@@ -30,34 +34,41 @@ This document walks through the steps to register an Apache XTable™ (Incubatin
    Apache XTable™ (Incubating) requires the JAR to be present in the classpath.
 
 ## Steps
+
 :::danger Important:
-Currently BigLake Metastore is only accessible through Google's 
+Currently BigLake Metastore is only accessible through Google's
 [BigLake Rest APIs](https://cloud.google.com/bigquery/docs/reference/biglake/rest), and as such
 Apache XTable™ (Incubating) requires you to setup the below items prior to running sync on your source dataset.
-   * BigLake Catalog
-   * BigLake Database
+* BigLake Catalog
+* BigLake Database
 :::
 
 ### Create BigLake Catalog
+
 Use the `Try this method` on Google's REST reference docs for
 [`projects.locations.catalogs.create`](https://cloud.google.com/bigquery/docs/reference/biglake/rest/v1/projects.locations.catalogs/create)
 method to create a catalog.
 
 In this tutorial we'll use `us-west1` region.
+
 ```rest md title="parent"
 projects/<yourProjectName>/locations/us-west1/catalogs
 ```
+
 ```rest md title="catalogId"
 onetable
 ```
 
 ### Create BigLake Database
+
 Use the `Try this method` on Google's REST reference docs for
 [`projects.locations.catalogs.databases.create`](https://cloud.google.com/bigquery/docs/reference/biglake/rest/v1/projects.locations.catalogs/create)
 method to create a database.
+
 ```rest md title="parent"
 projects/<yourProjectName>/locations/us-west1/catalogs/onetable/databases
 ```
+
 ```rest md title="databaseId"
 onetable_synced_db
 ```
@@ -69,10 +80,9 @@ groupId="table-format"
 defaultValue="hudi"
 values={[
 { label: 'sourceFormat: HUDI', value: 'hudi', },
-{ label: 'sourceFormat: DELTA', value: 'delta', },
-]}
->
-<TabItem value="hudi">
+{ label: 'sourceFormat: DELTA', value: 'delta', },]}
+
+> <TabItem value="hudi">
 
 ```yaml md title="yaml"
 sourceFormat: HUDI
@@ -84,6 +94,7 @@ datasets:
     tableName: table_name
     namespace: database_name
 ```
+
 </TabItem>
 
 <TabItem value="delta">
@@ -102,7 +113,7 @@ datasets:
 </TabItem>
 </Tabs>
 
-The catalog information can be specified in a yaml file and passed in with the `--icebergCatalogConfig` option. 
+The catalog information can be specified in a yaml file and passed in with the `--icebergCatalogConfig` option.
 An example `catalog.yaml` file to sync with BigLake Metastore:
 
 ```yaml md title="yaml"
@@ -127,15 +138,18 @@ to interpret the data as an Iceberg table.
 :::
 
 ### Validating the results
+
 Once the sync succeeds, Apache XTable™ (Incubating) would have written the table directly to BigLake Metastore.
 We can use `Try this method` option on Google's REST reference docs for
 [`projects.locations.catalogs.databases.tables.get`](https://cloud.google.com/bigquery/docs/reference/biglake/rest/v1/projects.locations.catalogs.databases.tables/get)
 method to view the created table.
+
 ```rest md title="name"
 projects/<yourProjectName>/locations/us-west1/catalogs/onetable/databases/onetable_synced_db/tables/table_name
 ```
 
 ## Conclusion
+
 In this guide we saw how to,
 1. sync a source table to create Iceberg metadata with Apache XTable™ (Incubating)
 2. catalog the data as an Iceberg table in BigLake Metastore

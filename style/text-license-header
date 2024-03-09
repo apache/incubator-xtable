@@ -14,32 +14,3 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-name: Site Build
-
-on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/site-build.yml"
-      - "website/**"
-
-jobs:
-  site-build:
-    name: Site Build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./website
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: ./website/package-lock.json
-
-      - run: npm install --frozen-lockfile
-      - run: npm run build

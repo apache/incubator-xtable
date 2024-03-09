@@ -1,27 +1,27 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
-    Licensed to the Apache Software Foundation (ASF) under one or more
-    contributor license agreements.  See the NOTICE file distributed with
-    this work for additional information regarding copyright ownership.
-    The ASF licenses this file to You under the Apache License, Version 2.0
-    (the "License"); you may not use this file except in compliance with
-    the License.  You may obtain a copy of the License at
-       http://www.apache.org/licenses/LICENSE-2.0
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.onetable</groupId>
     <artifactId>onetable</artifactId>
-    <name>onetable</name>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
+    <name>onetable</name>
 
     <modules>
         <module>api</module>
@@ -58,14 +58,6 @@
         <skipUTs>${skipTests}</skipUTs>
         <skipITs>${skipTests}</skipITs>
     </properties>
-
-    <dependencies>
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>${lombok.version}</version>
-        </dependency>
-    </dependencies>
 
     <dependencyManagement>
         <dependencies>
@@ -244,6 +236,7 @@
                 <groupId>org.apache.spark</groupId>
                 <artifactId>spark-core_${scala.version.prefix}</artifactId>
                 <version>${spark.version}</version>
+                <scope>provided</scope>
                 <exclusions>
                     <exclusion>
                         <groupId>org.slf4j</groupId>
@@ -254,7 +247,6 @@
                         <artifactId>log4j</artifactId>
                     </exclusion>
                 </exclusions>
-                <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.spark</groupId>
@@ -438,6 +430,14 @@
         </dependencies>
     </dependencyManagement>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+        </dependency>
+    </dependencies>
+
     <build>
         <pluginManagement>
             <plugins>
@@ -447,10 +447,10 @@
                     <version>${maven-shade-plugin.version}</version>
                     <executions>
                         <execution>
-                            <phase>package</phase>
                             <goals>
                                 <goal>shade</goal>
                             </goals>
+                            <phase>package</phase>
                             <configuration>
                                 <createDependencyReducedPom>false</createDependencyReducedPom>
                                 <filters>
@@ -518,14 +518,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <version>${test.plugin.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>integration-test</goal>
-                            <goal>verify</goal>
-                        </goals>
-                    </execution>
-                </executions>
                 <configuration>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <skip>${skipITs}</skip>
@@ -534,6 +526,14 @@
                     <trimStackTrace>false</trimStackTrace>
                     <argLine>-Xmx1024m</argLine>
                 </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
@@ -547,13 +547,87 @@
                             <groupArtifact>com.google.googlejavaformat:google-java-format</groupArtifact>
                         </googleJavaFormat>
                         <importOrder>
-                            <order>java,javax,lombok,org,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,scala,com,io.delta,io.onetable</order>
+                            <wildcardsLast>false</wildcardsLast>
+                            <semanticSort>false</semanticSort>
+                            <order>java,javax,lombok,org,org.apache.xtable,org.apache.paimon,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,scala,com,io.delta,io.onetable</order>
                         </importOrder>
-                        <removeUnusedImports/>
+                        <removeUnusedImports>
+                            <engine>google-java-format</engine>
+                        </removeUnusedImports>
                         <licenseHeader>
                             <file>style/license-header</file>
                         </licenseHeader>
                     </java>
+                    <python>
+                        <includes>
+                            <include>**/*.py</include>
+                        </includes>
+                        <black/>
+                    </python>
+                    <yaml>
+                        <includes>
+                            <include>**/*.yml</include>
+                            <include>**/*.yaml</include>
+                        </includes>
+                        <prettier/>
+                        <licenseHeader>
+                            <file>style/text-license-header</file>
+                            <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
+                        </licenseHeader>
+                    </yaml>
+                    <shell>
+                        <includes>
+                            <include>**/*.sh</include>
+                        </includes>
+                        <licenseHeader>
+                            <file>style/text-license-header</file>
+                            <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
+                            <skipLinesMatching>^#!.+?$</skipLinesMatching>
+                        </licenseHeader>
+                    </shell>
+                    <pom>
+                        <includes>
+                            <include>pom.xml</include>
+                            <include>src/**/*.xml</include>
+                        </includes>
+                        <sortPom>
+                            <encoding>UTF-8</encoding>
+                            <lineSeparator>${line.separator}</lineSeparator>
+                            <expandEmptyElements>false</expandEmptyElements>
+                            <spaceBeforeCloseEmptyElement>false</spaceBeforeCloseEmptyElement>
+                            <keepBlankLines>true</keepBlankLines>
+                            <nrOfIndentSpace>4</nrOfIndentSpace>
+                            <indentBlankLines>false</indentBlankLines>
+                            <indentSchemaLocation>false</indentSchemaLocation>
+                            <predefinedSortOrder>custom_1</predefinedSortOrder>
+                            <sortProperties>false</sortProperties>
+                            <sortModules>false</sortModules>
+                            <sortExecutions>false</sortExecutions>
+                        </sortPom>
+                        <licenseHeader>
+                            <file>style/xml-license-header</file>
+                            <delimiter>^&lt;project|^&lt;configuration|^&lt;Configuration</delimiter>
+                            <skipLinesMatching>^&lt;.*xml.+?$</skipLinesMatching>
+                        </licenseHeader>
+                    </pom>
+                    <markdown>
+                        <includes>
+                            <include>**/*.md</include>
+                        </includes>
+                        <flexmark/>
+                    </markdown>
+                    <formats>
+                        <format>
+                            <includes>
+                                <include>**/*.properties</include>
+                                <include>**/*.config</include>
+                            </includes>
+                            <licenseHeader>
+                                <file>style/text-license-header</file>
+                                <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
+                            </licenseHeader>
+                        </format>
+                    </formats>
                 </configuration>
                 <executions>
                     <execution>

@@ -1,4 +1,5 @@
 ## *Important Read*
+
 - *Please ensure the GitHub issue is mentioned at the beginning of the PR*
 
 ## What is the purpose of the pull request
@@ -30,3 +31,4 @@ This change added tests and can be verified as follows:
 - *Added integration tests for end-to-end.*
 - *Added HudiSchemaEvolutionTest to verify the change.*
 - *Manually verified the change by running a job locally.*
+

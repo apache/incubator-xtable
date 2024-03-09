@@ -6,7 +6,7 @@
 # (the "License"); you may not use this file except in compliance with
 # the License.  You may obtain a copy of the License at
 #
-#    http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,28 +14,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+## This file contains the default configuration of known OneTable tableFormatsClients for both source and target
+## table formats. The config maps a table format name to a client class, and contains the default configuration
+## values needed by the client.
 
-# This file contains the default configuration of known OneTable tableFormatsClients for both source and target
-# table formats. The config maps a table format name to a client class, and contains the default configuration
-# values needed by the client.
-
-# sourceClientProviderClass: The class name of a table format's client factory, where the client is
-#     used for reading from a table of this format. All user configurations, including hadoop config
-#     and client specific configuration, will be available to the factory for instantiation of the
-#     client.
-# targetClientProviderClass: The class name of a table format's client factory, where the client is
-#     used for writing to a table of this format.
-# configuration: A map of configuration values specific to this client.
+## sourceClientProviderClass: The class name of a table format's client factory, where the client is
+##     used for reading from a table of this format. All user configurations, including hadoop config
+##     and client specific configuration, will be available to the factory for instantiation of the
+##     client.
+## targetClientProviderClass: The class name of a table format's client factory, where the client is
+##     used for writing to a table of this format.
+## configuration: A map of configuration values specific to this client.
 
 tableFormatsClients:
-    HUDI:
-      sourceClientProviderClass: io.onetable.hudi.HudiSourceClientProvider
-    DELTA:
-      sourceClientProviderClass: io.onetable.delta.DeltaSourceClientProvider
-      targetClientProviderClass: io.onetable.delta.DeltaClient
-      configuration:
-        spark.master: local[2]
-        spark.app.name: onetableclient
-    ICEBERG:
-      sourceClientProviderClass: io.onetable.iceberg.IcebergSourceClientProvider
-      targetClientProviderClass: io.onetable.iceberg.IcebergTargetClient
+  HUDI:
+    sourceClientProviderClass: io.onetable.hudi.HudiSourceClientProvider
+  DELTA:
+    sourceClientProviderClass: io.onetable.delta.DeltaSourceClientProvider
+    targetClientProviderClass: io.onetable.delta.DeltaClient
+    configuration:
+      spark.master: local[2]
+      spark.app.name: onetableclient
+  ICEBERG:
+    sourceClientProviderClass: io.onetable.iceberg.IcebergSourceClientProvider
+    targetClientProviderClass: io.onetable.iceberg.IcebergTargetClient
