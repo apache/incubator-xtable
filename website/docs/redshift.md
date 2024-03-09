@@ -63,4 +63,3 @@ CREATE EXTERNAL DATABASE IF NOT EXISTS;
 SELECT *
 FROM onetable_synced_schema_delta.<table_name>;
 ```
-
