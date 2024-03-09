@@ -20,7 +20,7 @@ cd website
 npm start
 ```
 
-This command starts a local development server and opens up a browser window.
+This command starts a local development server and opens up a browser window. 
 Most changes are reflected live without having to restart the server.
 
 ## Build
@@ -40,7 +40,7 @@ cd website
 npm run serve
 ```
 > [!NOTE]  
-> If you make changes to the contents inside `docs` directory, you can verify the changes locally by visiting https://localhost:3000/docs/setup after running `npm run serve`.
+> If you make changes to the contents inside `docs` directory, you can verify the changes locally by visiting https://localhost:3000/docs/setup after running `npm run serve`. 
 
 ## Docs
 ### Creating new docs

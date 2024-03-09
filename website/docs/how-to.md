@@ -9,15 +9,15 @@ import TabItem from '@theme/TabItem';
 # Creating your first interoperable table
 
 :::danger Important
-Using Apache XTable™ (Incubating) to sync your source tables in different target format involves running sync on your
-current dataset using a bundled jar. You can create this bundled jar by following the instructions
-on the [Installation page](/docs/setup). Read through Apache XTable™'s
+Using Apache XTable™ (Incubating) to sync your source tables in different target format involves running sync on your 
+current dataset using a bundled jar. You can create this bundled jar by following the instructions 
+on the [Installation page](/docs/setup). Read through Apache XTable™'s 
 [GitHub page](https://github.com/apache/incubator-xtable#building-the-project-and-running-tests) for more information.
 :::
 
-In this tutorial we will look at how to use Apache XTable™ (Incubating) to add interoperability between table formats.
+In this tutorial we will look at how to use Apache XTable™ (Incubating) to add interoperability between table formats. 
 For example, you can expose a table ingested with Hudi as an Iceberg and/or Delta Lake table without
-copying or moving the underlying data files used for that table while maintaining a similar commit
+copying or moving the underlying data files used for that table while maintaining a similar commit 
 history to enable proper point in time queries.
 
 ## Pre-requisites
@@ -26,12 +26,12 @@ history to enable proper point in time queries.
 2. Clone the Apache XTable™ (Incubating) [repository](https://github.com/apache/incubator-xtable) and create the
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 3. Optional: Setup access to write to and/or read from distributed storage services like:
-    * Amazon S3 by following the steps
-      [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) to install AWSCLIv2
-      and setup access credentials by following the steps
-      [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html)
-    * Google Cloud Storage by following the steps
-      [here](https://cloud.google.com/iam/docs/keys-create-delete#creating)
+   * Amazon S3 by following the steps 
+   [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) to install AWSCLIv2 
+   and setup access credentials by following the steps
+   [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html)
+   * Google Cloud Storage by following the steps 
+   [here](https://cloud.google.com/iam/docs/keys-create-delete#creating)
 
 For the purpose of this tutorial, we will walk through the steps to using Apache XTable™ (Incubating) locally.
 
@@ -86,7 +86,7 @@ You may need additional configurations to write to external cloud storage locati
 when you are working with spark locally. Refer to the respective cloud provider's documentation for more information.
 :::
 
-### Create dataset
+### Create dataset 
 Write a source table locally.
 
 <Tabs
@@ -217,7 +217,7 @@ df = spark.createDataFrame(records, schema)
 </Tabs>
 
 
-### Running sync
+### Running sync 
 
 Create `my_config.yaml` in the cloned onetable directory.
 
@@ -341,7 +341,7 @@ Add `tableDataPath` for ICEBERG sourceFormat if the `tableBasePath` is different
 </Tabs>
 
 :::note Note:
-Authentication for AWS is done with `com.amazonaws.auth.DefaultAWSCredentialsProviderChain`.
+Authentication for AWS is done with `com.amazonaws.auth.DefaultAWSCredentialsProviderChain`. 
 To override this setting, specify a different implementation with the `--awsCredentialsProvider` option.
 
 Authentication for GCP requires service account credentials to be exported. i.e.
@@ -355,11 +355,11 @@ java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig 
 ```
 
 **Optional:**
-At this point, if you check your local path, you will be able to see the necessary metadata files that contain the schema,
+At this point, if you check your local path, you will be able to see the necessary metadata files that contain the schema, 
 commit history, partitions, and column stats that helps query engines to interpret the data in the target table format.
 
 ## Conclusion
-In this tutorial, we saw how to create a source table and use Apache XTable™ (Incubating) to create the metadata files
+In this tutorial, we saw how to create a source table and use Apache XTable™ (Incubating) to create the metadata files 
 that can be used to query the source table in different target table formats.
 
 ## Next steps

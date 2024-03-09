@@ -3,7 +3,7 @@ sidebar_position: 1
 title: "Docker Demo"
 ---
 
-# Building interoperable tables using Apache XTable™ (Incubating)
+# Building interoperable tables using Apache XTable™ (Incubating) 
 This demo walks you through a fictional use case and the steps to add interoperability between table formats using Apache XTable™.
 For this purpose, a self-contained data infrastructure is brought up as Docker containers within your computer.
 
@@ -34,8 +34,8 @@ You can access the local Trino container by running `docker exec -it trino trino
 You can access the local Presto container by running `docker exec -it presto presto-cli --server localhost:8082`
 
 #### Jupyter Notebook
-To access the notebook, look for a log line during startup that contains `To access the server, open this file in a
+To access the notebook, look for a log line during startup that contains `To access the server, open this file in a 
 browser: ...  Or copy and paste one of these URLs: ...` and use the link that starts with http://127.0.0.1:8888/
-to open the notebook in your browser.
+to open the notebook in your browser. 
 
 The demo is located at `work/demo.ipynb`. The notebook also includes helpful markdowns explaining the steps.

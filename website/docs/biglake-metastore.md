@@ -20,7 +20,7 @@ This document walks through the steps to register an Apache XTable™ (Incubatin
    necessary permissions to write log/metadata files in GCS, ask your administrator to grant [Storage Object User](https://cloud.google.com/storage/docs/access-control/iam-roles) (roles/storage.objectUser)
    access to the service account.
 4. If you're running Apache XTable™ (Incubating) outside GCP, you need to provide the machine access to interact with BigLake and GCS.
-   To do so, store the permissions key for your service account in your machine using
+   To do so, store the permissions key for your service account in your machine using 
    ```shell
    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service_account_key.json
    ```
@@ -31,12 +31,12 @@ This document walks through the steps to register an Apache XTable™ (Incubatin
 
 ## Steps
 :::danger Important:
-Currently BigLake Metastore is only accessible through Google's
+Currently BigLake Metastore is only accessible through Google's 
 [BigLake Rest APIs](https://cloud.google.com/bigquery/docs/reference/biglake/rest), and as such
 Apache XTable™ (Incubating) requires you to setup the below items prior to running sync on your source dataset.
-* BigLake Catalog
-* BigLake Database
-  :::
+   * BigLake Catalog
+   * BigLake Database
+:::
 
 ### Create BigLake Catalog
 Use the `Try this method` on Google's REST reference docs for
@@ -102,7 +102,7 @@ datasets:
 </TabItem>
 </Tabs>
 
-The catalog information can be specified in a yaml file and passed in with the `--icebergCatalogConfig` option.
+The catalog information can be specified in a yaml file and passed in with the `--icebergCatalogConfig` option. 
 An example `catalog.yaml` file to sync with BigLake Metastore:
 
 ```yaml md title="yaml"

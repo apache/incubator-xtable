@@ -39,7 +39,7 @@ file containing the list of data files to read for querying a Delta table.
 
 You have two options to create and query Delta tables in Redshift Spectrum:
 1. Follow the steps in
-   [this](https://docs.delta.io/latest/redshift-spectrum-integration.html#set-up-a-redshift-spectrum-to-delta-lake-integration-and-query-delta-tables)
+   [this](https://docs.delta.io/latest/redshift-spectrum-integration.html#set-up-a-redshift-spectrum-to-delta-lake-integration-and-query-delta-tables) 
    article to set up a Redshift Spectrum to Delta Lake integration and query Delta tables directly from Amazon S3.
 2. While creating the Glue Crawler to crawl the Apache XTable™ (Incubating) synced Delta table, choose the `Create Symlink tables`
    option in `Add data source` pop-up window. This will add `_symlink_format_manifest` folder with manifest files in the table

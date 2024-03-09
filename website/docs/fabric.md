@@ -7,20 +7,20 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Querying from Microsoft Fabric
-This guide offers a short tutorial on how to query Apache Iceberg and Apache Hudi tables in Microsoft Fabric utilizing
-the translation capabilities of Apache XTable™ (Incubating). This tutorial is intended solely for demonstration and to verify the
-compatibility of Apache XTable™ (Incubating) output with Fabric. The tutorial leverages the currently[^1] available features in Fabric, like
+This guide offers a short tutorial on how to query Apache Iceberg and Apache Hudi tables in Microsoft Fabric utilizing 
+the translation capabilities of Apache XTable™ (Incubating). This tutorial is intended solely for demonstration and to verify the 
+compatibility of Apache XTable™ (Incubating) output with Fabric. The tutorial leverages the currently[^1] available features in Fabric, like 
 `Shortcuts`.
 
 
 ## What is Microsoft Fabric
-Microsoft Fabric is a unified data analytics platform for data analytics. It offers a wide range of capabilities
-including data engineering, data science, real-time analytics, and business intelligence. At its core is the data
-lake, OneLake, which provides tabular data stored in Delta Parquet format, allowing one copy of the data to be used in
-all Fabric analytical services like T-SQL,
-Spark, and Power BI. OneLake is designed to do away with the need for data duplication and eliminates the necessity
-for data migration or transfers. Whether it's a data engineer adding data to a table using Spark or a SQL developer
-analyzing data with T-SQL in a data warehouse, both can access and work on the same data copy stored in OneLake.
+Microsoft Fabric is a unified data analytics platform for data analytics. It offers a wide range of capabilities 
+including data engineering, data science, real-time analytics, and business intelligence. At its core is the data 
+lake, OneLake, which provides tabular data stored in Delta Parquet format, allowing one copy of the data to be used in 
+all Fabric analytical services like T-SQL, 
+Spark, and Power BI. OneLake is designed to do away with the need for data duplication and eliminates the necessity 
+for data migration or transfers. Whether it's a data engineer adding data to a table using Spark or a SQL developer 
+analyzing data with T-SQL in a data warehouse, both can access and work on the same data copy stored in OneLake. 
 Additionally, OneLake enables integration of existing storage accounts via its 'Shortcut' feature, which acts as a link
 to data in other file systems.
 
@@ -34,9 +34,9 @@ including T-SQL, Spark, and Power BI.
 * A storage account with a container in [Azure Data Lake Storage Gen2](https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction) (ADLS).
 
 ### Step 1. Create a source table in ADLS
-This step creates a source table in Iceberg or Hudi format in the ADLS storage account. The primary actions to be
-taken to create a table `people` in Iceberg or Hudi format are documented in
-[Creating your first interoperable table - Create Dataset](/docs/how-to#create-dataset) tutorial section. However, instead of creating the
+This step creates a source table in Iceberg or Hudi format in the ADLS storage account. The primary actions to be 
+taken to create a table `people` in Iceberg or Hudi format are documented in 
+[Creating your first interoperable table - Create Dataset](/docs/how-to#create-dataset) tutorial section. However, instead of creating the 
 `people` table locally, configure `local_base_path` to point to the ADLS storage account.
 
 Assuming the container name is `mycontainer` and the storage account name is `mystorageaccount`, the `local_base_path`
@@ -53,8 +53,8 @@ spark.hadoop.fs.azure.account.oauth2.client.secret=<client-secret>
 
 ### Step 2. Translate source table to Delta Lake format using Apache XTable™ (Incubating)™
 This step translates the table `people` originally in Iceberg or Hudi format to Delta Lake format using Apache XTable™ (Incubating).
-The primary actions for the translation are documented in
-[Creating your first interoperable table - Running Sync](/docs/how-to#running-sync) tutorial section.
+The primary actions for the translation are documented in 
+[Creating your first interoperable table - Running Sync](/docs/how-to#running-sync) tutorial section. 
 However, since the table is in ADLS, you need to update datasets path and hadoop configurations.
 
 For e.g. if the source table is in Iceberg format, the configuration file should look like:
@@ -102,7 +102,7 @@ java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig 
 ```
 
 Running the above command will translate the table `people` in Iceberg or Hudi format to Delta Lake format. To validate
-the translation, you can list the directories in the table's data path. For this tutorial, `_delta_log` directory
+the translation, you can list the directories in the table's data path. For this tutorial, `_delta_log` directory 
 should be present in the `people` table's data path at  `default/people/data/_delta_log`.
 
 ### Step 3. Create a Shortcut in Fabric and Analyze

@@ -94,12 +94,12 @@ with metadata files which contains the information that helps query engines inte
 
 ### Register the target table in Glue Data Catalog
 From your terminal, create a glue database.
-
+   
  ```shell md title="shell"
  aws glue create-database --database-input "{\"Name\":\"onetable_synced_db\"}"
  ```
 
-From your terminal, create a glue crawler. Modify the `<yourAccountId>`, `<yourRoleName>`
+From your terminal, create a glue crawler. Modify the `<yourAccountId>`, `<yourRoleName>` 
 and `<path/to/your/data>`, with appropriate values.
 
 ```shell md title="shell"

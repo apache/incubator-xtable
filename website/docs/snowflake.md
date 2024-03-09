@@ -37,7 +37,7 @@ STORAGE_LOCATIONS =
 ```
 
 ### Create a catalog integration for Iceberg files in object storage
-You can skip this step if you are using Snowflake as the catalog.
+You can skip this step if you are using Snowflake as the catalog. 
 You can also use [AWS Glue as the catalog source](https://docs.snowflake.com/LIMITEDACCESS/iceberg-2023/create-catalog-integration#examples).
 
 ```sql md title="sql"
@@ -48,7 +48,7 @@ ENABLED=TRUE;
 ```
 
 ### Create an Iceberg table from Iceberg metadata in object storage
-Refer to additional [examples](https://docs.snowflake.com/LIMITEDACCESS/iceberg-2023/create-iceberg-table#examples)
+Refer to additional [examples](https://docs.snowflake.com/LIMITEDACCESS/iceberg-2023/create-iceberg-table#examples) 
 in the Snowflake Create Iceberg Table guide for more information.
 
 ```sql md title="sql"

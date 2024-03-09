@@ -19,7 +19,7 @@ For more information and required configurations refer to:
 For hands on experimentation, please follow [Creating your first interoperable table](/docs/how-to#create-dataset)
 to create Apache XTable™ (Incubating) synced tables followed by [Hive Metastore](/docs/hms) to register the target table
 in Hive Metastore. Once done, please follow the below high level steps:
-1. Start the StarRocks server
+1. Start the StarRocks server 
 2. From the directory where you have installed mysql-cli: login by running `mysql -P 9030 -h 127.0.0.1 -u root --prompt="StarRocks > "`.
 
 <Tabs

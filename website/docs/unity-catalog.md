@@ -36,8 +36,8 @@ datasets:
 :::note Note:
 1. Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have your source table in GCS
    and `abfss://<container-name>@<storage-account-name>.dfs.core.windows.net/<path-to-data>` if you have your source table in ADLS.
-2. And replace with appropriate values for `sourceFormat`, and `tableName` fields.
-   :::
+2. And replace with appropriate values for `sourceFormat`, and `tableName` fields. 
+:::
 
 From your terminal under the cloned Apache XTable™ (Incubating) directory, run the sync process using the below command.
 
@@ -45,12 +45,12 @@ From your terminal under the cloned Apache XTable™ (Incubating) directory, run
 java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
 ```
 
-:::tip Note:
-At this point, if you check your bucket path, you will be able to see `_delta_log` directory with
+:::tip Note: 
+At this point, if you check your bucket path, you will be able to see `_delta_log` directory with 
 00000000000000000000.json which contains the logs that helps query engines to interpret the source table as a Delta table.
 :::
 
-### Register the target table in Unity Catalog
+### Register the target table in Unity Catalog 
 In your Databricks workspace, under SQL editor, run the following queries.
 
 ```sql md title="SQL"
