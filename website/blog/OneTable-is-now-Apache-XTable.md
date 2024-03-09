@@ -54,7 +54,7 @@ the public good.
 marginRight:'auto', marginTop:'18pt', marginBottom:'18pt'}} />
 
 For those interested in exploring Apache XTable™, the official website is a good starting point. The documentation 
-section hosts a great hands-on [quickstart](https://onetable.dev/docs/how-to) guide to getting acquainted with XTable, 
+section hosts a great hands-on [quickstart](https://xtable.apache.org/docs/how-to) guide to getting acquainted with XTable, 
 providing a straightforward way to experience its interoperability capabilities firsthand. If you have specific ideas, 
 questions, or seek direct interaction, the [discussions](https://github.com/apache/incubator-xtable/discussions) section 
 is available for more in-depth exchanges. We invite you to contribute to the project by submitting pull requests or 
