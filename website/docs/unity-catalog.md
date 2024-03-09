@@ -1,15 +1,12 @@
 ---
-
 sidebar_position: 3
 title: "Unity Catalog"
-----------------------
+---
 
 # Syncing to Unity Catalog
-
 This document walks through the steps to register an Apache XTable™ (Incubating) synced Delta table in Unity Catalog on Databricks.
 
 ## Pre-requisites
-
 1. Source table(s) (Hudi/Iceberg) already written to external storage locations like S3/GCS/ADLS.
    If you don't have a source table written in S3/GCS/ADLS,
    you can follow the steps in [this](/docs/hms) tutorial to set it up.
@@ -23,9 +20,7 @@ This document walks through the steps to register an Apache XTable™ (Incubatin
    `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 
 ## Steps
-
 ### Running sync
-
 Create `my_config.yaml` in the cloned Apache XTable™ (Incubating) directory.
 
 ```yaml md title="yaml"
@@ -38,12 +33,11 @@ datasets:
     tableName: table_name
     partitionSpec: partitionpath:VALUE # you only need to specify partitionSpec for HUDI sourceFormat
 ```
-
 :::note Note:
 1. Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have your source table in GCS
-and `abfss://<container-name>@<storage-account-name>.dfs.core.windows.net/<path-to-data>` if you have your source table in ADLS.
+   and `abfss://<container-name>@<storage-account-name>.dfs.core.windows.net/<path-to-data>` if you have your source table in ADLS.
 2. And replace with appropriate values for `sourceFormat`, and `tableName` fields.
-:::
+   :::
 
 From your terminal under the cloned Apache XTable™ (Incubating) directory, run the sync process using the below command.
 
@@ -57,7 +51,6 @@ At this point, if you check your bucket path, you will be able to see `_delta_lo
 :::
 
 ### Register the target table in Unity Catalog
-
 In your Databricks workspace, under SQL editor, run the following queries.
 
 ```sql md title="SQL"
@@ -69,14 +62,12 @@ CREATE TABLE onetable.synced_delta_schema.<table_name>
 USING DELTA
 LOCATION 's3://path/to/source/data';
 ```
-
 :::note Note:
 Replace `s3://path/to/source/data` to `gs://path/to/source/data` if you have your source table in GCS
 and `abfss://<container-name>@<storage-account-name>.dfs.core.windows.net/<path-to-data>` if you have your source table in ADLS.
 :::
 
 ### Validating the results
-
 You can now see the created delta table in **Unity Catalog** under **Catalog** as `<table_name>` under
 `synced_delta_schema` and also query the table in the SQL editor:
 
@@ -85,7 +76,6 @@ SELECT * FROM onetable.synced_delta_schema.<table_name>;
 ```
 
 ## Conclusion
-
 In this guide we saw how to,
 1. sync a source table to create metadata for the desired target table formats using Apache XTable™ (Incubating)
 2. catalog the data in Delta format in Unity Catalog on Databricks

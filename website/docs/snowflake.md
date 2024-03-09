@@ -1,8 +1,7 @@
 ---
-
 sidebar_position: 7
 title: "Snowflake"
-------------------
+---
 
 # Querying from Snowflake
 
@@ -15,12 +14,10 @@ Iceberg on Snowflake is currently supported in
 :::
 
 ## Steps:
-
 These are high level steps to help you integrate Apache XTable™ (Incubating) synced Iceberg tables on Snowflake. For more additional information
 refer to the [Getting started with Iceberg tables](https://docs.snowflake.com/LIMITEDACCESS/iceberg-2023/tables-iceberg-getting-started).
 
 ### Create an external volume
-
 Iceberg tables on Snowflake uses user-supplied storage. The first step to create an Iceberg table is by [creating an
 external volume in Snowflake](https://docs.snowflake.com/LIMITEDACCESS/iceberg-2023/tables-external-volume-s3#step-4-creating-an-external-volume-in-snowflake)
 to hold the Iceberg table data and metadata
@@ -40,7 +37,6 @@ STORAGE_LOCATIONS =
 ```
 
 ### Create a catalog integration for Iceberg files in object storage
-
 You can skip this step if you are using Snowflake as the catalog.
 You can also use [AWS Glue as the catalog source](https://docs.snowflake.com/LIMITEDACCESS/iceberg-2023/create-catalog-integration#examples).
 
@@ -52,7 +48,6 @@ ENABLED=TRUE;
 ```
 
 ### Create an Iceberg table from Iceberg metadata in object storage
-
 Refer to additional [examples](https://docs.snowflake.com/LIMITEDACCESS/iceberg-2023/create-iceberg-table#examples)
 in the Snowflake Create Iceberg Table guide for more information.
 

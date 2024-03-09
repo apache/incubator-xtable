@@ -614,6 +614,9 @@
                         <includes>
                             <include>**/*.md</include>
                         </includes>
+                        <excludes>
+                            <exclude>website/**</exclude>
+                        </excludes>
                         <flexmark/>
                     </markdown>
                     <formats>

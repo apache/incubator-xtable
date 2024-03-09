@@ -1,8 +1,7 @@
 ---
-
 sidebar_position: 8
 title: "StarRocks"
-------------------
+---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -29,19 +28,18 @@ defaultValue="hudi"
 values={[
 { label: 'targetFormat: HUDI', value: 'hudi', },
 { label: 'targetFormat: DELTA', value: 'delta', },
-{ label: 'targetFormat: ICEBERG', value: 'iceberg', },]}
-
-> <TabItem value="hudi">
+{ label: 'targetFormat: ICEBERG', value: 'iceberg', },
+]}
+>
+<TabItem value="hudi">
 
 :::tip Note:
 If you are following the example from [Hive Metastore](/docs/hms), you can query the Apache XTable™ (Incubating) synced Hudi table
 from StarRocks using the below query.
-
 ```sql md title="sql"
 CREATE EXTERNAL CATALOG unified_catalog_hms PROPERTIES ("type" = "unified","unified.metastore.type" = "hive", "hive.metastore.uris" = "thrift://hivemetastore:9083" );
 SELECT * FROM unified_catalog_hms.hudi_db.<table_name>;
 ```
-
 :::
 
 </TabItem>
@@ -50,12 +48,10 @@ SELECT * FROM unified_catalog_hms.hudi_db.<table_name>;
 :::tip Note:
 If you are following the example from [Hive Metastore](/docs/hms), you can query the Apache XTable™ (Incubating) synced Delta table
 from StarRocks using the below query.
-
 ```sql md title="sql"
 CREATE EXTERNAL CATALOG unified_catalog_hms PROPERTIES ("type" = "unified","unified.metastore.type" = "hive", "hive.metastore.uris" = "thrift://hivemetastore:9083" );
 SELECT * FROM unified_catalog_hms.delta_db.<table_name>;
 ```
-
 :::
 
 </TabItem>
@@ -64,12 +60,10 @@ SELECT * FROM unified_catalog_hms.delta_db.<table_name>;
 :::tip Note:
 If you are following the example from [Hive Metastore](/docs/hms), you can query the Apache XTable™ (Incubating) synced Iceberg table
 from StarRocks using the below query.
-
 ```sql md title="sql"
 CREATE EXTERNAL CATALOG unified_catalog_hms PROPERTIES ("type" = "unified","unified.metastore.type" = "hive", "hive.metastore.uris" = "thrift://hivemetastore:9083" );
 SELECT * FROM unified_catalog_hms.iceberg_db.<table_name>;
 ```
-
 :::
 
 </TabItem>
