@@ -51,8 +51,6 @@ public class DeltaIncrementalChangesState {
    */
   @Builder
   public DeltaIncrementalChangesState(DeltaLog deltaLog, Long versionToStartFrom) {
-    // TODO (https://github.com/onetable-io/onetable/issues/103) Fall back to snapshot sync in
-    // vacuum cases.
     List<Tuple2<Long, List<Action>>> changesList =
         getChangesList(deltaLog.getChanges(versionToStartFrom, false));
     Long maxSeenVersion = null;
