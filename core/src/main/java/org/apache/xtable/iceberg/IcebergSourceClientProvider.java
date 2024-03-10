@@ -18,10 +18,10 @@
  
 package org.apache.xtable.iceberg;
 
-import org.apache.iceberg.Snapshot;
-
 import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.client.SourceClientProvider;
+
+import org.apache.iceberg.Snapshot;
 
 /** A concrete implementation of {@link SourceClientProvider} for Hudi table format. */
 public class IcebergSourceClientProvider extends SourceClientProvider<Snapshot> {

@@ -28,12 +28,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.hudi.common.table.HoodieTableConfig;
-import org.apache.hudi.exception.HoodieException;
-import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
-import org.apache.hudi.sync.common.HoodieSyncConfig;
-import org.apache.hudi.sync.common.HoodieSyncTool;
-
 import org.apache.xtable.client.OneTableClient;
 import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.client.PerTableConfigImpl;
@@ -42,6 +36,12 @@ import org.apache.xtable.hudi.HudiSourceConfigImpl;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
+
+import org.apache.hudi.common.table.HoodieTableConfig;
+import org.apache.hudi.exception.HoodieException;
+import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
+import org.apache.hudi.sync.common.HoodieSyncConfig;
+import org.apache.hudi.sync.common.HoodieSyncTool;
 
 /** A HoodieSyncTool for syncing a Hudi table to other formats (Delta and Iceberg) with OneTable. */
 public class OneTableSyncTool extends HoodieSyncTool {

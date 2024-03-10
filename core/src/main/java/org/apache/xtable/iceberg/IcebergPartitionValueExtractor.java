@@ -28,10 +28,10 @@ import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import org.apache.iceberg.StructLike;
-
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.stat.Range;
+
+import org.apache.iceberg.StructLike;
 
 /** Partition value extractor for Iceberg. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)

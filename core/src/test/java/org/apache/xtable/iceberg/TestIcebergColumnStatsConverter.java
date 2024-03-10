@@ -34,16 +34,16 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import org.apache.iceberg.Metrics;
-import org.apache.iceberg.Schema;
-import org.apache.iceberg.types.Conversions;
-import org.apache.iceberg.types.Types;
-
 import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.OneType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
+
+import org.apache.iceberg.Metrics;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.types.Conversions;
+import org.apache.iceberg.types.Types;
 
 public class TestIcebergColumnStatsConverter {
   private static final CharsetEncoder ENCODER = StandardCharsets.UTF_8.newEncoder();

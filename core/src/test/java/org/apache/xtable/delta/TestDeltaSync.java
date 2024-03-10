@@ -58,24 +58,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import org.apache.spark.sql.delta.GeneratedColumn;
-
-import scala.collection.JavaConverters;
-import scala.collection.Seq;
-
-import io.delta.standalone.DeltaLog;
-import io.delta.standalone.DeltaScan;
-import io.delta.standalone.Snapshot;
-import io.delta.standalone.actions.AddFile;
-import io.delta.standalone.data.CloseableIterator;
-import io.delta.standalone.expressions.And;
-import io.delta.standalone.expressions.Column;
-import io.delta.standalone.expressions.EqualTo;
-import io.delta.standalone.expressions.Expression;
-import io.delta.standalone.expressions.Literal;
-import io.delta.standalone.types.IntegerType;
-import io.delta.standalone.types.StringType;
-
 import org.apache.xtable.client.PerTableConfigImpl;
 import org.apache.xtable.model.OneSnapshot;
 import org.apache.xtable.model.OneTable;
@@ -93,6 +75,24 @@ import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.schema.SchemaFieldFinder;
 import org.apache.xtable.spi.sync.TableFormatSync;
+
+import org.apache.spark.sql.delta.GeneratedColumn;
+
+import scala.collection.JavaConverters;
+import scala.collection.Seq;
+
+import io.delta.standalone.DeltaLog;
+import io.delta.standalone.DeltaScan;
+import io.delta.standalone.Snapshot;
+import io.delta.standalone.actions.AddFile;
+import io.delta.standalone.data.CloseableIterator;
+import io.delta.standalone.expressions.And;
+import io.delta.standalone.expressions.Column;
+import io.delta.standalone.expressions.EqualTo;
+import io.delta.standalone.expressions.Expression;
+import io.delta.standalone.expressions.Literal;
+import io.delta.standalone.types.IntegerType;
+import io.delta.standalone.types.StringType;
 
 /**
  * Validates that the delta log is properly created/updated. Also validates that our assumptions

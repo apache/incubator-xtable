@@ -20,12 +20,12 @@ package org.apache.xtable.hudi;
 
 import org.apache.avro.Schema;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.spi.extractor.SchemaExtractor;
+
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Extracts the canonical {@link OneSchema} from {@link Schema} represented in Hudi. This uses logic

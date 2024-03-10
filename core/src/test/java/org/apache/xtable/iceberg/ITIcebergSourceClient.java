@@ -40,9 +40,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import org.apache.iceberg.Snapshot;
-import org.apache.iceberg.data.Record;
-
 import org.apache.xtable.TestIcebergTable;
 import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.client.PerTableConfigImpl;
@@ -53,6 +50,9 @@ import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.TableFormat;
+
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.data.Record;
 
 public class ITIcebergSourceClient {
   private static final Configuration hadoopConf = new Configuration();

@@ -34,6 +34,17 @@ import lombok.Value;
 
 import org.apache.hadoop.fs.Path;
 
+import org.apache.xtable.collectors.CustomCollectors;
+import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.SchemaVersion;
+import org.apache.xtable.model.stat.PartitionValue;
+import org.apache.xtable.model.storage.FileFormat;
+import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.OneFileGroup;
+
 import org.apache.hudi.avro.model.HoodieRestoreMetadata;
 import org.apache.hudi.avro.model.HoodieRollbackMetadata;
 import org.apache.hudi.common.config.HoodieCommonConfig;
@@ -57,17 +68,6 @@ import org.apache.hudi.common.table.view.FileSystemViewStorageType;
 import org.apache.hudi.common.table.view.SyncableFileSystemView;
 import org.apache.hudi.common.table.view.TableFileSystemView;
 import org.apache.hudi.metadata.HoodieTableMetadata;
-
-import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.exception.OneIOException;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.SchemaVersion;
-import org.apache.xtable.model.stat.PartitionValue;
-import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
 
 /** Extracts all the files for Hudi table represented by {@link OneTable}. */
 public class HudiDataFileExtractor implements AutoCloseable {

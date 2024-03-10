@@ -26,12 +26,6 @@ import java.util.List;
 import org.apache.avro.generic.IndexedRecord;
 import org.junit.jupiter.api.Test;
 
-import org.apache.iceberg.PartitionSpec;
-import org.apache.iceberg.Schema;
-import org.apache.iceberg.StructLike;
-import org.apache.iceberg.avro.AvroSchemaUtil;
-import org.apache.iceberg.types.Types;
-
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OnePartitionField;
@@ -39,6 +33,12 @@ import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
+
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.StructLike;
+import org.apache.iceberg.avro.AvroSchemaUtil;
+import org.apache.iceberg.types.Types;
 
 public class TestIcebergPartitionValueConverter {
   private IcebergPartitionValueConverter partitionValueConverter =

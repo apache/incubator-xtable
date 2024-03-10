@@ -32,8 +32,6 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
 
-import scala.collection.JavaConverters;
-
 import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.schema.OneSchema;
@@ -41,6 +39,8 @@ import org.apache.xtable.model.schema.OneType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
+
+import scala.collection.JavaConverters;
 
 /** Validates the partition extraction logic from Delta tables. */
 public class TestDeltaPartitionExtractor {

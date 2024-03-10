@@ -23,14 +23,14 @@ import java.util.List;
 
 import lombok.Builder;
 
-import org.apache.iceberg.DataFile;
-
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.OneDataFile;
+
+import org.apache.iceberg.DataFile;
 
 /** Extractor of data files for Iceberg */
 @Builder

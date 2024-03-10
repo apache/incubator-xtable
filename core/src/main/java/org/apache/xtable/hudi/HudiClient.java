@@ -31,6 +31,16 @@ import lombok.NonNull;
 import lombok.SneakyThrows;
 import lombok.Value;
 
+import org.apache.xtable.collectors.CustomCollectors;
+import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.model.CommitsBacklog;
+import org.apache.xtable.model.InstantsForIncrementalSync;
+import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.schema.SchemaCatalog;
+import org.apache.xtable.spi.extractor.SourceClient;
+
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
@@ -41,16 +51,6 @@ import org.apache.hudi.common.util.Option;
 
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
-
-import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.exception.OneIOException;
-import org.apache.xtable.model.CommitsBacklog;
-import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.schema.SchemaCatalog;
-import org.apache.xtable.spi.extractor.SourceClient;
 
 public class HudiClient implements SourceClient<HoodieInstant> {
 

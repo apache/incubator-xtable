@@ -36,10 +36,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import org.apache.hudi.common.table.HoodieTableConfig;
-import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.common.util.Option;
-
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.OneTable;
@@ -51,6 +47,10 @@ import org.apache.xtable.model.schema.OneType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.OneDataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
+
+import org.apache.hudi.common.table.HoodieTableConfig;
+import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.util.Option;
 
 /**
  * Unit tests that focus on the basic control flow of the HudiTargetClient. Functional tests are in

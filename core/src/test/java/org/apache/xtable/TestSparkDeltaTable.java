@@ -38,13 +38,13 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.functions;
 
+import org.apache.xtable.delta.TestDeltaHelper;
+
 import org.apache.spark.sql.delta.DeltaLog;
 
 import com.google.common.base.Preconditions;
 
 import io.delta.tables.DeltaTable;
-
-import org.apache.xtable.delta.TestDeltaHelper;
 
 @Getter
 public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable {

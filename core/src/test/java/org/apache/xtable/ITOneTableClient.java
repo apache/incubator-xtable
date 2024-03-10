@@ -66,6 +66,18 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import org.apache.xtable.client.OneTableClient;
+import org.apache.xtable.client.PerTableConfig;
+import org.apache.xtable.client.PerTableConfigImpl;
+import org.apache.xtable.client.SourceClientProvider;
+import org.apache.xtable.delta.DeltaSourceClientProvider;
+import org.apache.xtable.hudi.HudiSourceClientProvider;
+import org.apache.xtable.hudi.HudiSourceConfigImpl;
+import org.apache.xtable.hudi.HudiTestUtil;
+import org.apache.xtable.iceberg.IcebergSourceClientProvider;
+import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.model.sync.SyncMode;
+
 import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.model.HoodieAvroPayload;
@@ -80,18 +92,6 @@ import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.spark.sql.delta.DeltaLog;
 
 import com.google.common.collect.ImmutableList;
-
-import org.apache.xtable.client.OneTableClient;
-import org.apache.xtable.client.PerTableConfig;
-import org.apache.xtable.client.PerTableConfigImpl;
-import org.apache.xtable.client.SourceClientProvider;
-import org.apache.xtable.delta.DeltaSourceClientProvider;
-import org.apache.xtable.hudi.HudiSourceClientProvider;
-import org.apache.xtable.hudi.HudiSourceConfigImpl;
-import org.apache.xtable.hudi.HudiTestUtil;
-import org.apache.xtable.iceberg.IcebergSourceClientProvider;
-import org.apache.xtable.model.storage.TableFormat;
-import org.apache.xtable.model.sync.SyncMode;
 
 public class ITOneTableClient {
   @TempDir public static Path tempDir;

@@ -23,14 +23,14 @@ import java.util.List;
 
 import lombok.Builder;
 
-import org.apache.spark.sql.delta.Snapshot;
-
 import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.OneDataFile;
 import org.apache.xtable.spi.extractor.DataFileIterator;
+
+import org.apache.spark.sql.delta.Snapshot;
 
 /** DeltaDataFileExtractor lets the consumer iterate over partitions. */
 @Builder

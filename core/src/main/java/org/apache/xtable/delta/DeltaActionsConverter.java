@@ -26,16 +26,16 @@ import lombok.NoArgsConstructor;
 
 import org.apache.hadoop.fs.Path;
 
-import org.apache.spark.sql.delta.Snapshot;
-import org.apache.spark.sql.delta.actions.AddFile;
-import org.apache.spark.sql.delta.actions.RemoveFile;
-
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.OneDataFile;
+
+import org.apache.spark.sql.delta.Snapshot;
+import org.apache.spark.sql.delta.actions.AddFile;
+import org.apache.spark.sql.delta.actions.RemoveFile;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaActionsConverter {

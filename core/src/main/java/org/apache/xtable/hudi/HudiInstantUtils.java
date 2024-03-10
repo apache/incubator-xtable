@@ -30,9 +30,9 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoField;
 
-import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
-
 import org.apache.xtable.model.exception.OneParseException;
+
+import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
 
 class HudiInstantUtils {
   private static final ZoneId ZONE_ID = ZoneId.of("UTC");

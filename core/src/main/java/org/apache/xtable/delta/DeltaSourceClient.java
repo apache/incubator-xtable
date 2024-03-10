@@ -33,17 +33,6 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.spark.sql.SparkSession;
 
-import org.apache.spark.sql.delta.DeltaHistoryManager;
-import org.apache.spark.sql.delta.DeltaLog;
-import org.apache.spark.sql.delta.Snapshot;
-import org.apache.spark.sql.delta.actions.Action;
-import org.apache.spark.sql.delta.actions.AddFile;
-import org.apache.spark.sql.delta.actions.RemoveFile;
-
-import scala.Option;
-
-import io.delta.tables.DeltaTable;
-
 import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -59,6 +48,17 @@ import org.apache.xtable.model.storage.OneDataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.spi.extractor.DataFileIterator;
 import org.apache.xtable.spi.extractor.SourceClient;
+
+import org.apache.spark.sql.delta.DeltaHistoryManager;
+import org.apache.spark.sql.delta.DeltaLog;
+import org.apache.spark.sql.delta.Snapshot;
+import org.apache.spark.sql.delta.actions.Action;
+import org.apache.spark.sql.delta.actions.AddFile;
+import org.apache.spark.sql.delta.actions.RemoveFile;
+
+import scala.Option;
+
+import io.delta.tables.DeltaTable;
 
 @Log4j2
 @Builder

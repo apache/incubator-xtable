@@ -26,6 +26,15 @@ import java.util.stream.Stream;
 
 import lombok.Builder;
 
+import org.apache.xtable.collectors.CustomCollectors;
+import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.paths.PathUtils;
+
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.Action;
@@ -35,15 +44,6 @@ import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-
-import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.stat.ColumnStat;
-import org.apache.xtable.model.storage.DataFilesDiff;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
-import org.apache.xtable.paths.PathUtils;
 
 @Builder
 public class DeltaDataFileUpdatesExtractor {

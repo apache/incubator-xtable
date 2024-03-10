@@ -31,13 +31,13 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
+import org.apache.xtable.exception.NotSupportedException;
+
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
-
-import org.apache.xtable.exception.NotSupportedException;
 
 public class TestIcebergSchemaSync {
 

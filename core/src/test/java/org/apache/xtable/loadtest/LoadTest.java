@@ -30,10 +30,6 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.apache.hudi.common.model.HoodieTableType;
-import org.apache.hudi.common.table.timeline.HoodieInstant;
-import org.apache.hudi.config.HoodieArchivalConfig;
-
 import org.apache.xtable.TestJavaHudiTable;
 import org.apache.xtable.client.OneTableClient;
 import org.apache.xtable.client.PerTableConfig;
@@ -42,6 +38,10 @@ import org.apache.xtable.client.SourceClientProvider;
 import org.apache.xtable.hudi.HudiSourceClientProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
+
+import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.config.HoodieArchivalConfig;
 
 /**
  * Tests that can be run manually to simulate lots of commits/partitions/files/etc. to understand

@@ -28,18 +28,18 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.schema.OneField;
+import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.storage.DataLayoutStrategy;
+
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.exception.TableNotFoundException;
-
-import org.apache.xtable.exception.OneIOException;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.storage.DataLayoutStrategy;
 
 /** A class used to initialize new Hudi tables and load the metadata of existing tables. */
 @Log4j2

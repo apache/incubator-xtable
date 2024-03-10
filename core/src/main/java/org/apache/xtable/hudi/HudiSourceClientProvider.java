@@ -20,12 +20,12 @@ package org.apache.xtable.hudi;
 
 import lombok.extern.log4j.Log4j2;
 
+import org.apache.xtable.client.PerTableConfig;
+import org.apache.xtable.client.SourceClientProvider;
+
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
-
-import org.apache.xtable.client.PerTableConfig;
-import org.apache.xtable.client.SourceClientProvider;
 
 /** A concrete implementation of {@link SourceClientProvider} for Hudi table format. */
 @Log4j2

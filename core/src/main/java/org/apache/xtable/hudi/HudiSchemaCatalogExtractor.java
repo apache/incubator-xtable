@@ -21,13 +21,13 @@ package org.apache.xtable.hudi;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.hudi.common.table.HoodieTableMetaClient;
-
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.spi.extractor.SchemaCatalogExtractor;
+
+import org.apache.hudi.common.table.HoodieTableMetaClient;
 
 /** Implementation of {@link SchemaCatalogExtractor} for Hudi. */
 public class HudiSchemaCatalogExtractor implements SchemaCatalogExtractor<HoodieTableMetaClient> {

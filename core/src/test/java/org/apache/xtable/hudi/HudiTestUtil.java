@@ -35,6 +35,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
 import org.apache.spark.serializer.KryoSerializer;
 
+import org.apache.xtable.model.schema.SchemaVersion;
+
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.model.HoodieAvroPayload;
@@ -47,8 +49,6 @@ import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
-
-import org.apache.xtable.model.schema.SchemaVersion;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class HudiTestUtil {

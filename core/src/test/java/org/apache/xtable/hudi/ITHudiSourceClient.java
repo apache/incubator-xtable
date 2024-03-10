@@ -50,14 +50,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import org.apache.hudi.client.HoodieReadClient;
-import org.apache.hudi.common.fs.FSUtils;
-import org.apache.hudi.common.model.HoodieAvroPayload;
-import org.apache.hudi.common.model.HoodieRecord;
-import org.apache.hudi.common.model.HoodieTableType;
-import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.common.table.timeline.HoodieInstant;
-
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestJavaHudiTable;
 import org.apache.xtable.TestSparkHudiTable;
@@ -66,6 +58,14 @@ import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.OneSnapshot;
 import org.apache.xtable.model.TableChange;
+
+import org.apache.hudi.client.HoodieReadClient;
+import org.apache.hudi.common.fs.FSUtils;
+import org.apache.hudi.common.model.HoodieAvroPayload;
+import org.apache.hudi.common.model.HoodieRecord;
+import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 /**
  * A suite of functional tests that the extraction from Hudi to Intermediate representation works.

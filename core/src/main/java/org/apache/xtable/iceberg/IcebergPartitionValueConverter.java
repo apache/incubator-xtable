@@ -34,14 +34,6 @@ import lombok.NoArgsConstructor;
 
 import org.apache.avro.generic.IndexedRecord;
 
-import org.apache.iceberg.PartitionField;
-import org.apache.iceberg.PartitionKey;
-import org.apache.iceberg.PartitionSpec;
-import org.apache.iceberg.Schema;
-import org.apache.iceberg.StructLike;
-import org.apache.iceberg.transforms.Transforms;
-import org.apache.iceberg.types.Types;
-
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.OneTable;
@@ -51,6 +43,14 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.schema.SchemaFieldFinder;
+
+import org.apache.iceberg.PartitionField;
+import org.apache.iceberg.PartitionKey;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.StructLike;
+import org.apache.iceberg.transforms.Transforms;
+import org.apache.iceberg.types.Types;
 
 /** Partition value extractor for Iceberg. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)

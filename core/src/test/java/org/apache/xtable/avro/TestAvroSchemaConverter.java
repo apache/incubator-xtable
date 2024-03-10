@@ -28,12 +28,12 @@ import java.util.Map;
 import org.apache.avro.Schema;
 import org.junit.jupiter.api.Test;
 
-import org.apache.hudi.common.util.Option;
-
 import org.apache.xtable.hudi.idtracking.IdTracker;
 import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.OneType;
+
+import org.apache.hudi.common.util.Option;
 
 public class TestAvroSchemaConverter {
   @Test

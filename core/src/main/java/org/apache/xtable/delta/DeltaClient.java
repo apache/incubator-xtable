@@ -37,6 +37,17 @@ import org.apache.spark.sql.catalyst.expressions.Literal;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
+import org.apache.xtable.client.PerTableConfig;
+import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.spi.sync.TargetClient;
+
 import org.apache.spark.sql.delta.DeltaConfigs;
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.DeltaOperations;
@@ -53,17 +64,6 @@ import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
 import com.google.common.annotations.VisibleForTesting;
-
-import org.apache.xtable.client.PerTableConfig;
-import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
-import org.apache.xtable.model.storage.TableFormat;
-import org.apache.xtable.spi.sync.TargetClient;
 
 public class DeltaClient implements TargetClient {
   private static final String MIN_READER_VERSION = String.valueOf(1);

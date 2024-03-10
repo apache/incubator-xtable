@@ -28,11 +28,11 @@ import lombok.Value;
 
 import org.apache.hadoop.fs.Path;
 
-import com.google.common.base.Preconditions;
-
 import org.apache.xtable.hudi.HudiSourceConfigImpl;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.model.sync.SyncMode;
+
+import com.google.common.base.Preconditions;
 
 /** Represents input configuration to the sync process. */
 @Value

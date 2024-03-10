@@ -27,12 +27,12 @@ import java.util.function.Supplier;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import org.apache.xtable.exception.NotSupportedException;
+
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.types.Types;
-
-import org.apache.xtable.exception.NotSupportedException;
 
 /** Syncs schema updates for Iceberg. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)

@@ -24,6 +24,8 @@ import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 
+import org.apache.xtable.hudi.idtracking.IdTracker;
+
 import org.apache.hudi.callback.HoodieClientInitCallback;
 import org.apache.hudi.client.BaseHoodieClient;
 import org.apache.hudi.common.fs.FSUtils;
@@ -34,8 +36,6 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieException;
 
 import com.google.common.annotations.VisibleForTesting;
-
-import org.apache.xtable.hudi.idtracking.IdTracker;
 
 /**
  * An implementation of {@link HoodieClientInitCallback} that adds field ID metadata to the schema.

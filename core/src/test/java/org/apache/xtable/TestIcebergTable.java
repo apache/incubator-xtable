@@ -39,6 +39,8 @@ import lombok.SneakyThrows;
 
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.xtable.iceberg.TestIcebergDataHelper;
+
 import org.apache.iceberg.AppendFiles;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileScanTask;
@@ -64,8 +66,6 @@ import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 
 import com.google.common.base.Preconditions;
-
-import org.apache.xtable.iceberg.TestIcebergDataHelper;
 
 @Getter
 public class TestIcebergTable implements GenericTable<Record, String> {
