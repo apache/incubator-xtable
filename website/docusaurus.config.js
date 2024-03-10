@@ -8,12 +8,12 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 const config = {
   title: 'Apache XTable™ (Incubating)',
   favicon: 'images/xtable-favicon.png',
-  url: 'https://onetable.dev',
+  url: 'https://xtable.apache.org',
   baseUrl: '/',
 
   // GitHub pages deployment config.
-  organizationName: 'onetable-io',
-  projectName: 'onetable',
+  organizationName: 'apache',
+  projectName: 'incubator-xtable',
 
   onBrokenLinks: 'ignore',
   onBrokenMarkdownLinks: 'warn',
