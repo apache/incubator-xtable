@@ -27,7 +27,7 @@
         <Root additivity="false" level="warn">
             <AppenderRef ref="console"/>
         </Root>
-        <Logger additivity="false" level="info" name="io.onetable">
+        <Logger additivity="false" level="info" name="org.apache.xtable">
             <AppenderRef ref="console"/>
         </Logger>
     </Loggers>

@@ -84,9 +84,9 @@ datasets:
 # configuration: A map of configuration values specific to this client.
 tableFormatsClients:
     HUDI:
-      sourceClientProviderClass: io.onetable.hudi.HudiSourceClientProvider
+      sourceClientProviderClass: org.apache.xtable.hudi.HudiSourceClientProvider
     DELTA:
-      targetClientProviderClass: io.onetable.delta.DeltaClient
+      targetClientProviderClass: org.apache.xtable.delta.DeltaClient
       configuration:
         spark.master: local[2]
         spark.app.name: onetableclient
