@@ -40,8 +40,8 @@ If you are not planning on using Iceberg, then you do not need to add these to y
    for spark you can just add `--jars hudi-extensions-0.1.0-SNAPSHOT-bundled.jar` to the end of the command.
 2. Set the following configurations in your writer options:
    ```shell md title="shell"
-   hoodie.avro.write.support.class: io.onetable.hudi.extensions.HoodieAvroWriteSupportWithFieldIds
-   hoodie.client.init.callback.classes: io.onetable.hudi.extensions.AddFieldIdsClientInitCallback
+   hoodie.avro.write.support.class: org.apache.xtable.hudi.extensions.HoodieAvroWriteSupportWithFieldIds
+   hoodie.client.init.callback.classes: org.apache.xtable.hudi.extensions.AddFieldIdsClientInitCallback
    hoodie.datasource.write.row.writer.enable : false
    ```
 3. Run your existing code that use Hudi writers

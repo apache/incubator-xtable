@@ -3,9 +3,9 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>io.onetable</groupId>
-    <artifactId>onetable</artifactId>
-    <name>onetable</name>
+    <groupId>org.apache.xtable</groupId>
+    <artifactId>xtable</artifactId>
+    <name>xtable</name>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
@@ -56,17 +56,17 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>io.onetable</groupId>
-                <artifactId>onetable-api</artifactId>
+                <groupId>org.apache.xtable</groupId>
+                <artifactId>xtable-api</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.onetable</groupId>
-                <artifactId>onetable-core</artifactId>
+                <groupId>org.apache.xtable</groupId>
+                <artifactId>xtable-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.onetable</groupId>
+                <groupId>org.apache.xtable</groupId>
                 <artifactId>hudi-utils</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -533,7 +533,7 @@
                             <groupArtifact>com.google.googlejavaformat:google-java-format</groupArtifact>
                         </googleJavaFormat>
                         <importOrder>
-                            <order>java,javax,lombok,org,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,scala,com,io.delta,io.onetable</order>
+                            <order>java,javax,lombok,org,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,scala,com,io.delta,org.apache.xtable</order>
                         </importOrder>
                         <removeUnusedImports/>
                         <licenseHeader>
@@ -552,11 +552,4 @@
         </plugins>
     </build>
 
-    <distributionManagement>
-        <repository>
-            <id>github</id>
-            <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/onetable-io/onetable</url>
-        </repository>
-    </distributionManagement>
 </project>

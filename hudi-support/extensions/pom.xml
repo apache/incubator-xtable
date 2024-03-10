@@ -6,19 +6,19 @@
     <artifactId>hudi-extensions</artifactId>
 
     <parent>
-        <groupId>io.onetable</groupId>
+        <groupId>org.apache.xtable</groupId>
         <artifactId>hudi-support</artifactId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
 
     <dependencies>
         <dependency>
-            <groupId>io.onetable</groupId>
+            <groupId>org.apache.xtable</groupId>
             <artifactId>hudi-utils</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.onetable</groupId>
-            <artifactId>onetable-core</artifactId>
+            <groupId>org.apache.xtable</groupId>
+            <artifactId>xtable-core</artifactId>
         </dependency>
 
         <!-- Logging API -->

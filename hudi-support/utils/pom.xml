@@ -6,7 +6,7 @@
     <artifactId>hudi-utils</artifactId>
 
     <parent>
-        <groupId>io.onetable</groupId>
+        <groupId>org.apache.xtable</groupId>
         <artifactId>hudi-support</artifactId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
