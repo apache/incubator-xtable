@@ -6,8 +6,8 @@ The Hudi extensions provide the ability to add field IDs to the parquet schema w
 1. Add the extensions jar (`hudi-extensions-0.1.0-SNAPSHOT-bundled.jar`) to your class path.  
 For example, if you're using the Hudi [quick-start guide](https://hudi.apache.org/docs/quick-start-guide#spark-shellsql) for spark you can just add `--jars hudi-extensions-0.1.0-SNAPSHOT-bundled.jar` to the end of the command. 
 2. Set the following configurations in your writer options:  
-   `hoodie.avro.write.support.class: io.onetable.hudi.extensions.HoodieAvroWriteSupportWithFieldIds`  
-   `hoodie.client.init.callback.classes: io.onetable.hudi.extensions.AddFieldIdsClientInitCallback`  
+   `hoodie.avro.write.support.class: org.apache.xtable.hudi.extensions.HoodieAvroWriteSupportWithFieldIds`  
+   `hoodie.client.init.callback.classes: org.apache.xtable.hudi.extensions.AddFieldIdsClientInitCallback`  
    `hoodie.datasource.write.row.writer.enable : false` (RowWriter support is coming soon)  
 3. Run your existing code that use Hudi writers
 
@@ -16,7 +16,7 @@ For example, if you're using the Hudi [quick-start guide](https://hudi.apache.or
 If you want to use OneTable with Hudi [streaming ingestion](https://hudi.apache.org/docs/hoodie_streaming_ingestion) to sync each commit into other table formats.
 ### How do you use them?
 1. Add the extensions jar (`hudi-extensions-0.1.0-SNAPSHOT-bundled.jar`) to your class path.
-2. Add `io.onetable.hudi.sync.OneTableSyncTool` to your list of sync classes
+2. Add `org.apache.xtable.hudi.sync.OneTableSyncTool` to your list of sync classes
 3. Set the following configurations based on your preferences:
    `hoodie.onetable.formats: "ICEBERG,DELTA"` (or simply use one format)
    `hoodie.onetable.target.metadata.retention.hr: 168` (default retention for target format metadata is 168 hours)

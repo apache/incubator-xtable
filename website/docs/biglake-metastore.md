@@ -117,7 +117,7 @@ catalogOptions:
 From your terminal under the cloned Apache XTable™ (Incubating) directory, run the sync process using the below command.
 
 ```shell md title="shell"
-java -cp utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar:/path/to/downloaded/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar io.onetable.utilities.RunSync  --datasetConfig my_config.yaml --icebergCatalogConfig catalog.yaml
+java -cp utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar:/path/to/downloaded/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar org.apache.xtable.utilities.RunSync  --datasetConfig my_config.yaml --icebergCatalogConfig catalog.yaml
 ```
 
 :::tip Note:

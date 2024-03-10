@@ -12,13 +12,13 @@
 
 tableFormatsClients:
     HUDI:
-      sourceClientProviderClass: io.onetable.hudi.HudiSourceClientProvider
+      sourceClientProviderClass: org.apache.xtable.hudi.HudiSourceClientProvider
     DELTA:
-      sourceClientProviderClass: io.onetable.delta.DeltaSourceClientProvider
-      targetClientProviderClass: io.onetable.delta.DeltaClient
+      sourceClientProviderClass: org.apache.xtable.delta.DeltaSourceClientProvider
+      targetClientProviderClass: org.apache.xtable.delta.DeltaClient
       configuration:
         spark.master: local[2]
         spark.app.name: onetableclient
     ICEBERG:
-      sourceClientProviderClass: io.onetable.iceberg.IcebergSourceClientProvider
-      targetClientProviderClass: io.onetable.iceberg.IcebergTargetClient
+      sourceClientProviderClass: org.apache.xtable.iceberg.IcebergSourceClientProvider
+      targetClientProviderClass: org.apache.xtable.iceberg.IcebergTargetClient
