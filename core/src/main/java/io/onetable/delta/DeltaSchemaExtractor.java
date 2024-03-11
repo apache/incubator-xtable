@@ -61,6 +61,9 @@ import io.onetable.model.schema.OneType;
 public class DeltaSchemaExtractor {
   private static final String DELTA_COLUMN_MAPPING_ID = "delta.columnMapping.id";
   private static final DeltaSchemaExtractor INSTANCE = new DeltaSchemaExtractor();
+  // Timestamps in Delta are microsecond precision by default
+  private static final Map<OneSchema.MetadataKey, Object> DEFAULT_TIMESTAMP_PRECISION_METADATA = Collections.singletonMap(
+      OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
 
   public static DeltaSchemaExtractor getInstance() {
     return INSTANCE;
@@ -181,10 +184,11 @@ public class DeltaSchemaExtractor {
         break;
       case "timestamp":
         type = OneType.TIMESTAMP;
-        // Timestamps in Delta are microsecond precision by default
-        metadata =
-            Collections.singletonMap(
-                OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+        metadata = DEFAULT_TIMESTAMP_PRECISION_METADATA;
+        break;
+      case "timestamp_ntz":
+        type = OneType.TIMESTAMP_NTZ;
+        metadata = DEFAULT_TIMESTAMP_PRECISION_METADATA;
         break;
       case "struct":
         StructType structType = (StructType) dataType;
