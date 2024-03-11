@@ -32,16 +32,6 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
-import org.apache.xtable.client.PerTableConfig;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
-import org.apache.xtable.model.storage.TableFormat;
-import org.apache.xtable.spi.sync.TargetClient;
-
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
@@ -52,6 +42,16 @@ import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NotFoundException;
+
+import org.apache.xtable.client.PerTableConfig;
+import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.spi.sync.TargetClient;
 
 @Log4j2
 public class IcebergClient implements TargetClient {

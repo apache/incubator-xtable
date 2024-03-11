@@ -37,14 +37,6 @@ import lombok.NonNull;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.io.api.Binary;
 
-import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
-import org.apache.xtable.model.stat.ColumnStat;
-import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.OneDataFile;
-
 import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
@@ -54,6 +46,14 @@ import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.hadoop.CachingPath;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 import org.apache.hudi.metadata.MetadataPartitionType;
+
+import org.apache.xtable.collectors.CustomCollectors;
+import org.apache.xtable.model.schema.OneField;
+import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.stat.Range;
+import org.apache.xtable.model.storage.OneDataFile;
 
 /** Responsible for Column stats extraction for Hudi. */
 @AllArgsConstructor

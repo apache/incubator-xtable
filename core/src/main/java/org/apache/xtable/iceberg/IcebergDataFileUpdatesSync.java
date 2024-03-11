@@ -24,6 +24,9 @@ import java.util.stream.StreamSupport;
 
 import lombok.AllArgsConstructor;
 
+import org.apache.iceberg.*;
+import org.apache.iceberg.io.CloseableIterable;
+
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.OneTable;
@@ -31,9 +34,6 @@ import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.OneDataFile;
 import org.apache.xtable.model.storage.OneDataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
-
-import org.apache.iceberg.*;
-import org.apache.iceberg.io.CloseableIterable;
 
 @AllArgsConstructor(staticName = "of")
 public class IcebergDataFileUpdatesSync {

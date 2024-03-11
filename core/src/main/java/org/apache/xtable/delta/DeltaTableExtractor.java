@@ -23,16 +23,16 @@ import java.util.List;
 
 import lombok.Builder;
 
+import org.apache.spark.sql.delta.DeltaLog;
+import org.apache.spark.sql.delta.Snapshot;
+
+import scala.Option;
+
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
-
-import org.apache.spark.sql.delta.DeltaLog;
-import org.apache.spark.sql.delta.Snapshot;
-
-import scala.Option;
 
 /** Extracts {@link OneTable} canonical representation of a table at a point in time for Delta. */
 @Builder

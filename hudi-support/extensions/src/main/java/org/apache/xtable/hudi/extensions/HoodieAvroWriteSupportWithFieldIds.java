@@ -25,10 +25,6 @@ import java.util.stream.Collectors;
 import org.apache.avro.Schema;
 import org.apache.parquet.schema.MessageType;
 
-import org.apache.xtable.hudi.idtracking.IdTracker;
-import org.apache.xtable.hudi.idtracking.models.IdMapping;
-import org.apache.xtable.hudi.idtracking.models.IdTracking;
-
 import org.apache.hudi.avro.HoodieAvroWriteSupport;
 import org.apache.hudi.common.bloom.BloomFilter;
 import org.apache.hudi.common.util.Option;
@@ -38,6 +34,10 @@ import org.apache.iceberg.mapping.MappedField;
 import org.apache.iceberg.mapping.MappedFields;
 import org.apache.iceberg.mapping.NameMapping;
 import org.apache.iceberg.parquet.ParquetSchemaUtil;
+
+import org.apache.xtable.hudi.idtracking.IdTracker;
+import org.apache.xtable.hudi.idtracking.models.IdMapping;
+import org.apache.xtable.hudi.idtracking.models.IdTracking;
 
 /**
  * An extension of the standard {@link HoodieAvroWriteSupport} that adds field IDs to the parquet

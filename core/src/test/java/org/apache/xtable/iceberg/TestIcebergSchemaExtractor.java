@@ -26,12 +26,12 @@ import java.util.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.types.Types;
+
 import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.OneType;
-
-import org.apache.iceberg.Schema;
-import org.apache.iceberg.types.Types;
 
 public class TestIcebergSchemaExtractor {
 

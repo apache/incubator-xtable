@@ -29,6 +29,13 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.iceberg.*;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.hadoop.HadoopFileIO;
+import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.io.FileIO;
+
 import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.CommitsBacklog;
@@ -47,13 +54,6 @@ import org.apache.xtable.model.storage.OneDataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.extractor.SourceClient;
-
-import org.apache.iceberg.*;
-import org.apache.iceberg.catalog.Namespace;
-import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.hadoop.HadoopFileIO;
-import org.apache.iceberg.io.CloseableIterable;
-import org.apache.iceberg.io.FileIO;
 
 @Log4j2
 @Builder

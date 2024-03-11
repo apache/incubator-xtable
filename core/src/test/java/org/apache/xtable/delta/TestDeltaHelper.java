@@ -61,10 +61,10 @@ import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
-import org.apache.xtable.GenericTable;
-
 import io.delta.tables.DeltaTable;
 import io.delta.tables.DeltaTableBuilder;
+
+import org.apache.xtable.GenericTable;
 
 @Builder
 @Getter

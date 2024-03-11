@@ -37,6 +37,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
+import org.apache.iceberg.*;
+import org.apache.iceberg.data.GenericRecord;
+import org.apache.iceberg.data.parquet.GenericParquetWriter;
+import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.io.DataWriter;
+import org.apache.iceberg.parquet.Parquet;
+import org.apache.iceberg.types.Types;
+
 import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.client.PerTableConfigImpl;
 import org.apache.xtable.model.CommitsBacklog;
@@ -55,15 +64,6 @@ import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.OneDataFile;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
-
-import org.apache.iceberg.*;
-import org.apache.iceberg.data.GenericRecord;
-import org.apache.iceberg.data.parquet.GenericParquetWriter;
-import org.apache.iceberg.expressions.Expressions;
-import org.apache.iceberg.io.CloseableIterable;
-import org.apache.iceberg.io.DataWriter;
-import org.apache.iceberg.parquet.Parquet;
-import org.apache.iceberg.types.Types;
 
 class TestIcebergSourceClient {
 

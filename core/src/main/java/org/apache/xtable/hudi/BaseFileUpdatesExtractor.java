@@ -38,13 +38,6 @@ import lombok.Value;
 
 import org.apache.hadoop.fs.Path;
 
-import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.model.schema.OneType;
-import org.apache.xtable.model.stat.ColumnStat;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
-
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
@@ -57,6 +50,13 @@ import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.hadoop.CachingPath;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
+
+import org.apache.xtable.collectors.CustomCollectors;
+import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.OneFileGroup;
 
 @AllArgsConstructor(staticName = "of")
 public class BaseFileUpdatesExtractor {

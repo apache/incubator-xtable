@@ -27,14 +27,14 @@
 ## configuration: A map of configuration values specific to this client.
 
 tableFormatsClients:
-  HUDI:
-    sourceClientProviderClass: org.apache.xtable.hudi.HudiSourceClientProvider
-  DELTA:
-    sourceClientProviderClass: org.apache.xtable.delta.DeltaSourceClientProvider
-    targetClientProviderClass: org.apache.xtable.delta.DeltaClient
-    configuration:
-      spark.master: local[2]
-      spark.app.name: onetableclient
-  ICEBERG:
-    sourceClientProviderClass: org.apache.xtable.iceberg.IcebergSourceClientProvider
-    targetClientProviderClass: org.apache.xtable.iceberg.IcebergTargetClient
+    HUDI:
+      sourceClientProviderClass: org.apache.xtable.hudi.HudiSourceClientProvider
+    DELTA:
+      sourceClientProviderClass: org.apache.xtable.delta.DeltaSourceClientProvider
+      targetClientProviderClass: org.apache.xtable.delta.DeltaClient
+      configuration:
+        spark.master: local[2]
+        spark.app.name: onetableclient
+    ICEBERG:
+      sourceClientProviderClass: org.apache.xtable.iceberg.IcebergSourceClientProvider
+      targetClientProviderClass: org.apache.xtable.iceberg.IcebergTargetClient

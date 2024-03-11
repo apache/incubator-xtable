@@ -19,24 +19,25 @@
     <Appenders>
         <!-- Console appender configuration -->
         <Console name="console" target="SYSTEM_OUT">
-            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %-5p %c:%L - %m%n"/>
+            <PatternLayout
+                    pattern="%d{yyyy-MM-dd HH:mm:ss} %-5p %c:%L - %m%n" />
         </Console>
     </Appenders>
     <Loggers>
         <!-- Root logger referring to console appender -->
-        <Root additivity="false" level="info">
-            <AppenderRef ref="console"/>
+        <Root level="info" additivity="false">
+            <AppenderRef ref="console" />
         </Root>
-        <Logger additivity="false" level="warn" name="org.apache.spark">
+        <Logger name="org.apache.spark" level="warn" additivity="false">
             <AppenderRef ref="console"/>
         </Logger>
-        <Logger additivity="false" level="info" name="org.apache.spark.sql.delta">
+        <Logger name="org.apache.spark.sql.delta" level="info" additivity="false">
             <AppenderRef ref="console"/>
         </Logger>
-        <Logger additivity="false" level="warn" name="org.sparkproject.jetty">
+        <Logger name="org.sparkproject.jetty" level="warn" additivity="false">
             <AppenderRef ref="console"/>
         </Logger>
-        <Logger additivity="false" level="warn" name="org.apache.hadoop">
+        <Logger name="org.apache.hadoop" level="warn" additivity="false">
             <AppenderRef ref="console"/>
         </Logger>
     </Loggers>

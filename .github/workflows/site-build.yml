@@ -21,8 +21,8 @@ on:
     branches:
       - main
     paths:
-      - ".github/workflows/site-build.yml"
-      - "website/**"
+      - '.github/workflows/site-build.yml'
+      - 'website/**'
 
 jobs:
   site-build:
@@ -37,9 +37,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
+          node-version: '20'
+          cache: 'npm'
           cache-dependency-path: ./website/package-lock.json
 
       - run: npm install --frozen-lockfile
       - run: npm run build
+

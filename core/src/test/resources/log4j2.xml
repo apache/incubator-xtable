@@ -19,15 +19,16 @@
     <Appenders>
         <!-- Console appender configuration -->
         <Console name="console" target="SYSTEM_OUT">
-            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %-5p %c:%L - %m%n"/>
+            <PatternLayout
+                    pattern="%d{yyyy-MM-dd HH:mm:ss} %-5p %c:%L - %m%n" />
         </Console>
     </Appenders>
     <Loggers>
         <!-- Root logger referring to console appender -->
-        <Root additivity="false" level="warn">
-            <AppenderRef ref="console"/>
+        <Root level="warn" additivity="false">
+            <AppenderRef ref="console" />
         </Root>
-        <Logger additivity="false" level="info" name="org.apache.xtable">
+        <Logger name="org.apache.xtable" level="info" additivity="false">
             <AppenderRef ref="console"/>
         </Logger>
     </Loggers>

@@ -58,24 +58,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import org.apache.xtable.client.PerTableConfigImpl;
-import org.apache.xtable.model.OneSnapshot;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
-import org.apache.xtable.model.schema.PartitionTransformType;
-import org.apache.xtable.model.stat.PartitionValue;
-import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.DataLayoutStrategy;
-import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
-import org.apache.xtable.model.storage.TableFormat;
-import org.apache.xtable.schema.SchemaFieldFinder;
-import org.apache.xtable.spi.sync.TableFormatSync;
-
 import org.apache.spark.sql.delta.GeneratedColumn;
 
 import scala.collection.JavaConverters;
@@ -93,6 +75,24 @@ import io.delta.standalone.expressions.Expression;
 import io.delta.standalone.expressions.Literal;
 import io.delta.standalone.types.IntegerType;
 import io.delta.standalone.types.StringType;
+
+import org.apache.xtable.client.PerTableConfigImpl;
+import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.schema.OneField;
+import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.PartitionTransformType;
+import org.apache.xtable.model.stat.PartitionValue;
+import org.apache.xtable.model.stat.Range;
+import org.apache.xtable.model.storage.DataLayoutStrategy;
+import org.apache.xtable.model.storage.FileFormat;
+import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.schema.SchemaFieldFinder;
+import org.apache.xtable.spi.sync.TableFormatSync;
 
 /**
  * Validates that the delta log is properly created/updated. Also validates that our assumptions

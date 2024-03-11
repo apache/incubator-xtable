@@ -27,6 +27,11 @@ import javax.inject.Singleton;
 
 import org.apache.avro.Schema;
 
+import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.TableSchemaResolver;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.util.Option;
+
 import org.apache.xtable.exception.SchemaExtractorException;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.schema.OneField;
@@ -36,11 +41,6 @@ import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.schema.SchemaFieldFinder;
 import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
-
-import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.common.table.TableSchemaResolver;
-import org.apache.hudi.common.table.timeline.HoodieInstant;
-import org.apache.hudi.common.util.Option;
 
 /** Extracts {@link OneTable} a canonical representation of table at a point in time for Hudi. */
 @Singleton

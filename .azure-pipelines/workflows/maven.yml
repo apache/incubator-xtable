@@ -17,16 +17,16 @@
 trigger:
   branches:
     include:
-      - "*" # must quote since "*" is a YAML reserved character; we want a string
+      - '*'  # must quote since "*" is a YAML reserved character; we want a string
 
 variables:
   MAVEN_CACHE_FOLDER: $(Pipeline.Workspace)/.m2/repository
-  MAVEN_OPTS: "-ntp -B -Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)"
+  MAVEN_OPTS: '-ntp -B -Dmaven.repo.local=$(MAVEN_CACHE_FOLDER)'
 
 stages:
-  - stage: build
-    jobs:
-      - job: Linux
-        pool: vmssagentspool
-        steps:
-          - template: compile-and-test.yml
+- stage: build
+  jobs:
+  - job: Linux
+    pool: vmssagentspool
+    steps:
+    - template: compile-and-test.yml

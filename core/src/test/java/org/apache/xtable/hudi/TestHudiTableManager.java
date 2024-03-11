@@ -36,6 +36,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import org.apache.hudi.common.table.HoodieTableMetaClient;
+
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OnePartitionField;
@@ -43,8 +45,6 @@ import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
-
-import org.apache.hudi.common.table.HoodieTableMetaClient;
 
 public class TestHudiTableManager {
 

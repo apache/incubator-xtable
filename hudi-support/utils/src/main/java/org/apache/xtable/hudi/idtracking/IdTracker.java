@@ -34,9 +34,6 @@ import lombok.NoArgsConstructor;
 
 import org.apache.avro.Schema;
 
-import org.apache.xtable.hudi.idtracking.models.IdMapping;
-import org.apache.xtable.hudi.idtracking.models.IdTracking;
-
 import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
@@ -44,6 +41,9 @@ import org.apache.hudi.common.util.collection.Pair;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
+
+import org.apache.xtable.hudi.idtracking.models.IdMapping;
+import org.apache.xtable.hudi.idtracking.models.IdTracking;
 
 /** Utility class for reading and writing the IdTracking information from a schema. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)

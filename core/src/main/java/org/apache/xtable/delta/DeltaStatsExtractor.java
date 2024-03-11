@@ -36,6 +36,11 @@ import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.Value;
 
+import org.apache.spark.sql.delta.actions.AddFile;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.schema.OneField;
@@ -43,11 +48,6 @@ import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.OneType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
-
-import org.apache.spark.sql.delta.actions.AddFile;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * DeltaStatsExtractor extracts column stats and also responsible for their serialization leveraging

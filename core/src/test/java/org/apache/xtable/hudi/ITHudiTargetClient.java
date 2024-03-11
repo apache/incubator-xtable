@@ -48,25 +48,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import org.apache.xtable.client.PerTableConfigImpl;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
-import org.apache.xtable.model.schema.PartitionTransformType;
-import org.apache.xtable.model.stat.ColumnStat;
-import org.apache.xtable.model.stat.PartitionValue;
-import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.DataLayoutStrategy;
-import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
-import org.apache.xtable.model.storage.TableFormat;
-import org.apache.xtable.spi.sync.TargetClient;
-
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.avro.model.StringWrapper;
 import org.apache.hudi.client.HoodieJavaWriteClient;
@@ -88,6 +69,25 @@ import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.metadata.HoodieBackedTableMetadata;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
+
+import org.apache.xtable.client.PerTableConfigImpl;
+import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.schema.OneField;
+import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.PartitionTransformType;
+import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.stat.PartitionValue;
+import org.apache.xtable.model.stat.Range;
+import org.apache.xtable.model.storage.DataLayoutStrategy;
+import org.apache.xtable.model.storage.FileFormat;
+import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.spi.sync.TargetClient;
 
 /**
  * A suite of functional tests that assert that the metadata for the hudi table is properly written

@@ -41,8 +41,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.apache.xtable.hudi.idtracking.IdTracker;
-
 import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.client.BaseHoodieClient;
 import org.apache.hudi.client.HoodieJavaWriteClient;
@@ -59,6 +57,8 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.index.HoodieIndex;
+
+import org.apache.xtable.hudi.idtracking.IdTracker;
 
 public class TestAddFieldIdsClientInitCallback {
   @TempDir static Path tempDir;

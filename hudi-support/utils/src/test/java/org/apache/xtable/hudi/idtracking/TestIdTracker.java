@@ -27,10 +27,10 @@ import java.util.List;
 import org.apache.avro.Schema;
 import org.junit.jupiter.api.Test;
 
+import org.apache.hudi.common.util.Option;
+
 import org.apache.xtable.hudi.idtracking.models.IdMapping;
 import org.apache.xtable.hudi.idtracking.models.IdTracking;
-
-import org.apache.hudi.common.util.Option;
 
 public class TestIdTracker {
 

@@ -37,6 +37,13 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
 
+import com.fasterxml.jackson.annotation.JsonMerge;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.google.common.annotations.VisibleForTesting;
+
 import org.apache.xtable.client.OneTableClient;
 import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.client.PerTableConfigImpl;
@@ -48,13 +55,6 @@ import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.reflection.ReflectionUtils;
 import org.apache.xtable.utilities.RunSync.TableFormatClients.ClientConfig;
-
-import com.fasterxml.jackson.annotation.JsonMerge;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Provides a standalone runner for the sync process. See README.md for more details on how to run

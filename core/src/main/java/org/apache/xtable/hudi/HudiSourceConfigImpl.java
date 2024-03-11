@@ -26,11 +26,11 @@ import java.util.Locale;
 import lombok.Builder;
 import lombok.Value;
 
+import com.google.common.base.Preconditions;
+
 import org.apache.xtable.client.HudiSourceConfig;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.reflection.ReflectionUtils;
-
-import com.google.common.base.Preconditions;
 
 /** Configuration of Hudi source format for the sync process. */
 @Value

@@ -18,7 +18,7 @@ name: Azure CI
 
 on:
   issue_comment:
-    types: [created, edited, deleted]
+    types: [ created, edited, deleted ]
 
 permissions:
   statuses: write
@@ -47,11 +47,11 @@ jobs:
               repo: context.repo.repo,
               pull_number: issueNumber
             });
-
+            
             // Only check open PRs and a PR that is not a HOTFIX
             const shouldSkip = (pullRequest.body.includes('HOTFIX: SKIP AZURE CI')
               || pullRequest.state != 'open');
-
+            
             if (!shouldSkip) {
               const commitHash = pullRequest.head.sha;
               console.log(`Latest commit hash: ${commitHash}`);
@@ -70,7 +70,7 @@ jobs:
             const latestCommitHash = '${{ steps.check_pr_state.outputs.latest_commit_hash }}'            
             const issueNumber = context.issue.number;
             const checkAzureCiAndCreateCommitStatus = require(`${process.env.GITHUB_WORKSPACE}/.github/workflows/azure_ci.js`);
-
+            
             await checkAzureCiAndCreateCommitStatus({
               github,
               context,

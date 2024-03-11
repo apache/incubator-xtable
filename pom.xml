@@ -15,18 +15,24 @@
   ~ See the License for the specific language governing permissions and
   ~ limitations under the License.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.apache.xtable</groupId>
+    <artifactId>xtable</artifactId>
+    <name>xtable</name>
+
     <parent>
         <groupId>org.apache</groupId>
         <artifactId>apache</artifactId>
         <version>31</version>
     </parent>
-    <groupId>org.apache.xtable</groupId>
-    <artifactId>xtable</artifactId>
+
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
-    <name>xtable</name>
+
     <modules>
         <module>api</module>
         <module>core</module>
@@ -59,6 +65,14 @@
         <skipUTs>${skipTests}</skipUTs>
         <skipITs>${skipTests}</skipITs>
     </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+        </dependency>
+    </dependencies>
 
     <dependencyManagement>
         <dependencies>
@@ -237,7 +251,6 @@
                 <groupId>org.apache.spark</groupId>
                 <artifactId>spark-core_${scala.version.prefix}</artifactId>
                 <version>${spark.version}</version>
-                <scope>provided</scope>
                 <exclusions>
                     <exclusion>
                         <groupId>org.slf4j</groupId>
@@ -248,6 +261,7 @@
                         <artifactId>log4j</artifactId>
                     </exclusion>
                 </exclusions>
+                <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.spark</groupId>
@@ -431,14 +445,6 @@
         </dependencies>
     </dependencyManagement>
 
-    <dependencies>
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>${lombok.version}</version>
-        </dependency>
-    </dependencies>
-
     <build>
         <pluginManagement>
             <plugins>
@@ -447,10 +453,10 @@
                     <artifactId>maven-shade-plugin</artifactId>
                     <executions>
                         <execution>
+                            <phase>package</phase>
                             <goals>
                                 <goal>shade</goal>
                             </goals>
-                            <phase>package</phase>
                             <configuration>
                                 <createDependencyReducedPom>false</createDependencyReducedPom>
                                 <filters>
@@ -514,14 +520,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <configuration>
-                    <redirectTestOutputToFile>true</redirectTestOutputToFile>
-                    <skip>${skipITs}</skip>
-                    <reuseForks>false</reuseForks>
-                    <forkCount>6</forkCount>
-                    <trimStackTrace>false</trimStackTrace>
-                    <argLine>-Xmx1024m</argLine>
-                </configuration>
                 <executions>
                     <execution>
                         <goals>
@@ -530,6 +528,14 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                    <skip>${skipITs}</skip>
+                    <reuseForks>false</reuseForks>
+                    <forkCount>6</forkCount>
+                    <trimStackTrace>false</trimStackTrace>
+                    <argLine>-Xmx1024m</argLine>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
@@ -543,13 +549,9 @@
                             <groupArtifact>com.google.googlejavaformat:google-java-format</groupArtifact>
                         </googleJavaFormat>
                         <importOrder>
-                            <wildcardsLast>false</wildcardsLast>
-                            <semanticSort>false</semanticSort>
-                            <order>java,javax,lombok,org,org.apache.xtable,org.apache.paimon,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,scala,com,io.delta</order>
+                            <order>java,javax,lombok,org,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,scala,com,io.delta,org.apache.xtable</order>
                         </importOrder>
-                        <removeUnusedImports>
-                            <engine>google-java-format</engine>
-                        </removeUnusedImports>
+                        <removeUnusedImports/>
                         <licenseHeader>
                             <file>style/license-header</file>
                         </licenseHeader>
@@ -565,7 +567,6 @@
                             <include>**/*.yml</include>
                             <include>**/*.yaml</include>
                         </includes>
-                        <prettier/>
                         <licenseHeader>
                             <file>style/text-license-header</file>
                             <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
@@ -586,35 +587,12 @@
                             <include>pom.xml</include>
                             <include>src/**/*.xml</include>
                         </includes>
-                        <sortPom>
-                            <encoding>UTF-8</encoding>
-                            <lineSeparator>${line.separator}</lineSeparator>
-                            <expandEmptyElements>false</expandEmptyElements>
-                            <spaceBeforeCloseEmptyElement>false</spaceBeforeCloseEmptyElement>
-                            <keepBlankLines>true</keepBlankLines>
-                            <nrOfIndentSpace>4</nrOfIndentSpace>
-                            <indentBlankLines>false</indentBlankLines>
-                            <indentSchemaLocation>false</indentSchemaLocation>
-                            <predefinedSortOrder>custom_1</predefinedSortOrder>
-                            <sortProperties>false</sortProperties>
-                            <sortModules>false</sortModules>
-                            <sortExecutions>false</sortExecutions>
-                        </sortPom>
                         <licenseHeader>
                             <file>style/xml-license-header</file>
                             <delimiter>^&lt;project|^&lt;configuration|^&lt;Configuration</delimiter>
                             <skipLinesMatching>^&lt;.*xml.+?$</skipLinesMatching>
                         </licenseHeader>
                     </pom>
-                    <markdown>
-                        <includes>
-                            <include>**/*.md</include>
-                        </includes>
-                        <excludes>
-                            <exclude>website/**</exclude>
-                        </excludes>
-                        <flexmark/>
-                    </markdown>
                     <formats>
                         <format>
                             <includes>
@@ -639,11 +617,4 @@
         </plugins>
     </build>
 
-    <distributionManagement>
-        <repository>
-            <id>github</id>
-            <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/onetable-io/onetable</url>
-        </repository>
-    </distributionManagement>
 </project>

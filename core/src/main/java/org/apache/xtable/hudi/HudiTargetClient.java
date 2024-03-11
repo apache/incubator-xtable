@@ -40,20 +40,6 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.xtable.avro.AvroSchemaConverter;
-import org.apache.xtable.client.PerTableConfig;
-import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.exception.OneIOException;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
-import org.apache.xtable.model.storage.TableFormat;
-import org.apache.xtable.spi.sync.TargetClient;
-
 import org.apache.hudi.avro.model.HoodieActionInstant;
 import org.apache.hudi.avro.model.HoodieCleanFileInfo;
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
@@ -91,6 +77,20 @@ import org.apache.hudi.table.HoodieJavaTable;
 import org.apache.hudi.table.action.clean.CleanPlanner;
 
 import com.google.common.annotations.VisibleForTesting;
+
+import org.apache.xtable.avro.AvroSchemaConverter;
+import org.apache.xtable.client.PerTableConfig;
+import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.schema.OneField;
+import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.spi.sync.TargetClient;
 
 @Log4j2
 public class HudiTargetClient implements TargetClient {
