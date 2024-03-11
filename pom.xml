@@ -22,7 +22,11 @@
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>xtable</name>
-
+    <parent>
+        <groupId>org.apache</groupId>
+        <artifactId>apache</artifactId>
+        <version>31</version>
+    </parent>
     <modules>
         <module>api</module>
         <module>core</module>
@@ -46,13 +50,9 @@
         <iceberg.version>1.4.2</iceberg.version>
         <delta.version>2.4.0</delta.version>
         <jackson.version>2.14.2</jackson.version>
-        <test.plugin.version>2.22.2</test.plugin.version>
         <spotless.version>2.43.0</spotless.version>
         <google.java.format.version>1.8</google.java.format.version>
-        <maven-enforcer-plugin.version>3.1.0</maven-enforcer-plugin.version>
         <delta.standalone.version>0.5.0</delta.standalone.version>
-        <maven-compiler-plugin.version>3.10.1</maven-compiler-plugin.version>
-        <maven-shade-plugin.version>3.4.0</maven-shade-plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Test properties -->
         <skipTests>false</skipTests>
@@ -445,7 +445,6 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-shade-plugin</artifactId>
-                    <version>${maven-shade-plugin.version}</version>
                     <executions>
                         <execution>
                             <goals>
@@ -477,7 +476,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
-                <version>${maven-enforcer-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>enforce-logging</id>
@@ -500,7 +498,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven-compiler-plugin.version}</version>
                 <configuration>
                     <release>${java.version}</release>
                 </configuration>
@@ -508,7 +505,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>${test.plugin.version}</version>
                 <configuration>
                     <skip>${skipUTs}</skip>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
@@ -518,7 +514,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <version>${test.plugin.version}</version>
                 <configuration>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <skip>${skipITs}</skip>

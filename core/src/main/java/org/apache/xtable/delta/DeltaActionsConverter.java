@@ -61,7 +61,7 @@ public class DeltaActionsConverter {
             : Collections.emptyList();
     long recordCount =
         columnStats.stream().map(ColumnStat::getNumValues).max(Long::compareTo).orElse(0L);
-    // TODO(https://github.com/onetable-io/onetable/issues/102): removed record count.
+    // TODO(https://github.com/apache/incubator-xtable/issues/102): removed record count.
     return OneDataFile.builder()
         .physicalPath(getFullPathToFile(deltaSnapshot, addFile.path()))
         .fileFormat(fileFormat)

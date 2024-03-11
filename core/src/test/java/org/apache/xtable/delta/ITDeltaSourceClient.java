@@ -317,7 +317,6 @@ public class ITDeltaSourceClient {
     DeltaSourceClient client = clientProvider.getSourceClientInstance(tableConfig);
     // Get current snapshot
     OneSnapshot snapshot = client.getCurrentSnapshot();
-    // TODO: Complete and enable test (see https://github.com/onetable-io/onetable/issues/90)
   }
 
   @ParameterizedTest

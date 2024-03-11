@@ -20,6 +20,6 @@ package org.apache.xtable.testutil;
 
 public class Issues {
 
-  /** Refer to <a href="https://github.com/onetable-io/onetable/issues/102">GitHub #102</a> */
+  /** Refer to <a href="https://github.com/apache/incubator-xtable/issues/102">GitHub #102</a> */
   public static final boolean ISSUE_102_FIXED = false;
 }
