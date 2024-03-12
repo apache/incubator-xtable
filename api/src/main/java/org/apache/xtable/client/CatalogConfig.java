@@ -21,9 +21,9 @@ package org.apache.xtable.client;
 import java.util.Map;
 
 /**
- * Catologs are responsible for the management of and providing access to the metadata associated
+ * Catalogs are responsible for the management of and providing access to the metadata associated
  * with a given set of Tables, typically within the context of a namespaces. This interface
- * represents the configuration required to initialize a client for a particualr data engine such
+ * represents the configuration required to initialize a client for a particular data engine such
  * that it can access the necessary metadata for table conversions and semantic details.
  */
 public interface CatalogConfig {

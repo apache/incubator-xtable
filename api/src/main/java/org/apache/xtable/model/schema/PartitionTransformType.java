@@ -20,7 +20,7 @@ package org.apache.xtable.model.schema;
 
 /**
  * The type of transformation to apply to a field in the schema to generate the partition value.
- * YEAR, MONTH, DAY, HOUR applies to source field which is of timestamp type where as VALUE type
+ * YEAR, MONTH, DAY, HOUR applies to source field which is of timestamp type whereas VALUE type
  * represents identity transformation.
  *
  * @since 0.1
