@@ -584,12 +584,15 @@
                     </shell>
                     <pom>
                         <includes>
-                            <include>pom.xml</include>
-                            <include>src/**/*.xml</include>
+                            <include>**/*.xml</include>
                         </includes>
+                        <excludes>
+                            <exclude>.idea/**</exclude>
+                            <exclude>target/**</exclude>
+                        </excludes>
                         <licenseHeader>
                             <file>style/xml-license-header</file>
-                            <delimiter>^&lt;project|^&lt;configuration|^&lt;Configuration</delimiter>
+                            <delimiter>^&lt;project|^&lt;configuration|^&lt;Configuration|^&lt;extensions|^&lt;component</delimiter>
                             <skipLinesMatching>^&lt;.*xml.+?$</skipLinesMatching>
                         </licenseHeader>
                     </pom>
