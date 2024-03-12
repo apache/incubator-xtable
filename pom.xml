@@ -599,6 +599,9 @@
                                 <include>**/*.properties</include>
                                 <include>**/*.config</include>
                             </includes>
+                            <excludes>
+                                <exclude>demo/data/**</exclude>
+                            </excludes>
                             <licenseHeader>
                                 <file>style/text-license-header</file>
                                 <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
