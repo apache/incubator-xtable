@@ -29,15 +29,15 @@ github:
   enabled_merge_buttons:
     # "squash and merge" replaces committer with noreply@github, and we don't want that
     # See https://lists.apache.org/thread/vxxpt1x316kjryb4dptsbs95p66d9xrv
-    squash: false
+    squash:  false
     # We prefer linear history, so creating merge commits is disabled in UI
-    merge: false
-    rebase: true
+    merge:   false
+    rebase:  true
   protected_branches:
     main:
       required_pull_request_reviews:
         required_approving_review_count: 1
 notifications:
-  commits: commits@xtable.apache.org
-  issues: commits@xtable.apache.org
-  pullrequests: commits@xtable.apache.org
+    commits:      commits@xtable.apache.org
+    issues:       commits@xtable.apache.org
+    pullrequests: commits@xtable.apache.org
