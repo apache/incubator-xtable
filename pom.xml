@@ -565,6 +565,7 @@
                         </includes>
                         <excludes>
                             <exclude>target/**</exclude>
+                            <exclude>website/node_modules/**</exclude>
                         </excludes>
                         <black/>
                     </python>
@@ -575,6 +576,7 @@
                         </includes>
                         <excludes>
                             <exclude>target/**</exclude>
+                            <exclude>website/node_modules/**</exclude>
                         </excludes>
                         <licenseHeader>
                             <file>style/text-license-header</file>
@@ -587,6 +589,7 @@
                         </includes>
                         <excludes>
                             <exclude>target/**</exclude>
+                            <exclude>website/node_modules/**</exclude>
                         </excludes>
                         <licenseHeader>
                             <file>style/text-license-header</file>
@@ -601,6 +604,7 @@
                         <excludes>
                             <exclude>.idea/**</exclude>
                             <exclude>target/**</exclude>
+                            <exclude>website/node_modules/**</exclude>
                         </excludes>
                         <licenseHeader>
                             <file>style/xml-license-header</file>
@@ -617,6 +621,7 @@
                             <excludes>
                                 <exclude>demo/data/**</exclude>
                                 <exclude>target/**</exclude>
+                                <exclude>website/node_modules/**</exclude>
                             </excludes>
                             <licenseHeader>
                                 <file>style/text-license-header</file>
