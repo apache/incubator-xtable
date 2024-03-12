@@ -552,6 +552,9 @@
                             <order>java,javax,lombok,org,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,scala,com,io.delta,org.apache.xtable</order>
                         </importOrder>
                         <removeUnusedImports/>
+                        <excludes>
+                            <exclude>target/**</exclude>
+                        </excludes>
                         <licenseHeader>
                             <file>style/license-header</file>
                         </licenseHeader>
@@ -560,6 +563,9 @@
                         <includes>
                             <include>**/*.py</include>
                         </includes>
+                        <excludes>
+                            <exclude>target/**</exclude>
+                        </excludes>
                         <black/>
                     </python>
                     <yaml>
@@ -567,6 +573,9 @@
                             <include>**/*.yml</include>
                             <include>**/*.yaml</include>
                         </includes>
+                        <excludes>
+                            <exclude>target/**</exclude>
+                        </excludes>
                         <licenseHeader>
                             <file>style/text-license-header</file>
                             <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
@@ -576,6 +585,9 @@
                         <includes>
                             <include>**/*.sh</include>
                         </includes>
+                        <excludes>
+                            <exclude>target/**</exclude>
+                        </excludes>
                         <licenseHeader>
                             <file>style/text-license-header</file>
                             <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
@@ -604,6 +616,7 @@
                             </includes>
                             <excludes>
                                 <exclude>demo/data/**</exclude>
+                                <exclude>target/**</exclude>
                             </excludes>
                             <licenseHeader>
                                 <file>style/text-license-header</file>
