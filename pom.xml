@@ -1,4 +1,20 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -44,6 +60,7 @@
         <google.java.format.version>1.8</google.java.format.version>
         <delta.standalone.version>0.5.0</delta.standalone.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <target.dir.pattern>**/target/**</target.dir.pattern>
         <!-- Test properties -->
         <skipTests>false</skipTests>
         <skipUTs>${skipTests}</skipUTs>
@@ -536,10 +553,83 @@
                             <order>java,javax,lombok,org,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,scala,com,io.delta,org.apache.xtable</order>
                         </importOrder>
                         <removeUnusedImports/>
+                        <excludes>
+                            <exclude>${target.dir.pattern}</exclude>
+                        </excludes>
                         <licenseHeader>
                             <file>style/license-header</file>
                         </licenseHeader>
                     </java>
+                    <python>
+                        <includes>
+                            <include>**/*.py</include>
+                        </includes>
+                        <excludes>
+                            <exclude>${target.dir.pattern}</exclude>
+                            <exclude>website/node_modules/**</exclude>
+                        </excludes>
+                        <black/>
+                    </python>
+                    <yaml>
+                        <includes>
+                            <include>**/*.yml</include>
+                            <include>**/*.yaml</include>
+                        </includes>
+                        <excludes>
+                            <exclude>${target.dir.pattern}</exclude>
+                            <exclude>website/node_modules/**</exclude>
+                        </excludes>
+                        <licenseHeader>
+                            <file>style/text-license-header</file>
+                            <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
+                        </licenseHeader>
+                    </yaml>
+                    <shell>
+                        <includes>
+                            <include>**/*.sh</include>
+                        </includes>
+                        <excludes>
+                            <exclude>${target.dir.pattern}</exclude>
+                            <exclude>website/node_modules/**</exclude>
+                        </excludes>
+                        <licenseHeader>
+                            <file>style/text-license-header</file>
+                            <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
+                            <skipLinesMatching>^#!.+?$</skipLinesMatching>
+                        </licenseHeader>
+                    </shell>
+                    <pom>
+                        <includes>
+                            <include>**/*.xml</include>
+                        </includes>
+                        <excludes>
+                            <exclude>.idea/**</exclude>
+                            <exclude>${target.dir.pattern}</exclude>
+                            <exclude>website/node_modules/**</exclude>
+                        </excludes>
+                        <licenseHeader>
+                            <file>style/xml-license-header</file>
+                            <delimiter>^&lt;project|^&lt;configuration|^&lt;Configuration|^&lt;extensions|^&lt;component</delimiter>
+                            <skipLinesMatching>^&lt;.*xml.+?$</skipLinesMatching>
+                        </licenseHeader>
+                    </pom>
+                    <formats>
+                        <format>
+                            <includes>
+                                <include>**/*.properties</include>
+                                <include>**/*.config</include>
+                            </includes>
+                            <excludes>
+                                <exclude>demo/data/**</exclude>
+                                <exclude>${target.dir.pattern}</exclude>
+                                <exclude>website/node_modules/**</exclude>
+                            </excludes>
+                            <licenseHeader>
+                                <file>style/text-license-header</file>
+                                <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
+                            </licenseHeader>
+                        </format>
+                    </formats>
                 </configuration>
                 <executions>
                     <execution>
