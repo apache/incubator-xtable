@@ -131,11 +131,6 @@
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_${scala.version.prefix}</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
-            <scope>test</scope>
-        </dependency>
 
         <!-- Mockito -->
         <dependency>
