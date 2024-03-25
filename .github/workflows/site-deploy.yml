@@ -51,7 +51,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         if: github.ref == 'refs/heads/main'
         with:
-          deploy_key: ${{ secrets.XTABLE_WEBSITE_BUILD }}
+          personal_token: ${{ secrets.XTABLE_WEBSITE_BUILD }}
           external_repository: apache/incubator-xtable-site
           keep_files: true
           publish_branch: main
