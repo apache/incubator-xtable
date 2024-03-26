@@ -19,101 +19,34 @@
 package org.apache.xtable.model.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
 
-import java.io.File;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
 public class TestDataFilesDiff {
   @Test
-  void findDiffFromFileGroups() {
-    OneDataFile file1Group1 = OneDataFile.builder().physicalPath("file1Group1").build();
-    OneDataFile file2Group1 = OneDataFile.builder().physicalPath("file2Group1").build();
-    OneDataFile file1Group2 = OneDataFile.builder().physicalPath("file1Group2").build();
-    OneDataFile file2Group2 = OneDataFile.builder().physicalPath("file2Group2").build();
+  void testFrom() {
+    InternalDataFile sourceFile1 =
+        InternalDataFile.builder().physicalPath("file://new_source_file1.parquet").build();
+    InternalDataFile sourceFile2 =
+        InternalDataFile.builder().physicalPath("file://new_source_file2.parquet").build();
+    InternalDataFile targetFile1 =
+        InternalDataFile.builder().physicalPath("file://already_in_target1.parquet").build();
+    InternalDataFile targetFile2 =
+        InternalDataFile.builder().physicalPath("file://already_in_target2.parquet").build();
+    InternalDataFile sourceFileInTargetAlready =
+        InternalDataFile.builder().physicalPath("file://already_in_target3.parquet").build();
+    DataFilesDiff actual =
+        DataFilesDiff.from(
+            Arrays.asList(sourceFile1, sourceFile2, sourceFileInTargetAlready),
+            Arrays.asList(targetFile1, targetFile2, sourceFileInTargetAlready));
 
-    List<OneFileGroup> latestFileGroups =
-        OneFileGroup.fromFiles(Arrays.asList(file1Group1, file2Group1, file1Group2, file2Group2));
-
-    Map<String, File> previousFiles = new HashMap<>();
-    File file1 = mock(File.class);
-    File file2 = mock(File.class);
-    File file3 = mock(File.class);
-    previousFiles.put("file1Group1", file1);
-    previousFiles.put("file2NoGroup", file2);
-    previousFiles.put("file2Group2", file3);
-
-    DataFilesDiff<OneDataFile, File> diff =
-        DataFilesDiff.findNewAndRemovedFiles(latestFileGroups, previousFiles);
-    assertEquals(2, diff.getFilesAdded().size());
-    assertTrue(diff.getFilesAdded().contains(file1Group2));
-    assertTrue(diff.getFilesAdded().contains(file2Group1));
-    assertEquals(1, diff.getFilesRemoved().size());
-    assertTrue(diff.getFilesRemoved().contains(file2));
-  }
-
-  @Test
-  void findDiffFromFilesNoPrevious() {
-    File file1 = mock(File.class);
-    File file2 = mock(File.class);
-
-    Map<String, File> previousFiles = new HashMap<>();
-    Map<String, File> latestFiles = new HashMap<>();
-    latestFiles.put("file1", file1);
-    latestFiles.put("file2", file2);
-
-    DataFilesDiff<File, File> diff =
-        DataFilesDiff.findNewAndRemovedFiles(latestFiles, previousFiles);
-    assertEquals(0, diff.getFilesRemoved().size());
-    assertEquals(2, diff.getFilesAdded().size());
-    assertTrue(diff.getFilesAdded().contains(file1));
-    assertTrue(diff.getFilesAdded().contains(file2));
-  }
-
-  @Test
-  void findDiffFromFilesNoNew() {
-    File file1 = mock(File.class);
-    File file2 = mock(File.class);
-
-    Map<String, File> previousFiles = new HashMap<>();
-    previousFiles.put("file1", file1);
-    previousFiles.put("file2", file2);
-
-    Map<String, File> latestFiles = new HashMap<>();
-    latestFiles.put("file1", file1);
-    latestFiles.put("file2", file2);
-
-    DataFilesDiff<File, File> diff =
-        DataFilesDiff.findNewAndRemovedFiles(latestFiles, previousFiles);
-    assertEquals(0, diff.getFilesRemoved().size());
-    assertEquals(0, diff.getFilesAdded().size());
-  }
-
-  @Test
-  void findDiffFromFiles() {
-    File file1 = mock(File.class);
-    File file2 = mock(File.class);
-    File file3 = mock(File.class);
-
-    Map<String, File> previousFiles = new HashMap<>();
-    previousFiles.put("file1", file1);
-    previousFiles.put("file2", file2);
-
-    Map<String, File> latestFiles = new HashMap<>();
-    latestFiles.put("file2", file2);
-    latestFiles.put("file3", file3);
-
-    DataFilesDiff<File, File> diff =
-        DataFilesDiff.findNewAndRemovedFiles(latestFiles, previousFiles);
-    assertEquals(1, diff.getFilesAdded().size());
-    assertTrue(diff.getFilesAdded().contains(file3));
-    assertEquals(1, diff.getFilesRemoved().size());
-    assertTrue(diff.getFilesRemoved().contains(file1));
+    DataFilesDiff expected =
+        DataFilesDiff.builder()
+            .filesAdded(Arrays.asList(sourceFile1, sourceFile2))
+            .filesRemoved(Arrays.asList(targetFile1, targetFile2))
+            .build();
+    assertEquals(expected, actual);
   }
 }

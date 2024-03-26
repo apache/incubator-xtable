@@ -54,8 +54,8 @@ import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.schema.OneType;
 import org.apache.xtable.model.stat.ColumnStat;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.OneFileGroup;
 
 @AllArgsConstructor(staticName = "of")
@@ -94,17 +94,18 @@ public class BaseFileUpdatesExtractor {
         partitionedDataFiles.stream()
             .map(
                 partitionFileGroup -> {
-                  List<OneDataFile> dataFiles = partitionFileGroup.getFiles();
+                  List<InternalDataFile> dataFiles = partitionFileGroup.getFiles();
                   String partitionPath = getPartitionPath(tableBasePath, dataFiles);
                   // remove the partition from the set of partitions to drop since it is present in
                   // the snapshot
                   partitionPathsToDrop.remove(partitionPath);
                   // create a map of file path to the data file, any entries not in the hudi table
                   // will be added
-                  Map<String, OneDataFile> physicalPathToFile =
+                  Map<String, InternalDataFile> physicalPathToFile =
                       dataFiles.stream()
                           .collect(
-                              Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
+                              Collectors.toMap(
+                                  InternalDataFile::getPhysicalPath, Function.identity()));
                   List<HoodieBaseFile> baseFiles =
                       isTableInitialized
                           ? fsView.getLatestBaseFiles(partitionPath).collect(Collectors.toList())
@@ -160,16 +161,16 @@ public class BaseFileUpdatesExtractor {
   }
 
   /**
-   * Converts the provided {@link OneDataFilesDiff}.
+   * Converts the provided {@link DataFilesDiff}.
    *
-   * @param oneDataFilesDiff the diff to apply to the Hudi table
+   * @param dataFilesDiff the diff to apply to the Hudi table
    * @param commit The current commit started by the Hudi client
    * @return The information needed to create a "replace" commit for the Hudi table
    */
-  ReplaceMetadata convertDiff(@NonNull OneDataFilesDiff oneDataFilesDiff, @NonNull String commit) {
+  ReplaceMetadata convertDiff(@NonNull DataFilesDiff dataFilesDiff, @NonNull String commit) {
     // For all removed files, group by partition and extract the file id
     Map<String, List<String>> partitionToReplacedFileIds =
-        oneDataFilesDiff.getFilesRemoved().stream()
+        dataFilesDiff.getFilesRemoved().stream()
             .map(file -> new CachingPath(file.getPhysicalPath()))
             .collect(
                 Collectors.groupingBy(
@@ -177,9 +178,9 @@ public class BaseFileUpdatesExtractor {
                     Collectors.mapping(this::getFileId, Collectors.toList())));
     // For all added files, group by partition and extract the file id
     List<WriteStatus> writeStatuses =
-        oneDataFilesDiff.getFilesAdded().stream()
+        dataFilesDiff.getFilesAdded().stream()
             .map(file -> toWriteStatus(tableBasePath, commit, file, Optional.empty()))
-            .collect(CustomCollectors.toList(oneDataFilesDiff.getFilesAdded().size()));
+            .collect(CustomCollectors.toList(dataFilesDiff.getFilesAdded().size()));
     return ReplaceMetadata.of(partitionToReplacedFileIds, writeStatuses);
   }
 
@@ -206,7 +207,7 @@ public class BaseFileUpdatesExtractor {
   private WriteStatus toWriteStatus(
       Path tableBasePath,
       String commitTime,
-      OneDataFile file,
+      InternalDataFile file,
       Optional<String> partitionPathOptional) {
     WriteStatus writeStatus = new WriteStatus();
     Path path = new CachingPath(file.getPhysicalPath());
@@ -269,7 +270,7 @@ public class BaseFileUpdatesExtractor {
     }
   }
 
-  private String getPartitionPath(Path tableBasePath, List<OneDataFile> files) {
+  private String getPartitionPath(Path tableBasePath, List<InternalDataFile> files) {
     return HudiPathUtils.getPartitionPath(
         tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
   }

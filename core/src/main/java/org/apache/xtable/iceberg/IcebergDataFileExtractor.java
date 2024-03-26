@@ -30,7 +30,7 @@ import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.InternalDataFile;
 
 /** Extractor of data files for Iceberg */
 @Builder
@@ -41,19 +41,19 @@ public class IcebergDataFileExtractor {
       IcebergPartitionValueConverter.getInstance();
 
   /**
-   * Builds {@link OneDataFile} representation from Iceberg {@link DataFile}.
+   * Builds {@link InternalDataFile} representation from Iceberg {@link DataFile}.
    *
    * @param dataFile Iceberg data file
    * @param partitionValues representation of partition fields and ranges
    * @param schema current schema for the table, used for mapping field IDs to stats
    * @return corresponding OneTable data file
    */
-  OneDataFile fromIceberg(
+  InternalDataFile fromIceberg(
       DataFile dataFile, List<PartitionValue> partitionValues, OneSchema schema) {
     return fromIceberg(dataFile, partitionValues, schema, true);
   }
 
-  private OneDataFile fromIceberg(
+  private InternalDataFile fromIceberg(
       DataFile dataFile,
       List<PartitionValue> partitionValues,
       OneSchema schema,
@@ -74,7 +74,7 @@ public class IcebergDataFileExtractor {
     if (!filePath.contains(":")) {
       filePath = "file:" + filePath;
     }
-    return OneDataFile.builder()
+    return InternalDataFile.builder()
         .physicalPath(filePath)
         .fileFormat(fromIcebergFileFormat(dataFile.format()))
         .fileSizeBytes(dataFile.fileSizeInBytes())

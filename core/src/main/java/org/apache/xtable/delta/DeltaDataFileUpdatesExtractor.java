@@ -40,8 +40,8 @@ import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.DataFilesDiff;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.FilesDiff;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.paths.PathUtils;
 
@@ -72,25 +72,25 @@ public class DeltaDataFileUpdatesExtractor {
                     file -> DeltaActionsConverter.getFullPathToFile(snapshot, file.path()),
                     file -> file));
 
-    DataFilesDiff<OneDataFile, Action> diff =
-        OneDataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
+    FilesDiff<InternalDataFile, Action> diff =
+        DataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
     return applyDiff(
         diff.getFilesAdded(), diff.getFilesRemoved(), tableSchema, deltaLog.dataPath().toString());
   }
 
   public Seq<Action> applyDiff(
-      OneDataFilesDiff oneDataFilesDiff, OneSchema tableSchema, String tableBasePath) {
+      DataFilesDiff dataFilesDiff, OneSchema tableSchema, String tableBasePath) {
     List<Action> removeActions =
-        oneDataFilesDiff.getFilesRemoved().stream()
+        dataFilesDiff.getFilesRemoved().stream()
             .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath))
             .map(AddFile::remove)
-            .collect(CustomCollectors.toList(oneDataFilesDiff.getFilesRemoved().size()));
-    return applyDiff(oneDataFilesDiff.getFilesAdded(), removeActions, tableSchema, tableBasePath);
+            .collect(CustomCollectors.toList(dataFilesDiff.getFilesRemoved().size()));
+    return applyDiff(dataFilesDiff.getFilesAdded(), removeActions, tableSchema, tableBasePath);
   }
 
   private Seq<Action> applyDiff(
-      Set<OneDataFile> filesAdded,
+      Set<InternalDataFile> filesAdded,
       Collection<Action> removeFileActions,
       OneSchema tableSchema,
       String tableBasePath) {
@@ -105,7 +105,7 @@ public class DeltaDataFileUpdatesExtractor {
   }
 
   private Stream<AddFile> createAddFileAction(
-      OneDataFile dataFile, OneSchema schema, String tableBasePath) {
+      InternalDataFile dataFile, OneSchema schema, String tableBasePath) {
     return Stream.of(
         new AddFile(
             // Delta Lake supports relative and absolute paths in theory but relative paths seem

@@ -60,7 +60,7 @@ import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.TargetClient;
@@ -186,10 +186,10 @@ public class DeltaClient implements TargetClient {
   }
 
   @Override
-  public void syncFilesForDiff(OneDataFilesDiff oneDataFilesDiff) {
+  public void syncFilesForDiff(DataFilesDiff dataFilesDiff) {
     transactionState.setActions(
         dataFileUpdatesExtractor.applyDiff(
-            oneDataFilesDiff,
+            dataFilesDiff,
             transactionState.getLatestSchemaInternal(),
             deltaLog.dataPath().toString()));
   }

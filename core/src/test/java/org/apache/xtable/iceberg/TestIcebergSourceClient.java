@@ -26,7 +26,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -59,11 +62,9 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.PartitionValue;
-import org.apache.xtable.model.storage.DataLayoutStrategy;
+import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
-import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.model.storage.InternalDataFile;
 
 class TestIcebergSourceClient {
 
@@ -176,20 +177,20 @@ class TestIcebergSourceClient {
     List<OneFileGroup> dataFileChunks = oneSnapshot.getPartitionedDataFiles();
     assertEquals(5, dataFileChunks.size());
     for (OneFileGroup dataFilesChunk : dataFileChunks) {
-      List<OneDataFile> oneDataFiles = dataFilesChunk.getFiles();
-      assertEquals(1, oneDataFiles.size());
-      OneDataFile oneDataFile = oneDataFiles.get(0);
-      assertEquals(FileFormat.APACHE_PARQUET, oneDataFile.getFileFormat());
-      assertEquals(1, oneDataFile.getRecordCount());
-      Assertions.assertTrue(oneDataFile.getPhysicalPath().startsWith("file:" + workingDir));
+      List<InternalDataFile> internalDataFiles = dataFilesChunk.getFiles();
+      assertEquals(1, internalDataFiles.size());
+      InternalDataFile internalDataFile = internalDataFiles.get(0);
+      assertEquals(FileFormat.APACHE_PARQUET, internalDataFile.getFileFormat());
+      assertEquals(1, internalDataFile.getRecordCount());
+      Assertions.assertTrue(internalDataFile.getPhysicalPath().startsWith("file:" + workingDir));
 
-      List<PartitionValue> partitionValues = oneDataFile.getPartitionValues();
+      List<PartitionValue> partitionValues = internalDataFile.getPartitionValues();
       assertEquals(1, partitionValues.size());
       PartitionValue partitionEntry = partitionValues.iterator().next();
       assertEquals(
           "cs_sold_date_sk", partitionEntry.getPartitionField().getSourceField().getName());
       // TODO generate test with column stats
-      assertEquals(0, oneDataFile.getColumnStats().size());
+      assertEquals(0, internalDataFile.getColumnStats().size());
     }
   }
 

@@ -97,7 +97,7 @@ import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.schema.SchemaFieldFinder;
@@ -224,9 +224,9 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
     schemas.put(schemaVersion2, schema2);
 
-    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, Collections.emptyList());
-    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, Collections.emptyList());
-    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyList());
+    InternalDataFile dataFile1 = getDataFile(schemaVersion1, 1, Collections.emptyList());
+    InternalDataFile dataFile2 = getDataFile(schemaVersion1, 2, Collections.emptyList());
+    InternalDataFile dataFile3 = getDataFile(schemaVersion2, 3, Collections.emptyList());
     OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
     when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
@@ -320,10 +320,10 @@ public class TestIcebergSync {
     SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
     schemas.put(schemaVersion2, schema2);
 
-    OneDataFile dataFile1 = getOneDataFile(schemaVersion1, 1, Collections.emptyList());
-    OneDataFile dataFile2 = getOneDataFile(schemaVersion1, 2, Collections.emptyList());
-    OneDataFile dataFile3 = getOneDataFile(schemaVersion2, 3, Collections.emptyList());
-    OneDataFile dataFile4 = getOneDataFile(schemaVersion2, 4, Collections.emptyList());
+    InternalDataFile dataFile1 = getDataFile(schemaVersion1, 1, Collections.emptyList());
+    InternalDataFile dataFile2 = getDataFile(schemaVersion1, 2, Collections.emptyList());
+    InternalDataFile dataFile3 = getDataFile(schemaVersion2, 3, Collections.emptyList());
+    InternalDataFile dataFile4 = getDataFile(schemaVersion2, 4, Collections.emptyList());
     OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
     OneSnapshot snapshot3 = buildSnapshot(table2, schemas, dataFile3, dataFile4);
@@ -397,9 +397,9 @@ public class TestIcebergSync {
                 .partitionField(partitionField)
                 .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
                 .build());
-    OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
-    OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues1);
-    OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues2);
+    InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
+    InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues1);
+    InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues2);
     OneSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(oneSchema))
@@ -461,9 +461,9 @@ public class TestIcebergSync {
                 .partitionField(partitionField)
                 .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
                 .build());
-    OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
-    OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues1);
-    OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues2);
+    InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
+    InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues1);
+    InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues2);
     OneSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
@@ -516,9 +516,9 @@ public class TestIcebergSync {
     List<PartitionValue> partitionValues2 =
         Collections.singletonList(
             PartitionValue.builder().partitionField(partitionField).range(Range.scalar(2)).build());
-    OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
-    OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues1);
-    OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues2);
+    InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
+    InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues1);
+    InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues2);
     OneSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
@@ -592,9 +592,9 @@ public class TestIcebergSync {
                 .partitionField(partitionField2)
                 .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
                 .build());
-    OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
-    OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues2);
-    OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues3);
+    InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
+    InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues2);
+    InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues3);
     OneSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
@@ -659,9 +659,9 @@ public class TestIcebergSync {
                 .partitionField(partitionField)
                 .range(Range.scalar("value2"))
                 .build());
-    OneDataFile dataFile1 = getOneDataFile(schemaVersion, 1, partitionValues1);
-    OneDataFile dataFile2 = getOneDataFile(schemaVersion, 2, partitionValues1);
-    OneDataFile dataFile3 = getOneDataFile(schemaVersion, 3, partitionValues2);
+    InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
+    InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues1);
+    InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues2);
     OneSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
@@ -687,7 +687,7 @@ public class TestIcebergSync {
   }
 
   private OneSnapshot buildSnapshot(
-      OneTable table, Map<SchemaVersion, OneSchema> schemas, OneDataFile... dataFiles) {
+      OneTable table, Map<SchemaVersion, OneSchema> schemas, InternalDataFile... dataFiles) {
     return OneSnapshot.builder()
         .table(table)
         .schemaCatalog(SchemaCatalog.builder().schemas(schemas).build())
@@ -695,10 +695,10 @@ public class TestIcebergSync {
         .build();
   }
 
-  private OneDataFile getOneDataFile(
+  private InternalDataFile getDataFile(
       SchemaVersion schemaVersion, int index, List<PartitionValue> partitionValues) {
     String physicalPath = "file:/physical" + index + ".parquet";
-    return OneDataFile.builder()
+    return InternalDataFile.builder()
         .fileFormat(FileFormat.APACHE_PARQUET)
         .fileSizeBytes(RANDOM.nextInt(10000))
         .physicalPath(physicalPath)
@@ -727,7 +727,10 @@ public class TestIcebergSync {
   }
 
   private void validateIcebergTable(
-      String tableName, OneTable table, Set<OneDataFile> expectedFiles, Expression filterExpression)
+      String tableName,
+      OneTable table,
+      Set<InternalDataFile> expectedFiles,
+      Expression filterExpression)
       throws IOException {
     Path warehouseLocation = Paths.get(table.getBasePath()).getParent();
     try (HadoopCatalog catalog = new HadoopCatalog(CONFIGURATION, warehouseLocation.toString())) {
@@ -741,12 +744,13 @@ public class TestIcebergSync {
         assertEquals(1, Iterables.size(tasks), "1 combined scan task should be generated");
         for (CombinedScanTask combinedScanTask : tasks) {
           assertEquals(expectedFiles.size(), combinedScanTask.files().size());
-          Map<String, OneDataFile> pathToFile =
+          Map<String, InternalDataFile> pathToFile =
               expectedFiles.stream()
-                  .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
+                  .collect(
+                      Collectors.toMap(InternalDataFile::getPhysicalPath, Function.identity()));
           for (FileScanTask fileScanTask : combinedScanTask.files()) {
             // check that path and other stats match
-            OneDataFile expected = pathToFile.get(fileScanTask.file().path());
+            InternalDataFile expected = pathToFile.get(fileScanTask.file().path());
             assertNotNull(expected);
             assertEquals(expected.getFileSizeBytes(), fileScanTask.file().fileSizeInBytes());
             assertEquals(expected.getRecordCount(), fileScanTask.file().recordCount());
@@ -766,7 +770,7 @@ public class TestIcebergSync {
     }
   }
 
-  private void mockColStatsForFile(OneDataFile dataFile, int times) {
+  private void mockColStatsForFile(InternalDataFile dataFile, int times) {
     Metrics response = new Metrics(dataFile.getRecordCount(), null, null, null, null);
     Metrics[] responses =
         IntStream.of(times - 1).mapToObj(unused -> response).toArray(Metrics[]::new);

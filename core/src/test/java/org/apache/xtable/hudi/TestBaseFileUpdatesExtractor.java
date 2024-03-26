@@ -60,9 +60,9 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
+import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.testutil.ColumnStatMapUtil;
 
@@ -90,38 +90,38 @@ public class TestBaseFileUpdatesExtractor {
     String partitionPath1 = "partition1";
     String fileName1 = "file1.parquet";
     // create file with empty stats to test edge case
-    OneDataFile addedFile1 =
+    InternalDataFile addedFile1 =
         createFile(
             String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName1),
             Collections.emptyList());
     // create file with stats
     String partitionPath2 = "partition2";
     String fileName2 = "file2.parquet";
-    OneDataFile addedFile2 =
+    InternalDataFile addedFile2 =
         createFile(
             String.format("%s/%s/%s", tableBasePath, partitionPath2, fileName2), getColumnStats());
 
     // remove files 3 files from two different partitions
     String fileName3 = "file3.parquet";
-    OneDataFile removedFile1 =
+    InternalDataFile removedFile1 =
         createFile(
             String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName3), getColumnStats());
     // create file that matches hudi format to mimic that a file create by hudi is now being removed
     // by another system
     String fileIdForFile4 = "d1cf0980-445c-4c74-bdeb-b7e5d18779f5-0";
     String fileName4 = fileIdForFile4 + "_0-1116-142216_20231003013807542.parquet";
-    OneDataFile removedFile2 =
+    InternalDataFile removedFile2 =
         createFile(
             String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName4),
             Collections.emptyList());
     String fileName5 = "file5.parquet";
-    OneDataFile removedFile3 =
+    InternalDataFile removedFile3 =
         createFile(
             String.format("%s/%s/%s", tableBasePath, partitionPath2, fileName5),
             Collections.emptyList());
 
-    OneDataFilesDiff diff =
-        OneDataFilesDiff.builder()
+    DataFilesDiff diff =
+        DataFilesDiff.builder()
             .filesAdded(Arrays.asList(addedFile1, addedFile2))
             .filesRemoved(Arrays.asList(removedFile1, removedFile2, removedFile3))
             .build();
@@ -161,19 +161,19 @@ public class TestBaseFileUpdatesExtractor {
     String partitionPath1 = "partition1";
     String fileName1 = "file1.parquet";
     // create file with empty stats to test edge case
-    OneDataFile addedFile1 =
+    InternalDataFile addedFile1 =
         createFile(
             String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName1),
             Collections.emptyList());
     // create file with stats
     String fileName2 = "file2.parquet";
-    OneDataFile addedFile2 =
+    InternalDataFile addedFile2 =
         createFile(
             String.format("%s/%s/%s", tableBasePath, partitionPath1, fileName2), getColumnStats());
     // create file in a second partition
     String partitionPath2 = "partition2";
     String fileName3 = "file3.parquet";
-    OneDataFile addedFile3 =
+    InternalDataFile addedFile3 =
         createFile(
             String.format("%s/%s/%s", tableBasePath, partitionPath2, fileName3), getColumnStats());
 
@@ -257,17 +257,17 @@ public class TestBaseFileUpdatesExtractor {
     // create a snapshot without partition1 (dropped partition), a new file added to partition 2
     // along with one of the existing files, and a new file in partition 3
     String newFileName1 = "new_file_1.parquet";
-    OneDataFile addedFile1 =
+    InternalDataFile addedFile1 =
         createFile(
             String.format("%s/%s/%s", tableBasePath, partitionPath2, newFileName1),
             Collections.emptyList());
     String newFileName2 = "new_file_2.parquet";
-    OneDataFile addedFile2 =
+    InternalDataFile addedFile2 =
         createFile(
             String.format("%s/%s/%s", tableBasePath, partitionPath3, newFileName2),
             getColumnStats());
-    // OneDataFile for one of the existing files in partition2
-    OneDataFile existingFile =
+    // InternalDataFile for one of the existing files in partition2
+    InternalDataFile existingFile =
         createFile(
             String.format("%s/%s/%s", tableBasePath, partitionPath2, existingFileName2),
             Collections.emptyList());
@@ -350,10 +350,10 @@ public class TestBaseFileUpdatesExtractor {
     HoodieTableMetaClient metaClient = HoodieTableMetaClient.reload(setupMetaClient);
     // create a snapshot with a new file added along with one of the existing files
     String newFileName1 = "new_file_1.parquet";
-    OneDataFile addedFile1 =
+    InternalDataFile addedFile1 =
         createFile(String.format("%s/%s", tableBasePath, newFileName1), getColumnStats());
-    // OneDataFile for one of the existing files in partition2
-    OneDataFile existingFile =
+    // InternalDataFile for one of the existing files in partition2
+    InternalDataFile existingFile =
         createFile(
             String.format("%s/%s", tableBasePath, existingFileName2), Collections.emptyList());
     List<OneFileGroup> partitionedDataFiles =
@@ -388,8 +388,8 @@ public class TestBaseFileUpdatesExtractor {
         actual.stream().map(WriteStatus::toString).collect(Collectors.toSet()));
   }
 
-  private OneDataFile createFile(String physicalPath, List<ColumnStat> columnStats) {
-    return OneDataFile.builder()
+  private InternalDataFile createFile(String physicalPath, List<ColumnStat> columnStats) {
+    return InternalDataFile.builder()
         .schemaVersion(SCHEMA_VERSION)
         .physicalPath(physicalPath)
         .fileSizeBytes(FILE_SIZE)

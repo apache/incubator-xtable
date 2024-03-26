@@ -48,7 +48,7 @@ import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.TargetClient;
@@ -210,9 +210,9 @@ public class IcebergClient implements TargetClient {
   }
 
   @Override
-  public void syncFilesForDiff(OneDataFilesDiff oneDataFilesDiff) {
+  public void syncFilesForDiff(DataFilesDiff dataFilesDiff) {
     dataFileUpdatesExtractor.applyDiff(
-        transaction, oneDataFilesDiff, transaction.table().schema(), transaction.table().spec());
+        transaction, dataFilesDiff, transaction.table().schema(), transaction.table().spec());
   }
 
   @Override

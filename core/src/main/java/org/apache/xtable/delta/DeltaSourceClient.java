@@ -53,9 +53,9 @@ import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.schema.SchemaVersion;
+import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.spi.extractor.DataFileIterator;
 import org.apache.xtable.spi.extractor.SourceClient;
@@ -102,7 +102,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
     return OneSnapshot.builder()
         .table(table)
         .schemaCatalog(getSchemaCatalog(table, snapshot.version()))
-        .partitionedDataFiles(getOneDataFiles(snapshot, table.getReadSchema()))
+        .partitionedDataFiles(getInternalDataFiles(snapshot, table.getReadSchema()))
         .build();
   }
 
@@ -115,12 +115,12 @@ public class DeltaSourceClient implements SourceClient<Long> {
     FileFormat fileFormat =
         actionsConverter.convertToOneTableFileFormat(
             snapshotAtVersion.metadata().format().provider());
-    Set<OneDataFile> addedFiles = new HashSet<>();
-    Set<OneDataFile> removedFiles = new HashSet<>();
+    Set<InternalDataFile> addedFiles = new HashSet<>();
+    Set<InternalDataFile> removedFiles = new HashSet<>();
     for (Action action : actionsForVersion) {
       if (action instanceof AddFile) {
         addedFiles.add(
-            actionsConverter.convertAddActionToOneDataFile(
+            actionsConverter.convertAddActionToInternalDataFile(
                 (AddFile) action,
                 snapshotAtVersion,
                 fileFormat,
@@ -131,7 +131,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
                 DeltaStatsExtractor.getInstance()));
       } else if (action instanceof RemoveFile) {
         removedFiles.add(
-            actionsConverter.convertRemoveActionToOneDataFile(
+            actionsConverter.convertRemoveActionToInternalDataFile(
                 (RemoveFile) action,
                 snapshotAtVersion,
                 fileFormat,
@@ -139,8 +139,8 @@ public class DeltaSourceClient implements SourceClient<Long> {
                 DeltaPartitionExtractor.getInstance()));
       }
     }
-    OneDataFilesDiff dataFilesDiff =
-        OneDataFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
+    DataFilesDiff dataFilesDiff =
+        DataFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
     return TableChange.builder().tableAsOfChange(tableAtVersion).filesDiff(dataFilesDiff).build();
   }
 
@@ -188,9 +188,9 @@ public class DeltaSourceClient implements SourceClient<Long> {
                 .build());
   }
 
-  private List<OneFileGroup> getOneDataFiles(Snapshot snapshot, OneSchema schema) {
+  private List<OneFileGroup> getInternalDataFiles(Snapshot snapshot, OneSchema schema) {
     try (DataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
-      List<OneDataFile> dataFiles = new ArrayList<>();
+      List<InternalDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);
       return OneFileGroup.fromFiles(dataFiles);
     } catch (Exception e) {

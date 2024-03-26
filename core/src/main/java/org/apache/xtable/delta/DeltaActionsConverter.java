@@ -35,7 +35,7 @@ import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.InternalDataFile;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaActionsConverter {
@@ -46,7 +46,7 @@ public class DeltaActionsConverter {
     return INSTANCE;
   }
 
-  public OneDataFile convertAddActionToOneDataFile(
+  public InternalDataFile convertAddActionToInternalDataFile(
       AddFile addFile,
       Snapshot deltaSnapshot,
       FileFormat fileFormat,
@@ -62,7 +62,7 @@ public class DeltaActionsConverter {
     long recordCount =
         columnStats.stream().map(ColumnStat::getNumValues).max(Long::compareTo).orElse(0L);
     // TODO(https://github.com/apache/incubator-xtable/issues/102): removed record count.
-    return OneDataFile.builder()
+    return InternalDataFile.builder()
         .physicalPath(getFullPathToFile(deltaSnapshot, addFile.path()))
         .fileFormat(fileFormat)
         .fileSizeBytes(addFile.size())
@@ -74,13 +74,13 @@ public class DeltaActionsConverter {
         .build();
   }
 
-  public OneDataFile convertRemoveActionToOneDataFile(
+  public InternalDataFile convertRemoveActionToInternalDataFile(
       RemoveFile removeFile,
       Snapshot deltaSnapshot,
       FileFormat fileFormat,
       List<OnePartitionField> partitionFields,
       DeltaPartitionExtractor partitionExtractor) {
-    return OneDataFile.builder()
+    return InternalDataFile.builder()
         .physicalPath(getFullPathToFile(deltaSnapshot, removeFile.path()))
         .fileFormat(fileFormat)
         .partitionValues(

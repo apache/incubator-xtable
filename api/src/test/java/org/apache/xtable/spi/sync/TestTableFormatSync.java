@@ -48,8 +48,8 @@ import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
@@ -68,7 +68,7 @@ public class TestTableFormatSync {
             OneFileGroup.builder()
                 .files(
                     Collections.singletonList(
-                        OneDataFile.builder().physicalPath("/tmp/path/file.parquet").build()))
+                        InternalDataFile.builder().physicalPath("/tmp/path/file.parquet").build()))
                 .build());
     List<Instant> pendingCommitInstants = Collections.singletonList(Instant.now());
     OneSnapshot snapshot =
@@ -119,15 +119,15 @@ public class TestTableFormatSync {
   void syncChangesWithFailureForOneFormat() {
     Instant start = Instant.now();
     OneTable tableState1 = getTableState(1);
-    OneDataFilesDiff dataFilesDiff1 = getFilesDiff(1);
+    DataFilesDiff dataFilesDiff1 = getFilesDiff(1);
     TableChange tableChange1 =
         TableChange.builder().tableAsOfChange(tableState1).filesDiff(dataFilesDiff1).build();
     OneTable tableState2 = getTableState(2);
-    OneDataFilesDiff dataFilesDiff2 = getFilesDiff(2);
+    DataFilesDiff dataFilesDiff2 = getFilesDiff(2);
     TableChange tableChange2 =
         TableChange.builder().tableAsOfChange(tableState2).filesDiff(dataFilesDiff2).build();
     OneTable tableState3 = getTableState(3);
-    OneDataFilesDiff dataFilesDiff3 = getFilesDiff(3);
+    DataFilesDiff dataFilesDiff3 = getFilesDiff(3);
     TableChange tableChange3 =
         TableChange.builder().tableAsOfChange(tableState3).filesDiff(dataFilesDiff3).build();
 
@@ -206,15 +206,15 @@ public class TestTableFormatSync {
   void syncChangesWithDifferentFormatsAndMetadata() {
     Instant start = Instant.now();
     OneTable tableState1 = getTableState(1);
-    OneDataFilesDiff dataFilesDiff1 = getFilesDiff(1);
+    DataFilesDiff dataFilesDiff1 = getFilesDiff(1);
     TableChange tableChange1 =
         TableChange.builder().tableAsOfChange(tableState1).filesDiff(dataFilesDiff1).build();
     OneTable tableState2 = getTableState(2);
-    OneDataFilesDiff dataFilesDiff2 = getFilesDiff(2);
+    DataFilesDiff dataFilesDiff2 = getFilesDiff(2);
     TableChange tableChange2 =
         TableChange.builder().tableAsOfChange(tableState2).filesDiff(dataFilesDiff2).build();
     OneTable tableState3 = getTableState(3);
-    OneDataFilesDiff dataFilesDiff3 = getFilesDiff(3);
+    DataFilesDiff dataFilesDiff3 = getFilesDiff(3);
     TableChange tableChange3 =
         TableChange.builder().tableAsOfChange(tableState3).filesDiff(dataFilesDiff3).build();
 
@@ -292,7 +292,7 @@ public class TestTableFormatSync {
   void syncChangesOneFormatWithNoRequiredChanges() {
     Instant start = Instant.now();
     OneTable tableState1 = getTableState(1);
-    OneDataFilesDiff dataFilesDiff1 = getFilesDiff(1);
+    DataFilesDiff dataFilesDiff1 = getFilesDiff(1);
     TableChange tableChange1 =
         TableChange.builder().tableAsOfChange(tableState1).filesDiff(dataFilesDiff1).build();
 
@@ -358,11 +358,11 @@ public class TestTableFormatSync {
         .build();
   }
 
-  private OneDataFilesDiff getFilesDiff(int id) {
-    return OneDataFilesDiff.builder()
+  private DataFilesDiff getFilesDiff(int id) {
+    return DataFilesDiff.builder()
         .filesAdded(
             Collections.singletonList(
-                OneDataFile.builder()
+                InternalDataFile.builder()
                     .physicalPath(String.format("/tmp/path/file_%d.parquet", id))
                     .build()))
         .build();

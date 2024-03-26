@@ -88,7 +88,7 @@ import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.schema.SchemaFieldFinder;
@@ -149,9 +149,9 @@ public class TestDeltaSync {
     OneTable table1 = getOneTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
     OneTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
 
-    OneDataFile dataFile1 = getOneDataFile(1, Collections.emptyList(), basePath);
-    OneDataFile dataFile2 = getOneDataFile(2, Collections.emptyList(), basePath);
-    OneDataFile dataFile3 = getOneDataFile(3, Collections.emptyList(), basePath);
+    InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList(), basePath);
+    InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
+    InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList(), basePath);
 
     OneSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
     OneSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
@@ -195,9 +195,9 @@ public class TestDeltaSync {
                 .partitionField(onePartitionField)
                 .range(Range.scalar("warning"))
                 .build());
-    OneDataFile dataFile1 = getOneDataFile(1, partitionValues1, basePath);
-    OneDataFile dataFile2 = getOneDataFile(2, partitionValues1, basePath);
-    OneDataFile dataFile3 = getOneDataFile(3, partitionValues2, basePath);
+    InternalDataFile dataFile1 = getDataFile(1, partitionValues1, basePath);
+    InternalDataFile dataFile2 = getDataFile(2, partitionValues1, basePath);
+    InternalDataFile dataFile3 = getDataFile(3, partitionValues2, basePath);
 
     EqualTo equalToExpr =
         new EqualTo(new Column("string_field", new StringType()), Literal.of("warning"));
@@ -268,9 +268,9 @@ public class TestDeltaSync {
                 .range(Range.scalar(20))
                 .build());
 
-    OneDataFile dataFile1 = getOneDataFile(1, partitionValues1, basePath);
-    OneDataFile dataFile2 = getOneDataFile(2, partitionValues2, basePath);
-    OneDataFile dataFile3 = getOneDataFile(3, partitionValues3, basePath);
+    InternalDataFile dataFile1 = getDataFile(1, partitionValues1, basePath);
+    InternalDataFile dataFile2 = getDataFile(2, partitionValues2, basePath);
+    InternalDataFile dataFile3 = getDataFile(3, partitionValues3, basePath);
 
     EqualTo equalToExpr1 =
         new EqualTo(new Column("string_field", new StringType()), Literal.of("level"));
@@ -315,9 +315,9 @@ public class TestDeltaSync {
                 .partitionField(partitionField)
                 .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
                 .build());
-    OneDataFile dataFile1 = getOneDataFile(1, partitionValues1, basePath);
-    OneDataFile dataFile2 = getOneDataFile(2, partitionValues1, basePath);
-    OneDataFile dataFile3 = getOneDataFile(3, partitionValues2, basePath);
+    InternalDataFile dataFile1 = getDataFile(1, partitionValues1, basePath);
+    InternalDataFile dataFile2 = getDataFile(2, partitionValues1, basePath);
+    InternalDataFile dataFile3 = getDataFile(3, partitionValues2, basePath);
 
     OneSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
 
@@ -357,7 +357,7 @@ public class TestDeltaSync {
   }
 
   private void validateDeltaTable(
-      Path basePath, Set<OneDataFile> oneDataFiles, Expression filterExpression)
+      Path basePath, Set<InternalDataFile> internalDataFiles, Expression filterExpression)
       throws IOException {
     DeltaLog deltaLog = DeltaLog.forTable(new Configuration(), basePath.toString());
     assertTrue(deltaLog.tableExists());
@@ -370,26 +370,26 @@ public class TestDeltaSync {
     } else {
       deltaScan = snapshot.scan(filterExpression);
     }
-    Map<String, OneDataFile> pathToFile =
-        oneDataFiles.stream()
-            .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
+    Map<String, InternalDataFile> pathToFile =
+        internalDataFiles.stream()
+            .collect(Collectors.toMap(InternalDataFile::getPhysicalPath, Function.identity()));
     int count = 0;
     try (CloseableIterator<AddFile> fileItr = deltaScan.getFiles()) {
       for (CloseableIterator<AddFile> it = fileItr; it.hasNext(); ) {
         AddFile addFile = it.next();
         String fullPath =
             new org.apache.hadoop.fs.Path(basePath.resolve(addFile.getPath()).toUri()).toString();
-        OneDataFile expected = pathToFile.get(fullPath);
+        InternalDataFile expected = pathToFile.get(fullPath);
         assertNotNull(expected);
         assertEquals(addFile.getSize(), expected.getFileSizeBytes());
         count++;
       }
     }
     assertEquals(
-        oneDataFiles.size(), count, "Number of files from DeltaScan don't match expectation");
+        internalDataFiles.size(), count, "Number of files from DeltaScan don't match expectation");
   }
 
-  private OneSnapshot buildSnapshot(OneTable table, OneDataFile... dataFiles) {
+  private OneSnapshot buildSnapshot(OneTable table, InternalDataFile... dataFiles) {
     return OneSnapshot.builder()
         .table(table)
         .partitionedDataFiles(OneFileGroup.fromFiles(Arrays.asList(dataFiles)))
@@ -413,12 +413,12 @@ public class TestDeltaSync {
         .build();
   }
 
-  private OneDataFile getOneDataFile(
+  private InternalDataFile getDataFile(
       int index, List<PartitionValue> partitionValues, Path basePath) {
     String physicalPath =
         new org.apache.hadoop.fs.Path(basePath.toUri() + "physical" + index + ".parquet")
             .toString();
-    return OneDataFile.builder()
+    return InternalDataFile.builder()
         .fileFormat(FileFormat.APACHE_PARQUET)
         .fileSizeBytes(RANDOM.nextInt(10000))
         .physicalPath(physicalPath)

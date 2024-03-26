@@ -29,7 +29,7 @@ import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.spi.extractor.DataFileIterator;
 
 /** DeltaDataFileExtractor lets the consumer iterate over partitions. */
@@ -58,7 +58,7 @@ public class DeltaDataFileExtractor {
     private final FileFormat fileFormat;
     private final List<OneField> fields;
     private final List<OnePartitionField> partitionFields;
-    private final Iterator<OneDataFile> dataFilesIterator;
+    private final Iterator<InternalDataFile> dataFilesIterator;
 
     private DeltaDataFileIterator(Snapshot snapshot, OneSchema schema, boolean includeColumnStats) {
       this.fileFormat =
@@ -71,7 +71,7 @@ public class DeltaDataFileExtractor {
           snapshot.allFiles().collectAsList().stream()
               .map(
                   addFile ->
-                      actionsConverter.convertAddActionToOneDataFile(
+                      actionsConverter.convertAddActionToInternalDataFile(
                           addFile,
                           snapshot,
                           fileFormat,
@@ -92,7 +92,7 @@ public class DeltaDataFileExtractor {
     }
 
     @Override
-    public OneDataFile next() {
+    public InternalDataFile next() {
       return dataFilesIterator.next();
     }
   }

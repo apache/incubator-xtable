@@ -31,8 +31,8 @@ import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.storage.DataFilesDiff;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.FilesDiff;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.OneFileGroup;
 
 @AllArgsConstructor(staticName = "of")
@@ -57,29 +57,29 @@ public class IcebergDataFileUpdatesSync {
       throw new OneIOException("Failed to iterate through Iceberg data files", e);
     }
 
-    DataFilesDiff<OneDataFile, DataFile> diff =
-        OneDataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
+    FilesDiff<InternalDataFile, DataFile> diff =
+        DataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
     applyDiff(transaction, diff.getFilesAdded(), diff.getFilesRemoved(), schema, partitionSpec);
   }
 
   public void applyDiff(
       Transaction transaction,
-      OneDataFilesDiff oneDataFilesDiff,
+      DataFilesDiff dataFilesDiff,
       Schema schema,
       PartitionSpec partitionSpec) {
 
     Collection<DataFile> filesRemoved =
-        oneDataFilesDiff.getFilesRemoved().stream()
+        dataFilesDiff.getFilesRemoved().stream()
             .map(file -> getDataFile(partitionSpec, schema, file))
             .collect(Collectors.toList());
 
-    applyDiff(transaction, oneDataFilesDiff.getFilesAdded(), filesRemoved, schema, partitionSpec);
+    applyDiff(transaction, dataFilesDiff.getFilesAdded(), filesRemoved, schema, partitionSpec);
   }
 
   private void applyDiff(
       Transaction transaction,
-      Collection<OneDataFile> filesAdded,
+      Collection<InternalDataFile> filesAdded,
       Collection<DataFile> filesRemoved,
       Schema schema,
       PartitionSpec partitionSpec) {
@@ -89,7 +89,8 @@ public class IcebergDataFileUpdatesSync {
     overwriteFiles.commit();
   }
 
-  private DataFile getDataFile(PartitionSpec partitionSpec, Schema schema, OneDataFile dataFile) {
+  private DataFile getDataFile(
+      PartitionSpec partitionSpec, Schema schema, InternalDataFile dataFile) {
     DataFiles.Builder builder =
         DataFiles.builder(partitionSpec)
             .withPath(dataFile.getPhysicalPath())

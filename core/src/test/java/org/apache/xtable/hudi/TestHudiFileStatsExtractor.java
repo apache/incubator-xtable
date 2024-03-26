@@ -72,7 +72,7 @@ import org.apache.xtable.model.schema.OneType;
 import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.InternalDataFile;
 
 public class TestHudiFileStatsExtractor {
   private static final Schema AVRO_SCHEMA =
@@ -142,8 +142,8 @@ public class TestHudiFileStatsExtractor {
             .filter(path -> path.toString().endsWith(".parquet"))
             .findFirst()
             .orElseThrow(() -> new RuntimeException("No files found"));
-    OneDataFile inputFile =
-        OneDataFile.builder()
+    InternalDataFile inputFile =
+        InternalDataFile.builder()
             .physicalPath(parquetFile.toString())
             .schemaVersion(new SchemaVersion(1, null))
             .columnStats(Collections.emptyList())
@@ -155,7 +155,7 @@ public class TestHudiFileStatsExtractor {
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder().setBasePath(basePath).setConf(configuration).build();
     HudiFileStatsExtractor fileStatsExtractor = new HudiFileStatsExtractor(metaClient);
-    List<OneDataFile> output =
+    List<InternalDataFile> output =
         fileStatsExtractor
             .addStatsToFiles(tableMetadata, Stream.of(inputFile), schema)
             .collect(Collectors.toList());
@@ -179,8 +179,8 @@ public class TestHudiFileStatsExtractor {
       }
     }
 
-    OneDataFile inputFile =
-        OneDataFile.builder()
+    InternalDataFile inputFile =
+        InternalDataFile.builder()
             .physicalPath(file.toString())
             .schemaVersion(new SchemaVersion(1, null))
             .columnStats(Collections.emptyList())
@@ -193,16 +193,16 @@ public class TestHudiFileStatsExtractor {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     when(mockMetaClient.getHadoopConf()).thenReturn(configuration);
     HudiFileStatsExtractor fileStatsExtractor = new HudiFileStatsExtractor(mockMetaClient);
-    List<OneDataFile> output =
+    List<InternalDataFile> output =
         fileStatsExtractor
             .addStatsToFiles(null, Stream.of(inputFile), schema)
             .collect(Collectors.toList());
     validateOutput(output);
   }
 
-  private void validateOutput(List<OneDataFile> output) {
+  private void validateOutput(List<InternalDataFile> output) {
     assertEquals(1, output.size());
-    OneDataFile fileWithStats = output.get(0);
+    InternalDataFile fileWithStats = output.get(0);
     assertEquals(2, fileWithStats.getRecordCount());
     List<ColumnStat> columnStats = fileWithStats.getColumnStats();
 
