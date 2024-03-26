@@ -81,10 +81,10 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
+import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.TargetClient;
@@ -175,8 +175,8 @@ public class ITHudiTargetClient {
           Collections.emptyMap());
     }
 
-    OneDataFile fileToRemove =
-        OneDataFile.builder()
+    InternalDataFile fileToRemove =
+        InternalDataFile.builder()
             .fileFormat(FileFormat.APACHE_PARQUET)
             .lastModified(System.currentTimeMillis())
             .fileSizeBytes(100L)
@@ -189,8 +189,8 @@ public class ITHudiTargetClient {
     String fileName = "file_1.parquet";
     String filePath = getFilePath(partitionPath, fileName);
 
-    OneDataFilesDiff dataFilesDiff =
-        OneDataFilesDiff.builder()
+    DataFilesDiff dataFilesDiff =
+        DataFilesDiff.builder()
             .fileAdded(getTestFile(partitionPath, fileName))
             .fileRemoved(fileToRemove)
             .build();
@@ -371,11 +371,11 @@ public class ITHudiTargetClient {
 
   private OneTableMetadata incrementalSync(
       TargetClient targetClient,
-      List<OneDataFile> filesToAdd,
-      List<OneDataFile> filesToRemove,
+      List<InternalDataFile> filesToAdd,
+      List<InternalDataFile> filesToRemove,
       Instant commitStart) {
-    OneDataFilesDiff dataFilesDiff2 =
-        OneDataFilesDiff.builder().filesAdded(filesToAdd).filesRemoved(filesToRemove).build();
+    DataFilesDiff dataFilesDiff2 =
+        DataFilesDiff.builder().filesAdded(filesToAdd).filesRemoved(filesToRemove).build();
     OneTable state3 = getState(commitStart);
     targetClient.beginSync(state3);
     targetClient.syncFilesForDiff(dataFilesDiff2);
@@ -527,7 +527,7 @@ public class ITHudiTargetClient {
     assertEquals(-1, columnStats.getTotalUncompressedSize());
   }
 
-  private OneDataFile getTestFile(String partitionPath, String fileName) {
+  private InternalDataFile getTestFile(String partitionPath, String fileName) {
     List<ColumnStat> columnStats =
         Arrays.asList(
             ColumnStat.builder()
@@ -551,7 +551,7 @@ public class ITHudiTargetClient {
                 .numValues(2)
                 .totalSize(5)
                 .build());
-    return OneDataFile.builder()
+    return InternalDataFile.builder()
         .schemaVersion(SCHEMA_VERSION)
         .physicalPath(String.format("file://%s/%s/%s", tableBasePath, partitionPath, fileName))
         .fileSizeBytes(FILE_SIZE)

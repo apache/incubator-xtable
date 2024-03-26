@@ -53,7 +53,7 @@ import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.OneType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.InternalDataFile;
 
 /** Responsible for Column stats extraction for Hudi. */
 @AllArgsConstructor
@@ -83,8 +83,8 @@ public class HudiFileStatsExtractor {
    * @param schema the schema of the files (assumed to be the same for all files in stream)
    * @return a stream of files with column stats and row count information
    */
-  public Stream<OneDataFile> addStatsToFiles(
-      HoodieTableMetadata metadataTable, Stream<OneDataFile> files, OneSchema schema) {
+  public Stream<InternalDataFile> addStatsToFiles(
+      HoodieTableMetadata metadataTable, Stream<InternalDataFile> files, OneSchema schema) {
     boolean useMetadataTableColStats =
         metadataTable != null
             && metaClient
@@ -101,8 +101,8 @@ public class HudiFileStatsExtractor {
         : computeColumnStatsFromParquetFooters(files, nameFieldMap);
   }
 
-  private Stream<OneDataFile> computeColumnStatsFromParquetFooters(
-      Stream<OneDataFile> files, Map<String, OneField> nameFieldMap) {
+  private Stream<InternalDataFile> computeColumnStatsFromParquetFooters(
+      Stream<InternalDataFile> files, Map<String, OneField> nameFieldMap) {
     return files.map(
         file -> {
           HudiFileStats fileStats =
@@ -120,11 +120,11 @@ public class HudiFileStatsExtractor {
     return Pair.of(partitionPath, filePath.getName());
   }
 
-  private Stream<OneDataFile> computeColumnStatsFromMetadataTable(
+  private Stream<InternalDataFile> computeColumnStatsFromMetadataTable(
       HoodieTableMetadata metadataTable,
-      Stream<OneDataFile> files,
+      Stream<InternalDataFile> files,
       Map<String, OneField> nameFieldMap) {
-    Map<Pair<String, String>, OneDataFile> filePathsToDataFile =
+    Map<Pair<String, String>, InternalDataFile> filePathsToDataFile =
         files.collect(
             Collectors.toMap(
                 file -> getPartitionAndFileName(file.getPhysicalPath()), Function.identity()));
@@ -154,7 +154,7 @@ public class HudiFileStatsExtractor {
         .map(
             pathToDataFile -> {
               Pair<String, String> filePath = pathToDataFile.getKey();
-              OneDataFile file = pathToDataFile.getValue();
+              InternalDataFile file = pathToDataFile.getValue();
               List<Pair<OneField, HoodieMetadataColumnStats>> fileStats =
                   stats.getOrDefault(filePath, Collections.emptyList());
               List<ColumnStat> columnStats =

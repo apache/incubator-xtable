@@ -29,7 +29,7 @@ import java.util.stream.IntStream;
 
 import org.apache.xtable.model.OneSnapshot;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.InternalDataFile;
 
 public class ValidationTestHelper {
 
@@ -39,7 +39,7 @@ public class ValidationTestHelper {
     List<String> onetablePaths =
         oneSnapshot.getPartitionedDataFiles().stream()
             .flatMap(group -> group.getFiles().stream())
-            .map(OneDataFile::getPhysicalPath)
+            .map(InternalDataFile::getPhysicalPath)
             .collect(Collectors.toList());
     replaceFileScheme(allActivePaths);
     replaceFileScheme(onetablePaths);
@@ -90,12 +90,12 @@ public class ValidationTestHelper {
   public static List<String> getAllFilePaths(OneSnapshot oneSnapshot) {
     return oneSnapshot.getPartitionedDataFiles().stream()
         .flatMap(oneFileGroup -> oneFileGroup.getFiles().stream())
-        .map(oneDataFile -> oneDataFile.getPhysicalPath())
+        .map(InternalDataFile::getPhysicalPath)
         .collect(Collectors.toList());
   }
 
-  private static Set<String> extractPathsFromDataFile(Set<OneDataFile> dataFiles) {
-    return dataFiles.stream().map(OneDataFile::getPhysicalPath).collect(Collectors.toSet());
+  private static Set<String> extractPathsFromDataFile(Set<InternalDataFile> dataFiles) {
+    return dataFiles.stream().map(InternalDataFile::getPhysicalPath).collect(Collectors.toSet());
   }
 
   private static void replaceFileScheme(List<String> filePaths) {

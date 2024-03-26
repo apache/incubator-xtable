@@ -70,11 +70,8 @@ import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.DataLayoutStrategy;
-import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
-import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.model.storage.*;
+import org.apache.xtable.model.storage.InternalDataFile;
 
 public class ITDeltaSourceClient {
 
@@ -193,7 +190,7 @@ public class ITDeltaSourceClient {
         OneFileGroup.builder()
             .files(
                 Collections.singletonList(
-                    OneDataFile.builder()
+                    InternalDataFile.builder()
                         .physicalPath("file:/fake/path")
                         .fileFormat(FileFormat.APACHE_PARQUET)
                         .partitionValues(Collections.emptyList())
@@ -277,7 +274,7 @@ public class ITDeltaSourceClient {
             .partitionValues(partitionValue)
             .files(
                 Collections.singletonList(
-                    OneDataFile.builder()
+                    InternalDataFile.builder()
                         .physicalPath("file:/fake/path")
                         .fileFormat(FileFormat.APACHE_PARQUET)
                         .partitionValues(partitionValue)
@@ -679,17 +676,18 @@ public class ITDeltaSourceClient {
     validateDataFiles(expectedPartitionFiles.getFiles(), actualPartitionFiles.getFiles());
   }
 
-  private void validateDataFiles(List<OneDataFile> expectedFiles, List<OneDataFile> actualFiles)
+  private void validateDataFiles(
+      List<InternalDataFile> expectedFiles, List<InternalDataFile> actualFiles)
       throws URISyntaxException {
     Assertions.assertEquals(expectedFiles.size(), actualFiles.size());
     for (int i = 0; i < expectedFiles.size(); i++) {
-      OneDataFile expected = expectedFiles.get(i);
-      OneDataFile actual = actualFiles.get(i);
+      InternalDataFile expected = expectedFiles.get(i);
+      InternalDataFile actual = actualFiles.get(i);
       validatePropertiesDataFile(expected, actual);
     }
   }
 
-  private void validatePropertiesDataFile(OneDataFile expected, OneDataFile actual)
+  private void validatePropertiesDataFile(InternalDataFile expected, InternalDataFile actual)
       throws URISyntaxException {
     Assertions.assertEquals(expected.getSchemaVersion(), actual.getSchemaVersion());
     Assertions.assertTrue(

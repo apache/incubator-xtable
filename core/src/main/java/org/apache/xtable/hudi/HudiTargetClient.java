@@ -87,7 +87,7 @@ import org.apache.xtable.model.OneTableMetadata;
 import org.apache.xtable.model.schema.OneField;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.TargetClient;
@@ -251,9 +251,9 @@ public class HudiTargetClient implements TargetClient {
   }
 
   @Override
-  public void syncFilesForDiff(OneDataFilesDiff oneDataFilesDiff) {
+  public void syncFilesForDiff(DataFilesDiff dataFilesDiff) {
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
-        baseFileUpdatesExtractor.convertDiff(oneDataFilesDiff, commitState.getInstantTime());
+        baseFileUpdatesExtractor.convertDiff(dataFilesDiff, commitState.getInstantTime());
     commitState.setReplaceMetadata(replaceMetadata);
   }
 

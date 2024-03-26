@@ -42,8 +42,8 @@ import org.apache.xtable.model.OneSnapshot;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.SchemaCatalog;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.OneFileGroup;
 
 public class TestExtractFromSource {
@@ -66,8 +66,8 @@ public class TestExtractFromSource {
 
   @Test
   public void extractTableChanges() {
-    OneDataFile initialFile2 = getOneDataFile("file2.parquet");
-    OneDataFile initialFile3 = getOneDataFile("file3.parquet");
+    InternalDataFile initialFile2 = getDataFile("file2.parquet");
+    InternalDataFile initialFile3 = getDataFile("file3.parquet");
 
     Instant lastSyncTime = Instant.now().minus(2, ChronoUnit.DAYS);
     TestCommit firstCommitToSync = TestCommit.of("first_commit");
@@ -84,14 +84,14 @@ public class TestExtractFromSource {
         .thenReturn(commitsBacklogToReturn);
 
     // drop a file and add a file
-    OneDataFile newFile1 = getOneDataFile("file4.parquet");
+    InternalDataFile newFile1 = getDataFile("file4.parquet");
     OneTable tableAtFirstInstant =
         OneTable.builder().latestCommitTime(Instant.now().minus(1, ChronoUnit.DAYS)).build();
     TableChange tableChangeToReturnAtFirstInstant =
         TableChange.builder()
             .tableAsOfChange(tableAtFirstInstant)
             .filesDiff(
-                OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
+                DataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
             .build();
     when(mockSourceClient.getTableChangeForCommit(firstCommitToSync))
         .thenReturn(tableChangeToReturnAtFirstInstant);
@@ -99,19 +99,19 @@ public class TestExtractFromSource {
         TableChange.builder()
             .tableAsOfChange(tableAtFirstInstant)
             .filesDiff(
-                OneDataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
+                DataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
             .build();
 
     // add 2 new files, remove 2 files
-    OneDataFile newFile2 = getOneDataFile("file5.parquet");
-    OneDataFile newFile3 = getOneDataFile("file6.parquet");
+    InternalDataFile newFile2 = getDataFile("file5.parquet");
+    InternalDataFile newFile3 = getDataFile("file6.parquet");
 
     OneTable tableAtSecondInstant = OneTable.builder().latestCommitTime(Instant.now()).build();
     TableChange tableChangeToReturnAtSecondInstant =
         TableChange.builder()
             .tableAsOfChange(tableAtSecondInstant)
             .filesDiff(
-                OneDataFilesDiff.builder()
+                DataFilesDiff.builder()
                     .filesAdded(Arrays.asList(newFile2, newFile3))
                     .filesRemoved(Arrays.asList(initialFile3, newFile1))
                     .build())
@@ -122,7 +122,7 @@ public class TestExtractFromSource {
         TableChange.builder()
             .tableAsOfChange(tableAtSecondInstant)
             .filesDiff(
-                OneDataFilesDiff.builder()
+                DataFilesDiff.builder()
                     .filesAdded(Arrays.asList(newFile2, newFile3))
                     .filesRemoved(Arrays.asList(initialFile3, newFile1))
                     .build())
@@ -137,8 +137,8 @@ public class TestExtractFromSource {
         Arrays.asList(expectedFirstTableChange, expectedSecondTableChange), actualTableChanges);
   }
 
-  private OneDataFile getOneDataFile(String physicalPath) {
-    return OneDataFile.builder().physicalPath(physicalPath).build();
+  private InternalDataFile getDataFile(String physicalPath) {
+    return InternalDataFile.builder().physicalPath(physicalPath).build();
   }
 
   @AllArgsConstructor(staticName = "of")

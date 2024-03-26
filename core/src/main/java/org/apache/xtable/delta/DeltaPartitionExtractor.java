@@ -56,7 +56,7 @@ import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.schema.SchemaFieldFinder;
 
 /**
@@ -247,12 +247,13 @@ public class DeltaPartitionExtractor {
     return nameToStructFieldMap;
   }
 
-  public Map<String, String> partitionValueSerialization(OneDataFile oneDataFile) {
+  public Map<String, String> partitionValueSerialization(InternalDataFile internalDataFile) {
     Map<String, String> partitionValuesSerialized = new HashMap<>();
-    if (oneDataFile.getPartitionValues() == null || oneDataFile.getPartitionValues().isEmpty()) {
+    if (internalDataFile.getPartitionValues() == null
+        || internalDataFile.getPartitionValues().isEmpty()) {
       return partitionValuesSerialized;
     }
-    for (PartitionValue partitionValue : oneDataFile.getPartitionValues()) {
+    for (PartitionValue partitionValue : internalDataFile.getPartitionValues()) {
       OnePartitionField partitionField = partitionValue.getPartitionField();
       PartitionTransformType transformType = partitionField.getTransformType();
       String partitionValueSerialized;

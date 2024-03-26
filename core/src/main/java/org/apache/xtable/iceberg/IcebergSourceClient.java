@@ -48,11 +48,8 @@ import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.PartitionValue;
-import org.apache.xtable.model.storage.DataLayoutStrategy;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
-import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.model.storage.*;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.spi.extractor.SourceClient;
 
 @Log4j2
@@ -145,10 +142,10 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     PartitionSpec partitionSpec = iceTable.spec();
     List<OneFileGroup> partitionedDataFiles;
     try (CloseableIterable<FileScanTask> files = scan.planFiles()) {
-      List<OneDataFile> irFiles = new ArrayList<>();
+      List<InternalDataFile> irFiles = new ArrayList<>();
       for (FileScanTask fileScanTask : files) {
         DataFile file = fileScanTask.file();
-        OneDataFile irDataFile = fromIceberg(file, partitionSpec, irTable);
+        InternalDataFile irDataFile = fromIceberg(file, partitionSpec, irTable);
         irFiles.add(irDataFile);
       }
       partitionedDataFiles = OneFileGroup.fromFiles(irFiles);
@@ -164,7 +161,8 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         .build();
   }
 
-  private OneDataFile fromIceberg(DataFile file, PartitionSpec partitionSpec, OneTable oneTable) {
+  private InternalDataFile fromIceberg(
+      DataFile file, PartitionSpec partitionSpec, OneTable oneTable) {
     List<PartitionValue> partitionValues =
         partitionConverter.toOneTable(oneTable, file.partition(), partitionSpec);
     return dataFileExtractor.fromIceberg(file, partitionValues, oneTable.getReadSchema());
@@ -177,21 +175,18 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     PartitionSpec partitionSpec = iceTable.spec();
     OneTable irTable = getTable(snapshot);
 
-    Set<OneDataFile> dataFilesAdded =
+    Set<InternalDataFile> dataFilesAdded =
         StreamSupport.stream(snapshot.addedDataFiles(fileIO).spliterator(), false)
             .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable))
             .collect(Collectors.toSet());
 
-    Set<OneDataFile> dataFilesRemoved =
+    Set<InternalDataFile> dataFilesRemoved =
         StreamSupport.stream(snapshot.removedDataFiles(fileIO).spliterator(), false)
             .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable))
             .collect(Collectors.toSet());
 
-    OneDataFilesDiff filesDiff =
-        OneDataFilesDiff.builder()
-            .filesAdded(dataFilesAdded)
-            .filesRemoved(dataFilesRemoved)
-            .build();
+    DataFilesDiff filesDiff =
+        DataFilesDiff.builder().filesAdded(dataFilesAdded).filesRemoved(dataFilesRemoved).build();
 
     OneTable table = getTable(snapshot);
     return TableChange.builder().tableAsOfChange(table).filesDiff(filesDiff).build();

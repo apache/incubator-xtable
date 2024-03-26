@@ -18,86 +18,42 @@
  
 package org.apache.xtable.model.storage;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import lombok.Data;
-import lombok.Singular;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import lombok.experimental.SuperBuilder;
 
-/**
- * Holds the collection of files that represent the difference between two states/commits/snapshots
- * of a table with respect to the data files. Between any two states of a table, the newer/latest
- * state may contain new files not present in the older state and may have removed files that were
- * present in the older state. In most cases the data files included in the newer state are derived
- * from a new commit in a source table format that has not been applied to a target table format
- * yet. Hence, the collection of data files in the newer state are typically {@link OneDataFile}s,
- * whereas the files in the older state are represented using a generic type P which can be a data
- * file type in specific to the target table format.
- *
- * @param <L> the type of the files in the latest state
- * @param <P> the type of the files in the target table format
- */
-@Data
+/** Container for holding the list of files added and files removed between source and target. */
+@Value
+@EqualsAndHashCode(callSuper = true)
 @SuperBuilder
-public class DataFilesDiff<L, P> {
-  @Singular("fileAdded")
-  private Set<L> filesAdded;
-
-  @Singular("fileRemoved")
-  private Set<P> filesRemoved;
+public class DataFilesDiff extends FilesDiff<InternalDataFile, InternalDataFile> {
 
   /**
-   * Compares the latest files with the previous files and identifies the files that are new, i.e.
-   * are present in latest files buy not present in the previously known files, and the files that
-   * are removed, i.e. present in the previously known files but not present in the latest files.
+   * Creates a DataFilesDiff from the list of files in the target table and the list of files in the
+   * source table.
    *
-   * @param latestFiles a map of file path and file object representing files in the latest snapshot
-   *     of a table
-   * @param previousFiles a map of file path and file object representing files in a previously
-   *     synced snapshot of a table.
-   * @param <P> the type of the previous files
-   * @return the diff of the files
+   * @param source list of files currently in the source table
+   * @param target list of files currently in the target table
+   * @return files that need to be added and removed for the target table match the source table
    */
-  public static <L, P> DataFilesDiff<L, P> findNewAndRemovedFiles(
-      Map<String, L> latestFiles, Map<String, P> previousFiles) {
-    Set<L> newFiles = new HashSet<>();
-    Map<String, P> removedFiles = new HashMap<>(previousFiles);
+  public static DataFilesDiff from(List<InternalDataFile> source, List<InternalDataFile> target) {
+    Map<String, InternalDataFile> targetPaths =
+        target.stream()
+            .collect(Collectors.toMap(InternalDataFile::getPhysicalPath, Function.identity()));
+    Map<String, InternalDataFile> sourcePaths =
+        source.stream()
+            .collect(Collectors.toMap(InternalDataFile::getPhysicalPath, Function.identity()));
 
-    // if a file in latest files is also present in previous files, then it is neither new nor
-    // removed.
-    latestFiles.forEach(
-        (key, value) -> {
-          boolean notAKnownFile = removedFiles.remove(key) == null;
-          if (notAKnownFile) {
-            newFiles.add(value);
-          }
-        });
-    return DataFilesDiff.<L, P>builder()
-        .filesAdded(newFiles)
-        .filesRemoved(removedFiles.values())
+    FilesDiff<InternalDataFile, InternalDataFile> diff =
+        findNewAndRemovedFiles(sourcePaths, targetPaths);
+    return DataFilesDiff.builder()
+        .filesAdded(diff.getFilesAdded())
+        .filesRemoved(diff.getFilesRemoved())
         .build();
-  }
-
-  /**
-   * This method wraps the {@link #findNewAndRemovedFiles(Map, Map)} method, to compare the latest
-   * file groups with the previous files and identifies the files that are new, i.e. are present in
-   * latest files buy not present in the previously known files, and the files that are removed,
-   * i.e. present in the previously known files but not present in the latest files.
-   *
-   * @param latestFileGroups a list of file groups representing the latest snapshot of a table
-   * @param previousFiles a map of file path and file object representing files in a previously
-   *     synced snapshot of a table
-   * @param <P> the type of the previous files
-   * @return the set of files that are added
-   */
-  public static <P> DataFilesDiff<OneDataFile, P> findNewAndRemovedFiles(
-      List<OneFileGroup> latestFileGroups, Map<String, P> previousFiles) {
-    Map<String, OneDataFile> latestFiles =
-        latestFileGroups.stream()
-            .flatMap(group -> group.getFiles().stream())
-            .collect(Collectors.toMap(OneDataFile::getPhysicalPath, Function.identity()));
-    return findNewAndRemovedFiles(latestFiles, previousFiles);
   }
 }

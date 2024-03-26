@@ -20,7 +20,7 @@ package org.apache.xtable.spi.extractor;
 
 import java.util.Iterator;
 
-import org.apache.xtable.model.storage.OneDataFile;
+import org.apache.xtable.model.storage.InternalDataFile;
 
 /** DataFileIterator lets the consumer iterate over the files of a table. */
-public interface DataFileIterator extends Iterator<OneDataFile>, AutoCloseable {}
+public interface DataFileIterator extends Iterator<InternalDataFile>, AutoCloseable {}

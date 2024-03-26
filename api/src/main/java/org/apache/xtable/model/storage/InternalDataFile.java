@@ -36,7 +36,7 @@ import org.apache.xtable.model.stat.PartitionValue;
  */
 @Builder(toBuilder = true)
 @Value
-public class OneDataFile {
+public class InternalDataFile {
   // written schema version
   SchemaVersion schemaVersion;
   // physical path of the file (absolute with scheme)

@@ -64,9 +64,9 @@ import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.PartitionValue;
+import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.OneDataFile;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.OneFileGroup;
 
 /** Extracts all the files for Hudi table represented by {@link OneTable}. */
@@ -115,14 +115,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
           tableMetadata != null
               ? tableMetadata.getAllPartitionPaths()
               : FSUtils.getAllPartitionPaths(engineContext, metadataConfig, basePath.toString());
-      return getOneDataFilesForPartitions(allPartitionPaths, table);
+      return getInternalDataFilesForPartitions(allPartitionPaths, table);
     } catch (IOException ex) {
       throw new OneIOException(
           "Unable to read partitions for table " + metaClient.getTableConfig().getTableName(), ex);
     }
   }
 
-  public OneDataFilesDiff getDiffForCommit(
+  public DataFilesDiff getDiffForCommit(
       HoodieInstant hoodieInstantForDiff,
       OneTable table,
       HoodieInstant instant,
@@ -132,14 +132,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
         getAddedAndRemovedPartitionInfo(
             visibleTimeline, instant, fsView, hoodieInstantForDiff, table.getPartitioningFields());
 
-    Stream<OneDataFile> filesAddedWithoutStats = allInfo.getAdded().stream();
-    List<OneDataFile> filesAdded =
+    Stream<InternalDataFile> filesAddedWithoutStats = allInfo.getAdded().stream();
+    List<InternalDataFile> filesAdded =
         fileStatsExtractor
             .addStatsToFiles(tableMetadata, filesAddedWithoutStats, table.getReadSchema())
             .collect(Collectors.toList());
-    List<OneDataFile> filesRemoved = allInfo.getRemoved();
+    List<InternalDataFile> filesRemoved = allInfo.getRemoved();
 
-    return OneDataFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
+    return DataFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
   }
 
   private AddedAndRemovedFiles getAddedAndRemovedPartitionInfo(
@@ -149,8 +149,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieInstant instantToConsider,
       List<OnePartitionField> partitioningFields) {
     try {
-      List<OneDataFile> addedFiles = new ArrayList<>();
-      List<OneDataFile> removedFiles = new ArrayList<>();
+      List<InternalDataFile> addedFiles = new ArrayList<>();
+      List<InternalDataFile> removedFiles = new ArrayList<>();
       switch (instant.getAction()) {
         case HoodieTimeline.COMMIT_ACTION:
         case HoodieTimeline.DELTA_COMMIT_ACTION:
@@ -253,7 +253,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
     }
   }
 
-  private List<OneDataFile> getRemovedFiles(
+  private List<InternalDataFile> getRemovedFiles(
       String partitionPath, List<String> deletedPaths, List<OnePartitionField> partitioningFields) {
     List<PartitionValue> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
@@ -282,8 +282,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
       String partitionPath,
       Set<String> affectedFileIds,
       List<OnePartitionField> partitioningFields) {
-    List<OneDataFile> filesToAdd = new ArrayList<>(affectedFileIds.size());
-    List<OneDataFile> filesToRemove = new ArrayList<>(affectedFileIds.size());
+    List<InternalDataFile> filesToAdd = new ArrayList<>(affectedFileIds.size());
+    List<InternalDataFile> filesToRemove = new ArrayList<>(affectedFileIds.size());
     List<PartitionValue> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
     Stream<HoodieFileGroup> fileGroups =
@@ -318,8 +318,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
       Set<String> replacedFileIds,
       Set<String> newFileIds,
       List<OnePartitionField> partitioningFields) {
-    List<OneDataFile> filesToAdd = new ArrayList<>(newFileIds.size());
-    List<OneDataFile> filesToRemove = new ArrayList<>(replacedFileIds.size());
+    List<InternalDataFile> filesToAdd = new ArrayList<>(newFileIds.size());
+    List<InternalDataFile> filesToRemove = new ArrayList<>(replacedFileIds.size());
     List<PartitionValue> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
     Stream<HoodieFileGroup> fileGroups =
@@ -341,11 +341,11 @@ public class HudiDataFileExtractor implements AutoCloseable {
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
   }
 
-  private List<OneFileGroup> getOneDataFilesForPartitions(
+  private List<OneFileGroup> getInternalDataFilesForPartitions(
       List<String> partitionPaths, OneTable table) {
 
     SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
-    Stream<OneDataFile> filesWithoutStats =
+    Stream<InternalDataFile> filesWithoutStats =
         partitionPaths.stream()
             .parallel()
             .flatMap(
@@ -357,7 +357,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                       .getLatestBaseFiles(partitionPath)
                       .map(baseFile -> buildFileWithoutStats(partitionValues, baseFile));
                 });
-    Stream<OneDataFile> files =
+    Stream<InternalDataFile> files =
         fileStatsExtractor.addStatsToFiles(tableMetadata, filesWithoutStats, table.getReadSchema());
     return OneFileGroup.fromFiles(files);
   }
@@ -378,21 +378,21 @@ public class HudiDataFileExtractor implements AutoCloseable {
   @Builder
   @Value
   private static class AddedAndRemovedFiles {
-    List<OneDataFile> added;
-    List<OneDataFile> removed;
+    List<InternalDataFile> added;
+    List<InternalDataFile> removed;
   }
 
   /**
-   * Builds a {@link OneDataFile} without any statistics or rowCount value set.
+   * Builds a {@link InternalDataFile} without any statistics or rowCount value set.
    *
    * @param partitionValues values extracted from the partition path
    * @param hoodieBaseFile the base file from Hudi
-   * @return {@link OneDataFile} without any statistics or rowCount value set.
+   * @return {@link InternalDataFile} without any statistics or rowCount value set.
    */
-  private OneDataFile buildFileWithoutStats(
+  private InternalDataFile buildFileWithoutStats(
       List<PartitionValue> partitionValues, HoodieBaseFile hoodieBaseFile) {
     long rowCount = 0L;
-    return OneDataFile.builder()
+    return InternalDataFile.builder()
         .schemaVersion(DEFAULT_SCHEMA_VERSION)
         .physicalPath(hoodieBaseFile.getPath())
         .fileFormat(getFileFormat(FSUtils.getFileExtension(hoodieBaseFile.getPath())))

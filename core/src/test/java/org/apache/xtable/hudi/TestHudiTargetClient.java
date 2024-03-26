@@ -49,7 +49,7 @@ import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.schema.OneSchema;
 import org.apache.xtable.model.schema.OneType;
 import org.apache.xtable.model.schema.PartitionTransformType;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
 
 /**
@@ -203,7 +203,7 @@ public class TestHudiTargetClient {
     HudiTargetClient targetClient = getTargetClient(null);
     HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();
     String instant = "commit";
-    OneDataFilesDiff input = OneDataFilesDiff.builder().build();
+    DataFilesDiff input = DataFilesDiff.builder().build();
     BaseFileUpdatesExtractor.ReplaceMetadata output =
         BaseFileUpdatesExtractor.ReplaceMetadata.of(
             Collections.emptyMap(), Collections.emptyList());

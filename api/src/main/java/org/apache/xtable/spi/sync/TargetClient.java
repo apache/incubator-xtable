@@ -28,7 +28,7 @@ import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
 import org.apache.xtable.model.schema.OnePartitionField;
 import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
 
 /** A client that provides the major functionality for syncing changes to a target system. */
@@ -68,9 +68,9 @@ public interface TargetClient {
    * Syncs the changes in files to the target system. This method is required to both add and remove
    * files.
    *
-   * @param oneDataFilesDiff the diff that needs to be synced
+   * @param dataFilesDiff the diff that needs to be synced
    */
-  void syncFilesForDiff(OneDataFilesDiff oneDataFilesDiff);
+  void syncFilesForDiff(DataFilesDiff dataFilesDiff);
 
   /**
    * Starts the sync and performs any initialization required

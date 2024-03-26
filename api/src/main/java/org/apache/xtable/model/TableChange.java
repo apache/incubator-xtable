@@ -21,7 +21,7 @@ package org.apache.xtable.model;
 import lombok.Builder;
 import lombok.Value;
 
-import org.apache.xtable.model.storage.OneDataFilesDiff;
+import org.apache.xtable.model.storage.DataFilesDiff;
 
 /**
  * Captures the changes in a single commit/instant from the source table.
@@ -32,7 +32,7 @@ import org.apache.xtable.model.storage.OneDataFilesDiff;
 @Builder(toBuilder = true)
 public class TableChange {
   // Change in files at the specified instant
-  OneDataFilesDiff filesDiff;
+  DataFilesDiff filesDiff;
 
   /** The {@link OneTable} at the commit time to which this table change belongs. */
   OneTable tableAsOfChange;
