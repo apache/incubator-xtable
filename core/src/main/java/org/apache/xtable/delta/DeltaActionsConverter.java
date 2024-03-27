@@ -31,8 +31,8 @@ import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -50,8 +50,8 @@ public class DeltaActionsConverter {
       AddFile addFile,
       Snapshot deltaSnapshot,
       FileFormat fileFormat,
-      List<OnePartitionField> partitionFields,
-      List<OneField> fields,
+      List<InternalPartitionField> partitionFields,
+      List<InternalField> fields,
       boolean includeColumnStats,
       DeltaPartitionExtractor partitionExtractor,
       DeltaStatsExtractor fileStatsExtractor) {
@@ -78,7 +78,7 @@ public class DeltaActionsConverter {
       RemoveFile removeFile,
       Snapshot deltaSnapshot,
       FileFormat fileFormat,
-      List<OnePartitionField> partitionFields,
+      List<InternalPartitionField> partitionFields,
       DeltaPartitionExtractor partitionExtractor) {
     return InternalDataFile.builder()
         .physicalPath(getFullPathToFile(deltaSnapshot, removeFile.path()))

@@ -29,8 +29,8 @@ import org.apache.spark.sql.delta.Snapshot;
 import scala.Option;
 
 import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
 
@@ -42,8 +42,8 @@ public class DeltaTableExtractor {
 
   public OneTable table(DeltaLog deltaLog, String tableName, Long version) {
     Snapshot snapshot = deltaLog.getSnapshotAt(version, Option.empty());
-    OneSchema schema = schemaExtractor.toOneSchema(snapshot.metadata().schema());
-    List<OnePartitionField> partitionFields =
+    InternalSchema schema = schemaExtractor.toInternalSchema(snapshot.metadata().schema());
+    List<InternalPartitionField> partitionFields =
         DeltaPartitionExtractor.getInstance()
             .convertFromDeltaPartitionFormat(schema, snapshot.metadata().partitionSchema());
     // Delta follows Hive Style partitioning layout

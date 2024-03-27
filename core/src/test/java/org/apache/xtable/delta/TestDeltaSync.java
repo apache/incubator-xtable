@@ -77,12 +77,12 @@ import io.delta.standalone.types.IntegerType;
 import io.delta.standalone.types.StringType;
 
 import org.apache.xtable.client.PerTableConfigImpl;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
@@ -137,15 +137,19 @@ public class TestDeltaSync {
 
   @Test
   public void testCreateSnapshotControlFlow() throws Exception {
-    OneSchema schema1 = getOneSchema();
-    List<OneField> fields2 = new ArrayList<>(schema1.getFields());
+    InternalSchema schema1 = getInternalSchema();
+    List<InternalField> fields2 = new ArrayList<>(schema1.getFields());
     fields2.add(
-        OneField.builder()
+        InternalField.builder()
             .name("float_field")
             .schema(
-                OneSchema.builder().name("float").dataType(OneType.FLOAT).isNullable(true).build())
+                InternalSchema.builder()
+                    .name("float")
+                    .dataType(InternalType.FLOAT)
+                    .isNullable(true)
+                    .build())
             .build());
-    OneSchema schema2 = getOneSchema().toBuilder().fields(fields2).build();
+    InternalSchema schema2 = getInternalSchema().toBuilder().fields(fields2).build();
     OneTable table1 = getOneTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
     OneTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
 
@@ -153,8 +157,8 @@ public class TestDeltaSync {
     InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
     InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList(), basePath);
 
-    OneSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
-    OneSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
 
     TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(deltaClient), snapshot1);
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2)), null);
@@ -165,13 +169,17 @@ public class TestDeltaSync {
 
   @Test
   public void testPrimitiveFieldPartitioning() throws Exception {
-    OneSchema schema = getOneSchema();
-    OnePartitionField onePartitionField =
-        OnePartitionField.builder()
+    InternalSchema schema = getInternalSchema();
+    InternalPartitionField internalPartitionField =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("string_field")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
@@ -180,19 +188,19 @@ public class TestDeltaSync {
             tableName,
             basePath,
             schema,
-            Collections.singletonList(onePartitionField),
+            Collections.singletonList(internalPartitionField),
             LAST_COMMIT_TIME);
 
     List<PartitionValue> partitionValues1 =
         Collections.singletonList(
             PartitionValue.builder()
-                .partitionField(onePartitionField)
+                .partitionField(internalPartitionField)
                 .range(Range.scalar("level"))
                 .build());
     List<PartitionValue> partitionValues2 =
         Collections.singletonList(
             PartitionValue.builder()
-                .partitionField(onePartitionField)
+                .partitionField(internalPartitionField)
                 .range(Range.scalar("warning"))
                 .build());
     InternalDataFile dataFile1 = getDataFile(1, partitionValues1, basePath);
@@ -202,7 +210,7 @@ public class TestDeltaSync {
     EqualTo equalToExpr =
         new EqualTo(new Column("string_field", new StringType()), Literal.of("warning"));
 
-    OneSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
 
     TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(deltaClient), snapshot1);
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile3)), equalToExpr);
@@ -210,22 +218,26 @@ public class TestDeltaSync {
 
   @Test
   public void testMultipleFieldPartitioning() throws Exception {
-    OneSchema schema = getOneSchema();
-    OnePartitionField onePartitionField1 =
-        OnePartitionField.builder()
+    InternalSchema schema = getInternalSchema();
+    InternalPartitionField internalPartitionField1 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("string_field")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OnePartitionField onePartitionField2 =
-        OnePartitionField.builder()
+    InternalPartitionField internalPartitionField2 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("int_field")
-                    .schema(OneSchema.builder().name("int").dataType(OneType.INT).build())
+                    .schema(InternalSchema.builder().name("int").dataType(InternalType.INT).build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
@@ -234,37 +246,37 @@ public class TestDeltaSync {
             tableName,
             basePath,
             schema,
-            Arrays.asList(onePartitionField1, onePartitionField2),
+            Arrays.asList(internalPartitionField1, internalPartitionField2),
             LAST_COMMIT_TIME);
 
     List<PartitionValue> partitionValues1 =
         Arrays.asList(
             PartitionValue.builder()
-                .partitionField(onePartitionField1)
+                .partitionField(internalPartitionField1)
                 .range(Range.scalar("level"))
                 .build(),
             PartitionValue.builder()
-                .partitionField(onePartitionField2)
+                .partitionField(internalPartitionField2)
                 .range(Range.scalar(10))
                 .build());
     List<PartitionValue> partitionValues2 =
         Arrays.asList(
             PartitionValue.builder()
-                .partitionField(onePartitionField1)
+                .partitionField(internalPartitionField1)
                 .range(Range.scalar("level"))
                 .build(),
             PartitionValue.builder()
-                .partitionField(onePartitionField2)
+                .partitionField(internalPartitionField2)
                 .range(Range.scalar(20))
                 .build());
     List<PartitionValue> partitionValues3 =
         Arrays.asList(
             PartitionValue.builder()
-                .partitionField(onePartitionField1)
+                .partitionField(internalPartitionField1)
                 .range(Range.scalar("warning"))
                 .build(),
             PartitionValue.builder()
-                .partitionField(onePartitionField2)
+                .partitionField(internalPartitionField2)
                 .range(Range.scalar(20))
                 .build());
 
@@ -277,7 +289,7 @@ public class TestDeltaSync {
     EqualTo equalToExpr2 = new EqualTo(new Column("int_field", new IntegerType()), Literal.of(20));
     And CombinedExpr = new And(equalToExpr1, equalToExpr2);
 
-    OneSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
     TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(deltaClient), snapshot1);
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile2)), CombinedExpr);
   }
@@ -289,9 +301,9 @@ public class TestDeltaSync {
   @ParameterizedTest
   @MethodSource(value = "timestampPartitionTestingArgs")
   public void testTimestampPartitioning(PartitionTransformType transformType) throws Exception {
-    OneSchema schema = getOneSchema();
-    OnePartitionField partitionField =
-        OnePartitionField.builder()
+    InternalSchema schema = getInternalSchema();
+    InternalPartitionField partitionField =
+        InternalPartitionField.builder()
             .sourceField(SchemaFieldFinder.getInstance().findFieldByPath(schema, "timestamp_field"))
             .transformType(transformType)
             .build();
@@ -319,7 +331,7 @@ public class TestDeltaSync {
     InternalDataFile dataFile2 = getDataFile(2, partitionValues1, basePath);
     InternalDataFile dataFile3 = getDataFile(3, partitionValues2, basePath);
 
-    OneSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
 
     TableFormatSync.getInstance().syncSnapshot(Collections.singletonList(deltaClient), snapshot1);
 
@@ -389,8 +401,8 @@ public class TestDeltaSync {
         internalDataFiles.size(), count, "Number of files from DeltaScan don't match expectation");
   }
 
-  private OneSnapshot buildSnapshot(OneTable table, InternalDataFile... dataFiles) {
-    return OneSnapshot.builder()
+  private InternalSnapshot buildSnapshot(OneTable table, InternalDataFile... dataFiles) {
+    return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(OneFileGroup.fromFiles(Arrays.asList(dataFiles)))
         .build();
@@ -399,8 +411,8 @@ public class TestDeltaSync {
   private OneTable getOneTable(
       String tableName,
       Path basePath,
-      OneSchema schema,
-      List<OnePartitionField> partitionFields,
+      InternalSchema schema,
+      List<InternalPartitionField> partitionFields,
       Instant lastCommitTime) {
     return OneTable.builder()
         .name(tableName)
@@ -428,48 +440,48 @@ public class TestDeltaSync {
         .build();
   }
 
-  private OneSchema getOneSchema() {
-    Map<OneSchema.MetadataKey, Object> timestampMetadata = new HashMap<>();
+  private InternalSchema getInternalSchema() {
+    Map<InternalSchema.MetadataKey, Object> timestampMetadata = new HashMap<>();
     timestampMetadata.put(
-        OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
-    return OneSchema.builder()
-        .dataType(OneType.RECORD)
+        InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
+    return InternalSchema.builder()
+        .dataType(InternalType.RECORD)
         .name("top_level_schema")
         .fields(
             Arrays.asList(
-                OneField.builder()
+                InternalField.builder()
                     .name("long_field")
                     .schema(
-                        OneSchema.builder()
+                        InternalSchema.builder()
                             .name("long")
-                            .dataType(OneType.LONG)
+                            .dataType(InternalType.LONG)
                             .isNullable(true)
                             .build())
                     .build(),
-                OneField.builder()
+                InternalField.builder()
                     .name("string_field")
                     .schema(
-                        OneSchema.builder()
+                        InternalSchema.builder()
                             .name("string")
-                            .dataType(OneType.STRING)
+                            .dataType(InternalType.STRING)
                             .isNullable(true)
                             .build())
                     .build(),
-                OneField.builder()
+                InternalField.builder()
                     .name("int_field")
                     .schema(
-                        OneSchema.builder()
+                        InternalSchema.builder()
                             .name("int")
-                            .dataType(OneType.INT)
+                            .dataType(InternalType.INT)
                             .isNullable(true)
                             .build())
                     .build(),
-                OneField.builder()
+                InternalField.builder()
                     .name("timestamp_field")
                     .schema(
-                        OneSchema.builder()
+                        InternalSchema.builder()
                             .name("time")
-                            .dataType(OneType.TIMESTAMP)
+                            .dataType(InternalType.TIMESTAMP)
                             .isNullable(true)
                             .metadata(timestampMetadata)
                             .build())

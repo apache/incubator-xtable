@@ -31,9 +31,9 @@ import org.junit.jupiter.api.Test;
 import org.apache.hudi.common.util.Option;
 
 import org.apache.xtable.hudi.idtracking.IdTracker;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 
 public class TestAvroSchemaConverter {
   @Test
@@ -45,183 +45,183 @@ public class TestAvroSchemaConverter {
             .parse(
                 "{\"type\":\"record\",\"name\":\"testRecord\",\"doc\":\"What's up doc\",\"fields\":[{\"name\":\"requiredBoolean\",\"type\":\"boolean\",\"default\":false},{\"name\":\"optionalBoolean\",\"type\":[\"null\",\"boolean\"],\"default\":null},{\"name\":\"requiredInt\",\"type\":\"int\",\"default\":123},{\"name\":\"optionalInt\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"requiredLong\",\"type\":\"long\"},{\"name\":\"optionalLong\",\"type\":[\"null\",\"long\"],\"default\":null},{\"name\":\"requiredDouble\",\"type\":\"double\"},{\"name\":\"optionalDouble\",\"type\":[\"null\",\"double\"],\"default\":null},{\"name\":\"requiredFloat\",\"type\":\"float\"},{\"name\":\"optionalFloat\",\"type\":[\"null\",\"float\"],\"default\":null},{\"name\":\"requiredString\",\"type\":\"string\"},{\"name\":\"optionalString\",\"type\":[\"null\",\"string\"],\"default\":null},{\"name\":\"requiredBytes\",\"type\":\"bytes\"},{\"name\":\"optionalBytes\",\"type\":[\"null\",\"bytes\"],\"default\":null},{\"name\":\"requiredEnum\",\"type\":{\"type\":\"enum\",\"name\":\"REQUIRED_ENUM\",\"symbols\":[\"ONE\",\"TWO\"]},\"default\":\"ONE\"},{\"name\":\"optionalEnum\",\"type\":[\"null\",{\"type\":\"enum\",\"name\":\"OPTIONAL_ENUM\",\"symbols\":[\"THREE\",\"FOUR\"]}],\"default\":null}]}");
 
-    Map<OneSchema.MetadataKey, Object> requiredEnumMetadata = new HashMap<>();
-    requiredEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
-    Map<OneSchema.MetadataKey, Object> optionalEnumMetadata = new HashMap<>();
-    optionalEnumMetadata.put(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
+    Map<InternalSchema.MetadataKey, Object> requiredEnumMetadata = new HashMap<>();
+    requiredEnumMetadata.put(InternalSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
+    Map<InternalSchema.MetadataKey, Object> optionalEnumMetadata = new HashMap<>();
+    optionalEnumMetadata.put(
+        InternalSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
 
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
+    InternalSchema internalSchema =
+        InternalSchema.builder()
             .name(schemaName)
             .comment(doc)
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .isNullable(false)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredBoolean")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("boolean")
-                                .dataType(OneType.BOOLEAN)
+                                .dataType(InternalType.BOOLEAN)
                                 .isNullable(false)
                                 .build())
                         .defaultValue(false)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalBoolean")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("boolean")
-                                .dataType(OneType.BOOLEAN)
+                                .dataType(InternalType.BOOLEAN)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredInt")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("int")
-                                .dataType(OneType.INT)
+                                .dataType(InternalType.INT)
                                 .isNullable(false)
                                 .build())
                         .defaultValue(123)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalInt")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("int")
-                                .dataType(OneType.INT)
+                                .dataType(InternalType.INT)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredLong")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("long")
-                                .dataType(OneType.LONG)
+                                .dataType(InternalType.LONG)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalLong")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("long")
-                                .dataType(OneType.LONG)
+                                .dataType(InternalType.LONG)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredDouble")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("double")
-                                .dataType(OneType.DOUBLE)
+                                .dataType(InternalType.DOUBLE)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalDouble")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("double")
-                                .dataType(OneType.DOUBLE)
+                                .dataType(InternalType.DOUBLE)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredFloat")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("float")
-                                .dataType(OneType.FLOAT)
+                                .dataType(InternalType.FLOAT)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalFloat")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("float")
-                                .dataType(OneType.FLOAT)
+                                .dataType(InternalType.FLOAT)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredString")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("string")
-                                .dataType(OneType.STRING)
+                                .dataType(InternalType.STRING)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalString")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("string")
-                                .dataType(OneType.STRING)
+                                .dataType(InternalType.STRING)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredBytes")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("bytes")
-                                .dataType(OneType.BYTES)
+                                .dataType(InternalType.BYTES)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalBytes")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("bytes")
-                                .dataType(OneType.BYTES)
+                                .dataType(InternalType.BYTES)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredEnum")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("REQUIRED_ENUM")
-                                .dataType(OneType.ENUM)
+                                .dataType(InternalType.ENUM)
                                 .isNullable(false)
                                 .metadata(requiredEnumMetadata)
                                 .build())
                         .defaultValue("ONE")
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalEnum")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("OPTIONAL_ENUM")
-                                .dataType(OneType.ENUM)
+                                .dataType(InternalType.ENUM)
                                 .isNullable(true)
                                 .metadata(optionalEnumMetadata)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
 
     assertEquals(
-        oneSchemaRepresentation, AvroSchemaConverter.getInstance().toOneSchema(avroRepresentation));
+        internalSchema, AvroSchemaConverter.getInstance().toInternalSchema(avroRepresentation));
     assertEquals(
-        avroRepresentation,
-        AvroSchemaConverter.getInstance().fromOneSchema(oneSchemaRepresentation));
+        avroRepresentation, AvroSchemaConverter.getInstance().fromInternalSchema(internalSchema));
   }
 
   @Test
@@ -231,65 +231,67 @@ public class TestAvroSchemaConverter {
             .parse(
                 "{\"type\":\"record\",\"name\":\"testRecord\",\"fields\":[{\"name\":\"nestedOne\",\"type\":[\"null\",{\"type\":\"record\",\"name\":\"nestedOneType\",\"namespace\":\"nestedOne\",\"fields\":[{\"name\":\"nestedOptionalInt\",\"type\":[\"null\",\"int\"],\"default\":null},{\"name\":\"nestedRequiredDouble\",\"type\":\"double\"},{\"name\":\"nestedTwo\",\"type\":{\"type\":\"record\",\"name\":\"nestedTwoType\",\"namespace\":\"nestedOne.nestedTwo\",\"fields\":[{\"name\":\"doublyNestedString\",\"type\":[\"null\",\"string\"],\"default\":null}]}}]}],\"default\":null}]}");
 
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
+    InternalSchema internalSchema =
+        InternalSchema.builder()
             .name("testRecord")
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .isNullable(false)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("nestedOne")
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("nestedOneType")
-                                .dataType(OneType.RECORD)
+                                .dataType(InternalType.RECORD)
                                 .isNullable(true)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
+                                        InternalField.builder()
                                             .name("nestedOptionalInt")
                                             .parentPath("nestedOne")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("int")
-                                                    .dataType(OneType.INT)
+                                                    .dataType(InternalType.INT)
                                                     .isNullable(true)
                                                     .build())
-                                            .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                                            .defaultValue(
+                                                InternalField.Constants.NULL_DEFAULT_VALUE)
                                             .build(),
-                                        OneField.builder()
+                                        InternalField.builder()
                                             .name("nestedRequiredDouble")
                                             .parentPath("nestedOne")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("double")
-                                                    .dataType(OneType.DOUBLE)
+                                                    .dataType(InternalType.DOUBLE)
                                                     .isNullable(false)
                                                     .build())
                                             .build(),
-                                        OneField.builder()
+                                        InternalField.builder()
                                             .name("nestedTwo")
                                             .parentPath("nestedOne")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("nestedTwoType")
-                                                    .dataType(OneType.RECORD)
+                                                    .dataType(InternalType.RECORD)
                                                     .isNullable(false)
                                                     .fields(
                                                         Arrays.asList(
-                                                            OneField.builder()
+                                                            InternalField.builder()
                                                                 .name("doublyNestedString")
                                                                 .parentPath("nestedOne.nestedTwo")
                                                                 .schema(
-                                                                    OneSchema.builder()
+                                                                    InternalSchema.builder()
                                                                         .name("string")
-                                                                        .dataType(OneType.STRING)
+                                                                        .dataType(
+                                                                            InternalType.STRING)
                                                                         .isNullable(true)
                                                                         .build())
                                                                 .defaultValue(
-                                                                    OneField.Constants
+                                                                    InternalField.Constants
                                                                         .NULL_DEFAULT_VALUE)
                                                                 .build()))
                                                     .build())
@@ -299,10 +301,9 @@ public class TestAvroSchemaConverter {
             .build();
 
     assertEquals(
-        oneSchemaRepresentation, AvroSchemaConverter.getInstance().toOneSchema(avroRepresentation));
+        internalSchema, AvroSchemaConverter.getInstance().toInternalSchema(avroRepresentation));
     assertEquals(
-        avroRepresentation,
-        AvroSchemaConverter.getInstance().fromOneSchema(oneSchemaRepresentation));
+        avroRepresentation, AvroSchemaConverter.getInstance().fromInternalSchema(internalSchema));
   }
 
   @Test
@@ -312,87 +313,86 @@ public class TestAvroSchemaConverter {
             .parse(
                 "{\"type\":\"record\",\"name\":\"testRecord\",\"fields\":[{\"name\":\"intList\",\"type\":{\"type\":\"array\",\"items\":\"int\"}},{\"name\":\"recordList\",\"type\":[\"null\",{\"type\":\"array\",\"items\":{\"type\":\"record\",\"name\":\"element\",\"namespace\":\"recordList._one_field_element\",\"fields\":[{\"name\":\"requiredDouble\",\"type\":\"double\"},{\"name\":\"optionalString\",\"type\":[\"null\",\"string\"],\"default\":null}]}}],\"default\":null}]}");
 
-    OneSchema recordListElementSchema =
-        OneSchema.builder()
+    InternalSchema recordListElementSchema =
+        InternalSchema.builder()
             .name("element")
             .isNullable(false)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredDouble")
                         .parentPath("recordList._one_field_element")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("double")
-                                .dataType(OneType.DOUBLE)
+                                .dataType(InternalType.DOUBLE)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalString")
                         .parentPath("recordList._one_field_element")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("string")
-                                .dataType(OneType.STRING)
+                                .dataType(InternalType.STRING)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .build();
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
+    InternalSchema internalSchema =
+        InternalSchema.builder()
             .name("testRecord")
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .isNullable(false)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("intList")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("array")
                                 .isNullable(false)
-                                .dataType(OneType.LIST)
+                                .dataType(InternalType.LIST)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                                             .parentPath("intList")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("int")
-                                                    .dataType(OneType.INT)
+                                                    .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
                                             .build()))
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("recordList")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("array")
                                 .isNullable(true)
-                                .dataType(OneType.LIST)
+                                .dataType(InternalType.LIST)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                                             .parentPath("recordList")
                                             .schema(recordListElementSchema)
                                             .build()))
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
 
     assertEquals(
-        oneSchemaRepresentation, AvroSchemaConverter.getInstance().toOneSchema(avroRepresentation));
+        internalSchema, AvroSchemaConverter.getInstance().toInternalSchema(avroRepresentation));
     assertEquals(
-        avroRepresentation,
-        AvroSchemaConverter.getInstance().fromOneSchema(oneSchemaRepresentation));
+        avroRepresentation, AvroSchemaConverter.getInstance().fromInternalSchema(internalSchema));
   }
 
   @Test
@@ -402,109 +402,108 @@ public class TestAvroSchemaConverter {
             .parse(
                 "{\"type\":\"record\",\"name\":\"testRecord\",\"fields\":[{\"name\":\"intMap\",\"type\":{\"type\":\"map\",\"values\":\"int\"}},{\"name\":\"recordMap\",\"type\":[\"null\",{\"type\":\"map\",\"values\":{\"type\":\"record\",\"name\":\"element\",\"namespace\":\"recordMap._one_field_value\",\"fields\":[{\"name\":\"requiredDouble\",\"type\":\"double\"},{\"name\":\"optionalString\",\"type\":[\"null\",\"string\"],\"default\":null}]}}],\"default\":null}]}");
 
-    OneSchema recordMapElementSchema =
-        OneSchema.builder()
+    InternalSchema recordMapElementSchema =
+        InternalSchema.builder()
             .name("element")
             .isNullable(false)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredDouble")
                         .parentPath("recordMap._one_field_value")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("double")
-                                .dataType(OneType.DOUBLE)
+                                .dataType(InternalType.DOUBLE)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalString")
                         .parentPath("recordMap._one_field_value")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("string")
-                                .dataType(OneType.STRING)
+                                .dataType(InternalType.STRING)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .build();
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
+    InternalSchema internalSchema =
+        InternalSchema.builder()
             .name("testRecord")
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .isNullable(false)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("intMap")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("map")
                                 .isNullable(false)
-                                .dataType(OneType.MAP)
+                                .dataType(InternalType.MAP)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
                                             .parentPath("intMap")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("map_key")
-                                                    .dataType(OneType.STRING)
+                                                    .dataType(InternalType.STRING)
                                                     .isNullable(false)
                                                     .build())
                                             .defaultValue("")
                                             .build(),
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
                                             .parentPath("intMap")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("int")
-                                                    .dataType(OneType.INT)
+                                                    .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
                                             .build()))
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("recordMap")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("map")
                                 .isNullable(true)
-                                .dataType(OneType.MAP)
+                                .dataType(InternalType.MAP)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
                                             .parentPath("recordMap")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("map_key")
-                                                    .dataType(OneType.STRING)
+                                                    .dataType(InternalType.STRING)
                                                     .isNullable(false)
                                                     .build())
                                             .defaultValue("")
                                             .build(),
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
                                             .parentPath("recordMap")
                                             .schema(recordMapElementSchema)
                                             .build()))
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
 
     assertEquals(
-        oneSchemaRepresentation, AvroSchemaConverter.getInstance().toOneSchema(avroRepresentation));
+        internalSchema, AvroSchemaConverter.getInstance().toInternalSchema(avroRepresentation));
     assertEquals(
-        avroRepresentation,
-        AvroSchemaConverter.getInstance().fromOneSchema(oneSchemaRepresentation));
+        avroRepresentation, AvroSchemaConverter.getInstance().fromInternalSchema(internalSchema));
   }
 
   @Test
@@ -521,101 +520,103 @@ public class TestAvroSchemaConverter {
                     + "{\"name\":\"fixed_decimal\",\"type\":{\"type\":\"fixed\",\"logicalType\":\"decimal\",\"name\":\"fixed_field\",\"size\":10,\"precision\":5,\"scale\":3}},"
                     + "{\"name\":\"fixed_plain\",\"type\":{\"type\":\"fixed\",\"name\":\"fixed_plain_field\",\"size\":10}}]}");
 
-    Map<OneSchema.MetadataKey, Object> bytesMetadata = new HashMap<>();
-    bytesMetadata.put(OneSchema.MetadataKey.DECIMAL_PRECISION, 4);
-    bytesMetadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, 2);
-    Map<OneSchema.MetadataKey, Object> fixedDecimalMetadata = new HashMap<>();
-    fixedDecimalMetadata.put(OneSchema.MetadataKey.DECIMAL_PRECISION, 5);
-    fixedDecimalMetadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, 3);
-    fixedDecimalMetadata.put(OneSchema.MetadataKey.FIXED_BYTES_SIZE, 10);
-    Map<OneSchema.MetadataKey, Object> fixedMetadata = new HashMap<>();
-    fixedMetadata.put(OneSchema.MetadataKey.FIXED_BYTES_SIZE, 10);
-    Map<OneSchema.MetadataKey, Object> millisMetadata = new HashMap<>();
-    millisMetadata.put(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
-    Map<OneSchema.MetadataKey, Object> microsMetadata = new HashMap<>();
-    microsMetadata.put(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
+    Map<InternalSchema.MetadataKey, Object> bytesMetadata = new HashMap<>();
+    bytesMetadata.put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 4);
+    bytesMetadata.put(InternalSchema.MetadataKey.DECIMAL_SCALE, 2);
+    Map<InternalSchema.MetadataKey, Object> fixedDecimalMetadata = new HashMap<>();
+    fixedDecimalMetadata.put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 5);
+    fixedDecimalMetadata.put(InternalSchema.MetadataKey.DECIMAL_SCALE, 3);
+    fixedDecimalMetadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 10);
+    Map<InternalSchema.MetadataKey, Object> fixedMetadata = new HashMap<>();
+    fixedMetadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 10);
+    Map<InternalSchema.MetadataKey, Object> millisMetadata = new HashMap<>();
+    millisMetadata.put(
+        InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
+    Map<InternalSchema.MetadataKey, Object> microsMetadata = new HashMap<>();
+    microsMetadata.put(
+        InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
+    InternalSchema internalSchema =
+        InternalSchema.builder()
             .name("logicalTypes")
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .isNullable(false)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("int_date")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("int")
-                                .dataType(OneType.DATE)
+                                .dataType(InternalType.DATE)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("long_timestamp_millis")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("long")
-                                .dataType(OneType.TIMESTAMP)
+                                .dataType(InternalType.TIMESTAMP)
                                 .isNullable(false)
                                 .metadata(millisMetadata)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("long_timestamp_micros")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("long")
-                                .dataType(OneType.TIMESTAMP)
+                                .dataType(InternalType.TIMESTAMP)
                                 .isNullable(false)
                                 .metadata(microsMetadata)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("long_timestamp_millis_local")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("long")
-                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .dataType(InternalType.TIMESTAMP_NTZ)
                                 .isNullable(false)
                                 .metadata(millisMetadata)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("long_timestamp_micros_local")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("long")
-                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .dataType(InternalType.TIMESTAMP_NTZ)
                                 .isNullable(false)
                                 .metadata(microsMetadata)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("bytes_decimal")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("bytes")
-                                .dataType(OneType.DECIMAL)
+                                .dataType(InternalType.DECIMAL)
                                 .isNullable(false)
                                 .metadata(bytesMetadata)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("fixed_decimal")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("fixed_field")
-                                .dataType(OneType.DECIMAL)
+                                .dataType(InternalType.DECIMAL)
                                 .isNullable(false)
                                 .metadata(fixedDecimalMetadata)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("fixed_plain")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("fixed_plain_field")
-                                .dataType(OneType.FIXED)
+                                .dataType(InternalType.FIXED)
                                 .isNullable(false)
                                 .metadata(fixedMetadata)
                                 .build())
@@ -623,10 +624,9 @@ public class TestAvroSchemaConverter {
             .build();
 
     assertEquals(
-        oneSchemaRepresentation, AvroSchemaConverter.getInstance().toOneSchema(avroRepresentation));
+        internalSchema, AvroSchemaConverter.getInstance().toInternalSchema(avroRepresentation));
     assertEquals(
-        avroRepresentation,
-        AvroSchemaConverter.getInstance().fromOneSchema(oneSchemaRepresentation));
+        avroRepresentation, AvroSchemaConverter.getInstance().fromInternalSchema(internalSchema));
   }
 
   @Test
@@ -641,48 +641,48 @@ public class TestAvroSchemaConverter {
     Schema schemaWithIds =
         IdTracker.getInstance().addIdTracking(avroRepresentation, Option.empty(), false);
 
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
+    InternalSchema internalSchema =
+        InternalSchema.builder()
             .name("Sample")
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .isNullable(false)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("key")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("string")
-                                .dataType(OneType.STRING)
+                                .dataType(InternalType.STRING)
                                 .isNullable(false)
                                 .build())
                         .fieldId(1)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("ts")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("long")
-                                .dataType(OneType.LONG)
+                                .dataType(InternalType.LONG)
                                 .isNullable(false)
                                 .build())
                         .fieldId(2)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("nested_record")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("Nested")
-                                .dataType(OneType.RECORD)
+                                .dataType(InternalType.RECORD)
                                 .isNullable(true)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
+                                        InternalField.builder()
                                             .name("nested_int")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("int")
-                                                    .dataType(OneType.INT)
+                                                    .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
                                             .parentPath("nested_record")
@@ -691,45 +691,45 @@ public class TestAvroSchemaConverter {
                                             .build()))
                                 .build())
                         .fieldId(3)
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("nullable_map_field")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("map")
                                 .isNullable(true)
-                                .dataType(OneType.MAP)
+                                .dataType(InternalType.MAP)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
                                             .parentPath("nullable_map_field")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("map_key")
-                                                    .dataType(OneType.STRING)
+                                                    .dataType(InternalType.STRING)
                                                     .isNullable(false)
                                                     .build())
                                             .defaultValue("")
                                             .fieldId(9)
                                             .build(),
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
                                             .parentPath("nullable_map_field")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("Nested")
-                                                    .dataType(OneType.RECORD)
+                                                    .dataType(InternalType.RECORD)
                                                     .isNullable(false)
                                                     .fields(
                                                         Arrays.asList(
-                                                            OneField.builder()
+                                                            InternalField.builder()
                                                                 .name("nested_int")
                                                                 .schema(
-                                                                    OneSchema.builder()
+                                                                    InternalSchema.builder()
                                                                         .name("int")
-                                                                        .dataType(OneType.INT)
+                                                                        .dataType(InternalType.INT)
                                                                         .isNullable(false)
                                                                         .build())
                                                                 .parentPath(
@@ -742,36 +742,36 @@ public class TestAvroSchemaConverter {
                                             .build()))
                                 .build())
                         .fieldId(4)
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("primitive_map_field")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("map")
                                 .isNullable(false)
-                                .dataType(OneType.MAP)
+                                .dataType(InternalType.MAP)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
                                             .parentPath("primitive_map_field")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("map_key")
-                                                    .dataType(OneType.STRING)
+                                                    .dataType(InternalType.STRING)
                                                     .isNullable(false)
                                                     .build())
                                             .defaultValue("")
                                             .fieldId(12)
                                             .build(),
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
                                             .parentPath("primitive_map_field")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("string")
-                                                    .dataType(OneType.STRING)
+                                                    .dataType(InternalType.STRING)
                                                     .isNullable(false)
                                                     .build())
                                             .fieldId(13)
@@ -779,31 +779,31 @@ public class TestAvroSchemaConverter {
                                 .build())
                         .fieldId(5)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("array_field")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("array")
                                 .isNullable(false)
-                                .dataType(OneType.LIST)
+                                .dataType(InternalType.LIST)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                                             .parentPath("array_field")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("Nested")
-                                                    .dataType(OneType.RECORD)
+                                                    .dataType(InternalType.RECORD)
                                                     .isNullable(false)
                                                     .fields(
                                                         Arrays.asList(
-                                                            OneField.builder()
+                                                            InternalField.builder()
                                                                 .name("nested_int")
                                                                 .schema(
-                                                                    OneSchema.builder()
+                                                                    InternalSchema.builder()
                                                                         .name("int")
-                                                                        .dataType(OneType.INT)
+                                                                        .dataType(InternalType.INT)
                                                                         .isNullable(false)
                                                                         .build())
                                                                 .parentPath(
@@ -818,22 +818,22 @@ public class TestAvroSchemaConverter {
                         .defaultValue(new ArrayList<>())
                         .fieldId(6)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("primitive_array_field")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("array")
                                 .isNullable(false)
-                                .dataType(OneType.LIST)
+                                .dataType(InternalType.LIST)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                                             .parentPath("primitive_array_field")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("string")
-                                                    .dataType(OneType.STRING)
+                                                    .dataType(InternalType.STRING)
                                                     .isNullable(false)
                                                     .build())
                                             .fieldId(16)
@@ -842,7 +842,6 @@ public class TestAvroSchemaConverter {
                         .fieldId(7)
                         .build()))
             .build();
-    assertEquals(
-        oneSchemaRepresentation, AvroSchemaConverter.getInstance().toOneSchema(schemaWithIds));
+    assertEquals(internalSchema, AvroSchemaConverter.getInstance().toInternalSchema(schemaWithIds));
   }
 }

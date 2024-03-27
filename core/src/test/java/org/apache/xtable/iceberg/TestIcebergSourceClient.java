@@ -53,11 +53,11 @@ import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.client.PerTableConfigImpl;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.schema.SchemaVersion;
@@ -112,7 +112,7 @@ class TestIcebergSourceClient {
     validateSchema(oneTable.getReadSchema(), catalogSales.schema());
 
     assertEquals(1, oneTable.getPartitioningFields().size());
-    OneField partitionField = oneTable.getPartitioningFields().get(0).getSourceField();
+    InternalField partitionField = oneTable.getPartitioningFields().get(0).getSourceField();
     assertEquals("cs_sold_date_sk", partitionField.getName());
     assertEquals(7, partitionField.getFieldId());
     assertEquals(
@@ -136,10 +136,10 @@ class TestIcebergSourceClient {
 
     SchemaCatalog schemaCatalog = spyClient.getSchemaCatalog(null, iceCurrentSnapshot);
     Assertions.assertNotNull(schemaCatalog);
-    Map<SchemaVersion, OneSchema> schemas = schemaCatalog.getSchemas();
+    Map<SchemaVersion, InternalSchema> schemas = schemaCatalog.getSchemas();
     assertEquals(1, schemas.size());
     SchemaVersion expectedSchemaVersion = new SchemaVersion(iceCurrentSnapshot.schemaId(), "");
-    OneSchema irSchemaOfCommit = schemas.get(expectedSchemaVersion);
+    InternalSchema irSchemaOfCommit = schemas.get(expectedSchemaVersion);
     Assertions.assertNotNull(irSchemaOfCommit);
     validateSchema(irSchemaOfCommit, catalogSales.schemas().get(iceCurrentSnapshot.schemaId()));
   }
@@ -164,17 +164,17 @@ class TestIcebergSourceClient {
                 .partitionConverter(spyPartitionConverter)
                 .build());
 
-    OneSnapshot oneSnapshot = spyClient.getCurrentSnapshot();
-    Assertions.assertNotNull(oneSnapshot);
-    assertEquals(String.valueOf(iceCurrentSnapshot.snapshotId()), oneSnapshot.getVersion());
-    Assertions.assertNotNull(oneSnapshot.getTable());
+    InternalSnapshot internalSnapshot = spyClient.getCurrentSnapshot();
+    Assertions.assertNotNull(internalSnapshot);
+    assertEquals(String.valueOf(iceCurrentSnapshot.snapshotId()), internalSnapshot.getVersion());
+    Assertions.assertNotNull(internalSnapshot.getTable());
     verify(spyClient, times(1)).getTable(iceCurrentSnapshot);
-    verify(spyClient, times(1)).getSchemaCatalog(oneSnapshot.getTable(), iceCurrentSnapshot);
+    verify(spyClient, times(1)).getSchemaCatalog(internalSnapshot.getTable(), iceCurrentSnapshot);
     verify(spyPartitionConverter, times(5)).toOneTable(any(), any(), any());
     verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any(), any());
 
-    Assertions.assertNotNull(oneSnapshot.getPartitionedDataFiles());
-    List<OneFileGroup> dataFileChunks = oneSnapshot.getPartitionedDataFiles();
+    Assertions.assertNotNull(internalSnapshot.getPartitionedDataFiles());
+    List<OneFileGroup> dataFileChunks = internalSnapshot.getPartitionedDataFiles();
     assertEquals(5, dataFileChunks.size());
     for (OneFileGroup dataFilesChunk : dataFileChunks) {
       List<InternalDataFile> internalDataFiles = dataFilesChunk.getFiles();
@@ -347,7 +347,7 @@ class TestIcebergSourceClient {
     assertEquals(removedFiles, tableChange.getFilesDiff().getFilesRemoved().size());
   }
 
-  private void validateSchema(OneSchema readSchema, Schema expectedSchema) {
+  private void validateSchema(InternalSchema readSchema, Schema expectedSchema) {
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     Schema result = schemaExtractor.toIceberg(readSchema);
 

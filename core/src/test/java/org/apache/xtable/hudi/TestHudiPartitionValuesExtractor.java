@@ -33,10 +33,10 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.xtable.exception.PartitionValuesExtractorException;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
@@ -45,12 +45,16 @@ public class TestHudiPartitionValuesExtractor {
 
   @Test
   public void testSingleColumn() {
-    OnePartitionField column =
-        OnePartitionField.builder()
+    InternalPartitionField column =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column1")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
@@ -67,12 +71,16 @@ public class TestHudiPartitionValuesExtractor {
 
   @Test
   public void testSingleColumnValueWithSlashes() {
-    OnePartitionField column =
-        OnePartitionField.builder()
+    InternalPartitionField column =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column1")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
@@ -94,98 +102,98 @@ public class TestHudiPartitionValuesExtractor {
             Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli(),
             "yyyy-MM",
             "2022-10",
-            OneType.STRING,
+            InternalType.STRING,
             PartitionTransformType.MONTH),
         // date logical type translated to day granularity
         Arguments.of(
             Instant.parse("2022-10-02T00:00:00.00Z").toEpochMilli(),
             "yyyy-MM-dd",
             "2022-10-02",
-            OneType.DATE,
+            InternalType.DATE,
             PartitionTransformType.DAY),
         // date string with year granularity
         Arguments.of(
             Instant.parse("2022-01-01T00:00:00.00Z").toEpochMilli(),
             "yyyy",
             "2022",
-            OneType.STRING,
+            InternalType.STRING,
             PartitionTransformType.YEAR),
         // long field with day granularity
         Arguments.of(
             Instant.parse("2022-10-02T00:00:00.00Z").toEpochMilli(),
             "yyyy-MM-dd",
             "2022-10-02",
-            OneType.LONG,
+            InternalType.LONG,
             PartitionTransformType.DAY),
         // timestamp field with day granularity
         Arguments.of(
             Instant.parse("2022-10-02T00:00:00.00Z").toEpochMilli(),
             "yyyy-MM-dd",
             "2022-10-02",
-            OneType.TIMESTAMP,
+            InternalType.TIMESTAMP,
             PartitionTransformType.DAY),
         // timestamp field with month granularity
         Arguments.of(
             Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli(),
             "yyyy-MM",
             "2022-10",
-            OneType.TIMESTAMP,
+            InternalType.TIMESTAMP,
             PartitionTransformType.MONTH),
         // hour granularity with slashes
         Arguments.of(
             Instant.parse("2022-10-02T11:00:00.00Z").toEpochMilli(),
             "yyyy/MM/dd/hh",
             "2022/10/02/11",
-            OneType.STRING,
+            InternalType.STRING,
             PartitionTransformType.HOUR),
         // day granularity with slashes
         Arguments.of(
             Instant.parse("2022-10-02T00:00:00.00Z").toEpochMilli(),
             "yyyy/MM/dd",
             "2022/10/02",
-            OneType.STRING,
+            InternalType.STRING,
             PartitionTransformType.DAY),
         // month granularity with slashes
         Arguments.of(
             Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli(),
             "yyyy/MM",
             "2022/10",
-            OneType.STRING,
+            InternalType.STRING,
             PartitionTransformType.MONTH),
         // day granularity with slashes
         Arguments.of(
             Instant.parse("2022-01-01T00:00:00.00Z").toEpochMilli(),
             "yyyy",
             "2022",
-            OneType.STRING,
+            InternalType.STRING,
             PartitionTransformType.YEAR),
         // hour granularity concatenated
         Arguments.of(
             Instant.parse("2022-10-02T11:00:00.00Z").toEpochMilli(),
             "yyyyMMddhh",
             "2022100211",
-            OneType.STRING,
+            InternalType.STRING,
             PartitionTransformType.HOUR),
         // day granularity concatenated
         Arguments.of(
             Instant.parse("2022-10-02T00:00:00.00Z").toEpochMilli(),
             "yyyyMMdd",
             "20221002",
-            OneType.STRING,
+            InternalType.STRING,
             PartitionTransformType.DAY),
         // month granularity concatenated
         Arguments.of(
             Instant.parse("2022-10-01T00:00:00.00Z").toEpochMilli(),
             "yyyyMM",
             "202210",
-            OneType.STRING,
+            InternalType.STRING,
             PartitionTransformType.MONTH),
         // day granularity concatenated
         Arguments.of(
             Instant.parse("2022-01-01T00:00:00.00Z").toEpochMilli(),
             "yyyy",
             "2022",
-            OneType.STRING,
+            InternalType.STRING,
             PartitionTransformType.YEAR));
   }
 
@@ -195,15 +203,18 @@ public class TestHudiPartitionValuesExtractor {
       long partitionValue,
       String format,
       String partitionString,
-      OneType columnType,
+      InternalType columnType,
       PartitionTransformType partitionTransformType) {
-    OnePartitionField column =
-        OnePartitionField.builder()
+    InternalPartitionField column =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("col")
                     .schema(
-                        OneSchema.builder().name("partition-column").dataType(columnType).build())
+                        InternalSchema.builder()
+                            .name("partition-column")
+                            .dataType(columnType)
+                            .build())
                     .build())
             .transformType(partitionTransformType)
             .build();
@@ -225,38 +236,42 @@ public class TestHudiPartitionValuesExtractor {
 
   @Test
   public void testMultipleColumns() {
-    Map<OneSchema.MetadataKey, Object> timeFieldMetadata = new HashMap<>();
+    Map<InternalSchema.MetadataKey, Object> timeFieldMetadata = new HashMap<>();
     timeFieldMetadata.put(
-        OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
-    OnePartitionField column1 =
-        OnePartitionField.builder()
+        InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
+    InternalPartitionField column1 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column1")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OnePartitionField column2 =
-        OnePartitionField.builder()
+    InternalPartitionField column2 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column2")
                     .schema(
-                        OneSchema.builder()
+                        InternalSchema.builder()
                             .name("time")
-                            .dataType(OneType.TIMESTAMP)
+                            .dataType(InternalType.TIMESTAMP)
                             .metadata(timeFieldMetadata)
                             .build())
                     .build())
             .transformType(PartitionTransformType.MONTH)
             .build();
-    OnePartitionField column3 =
-        OnePartitionField.builder()
+    InternalPartitionField column3 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column3")
-                    .schema(OneSchema.builder().name("int").dataType(OneType.INT).build())
+                    .schema(InternalSchema.builder().name("int").dataType(InternalType.INT).build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
@@ -280,30 +295,38 @@ public class TestHudiPartitionValuesExtractor {
 
   @Test
   public void testMultipleColumnsWithDefaultHivePartition() {
-    OnePartitionField column1 =
-        OnePartitionField.builder()
+    InternalPartitionField column1 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column1")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OnePartitionField column2 =
-        OnePartitionField.builder()
+    InternalPartitionField column2 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column2")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.DAY)
             .build();
-    OnePartitionField column3 =
-        OnePartitionField.builder()
+    InternalPartitionField column3 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column3")
-                    .schema(OneSchema.builder().name("int").dataType(OneType.INT).build())
+                    .schema(InternalSchema.builder().name("int").dataType(InternalType.INT).build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
@@ -325,22 +348,27 @@ public class TestHudiPartitionValuesExtractor {
 
   @Test
   public void testHiveStyle() {
-    OnePartitionField column1 =
-        OnePartitionField.builder()
+    InternalPartitionField column1 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column1")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OnePartitionField column2 =
-        OnePartitionField.builder()
+    InternalPartitionField column2 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column2")
                     .parentPath("base")
-                    .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
+                    .schema(
+                        InternalSchema.builder().name("long").dataType(InternalType.LONG).build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
@@ -358,22 +386,27 @@ public class TestHudiPartitionValuesExtractor {
 
   @Test
   public void testHiveStyleWithDefaultPartition() {
-    OnePartitionField column1 =
-        OnePartitionField.builder()
+    InternalPartitionField column1 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column1")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OnePartitionField column2 =
-        OnePartitionField.builder()
+    InternalPartitionField column2 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column2")
                     .parentPath("base")
-                    .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
+                    .schema(
+                        InternalSchema.builder().name("long").dataType(InternalType.LONG).build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
@@ -392,22 +425,26 @@ public class TestHudiPartitionValuesExtractor {
 
   @Test
   public void testPartitionCountMismatch() {
-    OnePartitionField column1 =
-        OnePartitionField.builder()
+    InternalPartitionField column1 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column1")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OnePartitionField column2 =
-        OnePartitionField.builder()
+    InternalPartitionField column2 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column2")
                     .parentPath("base")
-                    .schema(OneSchema.builder().name("int").dataType(OneType.INT).build())
+                    .schema(InternalSchema.builder().name("int").dataType(InternalType.INT).build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
@@ -438,13 +475,16 @@ public class TestHudiPartitionValuesExtractor {
 
   @Test
   public void testPartitionFormatMismatch() {
-    OnePartitionField column =
-        OnePartitionField.builder()
+    InternalPartitionField column =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("column1")
                     .schema(
-                        OneSchema.builder().name("time").dataType(OneType.TIMESTAMP_NTZ).build())
+                        InternalSchema.builder()
+                            .name("time")
+                            .dataType(InternalType.TIMESTAMP_NTZ)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.DAY)
             .build();

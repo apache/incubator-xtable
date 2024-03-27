@@ -46,8 +46,8 @@ import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
@@ -164,13 +164,13 @@ public class IcebergClient implements TargetClient {
   }
 
   @Override
-  public void syncSchema(OneSchema schema) {
+  public void syncSchema(InternalSchema schema) {
     Schema latestSchema = schemaExtractor.toIceberg(schema);
     schemaSync.sync(transaction.table().schema(), latestSchema, transaction);
   }
 
   @Override
-  public void syncPartitionSpec(List<OnePartitionField> partitionSpec) {
+  public void syncPartitionSpec(List<InternalPartitionField> partitionSpec) {
     PartitionSpec latestPartitionSpec =
         partitionSpecExtractor.toIceberg(partitionSpec, transaction.table().schema());
     partitionSpecSync.sync(table.spec(), latestPartitionSpec, transaction);

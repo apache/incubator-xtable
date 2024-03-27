@@ -44,10 +44,10 @@ import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
@@ -94,15 +94,15 @@ public class TestHudiTargetClient {
   void syncSchema() {
     HudiTargetClient targetClient = getTargetClient(null);
     HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();
-    OneSchema input =
-        OneSchema.builder()
+    InternalSchema input =
+        InternalSchema.builder()
             .name("schema")
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .recordKeyFields(
-                Collections.singletonList(OneField.builder().name("record_key_field").build()))
+                Collections.singletonList(InternalField.builder().name("record_key_field").build()))
             .build();
     Schema converted = SchemaBuilder.record("record").fields().requiredInt("field").endRecord();
-    when(mockAvroSchemaConverter.fromOneSchema(input)).thenReturn(converted);
+    when(mockAvroSchemaConverter.fromInternalSchema(input)).thenReturn(converted);
     targetClient.syncSchema(input);
     // validate that schema is set in commitState
     verify(mockCommitState).setSchema(converted);
@@ -112,18 +112,18 @@ public class TestHudiTargetClient {
   void syncSchemaWithRecordKeyChanged() {
     HudiTargetClient targetClient = getTargetClient(null);
     initMocksForBeginSync(targetClient);
-    List<OneField> recordKeyFields =
+    List<InternalField> recordKeyFields =
         Arrays.asList(
-            OneField.builder().name("record_key_field").build(),
-            OneField.builder().name("record_key_field2").build());
-    OneSchema input =
-        OneSchema.builder()
+            InternalField.builder().name("record_key_field").build(),
+            InternalField.builder().name("record_key_field2").build());
+    InternalSchema input =
+        InternalSchema.builder()
             .name("schema")
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .recordKeyFields(recordKeyFields)
             .build();
     Schema converted = SchemaBuilder.record("record").fields().requiredInt("field").endRecord();
-    when(mockAvroSchemaConverter.fromOneSchema(input)).thenReturn(converted);
+    when(mockAvroSchemaConverter.fromInternalSchema(input)).thenReturn(converted);
     Exception thrownException =
         assertThrows(NotSupportedException.class, () -> targetClient.syncSchema(input));
     assertEquals(
@@ -156,14 +156,14 @@ public class TestHudiTargetClient {
     HoodieTableMetaClient mockMetaClient = initMocksForBeginSync(targetClient).getRight();
     String field1 = "field1";
     String field2 = "field2";
-    List<OnePartitionField> inputPartitionFields =
+    List<InternalPartitionField> inputPartitionFields =
         Arrays.asList(
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name(field1).build())
+            InternalPartitionField.builder()
+                .sourceField(InternalField.builder().name(field1).build())
                 .transformType(PartitionTransformType.VALUE)
                 .build(),
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name(field2).build())
+            InternalPartitionField.builder()
+                .sourceField(InternalField.builder().name(field2).build())
                 .transformType(PartitionTransformType.VALUE)
                 .build());
     HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
@@ -179,14 +179,14 @@ public class TestHudiTargetClient {
     HoodieTableMetaClient mockMetaClient = initMocksForBeginSync(targetClient).getRight();
     String field1 = "field1";
     String field2 = "field2";
-    List<OnePartitionField> inputPartitionFields =
+    List<InternalPartitionField> inputPartitionFields =
         Arrays.asList(
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name(field1).build())
+            InternalPartitionField.builder()
+                .sourceField(InternalField.builder().name(field1).build())
                 .transformType(PartitionTransformType.VALUE)
                 .build(),
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name(field2).build())
+            InternalPartitionField.builder()
+                .sourceField(InternalField.builder().name(field2).build())
                 .transformType(PartitionTransformType.VALUE)
                 .build());
     HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);

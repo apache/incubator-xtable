@@ -21,12 +21,12 @@ package org.apache.xtable.schema;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
 
 /**
- * SchemaFieldFinder finds the {@link OneField} in the given {@link OneSchema} identified by the
- * fully qualified path.
+ * SchemaFieldFinder finds the {@link InternalField} in the given {@link InternalSchema} identified
+ * by the fully qualified path.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class SchemaFieldFinder {
@@ -44,15 +44,15 @@ public class SchemaFieldFinder {
    * @param path dot separated path
    * @return the field if it exists, otherwise returns null
    */
-  public OneField findFieldByPath(OneSchema schema, String path) {
+  public InternalField findFieldByPath(InternalSchema schema, String path) {
     return findFieldByPath(schema, path.split("\\."), 0);
   }
 
-  private OneField findFieldByPath(OneSchema schema, String[] pathParts, int startIndex) {
+  private InternalField findFieldByPath(InternalSchema schema, String[] pathParts, int startIndex) {
     if (pathParts.length == 0) {
       return null;
     }
-    for (OneField field : schema.getFields()) {
+    for (InternalField field : schema.getFields()) {
       if (field.getName().equals(pathParts[startIndex])) {
         if (pathParts.length == startIndex + 1) {
           return field;

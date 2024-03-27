@@ -29,9 +29,9 @@ import org.junit.jupiter.api.Test;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Types;
 
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 
 public class TestIcebergSchemaExtractor {
 
@@ -42,233 +42,233 @@ public class TestIcebergSchemaExtractor {
   public void testPrimitiveTypes() {
     int precision = 10;
     int scale = 5;
-    Map<OneSchema.MetadataKey, Object> doubleMetadata = new HashMap<>();
-    doubleMetadata.put(OneSchema.MetadataKey.DECIMAL_PRECISION, precision);
-    doubleMetadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, scale);
+    Map<InternalSchema.MetadataKey, Object> doubleMetadata = new HashMap<>();
+    doubleMetadata.put(InternalSchema.MetadataKey.DECIMAL_PRECISION, precision);
+    doubleMetadata.put(InternalSchema.MetadataKey.DECIMAL_SCALE, scale);
 
     int fixedSize = 8;
-    Map<OneSchema.MetadataKey, Object> fixedMetadata =
-        Collections.singletonMap(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedSize);
+    Map<InternalSchema.MetadataKey, Object> fixedMetadata =
+        Collections.singletonMap(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, fixedSize);
 
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
-            .dataType(OneType.RECORD)
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .dataType(InternalType.RECORD)
             .isNullable(false)
             .name("record")
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredBoolean")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("boolean")
-                                .dataType(OneType.BOOLEAN)
+                                .dataType(InternalType.BOOLEAN)
                                 .isNullable(false)
                                 .build())
                         .fieldId(1)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalBoolean")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("boolean")
-                                .dataType(OneType.BOOLEAN)
+                                .dataType(InternalType.BOOLEAN)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .fieldId(2)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredInt")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("integer")
-                                .dataType(OneType.INT)
+                                .dataType(InternalType.INT)
                                 .isNullable(false)
                                 .build())
                         .fieldId(3)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalInt")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("integer")
-                                .dataType(OneType.INT)
+                                .dataType(InternalType.INT)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .fieldId(4)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredLong")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("long")
-                                .dataType(OneType.LONG)
+                                .dataType(InternalType.LONG)
                                 .isNullable(false)
                                 .build())
                         .fieldId(5)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalLong")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("long")
-                                .dataType(OneType.LONG)
+                                .dataType(InternalType.LONG)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .fieldId(6)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredDouble")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("double")
-                                .dataType(OneType.DOUBLE)
+                                .dataType(InternalType.DOUBLE)
                                 .isNullable(false)
                                 .build())
                         .fieldId(7)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalDouble")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("double")
-                                .dataType(OneType.DOUBLE)
+                                .dataType(InternalType.DOUBLE)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .fieldId(8)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredFloat")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("float")
-                                .dataType(OneType.FLOAT)
+                                .dataType(InternalType.FLOAT)
                                 .isNullable(false)
                                 .build())
                         .fieldId(9)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalFloat")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("float")
-                                .dataType(OneType.FLOAT)
+                                .dataType(InternalType.FLOAT)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .fieldId(10)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredString")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("string")
-                                .dataType(OneType.STRING)
+                                .dataType(InternalType.STRING)
                                 .isNullable(false)
                                 .build())
                         .fieldId(11)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalString")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("string")
-                                .dataType(OneType.STRING)
+                                .dataType(InternalType.STRING)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .fieldId(12)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredBytes")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("binary")
-                                .dataType(OneType.BYTES)
+                                .dataType(InternalType.BYTES)
                                 .isNullable(false)
                                 .build())
                         .fieldId(13)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalBytes")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("binary")
-                                .dataType(OneType.BYTES)
+                                .dataType(InternalType.BYTES)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .fieldId(14)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredDate")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("date")
-                                .dataType(OneType.DATE)
+                                .dataType(InternalType.DATE)
                                 .isNullable(false)
                                 .build())
                         .fieldId(17)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalDate")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("date")
-                                .dataType(OneType.DATE)
+                                .dataType(InternalType.DATE)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .fieldId(18)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredFixed")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("fixed")
-                                .dataType(OneType.FIXED)
+                                .dataType(InternalType.FIXED)
                                 .isNullable(false)
                                 .metadata(fixedMetadata)
                                 .build())
                         .fieldId(27)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalFixed")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("fixed")
-                                .dataType(OneType.FIXED)
+                                .dataType(InternalType.FIXED)
                                 .isNullable(true)
                                 .metadata(fixedMetadata)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .fieldId(28)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredDecimal")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("decimal")
-                                .dataType(OneType.DECIMAL)
+                                .dataType(InternalType.DECIMAL)
                                 .isNullable(false)
                                 .metadata(doubleMetadata)
                                 .build())
                         .fieldId(29)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalDecimal")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("decimal")
-                                .dataType(OneType.DECIMAL)
+                                .dataType(InternalType.DECIMAL)
                                 .isNullable(true)
                                 .metadata(doubleMetadata)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .fieldId(30)
                         .build()))
             .build();
@@ -299,44 +299,46 @@ public class TestIcebergSchemaExtractor {
                 30, "optionalDecimal", Types.DecimalType.of(precision, scale)));
 
     Assertions.assertTrue(
-        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
-    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(internalSchema)));
+    assertEquals(internalSchema, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 
   @Test
   public void testEnums() {
     // there are no enums in iceberg so we convert them to string
-    Map<OneSchema.MetadataKey, Object> requiredEnumMetadata =
-        Collections.singletonMap(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
-    Map<OneSchema.MetadataKey, Object> optionalEnumMetadata =
-        Collections.singletonMap(OneSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
+    Map<InternalSchema.MetadataKey, Object> requiredEnumMetadata =
+        Collections.singletonMap(
+            InternalSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
+    Map<InternalSchema.MetadataKey, Object> optionalEnumMetadata =
+        Collections.singletonMap(
+            InternalSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
 
-    OneSchema schemaWithEnums =
-        OneSchema.builder()
-            .dataType(OneType.RECORD)
+    InternalSchema schemaWithEnums =
+        InternalSchema.builder()
+            .dataType(InternalType.RECORD)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredEnum")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("REQUIRED_ENUM")
-                                .dataType(OneType.ENUM)
+                                .dataType(InternalType.ENUM)
                                 .isNullable(false)
                                 .metadata(requiredEnumMetadata)
                                 .build())
                         .defaultValue("ONE")
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalEnum")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("OPTIONAL_ENUM")
-                                .dataType(OneType.ENUM)
+                                .dataType(InternalType.ENUM)
                                 .isNullable(true)
                                 .metadata(optionalEnumMetadata)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
 
@@ -356,36 +358,36 @@ public class TestIcebergSchemaExtractor {
             Types.NestedField.optional(2, "optionalUuid", Types.UUIDType.get()));
 
     int fixedSize = 16;
-    Map<OneSchema.MetadataKey, Object> fixedMetadata = new HashMap<>();
-    fixedMetadata.put(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedSize);
-    OneSchema expectedSchema =
-        OneSchema.builder()
-            .dataType(OneType.RECORD)
+    Map<InternalSchema.MetadataKey, Object> fixedMetadata = new HashMap<>();
+    fixedMetadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, fixedSize);
+    InternalSchema expectedSchema =
+        InternalSchema.builder()
+            .dataType(InternalType.RECORD)
             .name("record")
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredUuid")
                         .fieldId(1)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("uuid")
-                                .dataType(OneType.FIXED)
+                                .dataType(InternalType.FIXED)
                                 .isNullable(false)
                                 .metadata(fixedMetadata)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalUuid")
                         .fieldId(2)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("uuid")
-                                .dataType(OneType.FIXED)
+                                .dataType(InternalType.FIXED)
                                 .isNullable(true)
                                 .metadata(fixedMetadata)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
     assertEquals(expectedSchema, (SCHEMA_EXTRACTOR.fromIceberg(inputSchema)));
@@ -393,103 +395,103 @@ public class TestIcebergSchemaExtractor {
 
   @Test
   public void testTimestamps() {
-    Map<OneSchema.MetadataKey, Object> millisTimestamp =
+    Map<InternalSchema.MetadataKey, Object> millisTimestamp =
         Collections.singletonMap(
-            OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
+            InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
 
-    Map<OneSchema.MetadataKey, Object> microsTimestamp =
+    Map<InternalSchema.MetadataKey, Object> microsTimestamp =
         Collections.singletonMap(
-            OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+            InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
 
-    OneSchema irSchema =
-        OneSchema.builder()
+    InternalSchema irSchema =
+        InternalSchema.builder()
             .name("record")
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredTimestampMillis")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
+                                .dataType(InternalType.TIMESTAMP)
                                 .metadata(millisTimestamp)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalTimestampMillis")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
+                                .dataType(InternalType.TIMESTAMP)
                                 .metadata(millisTimestamp)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredTimestampNtzMillis")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("timestampNtz")
-                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .dataType(InternalType.TIMESTAMP_NTZ)
                                 .isNullable(false)
                                 .metadata(millisTimestamp)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalTimestampNtzMillis")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("timestampNtz")
-                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .dataType(InternalType.TIMESTAMP_NTZ)
                                 .metadata(millisTimestamp)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredTimestampMicros")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
+                                .dataType(InternalType.TIMESTAMP)
                                 .metadata(microsTimestamp)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalTimestampMicros")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
+                                .dataType(InternalType.TIMESTAMP)
                                 .metadata(microsTimestamp)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredTimestampNtzMicros")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("timestampNtz")
-                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .dataType(InternalType.TIMESTAMP_NTZ)
                                 .isNullable(false)
                                 .metadata(microsTimestamp)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalTimestampNtzMicros")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("timestampNtz")
-                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .dataType(InternalType.TIMESTAMP_NTZ)
                                 .metadata(microsTimestamp)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
     Schema expectedTargetSchema =
@@ -518,57 +520,57 @@ public class TestIcebergSchemaExtractor {
                 6, "requiredTimestampWithoutZone", Types.TimestampType.withoutZone()),
             Types.NestedField.optional(
                 7, "optionalTimestampWithoutZone", Types.TimestampType.withoutZone()));
-    OneSchema expectedIrSchema =
-        OneSchema.builder()
-            .dataType(OneType.RECORD)
+    InternalSchema expectedIrSchema =
+        InternalSchema.builder()
+            .dataType(InternalType.RECORD)
             .name("record")
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredTimestampWithZone")
                         .fieldId(4)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
+                                .dataType(InternalType.TIMESTAMP)
                                 .metadata(microsTimestamp)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalTimestampWithZone")
                         .fieldId(5)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("timestamp")
-                                .dataType(OneType.TIMESTAMP)
+                                .dataType(InternalType.TIMESTAMP)
                                 .metadata(microsTimestamp)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredTimestampWithoutZone")
                         .fieldId(6)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("timestamp")
-                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .dataType(InternalType.TIMESTAMP_NTZ)
                                 .metadata(microsTimestamp)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalTimestampWithoutZone")
                         .fieldId(7)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("timestamp")
-                                .dataType(OneType.TIMESTAMP_NTZ)
+                                .dataType(InternalType.TIMESTAMP_NTZ)
                                 .metadata(microsTimestamp)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
     assertEquals(expectedIrSchema, SCHEMA_EXTRACTOR.fromIceberg(sourceSchema));
@@ -576,107 +578,107 @@ public class TestIcebergSchemaExtractor {
 
   @Test
   public void testMaps() {
-    OneSchema recordMapElementSchema =
-        OneSchema.builder()
+    InternalSchema recordMapElementSchema =
+        InternalSchema.builder()
             .name("struct")
             .isNullable(true)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredDouble")
                         .parentPath("recordMap._one_field_value")
                         .fieldId(7)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("double")
-                                .dataType(OneType.DOUBLE)
+                                .dataType(InternalType.DOUBLE)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalString")
                         .parentPath("recordMap._one_field_value")
                         .fieldId(8)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("string")
-                                .dataType(OneType.STRING)
+                                .dataType(InternalType.STRING)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .build();
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
+    InternalSchema internalSchema =
+        InternalSchema.builder()
             .name("record")
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .isNullable(false)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("intMap")
                         .fieldId(1)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("map")
                                 .isNullable(false)
-                                .dataType(OneType.MAP)
+                                .dataType(InternalType.MAP)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
                                             .parentPath("intMap")
                                             .fieldId(3)
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("string")
-                                                    .dataType(OneType.STRING)
+                                                    .dataType(InternalType.STRING)
                                                     .isNullable(false)
                                                     .build())
                                             .build(),
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
                                             .parentPath("intMap")
                                             .fieldId(4)
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("integer")
-                                                    .dataType(OneType.INT)
+                                                    .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
                                             .build()))
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("recordMap")
                         .fieldId(2)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("map")
                                 .isNullable(true)
-                                .dataType(OneType.MAP)
+                                .dataType(InternalType.MAP)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
                                             .fieldId(5)
                                             .parentPath("recordMap")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("integer")
-                                                    .dataType(OneType.INT)
+                                                    .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
                                             .build(),
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
                                             .fieldId(6)
                                             .parentPath("recordMap")
                                             .schema(recordMapElementSchema)
                                             .build()))
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
 
@@ -698,91 +700,91 @@ public class TestIcebergSchemaExtractor {
                         Types.NestedField.optional(8, "optionalString", Types.StringType.get())))));
 
     Assertions.assertTrue(
-        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
-    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(internalSchema)));
+    assertEquals(internalSchema, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 
   @Test
   public void testLists() {
-    OneSchema recordListElementSchema =
-        OneSchema.builder()
+    InternalSchema recordListElementSchema =
+        InternalSchema.builder()
             .name("struct")
             .isNullable(true)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredDouble")
                         .fieldId(5)
                         .parentPath("recordList._one_field_element")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("double")
-                                .dataType(OneType.DOUBLE)
+                                .dataType(InternalType.DOUBLE)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalString")
                         .fieldId(6)
                         .parentPath("recordList._one_field_element")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("string")
-                                .dataType(OneType.STRING)
+                                .dataType(InternalType.STRING)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .build();
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
-            .dataType(OneType.RECORD)
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .dataType(InternalType.RECORD)
             .name("record")
             .isNullable(false)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("intList")
                         .fieldId(1)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("list")
                                 .isNullable(false)
-                                .dataType(OneType.LIST)
+                                .dataType(InternalType.LIST)
                                 .fields(
                                     Collections.singletonList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                                             .fieldId(3)
                                             .parentPath("intList")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("integer")
-                                                    .dataType(OneType.INT)
+                                                    .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
                                             .build()))
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("recordList")
                         .fieldId(2)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("list")
                                 .isNullable(true)
-                                .dataType(OneType.LIST)
+                                .dataType(InternalType.LIST)
                                 .fields(
                                     Collections.singletonList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                                             .fieldId(4)
                                             .parentPath("recordList")
                                             .schema(recordListElementSchema)
                                             .build()))
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
 
@@ -800,76 +802,78 @@ public class TestIcebergSchemaExtractor {
                         Types.NestedField.optional(6, "optionalString", Types.StringType.get())))));
 
     Assertions.assertTrue(
-        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
-    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(internalSchema)));
+    assertEquals(internalSchema, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 
   @Test
   public void testNestedRecords() {
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
-            .dataType(OneType.RECORD)
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .dataType(InternalType.RECORD)
             .name("record")
             .isNullable(false)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("nestedOne")
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .fieldId(1)
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("struct")
-                                .dataType(OneType.RECORD)
+                                .dataType(InternalType.RECORD)
                                 .isNullable(true)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
+                                        InternalField.builder()
                                             .name("nestedOptionalInt")
                                             .parentPath("nestedOne")
                                             .fieldId(2)
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("integer")
-                                                    .dataType(OneType.INT)
+                                                    .dataType(InternalType.INT)
                                                     .isNullable(true)
                                                     .build())
-                                            .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                                            .defaultValue(
+                                                InternalField.Constants.NULL_DEFAULT_VALUE)
                                             .build(),
-                                        OneField.builder()
+                                        InternalField.builder()
                                             .name("nestedRequiredDouble")
                                             .parentPath("nestedOne")
                                             .fieldId(3)
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("double")
-                                                    .dataType(OneType.DOUBLE)
+                                                    .dataType(InternalType.DOUBLE)
                                                     .isNullable(false)
                                                     .build())
                                             .build(),
-                                        OneField.builder()
+                                        InternalField.builder()
                                             .name("nestedTwo")
                                             .parentPath("nestedOne")
                                             .fieldId(4)
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("struct")
-                                                    .dataType(OneType.RECORD)
+                                                    .dataType(InternalType.RECORD)
                                                     .isNullable(false)
                                                     .fields(
                                                         Collections.singletonList(
-                                                            OneField.builder()
+                                                            InternalField.builder()
                                                                 .name("doublyNestedString")
                                                                 .parentPath("nestedOne.nestedTwo")
                                                                 .fieldId(5)
                                                                 .schema(
-                                                                    OneSchema.builder()
+                                                                    InternalSchema.builder()
                                                                         .name("string")
-                                                                        .dataType(OneType.STRING)
+                                                                        .dataType(
+                                                                            InternalType.STRING)
                                                                         .isNullable(true)
                                                                         .build())
                                                                 .defaultValue(
-                                                                    OneField.Constants
+                                                                    InternalField.Constants
                                                                         .NULL_DEFAULT_VALUE)
                                                                 .build()))
                                                     .build())
@@ -893,121 +897,121 @@ public class TestIcebergSchemaExtractor {
                             Types.NestedField.optional(
                                 5, "doublyNestedString", Types.StringType.get()))))));
     Assertions.assertTrue(
-        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
-    assertEquals(oneSchemaRepresentation, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(internalSchema)));
+    assertEquals(internalSchema, SCHEMA_EXTRACTOR.fromIceberg(icebergRepresentation));
   }
 
   @Test
   public void testToIcebergWithNoFieldIdsSet() {
-    OneSchema recordListElementSchema =
-        OneSchema.builder()
+    InternalSchema recordListElementSchema =
+        InternalSchema.builder()
             .name("element")
             .isNullable(true)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredDouble")
                         .parentPath("recordList._one_field_element")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("double")
-                                .dataType(OneType.DOUBLE)
+                                .dataType(InternalType.DOUBLE)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalString")
                         .parentPath("recordList._one_field_element")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("string")
-                                .dataType(OneType.STRING)
+                                .dataType(InternalType.STRING)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .build();
-    OneSchema recordMapElementSchema =
-        OneSchema.builder()
+    InternalSchema recordMapElementSchema =
+        InternalSchema.builder()
             .name("element")
             .isNullable(true)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("requiredDouble")
                         .parentPath("recordMap._one_field_value")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("double")
-                                .dataType(OneType.DOUBLE)
+                                .dataType(InternalType.DOUBLE)
                                 .isNullable(false)
                                 .build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("optionalString")
                         .parentPath("recordMap._one_field_value")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("string")
-                                .dataType(OneType.STRING)
+                                .dataType(InternalType.STRING)
                                 .isNullable(true)
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .build();
-    OneSchema oneSchemaRepresentation =
-        OneSchema.builder()
+    InternalSchema internalSchema =
+        InternalSchema.builder()
             .name("testRecord")
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .isNullable(false)
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("recordList")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("array")
                                 .isNullable(true)
-                                .dataType(OneType.LIST)
+                                .dataType(InternalType.LIST)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                                             .parentPath("recordList")
                                             .schema(recordListElementSchema)
                                             .build()))
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("recordMap")
                         .schema(
-                            OneSchema.builder()
+                            InternalSchema.builder()
                                 .name("map")
                                 .isNullable(true)
-                                .dataType(OneType.MAP)
+                                .dataType(InternalType.MAP)
                                 .fields(
                                     Arrays.asList(
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
                                             .parentPath("recordMap")
                                             .schema(
-                                                OneSchema.builder()
+                                                InternalSchema.builder()
                                                     .name("map_key")
-                                                    .dataType(OneType.INT)
+                                                    .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
                                             .defaultValue("")
                                             .build(),
-                                        OneField.builder()
-                                            .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
                                             .parentPath("recordMap")
                                             .schema(recordMapElementSchema)
                                             .build()))
                                 .build())
-                        .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
 
@@ -1033,6 +1037,6 @@ public class TestIcebergSchemaExtractor {
                         Types.NestedField.optional(9, "optionalString", Types.StringType.get())))));
 
     Assertions.assertTrue(
-        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(oneSchemaRepresentation)));
+        icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(internalSchema)));
   }
 }

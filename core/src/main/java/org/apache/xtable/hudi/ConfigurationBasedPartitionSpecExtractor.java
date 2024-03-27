@@ -25,29 +25,29 @@ import java.util.Map;
 
 import lombok.AllArgsConstructor;
 
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.schema.SchemaFieldFinder;
 
 /**
- * Parses the OnePartitionFields from a configured list of specs with the format path:type:format
- * for date types or path:type for value types.
+ * Parses the InternalPartitionFields from a configured list of specs with the format
+ * path:type:format for date types or path:type for value types.
  */
 @AllArgsConstructor
 public class ConfigurationBasedPartitionSpecExtractor implements HudiSourcePartitionSpecExtractor {
   private final HudiSourceConfigImpl config;
 
   @Override
-  public List<OnePartitionField> spec(OneSchema tableSchema) {
-    List<OnePartitionField> partitionFields =
+  public List<InternalPartitionField> spec(InternalSchema tableSchema) {
+    List<InternalPartitionField> partitionFields =
         new ArrayList<>(config.getPartitionFieldSpecs().size());
     for (HudiSourceConfigImpl.PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
-      OneField sourceField =
+      InternalField sourceField =
           SchemaFieldFinder.getInstance()
               .findFieldByPath(tableSchema, fieldSpec.getSourceFieldPath());
       partitionFields.add(
-          OnePartitionField.builder()
+          InternalPartitionField.builder()
               .sourceField(sourceField)
               .transformType(fieldSpec.getTransformType())
               .build());

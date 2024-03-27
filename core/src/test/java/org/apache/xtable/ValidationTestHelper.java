@@ -27,17 +27,18 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.storage.InternalDataFile;
 
 public class ValidationTestHelper {
 
-  public static void validateOneSnapshot(OneSnapshot oneSnapshot, List<String> allActivePaths) {
-    assertNotNull(oneSnapshot);
-    assertNotNull(oneSnapshot.getTable());
+  public static void validateSnapshot(
+      InternalSnapshot internalSnapshot, List<String> allActivePaths) {
+    assertNotNull(internalSnapshot);
+    assertNotNull(internalSnapshot.getTable());
     List<String> onetablePaths =
-        oneSnapshot.getPartitionedDataFiles().stream()
+        internalSnapshot.getPartitionedDataFiles().stream()
             .flatMap(group -> group.getFiles().stream())
             .map(InternalDataFile::getPhysicalPath)
             .collect(Collectors.toList());
@@ -87,8 +88,8 @@ public class ValidationTestHelper {
         filesRemoved, extractPathsFromDataFile(tableChange.getFilesDiff().getFilesRemoved()));
   }
 
-  public static List<String> getAllFilePaths(OneSnapshot oneSnapshot) {
-    return oneSnapshot.getPartitionedDataFiles().stream()
+  public static List<String> getAllFilePaths(InternalSnapshot internalSnapshot) {
+    return internalSnapshot.getPartitionedDataFiles().stream()
         .flatMap(oneFileGroup -> oneFileGroup.getFiles().stream())
         .map(InternalDataFile::getPhysicalPath)
         .collect(Collectors.toList());

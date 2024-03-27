@@ -41,7 +41,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTableMetadata;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
@@ -55,7 +55,7 @@ import org.apache.xtable.spi.sync.TargetClient;
  * PerTableConfigImpl}. This is done in three steps,
  *
  * <ul>
- *   <li>1. Extracting snapshot {@link OneSnapshot} from the source table format.
+ *   <li>1. Extracting snapshot {@link InternalSnapshot} from the source table format.
  *   <li>2. Syncing the snapshot to the table formats provided in the config.
  *   <li>3. Storing the sync results generated in step
  * </ul>
@@ -174,7 +174,7 @@ public class OneTableClient {
 
   private <COMMIT> SyncResultForTableFormats syncSnapshot(
       Map<String, TargetClient> syncClientByFormat, ExtractFromSource<COMMIT> source) {
-    OneSnapshot snapshot = source.extractSnapshot();
+    InternalSnapshot snapshot = source.extractSnapshot();
     Map<String, SyncResult> syncResultsByFormat =
         tableFormatSync.syncSnapshot(syncClientByFormat.values(), snapshot);
     return SyncResultForTableFormats.builder().lastSyncResult(syncResultsByFormat).build();

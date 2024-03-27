@@ -40,13 +40,13 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import org.apache.xtable.model.IncrementalTableChanges;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -71,8 +71,8 @@ public class TestTableFormatSync {
                         InternalDataFile.builder().physicalPath("/tmp/path/file.parquet").build()))
                 .build());
     List<Instant> pendingCommitInstants = Collections.singletonList(Instant.now());
-    OneSnapshot snapshot =
-        OneSnapshot.builder()
+    InternalSnapshot snapshot =
+        InternalSnapshot.builder()
             .table(startingTableState)
             .partitionedDataFiles(fileGroups)
             .pendingCommits(pendingCommitInstants)
@@ -345,12 +345,14 @@ public class TestTableFormatSync {
   private static OneTable getTableState(int id) {
     return OneTable.builder()
         .tableFormat(TableFormat.HUDI)
-        .readSchema(OneSchema.builder().name(String.format("test_schema_%d", id)).build())
+        .readSchema(InternalSchema.builder().name(String.format("test_schema_%d", id)).build())
         .partitioningFields(
             Collections.singletonList(
-                OnePartitionField.builder()
+                InternalPartitionField.builder()
                     .sourceField(
-                        OneField.builder().name(String.format("partition_field_%d", id)).build())
+                        InternalField.builder()
+                            .name(String.format("partition_field_%d", id))
+                            .build())
                     .transformType(PartitionTransformType.VALUE)
                     .build()))
         .latestCommitTime(Instant.now().minus(10 - id, ChronoUnit.MINUTES))

@@ -24,8 +24,8 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Value;
 
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 
 /**
@@ -41,13 +41,13 @@ public class OneTable {
   // table format the table currently has data in
   String tableFormat;
   // Schema to use for reading the table
-  OneSchema readSchema;
+  InternalSchema readSchema;
   // Data layout strategy
   DataLayoutStrategy layoutStrategy;
   // Base path
   String basePath;
   // Partitioning fields if table is partitioned
-  List<OnePartitionField> partitioningFields;
+  List<InternalPartitionField> partitioningFields;
   // latest commit(write) on the table.
   Instant latestCommitTime;
 }

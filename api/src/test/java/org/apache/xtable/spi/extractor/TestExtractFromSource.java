@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.SchemaCatalog;
@@ -54,14 +54,14 @@ public class TestExtractFromSource {
     OneTable table = OneTable.builder().latestCommitTime(Instant.now()).build();
     SchemaCatalog schemaCatalog = new SchemaCatalog(Collections.emptyMap());
     List<OneFileGroup> dataFiles = Collections.emptyList();
-    OneSnapshot oneSnapshot =
-        OneSnapshot.builder()
+    InternalSnapshot internalSnapshot =
+        InternalSnapshot.builder()
             .schemaCatalog(schemaCatalog)
             .table(table)
             .partitionedDataFiles(dataFiles)
             .build();
-    when(mockSourceClient.getCurrentSnapshot()).thenReturn(oneSnapshot);
-    assertEquals(oneSnapshot, ExtractFromSource.of(mockSourceClient).extractSnapshot());
+    when(mockSourceClient.getCurrentSnapshot()).thenReturn(internalSnapshot);
+    assertEquals(internalSnapshot, ExtractFromSource.of(mockSourceClient).extractSnapshot());
   }
 
   @Test

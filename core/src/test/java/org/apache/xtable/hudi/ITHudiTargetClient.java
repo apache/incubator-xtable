@@ -73,10 +73,10 @@ import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 import org.apache.xtable.client.PerTableConfigImpl;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -105,27 +105,31 @@ public class ITHudiTargetClient {
   private static final long FILE_SIZE = 100L;
   private static final long RECORD_COUNT = 200L;
   private static final long LAST_MODIFIED = System.currentTimeMillis();
-  private static final OneSchema STRING_SCHEMA =
-      OneSchema.builder().name("string").dataType(OneType.STRING).isNullable(false).build();
+  private static final InternalSchema STRING_SCHEMA =
+      InternalSchema.builder()
+          .name("string")
+          .dataType(InternalType.STRING)
+          .isNullable(false)
+          .build();
 
-  private static final OneField PARTITION_FIELD_SOURCE =
-      OneField.builder().name(PARTITION_FIELD_NAME).schema(STRING_SCHEMA).build();
+  private static final InternalField PARTITION_FIELD_SOURCE =
+      InternalField.builder().name(PARTITION_FIELD_NAME).schema(STRING_SCHEMA).build();
 
-  private static final OnePartitionField PARTITION_FIELD =
-      OnePartitionField.builder()
+  private static final InternalPartitionField PARTITION_FIELD =
+      InternalPartitionField.builder()
           .sourceField(PARTITION_FIELD_SOURCE)
           .transformType(PartitionTransformType.VALUE)
           .build();
   private static final String TEST_SCHEMA_NAME = "test_schema";
-  private static final OneSchema SCHEMA =
-      OneSchema.builder()
+  private static final InternalSchema SCHEMA =
+      InternalSchema.builder()
           .name(TEST_SCHEMA_NAME)
-          .dataType(OneType.RECORD)
+          .dataType(InternalType.RECORD)
           .fields(
               Arrays.asList(
-                  OneField.builder().name(KEY_FIELD_NAME).schema(STRING_SCHEMA).build(),
+                  InternalField.builder().name(KEY_FIELD_NAME).schema(STRING_SCHEMA).build(),
                   PARTITION_FIELD_SOURCE,
-                  OneField.builder().name(OTHER_FIELD_NAME).schema(STRING_SCHEMA).build()))
+                  InternalField.builder().name(OTHER_FIELD_NAME).schema(STRING_SCHEMA).build()))
           .build();
   private final String tableBasePath = tempDir.resolve(UUID.randomUUID().toString()).toString();
 
@@ -572,7 +576,7 @@ public class ITHudiTargetClient {
         .readSchema(SCHEMA)
         .partitioningFields(
             Collections.singletonList(
-                OnePartitionField.builder()
+                InternalPartitionField.builder()
                     .sourceField(PARTITION_FIELD_SOURCE)
                     .transformType(PartitionTransformType.VALUE)
                     .build()))

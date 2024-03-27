@@ -46,7 +46,7 @@ import org.mockito.ArgumentMatcher;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
 import org.apache.xtable.model.TableChange;
@@ -73,7 +73,7 @@ public class TestOneTableClient {
   void testAllSnapshotSyncAsPerConfig() {
     SyncMode syncMode = SyncMode.FULL;
     OneTable oneTable = getOneTable();
-    OneSnapshot oneSnapshot = buildOneSnapshot(oneTable, "v1");
+    InternalSnapshot internalSnapshot = buildSnapshot(oneTable, "v1");
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
     Map<String, SyncResult> perTableResults = new HashMap<>();
@@ -88,10 +88,10 @@ public class TestOneTableClient {
         .thenReturn(mockTargetClient1);
     when(mockTableFormatClientFactory.createForFormat(TableFormat.DELTA, perTableConfig, mockConf))
         .thenReturn(mockTargetClient2);
-    when(mockSourceClient.getCurrentSnapshot()).thenReturn(oneSnapshot);
+    when(mockSourceClient.getCurrentSnapshot()).thenReturn(internalSnapshot);
     when(tableFormatSync.syncSnapshot(
             argThat(containsAll(Arrays.asList(mockTargetClient1, mockTargetClient2))),
-            eq(oneSnapshot)))
+            eq(internalSnapshot)))
         .thenReturn(perTableResults);
     OneTableClient oneTableClient =
         new OneTableClient(mockConf, mockTableFormatClientFactory, tableFormatSync);
@@ -186,7 +186,7 @@ public class TestOneTableClient {
     SyncMode syncMode = SyncMode.INCREMENTAL;
     OneTable oneTable = getOneTable();
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
-    OneSnapshot oneSnapshot = buildOneSnapshot(oneTable, "v1");
+    InternalSnapshot internalSnapshot = buildSnapshot(oneTable, "v1");
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
     Map<String, SyncResult> syncResults = new HashMap<>();
     syncResults.put(TableFormat.ICEBERG, syncResult);
@@ -211,10 +211,10 @@ public class TestOneTableClient {
     when(mockTargetClient2.getTableMetadata())
         .thenReturn(Optional.of(OneTableMetadata.of(instantAt5, Collections.emptyList())));
 
-    when(mockSourceClient.getCurrentSnapshot()).thenReturn(oneSnapshot);
+    when(mockSourceClient.getCurrentSnapshot()).thenReturn(internalSnapshot);
     when(tableFormatSync.syncSnapshot(
             argThat(containsAll(Arrays.asList(mockTargetClient1, mockTargetClient2))),
-            eq(oneSnapshot)))
+            eq(internalSnapshot)))
         .thenReturn(syncResults);
     OneTableClient oneTableClient =
         new OneTableClient(mockConf, mockTableFormatClientFactory, tableFormatSync);
@@ -275,13 +275,14 @@ public class TestOneTableClient {
     // Iceberg needs to sync by snapshot since instant15 is affected by table clean-up.
     OneTable oneTable = getOneTable();
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
-    OneSnapshot oneSnapshot = buildOneSnapshot(oneTable, "v1");
+    InternalSnapshot internalSnapshot = buildSnapshot(oneTable, "v1");
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
     Map<String, SyncResult> snapshotResult =
         Collections.singletonMap(TableFormat.ICEBERG, syncResult);
-    when(mockSourceClient.getCurrentSnapshot()).thenReturn(oneSnapshot);
+    when(mockSourceClient.getCurrentSnapshot()).thenReturn(internalSnapshot);
     when(tableFormatSync.syncSnapshot(
-            argThat(containsAll(Collections.singletonList(mockTargetClient1))), eq(oneSnapshot)))
+            argThat(containsAll(Collections.singletonList(mockTargetClient1))),
+            eq(internalSnapshot)))
         .thenReturn(snapshotResult);
     // Delta needs to sync last pending instant at instantAt8 and instants after last sync instant
     // which is instantAt5 and so i.e. instantAt2.
@@ -377,8 +378,8 @@ public class TestOneTableClient {
         .build();
   }
 
-  private OneSnapshot buildOneSnapshot(OneTable oneTable, String version) {
-    return OneSnapshot.builder().table(oneTable).version(version).build();
+  private InternalSnapshot buildSnapshot(OneTable oneTable, String version) {
+    return InternalSnapshot.builder().table(oneTable).version(version).build();
   }
 
   private OneTable getOneTable() {

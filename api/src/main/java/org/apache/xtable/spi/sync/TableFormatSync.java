@@ -34,7 +34,7 @@ import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.xtable.model.IncrementalTableChanges;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
 import org.apache.xtable.model.TableChange;
@@ -59,7 +59,7 @@ public class TableFormatSync {
    * @return the result of the sync process
    */
   public Map<String, SyncResult> syncSnapshot(
-      Collection<TargetClient> targetClients, OneSnapshot snapshot) {
+      Collection<TargetClient> targetClients, InternalSnapshot snapshot) {
     Instant startTime = Instant.now();
     Map<String, SyncResult> results = new HashMap<>();
     for (TargetClient targetClient : targetClients) {

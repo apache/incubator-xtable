@@ -52,7 +52,7 @@ import org.apache.hudi.hadoop.CachingPath;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
 import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -236,7 +236,8 @@ public class BaseFileUpdatesExtractor {
       String fileName, List<ColumnStat> columnStatMap) {
     return columnStatMap.stream()
         .filter(
-            entry -> !OneType.NON_SCALAR_TYPES.contains(entry.getField().getSchema().getDataType()))
+            entry ->
+                !InternalType.NON_SCALAR_TYPES.contains(entry.getField().getSchema().getDataType()))
         .map(
             columnStat ->
                 HoodieColumnRangeMetadata.<Comparable>create(

@@ -46,7 +46,7 @@ import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.SchemaCatalog;
@@ -83,7 +83,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public OneSnapshot getCurrentSnapshot() {
+  public InternalSnapshot getCurrentSnapshot() {
     HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
     HoodieTimeline completedTimeline = activeTimeline.filterCompletedInstants();
     // get latest commit
@@ -98,7 +98,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
             .findInstantsBefore(latestCommit.getTimestamp())
             .getInstants();
     OneTable table = getTable(latestCommit);
-    return OneSnapshot.builder()
+    return InternalSnapshot.builder()
         .table(table)
         .schemaCatalog(getSchemaCatalog(table, latestCommit))
         .partitionedDataFiles(dataFileExtractor.getFilesCurrentState(table))

@@ -36,9 +36,9 @@ import org.apache.spark.sql.delta.actions.AddFile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.testutil.ColumnStatMapUtil;
@@ -49,7 +49,7 @@ public class TestDeltaStatsExtractor {
 
   @Test
   public void testDeltaStats() throws JsonProcessingException {
-    OneSchema schema = ColumnStatMapUtil.getSchema();
+    InternalSchema schema = ColumnStatMapUtil.getSchema();
 
     List<ColumnStat> columnStats = getColumnStats();
 
@@ -114,8 +114,8 @@ public class TestDeltaStatsExtractor {
 
   @Test
   void roundTripStatsConversion() throws IOException {
-    OneSchema schema = ColumnStatMapUtil.getSchema();
-    List<OneField> fields = schema.getAllFields();
+    InternalSchema schema = ColumnStatMapUtil.getSchema();
+    List<InternalField> fields = schema.getAllFields();
     List<ColumnStat> columnStats = getColumnStats();
 
     String stats =
@@ -127,8 +127,10 @@ public class TestDeltaStatsExtractor {
     Set<ColumnStat> expected = new HashSet<>();
     columnStats.forEach(
         stat -> {
-          OneType dataType = stat.getField().getSchema().getDataType();
-          if (dataType != OneType.RECORD && dataType != OneType.LIST && dataType != OneType.MAP) {
+          InternalType dataType = stat.getField().getSchema().getDataType();
+          if (dataType != InternalType.RECORD
+              && dataType != InternalType.LIST
+              && dataType != InternalType.MAP) {
             ColumnStat columnStatWithoutSize = stat.toBuilder().totalSize(0).build();
             expected.add(columnStatWithoutSize);
           }
@@ -138,7 +140,7 @@ public class TestDeltaStatsExtractor {
 
   @Test
   void convertStatsToInternalRepresentation() throws IOException {
-    List<OneField> fields = getSchemaFields();
+    List<InternalField> fields = getSchemaFields();
     Map<String, Object> minValues = generateMap("a", 1, 1.0, 10);
     Map<String, Object> maxValues = generateMap("b", 2, 2.0, 20);
     Map<String, Object> nullValues = generateMap(1L, 2L, 3L, 4L);
@@ -181,34 +183,34 @@ public class TestDeltaStatsExtractor {
     assertEquals(expected, actual);
   }
 
-  private List<OneField> getSchemaFields() {
+  private List<InternalField> getSchemaFields() {
     return Arrays.asList(
-        OneField.builder()
+        InternalField.builder()
             .name("top_level_string")
-            .schema(OneSchema.builder().dataType(OneType.STRING).build())
+            .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
             .build(),
-        OneField.builder()
+        InternalField.builder()
             .name("nested")
-            .schema(OneSchema.builder().dataType(OneType.RECORD).build())
+            .schema(InternalSchema.builder().dataType(InternalType.RECORD).build())
             .build(),
-        OneField.builder()
+        InternalField.builder()
             .name("int_field")
             .parentPath("nested")
-            .schema(OneSchema.builder().dataType(OneType.INT).build())
+            .schema(InternalSchema.builder().dataType(InternalType.INT).build())
             .build(),
-        OneField.builder()
+        InternalField.builder()
             .name("double_nesting")
             .parentPath("nested")
-            .schema(OneSchema.builder().dataType(OneType.RECORD).build())
+            .schema(InternalSchema.builder().dataType(InternalType.RECORD).build())
             .build(),
-        OneField.builder()
+        InternalField.builder()
             .name("double_field")
             .parentPath("nested.double_nesting")
-            .schema(OneSchema.builder().dataType(OneType.DOUBLE).build())
+            .schema(InternalSchema.builder().dataType(InternalType.DOUBLE).build())
             .build(),
-        OneField.builder()
+        InternalField.builder()
             .name("top_level_int")
-            .schema(OneSchema.builder().dataType(OneType.INT).build())
+            .schema(InternalSchema.builder().dataType(InternalType.INT).build())
             .build());
   }
 

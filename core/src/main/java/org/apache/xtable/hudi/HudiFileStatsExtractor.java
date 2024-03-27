@@ -48,9 +48,9 @@ import org.apache.hudi.metadata.HoodieTableMetadata;
 import org.apache.hudi.metadata.MetadataPartitionType;
 
 import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -84,13 +84,13 @@ public class HudiFileStatsExtractor {
    * @return a stream of files with column stats and row count information
    */
   public Stream<InternalDataFile> addStatsToFiles(
-      HoodieTableMetadata metadataTable, Stream<InternalDataFile> files, OneSchema schema) {
+      HoodieTableMetadata metadataTable, Stream<InternalDataFile> files, InternalSchema schema) {
     boolean useMetadataTableColStats =
         metadataTable != null
             && metaClient
                 .getTableConfig()
                 .isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS);
-    final Map<String, OneField> nameFieldMap =
+    final Map<String, InternalField> nameFieldMap =
         schema.getAllFields().stream()
             .collect(
                 Collectors.toMap(
@@ -102,7 +102,7 @@ public class HudiFileStatsExtractor {
   }
 
   private Stream<InternalDataFile> computeColumnStatsFromParquetFooters(
-      Stream<InternalDataFile> files, Map<String, OneField> nameFieldMap) {
+      Stream<InternalDataFile> files, Map<String, InternalField> nameFieldMap) {
     return files.map(
         file -> {
           HudiFileStats fileStats =
@@ -123,7 +123,7 @@ public class HudiFileStatsExtractor {
   private Stream<InternalDataFile> computeColumnStatsFromMetadataTable(
       HoodieTableMetadata metadataTable,
       Stream<InternalDataFile> files,
-      Map<String, OneField> nameFieldMap) {
+      Map<String, InternalField> nameFieldMap) {
     Map<Pair<String, String>, InternalDataFile> filePathsToDataFile =
         files.collect(
             Collectors.toMap(
@@ -132,12 +132,12 @@ public class HudiFileStatsExtractor {
       return Stream.empty();
     }
     List<Pair<String, String>> filePaths = new ArrayList<>(filePathsToDataFile.keySet());
-    Map<Pair<String, String>, List<Pair<OneField, HoodieMetadataColumnStats>>> stats =
+    Map<Pair<String, String>, List<Pair<InternalField, HoodieMetadataColumnStats>>> stats =
         nameFieldMap.entrySet().parallelStream()
             .flatMap(
                 fieldNameToField -> {
                   String fieldName = fieldNameToField.getKey();
-                  OneField field = fieldNameToField.getValue();
+                  InternalField field = fieldNameToField.getValue();
                   return metadataTable.getColumnStats(filePaths, fieldName).entrySet().stream()
                       .map(
                           filePairToStats ->
@@ -155,7 +155,7 @@ public class HudiFileStatsExtractor {
             pathToDataFile -> {
               Pair<String, String> filePath = pathToDataFile.getKey();
               InternalDataFile file = pathToDataFile.getValue();
-              List<Pair<OneField, HoodieMetadataColumnStats>> fileStats =
+              List<Pair<InternalField, HoodieMetadataColumnStats>> fileStats =
                   stats.getOrDefault(filePath, Collections.emptyList());
               List<ColumnStat> columnStats =
                   fileStats.stream()
@@ -175,7 +175,7 @@ public class HudiFileStatsExtractor {
   }
 
   private HudiFileStats computeColumnStatsForFile(
-      Path filePath, Map<String, OneField> nameFieldMap) {
+      Path filePath, Map<String, InternalField> nameFieldMap) {
     List<HoodieColumnRangeMetadata<Comparable>> columnRanges =
         UTILS.readRangeFromParquetMetadata(
             metaClient.getHadoopConf(), filePath, new ArrayList<>(nameFieldMap.keySet()));
@@ -193,13 +193,13 @@ public class HudiFileStatsExtractor {
   }
 
   private static ColumnStat getColumnStatFromHudiStat(
-      OneField field, HoodieMetadataColumnStats columnStats) {
+      InternalField field, HoodieMetadataColumnStats columnStats) {
     if (columnStats == null) {
       return ColumnStat.builder().build();
     }
     Comparable<?> minValue = HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMinValue());
     Comparable<?> maxValue = HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMaxValue());
-    if (field.getSchema().getDataType() == OneType.DECIMAL) {
+    if (field.getSchema().getDataType() == InternalType.DECIMAL) {
       minValue =
           minValue instanceof ByteBuffer
               ? convertBytesToBigDecimal((ByteBuffer) minValue, DECIMAL_WRAPPER_SCALE)
@@ -225,7 +225,7 @@ public class HudiFileStatsExtractor {
   }
 
   private static ColumnStat getColumnStatFromColRange(
-      OneField field, HoodieColumnRangeMetadata<Comparable> colRange) {
+      InternalField field, HoodieColumnRangeMetadata<Comparable> colRange) {
     if (colRange == null) {
       return ColumnStat.builder().build();
     }
@@ -241,7 +241,7 @@ public class HudiFileStatsExtractor {
   private static ColumnStat getColumnStatFromValues(
       Comparable minValue,
       Comparable maxValue,
-      OneField field,
+      InternalField field,
       long nullCount,
       long valueCount,
       long totalSize) {
@@ -249,11 +249,11 @@ public class HudiFileStatsExtractor {
     if (minValue instanceof Date || maxValue instanceof Date) {
       minValue = minValue == null ? null : dateToDaysSinceEpoch(minValue);
       maxValue = maxValue == null ? null : dateToDaysSinceEpoch(maxValue);
-    } else if (field.getSchema().getDataType() == OneType.ENUM
+    } else if (field.getSchema().getDataType() == InternalType.ENUM
         && (minValue instanceof ByteBuffer || maxValue instanceof ByteBuffer)) {
       minValue = minValue == null ? null : new String(((ByteBuffer) minValue).array());
       maxValue = maxValue == null ? null : new String(((ByteBuffer) maxValue).array());
-    } else if (field.getSchema().getDataType() == OneType.FIXED
+    } else if (field.getSchema().getDataType() == InternalType.FIXED
         && (minValue instanceof Binary || maxValue instanceof Binary)) {
       minValue = minValue == null ? null : ByteBuffer.wrap(((Binary) minValue).getBytes());
       maxValue = maxValue == null ? null : ByteBuffer.wrap(((Binary) maxValue).getBytes());
@@ -273,7 +273,7 @@ public class HudiFileStatsExtractor {
     return (int) ((Date) date).toLocalDate().toEpochDay();
   }
 
-  private String getFieldNameForStats(OneField field, boolean isReadFromMetadataTable) {
+  private String getFieldNameForStats(InternalField field, boolean isReadFromMetadataTable) {
     String convertedDotPath = HudiSchemaExtractor.convertFromOneTablePath(field.getPath());
     // the array field naming is different for metadata table
     if (isReadFromMetadataTable) {

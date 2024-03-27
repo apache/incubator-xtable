@@ -39,9 +39,9 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Conversions;
 import org.apache.iceberg.types.Types;
 
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 
@@ -52,44 +52,45 @@ public class TestIcebergColumnStatsConverter {
   public void testMetricsCreation() throws Exception {
     long totalRowCount = 98776;
     Schema icebergSchema = IcebergTestUtils.SCHEMA;
-    OneField timestampField =
-        OneField.builder()
+    InternalField timestampField =
+        InternalField.builder()
             .name("timestamp_field")
-            .schema(OneSchema.builder().name("time").dataType(OneType.TIMESTAMP_NTZ).build())
+            .schema(
+                InternalSchema.builder().name("time").dataType(InternalType.TIMESTAMP_NTZ).build())
             .build();
-    OneField dateField =
-        OneField.builder()
+    InternalField dateField =
+        InternalField.builder()
             .name("date_field")
-            .schema(OneSchema.builder().name("date").dataType(OneType.DATE).build())
+            .schema(InternalSchema.builder().name("date").dataType(InternalType.DATE).build())
             .build();
-    OneField groupId =
-        OneField.builder()
+    InternalField groupId =
+        InternalField.builder()
             .name("group_id")
-            .schema(OneSchema.builder().name("int").dataType(OneType.INT).build())
+            .schema(InternalSchema.builder().name("int").dataType(InternalType.INT).build())
             .build();
-    OneField stringField =
-        OneField.builder()
+    InternalField stringField =
+        InternalField.builder()
             .name("string_field")
             .parentPath("record")
-            .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+            .schema(InternalSchema.builder().name("string").dataType(InternalType.STRING).build())
             .build();
-    OneField mapFieldKey =
-        OneField.builder()
-            .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+    InternalField mapFieldKey =
+        InternalField.builder()
+            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
             .parentPath("map_field")
-            .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+            .schema(InternalSchema.builder().name("string").dataType(InternalType.STRING).build())
             .build();
-    OneField mapFieldValue =
-        OneField.builder()
-            .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+    InternalField mapFieldValue =
+        InternalField.builder()
+            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
             .parentPath("map_field")
-            .schema(OneSchema.builder().name("int").dataType(OneType.INT).build())
+            .schema(InternalSchema.builder().name("int").dataType(InternalType.INT).build())
             .build();
-    OneField arrayFieldElement =
-        OneField.builder()
-            .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+    InternalField arrayFieldElement =
+        InternalField.builder()
+            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
             .parentPath("array_field")
-            .schema(OneSchema.builder().name("int").dataType(OneType.INT).build())
+            .schema(InternalSchema.builder().name("int").dataType(InternalType.INT).build())
             .build();
     ColumnStat timestampColumnStats =
         ColumnStat.builder()
@@ -231,10 +232,10 @@ public class TestIcebergColumnStatsConverter {
     Schema icebergSchema =
         new Schema(Types.NestedField.required(1, "date_field", Types.DateType.get()));
 
-    OneField dateField =
-        OneField.builder()
+    InternalField dateField =
+        InternalField.builder()
             .name("date_field")
-            .schema(OneSchema.builder().name("date").dataType(OneType.DATE).build())
+            .schema(InternalSchema.builder().name("date").dataType(InternalType.DATE).build())
             .build();
     ColumnStat dateColumnStats =
         ColumnStat.builder()
@@ -305,37 +306,37 @@ public class TestIcebergColumnStatsConverter {
     upperBounds.put(5, Conversions.toByteBuffer(Types.DateType.get(), 18182));
     upperBounds.put(6, Conversions.toByteBuffer(Types.TimestampType.withZone(), 20000000L));
 
-    List<OneField> fields =
+    List<InternalField> fields =
         Arrays.asList(
-            OneField.builder()
+            InternalField.builder()
                 .fieldId(1)
                 .name("int_field")
-                .schema(OneSchema.builder().dataType(OneType.INT).build())
+                .schema(InternalSchema.builder().dataType(InternalType.INT).build())
                 .build(),
-            OneField.builder()
+            InternalField.builder()
                 .fieldId(2)
                 .name("not_tracked_field")
-                .schema(OneSchema.builder().dataType(OneType.DATE).build())
+                .schema(InternalSchema.builder().dataType(InternalType.DATE).build())
                 .build(),
-            OneField.builder()
+            InternalField.builder()
                 .fieldId(3)
                 .name("null_field")
-                .schema(OneSchema.builder().dataType(OneType.INT).build())
+                .schema(InternalSchema.builder().dataType(InternalType.INT).build())
                 .build(),
-            OneField.builder()
+            InternalField.builder()
                 .fieldId(4)
                 .name("string_field")
-                .schema(OneSchema.builder().dataType(OneType.STRING).build())
+                .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
                 .build(),
-            OneField.builder()
+            InternalField.builder()
                 .fieldId(5)
                 .name("date_field")
-                .schema(OneSchema.builder().dataType(OneType.DATE).build())
+                .schema(InternalSchema.builder().dataType(InternalType.DATE).build())
                 .build(),
-            OneField.builder()
+            InternalField.builder()
                 .fieldId(6)
                 .name("timestamp_field")
-                .schema(OneSchema.builder().dataType(OneType.TIMESTAMP).build())
+                .schema(InternalSchema.builder().dataType(InternalType.TIMESTAMP).build())
                 .build());
 
     List<ColumnStat> actual =

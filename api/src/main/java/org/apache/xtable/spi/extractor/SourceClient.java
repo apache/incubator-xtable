@@ -23,7 +23,7 @@ import java.time.Instant;
 
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.SchemaCatalog;
@@ -52,11 +52,11 @@ public interface SourceClient<COMMIT> extends Closeable {
   SchemaCatalog getSchemaCatalog(OneTable table, COMMIT commit);
 
   /**
-   * Extracts the {@link OneSnapshot} as of latest state.
+   * Extracts the {@link InternalSnapshot} as of latest state.
    *
-   * @return {@link OneSnapshot} representing the current snapshot.
+   * @return {@link InternalSnapshot} representing the current snapshot.
    */
-  OneSnapshot getCurrentSnapshot();
+  InternalSnapshot getCurrentSnapshot();
 
   /**
    * Extracts a {@link TableChange} for the provided commit.

@@ -21,7 +21,7 @@ package org.apache.xtable.model.stat;
 import lombok.Builder;
 import lombok.Value;
 
-import org.apache.xtable.model.schema.OneField;
+import org.apache.xtable.model.schema.InternalField;
 
 /**
  * Captures column level statistics for a field.
@@ -31,7 +31,7 @@ import org.apache.xtable.model.schema.OneField;
 @Value
 @Builder(toBuilder = true)
 public class ColumnStat {
-  OneField field;
+  InternalField field;
   Range range;
   long numNulls;
   long numValues;

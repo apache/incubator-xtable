@@ -31,9 +31,9 @@ import lombok.Value;
  */
 @Value
 @Builder
-public class OnePartitionField {
+public class InternalPartitionField {
   // Source field the partition is based on
-  OneField sourceField;
+  InternalField sourceField;
   /*
    * Ordered partition field names of the table if they differ from the source field name. Use the
    * source field name directly when this list is empty. These are present when the transform is

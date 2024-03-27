@@ -37,8 +37,8 @@ import org.apache.hudi.exception.TableNotFoundException;
 
 import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 
 /** A class used to initialize new Hudi tables and load the metadata of existing tables. */
@@ -87,7 +87,7 @@ class HudiTableManager {
     if (table.getReadSchema() != null) {
       List<String> recordKeys =
           table.getReadSchema().getRecordKeyFields().stream()
-              .map(OneField::getName)
+              .map(InternalField::getName)
               .collect(Collectors.toList());
       if (!recordKeys.isEmpty()) {
         recordKeyField = String.join(",", recordKeys);
@@ -112,8 +112,8 @@ class HudiTableManager {
           .setPopulateMetaFields(false)
           .setPartitionFields(
               table.getPartitioningFields().stream()
-                  .map(OnePartitionField::getSourceField)
-                  .map(OneField::getPath)
+                  .map(InternalPartitionField::getSourceField)
+                  .map(InternalField::getPath)
                   .collect(Collectors.joining(",")))
           .initTable(configuration, tableDataPath);
     } catch (IOException ex) {
@@ -123,7 +123,7 @@ class HudiTableManager {
 
   @VisibleForTesting
   static String getKeyGeneratorClass(
-      List<OnePartitionField> partitionFields, List<OneField> recordKeyFields) {
+      List<InternalPartitionField> partitionFields, List<InternalField> recordKeyFields) {
     boolean multipleRecordKeyFields = recordKeyFields.size() > 1;
     boolean multiplePartitionFields = partitionFields.size() > 1;
     String keyGeneratorClass;
@@ -131,7 +131,7 @@ class HudiTableManager {
       keyGeneratorClass = NONPARTITIONED_KEY_GENERATOR;
     } else {
       if (partitionFields.stream()
-          .anyMatch(onePartitionField -> onePartitionField.getTransformType().isTimeBased())) {
+          .anyMatch(partitionField -> partitionField.getTransformType().isTimeBased())) {
         if (multiplePartitionFields) {
           // if there is more than one partition field and one of them is a date, we need to use
           // CustomKeyGenerator

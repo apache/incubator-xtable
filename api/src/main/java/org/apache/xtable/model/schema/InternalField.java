@@ -29,7 +29,7 @@ import lombok.Value;
  */
 @Value
 @Builder(toBuilder = true)
-public class OneField {
+public class InternalField {
   private static final String PATH_DELIMITER = "\\.";
 
   // The name of this field
@@ -37,7 +37,7 @@ public class OneField {
   // A dot separated path to the parent of this field. Null if this is a top level field.
   String parentPath;
   // Schema for the field
-  OneSchema schema;
+  InternalSchema schema;
   // Default value for the field
   Object defaultValue;
   // The id field for the field. This is used to identify the field in the schema even after

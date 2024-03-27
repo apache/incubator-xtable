@@ -24,7 +24,7 @@ import java.util.Map;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 
 import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.spi.extractor.SchemaCatalogExtractor;
@@ -39,7 +39,7 @@ public class HudiSchemaCatalogExtractor implements SchemaCatalogExtractor<Hoodie
 
   public static SchemaCatalog catalogWithTableSchema(OneTable table) {
     // does not support schema versions for now
-    Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
+    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
     schemas.put(schemaVersion, table.getReadSchema());
     return SchemaCatalog.builder().schemas(schemas).build();

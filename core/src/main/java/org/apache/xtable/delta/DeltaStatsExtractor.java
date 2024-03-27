@@ -43,9 +43,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.OneIOException;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 
@@ -55,19 +55,19 @@ import org.apache.xtable.model.stat.Range;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaStatsExtractor {
-  private static final Set<OneType> FIELD_TYPES_WITH_STATS_SUPPORT =
+  private static final Set<InternalType> FIELD_TYPES_WITH_STATS_SUPPORT =
       new HashSet<>(
           Arrays.asList(
-              OneType.BOOLEAN,
-              OneType.DATE,
-              OneType.DECIMAL,
-              OneType.DOUBLE,
-              OneType.INT,
-              OneType.LONG,
-              OneType.FLOAT,
-              OneType.STRING,
-              OneType.TIMESTAMP,
-              OneType.TIMESTAMP_NTZ));
+              InternalType.BOOLEAN,
+              InternalType.DATE,
+              InternalType.DECIMAL,
+              InternalType.DOUBLE,
+              InternalType.INT,
+              InternalType.LONG,
+              InternalType.FLOAT,
+              InternalType.STRING,
+              InternalType.TIMESTAMP,
+              InternalType.TIMESTAMP_NTZ));
 
   private static final DeltaStatsExtractor INSTANCE = new DeltaStatsExtractor();
 
@@ -79,7 +79,7 @@ public class DeltaStatsExtractor {
   }
 
   public String convertStatsToDeltaFormat(
-      OneSchema schema, long numRecords, List<ColumnStat> columnStats)
+      InternalSchema schema, long numRecords, List<ColumnStat> columnStats)
       throws JsonProcessingException {
     DeltaStats.DeltaStatsBuilder deltaStatsBuilder = DeltaStats.builder();
     deltaStatsBuilder.numRecords(numRecords);
@@ -100,14 +100,14 @@ public class DeltaStatsExtractor {
     return MAPPER.writeValueAsString(deltaStats);
   }
 
-  private Set<String> getPathsFromStructSchemaForMinAndMaxStats(OneSchema schema) {
+  private Set<String> getPathsFromStructSchemaForMinAndMaxStats(InternalSchema schema) {
     return schema.getAllFields().stream()
         .filter(
             field -> {
-              OneType type = field.getSchema().getDataType();
+              InternalType type = field.getSchema().getDataType();
               return FIELD_TYPES_WITH_STATS_SUPPORT.contains(type);
             })
-        .map(OneField::getPath)
+        .map(InternalField::getPath)
         .collect(Collectors.toSet());
   }
 
@@ -124,7 +124,7 @@ public class DeltaStatsExtractor {
     Map<String, Object> jsonObject = new HashMap<>();
     validColumnStats.forEach(
         columnStat -> {
-          OneField field = columnStat.getField();
+          InternalField field = columnStat.getField();
           String[] pathParts = field.getPathParts();
           insertValueAtPath(
               jsonObject,
@@ -172,7 +172,7 @@ public class DeltaStatsExtractor {
     }
   }
 
-  public List<ColumnStat> getColumnStatsForFile(AddFile addFile, List<OneField> fields) {
+  public List<ColumnStat> getColumnStatsForFile(AddFile addFile, List<InternalField> fields) {
     // TODO: Additional work needed to track maps & arrays.
     try {
       DeltaStats deltaStats = MAPPER.readValue(addFile.stats(), DeltaStats.class);

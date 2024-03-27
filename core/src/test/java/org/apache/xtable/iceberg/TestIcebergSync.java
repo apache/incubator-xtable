@@ -83,13 +83,13 @@ import com.google.common.collect.Sets;
 
 import org.apache.xtable.ITOneTableClient;
 import org.apache.xtable.client.PerTableConfigImpl;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.schema.SchemaVersion;
@@ -125,40 +125,45 @@ public class TestIcebergSync {
       Mockito.mock(IcebergColumnStatsConverter.class);
   private IcebergClient icebergClient;
 
-  private final OneSchema oneSchema =
-      OneSchema.builder()
-          .dataType(OneType.RECORD)
+  private final InternalSchema internalSchema =
+      InternalSchema.builder()
+          .dataType(InternalType.RECORD)
           .name("parent")
           .fields(
               Arrays.asList(
-                  OneField.builder()
+                  InternalField.builder()
                       .name("timestamp_field")
                       .schema(
-                          OneSchema.builder().name("long").dataType(OneType.TIMESTAMP_NTZ).build())
+                          InternalSchema.builder()
+                              .name("long")
+                              .dataType(InternalType.TIMESTAMP_NTZ)
+                              .build())
                       .build(),
-                  OneField.builder()
+                  InternalField.builder()
                       .name("date_field")
-                      .schema(OneSchema.builder().name("int").dataType(OneType.DATE).build())
+                      .schema(
+                          InternalSchema.builder().name("int").dataType(InternalType.DATE).build())
                       .build(),
-                  OneField.builder()
+                  InternalField.builder()
                       .name("group_id")
-                      .schema(OneSchema.builder().name("int").dataType(OneType.INT).build())
+                      .schema(
+                          InternalSchema.builder().name("int").dataType(InternalType.INT).build())
                       .build(),
-                  OneField.builder()
+                  InternalField.builder()
                       .name("record")
                       .schema(
-                          OneSchema.builder()
+                          InternalSchema.builder()
                               .name("nested")
-                              .dataType(OneType.RECORD)
+                              .dataType(InternalType.RECORD)
                               .fields(
                                   Collections.singletonList(
-                                      OneField.builder()
+                                      InternalField.builder()
                                           .name("string_field")
                                           .parentPath("record")
                                           .schema(
-                                              OneSchema.builder()
+                                              InternalSchema.builder()
                                                   .name("string")
-                                                  .dataType(OneType.STRING)
+                                                  .dataType(InternalType.STRING)
                                                   .build())
                                           .build()))
                               .build())
@@ -206,30 +211,30 @@ public class TestIcebergSync {
   @Test
   public void testCreateSnapshotControlFlow() throws Exception {
     // Test two iterations of the iceberg snapshot flow
-    List<OneField> fields2 = new ArrayList<>(oneSchema.getFields());
+    List<InternalField> fields2 = new ArrayList<>(internalSchema.getFields());
     fields2.add(
-        OneField.builder()
+        InternalField.builder()
             .name("long_field")
-            .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
+            .schema(InternalSchema.builder().name("long").dataType(InternalType.LONG).build())
             .build());
-    OneSchema schema2 = oneSchema.toBuilder().fields(fields2).build();
+    InternalSchema schema2 = internalSchema.toBuilder().fields(fields2).build();
     List<Types.NestedField> fields = new ArrayList<>(icebergSchema.columns());
     fields.add(Types.NestedField.of(6, false, "long_field", Types.LongType.get()));
     Schema icebergSchema2 = new Schema(fields);
-    OneTable table1 = getOneTable(tableName, basePath, oneSchema, null, LAST_COMMIT_TIME);
+    OneTable table1 = getOneTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
     OneTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
-    Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
+    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion1 = new SchemaVersion(1, "");
-    schemas.put(schemaVersion1, oneSchema);
+    schemas.put(schemaVersion1, internalSchema);
     SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
     schemas.put(schemaVersion2, schema2);
 
     InternalDataFile dataFile1 = getDataFile(schemaVersion1, 1, Collections.emptyList());
     InternalDataFile dataFile2 = getDataFile(schemaVersion1, 2, Collections.emptyList());
     InternalDataFile dataFile3 = getDataFile(schemaVersion2, 3, Collections.emptyList());
-    OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
-    OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
-    when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
+    InternalSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
+    when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
     ArgumentCaptor<Schema> partitionSpecSchemaArgumentCaptor =
         ArgumentCaptor.forClass(Schema.class);
@@ -301,22 +306,22 @@ public class TestIcebergSync {
 
   @Test
   public void testIncompleteWriteRollback() throws Exception {
-    List<OneField> fields2 = new ArrayList<>(oneSchema.getFields());
+    List<InternalField> fields2 = new ArrayList<>(internalSchema.getFields());
     fields2.add(
-        OneField.builder()
+        InternalField.builder()
             .name("long_field")
-            .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
+            .schema(InternalSchema.builder().name("long").dataType(InternalType.LONG).build())
             .build());
-    OneSchema schema2 = oneSchema.toBuilder().fields(fields2).build();
+    InternalSchema schema2 = internalSchema.toBuilder().fields(fields2).build();
     List<Types.NestedField> fields = new ArrayList<>(icebergSchema.columns());
     fields.add(Types.NestedField.of(6, false, "long_field", Types.LongType.get()));
     Schema icebergSchema2 = new Schema(fields);
-    OneTable table1 = getOneTable(tableName, basePath, oneSchema, null, LAST_COMMIT_TIME);
+    OneTable table1 = getOneTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
     OneTable table2 =
         getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME.plusMillis(100000L));
-    Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
+    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion1 = new SchemaVersion(1, "");
-    schemas.put(schemaVersion1, oneSchema);
+    schemas.put(schemaVersion1, internalSchema);
     SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
     schemas.put(schemaVersion2, schema2);
 
@@ -324,10 +329,10 @@ public class TestIcebergSync {
     InternalDataFile dataFile2 = getDataFile(schemaVersion1, 2, Collections.emptyList());
     InternalDataFile dataFile3 = getDataFile(schemaVersion2, 3, Collections.emptyList());
     InternalDataFile dataFile4 = getDataFile(schemaVersion2, 4, Collections.emptyList());
-    OneSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
-    OneSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
-    OneSnapshot snapshot3 = buildSnapshot(table2, schemas, dataFile3, dataFile4);
-    when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
+    InternalSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
+    InternalSnapshot snapshot3 = buildSnapshot(table2, schemas, dataFile3, dataFile4);
+    when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
     ArgumentCaptor<Schema> partitionSpecSchemaArgumentCaptor =
         ArgumentCaptor.forClass(Schema.class);
@@ -367,10 +372,10 @@ public class TestIcebergSync {
   @Test
   public void testTimestampPartitioning() throws Exception {
     // test partition filtering
-    OnePartitionField partitionField =
-        OnePartitionField.builder()
+    InternalPartitionField partitionField =
+        InternalPartitionField.builder()
             .sourceField(
-                SchemaFieldFinder.getInstance().findFieldByPath(oneSchema, "timestamp_field"))
+                SchemaFieldFinder.getInstance().findFieldByPath(internalSchema, "timestamp_field"))
             .transformType(PartitionTransformType.DAY)
             .build();
 
@@ -378,12 +383,12 @@ public class TestIcebergSync {
         getOneTable(
             tableName,
             basePath,
-            oneSchema,
+            internalSchema,
             Collections.singletonList(partitionField),
             LAST_COMMIT_TIME);
-    Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
+    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
-    schemas.put(schemaVersion, oneSchema);
+    schemas.put(schemaVersion, internalSchema);
 
     List<PartitionValue> partitionValues1 =
         Collections.singletonList(
@@ -400,9 +405,9 @@ public class TestIcebergSync {
     InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
     InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues1);
     InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues2);
-    OneSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
 
-    when(mockSchemaExtractor.toIceberg(oneSchema))
+    when(mockSchemaExtractor.toIceberg(internalSchema))
         .thenReturn(icebergSchema)
         .thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
@@ -432,9 +437,10 @@ public class TestIcebergSync {
   @Test
   public void testDatePartitioning() throws Exception {
     // test partition filtering
-    OnePartitionField partitionField =
-        OnePartitionField.builder()
-            .sourceField(SchemaFieldFinder.getInstance().findFieldByPath(oneSchema, "date_field"))
+    InternalPartitionField partitionField =
+        InternalPartitionField.builder()
+            .sourceField(
+                SchemaFieldFinder.getInstance().findFieldByPath(internalSchema, "date_field"))
             .transformType(PartitionTransformType.DAY)
             .build();
 
@@ -442,12 +448,12 @@ public class TestIcebergSync {
         getOneTable(
             tableName,
             basePath,
-            oneSchema,
+            internalSchema,
             Collections.singletonList(partitionField),
             LAST_COMMIT_TIME);
-    Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
+    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
-    schemas.put(schemaVersion, oneSchema);
+    schemas.put(schemaVersion, internalSchema);
 
     List<PartitionValue> partitionValues1 =
         Collections.singletonList(
@@ -464,9 +470,9 @@ public class TestIcebergSync {
     InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
     InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues1);
     InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues2);
-    OneSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
 
-    when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
+    when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
         PartitionSpec.builderFor(icebergSchema)
             .day(partitionField.getSourceField().getName())
@@ -493,9 +499,10 @@ public class TestIcebergSync {
   @Test
   public void testNumericFieldPartitioning() throws Exception {
     // test partition filtering
-    OnePartitionField partitionField =
-        OnePartitionField.builder()
-            .sourceField(SchemaFieldFinder.getInstance().findFieldByPath(oneSchema, "group_id"))
+    InternalPartitionField partitionField =
+        InternalPartitionField.builder()
+            .sourceField(
+                SchemaFieldFinder.getInstance().findFieldByPath(internalSchema, "group_id"))
             .transformType(PartitionTransformType.VALUE)
             .build();
 
@@ -503,12 +510,12 @@ public class TestIcebergSync {
         getOneTable(
             tableName,
             basePath,
-            oneSchema,
+            internalSchema,
             Collections.singletonList(partitionField),
             LAST_COMMIT_TIME);
-    Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
+    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
-    schemas.put(schemaVersion, oneSchema);
+    schemas.put(schemaVersion, internalSchema);
 
     List<PartitionValue> partitionValues1 =
         Collections.singletonList(
@@ -519,9 +526,9 @@ public class TestIcebergSync {
     InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
     InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues1);
     InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues2);
-    OneSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
 
-    when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
+    when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
         PartitionSpec.builderFor(icebergSchema)
             .identity(partitionField.getSourceField().getName())
@@ -548,15 +555,16 @@ public class TestIcebergSync {
   @Test
   public void testMultipleFieldPartitioning() throws Exception {
     // test partition filtering
-    OnePartitionField partitionField1 =
-        OnePartitionField.builder()
-            .sourceField(SchemaFieldFinder.getInstance().findFieldByPath(oneSchema, "group_id"))
+    InternalPartitionField partitionField1 =
+        InternalPartitionField.builder()
+            .sourceField(
+                SchemaFieldFinder.getInstance().findFieldByPath(internalSchema, "group_id"))
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OnePartitionField partitionField2 =
-        OnePartitionField.builder()
+    InternalPartitionField partitionField2 =
+        InternalPartitionField.builder()
             .sourceField(
-                SchemaFieldFinder.getInstance().findFieldByPath(oneSchema, "timestamp_field"))
+                SchemaFieldFinder.getInstance().findFieldByPath(internalSchema, "timestamp_field"))
             .transformType(PartitionTransformType.DAY)
             .build();
 
@@ -564,12 +572,12 @@ public class TestIcebergSync {
         getOneTable(
             tableName,
             basePath,
-            oneSchema,
+            internalSchema,
             Arrays.asList(partitionField1, partitionField2),
             LAST_COMMIT_TIME);
-    Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
+    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
-    schemas.put(schemaVersion, oneSchema);
+    schemas.put(schemaVersion, internalSchema);
 
     List<PartitionValue> partitionValues1 =
         Arrays.asList(
@@ -595,9 +603,9 @@ public class TestIcebergSync {
     InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
     InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues2);
     InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues3);
-    OneSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
 
-    when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
+    when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
         PartitionSpec.builderFor(icebergSchema)
             .identity(partitionField1.getSourceField().getName())
@@ -629,10 +637,11 @@ public class TestIcebergSync {
   @Test
   public void testNestedFieldPartitioning() throws Exception {
     // test partition filtering
-    OnePartitionField partitionField =
-        OnePartitionField.builder()
+    InternalPartitionField partitionField =
+        InternalPartitionField.builder()
             .sourceField(
-                SchemaFieldFinder.getInstance().findFieldByPath(oneSchema, "record.string_field"))
+                SchemaFieldFinder.getInstance()
+                    .findFieldByPath(internalSchema, "record.string_field"))
             .transformType(PartitionTransformType.VALUE)
             .build();
 
@@ -640,12 +649,12 @@ public class TestIcebergSync {
         getOneTable(
             tableName,
             basePath,
-            oneSchema,
+            internalSchema,
             Collections.singletonList(partitionField),
             LAST_COMMIT_TIME);
-    Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
+    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
-    schemas.put(schemaVersion, oneSchema);
+    schemas.put(schemaVersion, internalSchema);
 
     List<PartitionValue> partitionValues1 =
         Collections.singletonList(
@@ -662,9 +671,9 @@ public class TestIcebergSync {
     InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
     InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues1);
     InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues2);
-    OneSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
 
-    when(mockSchemaExtractor.toIceberg(oneSchema)).thenReturn(icebergSchema);
+    when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
         PartitionSpec.builderFor(icebergSchema)
             .identity(partitionField.getSourceField().getPath())
@@ -686,9 +695,9 @@ public class TestIcebergSync {
         Expressions.equal(partitionField.getSourceField().getPath(), "value1"));
   }
 
-  private OneSnapshot buildSnapshot(
-      OneTable table, Map<SchemaVersion, OneSchema> schemas, InternalDataFile... dataFiles) {
-    return OneSnapshot.builder()
+  private InternalSnapshot buildSnapshot(
+      OneTable table, Map<SchemaVersion, InternalSchema> schemas, InternalDataFile... dataFiles) {
+    return InternalSnapshot.builder()
         .table(table)
         .schemaCatalog(SchemaCatalog.builder().schemas(schemas).build())
         .partitionedDataFiles(OneFileGroup.fromFiles(Arrays.asList(dataFiles)))
@@ -712,8 +721,8 @@ public class TestIcebergSync {
   private OneTable getOneTable(
       String tableName,
       Path basePath,
-      OneSchema schema,
-      List<OnePartitionField> partitionFields,
+      InternalSchema schema,
+      List<InternalPartitionField> partitionFields,
       Instant lastCommitTime) {
     return OneTable.builder()
         .name(tableName)

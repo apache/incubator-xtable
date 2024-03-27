@@ -23,13 +23,13 @@ import org.apache.avro.Schema;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.spi.extractor.SchemaExtractor;
 
 /**
- * Extracts the canonical {@link OneSchema} from {@link Schema} represented in Hudi. This uses logic
- * similar to how spark converts {@link Schema} to {@link
+ * Extracts the canonical {@link InternalSchema} from {@link Schema} represented in Hudi. This uses
+ * logic similar to how spark converts {@link Schema} to {@link
  * org.apache.spark.sql.avro.SchemaConverters.SchemaType} in {@link
  * org.apache.spark.sql.avro.SchemaConverters}
  *
@@ -51,13 +51,13 @@ public class HudiSchemaExtractor implements SchemaExtractor<Schema> {
   }
 
   @Override
-  public OneSchema schema(Schema schema) {
-    return converter.toOneSchema(schema);
+  public InternalSchema schema(Schema schema) {
+    return converter.toInternalSchema(schema);
   }
 
   static String convertFromOneTablePath(String path) {
-    return path.replace(OneField.Constants.MAP_KEY_FIELD_NAME, MAP_KEY_FIELD_NAME)
-        .replace(OneField.Constants.MAP_VALUE_FIELD_NAME, MAP_VALUE_FIELD_NAME)
-        .replace(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME, LIST_ELEMENT_FIELD_NAME);
+    return path.replace(InternalField.Constants.MAP_KEY_FIELD_NAME, MAP_KEY_FIELD_NAME)
+        .replace(InternalField.Constants.MAP_VALUE_FIELD_NAME, MAP_VALUE_FIELD_NAME)
+        .replace(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME, LIST_ELEMENT_FIELD_NAME);
   }
 }

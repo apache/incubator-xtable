@@ -64,7 +64,7 @@ import org.apache.xtable.TestSparkHudiTable;
 import org.apache.xtable.ValidationTestHelper;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.TableChange;
 
 /**
@@ -137,9 +137,9 @@ public class ITHudiSourceClient {
           getHudiSourceClient(
               CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
       // Get the current snapshot
-      OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
-      ValidationTestHelper.validateOneSnapshot(
-          oneSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
+      InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
+      ValidationTestHelper.validateSnapshot(
+          internalSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
       // Get second change in Incremental format.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()
@@ -185,9 +185,9 @@ public class ITHudiSourceClient {
           getHudiSourceClient(
               CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
       // Get the current snapshot
-      OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
-      ValidationTestHelper.validateOneSnapshot(
-          oneSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
+      InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
+      ValidationTestHelper.validateSnapshot(
+          internalSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
       // Get second change in Incremental format.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()
@@ -273,9 +273,9 @@ public class ITHudiSourceClient {
       HudiClient hudiClient =
           getHudiSourceClient(CONFIGURATION, table.getBasePath(), "level:VALUE");
       // Get the current snapshot
-      OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
-      ValidationTestHelper.validateOneSnapshot(
-          oneSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
+      InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
+      ValidationTestHelper.validateSnapshot(
+          internalSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
       // Get changes in Incremental format.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()
@@ -325,9 +325,9 @@ public class ITHudiSourceClient {
       HudiClient hudiClient =
           getHudiSourceClient(CONFIGURATION, table.getBasePath(), "level:VALUE");
       // Get the current snapshot
-      OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
-      ValidationTestHelper.validateOneSnapshot(
-          oneSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
+      InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
+      ValidationTestHelper.validateSnapshot(
+          internalSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
       // Get changes in Incremental format.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()
@@ -392,9 +392,9 @@ public class ITHudiSourceClient {
           getHudiSourceClient(
               CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
       // Get the current snapshot
-      OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
-      ValidationTestHelper.validateOneSnapshot(
-          oneSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
+      InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
+      ValidationTestHelper.validateSnapshot(
+          internalSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
       // Get changes in Incremental format.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()
@@ -447,9 +447,9 @@ public class ITHudiSourceClient {
           getHudiSourceClient(
               CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
       // Get the current snapshot
-      OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
-      ValidationTestHelper.validateOneSnapshot(
-          oneSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
+      InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
+      ValidationTestHelper.validateSnapshot(
+          internalSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
       // Get changes in Incremental format.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()
@@ -513,8 +513,8 @@ public class ITHudiSourceClient {
           getHudiSourceClient(
               CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
       // Get the current snapshot
-      OneSnapshot oneSnapshot = hudiClient.getCurrentSnapshot();
-      ValidationTestHelper.validateOneSnapshot(oneSnapshot, baseFilesAfterCommit4);
+      InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
+      ValidationTestHelper.validateSnapshot(internalSnapshot, baseFilesAfterCommit4);
       // Get changes in Incremental format.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()

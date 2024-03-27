@@ -40,11 +40,11 @@ import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -95,11 +95,11 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     Table iceTable = getSourceTable();
     Schema iceSchema = iceTable.schemas().get(snapshot.schemaId());
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
-    OneSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
+    InternalSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
 
     // TODO select snapshot specific partition spec
     IcebergPartitionSpecExtractor partitionExtractor = IcebergPartitionSpecExtractor.getInstance();
-    List<OnePartitionField> irPartitionFields =
+    List<InternalPartitionField> irPartitionFields =
         partitionExtractor.fromIceberg(iceTable.spec(), iceSchema, irSchema);
     // Data layout is hive storage for partitioned by default. See
     // (https://github.com/apache/iceberg/blob/main/docs/aws.md)
@@ -124,14 +124,14 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     Integer iceSchemaId = snapshot.schemaId();
     Schema iceSchema = iceTable.schemas().get(iceSchemaId);
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
-    OneSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
-    Map<SchemaVersion, OneSchema> catalog =
+    InternalSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
+    Map<SchemaVersion, InternalSchema> catalog =
         Collections.singletonMap(new SchemaVersion(iceSchemaId, ""), irSchema);
     return SchemaCatalog.builder().schemas(catalog).build();
   }
 
   @Override
-  public OneSnapshot getCurrentSnapshot() {
+  public InternalSnapshot getCurrentSnapshot() {
     Table iceTable = getSourceTable();
 
     Snapshot currentSnapshot = iceTable.currentSnapshot();
@@ -153,7 +153,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
       throw new OneIOException("Failed to fetch current snapshot files from Iceberg source", e);
     }
 
-    return OneSnapshot.builder()
+    return InternalSnapshot.builder()
         .version(String.valueOf(currentSnapshot.snapshotId()))
         .table(irTable)
         .schemaCatalog(schemaCatalog)

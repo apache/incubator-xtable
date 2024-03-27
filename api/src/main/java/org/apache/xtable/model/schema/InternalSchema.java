@@ -31,8 +31,9 @@ import lombok.Getter;
 import lombok.ToString;
 
 /**
- * OneSchema represents a schema which could be a composite containing multiple {@link OneField} or
- * one of the primitives. Any level of schema hierarchy can be represented in this model.
+ * InternalSchema represents a schema which could be a composite containing multiple {@link
+ * InternalField} or one of the primitives. Any level of schema hierarchy can be represented in this
+ * model.
  *
  * @since 0.1
  */
@@ -40,16 +41,16 @@ import lombok.ToString;
 @Builder(toBuilder = true)
 @EqualsAndHashCode
 @ToString
-public class OneSchema {
+public class InternalSchema {
   // The name of this schema
   private final String name;
   // The data type of this schema
-  private final OneType dataType;
+  private final InternalType dataType;
   // User readable comment for this field
   private final String comment;
   // Indicates if values of this field can be `null` values.
   private final boolean isNullable;
-  private final List<OneField> fields;
+  private final List<InternalField> fields;
   // Record keys uniquely identify a record in a table.
   // Hudi Ref: https://hudi.apache.org/docs/key_generation/
   // Iceberg Ref:
@@ -57,11 +58,11 @@ public class OneSchema {
   // Delta Ref: https://docs.databricks.com/en/tables/constraints.html
   // In formats like Hudi, ordering of fields is important, so we use a list to preserve
   // the order of record keys for the table, if they exist.
-  @Builder.Default List<OneField> recordKeyFields = Collections.emptyList();
+  @Builder.Default List<InternalField> recordKeyFields = Collections.emptyList();
   private final Map<MetadataKey, Object> metadata;
 
-  public static OneSchemaBuilder builderFrom(OneSchema field) {
-    return field.toBuilder();
+  public static InternalSchemaBuilder builderFrom(InternalSchema schema) {
+    return schema.toBuilder();
   }
 
   public enum MetadataKey {
@@ -79,16 +80,16 @@ public class OneSchema {
 
   /**
    * Performs a level-order traversal of the schema and returns a list of all fields. Use this
-   * method to get a list that includes nested fields. Use {@link OneSchema#getFields()} when
+   * method to get a list that includes nested fields. Use {@link InternalSchema#getFields()} when
    * fetching the top level fields.
    *
    * @return list of all fields in the schema
    */
-  public List<OneField> getAllFields() {
-    List<OneField> output = new ArrayList<>();
-    Queue<OneField> fieldQueue = new ArrayDeque<>(getFields());
+  public List<InternalField> getAllFields() {
+    List<InternalField> output = new ArrayList<>();
+    Queue<InternalField> fieldQueue = new ArrayDeque<>(getFields());
     while (!fieldQueue.isEmpty()) {
-      OneField currentField = fieldQueue.poll();
+      InternalField currentField = fieldQueue.poll();
       if (currentField.getSchema().getFields() != null) {
         fieldQueue.addAll(currentField.getSchema().getFields());
       }

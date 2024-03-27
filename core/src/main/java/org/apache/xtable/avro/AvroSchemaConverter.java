@@ -40,26 +40,26 @@ import org.apache.xtable.exception.SchemaExtractorException;
 import org.apache.xtable.exception.UnsupportedSchemaTypeException;
 import org.apache.xtable.hudi.idtracking.IdTracker;
 import org.apache.xtable.hudi.idtracking.models.IdMapping;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.schema.SchemaUtils;
 
 /**
- * Class that converts Avro Schema {@link Schema} to Canonical Schema {@link OneSchema} and
+ * Class that converts Avro Schema {@link Schema} to Canonical Schema {@link InternalSchema} and
  * vice-versa. This conversion is fully reversible and there is a strict 1 to 1 mapping between avro
  * data types and canonical data types.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class AvroSchemaConverter {
   // avro only supports string keys in maps
-  private static final OneField MAP_KEY_FIELD =
-      OneField.builder()
-          .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+  private static final InternalField MAP_KEY_FIELD =
+      InternalField.builder()
+          .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
           .schema(
-              OneSchema.builder()
+              InternalSchema.builder()
                   .name("map_key")
-                  .dataType(OneType.STRING)
+                  .dataType(InternalType.STRING)
                   .isNullable(false)
                   .build())
           .defaultValue("")
@@ -73,7 +73,7 @@ public class AvroSchemaConverter {
     return INSTANCE;
   }
 
-  public OneSchema toOneSchema(Schema schema) {
+  public InternalSchema toInternalSchema(Schema schema) {
     Map<String, IdMapping> fieldNameToIdMapping =
         IdTracker.getInstance()
             .getIdTracking(schema)
@@ -82,11 +82,11 @@ public class AvroSchemaConverter {
                     idTracking.getIdMappings().stream()
                         .collect(Collectors.toMap(IdMapping::getName, Function.identity())))
             .orElse(Collections.emptyMap());
-    return toOneSchema(schema, null, fieldNameToIdMapping);
+    return toInternalSchema(schema, null, fieldNameToIdMapping);
   }
 
   /**
-   * Converts the Avro {@link Schema} to {@link OneSchema}.
+   * Converts the Avro {@link Schema} to {@link InternalSchema}.
    *
    * @param schema The schema being converted
    * @param parentPath If this schema is nested within another, this will be a dot separated string
@@ -95,91 +95,96 @@ public class AvroSchemaConverter {
    *     source schema. If source schema does not contain IdMappings, map will be empty.
    * @return a converted schema
    */
-  private OneSchema toOneSchema(
+  private InternalSchema toInternalSchema(
       Schema schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
     // TODO - Does not handle recursion in Avro schema
-    OneType newDataType;
-    Map<OneSchema.MetadataKey, Object> metadata = new HashMap<>();
+    InternalType newDataType;
+    Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
     switch (schema.getType()) {
       case INT:
         LogicalType logicalType = schema.getLogicalType();
         if (logicalType instanceof LogicalTypes.Date) {
-          newDataType = OneType.DATE;
+          newDataType = InternalType.DATE;
         } else {
-          newDataType = OneType.INT;
+          newDataType = InternalType.INT;
         }
         break;
       case STRING:
-        newDataType = OneType.STRING;
+        newDataType = InternalType.STRING;
         break;
       case BOOLEAN:
-        newDataType = OneType.BOOLEAN;
+        newDataType = InternalType.BOOLEAN;
         break;
       case BYTES:
       case FIXED:
         logicalType = schema.getLogicalType();
         if (logicalType instanceof LogicalTypes.Decimal) {
           metadata.put(
-              OneSchema.MetadataKey.DECIMAL_PRECISION,
+              InternalSchema.MetadataKey.DECIMAL_PRECISION,
               ((LogicalTypes.Decimal) logicalType).getPrecision());
           metadata.put(
-              OneSchema.MetadataKey.DECIMAL_SCALE, ((LogicalTypes.Decimal) logicalType).getScale());
+              InternalSchema.MetadataKey.DECIMAL_SCALE,
+              ((LogicalTypes.Decimal) logicalType).getScale());
           if (schema.getType() == Schema.Type.FIXED) {
-            metadata.put(OneSchema.MetadataKey.FIXED_BYTES_SIZE, schema.getFixedSize());
+            metadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, schema.getFixedSize());
           }
-          newDataType = OneType.DECIMAL;
+          newDataType = InternalType.DECIMAL;
           break;
         }
         if (schema.getType() == Schema.Type.FIXED) {
-          metadata.put(OneSchema.MetadataKey.FIXED_BYTES_SIZE, schema.getFixedSize());
-          newDataType = OneType.FIXED;
+          metadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, schema.getFixedSize());
+          newDataType = InternalType.FIXED;
         } else {
-          newDataType = OneType.BYTES;
+          newDataType = InternalType.BYTES;
         }
         break;
       case DOUBLE:
-        newDataType = OneType.DOUBLE;
+        newDataType = InternalType.DOUBLE;
         break;
       case FLOAT:
-        newDataType = OneType.FLOAT;
+        newDataType = InternalType.FLOAT;
         break;
       case LONG:
         logicalType = schema.getLogicalType();
         if (logicalType instanceof LogicalTypes.TimestampMillis) {
-          newDataType = OneType.TIMESTAMP;
-          metadata.put(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
+          newDataType = InternalType.TIMESTAMP;
+          metadata.put(
+              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
         } else if (logicalType instanceof LogicalTypes.TimestampMicros) {
-          newDataType = OneType.TIMESTAMP;
-          metadata.put(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+          newDataType = InternalType.TIMESTAMP;
+          metadata.put(
+              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
         } else if (logicalType instanceof LogicalTypes.LocalTimestampMillis) {
-          newDataType = OneType.TIMESTAMP_NTZ;
-          metadata.put(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
+          newDataType = InternalType.TIMESTAMP_NTZ;
+          metadata.put(
+              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
         } else if (logicalType instanceof LogicalTypes.LocalTimestampMicros) {
-          newDataType = OneType.TIMESTAMP_NTZ;
-          metadata.put(OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+          newDataType = InternalType.TIMESTAMP_NTZ;
+          metadata.put(
+              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
         } else {
-          newDataType = OneType.LONG;
+          newDataType = InternalType.LONG;
         }
         break;
       case ENUM:
-        metadata.put(OneSchema.MetadataKey.ENUM_VALUES, schema.getEnumSymbols());
-        newDataType = OneType.ENUM;
+        metadata.put(InternalSchema.MetadataKey.ENUM_VALUES, schema.getEnumSymbols());
+        newDataType = InternalType.ENUM;
         break;
       case NULL:
-        newDataType = OneType.NULL;
+        newDataType = InternalType.NULL;
         break;
       case RECORD:
-        List<OneField> subFields = new ArrayList<>(schema.getFields().size());
+        List<InternalField> subFields = new ArrayList<>(schema.getFields().size());
         for (Schema.Field avroField : schema.getFields()) {
           IdMapping idMapping = fieldNameToIdMapping.get(avroField.name());
-          OneSchema subFieldSchema =
-              toOneSchema(
+          InternalSchema subFieldSchema =
+              toInternalSchema(
                   avroField.schema(),
                   SchemaUtils.getFullyQualifiedPath(parentPath, avroField.name()),
                   getChildIdMap(idMapping));
           Object defaultValue = getDefaultValue(avroField);
           subFields.add(
-              OneField.builder()
+              InternalField.builder()
                   .parentPath(parentPath)
                   .name(avroField.name())
                   .schema(subFieldSchema)
@@ -187,31 +192,31 @@ public class AvroSchemaConverter {
                   .fieldId(idMapping == null ? null : idMapping.getId())
                   .build());
         }
-        return OneSchema.builder()
+        return InternalSchema.builder()
             .name(schema.getName())
             .comment(schema.getDoc())
-            .dataType(OneType.RECORD)
+            .dataType(InternalType.RECORD)
             .fields(subFields)
             .isNullable(schema.isNullable())
             .build();
       case ARRAY:
         IdMapping elementMapping = fieldNameToIdMapping.get(ELEMENT);
-        OneSchema elementSchema =
-            toOneSchema(
+        InternalSchema elementSchema =
+            toInternalSchema(
                 schema.getElementType(),
                 SchemaUtils.getFullyQualifiedPath(
-                    parentPath, OneField.Constants.ARRAY_ELEMENT_FIELD_NAME),
+                    parentPath, InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME),
                 getChildIdMap(elementMapping));
-        OneField elementField =
-            OneField.builder()
-                .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+        InternalField elementField =
+            InternalField.builder()
+                .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                 .parentPath(parentPath)
                 .schema(elementSchema)
                 .fieldId(elementMapping == null ? null : elementMapping.getId())
                 .build();
-        return OneSchema.builder()
+        return InternalSchema.builder()
             .name(schema.getName())
-            .dataType(OneType.LIST)
+            .dataType(InternalType.LIST)
             .comment(schema.getDoc())
             .isNullable(schema.isNullable())
             .fields(Collections.singletonList(elementField))
@@ -219,22 +224,22 @@ public class AvroSchemaConverter {
       case MAP:
         IdMapping keyMapping = fieldNameToIdMapping.get(KEY);
         IdMapping valueMapping = fieldNameToIdMapping.get(VALUE);
-        OneSchema valueSchema =
-            toOneSchema(
+        InternalSchema valueSchema =
+            toInternalSchema(
                 schema.getValueType(),
                 SchemaUtils.getFullyQualifiedPath(
-                    parentPath, OneField.Constants.MAP_VALUE_FIELD_NAME),
+                    parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
                 getChildIdMap(valueMapping));
-        OneField valueField =
-            OneField.builder()
-                .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+        InternalField valueField =
+            InternalField.builder()
+                .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
                 .parentPath(parentPath)
                 .schema(valueSchema)
                 .fieldId(valueMapping == null ? null : valueMapping.getId())
                 .build();
-        return OneSchema.builder()
+        return InternalSchema.builder()
             .name(schema.getName())
-            .dataType(OneType.MAP)
+            .dataType(InternalType.MAP)
             .comment(schema.getDoc())
             .isNullable(schema.isNullable())
             .fields(
@@ -254,11 +259,12 @@ public class AvroSchemaConverter {
                   .filter(t -> t.getType() != Schema.Type.NULL)
                   .collect(Collectors.toList());
           if (remainingSchemas.size() == 1) {
-            OneSchema restSchema =
-                toOneSchema(remainingSchemas.get(0), parentPath, fieldNameToIdMapping);
-            return OneSchema.builderFrom(restSchema).isNullable(true).build();
+            InternalSchema restSchema =
+                toInternalSchema(remainingSchemas.get(0), parentPath, fieldNameToIdMapping);
+            return InternalSchema.builderFrom(restSchema).isNullable(true).build();
           } else {
-            return OneSchema.builderFrom(toOneSchema(Schema.createUnion(remainingSchemas)))
+            return InternalSchema.builderFrom(
+                    toInternalSchema(Schema.createUnion(remainingSchemas)))
                 .isNullable(true)
                 .build();
           }
@@ -270,7 +276,7 @@ public class AvroSchemaConverter {
         throw new UnsupportedSchemaTypeException(
             String.format("Unsupported schema type %s", schema));
     }
-    return OneSchema.builder()
+    return InternalSchema.builder()
         .name(schema.getName())
         .dataType(newDataType)
         .comment(schema.getDoc())
@@ -289,152 +295,160 @@ public class AvroSchemaConverter {
 
   private static Object getDefaultValue(Schema.Field avroField) {
     return Schema.Field.NULL_VALUE.equals(avroField.defaultVal())
-        ? OneField.Constants.NULL_DEFAULT_VALUE
+        ? InternalField.Constants.NULL_DEFAULT_VALUE
         : avroField.defaultVal();
   }
 
   /**
-   * Converts the {@link OneSchema} to Avro {@link Schema}.
+   * Converts the {@link InternalSchema} to Avro {@link Schema}.
    *
-   * @param oneSchema internal schema representation
+   * @param internalSchema internal schema representation
    * @return an Avro schema
    */
-  public Schema fromOneSchema(OneSchema oneSchema) {
-    return fromOneSchema(oneSchema, null);
+  public Schema fromInternalSchema(InternalSchema internalSchema) {
+    return fromInternalSchema(internalSchema, null);
   }
 
   /**
-   * Internal method for converting the {@link OneSchema} to Avro {@link Schema}.
+   * Internal method for converting the {@link InternalSchema} to Avro {@link Schema}.
    *
-   * @param oneSchema internal schema representation
+   * @param internalSchema internal schema representation
    * @param currentPath If this schema is nested within another, this will be a dot separated
    *     string. This is used for the avro namespace to guarantee unique names for nested records.
    * @return an Avro schema
    */
-  private Schema fromOneSchema(OneSchema oneSchema, String currentPath) {
-    switch (oneSchema.getDataType()) {
+  private Schema fromInternalSchema(InternalSchema internalSchema, String currentPath) {
+    switch (internalSchema.getDataType()) {
       case RECORD:
         List<Schema.Field> fields =
-            oneSchema.getFields().stream()
+            internalSchema.getFields().stream()
                 .map(
                     field ->
                         new Schema.Field(
                             field.getName(),
-                            fromOneSchema(
+                            fromInternalSchema(
                                 field.getSchema(),
                                 SchemaUtils.getFullyQualifiedPath(currentPath, field.getName())),
                             field.getSchema().getComment(),
-                            OneField.Constants.NULL_DEFAULT_VALUE == field.getDefaultValue()
+                            InternalField.Constants.NULL_DEFAULT_VALUE == field.getDefaultValue()
                                 ? Schema.Field.NULL_VALUE
                                 : field.getDefaultValue()))
-                .collect(CustomCollectors.toList(oneSchema.getFields().size()));
+                .collect(CustomCollectors.toList(internalSchema.getFields().size()));
         return finalizeSchema(
             Schema.createRecord(
-                oneSchema.getName(), oneSchema.getComment(), currentPath, false, fields),
-            oneSchema);
+                internalSchema.getName(), internalSchema.getComment(), currentPath, false, fields),
+            internalSchema);
       case BYTES:
-        return finalizeSchema(Schema.create(Schema.Type.BYTES), oneSchema);
+        return finalizeSchema(Schema.create(Schema.Type.BYTES), internalSchema);
       case BOOLEAN:
-        return finalizeSchema(Schema.create(Schema.Type.BOOLEAN), oneSchema);
+        return finalizeSchema(Schema.create(Schema.Type.BOOLEAN), internalSchema);
       case INT:
-        return finalizeSchema(Schema.create(Schema.Type.INT), oneSchema);
+        return finalizeSchema(Schema.create(Schema.Type.INT), internalSchema);
       case LONG:
-        return finalizeSchema(Schema.create(Schema.Type.LONG), oneSchema);
+        return finalizeSchema(Schema.create(Schema.Type.LONG), internalSchema);
       case STRING:
-        return finalizeSchema(Schema.create(Schema.Type.STRING), oneSchema);
+        return finalizeSchema(Schema.create(Schema.Type.STRING), internalSchema);
       case FLOAT:
-        return finalizeSchema(Schema.create(Schema.Type.FLOAT), oneSchema);
+        return finalizeSchema(Schema.create(Schema.Type.FLOAT), internalSchema);
       case DOUBLE:
-        return finalizeSchema(Schema.create(Schema.Type.DOUBLE), oneSchema);
+        return finalizeSchema(Schema.create(Schema.Type.DOUBLE), internalSchema);
       case ENUM:
         return finalizeSchema(
             Schema.createEnum(
-                oneSchema.getName(),
-                oneSchema.getComment(),
+                internalSchema.getName(),
+                internalSchema.getComment(),
                 null,
-                (List<String>) oneSchema.getMetadata().get(OneSchema.MetadataKey.ENUM_VALUES),
+                (List<String>)
+                    internalSchema.getMetadata().get(InternalSchema.MetadataKey.ENUM_VALUES),
                 null),
-            oneSchema);
+            internalSchema);
       case DATE:
         return finalizeSchema(
-            LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT)), oneSchema);
+            LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT)), internalSchema);
       case TIMESTAMP:
-        if (oneSchema.getMetadata().get(OneSchema.MetadataKey.TIMESTAMP_PRECISION)
-            == OneSchema.MetadataValue.MICROS) {
+        if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+            == InternalSchema.MetadataValue.MICROS) {
           return finalizeSchema(
               LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG)),
-              oneSchema);
+              internalSchema);
         } else {
           return finalizeSchema(
               LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)),
-              oneSchema);
+              internalSchema);
         }
       case TIMESTAMP_NTZ:
-        if (oneSchema.getMetadata().get(OneSchema.MetadataKey.TIMESTAMP_PRECISION)
-            == OneSchema.MetadataValue.MICROS) {
+        if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+            == InternalSchema.MetadataValue.MICROS) {
           return finalizeSchema(
               LogicalTypes.localTimestampMicros().addToSchema(Schema.create(Schema.Type.LONG)),
-              oneSchema);
+              internalSchema);
         } else {
           return finalizeSchema(
               LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG)),
-              oneSchema);
+              internalSchema);
         }
       case LIST:
-        OneField elementField =
-            oneSchema.getFields().stream()
+        InternalField elementField =
+            internalSchema.getFields().stream()
                 .filter(
-                    field -> OneField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(field.getName()))
+                    field ->
+                        InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(field.getName()))
                 .findFirst()
                 .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
         return finalizeSchema(
-            Schema.createArray(fromOneSchema(elementField.getSchema(), elementField.getPath())),
-            oneSchema);
+            Schema.createArray(
+                fromInternalSchema(elementField.getSchema(), elementField.getPath())),
+            internalSchema);
       case MAP:
-        OneField valueField =
-            oneSchema.getFields().stream()
-                .filter(field -> OneField.Constants.MAP_VALUE_FIELD_NAME.equals(field.getName()))
+        InternalField valueField =
+            internalSchema.getFields().stream()
+                .filter(
+                    field -> InternalField.Constants.MAP_VALUE_FIELD_NAME.equals(field.getName()))
                 .findFirst()
                 .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
         return finalizeSchema(
-            Schema.createMap(fromOneSchema(valueField.getSchema(), valueField.getPath())),
-            oneSchema);
+            Schema.createMap(fromInternalSchema(valueField.getSchema(), valueField.getPath())),
+            internalSchema);
       case DECIMAL:
-        int precision = (int) oneSchema.getMetadata().get(OneSchema.MetadataKey.DECIMAL_PRECISION);
-        int scale = (int) oneSchema.getMetadata().get(OneSchema.MetadataKey.DECIMAL_SCALE);
+        int precision =
+            (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+        int scale =
+            (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
         Integer size =
-            (Integer) oneSchema.getMetadata().get(OneSchema.MetadataKey.FIXED_BYTES_SIZE);
+            (Integer) internalSchema.getMetadata().get(InternalSchema.MetadataKey.FIXED_BYTES_SIZE);
         if (size == null) {
           return finalizeSchema(
               LogicalTypes.decimal(precision, scale).addToSchema(Schema.create(Schema.Type.BYTES)),
-              oneSchema);
+              internalSchema);
         } else {
           return finalizeSchema(
               LogicalTypes.decimal(precision, scale)
                   .addToSchema(
-                      Schema.createFixed(oneSchema.getName(), oneSchema.getComment(), null, size)),
-              oneSchema);
+                      Schema.createFixed(
+                          internalSchema.getName(), internalSchema.getComment(), null, size)),
+              internalSchema);
         }
       case FIXED:
         Integer fixedSize =
-            (Integer) oneSchema.getMetadata().get(OneSchema.MetadataKey.FIXED_BYTES_SIZE);
+            (Integer) internalSchema.getMetadata().get(InternalSchema.MetadataKey.FIXED_BYTES_SIZE);
         return finalizeSchema(
-            Schema.createFixed(oneSchema.getName(), oneSchema.getComment(), null, fixedSize),
-            oneSchema);
+            Schema.createFixed(
+                internalSchema.getName(), internalSchema.getComment(), null, fixedSize),
+            internalSchema);
       default:
         throw new UnsupportedSchemaTypeException(
-            "Encountered unhandled type during OneSchema to Avro conversion: "
-                + oneSchema.getDataType());
+            "Encountered unhandled type during InternalSchema to Avro conversion: "
+                + internalSchema.getDataType());
     }
   }
 
-  private String buildCurrentPath(OneField field, String parentPath) {
+  private String buildCurrentPath(InternalField field, String parentPath) {
     return Optional.ofNullable(parentPath)
         .map(path -> path + "." + field.getName())
         .orElse(field.getName());
   }
 
-  private static Schema finalizeSchema(Schema targetSchema, OneSchema inputSchema) {
+  private static Schema finalizeSchema(Schema targetSchema, InternalSchema inputSchema) {
     if (inputSchema.isNullable()) {
       return Schema.createUnion(Schema.create(Schema.Type.NULL), targetSchema);
     }

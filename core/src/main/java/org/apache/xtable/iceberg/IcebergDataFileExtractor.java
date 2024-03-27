@@ -26,7 +26,7 @@ import lombok.Builder;
 import org.apache.iceberg.DataFile;
 
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.storage.FileFormat;
@@ -49,14 +49,14 @@ public class IcebergDataFileExtractor {
    * @return corresponding OneTable data file
    */
   InternalDataFile fromIceberg(
-      DataFile dataFile, List<PartitionValue> partitionValues, OneSchema schema) {
+      DataFile dataFile, List<PartitionValue> partitionValues, InternalSchema schema) {
     return fromIceberg(dataFile, partitionValues, schema, true);
   }
 
   private InternalDataFile fromIceberg(
       DataFile dataFile,
       List<PartitionValue> partitionValues,
-      OneSchema schema,
+      InternalSchema schema,
       boolean includeColumnStats) {
     List<ColumnStat> columnStats =
         includeColumnStats

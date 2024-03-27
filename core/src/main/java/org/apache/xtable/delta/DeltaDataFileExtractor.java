@@ -25,9 +25,9 @@ import lombok.Builder;
 
 import org.apache.spark.sql.delta.Snapshot;
 
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.spi.extractor.DataFileIterator;
@@ -50,17 +50,18 @@ public class DeltaDataFileExtractor {
    *
    * @return Delta table file iterator
    */
-  public DataFileIterator iterator(Snapshot deltaSnapshot, OneSchema schema) {
+  public DataFileIterator iterator(Snapshot deltaSnapshot, InternalSchema schema) {
     return new DeltaDataFileIterator(deltaSnapshot, schema, true);
   }
 
   public class DeltaDataFileIterator implements DataFileIterator {
     private final FileFormat fileFormat;
-    private final List<OneField> fields;
-    private final List<OnePartitionField> partitionFields;
+    private final List<InternalField> fields;
+    private final List<InternalPartitionField> partitionFields;
     private final Iterator<InternalDataFile> dataFilesIterator;
 
-    private DeltaDataFileIterator(Snapshot snapshot, OneSchema schema, boolean includeColumnStats) {
+    private DeltaDataFileIterator(
+        Snapshot snapshot, InternalSchema schema, boolean includeColumnStats) {
       this.fileFormat =
           actionsConverter.convertToOneTableFileFormat(snapshot.metadata().format().provider());
       this.fields = schema.getFields();

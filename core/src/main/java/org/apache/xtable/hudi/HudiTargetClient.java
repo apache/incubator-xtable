@@ -84,9 +84,9 @@ import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
@@ -186,19 +186,21 @@ public class HudiTargetClient implements TargetClient {
   }
 
   @Override
-  public void syncSchema(OneSchema schema) {
+  public void syncSchema(InternalSchema schema) {
     if (metaClient.isPresent()) {
       validateRecordKeysAreNotModified(schema);
     }
-    commitState.setSchema(avroSchemaConverter.fromOneSchema(schema));
+    commitState.setSchema(avroSchemaConverter.fromInternalSchema(schema));
   }
 
-  private void validateRecordKeysAreNotModified(OneSchema schema) {
+  private void validateRecordKeysAreNotModified(InternalSchema schema) {
     Option<String[]> recordKeyFields = getMetaClient().getTableConfig().getRecordKeyFields();
     if (recordKeyFields.isPresent()) {
       List<String> existingHudiRecordKeys = Arrays.asList(recordKeyFields.get());
       List<String> schemaFieldsList =
-          schema.getRecordKeyFields().stream().map(OneField::getPath).collect(Collectors.toList());
+          schema.getRecordKeyFields().stream()
+              .map(InternalField::getPath)
+              .collect(Collectors.toList());
       if (!schemaFieldsList.equals(existingHudiRecordKeys)) {
         Set<String> newKeys =
             schemaFieldsList.stream()
@@ -220,7 +222,7 @@ public class HudiTargetClient implements TargetClient {
   }
 
   @Override
-  public void syncPartitionSpec(List<OnePartitionField> partitionSpec) {
+  public void syncPartitionSpec(List<InternalPartitionField> partitionSpec) {
     List<String> existingPartitionFields =
         getMetaClient()
             .getTableConfig()
@@ -229,8 +231,8 @@ public class HudiTargetClient implements TargetClient {
             .orElse(Collections.emptyList());
     List<String> newPartitionFields =
         partitionSpec.stream()
-            .map(OnePartitionField::getSourceField)
-            .map(OneField::getPath)
+            .map(InternalPartitionField::getSourceField)
+            .map(InternalField::getPath)
             .collect(Collectors.toList());
     if (!existingPartitionFields.equals(newPartitionFields)) {
       throw new NotSupportedException("Partition spec cannot be changed after creating Hudi table");

@@ -20,13 +20,13 @@ package org.apache.xtable.spi.extractor;
 
 import java.util.Optional;
 
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 
 /**
- * Use the table client to extract the canonical {@link OneSnapshot} model.
+ * Use the table client to extract the canonical {@link InternalSnapshot} model.
  *
  * @param <CLIENT> Extracts Canonical snapshot model from table client.
  */
 public interface SnapshotExtractor<CLIENT> {
-  Optional<OneSnapshot> snapshot(CLIENT tableServiceClient);
+  Optional<InternalSnapshot> snapshot(CLIENT tableServiceClient);
 }

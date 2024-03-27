@@ -31,10 +31,10 @@ import org.apache.iceberg.transforms.Transforms;
 import org.apache.iceberg.types.Types;
 
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 
 public class TestIcebergPartitionSpecExtractor {
@@ -59,21 +59,21 @@ public class TestIcebergPartitionSpecExtractor {
 
   @Test
   public void testMultiplePartitions() {
-    List<OnePartitionField> partitionFieldList =
+    List<InternalPartitionField> partitionFieldList =
         Arrays.asList(
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("timestamp_hour")
-                        .schema(OneSchema.builder().dataType(OneType.TIMESTAMP).build())
+                        .schema(InternalSchema.builder().dataType(InternalType.TIMESTAMP).build())
                         .build())
                 .transformType(PartitionTransformType.HOUR)
                 .build(),
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("string_field")
-                        .schema(OneSchema.builder().dataType(OneType.STRING).build())
+                        .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
                         .build())
                 .transformType(PartitionTransformType.VALUE)
                 .build());
@@ -89,13 +89,14 @@ public class TestIcebergPartitionSpecExtractor {
 
   @Test
   public void testYearPartitioning() {
-    List<OnePartitionField> partitionFieldList =
+    List<InternalPartitionField> partitionFieldList =
         Collections.singletonList(
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("timestamp_year")
-                        .schema(OneSchema.builder().dataType(OneType.TIMESTAMP_NTZ).build())
+                        .schema(
+                            InternalSchema.builder().dataType(InternalType.TIMESTAMP_NTZ).build())
                         .build())
                 .transformType(PartitionTransformType.YEAR)
                 .build());
@@ -107,13 +108,14 @@ public class TestIcebergPartitionSpecExtractor {
 
   @Test
   public void testMonthPartitioning() {
-    List<OnePartitionField> partitionFieldList =
+    List<InternalPartitionField> partitionFieldList =
         Collections.singletonList(
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("timestamp_month")
-                        .schema(OneSchema.builder().dataType(OneType.TIMESTAMP_NTZ).build())
+                        .schema(
+                            InternalSchema.builder().dataType(InternalType.TIMESTAMP_NTZ).build())
                         .build())
                 .transformType(PartitionTransformType.MONTH)
                 .build());
@@ -125,13 +127,14 @@ public class TestIcebergPartitionSpecExtractor {
 
   @Test
   public void testDayPartitioning() {
-    List<OnePartitionField> partitionFieldList =
+    List<InternalPartitionField> partitionFieldList =
         Collections.singletonList(
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("timestamp_day")
-                        .schema(OneSchema.builder().dataType(OneType.TIMESTAMP_NTZ).build())
+                        .schema(
+                            InternalSchema.builder().dataType(InternalType.TIMESTAMP_NTZ).build())
                         .build())
                 .transformType(PartitionTransformType.DAY)
                 .build());
@@ -143,13 +146,14 @@ public class TestIcebergPartitionSpecExtractor {
 
   @Test
   public void testHourPartitioning() {
-    List<OnePartitionField> partitionFieldList =
+    List<InternalPartitionField> partitionFieldList =
         Collections.singletonList(
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("timestamp_hour")
-                        .schema(OneSchema.builder().dataType(OneType.TIMESTAMP_NTZ).build())
+                        .schema(
+                            InternalSchema.builder().dataType(InternalType.TIMESTAMP_NTZ).build())
                         .build())
                 .transformType(PartitionTransformType.HOUR)
                 .build());
@@ -161,14 +165,14 @@ public class TestIcebergPartitionSpecExtractor {
 
   @Test
   public void testNestedPartitionField() {
-    List<OnePartitionField> partitionFieldList =
+    List<InternalPartitionField> partitionFieldList =
         Collections.singletonList(
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("nested")
                         .parentPath("data")
-                        .schema(OneSchema.builder().dataType(OneType.STRING).build())
+                        .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
                         .build())
                 .transformType(PartitionTransformType.VALUE)
                 .build());
@@ -189,7 +193,7 @@ public class TestIcebergPartitionSpecExtractor {
   @Test
   public void testFromIcebergUnPartitioned() {
     IcebergPartitionSpecExtractor extractor = IcebergPartitionSpecExtractor.getInstance();
-    List<OnePartitionField> fields =
+    List<InternalPartitionField> fields =
         extractor.fromIceberg(PartitionSpec.unpartitioned(), null, null);
     Assertions.assertEquals(0, fields.size());
   }
@@ -205,29 +209,29 @@ public class TestIcebergPartitionSpecExtractor {
     PartitionSpec icePartitionSpec =
         PartitionSpec.builderFor(iceSchema).identity("key_string").build();
 
-    OneSchema irSchema =
-        OneSchema.builder()
+    InternalSchema irSchema =
+        InternalSchema.builder()
             .name("test_schema")
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("data_int")
-                        .schema(OneSchema.builder().dataType(OneType.INT).build())
+                        .schema(InternalSchema.builder().dataType(InternalType.INT).build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("key_string")
                         .fieldId(1)
-                        .schema(OneSchema.builder().dataType(OneType.STRING).build())
+                        .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
                         .build()))
             .build();
 
-    List<OnePartitionField> irPartitionSpec =
+    List<InternalPartitionField> irPartitionSpec =
         extractor.fromIceberg(icePartitionSpec, iceSchema, irSchema);
     Assertions.assertEquals(1, irPartitionSpec.size());
-    OneField sourceField = irPartitionSpec.get(0).getSourceField();
+    InternalField sourceField = irPartitionSpec.get(0).getSourceField();
     Assertions.assertEquals("key_string", sourceField.getName());
     Assertions.assertEquals(1, sourceField.getFieldId());
-    Assertions.assertEquals(OneType.STRING, sourceField.getSchema().getDataType());
+    Assertions.assertEquals(InternalType.STRING, sourceField.getSchema().getDataType());
     Assertions.assertEquals(
         PartitionTransformType.VALUE, irPartitionSpec.get(0).getTransformType());
   }
@@ -243,38 +247,38 @@ public class TestIcebergPartitionSpecExtractor {
     PartitionSpec icePartitionSpec =
         PartitionSpec.builderFor(iceSchema).identity("key_string").year("key_year").build();
 
-    OneSchema irSchema =
-        OneSchema.builder()
+    InternalSchema irSchema =
+        InternalSchema.builder()
             .name("test_schema")
             .fields(
                 Arrays.asList(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("key_year")
                         .fieldId(10)
-                        .schema(OneSchema.builder().dataType(OneType.DATE).build())
+                        .schema(InternalSchema.builder().dataType(InternalType.DATE).build())
                         .build(),
-                    OneField.builder()
+                    InternalField.builder()
                         .name("key_string")
                         .fieldId(11)
-                        .schema(OneSchema.builder().dataType(OneType.STRING).build())
+                        .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
                         .build()))
             .build();
 
-    List<OnePartitionField> irPartitionSpec =
+    List<InternalPartitionField> irPartitionSpec =
         extractor.fromIceberg(icePartitionSpec, iceSchema, irSchema);
     Assertions.assertEquals(2, irPartitionSpec.size());
 
-    OneField sourceField = irPartitionSpec.get(0).getSourceField();
+    InternalField sourceField = irPartitionSpec.get(0).getSourceField();
     Assertions.assertEquals("key_string", sourceField.getName());
     Assertions.assertEquals(11, sourceField.getFieldId());
-    Assertions.assertEquals(OneType.STRING, sourceField.getSchema().getDataType());
+    Assertions.assertEquals(InternalType.STRING, sourceField.getSchema().getDataType());
     Assertions.assertEquals(
         PartitionTransformType.VALUE, irPartitionSpec.get(0).getTransformType());
 
     sourceField = irPartitionSpec.get(1).getSourceField();
     Assertions.assertEquals("key_year", sourceField.getName());
     Assertions.assertEquals(10, sourceField.getFieldId());
-    Assertions.assertEquals(OneType.DATE, sourceField.getSchema().getDataType());
+    Assertions.assertEquals(InternalType.DATE, sourceField.getSchema().getDataType());
     Assertions.assertEquals(PartitionTransformType.YEAR, irPartitionSpec.get(1).getTransformType());
   }
 

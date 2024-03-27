@@ -32,7 +32,7 @@ import lombok.ToString;
  */
 @Getter
 @ToString
-public enum OneType {
+public enum InternalType {
   RECORD,
   ENUM,
   LIST,
@@ -53,13 +53,13 @@ public enum OneType {
   TIMESTAMP_NTZ;
   private final String name;
 
-  OneType() {
+  InternalType() {
     this.name = this.name().toLowerCase();
   }
 
-  public static final Set<OneType> NON_SCALAR_TYPES =
+  public static final Set<InternalType> NON_SCALAR_TYPES =
       Collections.unmodifiableSet(
-          new HashSet<OneType>() {
+          new HashSet<InternalType>() {
             {
               add(RECORD);
               add(LIST);

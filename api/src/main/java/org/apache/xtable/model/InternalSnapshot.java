@@ -39,7 +39,7 @@ import org.apache.xtable.model.storage.OneFileGroup;
  */
 @Value
 @Builder
-public class OneSnapshot {
+public class InternalSnapshot {
   // The instant of the Snapshot
   String version;
   // Table reference
