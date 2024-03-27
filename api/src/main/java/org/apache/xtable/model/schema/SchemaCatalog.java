@@ -33,9 +33,9 @@ import lombok.Value;
 @Value
 @Builder
 public class SchemaCatalog {
-  Map<SchemaVersion, OneSchema> schemas;
+  Map<SchemaVersion, InternalSchema> schemas;
 
-  public SchemaCatalog(Map<SchemaVersion, OneSchema> schemas) {
+  public SchemaCatalog(Map<SchemaVersion, InternalSchema> schemas) {
     this.schemas = schemas;
   }
 }

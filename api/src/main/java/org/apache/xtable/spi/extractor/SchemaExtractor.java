@@ -18,7 +18,7 @@
  
 package org.apache.xtable.spi.extractor;
 
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalSchema;
 
 /**
  * Interface to implement to extract canonical schema from a table format
@@ -26,5 +26,5 @@ import org.apache.xtable.model.schema.OneSchema;
  * @param <CLIENT> Extracts canonical schema from table client.
  */
 public interface SchemaExtractor<CLIENT> {
-  OneSchema schema(CLIENT client);
+  InternalSchema schema(CLIENT client);
 }

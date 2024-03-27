@@ -51,8 +51,8 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
 import org.apache.xtable.exception.PartitionSpecException;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
@@ -93,20 +93,20 @@ public class DeltaPartitionExtractor {
   /**
    * Extracts partition fields from delta table. Partitioning by nested columns isn't supported.
    * Example: Given a delta table and a reference to DeltaLog, method parameters can be obtained by
-   * deltaLog = DeltaLog.forTable(spark, deltaTablePath); OneSchema oneSchema =
-   * DeltaSchemaExtractor.getInstance().toOneSchema(deltaLog.snapshot().schema()); StructType
+   * deltaLog = DeltaLog.forTable(spark, deltaTablePath); InternalSchema internalSchema =
+   * DeltaSchemaExtractor.getInstance().toInternalSchema(deltaLog.snapshot().schema()); StructType
    * partitionSchema = deltaLog.metadata().partitionSchema();
    *
-   * @param oneSchema canonical representation of the schema.
+   * @param internalSchema canonical representation of the schema.
    * @param partitionSchema partition schema of the delta table.
    * @return list of canonical representation of the partition fields
    */
-  public List<OnePartitionField> convertFromDeltaPartitionFormat(
-      OneSchema oneSchema, StructType partitionSchema) {
+  public List<InternalPartitionField> convertFromDeltaPartitionFormat(
+      InternalSchema internalSchema, StructType partitionSchema) {
     if (partitionSchema.isEmpty()) {
       return Collections.emptyList();
     }
-    return getOnePartitionFields(partitionSchema, oneSchema);
+    return getInternalPartitionFields(partitionSchema, internalSchema);
   }
 
   /**
@@ -115,19 +115,19 @@ public class DeltaPartitionExtractor {
    * contain hour they should contain day, month and year as well. Other supports CAST(col as DATE)
    * and DATE_FORMAT(col, 'yyyy-MM-dd'). Partition by nested fields may not be fully supported.
    */
-  private List<OnePartitionField> getOnePartitionFields(
-      StructType partitionSchema, OneSchema oneSchema) {
+  private List<InternalPartitionField> getInternalPartitionFields(
+      StructType partitionSchema, InternalSchema internalSchema) {
     PeekingIterator<StructField> itr =
         Iterators.peekingIterator(Arrays.stream(partitionSchema.fields()).iterator());
-    List<OnePartitionField> partitionFields = new ArrayList<>(partitionSchema.fields().length);
+    List<InternalPartitionField> partitionFields = new ArrayList<>(partitionSchema.fields().length);
     while (itr.hasNext()) {
       StructField currPartitionField = itr.peek();
       if (!currPartitionField.metadata().contains(DELTA_GENERATION_EXPRESSION)) {
         partitionFields.add(
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(
                     SchemaFieldFinder.getInstance()
-                        .findFieldByPath(oneSchema, currPartitionField.name()))
+                        .findFieldByPath(internalSchema, currPartitionField.name()))
                 .transformType(PartitionTransformType.VALUE)
                 .build());
         itr.next(); // consume the field.
@@ -141,13 +141,13 @@ public class DeltaPartitionExtractor {
         if (ParsedGeneratedExpr.GeneratedExprType.CAST == parsedGeneratedExpr.generatedExprType) {
           partitionFields.add(
               getPartitionWithDateTransform(
-                  currPartitionField.name(), parsedGeneratedExpr, oneSchema));
+                  currPartitionField.name(), parsedGeneratedExpr, internalSchema));
           itr.next(); // consume the field.
         } else if (ParsedGeneratedExpr.GeneratedExprType.DATE_FORMAT
             == parsedGeneratedExpr.generatedExprType) {
           partitionFields.add(
               getPartitionWithDateFormatTransform(
-                  currPartitionField.name(), parsedGeneratedExpr, oneSchema));
+                  currPartitionField.name(), parsedGeneratedExpr, internalSchema));
           itr.next(); // consume the field.
         } else {
           // consume until we hit field with no generated expression or generated expression
@@ -171,15 +171,15 @@ public class DeltaPartitionExtractor {
             }
           }
           partitionFields.add(
-              getPartitionColumnsForHourOrDayOrMonthOrYear(parsedGeneratedExprs, oneSchema));
+              getPartitionColumnsForHourOrDayOrMonthOrYear(parsedGeneratedExprs, internalSchema));
         }
       }
     }
     return partitionFields;
   }
 
-  private OnePartitionField getPartitionColumnsForHourOrDayOrMonthOrYear(
-      List<ParsedGeneratedExpr> parsedGeneratedExprs, OneSchema oneSchema) {
+  private InternalPartitionField getPartitionColumnsForHourOrDayOrMonthOrYear(
+      List<ParsedGeneratedExpr> parsedGeneratedExprs, InternalSchema internalSchema) {
     if (parsedGeneratedExprs.size() > 4) {
       throw new IllegalStateException("Invalid partition transform");
     }
@@ -191,9 +191,9 @@ public class DeltaPartitionExtractor {
         parsedGeneratedExprs.stream()
             .map(parsedGeneratedExpr -> parsedGeneratedExpr.partitionColumnName)
             .collect(toList(parsedGeneratedExprs.size()));
-    return OnePartitionField.builder()
+    return InternalPartitionField.builder()
         .sourceField(
-            SchemaFieldFinder.getInstance().findFieldByPath(oneSchema, transform.sourceColumn))
+            SchemaFieldFinder.getInstance().findFieldByPath(internalSchema, transform.sourceColumn))
         .partitionFieldNames(partitionColumns)
         .transformType(
             parsedGeneratedExprs.get(parsedGeneratedExprs.size() - 1)
@@ -202,44 +202,48 @@ public class DeltaPartitionExtractor {
   }
 
   // Cast has default format of yyyy-MM-dd.
-  private OnePartitionField getPartitionWithDateTransform(
-      String partitionColumnName, ParsedGeneratedExpr parsedGeneratedExpr, OneSchema oneSchema) {
-    return OnePartitionField.builder()
+  private InternalPartitionField getPartitionWithDateTransform(
+      String partitionColumnName,
+      ParsedGeneratedExpr parsedGeneratedExpr,
+      InternalSchema internalSchema) {
+    return InternalPartitionField.builder()
         .sourceField(
             SchemaFieldFinder.getInstance()
-                .findFieldByPath(oneSchema, parsedGeneratedExpr.sourceColumn))
+                .findFieldByPath(internalSchema, parsedGeneratedExpr.sourceColumn))
         .partitionFieldNames(Collections.singletonList(partitionColumnName))
         .transformType(PartitionTransformType.DAY)
         .build();
   }
 
-  private OnePartitionField getPartitionWithDateFormatTransform(
-      String partitionColumnName, ParsedGeneratedExpr parsedGeneratedExpr, OneSchema oneSchema) {
-    return OnePartitionField.builder()
+  private InternalPartitionField getPartitionWithDateFormatTransform(
+      String partitionColumnName,
+      ParsedGeneratedExpr parsedGeneratedExpr,
+      InternalSchema internalSchema) {
+    return InternalPartitionField.builder()
         .sourceField(
             SchemaFieldFinder.getInstance()
-                .findFieldByPath(oneSchema, parsedGeneratedExpr.sourceColumn))
+                .findFieldByPath(internalSchema, parsedGeneratedExpr.sourceColumn))
         .partitionFieldNames(Collections.singletonList(partitionColumnName))
         .transformType(parsedGeneratedExpr.internalPartitionTransformType)
         .build();
   }
 
   public Map<String, StructField> convertToDeltaPartitionFormat(
-      List<OnePartitionField> partitionFields) {
+      List<InternalPartitionField> partitionFields) {
     if (partitionFields == null) {
       return null;
     }
     Map<String, StructField> nameToStructFieldMap = new HashMap<>();
-    for (OnePartitionField onePartitionField : partitionFields) {
+    for (InternalPartitionField internalPartitionField : partitionFields) {
       String currPartitionColumnName;
       StructField field;
 
-      if (onePartitionField.getTransformType() == PartitionTransformType.VALUE) {
-        currPartitionColumnName = onePartitionField.getSourceField().getName();
+      if (internalPartitionField.getTransformType() == PartitionTransformType.VALUE) {
+        currPartitionColumnName = internalPartitionField.getSourceField().getName();
         field = null;
       } else {
         // Since partition field of timestamp type, create new field in schema.
-        field = getGeneratedField(onePartitionField);
+        field = getGeneratedField(internalPartitionField);
         currPartitionColumnName = field.name();
       }
       nameToStructFieldMap.put(currPartitionColumnName, field);
@@ -254,7 +258,7 @@ public class DeltaPartitionExtractor {
       return partitionValuesSerialized;
     }
     for (PartitionValue partitionValue : internalDataFile.getPartitionValues()) {
-      OnePartitionField partitionField = partitionValue.getPartitionField();
+      InternalPartitionField partitionField = partitionValue.getPartitionField();
       PartitionTransformType transformType = partitionField.getTransformType();
       String partitionValueSerialized;
       if (transformType == PartitionTransformType.VALUE) {
@@ -282,7 +286,7 @@ public class DeltaPartitionExtractor {
   }
 
   public List<PartitionValue> partitionValueExtraction(
-      scala.collection.Map<String, String> values, List<OnePartitionField> partitionFields) {
+      scala.collection.Map<String, String> values, List<InternalPartitionField> partitionFields) {
     return partitionFields.stream()
         .map(
             partitionField -> {
@@ -308,7 +312,7 @@ public class DeltaPartitionExtractor {
   }
 
   private String getSerializedPartitionValue(
-      Map<String, String> values, OnePartitionField partitionField) {
+      Map<String, String> values, InternalPartitionField partitionField) {
     if (partitionField.getPartitionFieldNames() == null
         || partitionField.getPartitionFieldNames().isEmpty()) {
       return values.getOrDefault(partitionField.getSourceField().getName(), null);
@@ -322,11 +326,11 @@ public class DeltaPartitionExtractor {
         .collect(Collectors.joining("-"));
   }
 
-  private String getGeneratedColumnName(OnePartitionField onePartitionField) {
+  private String getGeneratedColumnName(InternalPartitionField internalPartitionField) {
     return String.format(
         DELTA_PARTITION_COL_NAME_FORMAT,
-        onePartitionField.getTransformType().toString(),
-        onePartitionField.getSourceField().getName());
+        internalPartitionField.getTransformType().toString(),
+        internalPartitionField.getSourceField().getName());
   }
 
   private String getDateFormat(PartitionTransformType transformType) {
@@ -344,15 +348,15 @@ public class DeltaPartitionExtractor {
     }
   }
 
-  private StructField getGeneratedField(OnePartitionField onePartitionField) {
+  private StructField getGeneratedField(InternalPartitionField internalPartitionField) {
     String generatedExpression;
     DataType dataType;
-    String currPartitionColumnName = getGeneratedColumnName(onePartitionField);
+    String currPartitionColumnName = getGeneratedColumnName(internalPartitionField);
     Map<String, String> generatedExpressionMetadata = new HashMap<>();
-    switch (onePartitionField.getTransformType()) {
+    switch (internalPartitionField.getTransformType()) {
       case YEAR:
         generatedExpression =
-            String.format(YEAR_FUNCTION, onePartitionField.getSourceField().getPath());
+            String.format(YEAR_FUNCTION, internalPartitionField.getSourceField().getPath());
         dataType = DataTypes.IntegerType;
         break;
       case MONTH:
@@ -360,13 +364,13 @@ public class DeltaPartitionExtractor {
         generatedExpression =
             String.format(
                 DATE_FORMAT_FUNCTION,
-                onePartitionField.getSourceField().getPath(),
-                getDateFormat(onePartitionField.getTransformType()));
+                internalPartitionField.getSourceField().getPath(),
+                getDateFormat(internalPartitionField.getTransformType()));
         dataType = DataTypes.StringType;
         break;
       case DAY:
         generatedExpression =
-            String.format(CAST_FUNCTION, onePartitionField.getSourceField().getPath());
+            String.format(CAST_FUNCTION, internalPartitionField.getSourceField().getPath());
         dataType = DataTypes.DateType;
         break;
       default:

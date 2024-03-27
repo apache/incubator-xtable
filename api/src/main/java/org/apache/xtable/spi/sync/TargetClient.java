@@ -26,8 +26,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
 
@@ -39,14 +39,14 @@ public interface TargetClient {
    *
    * @param schema the current schema
    */
-  void syncSchema(OneSchema schema);
+  void syncSchema(InternalSchema schema);
 
   /**
    * Syncs the current partition spec.
    *
    * @param partitionSpec the current partition spec
    */
-  void syncPartitionSpec(List<OnePartitionField> partitionSpec);
+  void syncPartitionSpec(List<InternalPartitionField> partitionSpec);
 
   /**
    * Syncs the {@link OneTableMetadata} to the target for tracking metadata between runs. This is

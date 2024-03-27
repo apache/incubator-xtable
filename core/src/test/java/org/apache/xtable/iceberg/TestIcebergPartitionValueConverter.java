@@ -33,9 +33,9 @@ import org.apache.iceberg.avro.AvroSchemaUtil;
 import org.apache.iceberg.types.Types;
 
 import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
@@ -61,7 +61,7 @@ public class TestIcebergPartitionValueConverter {
           "abc",
           1614556800000L,
           51 /* Iceberg represents year as diff from 1970 */);
-  private static final OneSchema ONE_SCHEMA =
+  private static final InternalSchema ONE_SCHEMA =
       IcebergSchemaExtractor.getInstance().fromIceberg(SCHEMA);
 
   @Test
@@ -123,14 +123,17 @@ public class TestIcebergPartitionValueConverter {
         .build();
   }
 
-  private OnePartitionField getPartitionField(
+  private InternalPartitionField getPartitionField(
       String sourceField, PartitionTransformType transformType) {
-    OneField oneField =
+    InternalField internalField =
         ONE_SCHEMA.getFields().stream()
             .filter(f -> f.getName().equals(sourceField))
             .findFirst()
             .get();
-    return OnePartitionField.builder().sourceField(oneField).transformType(transformType).build();
+    return InternalPartitionField.builder()
+        .sourceField(internalField)
+        .transformType(transformType)
+        .build();
   }
 
   public static class Row implements StructLike, IndexedRecord {

@@ -34,10 +34,10 @@ import org.junit.jupiter.api.Test;
 
 import scala.collection.JavaConverters;
 
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
@@ -99,13 +99,14 @@ public class TestDeltaPartitionExtractor {
                   Metadata.fromJson("{\"delta.generationExpression\": \"HOUR(birthDate)\"}")));
         }
       };
-  private static final OneSchema TIMESTAMP_SCHEMA =
-      OneSchema.builder()
+  private static final InternalSchema TIMESTAMP_SCHEMA =
+      InternalSchema.builder()
           .name("timestamp")
-          .dataType(OneType.TIMESTAMP)
+          .dataType(InternalType.TIMESTAMP)
           .metadata(
               Collections.singletonMap(
-                  OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS))
+                  InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
+                  InternalSchema.MetadataValue.MICROS))
           .build();
 
   private final DeltaPartitionExtractor deltaPartitionExtractor =
@@ -116,10 +117,10 @@ public class TestDeltaPartitionExtractor {
   public void testUnpartitionedTable() {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate"));
-    OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
-    List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, new StructType());
-    assertTrue(onePartitionFields.isEmpty());
+    InternalSchema internalSchema = deltaSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> internalPartitionFields =
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(internalSchema, new StructType());
+    assertTrue(internalPartitionFields.isEmpty());
   }
 
   @Test
@@ -127,20 +128,24 @@ public class TestDeltaPartitionExtractor {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("gender"));
-    OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
-    List<OnePartitionField> expectedOnePartitionFields =
+    InternalSchema internalSchema = deltaSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
         Arrays.asList(
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("gender")
-                        .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .build())
                         .build())
                 .transformType(PartitionTransformType.VALUE)
                 .build());
-    List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
-    assertEquals(expectedOnePartitionFields, onePartitionFields);
+    List<InternalPartitionField> internalPartitionFields =
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
   }
 
   @Test
@@ -148,17 +153,18 @@ public class TestDeltaPartitionExtractor {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateOfBirth"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("dateOfBirth"));
-    OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
-    List<OnePartitionField> expectedOnePartitionFields =
+    InternalSchema internalSchema = deltaSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
         Arrays.asList(
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.DAY)
                 .partitionFieldNames(Collections.singletonList("dateOfBirth"))
                 .build());
-    List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
-    assertEquals(expectedOnePartitionFields, onePartitionFields);
+    List<InternalPartitionField> internalPartitionFields =
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
   }
 
   @Test
@@ -166,17 +172,18 @@ public class TestDeltaPartitionExtractor {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateFmt"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("dateFmt"));
-    OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
-    List<OnePartitionField> expectedOnePartitionFields =
+    InternalSchema internalSchema = deltaSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
         Arrays.asList(
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.HOUR)
                 .partitionFieldNames(Collections.singletonList("dateFmt"))
                 .build());
-    List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
-    assertEquals(expectedOnePartitionFields, onePartitionFields);
+    List<InternalPartitionField> internalPartitionFields =
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
   }
 
   @Test
@@ -184,17 +191,18 @@ public class TestDeltaPartitionExtractor {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "yearOfBirth"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("yearOfBirth"));
-    OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
-    List<OnePartitionField> expectedOnePartitionFields =
+    InternalSchema internalSchema = deltaSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
         Arrays.asList(
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.YEAR)
                 .partitionFieldNames(Collections.singletonList("yearOfBirth"))
                 .build());
-    List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
-    assertEquals(expectedOnePartitionFields, onePartitionFields);
+    List<InternalPartitionField> internalPartitionFields =
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
   }
 
   @Test
@@ -202,25 +210,30 @@ public class TestDeltaPartitionExtractor {
     StructType tableSchema =
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "yearOfBirth"));
     StructType partitionSchema = getSchemaWithFields(Arrays.asList("yearOfBirth", "id"));
-    OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
-    List<OnePartitionField> expectedOnePartitionFields =
+    InternalSchema internalSchema = deltaSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
         Arrays.asList(
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.YEAR)
                 .partitionFieldNames(Collections.singletonList("yearOfBirth"))
                 .build(),
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("id")
-                        .schema(OneSchema.builder().name("integer").dataType(OneType.INT).build())
+                        .schema(
+                            InternalSchema.builder()
+                                .name("integer")
+                                .dataType(InternalType.INT)
+                                .build())
                         .build())
                 .transformType(PartitionTransformType.VALUE)
                 .build());
-    List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
-    assertEquals(expectedOnePartitionFields, onePartitionFields);
+    List<InternalPartitionField> internalPartitionFields =
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
   }
 
   @Test
@@ -239,18 +252,19 @@ public class TestDeltaPartitionExtractor {
     StructType partitionSchema =
         getSchemaWithFields(
             Arrays.asList("yearOfBirth", "monthOfBirth", "dayOfBirth", "hourOfBirth"));
-    OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
-    List<OnePartitionField> expectedOnePartitionFields =
+    InternalSchema internalSchema = deltaSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
         Arrays.asList(
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .partitionFieldNames(
                     Arrays.asList("yearOfBirth", "monthOfBirth", "dayOfBirth", "hourOfBirth"))
                 .transformType(PartitionTransformType.HOUR)
                 .build());
-    List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
-    assertEquals(expectedOnePartitionFields, onePartitionFields);
+    List<InternalPartitionField> internalPartitionFields =
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
   }
 
   // Test for preserving order of partition columns.
@@ -260,38 +274,48 @@ public class TestDeltaPartitionExtractor {
         getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateFmt"));
     StructType partitionSchema =
         getSchemaWithFields(Arrays.asList("id", "dateFmt", "gender", "dateOfBirth"));
-    OneSchema oneSchema = deltaSchemaExtractor.toOneSchema(tableSchema);
-    List<OnePartitionField> expectedOnePartitionFields =
+    InternalSchema internalSchema = deltaSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
         Arrays.asList(
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("id")
-                        .schema(OneSchema.builder().name("integer").dataType(OneType.INT).build())
+                        .schema(
+                            InternalSchema.builder()
+                                .name("integer")
+                                .dataType(InternalType.INT)
+                                .build())
                         .build())
                 .transformType(PartitionTransformType.VALUE)
                 .build(),
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.HOUR)
                 .partitionFieldNames(Collections.singletonList("dateFmt"))
                 .build(),
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(
-                    OneField.builder()
+                    InternalField.builder()
                         .name("gender")
-                        .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .build())
                         .build())
                 .transformType(PartitionTransformType.VALUE)
                 .build(),
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
                 .transformType(PartitionTransformType.DAY)
                 .partitionFieldNames(Collections.singletonList("dateOfBirth"))
                 .build());
-    List<OnePartitionField> onePartitionFields =
-        deltaPartitionExtractor.convertFromDeltaPartitionFormat(oneSchema, partitionSchema);
-    assertEquals(expectedOnePartitionFields, onePartitionFields);
+    List<InternalPartitionField> internalPartitionFields =
+        deltaPartitionExtractor.convertFromDeltaPartitionFormat(internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
   }
 
   @Test
@@ -305,21 +329,29 @@ public class TestDeltaPartitionExtractor {
         };
     scala.collection.mutable.Map<String, String> scalaMap =
         convertJavaMapToScalaMap(partitionValuesMap);
-    OnePartitionField onePartitionField1 =
-        OnePartitionField.builder()
+    InternalPartitionField internalPartitionField1 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("partition_column1")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OnePartitionField onePartitionField2 =
-        OnePartitionField.builder()
+    InternalPartitionField internalPartitionField2 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("partition_column2")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
@@ -328,16 +360,16 @@ public class TestDeltaPartitionExtractor {
     List<PartitionValue> expectedPartitionValues =
         Arrays.asList(
             PartitionValue.builder()
-                .partitionField(onePartitionField1)
+                .partitionField(internalPartitionField1)
                 .range(rangeForPartitionField1)
                 .build(),
             PartitionValue.builder()
-                .partitionField(onePartitionField2)
+                .partitionField(internalPartitionField2)
                 .range(rangeForPartitionField2)
                 .build());
     List<PartitionValue> partitionValues =
         deltaPartitionExtractor.partitionValueExtraction(
-            scalaMap, Arrays.asList(onePartitionField1, onePartitionField2));
+            scalaMap, Arrays.asList(internalPartitionField1, internalPartitionField2));
     assertEquals(expectedPartitionValues, partitionValues);
   }
 
@@ -355,22 +387,29 @@ public class TestDeltaPartitionExtractor {
         };
     scala.collection.mutable.Map<String, String> scalaMap =
         convertJavaMapToScalaMap(partitionValuesMap);
-    OnePartitionField onePartitionField1 =
-        OnePartitionField.builder()
+    InternalPartitionField internalPartitionField1 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("partition_column1")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OnePartitionField onePartitionField2 =
-        OnePartitionField.builder()
+    InternalPartitionField internalPartitionField2 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("some_date_column")
                     .schema(
-                        OneSchema.builder().name("timestamp").dataType(OneType.TIMESTAMP).build())
+                        InternalSchema.builder()
+                            .name("timestamp")
+                            .dataType(InternalType.TIMESTAMP)
+                            .build())
                     .build())
             .partitionFieldNames(Collections.singletonList("date_partition_column"))
             .transformType(PartitionTransformType.HOUR)
@@ -380,16 +419,16 @@ public class TestDeltaPartitionExtractor {
     List<PartitionValue> expectedPartitionValues =
         Arrays.asList(
             PartitionValue.builder()
-                .partitionField(onePartitionField1)
+                .partitionField(internalPartitionField1)
                 .range(rangeForPartitionField1)
                 .build(),
             PartitionValue.builder()
-                .partitionField(onePartitionField2)
+                .partitionField(internalPartitionField2)
                 .range(rangeForPartitionField2)
                 .build());
     List<PartitionValue> partitionValues =
         deltaPartitionExtractor.partitionValueExtraction(
-            scalaMap, Arrays.asList(onePartitionField1, onePartitionField2));
+            scalaMap, Arrays.asList(internalPartitionField1, internalPartitionField2));
     assertEquals(expectedPartitionValues, partitionValues);
   }
 
@@ -408,22 +447,29 @@ public class TestDeltaPartitionExtractor {
         };
     scala.collection.mutable.Map<String, String> scalaMap =
         convertJavaMapToScalaMap(partitionValuesMap);
-    OnePartitionField onePartitionField1 =
-        OnePartitionField.builder()
+    InternalPartitionField internalPartitionField1 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("partition_column1")
-                    .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OnePartitionField onePartitionField2 =
-        OnePartitionField.builder()
+    InternalPartitionField internalPartitionField2 =
+        InternalPartitionField.builder()
             .sourceField(
-                OneField.builder()
+                InternalField.builder()
                     .name("some_date_column")
                     .schema(
-                        OneSchema.builder().name("timestamp").dataType(OneType.TIMESTAMP).build())
+                        InternalSchema.builder()
+                            .name("timestamp")
+                            .dataType(InternalType.TIMESTAMP)
+                            .build())
                     .build())
             .partitionFieldNames(
                 Arrays.asList(
@@ -435,16 +481,16 @@ public class TestDeltaPartitionExtractor {
     List<PartitionValue> expectedPartitionValues =
         Arrays.asList(
             PartitionValue.builder()
-                .partitionField(onePartitionField1)
+                .partitionField(internalPartitionField1)
                 .range(rangeForPartitionField1)
                 .build(),
             PartitionValue.builder()
-                .partitionField(onePartitionField2)
+                .partitionField(internalPartitionField2)
                 .range(rangeForPartitionField2)
                 .build());
     List<PartitionValue> partitionValues =
         deltaPartitionExtractor.partitionValueExtraction(
-            scalaMap, Arrays.asList(onePartitionField1, onePartitionField2));
+            scalaMap, Arrays.asList(internalPartitionField1, internalPartitionField2));
     assertEquals(expectedPartitionValues, partitionValues);
   }
 

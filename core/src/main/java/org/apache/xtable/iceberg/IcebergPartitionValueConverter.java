@@ -45,8 +45,8 @@ import org.apache.iceberg.types.Types;
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
@@ -77,8 +77,8 @@ public class IcebergPartitionValueConverter {
       return Collections.emptyList();
     }
     List<PartitionValue> partitionValues = new ArrayList<>(partitionSpec.fields().size());
-    Map<OneField, Map<PartitionTransformType, OnePartitionField>> onePartitionFieldMap =
-        getOnePartitionFieldMap(oneTable);
+    Map<InternalField, Map<PartitionTransformType, InternalPartitionField>> partitionFieldMap =
+        getInternalPartitionFieldMap(oneTable);
     IndexedRecord partitionData = ((IndexedRecord) structLike);
     for (PartitionField partitionField : partitionSpec.fields()) {
       Object value;
@@ -129,47 +129,47 @@ public class IcebergPartitionValueConverter {
       }
       Types.NestedField partitionSourceField =
           partitionSpec.schema().findField(partitionField.sourceId());
-      OneField sourceField =
+      InternalField sourceField =
           SchemaFieldFinder.getInstance()
               .findFieldByPath(oneTable.getReadSchema(), partitionSourceField.name());
       // This helps reduce creating these objects for each file processed and re-using them.
-      OnePartitionField onePartitionField =
-          getFromOnePartitionFieldMap(onePartitionFieldMap, sourceField, transformType);
+      InternalPartitionField internalPartitionField =
+          getFromInternalPartitionFieldMap(partitionFieldMap, sourceField, transformType);
       partitionValues.add(
           PartitionValue.builder()
-              .partitionField(onePartitionField)
+              .partitionField(internalPartitionField)
               .range(Range.scalar(value))
               .build());
     }
     return partitionValues;
   }
 
-  private OnePartitionField getFromOnePartitionFieldMap(
-      Map<OneField, Map<PartitionTransformType, OnePartitionField>> onePartitionFieldMap,
-      OneField sourceField,
+  private InternalPartitionField getFromInternalPartitionFieldMap(
+      Map<InternalField, Map<PartitionTransformType, InternalPartitionField>> partitionFieldMap,
+      InternalField sourceField,
       PartitionTransformType transformType) {
-    if (!onePartitionFieldMap.containsKey(sourceField)) {
+    if (!partitionFieldMap.containsKey(sourceField)) {
       throw new IllegalStateException(
           "Partition field not found for source field: " + sourceField.getName());
     }
-    if (!onePartitionFieldMap.get(sourceField).containsKey(transformType)) {
+    if (!partitionFieldMap.get(sourceField).containsKey(transformType)) {
       throw new IllegalStateException(
           "Partition field not found for source field: "
               + sourceField.getName()
               + " and transform type: "
               + transformType);
     }
-    return onePartitionFieldMap.get(sourceField).get(transformType);
+    return partitionFieldMap.get(sourceField).get(transformType);
   }
 
-  private Map<OneField, Map<PartitionTransformType, OnePartitionField>> getOnePartitionFieldMap(
-      OneTable oneTable) {
-    List<OnePartitionField> onePartitionFields = oneTable.getPartitioningFields();
-    return onePartitionFields.stream()
+  private Map<InternalField, Map<PartitionTransformType, InternalPartitionField>>
+      getInternalPartitionFieldMap(OneTable oneTable) {
+    List<InternalPartitionField> internalPartitionFields = oneTable.getPartitioningFields();
+    return internalPartitionFields.stream()
         .collect(
             Collectors.groupingBy(
-                OnePartitionField::getSourceField,
-                Collectors.toMap(OnePartitionField::getTransformType, Function.identity())));
+                InternalPartitionField::getSourceField,
+                Collectors.toMap(InternalPartitionField::getTransformType, Function.identity())));
   }
 
   private static String escapeFieldName(String fieldName) {

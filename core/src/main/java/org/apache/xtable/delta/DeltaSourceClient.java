@@ -47,10 +47,10 @@ import io.delta.tables.DeltaTable;
 import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.storage.DataFilesDiff;
@@ -88,18 +88,18 @@ public class DeltaSourceClient implements SourceClient<Long> {
   @Override
   public SchemaCatalog getSchemaCatalog(OneTable table, Long version) {
     // TODO: Does not support schema versions for now
-    Map<SchemaVersion, OneSchema> schemas = new HashMap<>();
+    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
     schemas.put(schemaVersion, table.getReadSchema());
     return SchemaCatalog.builder().schemas(schemas).build();
   }
 
   @Override
-  public OneSnapshot getCurrentSnapshot() {
+  public InternalSnapshot getCurrentSnapshot() {
     DeltaLog deltaLog = DeltaLog.forTable(sparkSession, basePath);
     Snapshot snapshot = deltaLog.snapshot();
     OneTable table = getTable(snapshot.version());
-    return OneSnapshot.builder()
+    return InternalSnapshot.builder()
         .table(table)
         .schemaCatalog(getSchemaCatalog(table, snapshot.version()))
         .partitionedDataFiles(getInternalDataFiles(snapshot, table.getReadSchema()))
@@ -188,7 +188,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
                 .build());
   }
 
-  private List<OneFileGroup> getInternalDataFiles(Snapshot snapshot, OneSchema schema) {
+  private List<OneFileGroup> getInternalDataFiles(Snapshot snapshot, InternalSchema schema) {
     try (DataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
       List<InternalDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);

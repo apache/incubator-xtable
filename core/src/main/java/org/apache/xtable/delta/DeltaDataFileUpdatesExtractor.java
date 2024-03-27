@@ -37,7 +37,7 @@ import scala.collection.Seq;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FilesDiff;
@@ -59,7 +59,7 @@ public class DeltaDataFileUpdatesExtractor {
       DeltaDataFileExtractor.builder().build();
 
   public Seq<Action> applySnapshot(
-      DeltaLog deltaLog, List<OneFileGroup> partitionedDataFiles, OneSchema tableSchema) {
+      DeltaLog deltaLog, List<OneFileGroup> partitionedDataFiles, InternalSchema tableSchema) {
 
     // all files in the current delta snapshot are potential candidates for remove actions, i.e. if
     // the file is not present in the new snapshot (addedFiles) then the file is considered removed
@@ -80,7 +80,7 @@ public class DeltaDataFileUpdatesExtractor {
   }
 
   public Seq<Action> applyDiff(
-      DataFilesDiff dataFilesDiff, OneSchema tableSchema, String tableBasePath) {
+      DataFilesDiff dataFilesDiff, InternalSchema tableSchema, String tableBasePath) {
     List<Action> removeActions =
         dataFilesDiff.getFilesRemoved().stream()
             .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath))
@@ -92,7 +92,7 @@ public class DeltaDataFileUpdatesExtractor {
   private Seq<Action> applyDiff(
       Set<InternalDataFile> filesAdded,
       Collection<Action> removeFileActions,
-      OneSchema tableSchema,
+      InternalSchema tableSchema,
       String tableBasePath) {
     Stream<Action> addActions =
         filesAdded.stream()
@@ -105,7 +105,7 @@ public class DeltaDataFileUpdatesExtractor {
   }
 
   private Stream<AddFile> createAddFileAction(
-      InternalDataFile dataFile, OneSchema schema, String tableBasePath) {
+      InternalDataFile dataFile, InternalSchema schema, String tableBasePath) {
     return Stream.of(
         new AddFile(
             // Delta Lake supports relative and absolute paths in theory but relative paths seem
@@ -120,7 +120,8 @@ public class DeltaDataFileUpdatesExtractor {
             null));
   }
 
-  private String getColumnStats(OneSchema schema, long recordCount, List<ColumnStat> columnStats) {
+  private String getColumnStats(
+      InternalSchema schema, long recordCount, List<ColumnStat> columnStats) {
     try {
       return deltaStatsExtractor.convertStatsToDeltaFormat(schema, recordCount, columnStats);
     } catch (JsonProcessingException e) {

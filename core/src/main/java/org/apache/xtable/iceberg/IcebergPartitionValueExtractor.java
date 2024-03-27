@@ -30,7 +30,7 @@ import lombok.NoArgsConstructor;
 
 import org.apache.iceberg.StructLike;
 
-import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.stat.Range;
 
 /** Partition value extractor for Iceberg. */
@@ -44,11 +44,11 @@ public class IcebergPartitionValueExtractor {
     return INSTANCE;
   }
 
-  public Map<OnePartitionField, Range> extractPartitionValues(
-      List<OnePartitionField> partitionFields, StructLike structLike) {
-    Map<OnePartitionField, Range> partitionValues = new HashMap<>();
+  public Map<InternalPartitionField, Range> extractPartitionValues(
+      List<InternalPartitionField> partitionFields, StructLike structLike) {
+    Map<InternalPartitionField, Range> partitionValues = new HashMap<>();
     for (int i = 0; i < structLike.size(); i++) {
-      OnePartitionField partitionField = partitionFields.get(i);
+      InternalPartitionField partitionField = partitionFields.get(i);
       Object value;
       // Convert date based partitions into millis since epoch
       switch (partitionField.getTransformType()) {

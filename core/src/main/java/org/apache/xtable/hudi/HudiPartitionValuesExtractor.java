@@ -33,8 +33,8 @@ import lombok.NonNull;
 import lombok.Value;
 
 import org.apache.xtable.exception.PartitionValuesExtractorException;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 
@@ -45,14 +45,14 @@ public class HudiPartitionValuesExtractor {
   @NonNull private final Map<String, String> pathToPartitionFieldFormat;
 
   public List<PartitionValue> extractPartitionValues(
-      List<OnePartitionField> partitionColumns, String partitionPath) {
+      List<InternalPartitionField> partitionColumns, String partitionPath) {
     if (partitionColumns == null) {
       return Collections.emptyList();
     }
     int totalNumberOfPartitions = partitionColumns.size();
     List<PartitionValue> result = new ArrayList<>(totalNumberOfPartitions);
     String remainingPartitionPath = partitionPath;
-    for (OnePartitionField partitionField : partitionColumns) {
+    for (InternalPartitionField partitionField : partitionColumns) {
       String sourceFieldName = partitionField.getSourceField().getName();
       if (remainingPartitionPath.startsWith(sourceFieldName + "=")) {
         // Strip off hive style partitioning
@@ -81,7 +81,7 @@ public class HudiPartitionValuesExtractor {
   }
 
   private PartialResult parsePartitionPath(
-      OnePartitionField field, String remainingPath, int totalNumberOfPartitions) {
+      InternalPartitionField field, String remainingPath, int totalNumberOfPartitions) {
     switch (field.getTransformType()) {
       case YEAR:
       case MONTH:
@@ -119,7 +119,7 @@ public class HudiPartitionValuesExtractor {
   }
 
   private static PartialResult parseValue(
-      String remainingPath, OneType sourceFieldType, boolean isSlashDelimited) {
+      String remainingPath, InternalType sourceFieldType, boolean isSlashDelimited) {
     if (remainingPath.isEmpty()) {
       throw new PartitionValuesExtractorException("Missing partition value");
     }

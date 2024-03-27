@@ -61,7 +61,7 @@ import org.apache.hudi.metadata.HoodieTableMetadata;
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.storage.DataFilesDiff;
@@ -147,7 +147,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieInstant instant,
       TableFileSystemView fsView,
       HoodieInstant instantToConsider,
-      List<OnePartitionField> partitioningFields) {
+      List<InternalPartitionField> partitioningFields) {
     try {
       List<InternalDataFile> addedFiles = new ArrayList<>();
       List<InternalDataFile> removedFiles = new ArrayList<>();
@@ -254,7 +254,9 @@ public class HudiDataFileExtractor implements AutoCloseable {
   }
 
   private List<InternalDataFile> getRemovedFiles(
-      String partitionPath, List<String> deletedPaths, List<OnePartitionField> partitioningFields) {
+      String partitionPath,
+      List<String> deletedPaths,
+      List<InternalPartitionField> partitioningFields) {
     List<PartitionValue> partitionValues =
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
     return deletedPaths.stream()
@@ -281,7 +283,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieInstant instantToConsider,
       String partitionPath,
       Set<String> affectedFileIds,
-      List<OnePartitionField> partitioningFields) {
+      List<InternalPartitionField> partitioningFields) {
     List<InternalDataFile> filesToAdd = new ArrayList<>(affectedFileIds.size());
     List<InternalDataFile> filesToRemove = new ArrayList<>(affectedFileIds.size());
     List<PartitionValue> partitionValues =
@@ -317,7 +319,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
       String partitionPath,
       Set<String> replacedFileIds,
       Set<String> newFileIds,
-      List<OnePartitionField> partitioningFields) {
+      List<InternalPartitionField> partitioningFields) {
     List<InternalDataFile> filesToAdd = new ArrayList<>(newFileIds.size());
     List<InternalDataFile> filesToRemove = new ArrayList<>(replacedFileIds.size());
     List<PartitionValue> partitionValues =

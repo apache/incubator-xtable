@@ -35,7 +35,7 @@ import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
 
 import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.model.schema.OneField;
+import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 
@@ -59,7 +59,7 @@ public class IcebergColumnStatsConverter {
     Map<Integer, ByteBuffer> upperBounds = new HashMap<>();
     fieldColumnStats.forEach(
         columnStats -> {
-          OneField field = columnStats.getField();
+          InternalField field = columnStats.getField();
           Types.NestedField icebergField =
               schema.findField(IcebergSchemaExtractor.convertFromOneTablePath(field.getPath()));
           int fieldId = icebergField.fieldId();
@@ -87,7 +87,7 @@ public class IcebergColumnStatsConverter {
   }
 
   public List<ColumnStat> fromIceberg(
-      List<OneField> fields,
+      List<InternalField> fields,
       Map<Integer, Long> valueCounts,
       Map<Integer, Long> nullCounts,
       Map<Integer, Long> size,

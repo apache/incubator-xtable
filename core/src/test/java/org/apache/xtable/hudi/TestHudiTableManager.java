@@ -39,9 +39,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 
 import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
@@ -62,24 +62,24 @@ public class TestHudiTableManager {
     String field1 = "field1";
     String field2 = "field2";
     String recordKeyField = "path1.path2";
-    OneSchema tableSchema =
-        OneSchema.builder()
+    InternalSchema tableSchema =
+        InternalSchema.builder()
             .fields(
                 Arrays.asList(
-                    OneField.builder().name(field1).build(),
-                    OneField.builder().name(field2).build(),
-                    OneField.builder().name(recordKeyField).build()))
+                    InternalField.builder().name(field1).build(),
+                    InternalField.builder().name(field2).build(),
+                    InternalField.builder().name(recordKeyField).build()))
             .recordKeyFields(
-                Collections.singletonList(OneField.builder().name(recordKeyField).build()))
+                Collections.singletonList(InternalField.builder().name(recordKeyField).build()))
             .build();
-    List<OnePartitionField> inputPartitionFields =
+    List<InternalPartitionField> inputPartitionFields =
         Arrays.asList(
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name(field1).build())
+            InternalPartitionField.builder()
+                .sourceField(InternalField.builder().name(field1).build())
                 .transformType(PartitionTransformType.VALUE)
                 .build(),
-            OnePartitionField.builder()
-                .sourceField(OneField.builder().name(field2).build())
+            InternalPartitionField.builder()
+                .sourceField(InternalField.builder().name(field2).build())
                 .transformType(PartitionTransformType.VALUE)
                 .build());
     OneTable table =
@@ -146,8 +146,8 @@ public class TestHudiTableManager {
   @ParameterizedTest
   @MethodSource("keyGeneratorTestDataProvider")
   void testKeyGenerator(
-      List<OnePartitionField> partitionFields,
-      List<OneField> keyFields,
+      List<InternalPartitionField> partitionFields,
+      List<InternalField> keyFields,
       String expectedKeyGeneratorClass) {
     assertEquals(
         expectedKeyGeneratorClass,
@@ -155,22 +155,22 @@ public class TestHudiTableManager {
   }
 
   private static Stream<Arguments> keyGeneratorTestDataProvider() {
-    OneField keyField1 = OneField.builder().name("key1").build();
-    OneField keyField2 = OneField.builder().name("key2").build();
-    OneField field1 = OneField.builder().name("field1").build();
-    OnePartitionField field1ValuePartition =
-        OnePartitionField.builder()
+    InternalField keyField1 = InternalField.builder().name("key1").build();
+    InternalField keyField2 = InternalField.builder().name("key2").build();
+    InternalField field1 = InternalField.builder().name("field1").build();
+    InternalPartitionField field1ValuePartition =
+        InternalPartitionField.builder()
             .sourceField(field1)
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OnePartitionField field1DatePartition =
-        OnePartitionField.builder()
+    InternalPartitionField field1DatePartition =
+        InternalPartitionField.builder()
             .sourceField(field1)
             .transformType(PartitionTransformType.YEAR)
             .build();
-    OneField field2 = OneField.builder().name("field2").build();
-    OnePartitionField field2ValuePartition =
-        OnePartitionField.builder()
+    InternalField field2 = InternalField.builder().name("field2").build();
+    InternalPartitionField field2ValuePartition =
+        InternalPartitionField.builder()
             .sourceField(field2)
             .transformType(PartitionTransformType.VALUE)
             .build();

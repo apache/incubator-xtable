@@ -26,173 +26,173 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ColumnStatMapUtil {
-  private static final OneField LONG_FIELD =
-      OneField.builder()
+  private static final InternalField LONG_FIELD =
+      InternalField.builder()
           .name("long_field")
-          .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
+          .schema(InternalSchema.builder().name("long").dataType(InternalType.LONG).build())
           .build();
 
-  private static final OneField STRING_FIELD =
-      OneField.builder()
+  private static final InternalField STRING_FIELD =
+      InternalField.builder()
           .name("string_field")
-          .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+          .schema(InternalSchema.builder().name("string").dataType(InternalType.STRING).build())
           .build();
-  private static final OneField NULL_STRING_FIELD =
-      OneField.builder()
+  private static final InternalField NULL_STRING_FIELD =
+      InternalField.builder()
           .name("null_string_field")
-          .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+          .schema(InternalSchema.builder().name("string").dataType(InternalType.STRING).build())
           .build();
-  private static final OneField TIMESTAMP_FIELD =
-      OneField.builder()
+  private static final InternalField TIMESTAMP_FIELD =
+      InternalField.builder()
           .name("timestamp_field")
           .schema(
-              OneSchema.builder()
+              InternalSchema.builder()
                   .name("long")
-                  .dataType(OneType.TIMESTAMP)
+                  .dataType(InternalType.TIMESTAMP)
                   .metadata(
                       Collections.singletonMap(
-                          OneSchema.MetadataKey.TIMESTAMP_PRECISION,
-                          OneSchema.MetadataValue.MILLIS))
+                          InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
+                          InternalSchema.MetadataValue.MILLIS))
                   .build())
           .build();
-  private static final OneField TIMESTAMP_MICROS_FIELD =
-      OneField.builder()
+  private static final InternalField TIMESTAMP_MICROS_FIELD =
+      InternalField.builder()
           .name("timestamp_micros_field")
           .schema(
-              OneSchema.builder()
+              InternalSchema.builder()
                   .name("long")
-                  .dataType(OneType.TIMESTAMP)
+                  .dataType(InternalType.TIMESTAMP)
                   .metadata(
                       Collections.singletonMap(
-                          OneSchema.MetadataKey.TIMESTAMP_PRECISION,
-                          OneSchema.MetadataValue.MICROS))
+                          InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
+                          InternalSchema.MetadataValue.MICROS))
                   .build())
           .build();
-  private static final OneField LOCAL_TIMESTAMP_FIELD =
-      OneField.builder()
+  private static final InternalField LOCAL_TIMESTAMP_FIELD =
+      InternalField.builder()
           .name("local_timestamp_field")
           .schema(
-              OneSchema.builder()
+              InternalSchema.builder()
                   .name("long")
-                  .dataType(OneType.TIMESTAMP_NTZ)
+                  .dataType(InternalType.TIMESTAMP_NTZ)
                   .metadata(
                       Collections.singletonMap(
-                          OneSchema.MetadataKey.TIMESTAMP_PRECISION,
-                          OneSchema.MetadataValue.MILLIS))
+                          InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
+                          InternalSchema.MetadataValue.MILLIS))
                   .build())
           .build();
-  private static final OneField DATE_FIELD =
-      OneField.builder()
+  private static final InternalField DATE_FIELD =
+      InternalField.builder()
           .name("date_field")
-          .schema(OneSchema.builder().name("int").dataType(OneType.DATE).build())
+          .schema(InternalSchema.builder().name("int").dataType(InternalType.DATE).build())
           .build();
 
-  private static final OneField ARRAY_LONG_FIELD_ELEMENT =
-      OneField.builder()
-          .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+  private static final InternalField ARRAY_LONG_FIELD_ELEMENT =
+      InternalField.builder()
+          .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
           .parentPath("array_long_field")
-          .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
+          .schema(InternalSchema.builder().name("long").dataType(InternalType.LONG).build())
           .build();
-  private static final OneField ARRAY_LONG_FIELD =
-      OneField.builder()
+  private static final InternalField ARRAY_LONG_FIELD =
+      InternalField.builder()
           .name("array_long_field")
           .schema(
-              OneSchema.builder()
+              InternalSchema.builder()
                   .name("array")
-                  .dataType(OneType.LIST)
+                  .dataType(InternalType.LIST)
                   .fields(Collections.singletonList(ARRAY_LONG_FIELD_ELEMENT))
                   .build())
           .build();
 
-  private static final OneField MAP_KEY_STRING_FIELD =
-      OneField.builder()
-          .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+  private static final InternalField MAP_KEY_STRING_FIELD =
+      InternalField.builder()
+          .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
           .parentPath("map_string_long_field")
-          .schema(OneSchema.builder().name("map_key").dataType(OneType.STRING).build())
+          .schema(InternalSchema.builder().name("map_key").dataType(InternalType.STRING).build())
           .build();
-  private static final OneField MAP_VALUE_LONG_FIELD =
-      OneField.builder()
-          .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+  private static final InternalField MAP_VALUE_LONG_FIELD =
+      InternalField.builder()
+          .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
           .parentPath("map_string_long_field")
-          .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
+          .schema(InternalSchema.builder().name("long").dataType(InternalType.LONG).build())
           .build();
-  private static final OneField MAP_STRING_LONG_FIELD =
-      OneField.builder()
+  private static final InternalField MAP_STRING_LONG_FIELD =
+      InternalField.builder()
           .name("map_string_long_field")
           .schema(
-              OneSchema.builder()
+              InternalSchema.builder()
                   .name("map")
-                  .dataType(OneType.MAP)
+                  .dataType(InternalType.MAP)
                   .fields(Arrays.asList(MAP_KEY_STRING_FIELD, MAP_VALUE_LONG_FIELD))
                   .build())
           .build();
 
-  private static final OneField NESTED_ARRAY_STRING_FIELD_ELEMENT =
-      OneField.builder()
-          .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+  private static final InternalField NESTED_ARRAY_STRING_FIELD_ELEMENT =
+      InternalField.builder()
+          .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
           .parentPath("nested_struct_field.array_string_field")
-          .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+          .schema(InternalSchema.builder().name("string").dataType(InternalType.STRING).build())
           .build();
-  private static final OneField NESTED_ARRAY_STRING_FIELD =
-      OneField.builder()
+  private static final InternalField NESTED_ARRAY_STRING_FIELD =
+      InternalField.builder()
           .name("array_string_field")
           .parentPath("nested_struct_field")
           .schema(
-              OneSchema.builder()
+              InternalSchema.builder()
                   .name("array")
-                  .dataType(OneType.LIST)
+                  .dataType(InternalType.LIST)
                   .fields(Collections.singletonList(NESTED_ARRAY_STRING_FIELD_ELEMENT))
                   .build())
           .build();
 
-  private static final OneField NESTED_LONG_FIELD =
-      OneField.builder()
+  private static final InternalField NESTED_LONG_FIELD =
+      InternalField.builder()
           .name("nested_long_field")
           .parentPath("nested_struct_field")
-          .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
+          .schema(InternalSchema.builder().name("long").dataType(InternalType.LONG).build())
           .build();
 
-  private static final OneField NESTED_STRUCT_FIELD =
-      OneField.builder()
+  private static final InternalField NESTED_STRUCT_FIELD =
+      InternalField.builder()
           .name("nested_struct_field")
           .schema(
-              OneSchema.builder()
+              InternalSchema.builder()
                   .name("nested_struct_field")
-                  .dataType(OneType.RECORD)
+                  .dataType(InternalType.RECORD)
                   .fields(Arrays.asList(NESTED_ARRAY_STRING_FIELD, NESTED_LONG_FIELD))
                   .build())
           .build();
 
-  private static final OneField DECIMAL_FIELD =
-      OneField.builder()
+  private static final InternalField DECIMAL_FIELD =
+      InternalField.builder()
           .name("decimal_field")
-          .schema(OneSchema.builder().name("decimal").dataType(OneType.DECIMAL).build())
+          .schema(InternalSchema.builder().name("decimal").dataType(InternalType.DECIMAL).build())
           .build();
 
-  private static final OneField FLOAT_FIELD =
-      OneField.builder()
+  private static final InternalField FLOAT_FIELD =
+      InternalField.builder()
           .name("float_field")
-          .schema(OneSchema.builder().name("float").dataType(OneType.FLOAT).build())
+          .schema(InternalSchema.builder().name("float").dataType(InternalType.FLOAT).build())
           .build();
 
-  private static final OneField DOUBLE_FIELD =
-      OneField.builder()
+  private static final InternalField DOUBLE_FIELD =
+      InternalField.builder()
           .name("double_field")
-          .schema(OneSchema.builder().name("double").dataType(OneType.DOUBLE).build())
+          .schema(InternalSchema.builder().name("double").dataType(InternalType.DOUBLE).build())
           .build();
 
-  public static OneSchema getSchema() {
-    return OneSchema.builder()
+  public static InternalSchema getSchema() {
+    return InternalSchema.builder()
         .name("record")
-        .dataType(OneType.RECORD)
+        .dataType(InternalType.RECORD)
         .fields(
             Arrays.asList(
                 LONG_FIELD,

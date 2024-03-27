@@ -57,13 +57,13 @@ import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.client.PerTableConfigImpl;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.schema.SchemaVersion;
@@ -75,12 +75,16 @@ import org.apache.xtable.model.storage.InternalDataFile;
 
 public class ITDeltaSourceClient {
 
-  private static final OneField COL1_INT_FIELD =
-      OneField.builder()
+  private static final InternalField COL1_INT_FIELD =
+      InternalField.builder()
           .name("col1")
           .schema(
-              OneSchema.builder().name("integer").dataType(OneType.INT).isNullable(true).build())
-          .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+              InternalSchema.builder()
+                  .name("integer")
+                  .dataType(InternalType.INT)
+                  .isNullable(true)
+                  .build())
+          .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
           .build();
   private static final ColumnStat COL1_COLUMN_STAT =
       ColumnStat.builder()
@@ -91,12 +95,16 @@ public class ITDeltaSourceClient {
           .totalSize(0)
           .build();
 
-  private static final OneField COL2_INT_FIELD =
-      OneField.builder()
+  private static final InternalField COL2_INT_FIELD =
+      InternalField.builder()
           .name("col2")
           .schema(
-              OneSchema.builder().name("integer").dataType(OneType.INT).isNullable(true).build())
-          .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+              InternalSchema.builder()
+                  .name("integer")
+                  .dataType(InternalType.INT)
+                  .isNullable(true)
+                  .build())
+          .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
           .build();
   private static final ColumnStat COL2_COLUMN_STAT =
       ColumnStat.builder()
@@ -167,21 +175,25 @@ public class ITDeltaSourceClient {
             .build();
     DeltaSourceClient client = clientProvider.getSourceClientInstance(tableConfig);
     // Get current snapshot
-    OneSnapshot snapshot = client.getCurrentSnapshot();
+    InternalSnapshot snapshot = client.getCurrentSnapshot();
     // Validate table
-    List<OneField> fields = Arrays.asList(COL1_INT_FIELD, COL2_INT_FIELD);
+    List<InternalField> fields = Arrays.asList(COL1_INT_FIELD, COL2_INT_FIELD);
     validateTable(
         snapshot.getTable(),
         tableName,
         TableFormat.DELTA,
-        OneSchema.builder().name("struct").dataType(OneType.RECORD).fields(fields).build(),
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .fields(fields)
+            .build(),
         DataLayoutStrategy.FLAT,
         "file:" + basePath,
         Collections.emptyList());
     // Validate schema catalog
-    SchemaCatalog oneSchemaCatalog = snapshot.getSchemaCatalog();
+    SchemaCatalog schemaCatalog = snapshot.getSchemaCatalog();
     validateSchemaCatalog(
-        oneSchemaCatalog,
+        schemaCatalog,
         Collections.singletonMap(new SchemaVersion(1, ""), snapshot.getTable().getReadSchema()));
     // Validate data files
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
@@ -225,36 +237,40 @@ public class ITDeltaSourceClient {
             .build();
     DeltaSourceClient client = clientProvider.getSourceClientInstance(tableConfig);
     // Get current snapshot
-    OneSnapshot snapshot = client.getCurrentSnapshot();
+    InternalSnapshot snapshot = client.getCurrentSnapshot();
     // Validate table
-    OneField partCol =
-        OneField.builder()
+    InternalField partCol =
+        InternalField.builder()
             .name("part_col")
             .schema(
-                OneSchema.builder()
+                InternalSchema.builder()
                     .name("string")
-                    .dataType(OneType.STRING)
+                    .dataType(InternalType.STRING)
                     .isNullable(true)
                     .build())
-            .defaultValue(OneField.Constants.NULL_DEFAULT_VALUE)
+            .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
             .build();
-    List<OneField> fields = Arrays.asList(partCol, COL1_INT_FIELD, COL2_INT_FIELD);
+    List<InternalField> fields = Arrays.asList(partCol, COL1_INT_FIELD, COL2_INT_FIELD);
     validateTable(
         snapshot.getTable(),
         tableName,
         TableFormat.DELTA,
-        OneSchema.builder().name("struct").dataType(OneType.RECORD).fields(fields).build(),
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .fields(fields)
+            .build(),
         DataLayoutStrategy.HIVE_STYLE_PARTITION,
         "file:" + basePath,
         Collections.singletonList(
-            OnePartitionField.builder()
+            InternalPartitionField.builder()
                 .sourceField(partCol)
                 .transformType(PartitionTransformType.VALUE)
                 .build()));
     // Validate schema catalog
-    SchemaCatalog oneSchemaCatalog = snapshot.getSchemaCatalog();
+    SchemaCatalog schemaCatalog = snapshot.getSchemaCatalog();
     validateSchemaCatalog(
-        oneSchemaCatalog,
+        schemaCatalog,
         Collections.singletonMap(new SchemaVersion(1, ""), snapshot.getTable().getReadSchema()));
     // Validate data files
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
@@ -263,7 +279,7 @@ public class ITDeltaSourceClient {
         Collections.singletonList(
             PartitionValue.builder()
                 .partitionField(
-                    OnePartitionField.builder()
+                    InternalPartitionField.builder()
                         .sourceField(partCol)
                         .transformType(PartitionTransformType.VALUE)
                         .build())
@@ -313,7 +329,7 @@ public class ITDeltaSourceClient {
             .build();
     DeltaSourceClient client = clientProvider.getSourceClientInstance(tableConfig);
     // Get current snapshot
-    OneSnapshot snapshot = client.getCurrentSnapshot();
+    InternalSnapshot snapshot = client.getCurrentSnapshot();
   }
 
   @ParameterizedTest
@@ -351,13 +367,13 @@ public class ITDeltaSourceClient {
             .build();
     DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
     assertEquals(180L, testSparkDeltaTable.getNumRows());
-    OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    InternalSnapshot internalSnapshot = deltaSourceClient.getCurrentSnapshot();
 
     if (isPartitioned) {
-      validateDeltaPartitioning(oneSnapshot);
+      validateDeltaPartitioning(internalSnapshot);
     }
-    ValidationTestHelper.validateOneSnapshot(
-        oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+    ValidationTestHelper.validateSnapshot(
+        internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
         InstantsForIncrementalSync.builder()
@@ -389,7 +405,7 @@ public class ITDeltaSourceClient {
             .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
             .build();
     DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
-    OneSnapshot snapshotAfterCommit1 = deltaSourceClient.getCurrentSnapshot();
+    InternalSnapshot snapshotAfterCommit1 = deltaSourceClient.getCurrentSnapshot();
     List<String> allActivePaths = ValidationTestHelper.getAllFilePaths(snapshotAfterCommit1);
     assertEquals(1, allActivePaths.size());
     String activePathAfterCommit1 = allActivePaths.get(0);
@@ -457,12 +473,12 @@ public class ITDeltaSourceClient {
             .build();
     DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
     assertEquals(130L, testSparkDeltaTable.getNumRows());
-    OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    InternalSnapshot internalSnapshot = deltaSourceClient.getCurrentSnapshot();
     if (isPartitioned) {
-      validateDeltaPartitioning(oneSnapshot);
+      validateDeltaPartitioning(internalSnapshot);
     }
-    ValidationTestHelper.validateOneSnapshot(
-        oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+    ValidationTestHelper.validateSnapshot(
+        internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
         InstantsForIncrementalSync.builder()
@@ -504,12 +520,12 @@ public class ITDeltaSourceClient {
             .build();
     DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
     assertEquals(150L, testSparkDeltaTable.getNumRows());
-    OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    InternalSnapshot internalSnapshot = deltaSourceClient.getCurrentSnapshot();
     if (isPartitioned) {
-      validateDeltaPartitioning(oneSnapshot);
+      validateDeltaPartitioning(internalSnapshot);
     }
-    ValidationTestHelper.validateOneSnapshot(
-        oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+    ValidationTestHelper.validateSnapshot(
+        internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
         InstantsForIncrementalSync.builder()
@@ -561,11 +577,11 @@ public class ITDeltaSourceClient {
     DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
     assertEquals(
         120 - rowsByPartition.get(partitionValueToDelete).size(), testSparkDeltaTable.getNumRows());
-    OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    InternalSnapshot internalSnapshot = deltaSourceClient.getCurrentSnapshot();
 
-    validateDeltaPartitioning(oneSnapshot);
-    ValidationTestHelper.validateOneSnapshot(
-        oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+    validateDeltaPartitioning(internalSnapshot);
+    ValidationTestHelper.validateSnapshot(
+        internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
         InstantsForIncrementalSync.builder()
@@ -619,12 +635,12 @@ public class ITDeltaSourceClient {
             .build();
     DeltaSourceClient deltaSourceClient = clientProvider.getSourceClientInstance(tableConfig);
     assertEquals(250L, testSparkDeltaTable.getNumRows());
-    OneSnapshot oneSnapshot = deltaSourceClient.getCurrentSnapshot();
+    InternalSnapshot internalSnapshot = deltaSourceClient.getCurrentSnapshot();
     if (isPartitioned) {
-      validateDeltaPartitioning(oneSnapshot);
+      validateDeltaPartitioning(internalSnapshot);
     }
-    ValidationTestHelper.validateOneSnapshot(
-        oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+    ValidationTestHelper.validateSnapshot(
+        internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
         InstantsForIncrementalSync.builder()
@@ -639,10 +655,11 @@ public class ITDeltaSourceClient {
     ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
   }
 
-  private void validateDeltaPartitioning(OneSnapshot oneSnapshot) {
-    List<OnePartitionField> partitionFields = oneSnapshot.getTable().getPartitioningFields();
+  private void validateDeltaPartitioning(InternalSnapshot internalSnapshot) {
+    List<InternalPartitionField> partitionFields =
+        internalSnapshot.getTable().getPartitioningFields();
     assertEquals(1, partitionFields.size());
-    OnePartitionField partitionField = partitionFields.get(0);
+    InternalPartitionField partitionField = partitionFields.get(0);
     assertEquals("birthDate", partitionField.getSourceField().getName());
     assertEquals(PartitionTransformType.YEAR, partitionField.getTransformType());
   }
@@ -651,10 +668,10 @@ public class ITDeltaSourceClient {
       OneTable oneTable,
       String tableName,
       String tableFormat,
-      OneSchema readSchema,
+      InternalSchema readSchema,
       DataLayoutStrategy dataLayoutStrategy,
       String basePath,
-      List<OnePartitionField> partitioningFields) {
+      List<InternalPartitionField> partitioningFields) {
     Assertions.assertEquals(tableName, oneTable.getName());
     Assertions.assertEquals(tableFormat, oneTable.getTableFormat());
     Assertions.assertEquals(readSchema, oneTable.getReadSchema());
@@ -664,8 +681,8 @@ public class ITDeltaSourceClient {
   }
 
   private void validateSchemaCatalog(
-      SchemaCatalog oneSchemaCatalog, Map<SchemaVersion, OneSchema> schemas) {
-    Assertions.assertEquals(schemas, oneSchemaCatalog.getSchemas());
+      SchemaCatalog schemaCatalog, Map<SchemaVersion, InternalSchema> schemas) {
+    Assertions.assertEquals(schemas, schemaCatalog.getSchemas());
   }
 
   private void validatePartitionDataFiles(

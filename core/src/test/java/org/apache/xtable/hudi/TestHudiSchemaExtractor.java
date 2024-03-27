@@ -28,18 +28,18 @@ import org.apache.avro.SchemaBuilder;
 import org.junit.jupiter.api.Test;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalSchema;
 
 public class TestHudiSchemaExtractor {
 
   @Test
   public void testHoodieTableSchema() {
     AvroSchemaConverter mockConverter = mock(AvroSchemaConverter.class);
-    OneSchema mockOutput = OneSchema.builder().name("fake schema").build();
+    InternalSchema mockOutput = InternalSchema.builder().name("fake schema").build();
     Schema schema = SchemaBuilder.record("fake").fields().requiredString("foo").endRecord();
-    when(mockConverter.toOneSchema(schema)).thenReturn(mockOutput);
-    OneSchema canonicalSchema = new HudiSchemaExtractor(mockConverter).schema(schema);
+    when(mockConverter.toInternalSchema(schema)).thenReturn(mockOutput);
+    InternalSchema canonicalSchema = new HudiSchemaExtractor(mockConverter).schema(schema);
     assertEquals(mockOutput, canonicalSchema);
-    verify(mockConverter).toOneSchema(schema);
+    verify(mockConverter).toInternalSchema(schema);
   }
 }

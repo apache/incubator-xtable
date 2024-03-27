@@ -21,12 +21,12 @@ package org.apache.xtable.model.stat;
 import lombok.Builder;
 import lombok.Value;
 
-import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.InternalPartitionField;
 
 /** Associates the partition value with the partition field. */
 @Value
 @Builder
 public class PartitionValue {
-  OnePartitionField partitionField;
+  InternalPartitionField partitionField;
   Range range;
 }

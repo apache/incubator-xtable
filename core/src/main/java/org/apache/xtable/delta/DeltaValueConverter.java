@@ -34,8 +34,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.OneIOException;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 
 /**
@@ -53,7 +53,7 @@ public class DeltaValueConverter {
     return dateFormat;
   }
 
-  public static Object convertFromDeltaColumnStatValue(Object value, OneSchema fieldSchema) {
+  public static Object convertFromDeltaColumnStatValue(Object value, InternalSchema fieldSchema) {
     if (value == null) {
       return null;
     }
@@ -61,8 +61,8 @@ public class DeltaValueConverter {
       return castObjectToInternalType(value, fieldSchema.getDataType());
     }
     // Needs special handling for date and time.
-    OneType fieldType = fieldSchema.getDataType();
-    if (fieldType == OneType.DATE) {
+    InternalType fieldType = fieldSchema.getDataType();
+    if (fieldType == InternalType.DATE) {
       return (int) LocalDate.parse(value.toString()).toEpochDay();
     }
 
@@ -78,20 +78,21 @@ public class DeltaValueConverter {
         throw new OneIOException("Unable to parse time from column stats", ex);
       }
     }
-    OneSchema.MetadataValue timestampPrecision =
-        (OneSchema.MetadataValue)
+    InternalSchema.MetadataValue timestampPrecision =
+        (InternalSchema.MetadataValue)
             fieldSchema
                 .getMetadata()
                 .getOrDefault(
-                    OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
-    if (timestampPrecision == OneSchema.MetadataValue.MILLIS) {
+                    InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
+                    InternalSchema.MetadataValue.MICROS);
+    if (timestampPrecision == InternalSchema.MetadataValue.MILLIS) {
       return instant.toEpochMilli();
     }
     return TimeUnit.SECONDS.toMicros(instant.getEpochSecond())
         + TimeUnit.NANOSECONDS.toMicros(instant.getNano());
   }
 
-  public static Object convertToDeltaColumnStatValue(Object value, OneSchema fieldSchema) {
+  public static Object convertToDeltaColumnStatValue(Object value, InternalSchema fieldSchema) {
     if (value == null) {
       return null;
     }
@@ -99,41 +100,42 @@ public class DeltaValueConverter {
       return value;
     }
     // Needs special handling for date and time.
-    OneType fieldType = fieldSchema.getDataType();
-    if (fieldType == OneType.DATE) {
+    InternalType fieldType = fieldSchema.getDataType();
+    if (fieldType == InternalType.DATE) {
       return LocalDate.ofEpochDay((int) value).toString();
     }
-    OneSchema.MetadataValue timestampPrecision =
-        (OneSchema.MetadataValue)
+    InternalSchema.MetadataValue timestampPrecision =
+        (InternalSchema.MetadataValue)
             fieldSchema
                 .getMetadata()
                 .getOrDefault(
-                    OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MILLIS);
+                    InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
+                    InternalSchema.MetadataValue.MILLIS);
     long millis =
-        timestampPrecision == OneSchema.MetadataValue.MICROS
+        timestampPrecision == InternalSchema.MetadataValue.MICROS
             ? TimeUnit.MILLISECONDS.convert((Long) value, TimeUnit.MICROSECONDS)
             : (long) value;
     DateFormat dateFormat = getDateFormat(DATE_FORMAT_STR);
     return dateFormat.format(Date.from(Instant.ofEpochMilli(millis)));
   }
 
-  private static boolean noConversionForSchema(OneSchema fieldSchema) {
-    OneType fieldType = fieldSchema.getDataType();
-    return fieldType != OneType.DATE
-        && fieldType != OneType.TIMESTAMP
-        && fieldType != OneType.TIMESTAMP_NTZ;
+  private static boolean noConversionForSchema(InternalSchema fieldSchema) {
+    InternalType fieldType = fieldSchema.getDataType();
+    return fieldType != InternalType.DATE
+        && fieldType != InternalType.TIMESTAMP
+        && fieldType != InternalType.TIMESTAMP_NTZ;
   }
 
   public static String convertToDeltaPartitionValue(
       Object value,
-      OneType fieldType,
+      InternalType fieldType,
       PartitionTransformType partitionTransformType,
       String dateFormat) {
     if (value == null) {
       return null;
     }
     if (partitionTransformType == PartitionTransformType.VALUE) {
-      if (fieldType == OneType.DATE) {
+      if (fieldType == InternalType.DATE) {
         return LocalDate.ofEpochDay((int) value).toString();
       } else {
         return value.toString();
@@ -147,7 +149,7 @@ public class DeltaValueConverter {
 
   public static Object convertFromDeltaPartitionValue(
       String value,
-      OneType fieldType,
+      InternalType fieldType,
       PartitionTransformType partitionTransformType,
       String dateFormat) {
     if (value == null) {
@@ -189,7 +191,7 @@ public class DeltaValueConverter {
     }
   }
 
-  private static Object castObjectToInternalType(Object value, OneType valueType) {
+  private static Object castObjectToInternalType(Object value, InternalType valueType) {
     switch (valueType) {
       case FLOAT:
         if (value instanceof Double) {

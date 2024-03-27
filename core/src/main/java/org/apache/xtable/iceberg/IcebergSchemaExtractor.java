@@ -42,13 +42,13 @@ import org.apache.iceberg.types.Types;
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.SchemaExtractorException;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 
 /**
  * Schema extractor for Iceberg which converts canonical representation of the schema{@link
- * OneSchema} to Iceberg's schema representation {@link Schema}
+ * InternalSchema} to Iceberg's schema representation {@link Schema}
  */
 @Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -62,11 +62,11 @@ public class IcebergSchemaExtractor {
     return INSTANCE;
   }
 
-  public Schema toIceberg(OneSchema oneSchema) {
+  public Schema toIceberg(InternalSchema internalSchema) {
     // if field IDs are not assigned in the source, just use an incrementing integer
     AtomicInteger fieldIdTracker = new AtomicInteger(0);
-    List<Types.NestedField> nestedFields = convertFields(oneSchema, fieldIdTracker);
-    List<OneField> recordKeyFields = oneSchema.getRecordKeyFields();
+    List<Types.NestedField> nestedFields = convertFields(internalSchema, fieldIdTracker);
+    List<InternalField> recordKeyFields = internalSchema.getRecordKeyFields();
     boolean recordKeyFieldsAreNotRequired =
         recordKeyFields.stream().anyMatch(f -> f.getSchema().isNullable());
     // Iceberg requires the identifier fields to be required fields, so if any of the record key
@@ -89,7 +89,7 @@ public class IcebergSchemaExtractor {
     if (recordKeyFields.size() != recordKeyIds.size()) {
       List<String> missingFieldPaths =
           recordKeyFields.stream()
-              .map(OneField::getPath)
+              .map(InternalField::getPath)
               .filter(path -> partialSchema.findField(convertFromOneTablePath(path)) == null)
               .collect(CustomCollectors.toList(recordKeyFields.size()));
       log.error("Missing field IDs for record key field paths: " + missingFieldPaths);
@@ -105,15 +105,15 @@ public class IcebergSchemaExtractor {
    * @param iceSchema Iceberg schema
    * @return Internal representation of deserialized iceberg schema
    */
-  public OneSchema fromIceberg(Schema iceSchema) {
-    return OneSchema.builder()
-        .dataType(OneType.RECORD)
+  public InternalSchema fromIceberg(Schema iceSchema) {
+    return InternalSchema.builder()
+        .dataType(InternalType.RECORD)
         .fields(fromIceberg(iceSchema.columns(), null))
         .name("record")
         .build();
   }
 
-  private List<OneField> fromIceberg(List<Types.NestedField> iceFields, String parentPath) {
+  private List<InternalField> fromIceberg(List<Types.NestedField> iceFields, String parentPath) {
     return iceFields.stream()
         .map(
             iceField -> {
@@ -121,26 +121,27 @@ public class IcebergSchemaExtractor {
               String doc = iceField.doc();
               boolean isOptional = iceField.isOptional();
               String fieldPath = getFullyQualifiedPath(parentPath, iceField.name());
-              OneSchema irFieldSchema = fromIcebergType(type, fieldPath, doc, isOptional);
-              return OneField.builder()
+              InternalSchema irFieldSchema = fromIcebergType(type, fieldPath, doc, isOptional);
+              return InternalField.builder()
                   .name(iceField.name())
                   .fieldId(iceField.fieldId())
                   .schema(irFieldSchema)
                   .parentPath(parentPath)
                   .defaultValue(
-                      iceField.isOptional() ? OneField.Constants.NULL_DEFAULT_VALUE : null)
+                      iceField.isOptional() ? InternalField.Constants.NULL_DEFAULT_VALUE : null)
                   .build();
             })
         .collect(CustomCollectors.toList(iceFields.size()));
   }
 
   static String convertFromOneTablePath(String path) {
-    return path.replace(OneField.Constants.MAP_KEY_FIELD_NAME, MAP_KEY_FIELD_NAME)
-        .replace(OneField.Constants.MAP_VALUE_FIELD_NAME, MAP_VALUE_FIELD_NAME)
-        .replace(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME, LIST_ELEMENT_FIELD_NAME);
+    return path.replace(InternalField.Constants.MAP_KEY_FIELD_NAME, MAP_KEY_FIELD_NAME)
+        .replace(InternalField.Constants.MAP_VALUE_FIELD_NAME, MAP_VALUE_FIELD_NAME)
+        .replace(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME, LIST_ELEMENT_FIELD_NAME);
   }
 
-  private List<Types.NestedField> convertFields(OneSchema schema, AtomicInteger fieldIdTracker) {
+  private List<Types.NestedField> convertFields(
+      InternalSchema schema, AtomicInteger fieldIdTracker) {
     // mirror iceberg pattern of assigning IDs for a level before recursing
     List<Integer> ids =
         schema.getFields().stream()
@@ -152,7 +153,7 @@ public class IcebergSchemaExtractor {
             .collect(CustomCollectors.toList(schema.getFields().size()));
     List<Types.NestedField> nestedFields = new ArrayList<>(schema.getFields().size());
     for (int i = 0; i < schema.getFields().size(); i++) {
-      OneField field = schema.getFields().get(i);
+      InternalField field = schema.getFields().get(i);
       nestedFields.add(
           Types.NestedField.of(
               ids.get(i),
@@ -164,7 +165,7 @@ public class IcebergSchemaExtractor {
     return nestedFields;
   }
 
-  Type toIcebergType(OneField field, AtomicInteger fieldIdTracker) {
+  Type toIcebergType(InternalField field, AtomicInteger fieldIdTracker) {
     switch (field.getSchema().getDataType()) {
       case ENUM:
       case STRING:
@@ -178,7 +179,7 @@ public class IcebergSchemaExtractor {
         return Types.BinaryType.get();
       case FIXED:
         int size =
-            (int) field.getSchema().getMetadata().get(OneSchema.MetadataKey.FIXED_BYTES_SIZE);
+            (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.FIXED_BYTES_SIZE);
         return Types.FixedType.ofLength(size);
       case BOOLEAN:
         return Types.BooleanType.get();
@@ -192,22 +193,25 @@ public class IcebergSchemaExtractor {
         return Types.DoubleType.get();
       case DECIMAL:
         int precision =
-            (int) field.getSchema().getMetadata().get(OneSchema.MetadataKey.DECIMAL_PRECISION);
-        int scale = (int) field.getSchema().getMetadata().get(OneSchema.MetadataKey.DECIMAL_SCALE);
+            (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+        int scale =
+            (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
         return Types.DecimalType.of(precision, scale);
       case RECORD:
         return Types.StructType.of(convertFields(field.getSchema(), fieldIdTracker));
       case MAP:
-        OneField key =
+        InternalField key =
             field.getSchema().getFields().stream()
                 .filter(
-                    mapField -> OneField.Constants.MAP_KEY_FIELD_NAME.equals(mapField.getName()))
+                    mapField ->
+                        InternalField.Constants.MAP_KEY_FIELD_NAME.equals(mapField.getName()))
                 .findFirst()
                 .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
-        OneField value =
+        InternalField value =
             field.getSchema().getFields().stream()
                 .filter(
-                    mapField -> OneField.Constants.MAP_VALUE_FIELD_NAME.equals(mapField.getName()))
+                    mapField ->
+                        InternalField.Constants.MAP_VALUE_FIELD_NAME.equals(mapField.getName()))
                 .findFirst()
                 .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
         int keyId = key.getFieldId() == null ? fieldIdTracker.incrementAndGet() : key.getFieldId();
@@ -227,11 +231,12 @@ public class IcebergSchemaExtractor {
               toIcebergType(value, fieldIdTracker));
         }
       case LIST:
-        OneField element =
+        InternalField element =
             field.getSchema().getFields().stream()
                 .filter(
                     arrayField ->
-                        OneField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(arrayField.getName()))
+                        InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(
+                            arrayField.getName()))
                 .findFirst()
                 .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
         int elementId =
@@ -246,118 +251,121 @@ public class IcebergSchemaExtractor {
     }
   }
 
-  private OneSchema fromIcebergType(
+  private InternalSchema fromIcebergType(
       Type iceType, String fieldPath, String doc, boolean isOptional) {
-    OneType type;
-    List<OneField> fields = null;
-    Map<OneSchema.MetadataKey, Object> metadata = null;
+    InternalType type;
+    List<InternalField> fields = null;
+    Map<InternalSchema.MetadataKey, Object> metadata = null;
     switch (iceType.typeId()) {
       case STRING:
-        type = OneType.STRING;
+        type = InternalType.STRING;
         break;
       case INTEGER:
-        type = OneType.INT;
+        type = InternalType.INT;
         break;
       case LONG:
-        type = OneType.LONG;
+        type = InternalType.LONG;
         break;
       case BINARY:
-        type = OneType.BYTES;
+        type = InternalType.BYTES;
         break;
       case BOOLEAN:
-        type = OneType.BOOLEAN;
+        type = InternalType.BOOLEAN;
         break;
       case FLOAT:
-        type = OneType.FLOAT;
+        type = InternalType.FLOAT;
         break;
       case DATE:
-        type = OneType.DATE;
+        type = InternalType.DATE;
         break;
       case TIMESTAMP:
         Types.TimestampType timestampType = (Types.TimestampType) iceType;
-        type = timestampType.shouldAdjustToUTC() ? OneType.TIMESTAMP : OneType.TIMESTAMP_NTZ;
+        type =
+            timestampType.shouldAdjustToUTC() ? InternalType.TIMESTAMP : InternalType.TIMESTAMP_NTZ;
         metadata =
             Collections.singletonMap(
-                OneSchema.MetadataKey.TIMESTAMP_PRECISION, OneSchema.MetadataValue.MICROS);
+                InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
+                InternalSchema.MetadataValue.MICROS);
         break;
       case DOUBLE:
-        type = OneType.DOUBLE;
+        type = InternalType.DOUBLE;
         break;
       case DECIMAL:
         Types.DecimalType decimalType = (Types.DecimalType) iceType;
         metadata = new HashMap<>(2, 1.0f);
-        metadata.put(OneSchema.MetadataKey.DECIMAL_PRECISION, decimalType.precision());
-        metadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, decimalType.scale());
-        type = OneType.DECIMAL;
+        metadata.put(InternalSchema.MetadataKey.DECIMAL_PRECISION, decimalType.precision());
+        metadata.put(InternalSchema.MetadataKey.DECIMAL_SCALE, decimalType.scale());
+        type = InternalType.DECIMAL;
         break;
       case FIXED:
-        type = OneType.FIXED;
+        type = InternalType.FIXED;
         Types.FixedType fixedType = (Types.FixedType) iceType;
         metadata =
-            Collections.singletonMap(OneSchema.MetadataKey.FIXED_BYTES_SIZE, fixedType.length());
+            Collections.singletonMap(
+                InternalSchema.MetadataKey.FIXED_BYTES_SIZE, fixedType.length());
         break;
       case UUID:
-        type = OneType.FIXED;
-        metadata = Collections.singletonMap(OneSchema.MetadataKey.FIXED_BYTES_SIZE, 16);
+        type = InternalType.FIXED;
+        metadata = Collections.singletonMap(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 16);
         break;
       case STRUCT:
         Types.StructType structType = (Types.StructType) iceType;
         fields = fromIceberg(structType.fields(), fieldPath);
-        type = OneType.RECORD;
+        type = InternalType.RECORD;
         break;
       case MAP:
         Types.MapType mapType = (Types.MapType) iceType;
-        OneSchema keySchema =
+        InternalSchema keySchema =
             fromIcebergType(
                 mapType.keyType(),
-                getFullyQualifiedPath(fieldPath, OneField.Constants.MAP_KEY_FIELD_NAME),
+                getFullyQualifiedPath(fieldPath, InternalField.Constants.MAP_KEY_FIELD_NAME),
                 null,
                 false);
-        OneField keyField =
-            OneField.builder()
-                .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+        InternalField keyField =
+            InternalField.builder()
+                .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
                 .parentPath(fieldPath)
                 .schema(keySchema)
                 .fieldId(mapType.keyId())
                 .build();
-        OneSchema valueSchema =
+        InternalSchema valueSchema =
             fromIcebergType(
                 mapType.valueType(),
-                getFullyQualifiedPath(fieldPath, OneField.Constants.MAP_VALUE_FIELD_NAME),
+                getFullyQualifiedPath(fieldPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
                 null,
                 mapType.isValueOptional());
-        OneField valueField =
-            OneField.builder()
-                .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+        InternalField valueField =
+            InternalField.builder()
+                .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
                 .parentPath(fieldPath)
                 .schema(valueSchema)
                 .fieldId(mapType.valueId())
                 .build();
-        type = OneType.MAP;
+        type = InternalType.MAP;
         fields = Arrays.asList(keyField, valueField);
         break;
       case LIST:
         Types.ListType listType = (Types.ListType) iceType;
-        OneSchema elementSchema =
+        InternalSchema elementSchema =
             fromIcebergType(
                 listType.elementType(),
-                getFullyQualifiedPath(fieldPath, OneField.Constants.ARRAY_ELEMENT_FIELD_NAME),
+                getFullyQualifiedPath(fieldPath, InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME),
                 null,
                 listType.isElementOptional());
-        OneField elementField =
-            OneField.builder()
-                .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+        InternalField elementField =
+            InternalField.builder()
+                .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                 .parentPath(fieldPath)
                 .schema(elementSchema)
                 .fieldId(listType.elementId())
                 .build();
-        type = OneType.LIST;
+        type = InternalType.LIST;
         fields = Collections.singletonList(elementField);
         break;
       default:
         throw new NotSupportedException("Unsupported type: " + iceType.typeId());
     }
-    return OneSchema.builder()
+    return InternalSchema.builder()
         .name(iceType.typeId().name().toLowerCase())
         .dataType(type)
         .comment(doc)

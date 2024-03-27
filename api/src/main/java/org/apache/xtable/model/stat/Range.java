@@ -22,8 +22,8 @@ import java.util.Objects;
 
 import lombok.Value;
 
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.InternalDataFile;
 
@@ -37,19 +37,21 @@ import org.apache.xtable.model.storage.InternalDataFile;
  * PartitionTransformType#YEAR} are all stored as a long representing a point in time as
  * milliseconds since epoch. {@link PartitionTransformType#VALUE} will match the rules below.
  *
- * <p>The minValue and maxValue object type will match the underlying OneType (INT is integer,
+ * <p>The minValue and maxValue object type will match the underlying InternalType (INT is integer,
  * DOUBLE is double, etc.) except for these cases:
  *
  * <ul>
- *   <li>{@link OneType#TIMESTAMP} will be stored as a long represent millis or micros since epoch
- *       depending on the {@link OneSchema.MetadataKey#TIMESTAMP_PRECISION}'s value ({@link
- *       OneSchema.MetadataValue#MICROS} or {@link OneSchema.MetadataValue#MILLIS})
- *   <li>{@link OneType#TIMESTAMP_NTZ} will be stored as a long represent millis or micros since
- *       epoch depending on the {@link OneSchema.MetadataKey#TIMESTAMP_PRECISION}'s value ({@link
- *       OneSchema.MetadataValue#MICROS} or {@link OneSchema.MetadataValue#MILLIS})
- *   <li>{@link OneType#DATE} will be stored as an integer representing days since epoch
- *   <li>{@link OneType#ENUM} will be stored as a string
- *   <li>{@link OneType#FIXED} will be stored as a {@link java.nio.ByteBuffer}
+ *   <li>{@link InternalType#TIMESTAMP} will be stored as a long represent millis or micros since
+ *       epoch depending on the {@link InternalSchema.MetadataKey#TIMESTAMP_PRECISION}'s value
+ *       ({@link InternalSchema.MetadataValue#MICROS} or {@link
+ *       InternalSchema.MetadataValue#MILLIS})
+ *   <li>{@link InternalType#TIMESTAMP_NTZ} will be stored as a long represent millis or micros
+ *       since epoch depending on the {@link InternalSchema.MetadataKey#TIMESTAMP_PRECISION}'s value
+ *       ({@link InternalSchema.MetadataValue#MICROS} or {@link
+ *       InternalSchema.MetadataValue#MILLIS})
+ *   <li>{@link InternalType#DATE} will be stored as an integer representing days since epoch
+ *   <li>{@link InternalType#ENUM} will be stored as a string
+ *   <li>{@link InternalType#FIXED} will be stored as a {@link java.nio.ByteBuffer}
  * </ul>
  *
  * @since 0.1

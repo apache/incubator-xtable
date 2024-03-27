@@ -26,7 +26,7 @@ import lombok.Getter;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.TableChange;
 
 @AllArgsConstructor(staticName = "of")
@@ -34,7 +34,7 @@ import org.apache.xtable.model.TableChange;
 public class ExtractFromSource<COMMIT> {
   private final SourceClient<COMMIT> sourceClient;
 
-  public OneSnapshot extractSnapshot() {
+  public InternalSnapshot extractSnapshot() {
     return sourceClient.getCurrentSnapshot();
   }
 

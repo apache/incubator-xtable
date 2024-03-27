@@ -66,9 +66,9 @@ import org.apache.hudi.metadata.HoodieTableMetadata;
 
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestJavaHudiTable;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.FileFormat;
@@ -83,19 +83,19 @@ public class TestHudiFileStatsExtractor {
       AVRO_SCHEMA.getField("nested_record").schema().getTypes().get(1);
 
   private final Configuration configuration = new Configuration();
-  private final OneField nestedIntBase = getNestedIntBase();
-  private final OneSchema nestedSchema = getNestedSchema(nestedIntBase, "nested_record");
-  private final OneField longField = getLongField();
-  private final OneField stringField = getStringField();
-  private final OneField dateField = getDateField();
-  private final OneField timestampField = getTimestampField();
-  private final OneField mapKeyField = getMapKeyField();
-  private final OneField mapValueField = getMapValueField(nestedIntBase);
-  private final OneField arrayField = getArrayField(nestedIntBase);
-  private final OneField decimalField = getDecimalField();
+  private final InternalField nestedIntBase = getNestedIntBase();
+  private final InternalSchema nestedSchema = getNestedSchema(nestedIntBase, "nested_record");
+  private final InternalField longField = getLongField();
+  private final InternalField stringField = getStringField();
+  private final InternalField dateField = getDateField();
+  private final InternalField timestampField = getTimestampField();
+  private final InternalField mapKeyField = getMapKeyField();
+  private final InternalField mapValueField = getMapValueField(nestedIntBase);
+  private final InternalField arrayField = getArrayField(nestedIntBase);
+  private final InternalField decimalField = getDecimalField();
 
-  private final OneSchema schema =
-      OneSchema.builder()
+  private final InternalSchema schema =
+      InternalSchema.builder()
           .name("schema")
           .fields(
               Arrays.asList(
@@ -103,18 +103,20 @@ public class TestHudiFileStatsExtractor {
                   stringField,
                   dateField,
                   timestampField,
-                  OneField.builder().name("nested_record").schema(nestedSchema).build(),
-                  OneField.builder()
+                  InternalField.builder().name("nested_record").schema(nestedSchema).build(),
+                  InternalField.builder()
                       .name("map_record")
                       .schema(
-                          OneSchema.builder()
+                          InternalSchema.builder()
                               .fields(Arrays.asList(mapKeyField, mapValueField))
                               .build())
                       .build(),
-                  OneField.builder()
+                  InternalField.builder()
                       .name("repeated_record")
                       .schema(
-                          OneSchema.builder().fields(Collections.singletonList(arrayField)).build())
+                          InternalSchema.builder()
+                              .fields(Collections.singletonList(arrayField))
+                              .build())
                       .build(),
                   decimalField))
           .build();
@@ -327,87 +329,94 @@ public class TestHudiFileStatsExtractor {
     return Arrays.asList(record1, record2);
   }
 
-  private OneField getDecimalField() {
-    Map<OneSchema.MetadataKey, Object> metadata = new HashMap<>();
-    metadata.put(OneSchema.MetadataKey.DECIMAL_PRECISION, 20);
-    metadata.put(OneSchema.MetadataKey.DECIMAL_SCALE, 2);
-    return OneField.builder()
+  private InternalField getDecimalField() {
+    Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
+    metadata.put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 20);
+    metadata.put(InternalSchema.MetadataKey.DECIMAL_SCALE, 2);
+    return InternalField.builder()
         .name("decimal_field")
         .schema(
-            OneSchema.builder()
+            InternalSchema.builder()
                 .name("decimal")
-                .dataType(OneType.DECIMAL)
+                .dataType(InternalType.DECIMAL)
                 .metadata(metadata)
                 .build())
         .build();
   }
 
-  private OneField getArrayField(OneField nestedIntBase) {
-    return OneField.builder()
-        .name(OneField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+  private InternalField getArrayField(InternalField nestedIntBase) {
+    return InternalField.builder()
+        .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
         .parentPath("repeated_record")
         .schema(
             getNestedSchema(
-                nestedIntBase, "repeated_record." + OneField.Constants.ARRAY_ELEMENT_FIELD_NAME))
+                nestedIntBase,
+                "repeated_record." + InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME))
         .build();
   }
 
-  private OneField getMapValueField(OneField nestedIntBase) {
-    return OneField.builder()
-        .name(OneField.Constants.MAP_VALUE_FIELD_NAME)
+  private InternalField getMapValueField(InternalField nestedIntBase) {
+    return InternalField.builder()
+        .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
         .parentPath("map_record")
         .schema(
-            getNestedSchema(nestedIntBase, "map_record." + OneField.Constants.MAP_VALUE_FIELD_NAME))
+            getNestedSchema(
+                nestedIntBase, "map_record." + InternalField.Constants.MAP_VALUE_FIELD_NAME))
         .build();
   }
 
-  private OneField getMapKeyField() {
-    return OneField.builder()
-        .name(OneField.Constants.MAP_KEY_FIELD_NAME)
+  private InternalField getMapKeyField() {
+    return InternalField.builder()
+        .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
         .parentPath("map_record")
-        .schema(OneSchema.builder().name("map_key").dataType(OneType.STRING).build())
+        .schema(InternalSchema.builder().name("map_key").dataType(InternalType.STRING).build())
         .build();
   }
 
-  private OneField getTimestampField() {
-    return OneField.builder()
+  private InternalField getTimestampField() {
+    return InternalField.builder()
         .name("timestamp_field")
-        .schema(OneSchema.builder().name("time").dataType(OneType.TIMESTAMP_NTZ).build())
+        .schema(InternalSchema.builder().name("time").dataType(InternalType.TIMESTAMP_NTZ).build())
         .build();
   }
 
-  private OneField getDateField() {
-    return OneField.builder()
+  private InternalField getDateField() {
+    return InternalField.builder()
         .name("date_field")
-        .schema(OneSchema.builder().name("date").dataType(OneType.DATE).build())
+        .schema(InternalSchema.builder().name("date").dataType(InternalType.DATE).build())
         .build();
   }
 
-  private OneField getStringField() {
-    return OneField.builder()
+  private InternalField getStringField() {
+    return InternalField.builder()
         .name("key")
-        .schema(OneSchema.builder().name("string").dataType(OneType.STRING).build())
+        .schema(InternalSchema.builder().name("string").dataType(InternalType.STRING).build())
         .build();
   }
 
-  private OneField getLongField() {
-    return OneField.builder()
+  private InternalField getLongField() {
+    return InternalField.builder()
         .name("long_field")
-        .schema(OneSchema.builder().name("long").dataType(OneType.LONG).build())
+        .schema(InternalSchema.builder().name("long").dataType(InternalType.LONG).build())
         .build();
   }
 
-  private OneField getNestedIntBase() {
-    return OneField.builder()
+  private InternalField getNestedIntBase() {
+    return InternalField.builder()
         .name("nested_int")
-        .schema(OneSchema.builder().name("int").dataType(OneType.INT).isNullable(false).build())
+        .schema(
+            InternalSchema.builder()
+                .name("int")
+                .dataType(InternalType.INT)
+                .isNullable(false)
+                .build())
         .build();
   }
 
-  private OneSchema getNestedSchema(OneField nestedIntBase, String parentPath) {
-    return OneSchema.builder()
+  private InternalSchema getNestedSchema(InternalField nestedIntBase, String parentPath) {
+    return InternalSchema.builder()
         .name("nested")
-        .dataType(OneType.RECORD)
+        .dataType(InternalType.RECORD)
         .fields(Collections.singletonList(nestedIntBase.toBuilder().parentPath(parentPath).build()))
         .build();
   }

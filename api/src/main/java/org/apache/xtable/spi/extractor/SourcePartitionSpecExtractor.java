@@ -20,13 +20,13 @@ package org.apache.xtable.spi.extractor;
 
 import java.util.List;
 
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 
 /**
  * Interface to implement to extract partition fields from given canonical schema. Refer @see
  * org.apache.xtable.hudi.ConfigurationBasedPartitionSpecExtractor for an example implementation.
  */
 public interface SourcePartitionSpecExtractor {
-  List<OnePartitionField> spec(OneSchema tableSchema);
+  List<InternalPartitionField> spec(InternalSchema tableSchema);
 }

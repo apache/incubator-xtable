@@ -32,9 +32,9 @@ import org.apache.iceberg.transforms.Transform;
 import org.apache.iceberg.types.Types;
 
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.schema.SchemaFieldFinder;
 
@@ -47,12 +47,12 @@ public class IcebergPartitionSpecExtractor {
     return INSTANCE;
   }
 
-  public PartitionSpec toIceberg(List<OnePartitionField> partitionFields, Schema tableSchema) {
+  public PartitionSpec toIceberg(List<InternalPartitionField> partitionFields, Schema tableSchema) {
     if (partitionFields == null || partitionFields.isEmpty()) {
       return PartitionSpec.unpartitioned();
     }
     PartitionSpec.Builder partitionSpecBuilder = PartitionSpec.builderFor(tableSchema);
-    for (OnePartitionField partitioningField : partitionFields) {
+    for (InternalPartitionField partitioningField : partitionFields) {
       String fieldPath = partitioningField.getSourceField().getPath();
       switch (partitioningField.getTransformType()) {
         case YEAR:
@@ -113,22 +113,22 @@ public class IcebergPartitionSpecExtractor {
    * @param iceSchema the Iceberg schema
    * @return generated internal representation of the Iceberg partition spec
    */
-  public List<OnePartitionField> fromIceberg(
-      PartitionSpec iceSpec, Schema iceSchema, OneSchema irSchema) {
+  public List<InternalPartitionField> fromIceberg(
+      PartitionSpec iceSpec, Schema iceSchema, InternalSchema irSchema) {
     if (iceSpec.isUnpartitioned()) {
       return Collections.emptyList();
     }
 
-    List<OnePartitionField> irPartitionFields = new ArrayList<>(iceSpec.fields().size());
+    List<InternalPartitionField> irPartitionFields = new ArrayList<>(iceSpec.fields().size());
     for (PartitionField iceField : iceSpec.fields()) {
       // fetch the ice field from the schema to properly handle hidden partition fields
       int sourceColumnId = iceField.sourceId();
       Types.NestedField iceSchemaField = iceSchema.findField(sourceColumnId);
 
-      OneField irField =
+      InternalField irField =
           SchemaFieldFinder.getInstance().findFieldByPath(irSchema, iceSchemaField.name());
-      OnePartitionField irPartitionField =
-          OnePartitionField.builder()
+      InternalPartitionField irPartitionField =
+          InternalPartitionField.builder()
               .sourceField(irField)
               .transformType(fromIcebergTransform(iceField.transform()))
               .build();

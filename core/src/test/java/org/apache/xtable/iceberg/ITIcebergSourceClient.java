@@ -19,7 +19,7 @@
 package org.apache.xtable.iceberg;
 
 import static org.apache.xtable.GenericTable.getTableName;
-import static org.apache.xtable.ValidationTestHelper.validateOneSnapshot;
+import static org.apache.xtable.ValidationTestHelper.validateSnapshot;
 import static org.apache.xtable.ValidationTestHelper.validateTableChanges;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -50,9 +50,9 @@ import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.client.PerTableConfigImpl;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
-import org.apache.xtable.model.OneSnapshot;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.schema.OnePartitionField;
+import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.TableFormat;
 
@@ -105,12 +105,12 @@ public class ITIcebergSourceClient {
               .build();
       IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
       assertEquals(180L, testIcebergTable.getNumRows());
-      OneSnapshot oneSnapshot = icebergSourceClient.getCurrentSnapshot();
+      InternalSnapshot internalSnapshot = icebergSourceClient.getCurrentSnapshot();
 
       if (isPartitioned) {
-        validateIcebergPartitioning(oneSnapshot);
+        validateIcebergPartitioning(internalSnapshot);
       }
-      validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+      validateSnapshot(internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
       // Get changes in incremental format.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()
@@ -166,10 +166,10 @@ public class ITIcebergSourceClient {
       assertEquals(
           120 - recordsByPartition.get(partitionValueToDelete).size(),
           testIcebergTable.getNumRows());
-      OneSnapshot oneSnapshot = icebergSourceClient.getCurrentSnapshot();
+      InternalSnapshot internalSnapshot = icebergSourceClient.getCurrentSnapshot();
 
-      validateIcebergPartitioning(oneSnapshot);
-      validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+      validateIcebergPartitioning(internalSnapshot);
+      validateSnapshot(internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
       // Get changes in incremental format.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()
@@ -225,10 +225,10 @@ public class ITIcebergSourceClient {
       assertEquals(
           120 - recordsByPartition.get(partitionValueToDelete).size(),
           testIcebergTable.getNumRows());
-      OneSnapshot oneSnapshot = icebergSourceClient.getCurrentSnapshot();
+      InternalSnapshot internalSnapshot = icebergSourceClient.getCurrentSnapshot();
 
-      validateIcebergPartitioning(oneSnapshot);
-      validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+      validateIcebergPartitioning(internalSnapshot);
+      validateSnapshot(internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
       // Get changes in incremental format.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()
@@ -282,12 +282,12 @@ public class ITIcebergSourceClient {
               .build();
       IcebergSourceClient icebergSourceClient = clientProvider.getSourceClientInstance(tableConfig);
       assertEquals(200L, testIcebergTable.getNumRows());
-      OneSnapshot oneSnapshot = icebergSourceClient.getCurrentSnapshot();
+      InternalSnapshot internalSnapshot = icebergSourceClient.getCurrentSnapshot();
 
       if (isPartitioned) {
-        validateIcebergPartitioning(oneSnapshot);
+        validateIcebergPartitioning(internalSnapshot);
       }
-      validateOneSnapshot(oneSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+      validateSnapshot(internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
       // Get changes in incremental format.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()
@@ -346,10 +346,11 @@ public class ITIcebergSourceClient {
     }
   }
 
-  private void validateIcebergPartitioning(OneSnapshot oneSnapshot) {
-    List<OnePartitionField> partitionFields = oneSnapshot.getTable().getPartitioningFields();
+  private void validateIcebergPartitioning(InternalSnapshot internalSnapshot) {
+    List<InternalPartitionField> partitionFields =
+        internalSnapshot.getTable().getPartitioningFields();
     assertEquals(1, partitionFields.size());
-    OnePartitionField partitionField = partitionFields.get(0);
+    InternalPartitionField partitionField = partitionFields.get(0);
     assertEquals("level", partitionField.getSourceField().getName());
     assertEquals(PartitionTransformType.VALUE, partitionField.getTransformType());
   }

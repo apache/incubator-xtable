@@ -58,8 +58,8 @@ import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.OneTable;
 import org.apache.xtable.model.OneTableMetadata;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.OneFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
@@ -154,12 +154,12 @@ public class DeltaClient implements TargetClient {
   }
 
   @Override
-  public void syncSchema(OneSchema schema) {
+  public void syncSchema(InternalSchema schema) {
     transactionState.setLatestSchema(schema);
   }
 
   @Override
-  public void syncPartitionSpec(List<OnePartitionField> partitionSpec) {
+  public void syncPartitionSpec(List<InternalPartitionField> partitionSpec) {
     Map<String, StructField> spec = partitionExtractor.convertToDeltaPartitionFormat(partitionSpec);
     if (partitionSpec != null) {
       for (Map.Entry<String, StructField> e : spec.entrySet()) {
@@ -222,7 +222,7 @@ public class DeltaClient implements TargetClient {
     @Getter private final List<String> partitionColumns;
     private final String tableName;
     @Getter private StructType latestSchema;
-    @Getter private OneSchema latestSchemaInternal;
+    @Getter private InternalSchema latestSchemaInternal;
     @Setter private OneTableMetadata metadata;
     @Setter private Seq<Action> actions;
 
@@ -239,12 +239,12 @@ public class DeltaClient implements TargetClient {
 
     private void addColumn(StructField field) {
       latestSchema = latestSchema.add(field);
-      latestSchemaInternal = schemaExtractor.toOneSchema(latestSchema);
+      latestSchemaInternal = schemaExtractor.toInternalSchema(latestSchema);
     }
 
-    private void setLatestSchema(OneSchema schema) {
+    private void setLatestSchema(InternalSchema schema) {
       this.latestSchemaInternal = schema;
-      this.latestSchema = schemaExtractor.fromOneSchema(schema);
+      this.latestSchema = schemaExtractor.fromInternalSchema(schema);
     }
 
     private void commitTransaction() {

@@ -52,10 +52,10 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.hadoop.CachingPath;
 
-import org.apache.xtable.model.schema.OneField;
-import org.apache.xtable.model.schema.OnePartitionField;
-import org.apache.xtable.model.schema.OneSchema;
-import org.apache.xtable.model.schema.OneType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -74,12 +74,12 @@ public class TestBaseFileUpdatesExtractor {
   private static final long LAST_MODIFIED = System.currentTimeMillis();
   private static final HoodieEngineContext CONTEXT =
       new HoodieJavaEngineContext(new Configuration());
-  private static final OnePartitionField PARTITION_FIELD =
-      OnePartitionField.builder()
+  private static final InternalPartitionField PARTITION_FIELD =
+      InternalPartitionField.builder()
           .sourceField(
-              OneField.builder()
+              InternalField.builder()
                   .name("string_field")
-                  .schema(OneSchema.builder().dataType(OneType.STRING).build())
+                  .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
                   .build())
           .transformType(PartitionTransformType.VALUE)
           .build();
