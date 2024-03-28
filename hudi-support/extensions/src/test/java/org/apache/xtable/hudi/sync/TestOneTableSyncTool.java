@@ -104,8 +104,8 @@ public class TestOneTableSyncTool {
     properties.putAll(options);
 
     new OneTableSyncTool(properties, new Configuration()).syncHoodieTable();
-    // lightweight check to make sure metadata dirs are made - assumes that OneTable sync is correct
-    // if it succeeds
+    // lightweight check to make sure metadata dirs are made - assumes that InternalTable sync is
+    // correct if it succeeds
     assertTrue(Files.exists(Paths.get(URI.create(path + "/_delta_log"))));
     assertTrue(Files.exists(Paths.get(URI.create(path + "/metadata"))));
   }

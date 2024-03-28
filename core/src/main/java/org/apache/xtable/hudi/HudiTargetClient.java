@@ -82,13 +82,13 @@ import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.OneIOException;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.TargetClient;
 
@@ -240,12 +240,12 @@ public class HudiTargetClient implements TargetClient {
   }
 
   @Override
-  public void syncMetadata(OneTableMetadata metadata) {
-    commitState.setOneTableMetadata(metadata);
+  public void syncMetadata(TableSyncMetadata metadata) {
+    commitState.setTableSyncMetadata(metadata);
   }
 
   @Override
-  public void syncFilesForSnapshot(List<OneFileGroup> partitionedDataFiles) {
+  public void syncFilesForSnapshot(List<PartitionFileGroup> partitionedDataFiles) {
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         baseFileUpdatesExtractor.extractSnapshotChanges(
             partitionedDataFiles, getMetaClient(), commitState.getInstantTime());
@@ -260,7 +260,7 @@ public class HudiTargetClient implements TargetClient {
   }
 
   @Override
-  public void beginSync(OneTable table) {
+  public void beginSync(InternalTable table) {
     if (!metaClient.isPresent()) {
       metaClient = Optional.of(hudiTableManager.initializeHudiTable(tableDataPath, table));
     } else {
@@ -280,7 +280,7 @@ public class HudiTargetClient implements TargetClient {
   }
 
   @Override
-  public Optional<OneTableMetadata> getTableMetadata() {
+  public Optional<TableSyncMetadata> getTableMetadata() {
     return metaClient.flatMap(
         client ->
             client
@@ -307,7 +307,7 @@ public class HudiTargetClient implements TargetClient {
                         throw new OneIOException("Unable to read Hudi commit metadata", ex);
                       }
                     })
-                .flatMap(OneTableMetadata::fromMap));
+                .flatMap(TableSyncMetadata::fromMap));
   }
 
   @Override
@@ -327,7 +327,7 @@ public class HudiTargetClient implements TargetClient {
     private final int maxNumDeltaCommitsBeforeCompaction;
     private List<WriteStatus> writeStatuses;
     @Setter private Schema schema;
-    @Setter private OneTableMetadata oneTableMetadata;
+    @Setter private TableSyncMetadata tableSyncMetadata;
     private Map<String, List<String>> partitionToReplacedFileIds;
 
     private CommitState(
@@ -341,7 +341,7 @@ public class HudiTargetClient implements TargetClient {
       this.maxNumDeltaCommitsBeforeCompaction = maxNumDeltaCommitsBeforeCompaction;
       this.schema = null;
       this.writeStatuses = Collections.emptyList();
-      this.oneTableMetadata = null;
+      this.tableSyncMetadata = null;
       this.partitionToReplacedFileIds = Collections.emptyMap();
     }
 
@@ -548,7 +548,7 @@ public class HudiTargetClient implements TargetClient {
     }
 
     private Option<Map<String, String>> getExtraMetadata() {
-      Map<String, String> extraMetadata = new HashMap<>(oneTableMetadata.asMap());
+      Map<String, String> extraMetadata = new HashMap<>(tableSyncMetadata.asMap());
       return Option.of(extraMetadata);
     }
 

@@ -18,15 +18,15 @@
  
 package org.apache.xtable.exception;
 
-import org.apache.xtable.model.exception.OneTableErrorCode;
-import org.apache.xtable.model.exception.OneTableException;
+import org.apache.xtable.model.exception.ErrorCode;
+import org.apache.xtable.model.exception.InternalException;
 
-public class PartitionValuesExtractorException extends OneTableException {
+public class PartitionValuesExtractorException extends InternalException {
   public PartitionValuesExtractorException(String message) {
-    super(OneTableErrorCode.INVALID_PARTITION_VALUE, message);
+    super(ErrorCode.INVALID_PARTITION_VALUE, message);
   }
 
   public PartitionValuesExtractorException(String message, Exception e) {
-    super(OneTableErrorCode.INVALID_PARTITION_VALUE, message, e);
+    super(ErrorCode.INVALID_PARTITION_VALUE, message, e);
   }
 }

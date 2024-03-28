@@ -47,9 +47,9 @@ import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.TableSyncMetadata;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
@@ -72,8 +72,8 @@ public class TestOneTableClient {
   @Test
   void testAllSnapshotSyncAsPerConfig() {
     SyncMode syncMode = SyncMode.FULL;
-    OneTable oneTable = getOneTable();
-    InternalSnapshot internalSnapshot = buildSnapshot(oneTable, "v1");
+    InternalTable internalTable = getOneTable();
+    InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1");
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
     Map<String, SyncResult> perTableResults = new HashMap<>();
@@ -140,11 +140,11 @@ public class TestOneTableClient {
         Arrays.asList(instantAt15, instantAt14, instantAt10, instantAt8, instantAt5, instantAt2);
     CommitsBacklog<Instant> commitsBacklog =
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
-    Optional<OneTableMetadata> targetClient1Metadata =
-        Optional.of(OneTableMetadata.of(icebergLastSyncInstant, pendingInstantsForIceberg));
+    Optional<TableSyncMetadata> targetClient1Metadata =
+        Optional.of(TableSyncMetadata.of(icebergLastSyncInstant, pendingInstantsForIceberg));
     when(mockTargetClient1.getTableMetadata()).thenReturn(targetClient1Metadata);
-    Optional<OneTableMetadata> targetClient2Metadata =
-        Optional.of(OneTableMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta));
+    Optional<TableSyncMetadata> targetClient2Metadata =
+        Optional.of(TableSyncMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta));
     when(mockTargetClient2.getTableMetadata()).thenReturn(targetClient2Metadata);
     when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync)).thenReturn(commitsBacklog);
     List<TableChange> tableChanges = new ArrayList<>();
@@ -166,7 +166,7 @@ public class TestOneTableClient {
     Map<String, List<SyncResult>> allResults = new HashMap<>();
     allResults.put(TableFormat.ICEBERG, icebergSyncResults);
     allResults.put(TableFormat.DELTA, deltaSyncResults);
-    Map<TargetClient, OneTableMetadata> clientToMetadata = new HashMap<>();
+    Map<TargetClient, TableSyncMetadata> clientToMetadata = new HashMap<>();
     clientToMetadata.put(mockTargetClient1, targetClient1Metadata.get());
     clientToMetadata.put(mockTargetClient2, targetClient2Metadata.get());
     when(tableFormatSync.syncChanges(
@@ -184,9 +184,9 @@ public class TestOneTableClient {
   @Test
   void testIncrementalSyncFallBackToSnapshotForAllFormats() {
     SyncMode syncMode = SyncMode.INCREMENTAL;
-    OneTable oneTable = getOneTable();
+    InternalTable internalTable = getOneTable();
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
-    InternalSnapshot internalSnapshot = buildSnapshot(oneTable, "v1");
+    InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1");
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
     Map<String, SyncResult> syncResults = new HashMap<>();
     syncResults.put(TableFormat.ICEBERG, syncResult);
@@ -207,9 +207,9 @@ public class TestOneTableClient {
 
     // Both Iceberg and Delta last synced at instantAt5 and have no pending instants.
     when(mockTargetClient1.getTableMetadata())
-        .thenReturn(Optional.of(OneTableMetadata.of(instantAt5, Collections.emptyList())));
+        .thenReturn(Optional.of(TableSyncMetadata.of(instantAt5, Collections.emptyList())));
     when(mockTargetClient2.getTableMetadata())
-        .thenReturn(Optional.of(OneTableMetadata.of(instantAt5, Collections.emptyList())));
+        .thenReturn(Optional.of(TableSyncMetadata.of(instantAt5, Collections.emptyList())));
 
     when(mockSourceClient.getCurrentSnapshot()).thenReturn(internalSnapshot);
     when(tableFormatSync.syncSnapshot(
@@ -261,9 +261,9 @@ public class TestOneTableClient {
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
     when(mockTargetClient1.getTableMetadata())
         .thenReturn(
-            Optional.of(OneTableMetadata.of(icebergLastSyncInstant, pendingInstantsForIceberg)));
-    Optional<OneTableMetadata> targetClient2Metadata =
-        Optional.of(OneTableMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta));
+            Optional.of(TableSyncMetadata.of(icebergLastSyncInstant, pendingInstantsForIceberg)));
+    Optional<TableSyncMetadata> targetClient2Metadata =
+        Optional.of(TableSyncMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta));
     when(mockTargetClient2.getTableMetadata()).thenReturn(targetClient2Metadata);
     when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync)).thenReturn(commitsBacklog);
     List<TableChange> tableChanges = new ArrayList<>();
@@ -273,9 +273,9 @@ public class TestOneTableClient {
       when(mockSourceClient.getTableChangeForCommit(instant)).thenReturn(tableChange);
     }
     // Iceberg needs to sync by snapshot since instant15 is affected by table clean-up.
-    OneTable oneTable = getOneTable();
+    InternalTable internalTable = getOneTable();
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
-    InternalSnapshot internalSnapshot = buildSnapshot(oneTable, "v1");
+    InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1");
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
     Map<String, SyncResult> snapshotResult =
         Collections.singletonMap(TableFormat.ICEBERG, syncResult);
@@ -330,14 +330,14 @@ public class TestOneTableClient {
     List<Instant> instantsToProcess = Collections.emptyList();
     CommitsBacklog<Instant> commitsBacklog =
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
-    Optional<OneTableMetadata> targetClient1Metadata =
-        Optional.of(OneTableMetadata.of(icebergLastSyncInstant, Collections.emptyList()));
+    Optional<TableSyncMetadata> targetClient1Metadata =
+        Optional.of(TableSyncMetadata.of(icebergLastSyncInstant, Collections.emptyList()));
     when(mockTargetClient1.getTableMetadata()).thenReturn(targetClient1Metadata);
-    Optional<OneTableMetadata> targetClient2Metadata =
-        Optional.of(OneTableMetadata.of(deltaLastSyncInstant, Collections.emptyList()));
+    Optional<TableSyncMetadata> targetClient2Metadata =
+        Optional.of(TableSyncMetadata.of(deltaLastSyncInstant, Collections.emptyList()));
     when(mockTargetClient2.getTableMetadata()).thenReturn(targetClient2Metadata);
     when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync)).thenReturn(commitsBacklog);
-    Map<TargetClient, OneTableMetadata> clientsWithMetadata = new HashMap<>();
+    Map<TargetClient, TableSyncMetadata> clientsWithMetadata = new HashMap<>();
     clientsWithMetadata.put(mockTargetClient1, targetClient1Metadata.get());
     clientsWithMetadata.put(mockTargetClient2, targetClient2Metadata.get());
     when(tableFormatSync.syncChanges(
@@ -378,16 +378,16 @@ public class TestOneTableClient {
         .build();
   }
 
-  private InternalSnapshot buildSnapshot(OneTable oneTable, String version) {
-    return InternalSnapshot.builder().table(oneTable).version(version).build();
+  private InternalSnapshot buildSnapshot(InternalTable internalTable, String version) {
+    return InternalSnapshot.builder().table(internalTable).version(version).build();
   }
 
-  private OneTable getOneTable() {
+  private InternalTable getOneTable() {
     return getOneTable(Instant.now());
   }
 
-  private OneTable getOneTable(Instant instant) {
-    return OneTable.builder().name("some_table").latestCommitTime(instant).build();
+  private InternalTable getOneTable(Instant instant) {
+    return InternalTable.builder().name("some_table").latestCommitTime(instant).build();
   }
 
   private Instant getInstantAtLastNMinutes(Instant currentInstant, int n) {

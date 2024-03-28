@@ -42,7 +42,7 @@ import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.paths.PathUtils;
 
 @Builder
@@ -59,7 +59,9 @@ public class DeltaDataFileUpdatesExtractor {
       DeltaDataFileExtractor.builder().build();
 
   public Seq<Action> applySnapshot(
-      DeltaLog deltaLog, List<OneFileGroup> partitionedDataFiles, InternalSchema tableSchema) {
+      DeltaLog deltaLog,
+      List<PartitionFileGroup> partitionedDataFiles,
+      InternalSchema tableSchema) {
 
     // all files in the current delta snapshot are potential candidates for remove actions, i.e. if
     // the file is not present in the new snapshot (addedFiles) then the file is considered removed

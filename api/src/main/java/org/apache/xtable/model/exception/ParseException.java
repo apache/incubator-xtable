@@ -18,23 +18,13 @@
  
 package org.apache.xtable.model.exception;
 
-public enum OneTableErrorCode {
-  INVALID_CONFIGURATION(10001),
-  INVALID_PARTITION_SPEC(10002),
-  INVALID_PARTITION_VALUE(10003),
-  IO_EXCEPTION(10004),
-  INVALID_SCHEMA(10005),
-  UNSUPPORTED_SCHEMA_TYPE(10006),
-  UNSUPPORTED_FEATURE(10007),
-  PARSE_EXCEPTION(10008);
-
-  private final int errorCode;
-
-  OneTableErrorCode(int errorCode) {
-    this.errorCode = errorCode;
+/** Exception thrown when there is a parsing error, for e.g. parsing a date string. */
+public class ParseException extends InternalException {
+  public ParseException(String message, Throwable e) {
+    super(ErrorCode.PARSE_EXCEPTION, message, e);
   }
 
-  public int getErrorCode() {
-    return errorCode;
+  public ParseException(String message) {
+    super(ErrorCode.PARSE_EXCEPTION, message);
   }
 }

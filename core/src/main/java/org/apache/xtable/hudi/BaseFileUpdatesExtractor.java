@@ -56,7 +56,7 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 
 @AllArgsConstructor(staticName = "of")
 public class BaseFileUpdatesExtractor {
@@ -75,7 +75,9 @@ public class BaseFileUpdatesExtractor {
    * @return The information needed to create a "replace" commit for the Hudi table
    */
   ReplaceMetadata extractSnapshotChanges(
-      List<OneFileGroup> partitionedDataFiles, HoodieTableMetaClient metaClient, String commit) {
+      List<PartitionFileGroup> partitionedDataFiles,
+      HoodieTableMetaClient metaClient,
+      String commit) {
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(metaClient.getTableConfig().isMetadataTableAvailable())

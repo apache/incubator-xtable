@@ -18,12 +18,19 @@
  
 package org.apache.xtable.model.exception;
 
-public class OneParseException extends OneTableException {
-  public OneParseException(String message, Throwable e) {
-    super(OneTableErrorCode.PARSE_EXCEPTION, message, e);
+import lombok.ToString;
+
+@ToString
+public class InternalException extends RuntimeException {
+  private final ErrorCode errorCode;
+
+  protected InternalException(ErrorCode errorCode, String message, Throwable e) {
+    super(message, e);
+    this.errorCode = errorCode;
   }
 
-  public OneParseException(String message) {
-    super(OneTableErrorCode.PARSE_EXCEPTION, message);
+  protected InternalException(ErrorCode errorCode, String message) {
+    super(message);
+    this.errorCode = errorCode;
   }
 }

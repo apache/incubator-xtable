@@ -87,7 +87,7 @@ public class RunSync {
               CLIENTS_CONFIG_PATH,
               "clientsConfig",
               true,
-              "The path to a yaml file containing OneTable client configurations. "
+              "The path to a yaml file containing InternalTable client configurations. "
                   + "These configs will override the default")
           .addOption(
               ICEBERG_CATALOG_CONFIG_PATH,

@@ -45,7 +45,7 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.schema.SchemaUtils;
 
 /**
- * Converts between Delta and OneTable schemas. Some items to be aware of:
+ * Converts between Delta and InternalTable schemas. Some items to be aware of:
  *
  * <ul>
  *   <li>Delta schemas are represented as Spark StructTypes which do not have enums so the enum

@@ -18,16 +18,16 @@
  
 package org.apache.xtable.exception;
 
-import org.apache.xtable.model.exception.OneTableErrorCode;
-import org.apache.xtable.model.exception.OneTableException;
+import org.apache.xtable.model.exception.ErrorCode;
+import org.apache.xtable.model.exception.InternalException;
 
 /** Exception to report for errors during Schema Extraction. */
-public class SchemaExtractorException extends OneTableException {
+public class SchemaExtractorException extends InternalException {
   public SchemaExtractorException(String message) {
-    super(OneTableErrorCode.INVALID_SCHEMA, message);
+    super(ErrorCode.INVALID_SCHEMA, message);
   }
 
   public SchemaExtractorException(String message, Exception e) {
-    super(OneTableErrorCode.INVALID_SCHEMA, message, e);
+    super(ErrorCode.INVALID_SCHEMA, message, e);
   }
 }

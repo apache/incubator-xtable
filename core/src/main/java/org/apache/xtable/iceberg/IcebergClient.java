@@ -18,8 +18,8 @@
  
 package org.apache.xtable.iceberg;
 
-import static org.apache.xtable.model.OneTableMetadata.INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP;
-import static org.apache.xtable.model.OneTableMetadata.ONETABLE_LAST_INSTANT_SYNCED_PROP;
+import static org.apache.xtable.model.TableSyncMetadata.INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP;
+import static org.apache.xtable.model.TableSyncMetadata.ONETABLE_LAST_INSTANT_SYNCED_PROP;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -44,12 +44,12 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NotFoundException;
 
 import org.apache.xtable.client.PerTableConfig;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.TargetClient;
 
@@ -69,7 +69,7 @@ public class IcebergClient implements TargetClient {
   private int snapshotRetentionInHours;
   private Transaction transaction;
   private Table table;
-  private OneTable internalTableState;
+  private InternalTable internalTableState;
 
   public IcebergClient() {}
 
@@ -143,23 +143,23 @@ public class IcebergClient implements TargetClient {
   }
 
   @Override
-  public void beginSync(OneTable oneTable) {
-    initializeTableIfRequired(oneTable);
+  public void beginSync(InternalTable internalTable) {
+    initializeTableIfRequired(internalTable);
     transaction = table.newTransaction();
-    internalTableState = oneTable;
+    internalTableState = internalTable;
   }
 
-  private void initializeTableIfRequired(OneTable oneTable) {
+  private void initializeTableIfRequired(InternalTable internalTable) {
     if (table == null) {
       table =
           tableManager.getOrCreateTable(
               catalogConfig,
               tableIdentifier,
               basePath,
-              schemaExtractor.toIceberg(oneTable.getReadSchema()),
+              schemaExtractor.toIceberg(internalTable.getReadSchema()),
               partitionSpecExtractor.toIceberg(
-                  oneTable.getPartitioningFields(),
-                  schemaExtractor.toIceberg(oneTable.getReadSchema())));
+                  internalTable.getPartitioningFields(),
+                  schemaExtractor.toIceberg(internalTable.getReadSchema())));
     }
   }
 
@@ -177,7 +177,7 @@ public class IcebergClient implements TargetClient {
   }
 
   @Override
-  public void syncMetadata(OneTableMetadata metadata) {
+  public void syncMetadata(TableSyncMetadata metadata) {
     UpdateProperties updateProperties = transaction.updateProperties();
     for (Map.Entry<String, String> stateProperty : metadata.asMap().entrySet()) {
       updateProperties.set(stateProperty.getKey(), stateProperty.getValue());
@@ -199,7 +199,7 @@ public class IcebergClient implements TargetClient {
   }
 
   @Override
-  public void syncFilesForSnapshot(List<OneFileGroup> partitionedDataFiles) {
+  public void syncFilesForSnapshot(List<PartitionFileGroup> partitionedDataFiles) {
     dataFileUpdatesExtractor.applySnapshot(
         table,
         internalTableState,
@@ -236,11 +236,11 @@ public class IcebergClient implements TargetClient {
   }
 
   @Override
-  public Optional<OneTableMetadata> getTableMetadata() {
+  public Optional<TableSyncMetadata> getTableMetadata() {
     if (table == null) {
       return Optional.empty();
     }
-    return OneTableMetadata.fromMap(table.properties());
+    return TableSyncMetadata.fromMap(table.properties());
   }
 
   @Override
@@ -269,8 +269,8 @@ public class IcebergClient implements TargetClient {
               currentSnapshot.snapshotId(),
               currentSnapshot.parentId());
           // if we need to rollback, we must also clear the last sync state since that sync is no
-          // longer considered valid. This will force OneTable to fall back to a snapshot sync in
-          // the subsequent sync round.
+          // longer considered valid. This will force InternalTable to fall back to a snapshot sync
+          // in the subsequent sync round.
           table.manageSnapshots().rollbackTo(currentSnapshot.parentId()).commit();
           Transaction transaction = table.newTransaction();
           transaction

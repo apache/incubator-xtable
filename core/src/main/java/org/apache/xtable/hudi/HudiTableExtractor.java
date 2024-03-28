@@ -33,7 +33,7 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.util.Option;
 
 import org.apache.xtable.exception.SchemaExtractorException;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -42,7 +42,9 @@ import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.schema.SchemaFieldFinder;
 import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
 
-/** Extracts {@link OneTable} a canonical representation of table at a point in time for Hudi. */
+/**
+ * Extracts {@link InternalTable} a canonical representation of table at a point in time for Hudi.
+ */
 @Singleton
 public class HudiTableExtractor {
   private final HudiSchemaExtractor schemaExtractor;
@@ -55,7 +57,7 @@ public class HudiTableExtractor {
     this.partitionSpecExtractor = sourcePartitionSpecExtractor;
   }
 
-  public OneTable table(HoodieTableMetaClient metaClient, HoodieInstant commit) {
+  public InternalTable table(HoodieTableMetaClient metaClient, HoodieInstant commit) {
     TableSchemaResolver tableSchemaResolver = new TableSchemaResolver(metaClient);
     InternalSchema canonicalSchema;
     Schema avroSchema;
@@ -77,7 +79,7 @@ public class HudiTableExtractor {
         partitionFields.size() > 0
             ? DataLayoutStrategy.DIR_HIERARCHY_PARTITION_VALUES
             : DataLayoutStrategy.FLAT;
-    return OneTable.builder()
+    return InternalTable.builder()
         .tableFormat(TableFormat.HUDI)
         .basePath(metaClient.getBasePathV2().toString())
         .name(metaClient.getTableConfig().getTableName())

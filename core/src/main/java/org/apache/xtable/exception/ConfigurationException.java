@@ -18,15 +18,15 @@
  
 package org.apache.xtable.exception;
 
-import org.apache.xtable.model.exception.OneTableErrorCode;
-import org.apache.xtable.model.exception.OneTableException;
+import org.apache.xtable.model.exception.ErrorCode;
+import org.apache.xtable.model.exception.InternalException;
 
-public class ConfigurationException extends OneTableException {
+public class ConfigurationException extends InternalException {
   public ConfigurationException(String message, Throwable e) {
-    super(OneTableErrorCode.INVALID_CONFIGURATION, message, e);
+    super(ErrorCode.INVALID_CONFIGURATION, message, e);
   }
 
   public ConfigurationException(String message) {
-    super(OneTableErrorCode.INVALID_CONFIGURATION, message);
+    super(ErrorCode.INVALID_CONFIGURATION, message);
   }
 }

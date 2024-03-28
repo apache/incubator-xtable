@@ -44,7 +44,7 @@ import org.apache.iceberg.types.Types;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.PartitionTransformType;
@@ -72,13 +72,13 @@ public class IcebergPartitionValueConverter {
   }
 
   public List<PartitionValue> toOneTable(
-      OneTable oneTable, StructLike structLike, PartitionSpec partitionSpec) {
+      InternalTable internalTable, StructLike structLike, PartitionSpec partitionSpec) {
     if (!partitionSpec.isPartitioned()) {
       return Collections.emptyList();
     }
     List<PartitionValue> partitionValues = new ArrayList<>(partitionSpec.fields().size());
     Map<InternalField, Map<PartitionTransformType, InternalPartitionField>> partitionFieldMap =
-        getInternalPartitionFieldMap(oneTable);
+        getInternalPartitionFieldMap(internalTable);
     IndexedRecord partitionData = ((IndexedRecord) structLike);
     for (PartitionField partitionField : partitionSpec.fields()) {
       Object value;
@@ -131,7 +131,7 @@ public class IcebergPartitionValueConverter {
           partitionSpec.schema().findField(partitionField.sourceId());
       InternalField sourceField =
           SchemaFieldFinder.getInstance()
-              .findFieldByPath(oneTable.getReadSchema(), partitionSourceField.name());
+              .findFieldByPath(internalTable.getReadSchema(), partitionSourceField.name());
       // This helps reduce creating these objects for each file processed and re-using them.
       InternalPartitionField internalPartitionField =
           getFromInternalPartitionFieldMap(partitionFieldMap, sourceField, transformType);
@@ -163,8 +163,8 @@ public class IcebergPartitionValueConverter {
   }
 
   private Map<InternalField, Map<PartitionTransformType, InternalPartitionField>>
-      getInternalPartitionFieldMap(OneTable oneTable) {
-    List<InternalPartitionField> internalPartitionFields = oneTable.getPartitioningFields();
+      getInternalPartitionFieldMap(InternalTable internalTable) {
+    List<InternalPartitionField> internalPartitionFields = internalTable.getPartitioningFields();
     return internalPartitionFields.stream()
         .collect(
             Collectors.groupingBy(

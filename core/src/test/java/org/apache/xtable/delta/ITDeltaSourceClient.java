@@ -58,7 +58,7 @@ import org.apache.xtable.client.PerTableConfigImpl;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -199,7 +199,7 @@ public class ITDeltaSourceClient {
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
     validatePartitionDataFiles(
-        OneFileGroup.builder()
+        PartitionFileGroup.builder()
             .files(
                 Collections.singletonList(
                     InternalDataFile.builder()
@@ -286,7 +286,7 @@ public class ITDeltaSourceClient {
                 .range(Range.scalar("SingleValue"))
                 .build());
     validatePartitionDataFiles(
-        OneFileGroup.builder()
+        PartitionFileGroup.builder()
             .partitionValues(partitionValue)
             .files(
                 Collections.singletonList(
@@ -665,19 +665,19 @@ public class ITDeltaSourceClient {
   }
 
   private static void validateTable(
-      OneTable oneTable,
+      InternalTable internalTable,
       String tableName,
       String tableFormat,
       InternalSchema readSchema,
       DataLayoutStrategy dataLayoutStrategy,
       String basePath,
       List<InternalPartitionField> partitioningFields) {
-    Assertions.assertEquals(tableName, oneTable.getName());
-    Assertions.assertEquals(tableFormat, oneTable.getTableFormat());
-    Assertions.assertEquals(readSchema, oneTable.getReadSchema());
-    Assertions.assertEquals(dataLayoutStrategy, oneTable.getLayoutStrategy());
-    Assertions.assertEquals(basePath, oneTable.getBasePath());
-    Assertions.assertEquals(partitioningFields, oneTable.getPartitioningFields());
+    Assertions.assertEquals(tableName, internalTable.getName());
+    Assertions.assertEquals(tableFormat, internalTable.getTableFormat());
+    Assertions.assertEquals(readSchema, internalTable.getReadSchema());
+    Assertions.assertEquals(dataLayoutStrategy, internalTable.getLayoutStrategy());
+    Assertions.assertEquals(basePath, internalTable.getBasePath());
+    Assertions.assertEquals(partitioningFields, internalTable.getPartitioningFields());
   }
 
   private void validateSchemaCatalog(
@@ -686,7 +686,7 @@ public class ITDeltaSourceClient {
   }
 
   private void validatePartitionDataFiles(
-      OneFileGroup expectedPartitionFiles, OneFileGroup actualPartitionFiles)
+      PartitionFileGroup expectedPartitionFiles, PartitionFileGroup actualPartitionFiles)
       throws URISyntaxException {
     assertEquals(
         expectedPartitionFiles.getPartitionValues(), actualPartitionFiles.getPartitionValues());

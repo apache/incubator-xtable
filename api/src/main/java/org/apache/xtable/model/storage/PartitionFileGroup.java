@@ -31,21 +31,21 @@ import org.apache.xtable.model.stat.PartitionValue;
 /** Represents a grouping of {@link InternalDataFile} with the same partition values. */
 @Value
 @Builder
-public class OneFileGroup {
+public class PartitionFileGroup {
   List<PartitionValue> partitionValues;
   List<InternalDataFile> files;
 
-  public static List<OneFileGroup> fromFiles(List<InternalDataFile> files) {
+  public static List<PartitionFileGroup> fromFiles(List<InternalDataFile> files) {
     return fromFiles(files.stream());
   }
 
-  public static List<OneFileGroup> fromFiles(Stream<InternalDataFile> files) {
+  public static List<PartitionFileGroup> fromFiles(Stream<InternalDataFile> files) {
     Map<List<PartitionValue>, List<InternalDataFile>> filesGrouped =
         files.collect(Collectors.groupingBy(InternalDataFile::getPartitionValues));
     return filesGrouped.entrySet().stream()
         .map(
             entry ->
-                OneFileGroup.builder()
+                PartitionFileGroup.builder()
                     .partitionValues(entry.getKey())
                     .files(entry.getValue())
                     .build())

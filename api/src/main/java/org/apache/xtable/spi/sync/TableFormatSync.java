@@ -35,13 +35,13 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.TableSyncMetadata;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
 
-/** Provides the functionality to sync from the OneTable format to the target format. */
+/** Provides the functionality to sync from the InternalTable format to the target format. */
 @Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class TableFormatSync {
@@ -64,13 +64,13 @@ public class TableFormatSync {
     Map<String, SyncResult> results = new HashMap<>();
     for (TargetClient targetClient : targetClients) {
       try {
-        OneTable oneTable = snapshot.getTable();
+        InternalTable internalTable = snapshot.getTable();
         results.put(
             targetClient.getTableFormat(),
             getSyncResult(
                 targetClient,
                 SyncMode.FULL,
-                oneTable,
+                internalTable,
                 client -> client.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
                 startTime,
                 snapshot.getPendingCommits()));
@@ -91,7 +91,7 @@ public class TableFormatSync {
    * @return the results of trying to sync each change
    */
   public Map<String, List<SyncResult>> syncChanges(
-      Map<TargetClient, OneTableMetadata> targetClientWithMetadata,
+      Map<TargetClient, TableSyncMetadata> targetClientWithMetadata,
       IncrementalTableChanges changes) {
     Map<String, List<SyncResult>> results = new HashMap<>();
     Set<TargetClient> clientsWithFailures = new HashSet<>();
@@ -101,7 +101,7 @@ public class TableFormatSync {
           targetClientWithMetadata.entrySet().stream()
               .filter(
                   entry -> {
-                    OneTableMetadata metadata = entry.getValue();
+                    TableSyncMetadata metadata = entry.getValue();
                     return isChangeApplicableForLastSyncMetadata(change, metadata);
                   })
               .map(Map.Entry::getKey)
@@ -133,7 +133,7 @@ public class TableFormatSync {
   }
 
   private static boolean isChangeApplicableForLastSyncMetadata(
-      TableChange change, OneTableMetadata metadata) {
+      TableChange change, TableSyncMetadata metadata) {
     return change
             .getTableAsOfChange()
             .getLatestCommitTime()
@@ -146,7 +146,7 @@ public class TableFormatSync {
   private SyncResult getSyncResult(
       TargetClient client,
       SyncMode mode,
-      OneTable tableState,
+      InternalTable tableState,
       SyncFiles fileSyncMethod,
       Instant startTime,
       List<Instant> pendingCommits) {
@@ -159,8 +159,8 @@ public class TableFormatSync {
     // Update the files in the target table
     fileSyncMethod.sync(client);
     // Persist the latest commit time in table properties for incremental syncs.
-    OneTableMetadata latestState =
-        OneTableMetadata.of(tableState.getLatestCommitTime(), pendingCommits);
+    TableSyncMetadata latestState =
+        TableSyncMetadata.of(tableState.getLatestCommitTime(), pendingCommits);
     client.syncMetadata(latestState);
     client.completeSync();
 

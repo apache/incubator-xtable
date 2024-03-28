@@ -39,21 +39,21 @@ import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 
 public class TestExtractFromSource {
   private final SourceClient<TestCommit> mockSourceClient = mock(SourceClient.class);
 
   @Test
   public void extractSnapshot() {
-    OneTable table = OneTable.builder().latestCommitTime(Instant.now()).build();
+    InternalTable table = InternalTable.builder().latestCommitTime(Instant.now()).build();
     SchemaCatalog schemaCatalog = new SchemaCatalog(Collections.emptyMap());
-    List<OneFileGroup> dataFiles = Collections.emptyList();
+    List<PartitionFileGroup> dataFiles = Collections.emptyList();
     InternalSnapshot internalSnapshot =
         InternalSnapshot.builder()
             .schemaCatalog(schemaCatalog)
@@ -85,8 +85,8 @@ public class TestExtractFromSource {
 
     // drop a file and add a file
     InternalDataFile newFile1 = getDataFile("file4.parquet");
-    OneTable tableAtFirstInstant =
-        OneTable.builder().latestCommitTime(Instant.now().minus(1, ChronoUnit.DAYS)).build();
+    InternalTable tableAtFirstInstant =
+        InternalTable.builder().latestCommitTime(Instant.now().minus(1, ChronoUnit.DAYS)).build();
     TableChange tableChangeToReturnAtFirstInstant =
         TableChange.builder()
             .tableAsOfChange(tableAtFirstInstant)
@@ -106,7 +106,8 @@ public class TestExtractFromSource {
     InternalDataFile newFile2 = getDataFile("file5.parquet");
     InternalDataFile newFile3 = getDataFile("file6.parquet");
 
-    OneTable tableAtSecondInstant = OneTable.builder().latestCommitTime(Instant.now()).build();
+    InternalTable tableAtSecondInstant =
+        InternalTable.builder().latestCommitTime(Instant.now()).build();
     TableChange tableChangeToReturnAtSecondInstant =
         TableChange.builder()
             .tableAsOfChange(tableAtSecondInstant)

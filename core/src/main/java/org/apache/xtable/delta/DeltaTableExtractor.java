@@ -28,19 +28,21 @@ import org.apache.spark.sql.delta.Snapshot;
 
 import scala.Option;
 
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
 
-/** Extracts {@link OneTable} canonical representation of a table at a point in time for Delta. */
+/**
+ * Extracts {@link InternalTable} canonical representation of a table at a point in time for Delta.
+ */
 @Builder
 public class DeltaTableExtractor {
   @Builder.Default
   private static final DeltaSchemaExtractor schemaExtractor = DeltaSchemaExtractor.getInstance();
 
-  public OneTable table(DeltaLog deltaLog, String tableName, Long version) {
+  public InternalTable table(DeltaLog deltaLog, String tableName, Long version) {
     Snapshot snapshot = deltaLog.getSnapshotAt(version, Option.empty());
     InternalSchema schema = schemaExtractor.toInternalSchema(snapshot.metadata().schema());
     List<InternalPartitionField> partitionFields =
@@ -52,7 +54,7 @@ public class DeltaTableExtractor {
         !partitionFields.isEmpty()
             ? DataLayoutStrategy.HIVE_STYLE_PARTITION
             : DataLayoutStrategy.FLAT;
-    return OneTable.builder()
+    return InternalTable.builder()
         .tableFormat(TableFormat.DELTA)
         .basePath(snapshot.deltaLog().dataPath().toString())
         .name(tableName)

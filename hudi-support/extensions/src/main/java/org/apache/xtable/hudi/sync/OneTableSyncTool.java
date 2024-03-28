@@ -43,7 +43,10 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
 
-/** A HoodieSyncTool for syncing a Hudi table to other formats (Delta and Iceberg) with OneTable. */
+/**
+ * A HoodieSyncTool for syncing a Hudi table to other formats (Delta and Iceberg) with
+ * InternalTable.
+ */
 public class OneTableSyncTool extends HoodieSyncTool {
   private final OneTableSyncConfig config;
   private final HudiSourceClientProvider hudiSourceClientProvider;
@@ -87,7 +90,7 @@ public class OneTableSyncTool extends HoodieSyncTool {
             .map(entry -> entry.getKey().toString())
             .collect(Collectors.joining(","));
     if (!failingFormats.isEmpty()) {
-      throw new HoodieException("Unable to sync to OneTable for formats: " + failingFormats);
+      throw new HoodieException("Unable to sync to InternalTable for formats: " + failingFormats);
     }
   }
 

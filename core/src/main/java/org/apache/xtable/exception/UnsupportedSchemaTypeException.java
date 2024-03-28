@@ -18,15 +18,15 @@
  
 package org.apache.xtable.exception;
 
-import org.apache.xtable.model.exception.OneTableErrorCode;
-import org.apache.xtable.model.exception.OneTableException;
+import org.apache.xtable.model.exception.ErrorCode;
+import org.apache.xtable.model.exception.InternalException;
 
-public class UnsupportedSchemaTypeException extends OneTableException {
+public class UnsupportedSchemaTypeException extends InternalException {
   public UnsupportedSchemaTypeException(String message) {
-    super(OneTableErrorCode.UNSUPPORTED_SCHEMA_TYPE, message);
+    super(ErrorCode.UNSUPPORTED_SCHEMA_TYPE, message);
   }
 
   public UnsupportedSchemaTypeException(String message, Exception e) {
-    super(OneTableErrorCode.UNSUPPORTED_SCHEMA_TYPE, message, e);
+    super(ErrorCode.UNSUPPORTED_SCHEMA_TYPE, message, e);
   }
 }

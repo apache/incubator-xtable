@@ -32,7 +32,7 @@ import java.time.temporal.ChronoField;
 
 import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
 
-import org.apache.xtable.model.exception.OneParseException;
+import org.apache.xtable.model.exception.ParseException;
 
 class HudiInstantUtils {
   private static final ZoneId ZONE_ID = ZoneId.of("UTC");
@@ -66,7 +66,7 @@ class HudiInstantUtils {
       LocalDateTime dt = LocalDateTime.parse(timestampInMillis, MILLIS_INSTANT_TIME_FORMATTER);
       return dt.atZone(ZONE_ID).toInstant();
     } catch (DateTimeParseException ex) {
-      throw new OneParseException("Unable to parse date from commit timestamp: " + timestamp, ex);
+      throw new ParseException("Unable to parse date from commit timestamp: " + timestamp, ex);
     }
   }
 

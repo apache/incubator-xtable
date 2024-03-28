@@ -84,8 +84,8 @@ import com.google.common.collect.Sets;
 import org.apache.xtable.ITOneTableClient;
 import org.apache.xtable.client.PerTableConfigImpl;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -98,7 +98,7 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.schema.SchemaFieldFinder;
 import org.apache.xtable.spi.sync.TableFormatSync;
@@ -221,8 +221,8 @@ public class TestIcebergSync {
     List<Types.NestedField> fields = new ArrayList<>(icebergSchema.columns());
     fields.add(Types.NestedField.of(6, false, "long_field", Types.LongType.get()));
     Schema icebergSchema2 = new Schema(fields);
-    OneTable table1 = getOneTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
-    OneTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
+    InternalTable table1 = getOneTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
+    InternalTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
     Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion1 = new SchemaVersion(1, "");
     schemas.put(schemaVersion1, internalSchema);
@@ -316,8 +316,8 @@ public class TestIcebergSync {
     List<Types.NestedField> fields = new ArrayList<>(icebergSchema.columns());
     fields.add(Types.NestedField.of(6, false, "long_field", Types.LongType.get()));
     Schema icebergSchema2 = new Schema(fields);
-    OneTable table1 = getOneTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
-    OneTable table2 =
+    InternalTable table1 = getOneTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
+    InternalTable table2 =
         getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME.plusMillis(100000L));
     Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion1 = new SchemaVersion(1, "");
@@ -357,7 +357,7 @@ public class TestIcebergSync {
     Files.delete(Paths.get(URI.create(manifestFile)));
 
     Optional<Instant> actual =
-        getIcebergClient().getTableMetadata().map(OneTableMetadata::getLastInstantSynced);
+        getIcebergClient().getTableMetadata().map(TableSyncMetadata::getLastInstantSynced);
     // assert that the last commit is rolled back and the metadata is removed
     assertFalse(actual.isPresent());
     // get a new iceberg sync to make sure table is re-read from disk and no metadata is cached
@@ -379,7 +379,7 @@ public class TestIcebergSync {
             .transformType(PartitionTransformType.DAY)
             .build();
 
-    OneTable table =
+    InternalTable table =
         getOneTable(
             tableName,
             basePath,
@@ -444,7 +444,7 @@ public class TestIcebergSync {
             .transformType(PartitionTransformType.DAY)
             .build();
 
-    OneTable table =
+    InternalTable table =
         getOneTable(
             tableName,
             basePath,
@@ -506,7 +506,7 @@ public class TestIcebergSync {
             .transformType(PartitionTransformType.VALUE)
             .build();
 
-    OneTable table =
+    InternalTable table =
         getOneTable(
             tableName,
             basePath,
@@ -568,7 +568,7 @@ public class TestIcebergSync {
             .transformType(PartitionTransformType.DAY)
             .build();
 
-    OneTable table =
+    InternalTable table =
         getOneTable(
             tableName,
             basePath,
@@ -645,7 +645,7 @@ public class TestIcebergSync {
             .transformType(PartitionTransformType.VALUE)
             .build();
 
-    OneTable table =
+    InternalTable table =
         getOneTable(
             tableName,
             basePath,
@@ -696,11 +696,13 @@ public class TestIcebergSync {
   }
 
   private InternalSnapshot buildSnapshot(
-      OneTable table, Map<SchemaVersion, InternalSchema> schemas, InternalDataFile... dataFiles) {
+      InternalTable table,
+      Map<SchemaVersion, InternalSchema> schemas,
+      InternalDataFile... dataFiles) {
     return InternalSnapshot.builder()
         .table(table)
         .schemaCatalog(SchemaCatalog.builder().schemas(schemas).build())
-        .partitionedDataFiles(OneFileGroup.fromFiles(Arrays.asList(dataFiles)))
+        .partitionedDataFiles(PartitionFileGroup.fromFiles(Arrays.asList(dataFiles)))
         .build();
   }
 
@@ -718,13 +720,13 @@ public class TestIcebergSync {
         .build();
   }
 
-  private OneTable getOneTable(
+  private InternalTable getOneTable(
       String tableName,
       Path basePath,
       InternalSchema schema,
       List<InternalPartitionField> partitionFields,
       Instant lastCommitTime) {
-    return OneTable.builder()
+    return InternalTable.builder()
         .name(tableName)
         .basePath(basePath.toString())
         .layoutStrategy(DataLayoutStrategy.FLAT)
@@ -737,7 +739,7 @@ public class TestIcebergSync {
 
   private void validateIcebergTable(
       String tableName,
-      OneTable table,
+      InternalTable table,
       Set<InternalDataFile> expectedFiles,
       Expression filterExpression)
       throws IOException {
