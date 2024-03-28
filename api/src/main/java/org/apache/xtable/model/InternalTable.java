@@ -35,7 +35,7 @@ import org.apache.xtable.model.storage.DataLayoutStrategy;
  */
 @Value
 @Builder(toBuilder = true)
-public class OneTable {
+public class InternalTable {
   // name of the table
   String name;
   // table format the table currently has data in

@@ -18,15 +18,15 @@
  
 package org.apache.xtable.exception;
 
-import org.apache.xtable.model.exception.OneTableErrorCode;
-import org.apache.xtable.model.exception.OneTableException;
+import org.apache.xtable.model.exception.ErrorCode;
+import org.apache.xtable.model.exception.InternalException;
 
-public class OneIOException extends OneTableException {
+public class OneIOException extends InternalException {
   public OneIOException(String message, Throwable e) {
-    super(OneTableErrorCode.IO_EXCEPTION, message, e);
+    super(ErrorCode.IO_EXCEPTION, message, e);
   }
 
   public OneIOException(String message) {
-    super(OneTableErrorCode.IO_EXCEPTION, message);
+    super(ErrorCode.IO_EXCEPTION, message);
   }
 }

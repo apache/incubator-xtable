@@ -32,7 +32,7 @@ import org.apache.iceberg.StructLike;
 import org.apache.iceberg.avro.AvroSchemaUtil;
 import org.apache.iceberg.types.Types;
 
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -108,13 +108,13 @@ public class TestIcebergPartitionValueConverter {
     assertEquals(expectedPartitionValues, partitionValues);
   }
 
-  private OneTable buildOnetable(boolean isPartitioned) {
+  private InternalTable buildOnetable(boolean isPartitioned) {
     return buildOnetable(isPartitioned, null, null);
   }
 
-  private OneTable buildOnetable(
+  private InternalTable buildOnetable(
       boolean isPartitioned, String sourceField, PartitionTransformType transformType) {
-    return OneTable.builder()
+    return InternalTable.builder()
         .readSchema(IcebergSchemaExtractor.getInstance().fromIceberg(SCHEMA))
         .partitioningFields(
             isPartitioned

@@ -46,7 +46,7 @@ public class IcebergDataFileExtractor {
    * @param dataFile Iceberg data file
    * @param partitionValues representation of partition fields and ranges
    * @param schema current schema for the table, used for mapping field IDs to stats
-   * @return corresponding OneTable data file
+   * @return corresponding InternalTable data file
    */
   InternalDataFile fromIceberg(
       DataFile dataFile, List<PartitionValue> partitionValues, InternalSchema schema) {
@@ -85,10 +85,10 @@ public class IcebergDataFileExtractor {
   }
 
   /**
-   * Maps Iceberg file format to OneTable file format
+   * Maps Iceberg file format to InternalTable file format
    *
    * @param format Iceberg file format
-   * @return corresponding OneTable file format
+   * @return corresponding InternalTable file format
    */
   FileFormat fromIcebergFileFormat(org.apache.iceberg.FileFormat format) {
     switch (format) {

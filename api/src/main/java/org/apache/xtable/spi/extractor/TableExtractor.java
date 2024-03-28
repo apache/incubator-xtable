@@ -18,13 +18,13 @@
  
 package org.apache.xtable.spi.extractor;
 
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 
 /**
- * Extracts {@link OneTable} from given {@link CLIENT}.
+ * Extracts {@link InternalTable} from given {@link CLIENT}.
  *
  * @param <CLIENT> Extracts canonical table model from table client.
  */
 public interface TableExtractor<CLIENT> {
-  OneTable table(CLIENT tableServiceClient);
+  InternalTable table(CLIENT tableServiceClient);
 }

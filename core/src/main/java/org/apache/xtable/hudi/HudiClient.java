@@ -47,7 +47,7 @@ import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.spi.extractor.SourceClient;
@@ -73,12 +73,12 @@ public class HudiClient implements SourceClient<HoodieInstant> {
   }
 
   @Override
-  public OneTable getTable(HoodieInstant commit) {
+  public InternalTable getTable(HoodieInstant commit) {
     return tableExtractor.table(metaClient, commit);
   }
 
   @Override
-  public SchemaCatalog getSchemaCatalog(OneTable table, HoodieInstant commit) {
+  public SchemaCatalog getSchemaCatalog(InternalTable table, HoodieInstant commit) {
     return HudiSchemaCatalogExtractor.catalogWithTableSchema(table);
   }
 
@@ -97,7 +97,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
             .filterInflightsAndRequested()
             .findInstantsBefore(latestCommit.getTimestamp())
             .getInstants();
-    OneTable table = getTable(latestCommit);
+    InternalTable table = getTable(latestCommit);
     return InternalSnapshot.builder()
         .table(table)
         .schemaCatalog(getSchemaCatalog(table, latestCommit))
@@ -118,7 +118,7 @@ public class HudiClient implements SourceClient<HoodieInstant> {
         activeTimeline
             .filterCompletedInstants()
             .findInstantsBeforeOrEquals(hoodieInstantForDiff.getTimestamp());
-    OneTable table = getTable(hoodieInstantForDiff);
+    InternalTable table = getTable(hoodieInstantForDiff);
     return TableChange.builder()
         .tableAsOfChange(table)
         .filesDiff(

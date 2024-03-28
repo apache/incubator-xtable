@@ -26,7 +26,7 @@ import lombok.Builder;
 import lombok.Value;
 
 import org.apache.xtable.model.schema.SchemaCatalog;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 
 /**
  * Snapshot represents the view of the table at a specific point in time. Snapshot captures all the
@@ -43,11 +43,11 @@ public class InternalSnapshot {
   // The instant of the Snapshot
   String version;
   // Table reference
-  OneTable table;
+  InternalTable table;
   // Schema catalog referencing the written schema for each data file in the snapshot
   SchemaCatalog schemaCatalog;
   // Data files grouped by partition
-  List<OneFileGroup> partitionedDataFiles;
+  List<PartitionFileGroup> partitionedDataFiles;
   // pending commits before latest commit on the table.
   @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
 }

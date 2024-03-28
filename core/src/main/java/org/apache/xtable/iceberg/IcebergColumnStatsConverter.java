@@ -54,7 +54,7 @@ public class IcebergColumnStatsConverter {
     Map<Integer, Long> columnSizes = new HashMap<>();
     Map<Integer, Long> valueCounts = new HashMap<>();
     Map<Integer, Long> nullValueCounts = new HashMap<>();
-    Map<Integer, Long> nanValueCounts = null; // OneTable currently doesn't track this
+    Map<Integer, Long> nanValueCounts = null; // InternalTable currently doesn't track this
     Map<Integer, ByteBuffer> lowerBounds = new HashMap<>();
     Map<Integer, ByteBuffer> upperBounds = new HashMap<>();
     fieldColumnStats.forEach(

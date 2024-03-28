@@ -78,7 +78,7 @@ import io.delta.standalone.types.StringType;
 
 import org.apache.xtable.client.PerTableConfigImpl;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -89,7 +89,7 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.schema.SchemaFieldFinder;
 import org.apache.xtable.spi.sync.TableFormatSync;
@@ -150,8 +150,8 @@ public class TestDeltaSync {
                     .build())
             .build());
     InternalSchema schema2 = getInternalSchema().toBuilder().fields(fields2).build();
-    OneTable table1 = getOneTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
-    OneTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
+    InternalTable table1 = getOneTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
+    InternalTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
 
     InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList(), basePath);
     InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
@@ -183,7 +183,7 @@ public class TestDeltaSync {
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OneTable table =
+    InternalTable table =
         getOneTable(
             tableName,
             basePath,
@@ -241,7 +241,7 @@ public class TestDeltaSync {
                     .build())
             .transformType(PartitionTransformType.VALUE)
             .build();
-    OneTable table =
+    InternalTable table =
         getOneTable(
             tableName,
             basePath,
@@ -307,7 +307,7 @@ public class TestDeltaSync {
             .sourceField(SchemaFieldFinder.getInstance().findFieldByPath(schema, "timestamp_field"))
             .transformType(transformType)
             .build();
-    OneTable table =
+    InternalTable table =
         getOneTable(
             tableName,
             basePath,
@@ -401,20 +401,20 @@ public class TestDeltaSync {
         internalDataFiles.size(), count, "Number of files from DeltaScan don't match expectation");
   }
 
-  private InternalSnapshot buildSnapshot(OneTable table, InternalDataFile... dataFiles) {
+  private InternalSnapshot buildSnapshot(InternalTable table, InternalDataFile... dataFiles) {
     return InternalSnapshot.builder()
         .table(table)
-        .partitionedDataFiles(OneFileGroup.fromFiles(Arrays.asList(dataFiles)))
+        .partitionedDataFiles(PartitionFileGroup.fromFiles(Arrays.asList(dataFiles)))
         .build();
   }
 
-  private OneTable getOneTable(
+  private InternalTable getOneTable(
       String tableName,
       Path basePath,
       InternalSchema schema,
       List<InternalPartitionField> partitionFields,
       Instant lastCommitTime) {
-    return OneTable.builder()
+    return InternalTable.builder()
         .name(tableName)
         .basePath(basePath.toUri().toString())
         .layoutStrategy(DataLayoutStrategy.FLAT)

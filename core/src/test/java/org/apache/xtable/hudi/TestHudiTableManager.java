@@ -38,7 +38,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -82,8 +82,8 @@ public class TestHudiTableManager {
                 .sourceField(InternalField.builder().name(field2).build())
                 .transformType(PartitionTransformType.VALUE)
                 .build());
-    OneTable table =
-        OneTable.builder()
+    InternalTable table =
+        InternalTable.builder()
             .name(tableName)
             .partitioningFields(inputPartitionFields)
             .readSchema(tableSchema)

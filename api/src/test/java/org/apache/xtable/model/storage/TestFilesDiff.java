@@ -38,8 +38,9 @@ public class TestFilesDiff {
     InternalDataFile file1Group2 = InternalDataFile.builder().physicalPath("file1Group2").build();
     InternalDataFile file2Group2 = InternalDataFile.builder().physicalPath("file2Group2").build();
 
-    List<OneFileGroup> latestFileGroups =
-        OneFileGroup.fromFiles(Arrays.asList(file1Group1, file2Group1, file1Group2, file2Group2));
+    List<PartitionFileGroup> latestFileGroups =
+        PartitionFileGroup.fromFiles(
+            Arrays.asList(file1Group1, file2Group1, file1Group2, file2Group2));
 
     Map<String, File> previousFiles = new HashMap<>();
     File file1 = mock(File.class);

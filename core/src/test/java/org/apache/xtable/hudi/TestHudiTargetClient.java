@@ -42,15 +42,15 @@ import org.apache.hudi.common.util.Option;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.DataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 
 /**
  * Unit tests that focus on the basic control flow of the HudiTargetClient. Functional tests are in
@@ -62,8 +62,12 @@ public class TestHudiTargetClient {
   private static final Instant COMMIT_TIME = Instant.ofEpochMilli(1598644800000L);
   private static final String COMMIT = "20200828200000000";
   private static final String BASE_PATH = "test-base-path";
-  private static final OneTable TABLE =
-      OneTable.builder().name("table").basePath(BASE_PATH).latestCommitTime(COMMIT_TIME).build();
+  private static final InternalTable TABLE =
+      InternalTable.builder()
+          .name("table")
+          .basePath(BASE_PATH)
+          .latestCommitTime(COMMIT_TIME)
+          .build();
 
   private final BaseFileUpdatesExtractor mockBaseFileUpdatesExtractor =
       mock(BaseFileUpdatesExtractor.class);
@@ -135,10 +139,10 @@ public class TestHudiTargetClient {
   void syncMetadata() {
     HudiTargetClient targetClient = getTargetClient(null);
     HudiTargetClient.CommitState mockCommitState = initMocksForBeginSync(targetClient).getLeft();
-    OneTableMetadata metadata = OneTableMetadata.of(COMMIT_TIME, Collections.emptyList());
+    TableSyncMetadata metadata = TableSyncMetadata.of(COMMIT_TIME, Collections.emptyList());
     targetClient.syncMetadata(metadata);
     // validate that metadata is set in commitState
-    verify(mockCommitState).setOneTableMetadata(metadata);
+    verify(mockCommitState).setTableSyncMetadata(metadata);
   }
 
   @Test
@@ -223,7 +227,7 @@ public class TestHudiTargetClient {
     HudiTargetClient.CommitState mockCommitState = mocks.getLeft();
     HoodieTableMetaClient mockMetaClient = mocks.getRight();
     String instant = "commit";
-    List<OneFileGroup> input = Collections.emptyList();
+    List<PartitionFileGroup> input = Collections.emptyList();
     BaseFileUpdatesExtractor.ReplaceMetadata output =
         BaseFileUpdatesExtractor.ReplaceMetadata.of(
             Collections.emptyMap(), Collections.emptyList());

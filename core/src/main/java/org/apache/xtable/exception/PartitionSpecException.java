@@ -18,15 +18,15 @@
  
 package org.apache.xtable.exception;
 
-import org.apache.xtable.model.exception.OneTableErrorCode;
-import org.apache.xtable.model.exception.OneTableException;
+import org.apache.xtable.model.exception.ErrorCode;
+import org.apache.xtable.model.exception.InternalException;
 
-public class PartitionSpecException extends OneTableException {
+public class PartitionSpecException extends InternalException {
   public PartitionSpecException(String message) {
-    super(OneTableErrorCode.INVALID_PARTITION_SPEC, message);
+    super(ErrorCode.INVALID_PARTITION_SPEC, message);
   }
 
   public PartitionSpecException(String message, Exception e) {
-    super(OneTableErrorCode.INVALID_PARTITION_SPEC, message, e);
+    super(ErrorCode.INVALID_PARTITION_SPEC, message, e);
   }
 }

@@ -63,7 +63,7 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.testutil.ColumnStatMapUtil;
 
 public class TestBaseFileUpdatesExtractor {
@@ -180,9 +180,9 @@ public class TestBaseFileUpdatesExtractor {
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
 
-    List<OneFileGroup> partitionedDataFiles =
+    List<PartitionFileGroup> partitionedDataFiles =
         Arrays.asList(
-            OneFileGroup.builder()
+            PartitionFileGroup.builder()
                 .partitionValues(
                     Collections.singletonList(
                         PartitionValue.builder()
@@ -191,7 +191,7 @@ public class TestBaseFileUpdatesExtractor {
                             .build()))
                 .files(Arrays.asList(addedFile1, addedFile2))
                 .build(),
-            OneFileGroup.builder()
+            PartitionFileGroup.builder()
                 .partitionValues(
                     Collections.singletonList(
                         PartitionValue.builder()
@@ -271,9 +271,9 @@ public class TestBaseFileUpdatesExtractor {
         createFile(
             String.format("%s/%s/%s", tableBasePath, partitionPath2, existingFileName2),
             Collections.emptyList());
-    List<OneFileGroup> partitionedDataFiles =
+    List<PartitionFileGroup> partitionedDataFiles =
         Arrays.asList(
-            OneFileGroup.builder()
+            PartitionFileGroup.builder()
                 .files(Arrays.asList(addedFile1, existingFile))
                 .partitionValues(
                     Collections.singletonList(
@@ -282,7 +282,7 @@ public class TestBaseFileUpdatesExtractor {
                             .range(Range.scalar(partitionPath2))
                             .build()))
                 .build(),
-            OneFileGroup.builder()
+            PartitionFileGroup.builder()
                 .files(Collections.singletonList(addedFile2))
                 .partitionValues(
                     Collections.singletonList(
@@ -356,9 +356,9 @@ public class TestBaseFileUpdatesExtractor {
     InternalDataFile existingFile =
         createFile(
             String.format("%s/%s", tableBasePath, existingFileName2), Collections.emptyList());
-    List<OneFileGroup> partitionedDataFiles =
+    List<PartitionFileGroup> partitionedDataFiles =
         Collections.singletonList(
-            OneFileGroup.builder()
+            PartitionFileGroup.builder()
                 .files(Arrays.asList(addedFile1, existingFile))
                 .partitionValues(Collections.emptyList())
                 .build());

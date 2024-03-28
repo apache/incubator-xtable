@@ -24,7 +24,7 @@ import java.time.Instant;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.SchemaCatalog;
 
@@ -35,12 +35,12 @@ import org.apache.xtable.model.schema.SchemaCatalog;
  */
 public interface SourceClient<COMMIT> extends Closeable {
   /**
-   * Extracts the {@link OneTable} definition as of the provided commit.
+   * Extracts the {@link InternalTable} definition as of the provided commit.
    *
    * @param commit the commit to consider for reading the table state
    * @return the table definition
    */
-  OneTable getTable(COMMIT commit);
+  InternalTable getTable(COMMIT commit);
 
   /**
    * Extracts the {@link SchemaCatalog} as of the provided instant.
@@ -49,7 +49,7 @@ public interface SourceClient<COMMIT> extends Closeable {
    * @param commit the commit to consider for reading the schema catalog
    * @return the schema catalog
    */
-  SchemaCatalog getSchemaCatalog(OneTable table, COMMIT commit);
+  SchemaCatalog getSchemaCatalog(InternalTable table, COMMIT commit);
 
   /**
    * Extracts the {@link InternalSnapshot} as of latest state.

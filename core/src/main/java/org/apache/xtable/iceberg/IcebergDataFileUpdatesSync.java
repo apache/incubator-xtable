@@ -29,11 +29,11 @@ import org.apache.iceberg.io.CloseableIterable;
 
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.OneIOException;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 
 @AllArgsConstructor(staticName = "of")
 public class IcebergDataFileUpdatesSync {
@@ -42,9 +42,9 @@ public class IcebergDataFileUpdatesSync {
 
   public void applySnapshot(
       Table table,
-      OneTable oneTable,
+      InternalTable internalTable,
       Transaction transaction,
-      List<OneFileGroup> partitionedDataFiles,
+      List<PartitionFileGroup> partitionedDataFiles,
       Schema schema,
       PartitionSpec partitionSpec) {
 

@@ -71,8 +71,8 @@ import org.apache.hudi.metadata.HoodieBackedTableMetadata;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
 import org.apache.xtable.client.PerTableConfigImpl;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -85,7 +85,7 @@ import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.TargetClient;
 
@@ -200,12 +200,12 @@ public class ITHudiTargetClient {
             .build();
     // perform sync
     HudiTargetClient targetClient = getTargetClient();
-    OneTable initialState = getState(Instant.now());
+    InternalTable initialState = getState(Instant.now());
     targetClient.beginSync(initialState);
     targetClient.syncFilesForDiff(dataFilesDiff);
     targetClient.syncSchema(SCHEMA);
-    OneTableMetadata latestState =
-        OneTableMetadata.of(initialState.getLatestCommitTime(), Collections.emptyList());
+    TableSyncMetadata latestState =
+        TableSyncMetadata.of(initialState.getLatestCommitTime(), Collections.emptyList());
     targetClient.syncMetadata(latestState);
     targetClient.completeSync();
 
@@ -227,9 +227,9 @@ public class ITHudiTargetClient {
     String partitionPath = "partition_path";
     String fileName = "file_1.parquet";
     String filePath = getFilePath(partitionPath, fileName);
-    List<OneFileGroup> snapshot =
+    List<PartitionFileGroup> snapshot =
         Collections.singletonList(
-            OneFileGroup.builder()
+            PartitionFileGroup.builder()
                 .files(Collections.singletonList(getTestFile(partitionPath, fileName)))
                 .partitionValues(
                     Collections.singletonList(
@@ -239,12 +239,12 @@ public class ITHudiTargetClient {
                             .build()))
                 .build());
     // sync snapshot and metadata
-    OneTable initialState = getState(Instant.now());
+    InternalTable initialState = getState(Instant.now());
     HudiTargetClient targetClient = getTargetClient();
     targetClient.beginSync(initialState);
     targetClient.syncFilesForSnapshot(snapshot);
-    OneTableMetadata latestState =
-        OneTableMetadata.of(initialState.getLatestCommitTime(), Collections.emptyList());
+    TableSyncMetadata latestState =
+        TableSyncMetadata.of(initialState.getLatestCommitTime(), Collections.emptyList());
     targetClient.syncSchema(initialState.getReadSchema());
     targetClient.syncMetadata(latestState);
     targetClient.completeSync();
@@ -269,9 +269,9 @@ public class ITHudiTargetClient {
 
     String fileName1 = "file_1.parquet";
     String filePath1 = getFilePath(partitionPath, fileName1);
-    List<OneFileGroup> snapshot =
+    List<PartitionFileGroup> snapshot =
         Collections.singletonList(
-            OneFileGroup.builder()
+            PartitionFileGroup.builder()
                 .files(
                     Arrays.asList(
                         getTestFile(partitionPath, fileName0),
@@ -284,12 +284,12 @@ public class ITHudiTargetClient {
                             .build()))
                 .build());
     // sync snapshot and metadata
-    OneTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));
+    InternalTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));
     HudiTargetClient targetClient = getTargetClient();
     targetClient.beginSync(initialState);
     targetClient.syncFilesForSnapshot(snapshot);
-    OneTableMetadata latestState =
-        OneTableMetadata.of(initialState.getLatestCommitTime(), Collections.emptyList());
+    TableSyncMetadata latestState =
+        TableSyncMetadata.of(initialState.getLatestCommitTime(), Collections.emptyList());
     targetClient.syncMetadata(latestState);
     targetClient.syncSchema(initialState.getReadSchema());
     targetClient.completeSync();
@@ -373,18 +373,18 @@ public class ITHudiTargetClient {
         2, metaClient.getArchivedTimeline().reload().filterCompletedInstants().countInstants());
   }
 
-  private OneTableMetadata incrementalSync(
+  private TableSyncMetadata incrementalSync(
       TargetClient targetClient,
       List<InternalDataFile> filesToAdd,
       List<InternalDataFile> filesToRemove,
       Instant commitStart) {
     DataFilesDiff dataFilesDiff2 =
         DataFilesDiff.builder().filesAdded(filesToAdd).filesRemoved(filesToRemove).build();
-    OneTable state3 = getState(commitStart);
+    InternalTable state3 = getState(commitStart);
     targetClient.beginSync(state3);
     targetClient.syncFilesForDiff(dataFilesDiff2);
-    OneTableMetadata latestState =
-        OneTableMetadata.of(state3.getLatestCommitTime(), Collections.emptyList());
+    TableSyncMetadata latestState =
+        TableSyncMetadata.of(state3.getLatestCommitTime(), Collections.emptyList());
     targetClient.syncMetadata(latestState);
     targetClient.completeSync();
     return latestState;
@@ -566,8 +566,8 @@ public class ITHudiTargetClient {
         .build();
   }
 
-  private OneTable getState(Instant latestCommitTime) {
-    return OneTable.builder()
+  private InternalTable getState(Instant latestCommitTime) {
+    return InternalTable.builder()
         .basePath(tableBasePath)
         .name(TABLE_NAME)
         .latestCommitTime(latestCommitTime)

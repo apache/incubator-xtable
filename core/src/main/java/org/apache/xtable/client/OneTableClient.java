@@ -42,7 +42,7 @@ import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.TableSyncMetadata;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.spi.extractor.ExtractFromSource;
@@ -98,7 +98,7 @@ public class OneTableClient {
                       tableFormat ->
                           tableFormatClientFactory.createForFormat(tableFormat, config, conf)));
       // State for each TableFormat
-      Map<String, Optional<OneTableMetadata>> lastSyncMetadataByFormat =
+      Map<String, Optional<TableSyncMetadata>> lastSyncMetadataByFormat =
           syncClientByFormat.entrySet().stream()
               .collect(
                   Collectors.toMap(
@@ -149,7 +149,7 @@ public class OneTableClient {
   private <COMMIT> Map<String, TargetClient> getFormatsToSyncIncrementally(
       PerTableConfig perTableConfig,
       Map<String, TargetClient> syncClientByFormat,
-      Map<String, Optional<OneTableMetadata>> lastSyncMetadataByFormat,
+      Map<String, Optional<TableSyncMetadata>> lastSyncMetadataByFormat,
       SourceClient<COMMIT> sourceClient) {
     if (perTableConfig.getSyncMode() == SyncMode.FULL) {
       // Full sync requested by config, hence no incremental sync.
@@ -161,11 +161,11 @@ public class OneTableClient {
               Optional<Instant> lastSyncInstant =
                   lastSyncMetadataByFormat
                       .get(entry.getKey())
-                      .map(OneTableMetadata::getLastInstantSynced);
+                      .map(TableSyncMetadata::getLastInstantSynced);
               List<Instant> pendingInstants =
                   lastSyncMetadataByFormat
                       .get(entry.getKey())
-                      .map(OneTableMetadata::getInstantsToConsiderForNextSync)
+                      .map(TableSyncMetadata::getInstantsToConsiderForNextSync)
                       .orElse(Collections.emptyList());
               return isIncrementalSyncSufficient(sourceClient, lastSyncInstant, pendingInstants);
             })
@@ -182,10 +182,10 @@ public class OneTableClient {
 
   private <COMMIT> SyncResultForTableFormats syncIncrementalChanges(
       Map<String, TargetClient> syncClientByFormat,
-      Map<String, Optional<OneTableMetadata>> lastSyncMetadataByFormat,
+      Map<String, Optional<TableSyncMetadata>> lastSyncMetadataByFormat,
       ExtractFromSource<COMMIT> source) {
     Map<String, SyncResult> syncResultsByFormat = Collections.emptyMap();
-    Map<TargetClient, OneTableMetadata> filteredSyncMetadataByFormat =
+    Map<TargetClient, TableSyncMetadata> filteredSyncMetadataByFormat =
         lastSyncMetadataByFormat.entrySet().stream()
             .filter(entry -> syncClientByFormat.containsKey(entry.getKey()))
             .collect(
@@ -231,7 +231,7 @@ public class OneTableClient {
                         .min(Instant::compareTo))
             .orElseGet(() -> pendingInstantsStream.min(Instant::compareTo));
     if (!earliestInstant.isPresent()) {
-      log.info("No previous OneTable sync for target. Falling back to snapshot sync.");
+      log.info("No previous InternalTable sync for target. Falling back to snapshot sync.");
       return false;
     }
     boolean isIncrementalSafeFromInstant =
@@ -246,15 +246,15 @@ public class OneTableClient {
   }
 
   private InstantsForIncrementalSync getMostOutOfSyncCommitAndPendingCommits(
-      Map<TargetClient, OneTableMetadata> lastSyncMetadataByFormat) {
+      Map<TargetClient, TableSyncMetadata> lastSyncMetadataByFormat) {
     Optional<Instant> mostOutOfSyncCommit =
         lastSyncMetadataByFormat.values().stream()
-            .map(OneTableMetadata::getLastInstantSynced)
+            .map(TableSyncMetadata::getLastInstantSynced)
             .sorted()
             .findFirst();
     List<Instant> allPendingInstants =
         lastSyncMetadataByFormat.values().stream()
-            .map(OneTableMetadata::getInstantsToConsiderForNextSync)
+            .map(TableSyncMetadata::getInstantsToConsiderForNextSync)
             .flatMap(Collection::stream)
             .distinct()
             .sorted()

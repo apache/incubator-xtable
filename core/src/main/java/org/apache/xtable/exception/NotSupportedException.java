@@ -18,15 +18,15 @@
  
 package org.apache.xtable.exception;
 
-import org.apache.xtable.model.exception.OneTableErrorCode;
-import org.apache.xtable.model.exception.OneTableException;
+import org.apache.xtable.model.exception.ErrorCode;
+import org.apache.xtable.model.exception.InternalException;
 
-public class NotSupportedException extends OneTableException {
+public class NotSupportedException extends InternalException {
   public NotSupportedException(String message, Throwable e) {
-    super(OneTableErrorCode.UNSUPPORTED_FEATURE, message, e);
+    super(ErrorCode.UNSUPPORTED_FEATURE, message, e);
   }
 
   public NotSupportedException(String message) {
-    super(OneTableErrorCode.UNSUPPORTED_FEATURE, message);
+    super(ErrorCode.UNSUPPORTED_FEATURE, message);
   }
 }

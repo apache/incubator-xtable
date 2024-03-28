@@ -34,6 +34,6 @@ public class TableChange {
   // Change in files at the specified instant
   DataFilesDiff filesDiff;
 
-  /** The {@link OneTable} at the commit time to which this table change belongs. */
-  OneTable tableAsOfChange;
+  /** The {@link InternalTable} at the commit time to which this table change belongs. */
+  InternalTable tableAsOfChange;
 }

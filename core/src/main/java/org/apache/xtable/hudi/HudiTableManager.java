@@ -36,7 +36,7 @@ import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.exception.TableNotFoundException;
 
 import org.apache.xtable.exception.OneIOException;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
@@ -76,13 +76,13 @@ class HudiTableManager {
   }
 
   /**
-   * Initializes a Hudi table with properties matching the provided {@link OneTable}
+   * Initializes a Hudi table with properties matching the provided {@link InternalTable}
    *
    * @param tableDataPath the base path for the data files in the table
    * @param table the table to initialize
    * @return {@link HoodieTableMetaClient} for the table that was created
    */
-  HoodieTableMetaClient initializeHudiTable(String tableDataPath, OneTable table) {
+  HoodieTableMetaClient initializeHudiTable(String tableDataPath, InternalTable table) {
     String recordKeyField = "";
     if (table.getReadSchema() != null) {
       List<String> recordKeys =

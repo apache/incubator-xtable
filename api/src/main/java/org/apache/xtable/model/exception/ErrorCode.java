@@ -18,19 +18,22 @@
  
 package org.apache.xtable.model.exception;
 
-import lombok.ToString;
+import lombok.Getter;
 
-@ToString
-public class OneTableException extends RuntimeException {
-  private final OneTableErrorCode errorCode;
+@Getter
+public enum ErrorCode {
+  INVALID_CONFIGURATION(10001),
+  INVALID_PARTITION_SPEC(10002),
+  INVALID_PARTITION_VALUE(10003),
+  IO_EXCEPTION(10004),
+  INVALID_SCHEMA(10005),
+  UNSUPPORTED_SCHEMA_TYPE(10006),
+  UNSUPPORTED_FEATURE(10007),
+  PARSE_EXCEPTION(10008);
 
-  protected OneTableException(OneTableErrorCode errorCode, String message, Throwable e) {
-    super(message, e);
-    this.errorCode = errorCode;
-  }
+  private final int errorCode;
 
-  protected OneTableException(OneTableErrorCode errorCode, String message) {
-    super(message);
+  ErrorCode(int errorCode) {
     this.errorCode = errorCode;
   }
 }

@@ -56,12 +56,12 @@ import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.xtable.client.PerTableConfig;
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.TargetClient;
 
@@ -148,7 +148,7 @@ public class DeltaClient implements TargetClient {
   }
 
   @Override
-  public void beginSync(OneTable table) {
+  public void beginSync(InternalTable table) {
     this.transactionState =
         new TransactionState(deltaLog, tableName, table.getLatestCommitTime(), logRetentionInHours);
   }
@@ -174,12 +174,12 @@ public class DeltaClient implements TargetClient {
   }
 
   @Override
-  public void syncMetadata(OneTableMetadata metadata) {
+  public void syncMetadata(TableSyncMetadata metadata) {
     transactionState.setMetadata(metadata);
   }
 
   @Override
-  public void syncFilesForSnapshot(List<OneFileGroup> partitionedDataFiles) {
+  public void syncFilesForSnapshot(List<PartitionFileGroup> partitionedDataFiles) {
     transactionState.setActions(
         dataFileUpdatesExtractor.applySnapshot(
             deltaLog, partitionedDataFiles, transactionState.getLatestSchemaInternal()));
@@ -201,8 +201,8 @@ public class DeltaClient implements TargetClient {
   }
 
   @Override
-  public Optional<OneTableMetadata> getTableMetadata() {
-    return OneTableMetadata.fromMap(
+  public Optional<TableSyncMetadata> getTableMetadata() {
+    return TableSyncMetadata.fromMap(
         JavaConverters.mapAsJavaMapConverter(deltaLog.snapshot().metadata().configuration())
             .asJava());
   }
@@ -223,7 +223,7 @@ public class DeltaClient implements TargetClient {
     private final String tableName;
     @Getter private StructType latestSchema;
     @Getter private InternalSchema latestSchemaInternal;
-    @Setter private OneTableMetadata metadata;
+    @Setter private TableSyncMetadata metadata;
     @Setter private Seq<Action> actions;
 
     private TransactionState(

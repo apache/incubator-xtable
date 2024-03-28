@@ -41,16 +41,16 @@ import org.junit.jupiter.api.Test;
 
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
@@ -62,10 +62,10 @@ public class TestTableFormatSync {
   @Test
   void syncSnapshotWithFailureForOneFormat() {
     Instant start = Instant.now();
-    OneTable startingTableState = getTableState(1);
-    List<OneFileGroup> fileGroups =
+    InternalTable startingTableState = getTableState(1);
+    List<PartitionFileGroup> fileGroups =
         Collections.singletonList(
-            OneFileGroup.builder()
+            PartitionFileGroup.builder()
                 .files(
                     Collections.singletonList(
                         InternalDataFile.builder().physicalPath("/tmp/path/file.parquet").build()))
@@ -118,15 +118,15 @@ public class TestTableFormatSync {
   @Test
   void syncChangesWithFailureForOneFormat() {
     Instant start = Instant.now();
-    OneTable tableState1 = getTableState(1);
+    InternalTable tableState1 = getTableState(1);
     DataFilesDiff dataFilesDiff1 = getFilesDiff(1);
     TableChange tableChange1 =
         TableChange.builder().tableAsOfChange(tableState1).filesDiff(dataFilesDiff1).build();
-    OneTable tableState2 = getTableState(2);
+    InternalTable tableState2 = getTableState(2);
     DataFilesDiff dataFilesDiff2 = getFilesDiff(2);
     TableChange tableChange2 =
         TableChange.builder().tableAsOfChange(tableState2).filesDiff(dataFilesDiff2).build();
-    OneTable tableState3 = getTableState(3);
+    InternalTable tableState3 = getTableState(3);
     DataFilesDiff dataFilesDiff3 = getFilesDiff(3);
     TableChange tableChange3 =
         TableChange.builder().tableAsOfChange(tableState3).filesDiff(dataFilesDiff3).build();
@@ -145,13 +145,13 @@ public class TestTableFormatSync {
             .tableChanges(tableChanges.iterator())
             .build();
 
-    Map<TargetClient, OneTableMetadata> clientWithMetadata = new HashMap<>();
+    Map<TargetClient, TableSyncMetadata> clientWithMetadata = new HashMap<>();
     clientWithMetadata.put(
         mockTargetClient1,
-        OneTableMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
+        TableSyncMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
     clientWithMetadata.put(
         mockTargetClient2,
-        OneTableMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
+        TableSyncMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
 
     Map<String, List<SyncResult>> result =
         TableFormatSync.getInstance().syncChanges(clientWithMetadata, incrementalTableChanges);
@@ -205,15 +205,15 @@ public class TestTableFormatSync {
   @Test
   void syncChangesWithDifferentFormatsAndMetadata() {
     Instant start = Instant.now();
-    OneTable tableState1 = getTableState(1);
+    InternalTable tableState1 = getTableState(1);
     DataFilesDiff dataFilesDiff1 = getFilesDiff(1);
     TableChange tableChange1 =
         TableChange.builder().tableAsOfChange(tableState1).filesDiff(dataFilesDiff1).build();
-    OneTable tableState2 = getTableState(2);
+    InternalTable tableState2 = getTableState(2);
     DataFilesDiff dataFilesDiff2 = getFilesDiff(2);
     TableChange tableChange2 =
         TableChange.builder().tableAsOfChange(tableState2).filesDiff(dataFilesDiff2).build();
-    OneTable tableState3 = getTableState(3);
+    InternalTable tableState3 = getTableState(3);
     DataFilesDiff dataFilesDiff3 = getFilesDiff(3);
     TableChange tableChange3 =
         TableChange.builder().tableAsOfChange(tableState3).filesDiff(dataFilesDiff3).build();
@@ -229,18 +229,18 @@ public class TestTableFormatSync {
             .tableChanges(tableChanges.iterator())
             .build();
 
-    Map<TargetClient, OneTableMetadata> clientWithMetadata = new HashMap<>();
+    Map<TargetClient, TableSyncMetadata> clientWithMetadata = new HashMap<>();
     // mockTargetClient1 will have the first table change as a previously pending instant and
     // otherwise be synced up to the 2nd change
     clientWithMetadata.put(
         mockTargetClient1,
-        OneTableMetadata.of(
+        TableSyncMetadata.of(
             tableChange2.getTableAsOfChange().getLatestCommitTime(),
             Collections.singletonList(tableChange1.getTableAsOfChange().getLatestCommitTime())));
     // mockTargetClient2 will have synced the first table change previously
     clientWithMetadata.put(
         mockTargetClient2,
-        OneTableMetadata.of(
+        TableSyncMetadata.of(
             tableChange1.getTableAsOfChange().getLatestCommitTime(), Collections.emptyList()));
 
     Map<String, List<SyncResult>> result =
@@ -291,7 +291,7 @@ public class TestTableFormatSync {
   @Test
   void syncChangesOneFormatWithNoRequiredChanges() {
     Instant start = Instant.now();
-    OneTable tableState1 = getTableState(1);
+    InternalTable tableState1 = getTableState(1);
     DataFilesDiff dataFilesDiff1 = getFilesDiff(1);
     TableChange tableChange1 =
         TableChange.builder().tableAsOfChange(tableState1).filesDiff(dataFilesDiff1).build();
@@ -307,14 +307,14 @@ public class TestTableFormatSync {
             .tableChanges(tableChanges.iterator())
             .build();
 
-    Map<TargetClient, OneTableMetadata> clientWithMetadata = new HashMap<>();
+    Map<TargetClient, TableSyncMetadata> clientWithMetadata = new HashMap<>();
     // mockTargetClient1 will have nothing to sync
     clientWithMetadata.put(
-        mockTargetClient1, OneTableMetadata.of(Instant.now(), Collections.emptyList()));
+        mockTargetClient1, TableSyncMetadata.of(Instant.now(), Collections.emptyList()));
     // mockTargetClient2 will have synced the first table change previously
     clientWithMetadata.put(
         mockTargetClient2,
-        OneTableMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
+        TableSyncMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
 
     Map<String, List<SyncResult>> result =
         TableFormatSync.getInstance().syncChanges(clientWithMetadata, incrementalTableChanges);
@@ -342,8 +342,8 @@ public class TestTableFormatSync {
    * @param id id to use in the names of certain fields
    * @return the table
    */
-  private static OneTable getTableState(int id) {
-    return OneTable.builder()
+  private static InternalTable getTableState(int id) {
+    return InternalTable.builder()
         .tableFormat(TableFormat.HUDI)
         .readSchema(InternalSchema.builder().name(String.format("test_schema_%d", id)).build())
         .partitioningFields(
@@ -371,12 +371,14 @@ public class TestTableFormatSync {
   }
 
   private void verifyBaseClientCalls(
-      TargetClient mockClient, OneTable startingTableState, List<Instant> pendingCommitInstants) {
+      TargetClient mockClient,
+      InternalTable startingTableState,
+      List<Instant> pendingCommitInstants) {
     verify(mockClient).beginSync(startingTableState);
     verify(mockClient).syncSchema(startingTableState.getReadSchema());
     verify(mockClient).syncPartitionSpec(startingTableState.getPartitioningFields());
     verify(mockClient)
         .syncMetadata(
-            OneTableMetadata.of(startingTableState.getLatestCommitTime(), pendingCommitInstants));
+            TableSyncMetadata.of(startingTableState.getLatestCommitTime(), pendingCommitInstants));
   }
 }

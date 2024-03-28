@@ -60,16 +60,16 @@ import org.apache.hudi.metadata.HoodieTableMetadata;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.OneIOException;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 
-/** Extracts all the files for Hudi table represented by {@link OneTable}. */
+/** Extracts all the files for Hudi table represented by {@link InternalTable}. */
 public class HudiDataFileExtractor implements AutoCloseable {
   private static final SchemaVersion DEFAULT_SCHEMA_VERSION = new SchemaVersion(1, null);
   private final HoodieTableMetadata tableMetadata;
@@ -109,7 +109,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
     this.fileStatsExtractor = hudiFileStatsExtractor;
   }
 
-  public List<OneFileGroup> getFilesCurrentState(OneTable table) {
+  public List<PartitionFileGroup> getFilesCurrentState(InternalTable table) {
     try {
       List<String> allPartitionPaths =
           tableMetadata != null
@@ -124,7 +124,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
   public DataFilesDiff getDiffForCommit(
       HoodieInstant hoodieInstantForDiff,
-      OneTable table,
+      InternalTable table,
       HoodieInstant instant,
       HoodieTimeline visibleTimeline) {
     SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
@@ -343,8 +343,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
   }
 
-  private List<OneFileGroup> getInternalDataFilesForPartitions(
-      List<String> partitionPaths, OneTable table) {
+  private List<PartitionFileGroup> getInternalDataFilesForPartitions(
+      List<String> partitionPaths, InternalTable table) {
 
     SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
     Stream<InternalDataFile> filesWithoutStats =
@@ -361,7 +361,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                 });
     Stream<InternalDataFile> files =
         fileStatsExtractor.addStatsToFiles(tableMetadata, filesWithoutStats, table.getReadSchema());
-    return OneFileGroup.fromFiles(files);
+    return PartitionFileGroup.fromFiles(files);
   }
 
   @Override

@@ -48,7 +48,7 @@ import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.SchemaCatalog;
@@ -56,7 +56,7 @@ import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.spi.extractor.DataFileIterator;
 import org.apache.xtable.spi.extractor.SourceClient;
 
@@ -81,12 +81,12 @@ public class DeltaSourceClient implements SourceClient<Long> {
   private final String basePath;
 
   @Override
-  public OneTable getTable(Long version) {
+  public InternalTable getTable(Long version) {
     return tableExtractor.table(deltaLog, tableName, version);
   }
 
   @Override
-  public SchemaCatalog getSchemaCatalog(OneTable table, Long version) {
+  public SchemaCatalog getSchemaCatalog(InternalTable table, Long version) {
     // TODO: Does not support schema versions for now
     Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion = new SchemaVersion(1, "");
@@ -98,7 +98,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
   public InternalSnapshot getCurrentSnapshot() {
     DeltaLog deltaLog = DeltaLog.forTable(sparkSession, basePath);
     Snapshot snapshot = deltaLog.snapshot();
-    OneTable table = getTable(snapshot.version());
+    InternalTable table = getTable(snapshot.version());
     return InternalSnapshot.builder()
         .table(table)
         .schemaCatalog(getSchemaCatalog(table, snapshot.version()))
@@ -108,7 +108,7 @@ public class DeltaSourceClient implements SourceClient<Long> {
 
   @Override
   public TableChange getTableChangeForCommit(Long versionNumber) {
-    OneTable tableAtVersion = tableExtractor.table(deltaLog, tableName, versionNumber);
+    InternalTable tableAtVersion = tableExtractor.table(deltaLog, tableName, versionNumber);
     // Client to call getCommitsBacklog and call this method.
     List<Action> actionsForVersion = getChangesState().getActionsForVersion(versionNumber);
     Snapshot snapshotAtVersion = deltaLog.getSnapshotAt(versionNumber, Option.empty());
@@ -188,11 +188,11 @@ public class DeltaSourceClient implements SourceClient<Long> {
                 .build());
   }
 
-  private List<OneFileGroup> getInternalDataFiles(Snapshot snapshot, InternalSchema schema) {
+  private List<PartitionFileGroup> getInternalDataFiles(Snapshot snapshot, InternalSchema schema) {
     try (DataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
       List<InternalDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);
-      return OneFileGroup.fromFiles(dataFiles);
+      return PartitionFileGroup.fromFiles(dataFiles);
     } catch (Exception e) {
       throw new OneIOException("Failed to iterate through Delta data files", e);
     }

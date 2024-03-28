@@ -20,16 +20,16 @@ package org.apache.xtable.model.validation;
 
 import java.util.Map;
 
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.storage.TableFormat;
 
 /**
  * Interface to implement a validation checker. Runs the specified list of {@link ValidationCheck}
- * on the {@link OneTable} using the specified {@link TableFormat}
+ * on the {@link InternalTable} using the specified {@link TableFormat}
  *
  * @since 0.1
  */
 public interface ValidationChecker {
   Map<ValidationCheck, ValidationResult> validate(
-      OneTable table, TableFormat tableFormat, ValidationCheck[] checks);
+      InternalTable table, TableFormat tableFormat, ValidationCheck[] checks);
 }

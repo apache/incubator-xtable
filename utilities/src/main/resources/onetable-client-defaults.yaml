@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-## This file contains the default configuration of known OneTable tableFormatsClients for both source and target
+## This file contains the default configuration of known InternalTable tableFormatsClients for both source and target
 ## table formats. The config maps a table format name to a client class, and contains the default configuration
 ## values needed by the client.
 

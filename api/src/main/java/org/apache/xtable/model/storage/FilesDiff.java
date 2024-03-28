@@ -93,7 +93,7 @@ public class FilesDiff<L, P> {
    * @return the set of files that are added
    */
   public static <P> FilesDiff<InternalDataFile, P> findNewAndRemovedFiles(
-      List<OneFileGroup> latestFileGroups, Map<String, P> previousFiles) {
+      List<PartitionFileGroup> latestFileGroups, Map<String, P> previousFiles) {
     Map<String, InternalDataFile> latestFiles =
         latestFileGroups.stream()
             .flatMap(group -> group.getFiles().stream())

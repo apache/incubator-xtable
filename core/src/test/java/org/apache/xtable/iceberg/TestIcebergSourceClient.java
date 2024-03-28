@@ -54,7 +54,7 @@ import org.apache.xtable.client.PerTableConfigImpl;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -99,24 +99,25 @@ class TestIcebergSourceClient {
     IcebergSourceClient client = clientProvider.getSourceClientInstance(sourceTableConfig);
 
     Snapshot snapshot = catalogSales.currentSnapshot();
-    OneTable oneTable = client.getTable(snapshot);
-    Assertions.assertNotNull(oneTable);
-    assertEquals(TableFormat.ICEBERG, oneTable.getTableFormat());
-    Assertions.assertTrue(oneTable.getName().endsWith("catalog_sales"));
-    assertEquals(catalogSales.location(), oneTable.getBasePath());
-    assertEquals(DataLayoutStrategy.HIVE_STYLE_PARTITION, oneTable.getLayoutStrategy());
-    assertEquals(snapshot.timestampMillis(), oneTable.getLatestCommitTime().toEpochMilli());
-    Assertions.assertNotNull(oneTable.getReadSchema());
+    InternalTable internalTable = client.getTable(snapshot);
+    Assertions.assertNotNull(internalTable);
+    assertEquals(TableFormat.ICEBERG, internalTable.getTableFormat());
+    Assertions.assertTrue(internalTable.getName().endsWith("catalog_sales"));
+    assertEquals(catalogSales.location(), internalTable.getBasePath());
+    assertEquals(DataLayoutStrategy.HIVE_STYLE_PARTITION, internalTable.getLayoutStrategy());
+    assertEquals(snapshot.timestampMillis(), internalTable.getLatestCommitTime().toEpochMilli());
+    Assertions.assertNotNull(internalTable.getReadSchema());
 
-    Assertions.assertEquals(7, oneTable.getReadSchema().getFields().size());
-    validateSchema(oneTable.getReadSchema(), catalogSales.schema());
+    Assertions.assertEquals(7, internalTable.getReadSchema().getFields().size());
+    validateSchema(internalTable.getReadSchema(), catalogSales.schema());
 
-    assertEquals(1, oneTable.getPartitioningFields().size());
-    InternalField partitionField = oneTable.getPartitioningFields().get(0).getSourceField();
+    assertEquals(1, internalTable.getPartitioningFields().size());
+    InternalField partitionField = internalTable.getPartitioningFields().get(0).getSourceField();
     assertEquals("cs_sold_date_sk", partitionField.getName());
     assertEquals(7, partitionField.getFieldId());
     assertEquals(
-        PartitionTransformType.VALUE, oneTable.getPartitioningFields().get(0).getTransformType());
+        PartitionTransformType.VALUE,
+        internalTable.getPartitioningFields().get(0).getTransformType());
   }
 
   @Test
@@ -174,9 +175,9 @@ class TestIcebergSourceClient {
     verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any(), any());
 
     Assertions.assertNotNull(internalSnapshot.getPartitionedDataFiles());
-    List<OneFileGroup> dataFileChunks = internalSnapshot.getPartitionedDataFiles();
+    List<PartitionFileGroup> dataFileChunks = internalSnapshot.getPartitionedDataFiles();
     assertEquals(5, dataFileChunks.size());
-    for (OneFileGroup dataFilesChunk : dataFileChunks) {
+    for (PartitionFileGroup dataFilesChunk : dataFileChunks) {
       List<InternalDataFile> internalDataFiles = dataFilesChunk.getFiles();
       assertEquals(1, internalDataFiles.size());
       InternalDataFile internalDataFile = internalDataFiles.get(0);

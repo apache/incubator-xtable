@@ -41,7 +41,7 @@ import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.OneTable;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -91,7 +91,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   }
 
   @Override
-  public OneTable getTable(Snapshot snapshot) {
+  public InternalTable getTable(Snapshot snapshot) {
     Table iceTable = getSourceTable();
     Schema iceSchema = iceTable.schemas().get(snapshot.schemaId());
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
@@ -107,7 +107,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         irPartitionFields.size() > 0
             ? DataLayoutStrategy.HIVE_STYLE_PARTITION
             : DataLayoutStrategy.FLAT;
-    return OneTable.builder()
+    return InternalTable.builder()
         .tableFormat(TableFormat.ICEBERG)
         .basePath(iceTable.location())
         .name(iceTable.name())
@@ -119,7 +119,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   }
 
   @Override
-  public SchemaCatalog getSchemaCatalog(OneTable table, Snapshot snapshot) {
+  public SchemaCatalog getSchemaCatalog(InternalTable table, Snapshot snapshot) {
     Table iceTable = getSourceTable();
     Integer iceSchemaId = snapshot.schemaId();
     Schema iceSchema = iceTable.schemas().get(iceSchemaId);
@@ -135,12 +135,12 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     Table iceTable = getSourceTable();
 
     Snapshot currentSnapshot = iceTable.currentSnapshot();
-    OneTable irTable = getTable(currentSnapshot);
+    InternalTable irTable = getTable(currentSnapshot);
     SchemaCatalog schemaCatalog = getSchemaCatalog(irTable, currentSnapshot);
 
     TableScan scan = iceTable.newScan().useSnapshot(currentSnapshot.snapshotId());
     PartitionSpec partitionSpec = iceTable.spec();
-    List<OneFileGroup> partitionedDataFiles;
+    List<PartitionFileGroup> partitionedDataFiles;
     try (CloseableIterable<FileScanTask> files = scan.planFiles()) {
       List<InternalDataFile> irFiles = new ArrayList<>();
       for (FileScanTask fileScanTask : files) {
@@ -148,7 +148,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
         InternalDataFile irDataFile = fromIceberg(file, partitionSpec, irTable);
         irFiles.add(irDataFile);
       }
-      partitionedDataFiles = OneFileGroup.fromFiles(irFiles);
+      partitionedDataFiles = PartitionFileGroup.fromFiles(irFiles);
     } catch (IOException e) {
       throw new OneIOException("Failed to fetch current snapshot files from Iceberg source", e);
     }
@@ -162,10 +162,10 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
   }
 
   private InternalDataFile fromIceberg(
-      DataFile file, PartitionSpec partitionSpec, OneTable oneTable) {
+      DataFile file, PartitionSpec partitionSpec, InternalTable internalTable) {
     List<PartitionValue> partitionValues =
-        partitionConverter.toOneTable(oneTable, file.partition(), partitionSpec);
-    return dataFileExtractor.fromIceberg(file, partitionValues, oneTable.getReadSchema());
+        partitionConverter.toOneTable(internalTable, file.partition(), partitionSpec);
+    return dataFileExtractor.fromIceberg(file, partitionValues, internalTable.getReadSchema());
   }
 
   @Override
@@ -173,7 +173,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     FileIO fileIO = getTableOps();
     Table iceTable = getSourceTable();
     PartitionSpec partitionSpec = iceTable.spec();
-    OneTable irTable = getTable(snapshot);
+    InternalTable irTable = getTable(snapshot);
 
     Set<InternalDataFile> dataFilesAdded =
         StreamSupport.stream(snapshot.addedDataFiles(fileIO).spliterator(), false)
@@ -188,7 +188,7 @@ public class IcebergSourceClient implements SourceClient<Snapshot> {
     DataFilesDiff filesDiff =
         DataFilesDiff.builder().filesAdded(dataFilesAdded).filesRemoved(dataFilesRemoved).build();
 
-    OneTable table = getTable(snapshot);
+    InternalTable table = getTable(snapshot);
     return TableChange.builder().tableAsOfChange(table).filesDiff(filesDiff).build();
   }
 

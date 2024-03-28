@@ -30,9 +30,13 @@ import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 
+/**
+ * Metadata representing the state of a table sync process. This metadata is stored in the target
+ * table's properties and is used to track the status of previous sync operation.
+ */
 @AllArgsConstructor(staticName = "of")
 @Value
-public class OneTableMetadata {
+public class TableSyncMetadata {
   /**
    * Property name for the lastInstantSynced field from SyncResult, used for persisting
    * lastInstantSynced in the table metadata/properties
@@ -57,7 +61,7 @@ public class OneTableMetadata {
     return map;
   }
 
-  public static Optional<OneTableMetadata> fromMap(Map<String, String> properties) {
+  public static Optional<TableSyncMetadata> fromMap(Map<String, String> properties) {
     if (properties != null) {
       Instant lastInstantSynced = null;
       List<Instant> instantsToConsiderForNextSync = null;
@@ -70,7 +74,7 @@ public class OneTableMetadata {
                 properties.get(INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP));
       }
       return Optional.ofNullable(
-          OneTableMetadata.of(lastInstantSynced, instantsToConsiderForNextSync));
+          TableSyncMetadata.of(lastInstantSynced, instantsToConsiderForNextSync));
     }
     return Optional.empty();
   }

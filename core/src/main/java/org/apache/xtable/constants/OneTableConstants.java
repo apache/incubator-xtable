@@ -30,6 +30,6 @@ public class OneTableConstants {
    */
   public static final Integer NUM_ARCHIVED_SYNCS_RESULTS = 10;
 
-  /** OneTable meta directory inside table base path to store sync info. */
+  /** InternalTable meta directory inside table base path to store sync info. */
   public static final String ONETABLE_META_DIR = ".onetable";
 }

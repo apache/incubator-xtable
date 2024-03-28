@@ -24,12 +24,12 @@ import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.xtable.client.PerTableConfig;
-import org.apache.xtable.model.OneTable;
-import org.apache.xtable.model.OneTableMetadata;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
-import org.apache.xtable.model.storage.OneFileGroup;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 
 /** A client that provides the major functionality for syncing changes to a target system. */
 public interface TargetClient {
@@ -49,12 +49,12 @@ public interface TargetClient {
   void syncPartitionSpec(List<InternalPartitionField> partitionSpec);
 
   /**
-   * Syncs the {@link OneTableMetadata} to the target for tracking metadata between runs. This is
+   * Syncs the {@link TableSyncMetadata} to the target for tracking metadata between runs. This is
    * required for incremental sync.
    *
    * @param metadata the current metadata
    */
-  void syncMetadata(OneTableMetadata metadata);
+  void syncMetadata(TableSyncMetadata metadata);
 
   /**
    * Syncs the provided snapshot files to the target system. This method is required to both add and
@@ -62,7 +62,7 @@ public interface TargetClient {
    *
    * @param partitionedDataFiles the files to sync, grouped by partition
    */
-  void syncFilesForSnapshot(List<OneFileGroup> partitionedDataFiles);
+  void syncFilesForSnapshot(List<PartitionFileGroup> partitionedDataFiles);
 
   /**
    * Syncs the changes in files to the target system. This method is required to both add and remove
@@ -77,13 +77,13 @@ public interface TargetClient {
    *
    * @param table the table that will be synced
    */
-  void beginSync(OneTable table);
+  void beginSync(InternalTable table);
 
   /** Completes the sync and performs any cleanup required. */
   void completeSync();
 
   /** Returns the onetable metadata persisted in the target */
-  Optional<OneTableMetadata> getTableMetadata();
+  Optional<TableSyncMetadata> getTableMetadata();
 
   /** Returns the TableFormat name the client syncs to */
   String getTableFormat();
