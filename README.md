@@ -93,9 +93,11 @@ catalogOptions: # all other options are passed through in a map
   key2: value2
 ```
 5. run with `java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--clientsConfig clients.yaml] [--icebergCatalogConfig catalog.yaml]`
-The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Authentication for AWS is done with 
-`com.amazonaws.auth.DefaultAWSCredentialsProviderChain`. To override this setting, specify a different implementation 
-with the `--awsCredentialsProvider` option.
+The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Sample hadoop configurations for configuring the clients 
+can be found in the [onetable-hadoop-defaults.xml](https://github.com/apache/incubator-xtable/blob/main/utilities/src/main/resources/onetable-hadoop-defaults.xml) file.
+The custom hadoop configurations can be passed in with the `--hadoopConfig [custom-hadoop-config-file]` option.
+The config in custom hadoop config file will override the default hadoop configurations. For an example
+of a custom hadoop config file, see [hadoop.xml](https://xtable.apache.org/docs/fabric#step-2-translate-source-table-to-delta-lake-format-using-apache-xtable-incubating).
 
 # Contributing
 ## Setup
