@@ -66,23 +66,23 @@ datasets:
     - `DAY`: same as `YEAR` but with day granularity
     - `HOUR`: same as `YEAR` but with hour granularity
   - `format`: if your partition type is `YEAR`, `MONTH`, `DAY`, or `HOUR` specify the format for the date string as it appears in your file paths
-3. The default implementations of table format clients can be replaced with custom implementations by specifying a client configs yaml file in the format below:
+3. The default implementations of table format converters can be replaced with custom implementations by specifying a converter configs yaml file in the format below:
 ```yaml
-# sourceClientProviderClass: The class name of a table format's client factory, where the client is
+# conversionSourceProviderClass: The class name of a table format's converter factory, where the converter is
 #     used for reading from a table of this format. All user configurations, including hadoop config
-#     and client specific configuration, will be available to the factory for instantiation of the
-#     client.
-# targetClientProviderClass: The class name of a table format's client factory, where the client is
+#     and converter specific configuration, will be available to the factory for instantiation of the
+#     converter.
+# conversionTargetProviderClass: The class name of a table format's converter factory, where the converter is
 #     used for writing to a table of this format.
-# configuration: A map of configuration values specific to this client.
-tableFormatsClients:
+# configuration: A map of configuration values specific to this converter.
+tableFormatConverters:
     HUDI:
-      sourceClientProviderClass: org.apache.xtable.hudi.HudiSourceClientProvider
+      conversionSourceProviderClass: org.apache.xtable.hudi.HudiConversionSourceProvider
     DELTA:
-      targetClientProviderClass: org.apache.xtable.delta.DeltaClient
+      conversionTargetProviderClass: org.apache.xtable.delta.DeltaConversionTarget
       configuration:
         spark.master: local[2]
-        spark.app.name: onetableclient
+        spark.app.name: xtable
 ```
 4. A catalog can be used when reading and updating Iceberg tables. The catalog can be specified in a yaml file and passed in with the `--icebergCatalogConfig` option. The format of the catalog config file is:
 ```yaml
@@ -92,8 +92,8 @@ catalogOptions: # all other options are passed through in a map
   key1: value1
   key2: value2
 ```
-5. run with `java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--clientsConfig clients.yaml] [--icebergCatalogConfig catalog.yaml]`
-The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Sample hadoop configurations for configuring the clients 
+5. run with `java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--convertersConfig converters.yaml] [--icebergCatalogConfig catalog.yaml]`
+The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Sample hadoop configurations for configuring the converters 
 can be found in the [onetable-hadoop-defaults.xml](https://github.com/apache/incubator-xtable/blob/main/utilities/src/main/resources/onetable-hadoop-defaults.xml) file.
 The custom hadoop configurations can be passed in with the `--hadoopConfig [custom-hadoop-config-file]` option.
 The config in custom hadoop config file will override the default hadoop configurations. For an example
@@ -107,7 +107,7 @@ For setting up the repo on IntelliJ, open the project and change the java versio
 You have found a bug, or have a cool idea you that want to contribute to the project ? Please file a GitHub issue [here](https://github.com/apache/incubator-xtable/issues)
 
 ## Adding a new target format
-Adding a new target format requires a developer implement [TargetClient](./api/src/main/java/org/apache/xtable/spi/sync/TargetClient.java). Once you have implemented that interface, you can integrate it into the [OneTableClient](./core/src/main/java/org/apache/xtable/client/OneTableClient.java). If you think others may find that target useful, please raise a Pull Request to add it to the project.
+Adding a new target format requires a developer implement [ConversionTarget](./api/src/main/java/org/apache/xtable/spi/sync/ConversionTarget.java). Once you have implemented that interface, you can integrate it into the [OneTableClient](./core/src/main/java/org/apache/xtable/client/OneTableClient.java). If you think others may find that target useful, please raise a Pull Request to add it to the project.
 
 ## Overview of the sync process
 ![img.png](assets/images/sync_flow.jpg)

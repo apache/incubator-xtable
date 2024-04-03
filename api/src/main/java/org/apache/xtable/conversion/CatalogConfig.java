@@ -16,21 +16,20 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.iceberg;
+package org.apache.xtable.conversion;
 
-import java.util.Collections;
 import java.util.Map;
 
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+/**
+ * Catalogs are responsible for the management of and providing access to the metadata associated
+ * with a given set of Tables, typically within the context of a namespaces. This interface
+ * represents the configuration required to initialize a client for a particular data engine such
+ * that it can access the necessary metadata for table conversions and semantic details.
+ */
+public interface CatalogConfig {
+  String getCatalogImpl();
 
-import org.apache.xtable.conversion.CatalogConfig;
+  String getCatalogName();
 
-@Value
-@Builder
-public class IcebergCatalogConfig implements CatalogConfig {
-  @NonNull String catalogImpl;
-  @NonNull String catalogName;
-  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
+  Map<String, String> getCatalogOptions();
 }

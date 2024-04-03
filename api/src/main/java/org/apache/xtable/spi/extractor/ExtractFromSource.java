@@ -32,20 +32,20 @@ import org.apache.xtable.model.TableChange;
 @AllArgsConstructor(staticName = "of")
 @Getter
 public class ExtractFromSource<COMMIT> {
-  private final SourceClient<COMMIT> sourceClient;
+  private final ConversionSource<COMMIT> conversionSource;
 
   public InternalSnapshot extractSnapshot() {
-    return sourceClient.getCurrentSnapshot();
+    return conversionSource.getCurrentSnapshot();
   }
 
   public IncrementalTableChanges extractTableChanges(
       InstantsForIncrementalSync instantsForIncrementalSync) {
     CommitsBacklog<COMMIT> commitsBacklog =
-        sourceClient.getCommitsBacklog(instantsForIncrementalSync);
+        conversionSource.getCommitsBacklog(instantsForIncrementalSync);
     // No overlap between updatedPendingCommits and commitList, process separately.
     Iterator<TableChange> tableChangeIterator =
         commitsBacklog.getCommitsToProcess().stream()
-            .map(sourceClient::getTableChangeForCommit)
+            .map(conversionSource::getTableChangeForCommit)
             .iterator();
     return IncrementalTableChanges.builder()
         .tableChanges(tableChangeIterator)

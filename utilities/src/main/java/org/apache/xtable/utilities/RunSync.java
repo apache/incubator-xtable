@@ -44,17 +44,17 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.annotations.VisibleForTesting;
 
-import org.apache.xtable.client.OneTableClient;
-import org.apache.xtable.client.PerTableConfig;
-import org.apache.xtable.client.PerTableConfigImpl;
-import org.apache.xtable.client.SourceClientProvider;
+import org.apache.xtable.conversion.ConversionController;
+import org.apache.xtable.conversion.ConversionSourceProvider;
+import org.apache.xtable.conversion.PerTableConfig;
+import org.apache.xtable.conversion.PerTableConfigImpl;
 import org.apache.xtable.hudi.ConfigurationBasedPartitionSpecExtractor;
 import org.apache.xtable.hudi.HudiSourceConfigImpl;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.reflection.ReflectionUtils;
-import org.apache.xtable.utilities.RunSync.TableFormatClients.ClientConfig;
+import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
 
 /**
  * Provides a standalone runner for the sync process. See README.md for more details on how to run
@@ -66,7 +66,7 @@ public class RunSync {
   public static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
   private static final String DATASET_CONFIG_OPTION = "d";
   private static final String HADOOP_CONFIG_PATH = "p";
-  private static final String CLIENTS_CONFIG_PATH = "c";
+  private static final String CONVERTERS_CONFIG_PATH = "c";
   private static final String ICEBERG_CATALOG_CONFIG_PATH = "i";
   private static final String HELP_OPTION = "h";
 
@@ -84,10 +84,10 @@ public class RunSync {
               "Hadoop config xml file path containing configs necessary to access the "
                   + "file system. These configs will override the default configs.")
           .addOption(
-              CLIENTS_CONFIG_PATH,
-              "clientsConfig",
+              CONVERTERS_CONFIG_PATH,
+              "convertersConfig",
               true,
-              "The path to a yaml file containing InternalTable client configurations. "
+              "The path to a yaml file containing InternalTable converter configurations. "
                   + "These configs will override the default")
           .addOption(
               ICEBERG_CATALOG_CONFIG_PATH,
@@ -127,22 +127,23 @@ public class RunSync {
     IcebergCatalogConfig icebergCatalogConfig = loadIcebergCatalogConfig(icebergCatalogConfigInput);
 
     String sourceFormat = datasetConfig.sourceFormat;
-    customConfig = getCustomConfigurations(cmd, CLIENTS_CONFIG_PATH);
-    TableFormatClients tableFormatClients = loadTableFormatClientConfigs(customConfig);
-    ClientConfig sourceClientConfig = tableFormatClients.getTableFormatsClients().get(sourceFormat);
-    if (sourceClientConfig == null) {
+    customConfig = getCustomConfigurations(cmd, CONVERTERS_CONFIG_PATH);
+    TableFormatConverters tableFormatConverters = loadTableFormatConversionConfigs(customConfig);
+    ConversionConfig sourceConversionConfig =
+        tableFormatConverters.getTableFormatConverters().get(sourceFormat);
+    if (sourceConversionConfig == null) {
       throw new IllegalArgumentException(
           String.format(
               "Source format %s is not supported. Known source and target formats are %s",
-              sourceFormat, tableFormatClients.getTableFormatsClients().keySet()));
+              sourceFormat, tableFormatConverters.getTableFormatConverters().keySet()));
     }
-    String sourceProviderClass = sourceClientConfig.sourceClientProviderClass;
-    SourceClientProvider<?> sourceClientProvider =
+    String sourceProviderClass = sourceConversionConfig.conversionSourceProviderClass;
+    ConversionSourceProvider<?> conversionSourceProvider =
         ReflectionUtils.createInstanceOfClass(sourceProviderClass);
-    sourceClientProvider.init(hadoopConf, sourceClientConfig.configuration);
+    conversionSourceProvider.init(hadoopConf, sourceConversionConfig.configuration);
 
     List<String> tableFormatList = datasetConfig.getTargetFormats();
-    OneTableClient client = new OneTableClient(hadoopConf);
+    ConversionController conversionController = new ConversionController(hadoopConf);
     for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
       log.info(
           "Running sync for basePath {} for following table formats {}",
@@ -165,7 +166,7 @@ public class RunSync {
               .syncMode(SyncMode.INCREMENTAL)
               .build();
       try {
-        client.sync(config, sourceClientProvider);
+        conversionController.sync(config, conversionSourceProvider);
       } catch (Exception e) {
         log.error(String.format("Error running sync for %s", table.getTableBasePath()), e);
       }
@@ -191,22 +192,24 @@ public class RunSync {
   }
 
   /**
-   * Loads the client configs. The method first loads the default configs and then merges any custom
-   * configs provided by the user.
+   * Loads the conversion configs. The method first loads the default configs and then merges any
+   * custom configs provided by the user.
    *
    * @param customConfigs the custom configs provided by the user
-   * @return available tableFormatsClients and their configs
+   * @return available tableFormatConverters and their configs
    */
   @VisibleForTesting
-  static TableFormatClients loadTableFormatClientConfigs(byte[] customConfigs) throws IOException {
-    // get resource stream from default client config yaml file
+  static TableFormatConverters loadTableFormatConversionConfigs(byte[] customConfigs)
+      throws IOException {
+    // get resource stream from default converter config yaml file
     try (InputStream inputStream =
-        RunSync.class.getClassLoader().getResourceAsStream("onetable-client-defaults.yaml")) {
-      TableFormatClients clients = YAML_MAPPER.readValue(inputStream, TableFormatClients.class);
+        RunSync.class.getClassLoader().getResourceAsStream("onetable-conversion-defaults.yaml")) {
+      TableFormatConverters converters =
+          YAML_MAPPER.readValue(inputStream, TableFormatConverters.class);
       if (customConfigs != null) {
-        YAML_MAPPER.readerForUpdating(clients).readValue(customConfigs);
+        YAML_MAPPER.readerForUpdating(converters).readValue(customConfigs);
       }
-      return clients;
+      return converters;
     }
   }
 
@@ -250,19 +253,22 @@ public class RunSync {
   }
 
   @Data
-  public static class TableFormatClients {
-    /** Map of table format name to the client configs. */
-    @JsonProperty("tableFormatsClients")
+  public static class TableFormatConverters {
+    /** Map of table format name to the conversion configs. */
+    @JsonProperty("tableFormatConverters")
     @JsonMerge
-    Map<String, ClientConfig> tableFormatsClients;
+    Map<String, ConversionConfig> tableFormatConverters;
 
     @Data
-    public static class ClientConfig {
-      /** The class name of the source client which reads the table metadata. */
-      String sourceClientProviderClass;
+    public static class ConversionConfig {
+      /**
+       * The class name of the {@link ConversionSourceProvider} that will generate the {@link
+       * org.apache.xtable.spi.extractor.ConversionSource}.
+       */
+      String conversionSourceProviderClass;
 
-      /** The class name of the target client which writes the table metadata. */
-      String targetClientProviderClass;
+      /** The class name of the target converter which writes the table metadata. */
+      String conversionTargetProviderClass;
 
       /** the configuration specific to the table format. */
       @JsonMerge Map<String, String> configuration;

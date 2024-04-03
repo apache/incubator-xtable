@@ -18,19 +18,18 @@
  
 package org.apache.xtable.iceberg;
 
-import java.util.Collections;
-import java.util.Map;
+import org.apache.iceberg.Snapshot;
 
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+import org.apache.xtable.conversion.ConversionSourceProvider;
+import org.apache.xtable.conversion.PerTableConfig;
 
-import org.apache.xtable.conversion.CatalogConfig;
-
-@Value
-@Builder
-public class IcebergCatalogConfig implements CatalogConfig {
-  @NonNull String catalogImpl;
-  @NonNull String catalogName;
-  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
+/** A concrete implementation of {@link ConversionSourceProvider} for Hudi table format. */
+public class IcebergConversionSourceProvider extends ConversionSourceProvider<Snapshot> {
+  @Override
+  public IcebergConversionSource getConversionSourceInstance(PerTableConfig sourceTableConfig) {
+    return IcebergConversionSource.builder()
+        .sourceTableConfig(sourceTableConfig)
+        .hadoopConf(hadoopConf)
+        .build();
+  }
 }

@@ -35,11 +35,11 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.config.HoodieArchivalConfig;
 
 import org.apache.xtable.TestJavaHudiTable;
-import org.apache.xtable.client.OneTableClient;
-import org.apache.xtable.client.PerTableConfig;
-import org.apache.xtable.client.PerTableConfigImpl;
-import org.apache.xtable.client.SourceClientProvider;
-import org.apache.xtable.hudi.HudiSourceClientProvider;
+import org.apache.xtable.conversion.ConversionController;
+import org.apache.xtable.conversion.ConversionSourceProvider;
+import org.apache.xtable.conversion.PerTableConfig;
+import org.apache.xtable.conversion.PerTableConfigImpl;
+import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 
@@ -51,12 +51,12 @@ import org.apache.xtable.model.sync.SyncMode;
 public class LoadTest {
   @TempDir public static Path tempDir;
   private static final Configuration CONFIGURATION = new Configuration();
-  private SourceClientProvider<HoodieInstant> hudiSourceClientProvider;
+  private ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider;
 
   @BeforeEach
   public void setup() {
-    hudiSourceClientProvider = new HudiSourceClientProvider();
-    hudiSourceClientProvider.init(CONFIGURATION, Collections.emptyMap());
+    hudiConversionSourceProvider = new HudiConversionSourceProvider();
+    hudiConversionSourceProvider.init(CONFIGURATION, Collections.emptyMap());
   }
 
   @Test
@@ -82,9 +82,9 @@ public class LoadTest {
               .tableBasePath(table.getBasePath())
               .syncMode(SyncMode.FULL)
               .build();
-      OneTableClient oneTableClient = new OneTableClient(CONFIGURATION);
+      ConversionController conversionController = new ConversionController(CONFIGURATION);
       long start = System.currentTimeMillis();
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      conversionController.sync(perTableConfig, hudiConversionSourceProvider);
       long end = System.currentTimeMillis();
       System.out.println("Full sync took " + (end - start) + "ms");
     }
@@ -112,8 +112,8 @@ public class LoadTest {
               .syncMode(SyncMode.INCREMENTAL)
               .build();
       // sync once to establish first commit
-      OneTableClient oneTableClient = new OneTableClient(CONFIGURATION);
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      ConversionController conversionController = new ConversionController(CONFIGURATION);
+      conversionController.sync(perTableConfig, hudiConversionSourceProvider);
       for (int i = 0; i < numCommits; i++) {
         table.insertRecords(
             1,
@@ -124,7 +124,7 @@ public class LoadTest {
       }
 
       long start = System.currentTimeMillis();
-      oneTableClient.sync(perTableConfig, hudiSourceClientProvider);
+      conversionController.sync(perTableConfig, hudiConversionSourceProvider);
       long end = System.currentTimeMillis();
       System.out.println("Incremental sync took " + (end - start) + "ms");
     }

@@ -16,21 +16,28 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.iceberg;
+package org.apache.xtable.conversion;
 
-import java.util.Collections;
-import java.util.Map;
+import java.util.List;
 
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+import org.apache.xtable.model.sync.SyncMode;
 
-import org.apache.xtable.conversion.CatalogConfig;
+public interface PerTableConfig {
+  int getTargetMetadataRetentionInHours();
 
-@Value
-@Builder
-public class IcebergCatalogConfig implements CatalogConfig {
-  @NonNull String catalogImpl;
-  @NonNull String catalogName;
-  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
+  String getTableBasePath();
+
+  String getTableDataPath();
+
+  String getTableName();
+
+  HudiSourceConfig getHudiSourceConfig();
+
+  List<String> getTargetTableFormats();
+
+  SyncMode getSyncMode();
+
+  String[] getNamespace();
+
+  CatalogConfig getIcebergCatalogConfig();
 }

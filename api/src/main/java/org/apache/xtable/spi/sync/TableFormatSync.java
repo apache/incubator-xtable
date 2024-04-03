@@ -54,30 +54,30 @@ public class TableFormatSync {
   /**
    * Syncs the provided snapshot to the target table formats.
    *
-   * @param targetClients the targets to sync with the snapshot
+   * @param conversionTargets the targets to sync with the snapshot
    * @param snapshot the snapshot to sync
    * @return the result of the sync process
    */
   public Map<String, SyncResult> syncSnapshot(
-      Collection<TargetClient> targetClients, InternalSnapshot snapshot) {
+      Collection<ConversionTarget> conversionTargets, InternalSnapshot snapshot) {
     Instant startTime = Instant.now();
     Map<String, SyncResult> results = new HashMap<>();
-    for (TargetClient targetClient : targetClients) {
+    for (ConversionTarget conversionTarget : conversionTargets) {
       try {
         InternalTable internalTable = snapshot.getTable();
         results.put(
-            targetClient.getTableFormat(),
+            conversionTarget.getTableFormat(),
             getSyncResult(
-                targetClient,
+                conversionTarget,
                 SyncMode.FULL,
                 internalTable,
-                client -> client.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
+                target -> target.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
                 startTime,
                 snapshot.getPendingCommits()));
       } catch (Exception e) {
         log.error("Failed to sync snapshot", e);
         results.put(
-            targetClient.getTableFormat(), buildResultForError(SyncMode.FULL, startTime, e));
+            conversionTarget.getTableFormat(), buildResultForError(SyncMode.FULL, startTime, e));
       }
     }
     return results;
@@ -86,19 +86,19 @@ public class TableFormatSync {
   /**
    * Syncs a set of changes to the target table formats.
    *
-   * @param targetClientWithMetadata a map of target clients to their last sync metadata
+   * @param conversionTargetWithMetadata a map of conversion targets to their last sync metadata
    * @param changes the changes from the source table format that need to be applied
    * @return the results of trying to sync each change
    */
   public Map<String, List<SyncResult>> syncChanges(
-      Map<TargetClient, TableSyncMetadata> targetClientWithMetadata,
+      Map<ConversionTarget, TableSyncMetadata> conversionTargetWithMetadata,
       IncrementalTableChanges changes) {
     Map<String, List<SyncResult>> results = new HashMap<>();
-    Set<TargetClient> clientsWithFailures = new HashSet<>();
+    Set<ConversionTarget> conversionTargetsWithFailures = new HashSet<>();
     while (changes.getTableChanges().hasNext()) {
       TableChange change = changes.getTableChanges().next();
-      Collection<TargetClient> clientsToSync =
-          targetClientWithMetadata.entrySet().stream()
+      Collection<ConversionTarget> conversionTargetsToSync =
+          conversionTargetWithMetadata.entrySet().stream()
               .filter(
                   entry -> {
                     TableSyncMetadata metadata = entry.getValue();
@@ -106,26 +106,26 @@ public class TableFormatSync {
                   })
               .map(Map.Entry::getKey)
               .collect(Collectors.toList());
-      for (TargetClient targetClient : clientsToSync) {
-        if (clientsWithFailures.contains(targetClient)) {
+      for (ConversionTarget conversionTarget : conversionTargetsToSync) {
+        if (conversionTargetsWithFailures.contains(conversionTarget)) {
           continue;
         }
         Instant startTime = Instant.now();
         List<SyncResult> resultsForFormat =
-            results.computeIfAbsent(targetClient.getTableFormat(), key -> new ArrayList<>());
+            results.computeIfAbsent(conversionTarget.getTableFormat(), key -> new ArrayList<>());
         try {
           resultsForFormat.add(
               getSyncResult(
-                  targetClient,
+                  conversionTarget,
                   SyncMode.INCREMENTAL,
                   change.getTableAsOfChange(),
-                  client -> client.syncFilesForDiff(change.getFilesDiff()),
+                  target -> target.syncFilesForDiff(change.getFilesDiff()),
                   startTime,
                   changes.getPendingCommits()));
         } catch (Exception e) {
           log.error("Failed to sync table changes", e);
           resultsForFormat.add(buildResultForError(SyncMode.INCREMENTAL, startTime, e));
-          clientsWithFailures.add(targetClient);
+          conversionTargetsWithFailures.add(conversionTarget);
         }
       }
     }
@@ -144,25 +144,25 @@ public class TableFormatSync {
   }
 
   private SyncResult getSyncResult(
-      TargetClient client,
+      ConversionTarget conversionTarget,
       SyncMode mode,
       InternalTable tableState,
       SyncFiles fileSyncMethod,
       Instant startTime,
       List<Instant> pendingCommits) {
     // initialize the sync
-    client.beginSync(tableState);
+    conversionTarget.beginSync(tableState);
     // sync schema updates
-    client.syncSchema(tableState.getReadSchema());
+    conversionTarget.syncSchema(tableState.getReadSchema());
     // sync partition updates
-    client.syncPartitionSpec(tableState.getPartitioningFields());
+    conversionTarget.syncPartitionSpec(tableState.getPartitioningFields());
     // Update the files in the target table
-    fileSyncMethod.sync(client);
+    fileSyncMethod.sync(conversionTarget);
     // Persist the latest commit time in table properties for incremental syncs.
     TableSyncMetadata latestState =
         TableSyncMetadata.of(tableState.getLatestCommitTime(), pendingCommits);
-    client.syncMetadata(latestState);
-    client.completeSync();
+    conversionTarget.syncMetadata(latestState);
+    conversionTarget.completeSync();
 
     return SyncResult.builder()
         .mode(mode)
@@ -175,7 +175,7 @@ public class TableFormatSync {
 
   @FunctionalInterface
   private interface SyncFiles {
-    void sync(TargetClient client);
+    void sync(ConversionTarget conversionTarget);
   }
 
   private SyncResult buildResultForError(SyncMode mode, Instant startTime, Exception e) {

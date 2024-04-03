@@ -30,8 +30,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
-import org.apache.xtable.utilities.RunSync.TableFormatClients;
-import org.apache.xtable.utilities.RunSync.TableFormatClients.ClientConfig;
+import org.apache.xtable.utilities.RunSync.TableFormatConverters;
+import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
 
 class TestRunSync {
 
@@ -77,50 +77,52 @@ class TestRunSync {
   }
 
   @Test
-  public void testTableFormatClientConfigDefault() throws IOException {
-    TableFormatClients clients = RunSync.loadTableFormatClientConfigs(null);
-    Map<String, ClientConfig> tfClients = clients.getTableFormatsClients();
-    Assertions.assertEquals(3, tfClients.size());
-    Assertions.assertNotNull(tfClients.get(DELTA));
-    Assertions.assertNotNull(tfClients.get(HUDI));
-    Assertions.assertNotNull(tfClients.get(ICEBERG));
+  public void testTableFormatConverterConfigDefault() throws IOException {
+    TableFormatConverters converters = RunSync.loadTableFormatConversionConfigs(null);
+    Map<String, ConversionConfig> tfConverters = converters.getTableFormatConverters();
+    Assertions.assertEquals(3, tfConverters.size());
+    Assertions.assertNotNull(tfConverters.get(DELTA));
+    Assertions.assertNotNull(tfConverters.get(HUDI));
+    Assertions.assertNotNull(tfConverters.get(ICEBERG));
 
     Assertions.assertEquals(
-        "org.apache.xtable.hudi.HudiSourceClientProvider",
-        tfClients.get(HUDI).getSourceClientProviderClass());
+        "org.apache.xtable.hudi.HudiConversionSourceProvider",
+        tfConverters.get(HUDI).getConversionSourceProviderClass());
     Assertions.assertEquals(
-        "org.apache.xtable.iceberg.IcebergTargetClient",
-        tfClients.get(ICEBERG).getTargetClientProviderClass());
+        "org.apache.xtable.iceberg.IcebergConversionTarget",
+        tfConverters.get(ICEBERG).getConversionTargetProviderClass());
     Assertions.assertEquals(
-        "org.apache.xtable.iceberg.IcebergSourceClientProvider",
-        tfClients.get(ICEBERG).getSourceClientProviderClass());
+        "org.apache.xtable.iceberg.IcebergConversionSourceProvider",
+        tfConverters.get(ICEBERG).getConversionSourceProviderClass());
   }
 
   @Test
-  public void testTableFormatClientCustom() throws IOException {
-    String customClients =
-        "tableFormatsClients:\n"
+  public void testTableFormatConverterCustom() throws IOException {
+    String customConverters =
+        "tableFormatConverters:\n"
             + "  HUDI:\n"
-            + "    sourceClientProviderClass: foo\n"
+            + "    conversionSourceProviderClass: foo\n"
             + "  DELTA:\n"
             + "    configuration:\n"
             + "      spark.master: local[4]\n"
             + "      foo: bar\n"
             + "  NEW_FORMAT:\n"
-            + "    sourceClientProviderClass: bar\n";
-    TableFormatClients clients = RunSync.loadTableFormatClientConfigs(customClients.getBytes());
-    Map<String, ClientConfig> tfClients = clients.getTableFormatsClients();
-    Assertions.assertEquals(4, tfClients.size());
+            + "    conversionSourceProviderClass: bar\n";
+    TableFormatConverters converters =
+        RunSync.loadTableFormatConversionConfigs(customConverters.getBytes());
+    Map<String, ConversionConfig> tfConverters = converters.getTableFormatConverters();
+    Assertions.assertEquals(4, tfConverters.size());
 
-    Assertions.assertNotNull(tfClients.get("NEW_FORMAT"));
-    Assertions.assertEquals("bar", tfClients.get("NEW_FORMAT").getSourceClientProviderClass());
+    Assertions.assertNotNull(tfConverters.get("NEW_FORMAT"));
+    Assertions.assertEquals(
+        "bar", tfConverters.get("NEW_FORMAT").getConversionSourceProviderClass());
 
-    Assertions.assertEquals("foo", tfClients.get(HUDI).getSourceClientProviderClass());
+    Assertions.assertEquals("foo", tfConverters.get(HUDI).getConversionSourceProviderClass());
 
-    Map<String, String> deltaClientConfigs = tfClients.get(DELTA).getConfiguration();
-    Assertions.assertEquals(3, deltaClientConfigs.size());
-    Assertions.assertEquals("local[4]", deltaClientConfigs.get("spark.master"));
-    Assertions.assertEquals("bar", deltaClientConfigs.get("foo"));
+    Map<String, String> deltaConfigs = tfConverters.get(DELTA).getConfiguration();
+    Assertions.assertEquals(3, deltaConfigs.size());
+    Assertions.assertEquals("local[4]", deltaConfigs.get("spark.master"));
+    Assertions.assertEquals("bar", deltaConfigs.get("foo"));
   }
 
   @Test
