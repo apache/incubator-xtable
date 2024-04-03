@@ -16,21 +16,12 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.iceberg;
+package org.apache.xtable.conversion;
 
-import java.util.Collections;
-import java.util.Map;
+import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
 
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+public interface HudiSourceConfig {
+  public String getPartitionSpecExtractorClass();
 
-import org.apache.xtable.conversion.CatalogConfig;
-
-@Value
-@Builder
-public class IcebergCatalogConfig implements CatalogConfig {
-  @NonNull String catalogImpl;
-  @NonNull String catalogName;
-  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
+  SourcePartitionSpecExtractor loadSourcePartitionSpecExtractor();
 }

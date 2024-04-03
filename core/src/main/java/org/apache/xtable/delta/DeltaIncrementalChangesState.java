@@ -67,8 +67,8 @@ public class DeltaIncrementalChangesState {
 
   /**
    * Returns the versions in sorted order. The start version is the next one after the last sync
-   * version to the target client. The end version is the latest version in the Delta table at the
-   * time of initialization.
+   * version to the target. The end version is the latest version in the Delta table at the time of
+   * initialization.
    *
    * @return
    */

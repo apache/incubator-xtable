@@ -47,7 +47,7 @@ import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 public class TestExtractFromSource {
-  private final SourceClient<TestCommit> mockSourceClient = mock(SourceClient.class);
+  private final ConversionSource<TestCommit> mockConversionSource = mock(ConversionSource.class);
 
   @Test
   public void extractSnapshot() {
@@ -60,8 +60,8 @@ public class TestExtractFromSource {
             .table(table)
             .partitionedDataFiles(dataFiles)
             .build();
-    when(mockSourceClient.getCurrentSnapshot()).thenReturn(internalSnapshot);
-    assertEquals(internalSnapshot, ExtractFromSource.of(mockSourceClient).extractSnapshot());
+    when(mockConversionSource.getCurrentSnapshot()).thenReturn(internalSnapshot);
+    assertEquals(internalSnapshot, ExtractFromSource.of(mockConversionSource).extractSnapshot());
   }
 
   @Test
@@ -80,7 +80,7 @@ public class TestExtractFromSource {
             .commitsToProcess(Arrays.asList(firstCommitToSync, secondCommitToSync))
             .inFlightInstants(Collections.singletonList(inflightInstant))
             .build();
-    when(mockSourceClient.getCommitsBacklog(instantsForIncrementalSync))
+    when(mockConversionSource.getCommitsBacklog(instantsForIncrementalSync))
         .thenReturn(commitsBacklogToReturn);
 
     // drop a file and add a file
@@ -93,7 +93,7 @@ public class TestExtractFromSource {
             .filesDiff(
                 DataFilesDiff.builder().fileAdded(newFile1).fileRemoved(initialFile2).build())
             .build();
-    when(mockSourceClient.getTableChangeForCommit(firstCommitToSync))
+    when(mockConversionSource.getTableChangeForCommit(firstCommitToSync))
         .thenReturn(tableChangeToReturnAtFirstInstant);
     TableChange expectedFirstTableChange =
         TableChange.builder()
@@ -117,7 +117,7 @@ public class TestExtractFromSource {
                     .filesRemoved(Arrays.asList(initialFile3, newFile1))
                     .build())
             .build();
-    when(mockSourceClient.getTableChangeForCommit(secondCommitToSync))
+    when(mockConversionSource.getTableChangeForCommit(secondCommitToSync))
         .thenReturn(tableChangeToReturnAtSecondInstant);
     TableChange expectedSecondTableChange =
         TableChange.builder()
@@ -130,7 +130,7 @@ public class TestExtractFromSource {
             .build();
 
     IncrementalTableChanges actual =
-        ExtractFromSource.of(mockSourceClient).extractTableChanges(instantsForIncrementalSync);
+        ExtractFromSource.of(mockConversionSource).extractTableChanges(instantsForIncrementalSync);
     assertEquals(Collections.singletonList(inflightInstant), actual.getPendingCommits());
     List<TableChange> actualTableChanges = new ArrayList<>();
     actual.getTableChanges().forEachRemaining(actualTableChanges::add);
