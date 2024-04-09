@@ -567,6 +567,8 @@
                         <excludes>
                             <exclude>${target.dir.pattern}</exclude>
                             <exclude>website/node_modules/**</exclude>
+                            <exclude>website/build/**</exclude>
+                            <exclude>website/.docusaurus/**</exclude>
                         </excludes>
                         <black/>
                     </python>
@@ -578,6 +580,8 @@
                         <excludes>
                             <exclude>${target.dir.pattern}</exclude>
                             <exclude>website/node_modules/**</exclude>
+                            <exclude>website/build/**</exclude>
+                            <exclude>website/.docusaurus/**</exclude>
                         </excludes>
                         <licenseHeader>
                             <file>style/text-license-header</file>
@@ -591,6 +595,8 @@
                         <excludes>
                             <exclude>${target.dir.pattern}</exclude>
                             <exclude>website/node_modules/**</exclude>
+                            <exclude>website/build/**</exclude>
+                            <exclude>website/.docusaurus/**</exclude>
                         </excludes>
                         <licenseHeader>
                             <file>style/text-license-header</file>
@@ -606,6 +612,8 @@
                             <exclude>.idea/**</exclude>
                             <exclude>${target.dir.pattern}</exclude>
                             <exclude>website/node_modules/**</exclude>
+                            <exclude>website/build/**</exclude>
+                            <exclude>website/.docusaurus/**</exclude>
                         </excludes>
                         <licenseHeader>
                             <file>style/xml-license-header</file>
@@ -623,6 +631,8 @@
                                 <exclude>demo/data/**</exclude>
                                 <exclude>${target.dir.pattern}</exclude>
                                 <exclude>website/node_modules/**</exclude>
+                                <exclude>website/build/**</exclude>
+                                <exclude>website/.docusaurus/**</exclude>
                             </excludes>
                             <licenseHeader>
                                 <file>style/text-license-header</file>
