@@ -62,7 +62,7 @@ public class IcebergSchemaSync {
    * updates to happen in the same order as the source system.
    *
    * @param current The current schema in the iceberg table
-   * @param latest The latest schema provided by Onetable (reflects source schema's state)
+   * @param latest The latest schema provided by XTable (reflects source schema's state)
    * @param updateSchema An updateSchema object for the current transaction
    * @param parentPath dot separated path for nested field's parent
    * @return map of fieldId to action

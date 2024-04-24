@@ -219,7 +219,7 @@ df = spark.createDataFrame(records, schema)
 
 ### Running sync 
 
-Create `my_config.yaml` in the cloned onetable directory.
+Create `my_config.yaml` in the cloned xtable directory.
 
 <Tabs
 groupId="table-format"

@@ -181,9 +181,9 @@ public class ITConversionController {
     String tableName = getTableName();
     ConversionController conversionController = new ConversionController(jsc.hadoopConfiguration());
     List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
-    String oneTablePartitionConfig = null;
+    String partitionConfig = null;
     if (isPartitioned) {
-      oneTablePartitionConfig = "level:VALUE";
+      partitionConfig = "level:VALUE";
     }
     ConversionSourceProvider<?> conversionSourceProvider =
         getConversionSourceProvider(sourceTableFormat);
@@ -200,9 +200,7 @@ public class ITConversionController {
               .tableBasePath(table.getBasePath())
               .tableDataPath(table.getDataPath())
               .hudiSourceConfig(
-                  HudiSourceConfigImpl.builder()
-                      .partitionFieldSpecConfig(oneTablePartitionConfig)
-                      .build())
+                  HudiSourceConfigImpl.builder().partitionFieldSpecConfig(partitionConfig).build())
               .syncMode(syncMode)
               .build();
       conversionController.sync(perTableConfig, conversionSourceProvider);
@@ -231,9 +229,7 @@ public class ITConversionController {
               .tableBasePath(tableWithUpdatedSchema.getBasePath())
               .tableDataPath(tableWithUpdatedSchema.getDataPath())
               .hudiSourceConfig(
-                  HudiSourceConfigImpl.builder()
-                      .partitionFieldSpecConfig(oneTablePartitionConfig)
-                      .build())
+                  HudiSourceConfigImpl.builder().partitionFieldSpecConfig(partitionConfig).build())
               .syncMode(syncMode)
               .build();
       List<Row> insertsAfterSchemaUpdate = tableWithUpdatedSchema.insertRows(100);
@@ -290,7 +286,7 @@ public class ITConversionController {
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfigImpl.builder()
-                      .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
+                      .partitionFieldSpecConfig(partitionConfig.getXTableConfig())
                       .build())
               .syncMode(syncMode)
               .build();
@@ -325,7 +321,7 @@ public class ITConversionController {
               .tableBasePath(table.getBasePath())
               .hudiSourceConfig(
                   HudiSourceConfigImpl.builder()
-                      .partitionFieldSpecConfig(partitionConfig.getOneTableConfig())
+                      .partitionFieldSpecConfig(partitionConfig.getXTableConfig())
                       .build())
               .syncMode(syncMode)
               .build();
@@ -475,7 +471,7 @@ public class ITConversionController {
     String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
     List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
     Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
-    String oneTablePartitionConfig = tableFormatPartitionDataHolder.getOneTablePartitionConfig();
+    String xTablePartitionConfig = tableFormatPartitionDataHolder.getXTablePartitionConfig();
     String filter = tableFormatPartitionDataHolder.getFilter();
     ConversionSourceProvider<?> conversionSourceProvider =
         getConversionSourceProvider(sourceTableFormat);
@@ -497,7 +493,7 @@ public class ITConversionController {
               .tableDataPath(tableToClose.getDataPath())
               .hudiSourceConfig(
                   HudiSourceConfigImpl.builder()
-                      .partitionFieldSpecConfig(oneTablePartitionConfig)
+                      .partitionFieldSpecConfig(xTablePartitionConfig)
                       .build())
               .syncMode(SyncMode.INCREMENTAL)
               .build();
@@ -843,13 +839,13 @@ public class ITConversionController {
       String sourceFormat,
       List<String> targetFormats,
       String hudiPartitionConfig,
-      String oneTablePartitionConfig,
+      String xTablePartitionConfig,
       String filter) {
     return TableFormatPartitionDataHolder.builder()
         .sourceTableFormat(sourceFormat)
         .targetTableFormats(targetFormats)
         .hudiSourceConfig(Optional.ofNullable(hudiPartitionConfig))
-        .oneTablePartitionConfig(oneTablePartitionConfig)
+        .xTablePartitionConfig(xTablePartitionConfig)
         .filter(filter)
         .build();
   }
@@ -859,7 +855,7 @@ public class ITConversionController {
   private static class TableFormatPartitionDataHolder {
     String sourceTableFormat;
     List<String> targetTableFormats;
-    String oneTablePartitionConfig;
+    String xTablePartitionConfig;
     Optional<String> hudiSourceConfig;
     String filter;
   }

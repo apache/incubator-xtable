@@ -71,7 +71,7 @@ public class IcebergPartitionValueConverter {
     return INSTANCE;
   }
 
-  public List<PartitionValue> toOneTable(
+  public List<PartitionValue> toXTable(
       InternalTable internalTable, StructLike structLike, PartitionSpec partitionSpec) {
     if (!partitionSpec.isPartitioned()) {
       return Collections.emptyList();

@@ -38,7 +38,7 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 
 public class TestIcebergPartitionSpecExtractor {
-  // TODO assert error cases and add wrap errors in Onetable exceptions
+  // TODO assert error cases and add wrap errors in XTable exceptions
   private static final Schema TEST_SCHEMA =
       new Schema(
           Types.NestedField.required(0, "timestamp_hour", Types.TimestampType.withZone()),

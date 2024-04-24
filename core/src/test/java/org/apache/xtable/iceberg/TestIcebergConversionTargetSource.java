@@ -174,7 +174,7 @@ class TestIcebergConversionTargetSource {
     verify(spyConversionSource, times(1)).getTable(iceCurrentSnapshot);
     verify(spyConversionSource, times(1))
         .getSchemaCatalog(internalSnapshot.getTable(), iceCurrentSnapshot);
-    verify(spyPartitionConverter, times(5)).toOneTable(any(), any(), any());
+    verify(spyPartitionConverter, times(5)).toXTable(any(), any(), any());
     verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any(), any());
 
     Assertions.assertNotNull(internalSnapshot.getPartitionedDataFiles());

@@ -43,7 +43,7 @@ import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
 import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
@@ -91,7 +91,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
         completedTimeline
             .lastInstant()
             .orElseThrow(
-                () -> new OneIOException("Unable to read latest commit from Hudi source table"));
+                () -> new ReadException("Unable to read latest commit from Hudi source table"));
     List<HoodieInstant> pendingInstants =
         activeTimeline
             .filterInflightsAndRequested()

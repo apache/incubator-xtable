@@ -221,8 +221,9 @@ public class TestIcebergSync {
     List<Types.NestedField> fields = new ArrayList<>(icebergSchema.columns());
     fields.add(Types.NestedField.of(6, false, "long_field", Types.LongType.get()));
     Schema icebergSchema2 = new Schema(fields);
-    InternalTable table1 = getOneTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
-    InternalTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
+    InternalTable table1 =
+        getInternalTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
+    InternalTable table2 = getInternalTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
     Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion1 = new SchemaVersion(1, "");
     schemas.put(schemaVersion1, internalSchema);
@@ -318,9 +319,10 @@ public class TestIcebergSync {
     List<Types.NestedField> fields = new ArrayList<>(icebergSchema.columns());
     fields.add(Types.NestedField.of(6, false, "long_field", Types.LongType.get()));
     Schema icebergSchema2 = new Schema(fields);
-    InternalTable table1 = getOneTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
+    InternalTable table1 =
+        getInternalTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
     InternalTable table2 =
-        getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME.plusMillis(100000L));
+        getInternalTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME.plusMillis(100000L));
     Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
     SchemaVersion schemaVersion1 = new SchemaVersion(1, "");
     schemas.put(schemaVersion1, internalSchema);
@@ -385,7 +387,7 @@ public class TestIcebergSync {
             .build();
 
     InternalTable table =
-        getOneTable(
+        getInternalTable(
             tableName,
             basePath,
             internalSchema,
@@ -451,7 +453,7 @@ public class TestIcebergSync {
             .build();
 
     InternalTable table =
-        getOneTable(
+        getInternalTable(
             tableName,
             basePath,
             internalSchema,
@@ -514,7 +516,7 @@ public class TestIcebergSync {
             .build();
 
     InternalTable table =
-        getOneTable(
+        getInternalTable(
             tableName,
             basePath,
             internalSchema,
@@ -577,7 +579,7 @@ public class TestIcebergSync {
             .build();
 
     InternalTable table =
-        getOneTable(
+        getInternalTable(
             tableName,
             basePath,
             internalSchema,
@@ -655,7 +657,7 @@ public class TestIcebergSync {
             .build();
 
     InternalTable table =
-        getOneTable(
+        getInternalTable(
             tableName,
             basePath,
             internalSchema,
@@ -730,7 +732,7 @@ public class TestIcebergSync {
         .build();
   }
 
-  private InternalTable getOneTable(
+  private InternalTable getInternalTable(
       String tableName,
       Path basePath,
       InternalSchema schema,

@@ -16,20 +16,21 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.constants;
+package org.apache.xtable.exception;
 
-import lombok.Builder;
-import lombok.Value;
+import org.apache.xtable.model.exception.ErrorCode;
+import org.apache.xtable.model.exception.InternalException;
 
-@Builder
-@Value
-public class OneTableConstants {
-  /**
-   * Maximum number of syncs that are persisted in the archive file, after that least recent sync is
-   * evicted.
-   */
-  public static final Integer NUM_ARCHIVED_SYNCS_RESULTS = 10;
+/**
+ * Exception thrown when there is an error updating a {@link
+ * org.apache.xtable.spi.sync.ConversionTarget}.
+ */
+public class UpdateException extends InternalException {
+  public UpdateException(String message, Throwable e) {
+    super(ErrorCode.UPDATE_EXCEPTION, message, e);
+  }
 
-  /** InternalTable meta directory inside table base path to store sync info. */
-  public static final String ONETABLE_META_DIR = ".onetable";
+  public UpdateException(String message) {
+    super(ErrorCode.UPDATE_EXCEPTION, message);
+  }
 }

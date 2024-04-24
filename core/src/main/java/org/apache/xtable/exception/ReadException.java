@@ -21,12 +21,17 @@ package org.apache.xtable.exception;
 import org.apache.xtable.model.exception.ErrorCode;
 import org.apache.xtable.model.exception.InternalException;
 
-public class OneIOException extends InternalException {
-  public OneIOException(String message, Throwable e) {
-    super(ErrorCode.IO_EXCEPTION, message, e);
+/**
+ * Exception thrown when there is an error reading existing state from a {@link
+ * org.apache.xtable.spi.extractor.ConversionSource} or {@link
+ * org.apache.xtable.spi.sync.ConversionTarget}.
+ */
+public class ReadException extends InternalException {
+  public ReadException(String message, Throwable e) {
+    super(ErrorCode.READ_EXCEPTION, message, e);
   }
 
-  public OneIOException(String message) {
-    super(ErrorCode.IO_EXCEPTION, message);
+  public ReadException(String message) {
+    super(ErrorCode.READ_EXCEPTION, message);
   }
 }

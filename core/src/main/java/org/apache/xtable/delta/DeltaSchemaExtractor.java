@@ -49,7 +49,7 @@ import org.apache.xtable.schema.SchemaUtils;
  *
  * <ul>
  *   <li>Delta schemas are represented as Spark StructTypes which do not have enums so the enum
- *       types are lost when converting from Onetable to Delta Lake representations
+ *       types are lost when converting from XTable to Delta Lake representations
  *   <li>Delta does not have a fixed length byte array option so {@link InternalType#FIXED} is
  *       simply translated to a {@link org.apache.spark.sql.types.BinaryType}
  *   <li>Similarly, {@link InternalType#TIMESTAMP_NTZ} is translated to a long in Delta Lake

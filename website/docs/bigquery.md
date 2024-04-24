@@ -14,7 +14,7 @@ Apache XTable™ (Incubating) outputs metadata files for Iceberg target format s
 to read the BigLake tables.
 
 ```sql md title="sql"
-CREATE EXTERNAL TABLE onetable_synced_iceberg_table
+CREATE EXTERNAL TABLE xtable_synced_iceberg_table
 WITH CONNECTION `myproject.mylocation.myconnection`
 OPTIONS (
      format = 'ICEBERG',

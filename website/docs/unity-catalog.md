@@ -54,11 +54,11 @@ At this point, if you check your bucket path, you will be able to see `_delta_lo
 In your Databricks workspace, under SQL editor, run the following queries.
 
 ```sql md title="SQL"
-CREATE CATALOG onetable;
+CREATE CATALOG xtable;
 
-CREATE SCHEMA onetable.synced_delta_schema;
+CREATE SCHEMA xtable.synced_delta_schema;
 
-CREATE TABLE onetable.synced_delta_schema.<table_name>
+CREATE TABLE xtable.synced_delta_schema.<table_name>
 USING DELTA
 LOCATION 's3://path/to/source/data';
 ```
@@ -72,7 +72,7 @@ You can now see the created delta table in **Unity Catalog** under **Catalog** a
 `synced_delta_schema` and also query the table in the SQL editor:
 
 ```sql
-SELECT * FROM onetable.synced_delta_schema.<table_name>;
+SELECT * FROM xtable.synced_delta_schema.<table_name>;
 ```
 
 ## Conclusion

@@ -18,7 +18,7 @@
  
 package org.apache.xtable.hudi;
 
-import static org.apache.xtable.hudi.HudiSchemaExtractor.convertFromOneTablePath;
+import static org.apache.xtable.hudi.HudiSchemaExtractor.convertFromXTablePath;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -244,7 +244,7 @@ public class BaseFileUpdatesExtractor {
             columnStat ->
                 HoodieColumnRangeMetadata.<Comparable>create(
                     fileName,
-                    convertFromOneTablePath(columnStat.getField().getPath()),
+                    convertFromXTablePath(columnStat.getField().getPath()),
                     (Comparable) columnStat.getRange().getMinValue(),
                     (Comparable) columnStat.getRange().getMaxValue(),
                     columnStat.getNumNulls(),

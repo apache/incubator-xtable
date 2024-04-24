@@ -28,7 +28,7 @@ import org.apache.iceberg.*;
 import org.apache.iceberg.io.CloseableIterable;
 
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FilesDiff;
@@ -54,7 +54,7 @@ public class IcebergDataFileUpdatesSync {
           .map(FileScanTask::file)
           .forEach(file -> previousFiles.put(file.path().toString(), file));
     } catch (Exception e) {
-      throw new OneIOException("Failed to iterate through Iceberg data files", e);
+      throw new ReadException("Failed to iterate through Iceberg data files", e);
     }
 
     FilesDiff<InternalDataFile, DataFile> diff =

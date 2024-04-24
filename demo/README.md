@@ -1,7 +1,7 @@
 # Running a Local Demo
-This demo was created for the 2023 Open Source Data Summit. It shows how OneTable can be used with two existing datasets.
+This demo was created for the 2023 Open Source Data Summit. It shows how XTable can be used with two existing datasets.
 
-Use `./start_demo.sh` to spin up a local notebook with a scala interpreter, Hive Metastore, Presto and Trino in docker containers. The script will first build the OneTable jars required for the demo and then start the containers.  
+Use `./start_demo.sh` to spin up a local notebook with a scala interpreter, Hive Metastore, Presto and Trino in docker containers. The script will first build the XTable jars required for the demo and then start the containers.  
 
 ## Accessing Services
 ### Jupyter Notebook

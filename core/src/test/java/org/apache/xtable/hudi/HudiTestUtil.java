@@ -117,7 +117,7 @@ public class HudiTestUtil {
 
   public static SparkConf getSparkConf(Path tempDir) {
     return new SparkConf()
-        .setAppName("onetable-testing")
+        .setAppName("xtable-testing")
         .set("spark.serializer", KryoSerializer.class.getName())
         .set("spark.sql.catalog.default_iceberg", "org.apache.iceberg.spark.SparkCatalog")
         .set("spark.sql.catalog.default_iceberg.type", "hadoop")
@@ -140,6 +140,6 @@ public class HudiTestUtil {
   @AllArgsConstructor(staticName = "of")
   public static class PartitionConfig {
     String hudiConfig;
-    String oneTableConfig;
+    String xTableConfig;
   }
 }

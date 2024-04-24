@@ -44,7 +44,7 @@ import scala.Option;
 
 import io.delta.tables.DeltaTable;
 
-import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
@@ -112,8 +112,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     List<Action> actionsForVersion = getChangesState().getActionsForVersion(versionNumber);
     Snapshot snapshotAtVersion = deltaLog.getSnapshotAt(versionNumber, Option.empty());
     FileFormat fileFormat =
-        actionsConverter.convertToOneTableFileFormat(
-            snapshotAtVersion.metadata().format().provider());
+        actionsConverter.convertToFileFormat(snapshotAtVersion.metadata().format().provider());
     Set<InternalDataFile> addedFiles = new HashSet<>();
     Set<InternalDataFile> removedFiles = new HashSet<>();
     for (Action action : actionsForVersion) {
@@ -193,7 +192,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
       fileIterator.forEachRemaining(dataFiles::add);
       return PartitionFileGroup.fromFiles(dataFiles);
     } catch (Exception e) {
-      throw new OneIOException("Failed to iterate through Delta data files", e);
+      throw new ReadException("Failed to iterate through Delta data files", e);
     }
   }
 

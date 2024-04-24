@@ -48,7 +48,7 @@ In this tutorial we'll use `us-west1` region.
 projects/<yourProjectName>/locations/us-west1/catalogs
 ```
 ```rest md title="catalogId"
-onetable
+xtable
 ```
 
 ### Create BigLake Database
@@ -56,10 +56,10 @@ Use the `Try this method` on Google's REST reference docs for
 [`projects.locations.catalogs.databases.create`](https://cloud.google.com/bigquery/docs/reference/biglake/rest/v1/projects.locations.catalogs/create)
 method to create a database.
 ```rest md title="parent"
-projects/<yourProjectName>/locations/us-west1/catalogs/onetable/databases
+projects/<yourProjectName>/locations/us-west1/catalogs/xtable/databases
 ```
 ```rest md title="databaseId"
-onetable_synced_db
+xtable_synced_db
 ```
 
 ### Running sync
@@ -96,7 +96,7 @@ datasets:
   -
     tableBasePath: gs://path/to/source/data
     tableName: table_name
-    namespace: onetable_synced_db
+    namespace: xtable_synced_db
 ```
 
 </TabItem>
@@ -107,7 +107,7 @@ An example `catalog.yaml` file to sync with BigLake Metastore:
 
 ```yaml md title="yaml"
 catalogImpl: org.apache.iceberg.gcp.biglake.BigLakeCatalog
-catalogName: onetable
+catalogName: xtable
 catalogOptions:
   gcp_project: <yourProjectName>
   gcp_location: us-west1
@@ -132,7 +132,7 @@ We can use `Try this method` option on Google's REST reference docs for
 [`projects.locations.catalogs.databases.tables.get`](https://cloud.google.com/bigquery/docs/reference/biglake/rest/v1/projects.locations.catalogs.databases.tables/get)
 method to view the created table.
 ```rest md title="name"
-projects/<yourProjectName>/locations/us-west1/catalogs/onetable/databases/onetable_synced_db/tables/table_name
+projects/<yourProjectName>/locations/us-west1/catalogs/xtable/databases/xtable_synced_db/tables/table_name
 ```
 
 ## Conclusion

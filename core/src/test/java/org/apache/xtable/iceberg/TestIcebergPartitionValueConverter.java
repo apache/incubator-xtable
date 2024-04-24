@@ -65,15 +65,16 @@ public class TestIcebergPartitionValueConverter {
       IcebergSchemaExtractor.getInstance().fromIceberg(SCHEMA);
 
   @Test
-  public void testToOneTableNotPartitioned() {
+  public void testToXTableNotPartitioned() {
     PartitionSpec partitionSpec = PartitionSpec.unpartitioned();
     List<PartitionValue> partitionValues =
-        partitionValueConverter.toOneTable(buildOnetable(false), STRUCT_LIKE_RECORD, partitionSpec);
+        partitionValueConverter.toXTable(
+            buildInternalTable(false), STRUCT_LIKE_RECORD, partitionSpec);
     assertTrue(partitionValues.isEmpty());
   }
 
   @Test
-  public void testToOneTableValuePartitioned() {
+  public void testToXTableValuePartitioned() {
     List<PartitionValue> expectedPartitionValues =
         Collections.singletonList(
             PartitionValue.builder()
@@ -82,8 +83,8 @@ public class TestIcebergPartitionValueConverter {
                 .build());
     PartitionSpec partitionSpec = PartitionSpec.builderFor(SCHEMA).identity("name").build();
     List<PartitionValue> partitionValues =
-        partitionValueConverter.toOneTable(
-            buildOnetable(true, "name", PartitionTransformType.VALUE),
+        partitionValueConverter.toXTable(
+            buildInternalTable(true, "name", PartitionTransformType.VALUE),
             STRUCT_LIKE_RECORD,
             partitionSpec);
     assertEquals(1, partitionValues.size());
@@ -91,7 +92,7 @@ public class TestIcebergPartitionValueConverter {
   }
 
   @Test
-  public void testToOneTableYearPartitioned() {
+  public void testToXTableYearPartitioned() {
     List<PartitionValue> expectedPartitionValues =
         Collections.singletonList(
             PartitionValue.builder()
@@ -100,19 +101,19 @@ public class TestIcebergPartitionValueConverter {
                 .build());
     PartitionSpec partitionSpec = PartitionSpec.builderFor(SCHEMA).year("birthDate").build();
     List<PartitionValue> partitionValues =
-        partitionValueConverter.toOneTable(
-            buildOnetable(true, "birthDate", PartitionTransformType.YEAR),
+        partitionValueConverter.toXTable(
+            buildInternalTable(true, "birthDate", PartitionTransformType.YEAR),
             STRUCT_LIKE_RECORD,
             partitionSpec);
     assertEquals(1, partitionValues.size());
     assertEquals(expectedPartitionValues, partitionValues);
   }
 
-  private InternalTable buildOnetable(boolean isPartitioned) {
-    return buildOnetable(isPartitioned, null, null);
+  private InternalTable buildInternalTable(boolean isPartitioned) {
+    return buildInternalTable(isPartitioned, null, null);
   }
 
-  private InternalTable buildOnetable(
+  private InternalTable buildInternalTable(
       boolean isPartitioned, String sourceField, PartitionTransformType transformType) {
     return InternalTable.builder()
         .readSchema(IcebergSchemaExtractor.getInstance().fromIceberg(SCHEMA))

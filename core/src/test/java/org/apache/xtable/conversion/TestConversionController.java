@@ -72,7 +72,7 @@ public class TestConversionController {
   @Test
   void testAllSnapshotSyncAsPerConfig() {
     SyncMode syncMode = SyncMode.FULL;
-    InternalTable internalTable = getOneTable();
+    InternalTable internalTable = getInternalTable();
     InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1");
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
@@ -185,7 +185,7 @@ public class TestConversionController {
   @Test
   void testIncrementalSyncFallBackToSnapshotForAllFormats() {
     SyncMode syncMode = SyncMode.INCREMENTAL;
-    InternalTable internalTable = getOneTable();
+    InternalTable internalTable = getInternalTable();
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
     InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1");
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
@@ -274,7 +274,7 @@ public class TestConversionController {
       when(mockConversionSource.getTableChangeForCommit(instant)).thenReturn(tableChange);
     }
     // Iceberg needs to sync by snapshot since instant15 is affected by table clean-up.
-    InternalTable internalTable = getOneTable();
+    InternalTable internalTable = getInternalTable();
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
     InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1");
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
@@ -370,7 +370,7 @@ public class TestConversionController {
   }
 
   private TableChange getTableChange(Instant instant) {
-    return TableChange.builder().tableAsOfChange(getOneTable(instant)).build();
+    return TableChange.builder().tableAsOfChange(getInternalTable(instant)).build();
   }
 
   private SyncResult buildSyncResult(SyncMode syncMode, Instant lastSyncedInstant) {
@@ -385,11 +385,11 @@ public class TestConversionController {
     return InternalSnapshot.builder().table(internalTable).version(version).build();
   }
 
-  private InternalTable getOneTable() {
-    return getOneTable(Instant.now());
+  private InternalTable getInternalTable() {
+    return getInternalTable(Instant.now());
   }
 
-  private InternalTable getOneTable(Instant instant) {
+  private InternalTable getInternalTable(Instant instant) {
     return InternalTable.builder().name("some_table").latestCommitTime(instant).build();
   }
 
