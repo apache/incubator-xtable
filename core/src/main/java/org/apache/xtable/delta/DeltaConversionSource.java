@@ -21,10 +21,8 @@ package org.apache.xtable.delta;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -51,8 +49,6 @@ import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.schema.SchemaCatalog;
-import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -86,22 +82,12 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   }
 
   @Override
-  public SchemaCatalog getSchemaCatalog(InternalTable table, Long version) {
-    // TODO: Does not support schema versions for now
-    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
-    SchemaVersion schemaVersion = new SchemaVersion(1, "");
-    schemas.put(schemaVersion, table.getReadSchema());
-    return SchemaCatalog.builder().schemas(schemas).build();
-  }
-
-  @Override
   public InternalSnapshot getCurrentSnapshot() {
     DeltaLog deltaLog = DeltaLog.forTable(sparkSession, basePath);
     Snapshot snapshot = deltaLog.snapshot();
     InternalTable table = getTable(snapshot.version());
     return InternalSnapshot.builder()
         .table(table)
-        .schemaCatalog(getSchemaCatalog(table, snapshot.version()))
         .partitionedDataFiles(getInternalDataFiles(snapshot, table.getReadSchema()))
         .build();
   }

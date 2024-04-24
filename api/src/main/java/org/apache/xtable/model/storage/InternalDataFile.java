@@ -25,7 +25,6 @@ import lombok.Builder;
 import lombok.NonNull;
 import lombok.Value;
 
-import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 
@@ -37,8 +36,6 @@ import org.apache.xtable.model.stat.PartitionValue;
 @Builder(toBuilder = true)
 @Value
 public class InternalDataFile {
-  // written schema version
-  SchemaVersion schemaVersion;
   // physical path of the file (absolute with scheme)
   @NonNull String physicalPath;
   // file format

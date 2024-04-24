@@ -26,7 +26,6 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.schema.SchemaCatalog;
 
 /**
  * A client that provides the major functionality for extracting the state at a given instant in a
@@ -41,15 +40,6 @@ public interface ConversionSource<COMMIT> extends Closeable {
    * @return the table definition
    */
   InternalTable getTable(COMMIT commit);
-
-  /**
-   * Extracts the {@link SchemaCatalog} as of the provided instant.
-   *
-   * @param table the current state of the table for this commit
-   * @param commit the commit to consider for reading the schema catalog
-   * @return the schema catalog
-   */
-  SchemaCatalog getSchemaCatalog(InternalTable table, COMMIT commit);
 
   /**
    * Extracts the {@link InternalSnapshot} as of latest state.

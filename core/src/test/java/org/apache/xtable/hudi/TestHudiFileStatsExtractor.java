@@ -69,7 +69,6 @@ import org.apache.xtable.TestJavaHudiTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
-import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -147,7 +146,6 @@ public class TestHudiFileStatsExtractor {
     InternalDataFile inputFile =
         InternalDataFile.builder()
             .physicalPath(parquetFile.toString())
-            .schemaVersion(new SchemaVersion(1, null))
             .columnStats(Collections.emptyList())
             .fileFormat(FileFormat.APACHE_PARQUET)
             .lastModified(1234L)
@@ -184,7 +182,6 @@ public class TestHudiFileStatsExtractor {
     InternalDataFile inputFile =
         InternalDataFile.builder()
             .physicalPath(file.toString())
-            .schemaVersion(new SchemaVersion(1, null))
             .columnStats(Collections.emptyList())
             .fileFormat(FileFormat.APACHE_PARQUET)
             .lastModified(1234L)

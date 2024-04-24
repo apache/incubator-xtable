@@ -41,7 +41,6 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
@@ -52,14 +51,9 @@ public class TestExtractFromSource {
   @Test
   public void extractSnapshot() {
     InternalTable table = InternalTable.builder().latestCommitTime(Instant.now()).build();
-    SchemaCatalog schemaCatalog = new SchemaCatalog(Collections.emptyMap());
     List<PartitionFileGroup> dataFiles = Collections.emptyList();
     InternalSnapshot internalSnapshot =
-        InternalSnapshot.builder()
-            .schemaCatalog(schemaCatalog)
-            .table(table)
-            .partitionedDataFiles(dataFiles)
-            .build();
+        InternalSnapshot.builder().table(table).partitionedDataFiles(dataFiles).build();
     when(mockConversionSource.getCurrentSnapshot()).thenReturn(internalSnapshot);
     assertEquals(internalSnapshot, ExtractFromSource.of(mockConversionSource).extractSnapshot());
   }

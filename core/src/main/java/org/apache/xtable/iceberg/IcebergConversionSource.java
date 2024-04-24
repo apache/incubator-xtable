@@ -45,8 +45,6 @@ import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.schema.SchemaCatalog;
-import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -119,24 +117,11 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   }
 
   @Override
-  public SchemaCatalog getSchemaCatalog(InternalTable table, Snapshot snapshot) {
-    Table iceTable = getSourceTable();
-    Integer iceSchemaId = snapshot.schemaId();
-    Schema iceSchema = iceTable.schemas().get(iceSchemaId);
-    IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
-    InternalSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
-    Map<SchemaVersion, InternalSchema> catalog =
-        Collections.singletonMap(new SchemaVersion(iceSchemaId, ""), irSchema);
-    return SchemaCatalog.builder().schemas(catalog).build();
-  }
-
-  @Override
   public InternalSnapshot getCurrentSnapshot() {
     Table iceTable = getSourceTable();
 
     Snapshot currentSnapshot = iceTable.currentSnapshot();
     InternalTable irTable = getTable(currentSnapshot);
-    SchemaCatalog schemaCatalog = getSchemaCatalog(irTable, currentSnapshot);
 
     TableScan scan = iceTable.newScan().useSnapshot(currentSnapshot.snapshotId());
     PartitionSpec partitionSpec = iceTable.spec();
@@ -156,7 +141,6 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
     return InternalSnapshot.builder()
         .version(String.valueOf(currentSnapshot.snapshotId()))
         .table(irTable)
-        .schemaCatalog(schemaCatalog)
         .partitionedDataFiles(partitionedDataFiles)
         .build();
   }

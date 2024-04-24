@@ -25,7 +25,6 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Value;
 
-import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 /**
@@ -44,8 +43,6 @@ public class InternalSnapshot {
   String version;
   // Table reference
   InternalTable table;
-  // Schema catalog referencing the written schema for each data file in the snapshot
-  SchemaCatalog schemaCatalog;
   // Data files grouped by partition
   List<PartitionFileGroup> partitionedDataFiles;
   // pending commits before latest commit on the table.

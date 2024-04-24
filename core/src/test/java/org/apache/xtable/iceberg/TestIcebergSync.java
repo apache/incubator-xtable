@@ -41,7 +41,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -91,8 +90,6 @@ import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
-import org.apache.xtable.model.schema.SchemaCatalog;
-import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
@@ -224,17 +221,12 @@ public class TestIcebergSync {
     InternalTable table1 =
         getInternalTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
     InternalTable table2 = getInternalTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
-    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
-    SchemaVersion schemaVersion1 = new SchemaVersion(1, "");
-    schemas.put(schemaVersion1, internalSchema);
-    SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
-    schemas.put(schemaVersion2, schema2);
 
-    InternalDataFile dataFile1 = getDataFile(schemaVersion1, 1, Collections.emptyList());
-    InternalDataFile dataFile2 = getDataFile(schemaVersion1, 2, Collections.emptyList());
-    InternalDataFile dataFile3 = getDataFile(schemaVersion2, 3, Collections.emptyList());
-    InternalSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
-    InternalSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
+    InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList());
+    InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList());
+    InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList());
+    InternalSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
     when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
     ArgumentCaptor<Schema> partitionSpecSchemaArgumentCaptor =
@@ -323,19 +315,14 @@ public class TestIcebergSync {
         getInternalTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
     InternalTable table2 =
         getInternalTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME.plusMillis(100000L));
-    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
-    SchemaVersion schemaVersion1 = new SchemaVersion(1, "");
-    schemas.put(schemaVersion1, internalSchema);
-    SchemaVersion schemaVersion2 = new SchemaVersion(2, "");
-    schemas.put(schemaVersion2, schema2);
 
-    InternalDataFile dataFile1 = getDataFile(schemaVersion1, 1, Collections.emptyList());
-    InternalDataFile dataFile2 = getDataFile(schemaVersion1, 2, Collections.emptyList());
-    InternalDataFile dataFile3 = getDataFile(schemaVersion2, 3, Collections.emptyList());
-    InternalDataFile dataFile4 = getDataFile(schemaVersion2, 4, Collections.emptyList());
-    InternalSnapshot snapshot1 = buildSnapshot(table1, schemas, dataFile1, dataFile2);
-    InternalSnapshot snapshot2 = buildSnapshot(table2, schemas, dataFile2, dataFile3);
-    InternalSnapshot snapshot3 = buildSnapshot(table2, schemas, dataFile3, dataFile4);
+    InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList());
+    InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList());
+    InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList());
+    InternalDataFile dataFile4 = getDataFile(4, Collections.emptyList());
+    InternalSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
+    InternalSnapshot snapshot3 = buildSnapshot(table2, dataFile3, dataFile4);
     when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     when(mockSchemaExtractor.toIceberg(schema2)).thenReturn(icebergSchema2);
     ArgumentCaptor<Schema> partitionSpecSchemaArgumentCaptor =
@@ -393,9 +380,6 @@ public class TestIcebergSync {
             internalSchema,
             Collections.singletonList(partitionField),
             LAST_COMMIT_TIME);
-    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
-    SchemaVersion schemaVersion = new SchemaVersion(1, "");
-    schemas.put(schemaVersion, internalSchema);
 
     List<PartitionValue> partitionValues1 =
         Collections.singletonList(
@@ -409,10 +393,10 @@ public class TestIcebergSync {
                 .partitionField(partitionField)
                 .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
                 .build());
-    InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
-    InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues1);
-    InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues2);
-    InternalSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
+    InternalDataFile dataFile1 = getDataFile(1, partitionValues1);
+    InternalDataFile dataFile2 = getDataFile(2, partitionValues1);
+    InternalDataFile dataFile3 = getDataFile(3, partitionValues2);
+    InternalSnapshot snapshot = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(internalSchema))
         .thenReturn(icebergSchema)
@@ -459,9 +443,6 @@ public class TestIcebergSync {
             internalSchema,
             Collections.singletonList(partitionField),
             LAST_COMMIT_TIME);
-    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
-    SchemaVersion schemaVersion = new SchemaVersion(1, "");
-    schemas.put(schemaVersion, internalSchema);
 
     List<PartitionValue> partitionValues1 =
         Collections.singletonList(
@@ -475,10 +456,10 @@ public class TestIcebergSync {
                 .partitionField(partitionField)
                 .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
                 .build());
-    InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
-    InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues1);
-    InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues2);
-    InternalSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
+    InternalDataFile dataFile1 = getDataFile(1, partitionValues1);
+    InternalDataFile dataFile2 = getDataFile(2, partitionValues1);
+    InternalDataFile dataFile3 = getDataFile(3, partitionValues2);
+    InternalSnapshot snapshot = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
@@ -522,9 +503,6 @@ public class TestIcebergSync {
             internalSchema,
             Collections.singletonList(partitionField),
             LAST_COMMIT_TIME);
-    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
-    SchemaVersion schemaVersion = new SchemaVersion(1, "");
-    schemas.put(schemaVersion, internalSchema);
 
     List<PartitionValue> partitionValues1 =
         Collections.singletonList(
@@ -532,10 +510,10 @@ public class TestIcebergSync {
     List<PartitionValue> partitionValues2 =
         Collections.singletonList(
             PartitionValue.builder().partitionField(partitionField).range(Range.scalar(2)).build());
-    InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
-    InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues1);
-    InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues2);
-    InternalSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
+    InternalDataFile dataFile1 = getDataFile(1, partitionValues1);
+    InternalDataFile dataFile2 = getDataFile(2, partitionValues1);
+    InternalDataFile dataFile3 = getDataFile(3, partitionValues2);
+    InternalSnapshot snapshot = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
@@ -585,9 +563,6 @@ public class TestIcebergSync {
             internalSchema,
             Arrays.asList(partitionField1, partitionField2),
             LAST_COMMIT_TIME);
-    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
-    SchemaVersion schemaVersion = new SchemaVersion(1, "");
-    schemas.put(schemaVersion, internalSchema);
 
     List<PartitionValue> partitionValues1 =
         Arrays.asList(
@@ -610,10 +585,10 @@ public class TestIcebergSync {
                 .partitionField(partitionField2)
                 .range(Range.scalar(Instant.parse("2022-10-03T00:00:00.00Z").toEpochMilli()))
                 .build());
-    InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
-    InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues2);
-    InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues3);
-    InternalSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
+    InternalDataFile dataFile1 = getDataFile(1, partitionValues1);
+    InternalDataFile dataFile2 = getDataFile(2, partitionValues2);
+    InternalDataFile dataFile3 = getDataFile(3, partitionValues3);
+    InternalSnapshot snapshot = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
@@ -663,9 +638,6 @@ public class TestIcebergSync {
             internalSchema,
             Collections.singletonList(partitionField),
             LAST_COMMIT_TIME);
-    Map<SchemaVersion, InternalSchema> schemas = new HashMap<>();
-    SchemaVersion schemaVersion = new SchemaVersion(1, "");
-    schemas.put(schemaVersion, internalSchema);
 
     List<PartitionValue> partitionValues1 =
         Collections.singletonList(
@@ -679,10 +651,10 @@ public class TestIcebergSync {
                 .partitionField(partitionField)
                 .range(Range.scalar("value2"))
                 .build());
-    InternalDataFile dataFile1 = getDataFile(schemaVersion, 1, partitionValues1);
-    InternalDataFile dataFile2 = getDataFile(schemaVersion, 2, partitionValues1);
-    InternalDataFile dataFile3 = getDataFile(schemaVersion, 3, partitionValues2);
-    InternalSnapshot snapshot = buildSnapshot(table, schemas, dataFile1, dataFile2, dataFile3);
+    InternalDataFile dataFile1 = getDataFile(1, partitionValues1);
+    InternalDataFile dataFile2 = getDataFile(2, partitionValues1);
+    InternalDataFile dataFile3 = getDataFile(3, partitionValues2);
+    InternalSnapshot snapshot = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
 
     when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
     PartitionSpec partitionSpec =
@@ -707,26 +679,20 @@ public class TestIcebergSync {
         Expressions.equal(partitionField.getSourceField().getPath(), "value1"));
   }
 
-  private InternalSnapshot buildSnapshot(
-      InternalTable table,
-      Map<SchemaVersion, InternalSchema> schemas,
-      InternalDataFile... dataFiles) {
+  private InternalSnapshot buildSnapshot(InternalTable table, InternalDataFile... dataFiles) {
     return InternalSnapshot.builder()
         .table(table)
-        .schemaCatalog(SchemaCatalog.builder().schemas(schemas).build())
         .partitionedDataFiles(PartitionFileGroup.fromFiles(Arrays.asList(dataFiles)))
         .build();
   }
 
-  private InternalDataFile getDataFile(
-      SchemaVersion schemaVersion, int index, List<PartitionValue> partitionValues) {
+  private InternalDataFile getDataFile(int index, List<PartitionValue> partitionValues) {
     String physicalPath = "file:/physical" + index + ".parquet";
     return InternalDataFile.builder()
         .fileFormat(FileFormat.APACHE_PARQUET)
         .fileSizeBytes(RANDOM.nextInt(10000))
         .physicalPath(physicalPath)
         .recordCount(RANDOM.nextInt(10000))
-        .schemaVersion(schemaVersion)
         .partitionValues(partitionValues)
         .columnStats(Collections.emptyList())
         .build();
