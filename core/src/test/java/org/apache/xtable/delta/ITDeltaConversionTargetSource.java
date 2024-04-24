@@ -65,8 +65,6 @@ import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
-import org.apache.xtable.model.schema.SchemaCatalog;
-import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
@@ -191,11 +189,6 @@ public class ITDeltaConversionTargetSource {
         DataLayoutStrategy.FLAT,
         "file:" + basePath,
         Collections.emptyList());
-    // Validate schema catalog
-    SchemaCatalog schemaCatalog = snapshot.getSchemaCatalog();
-    validateSchemaCatalog(
-        schemaCatalog,
-        Collections.singletonMap(new SchemaVersion(1, ""), snapshot.getTable().getReadSchema()));
     // Validate data files
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
@@ -269,11 +262,6 @@ public class ITDeltaConversionTargetSource {
                 .sourceField(partCol)
                 .transformType(PartitionTransformType.VALUE)
                 .build()));
-    // Validate schema catalog
-    SchemaCatalog schemaCatalog = snapshot.getSchemaCatalog();
-    validateSchemaCatalog(
-        schemaCatalog,
-        Collections.singletonMap(new SchemaVersion(1, ""), snapshot.getTable().getReadSchema()));
     // Validate data files
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
@@ -689,11 +677,6 @@ public class ITDeltaConversionTargetSource {
     Assertions.assertEquals(partitioningFields, internalTable.getPartitioningFields());
   }
 
-  private void validateSchemaCatalog(
-      SchemaCatalog schemaCatalog, Map<SchemaVersion, InternalSchema> schemas) {
-    Assertions.assertEquals(schemas, schemaCatalog.getSchemas());
-  }
-
   private void validatePartitionDataFiles(
       PartitionFileGroup expectedPartitionFiles, PartitionFileGroup actualPartitionFiles)
       throws URISyntaxException {
@@ -715,7 +698,6 @@ public class ITDeltaConversionTargetSource {
 
   private void validatePropertiesDataFile(InternalDataFile expected, InternalDataFile actual)
       throws URISyntaxException {
-    Assertions.assertEquals(expected.getSchemaVersion(), actual.getSchemaVersion());
     Assertions.assertTrue(
         Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
         () -> "path == " + actual.getPhysicalPath() + " is not absolute");

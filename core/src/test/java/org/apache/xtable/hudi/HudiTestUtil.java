@@ -48,11 +48,8 @@ import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 
-import org.apache.xtable.model.schema.SchemaVersion;
-
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class HudiTestUtil {
-  static final SchemaVersion SCHEMA_VERSION = new SchemaVersion(1, "");
 
   @SneakyThrows
   static HoodieTableMetaClient initTableAndGetMetaClient(

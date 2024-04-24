@@ -38,7 +38,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import org.apache.iceberg.*;
 import org.apache.iceberg.data.GenericRecord;
@@ -59,8 +58,6 @@ import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
-import org.apache.xtable.model.schema.SchemaCatalog;
-import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.FileFormat;
@@ -122,32 +119,6 @@ class TestIcebergConversionTargetSource {
   }
 
   @Test
-  public void getSchemaCatalogTest(@TempDir Path workingDir) throws IOException {
-    Table catalogSales = createTestTableWithData(workingDir.toString());
-    Snapshot iceCurrentSnapshot = catalogSales.currentSnapshot();
-
-    // add extra schema to test current schema is returned
-    catalogSales.updateSchema().addColumn("new_column", Types.IntegerType.get()).commit();
-    assertEquals(2, catalogSales.schemas().size());
-    assertEquals(0, iceCurrentSnapshot.schemaId());
-
-    PerTableConfig sourceTableConfig = getPerTableConfig(catalogSales);
-
-    IcebergConversionSource conversionSource =
-        sourceProvider.getConversionSourceInstance(sourceTableConfig);
-    IcebergConversionSource spyConversionSource = Mockito.spy(conversionSource);
-
-    SchemaCatalog schemaCatalog = spyConversionSource.getSchemaCatalog(null, iceCurrentSnapshot);
-    Assertions.assertNotNull(schemaCatalog);
-    Map<SchemaVersion, InternalSchema> schemas = schemaCatalog.getSchemas();
-    assertEquals(1, schemas.size());
-    SchemaVersion expectedSchemaVersion = new SchemaVersion(iceCurrentSnapshot.schemaId(), "");
-    InternalSchema irSchemaOfCommit = schemas.get(expectedSchemaVersion);
-    Assertions.assertNotNull(irSchemaOfCommit);
-    validateSchema(irSchemaOfCommit, catalogSales.schemas().get(iceCurrentSnapshot.schemaId()));
-  }
-
-  @Test
   public void testGetCurrentSnapshot(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestTableWithData(workingDir.toString());
     Snapshot iceCurrentSnapshot = catalogSales.currentSnapshot();
@@ -172,8 +143,6 @@ class TestIcebergConversionTargetSource {
     assertEquals(String.valueOf(iceCurrentSnapshot.snapshotId()), internalSnapshot.getVersion());
     Assertions.assertNotNull(internalSnapshot.getTable());
     verify(spyConversionSource, times(1)).getTable(iceCurrentSnapshot);
-    verify(spyConversionSource, times(1))
-        .getSchemaCatalog(internalSnapshot.getTable(), iceCurrentSnapshot);
     verify(spyPartitionConverter, times(5)).toXTable(any(), any(), any());
     verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any(), any());
 

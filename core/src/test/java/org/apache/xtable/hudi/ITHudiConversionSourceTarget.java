@@ -18,7 +18,6 @@
  
 package org.apache.xtable.hudi;
 
-import static org.apache.xtable.hudi.HudiTestUtil.SCHEMA_VERSION;
 import static org.apache.xtable.hudi.HudiTestUtil.createWriteStatus;
 import static org.apache.xtable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.apache.xtable.hudi.HudiTestUtil.initTableAndGetMetaClient;
@@ -188,7 +187,6 @@ public class ITHudiConversionSourceTarget {
             .physicalPath(
                 String.format("file://%s/%s/%s", tableBasePath, partitionPath, existingFileName1))
             .recordCount(2)
-            .schemaVersion(SCHEMA_VERSION)
             .build();
     String fileName = "file_1.parquet";
     String filePath = getFilePath(partitionPath, fileName);
@@ -556,7 +554,6 @@ public class ITHudiConversionSourceTarget {
                 .totalSize(5)
                 .build());
     return InternalDataFile.builder()
-        .schemaVersion(SCHEMA_VERSION)
         .physicalPath(String.format("file://%s/%s/%s", tableBasePath, partitionPath, fileName))
         .fileSizeBytes(FILE_SIZE)
         .fileFormat(FileFormat.APACHE_PARQUET)

@@ -18,7 +18,6 @@
  
 package org.apache.xtable.hudi;
 
-import static org.apache.xtable.hudi.HudiTestUtil.SCHEMA_VERSION;
 import static org.apache.xtable.hudi.HudiTestUtil.createWriteStatus;
 import static org.apache.xtable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.apache.xtable.hudi.HudiTestUtil.initTableAndGetMetaClient;
@@ -390,7 +389,6 @@ public class TestBaseFileUpdatesExtractor {
 
   private InternalDataFile createFile(String physicalPath, List<ColumnStat> columnStats) {
     return InternalDataFile.builder()
-        .schemaVersion(SCHEMA_VERSION)
         .physicalPath(physicalPath)
         .fileSizeBytes(FILE_SIZE)
         .fileFormat(FileFormat.APACHE_PARQUET)

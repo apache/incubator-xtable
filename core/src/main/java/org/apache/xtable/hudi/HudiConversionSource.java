@@ -49,7 +49,6 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.schema.SchemaCatalog;
 import org.apache.xtable.spi.extractor.ConversionSource;
 
 public class HudiConversionSource implements ConversionSource<HoodieInstant> {
@@ -78,11 +77,6 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
   }
 
   @Override
-  public SchemaCatalog getSchemaCatalog(InternalTable table, HoodieInstant commit) {
-    return HudiSchemaCatalogExtractor.catalogWithTableSchema(table);
-  }
-
-  @Override
   public InternalSnapshot getCurrentSnapshot() {
     HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
     HoodieTimeline completedTimeline = activeTimeline.filterCompletedInstants();
@@ -100,7 +94,6 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
     InternalTable table = getTable(latestCommit);
     return InternalSnapshot.builder()
         .table(table)
-        .schemaCatalog(getSchemaCatalog(table, latestCommit))
         .partitionedDataFiles(dataFileExtractor.getFilesCurrentState(table))
         .pendingCommits(
             pendingInstants.stream()

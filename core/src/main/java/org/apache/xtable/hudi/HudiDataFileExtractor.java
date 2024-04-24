@@ -64,7 +64,6 @@ import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.exception.ParseException;
 import org.apache.xtable.model.schema.InternalPartitionField;
-import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
@@ -73,7 +72,6 @@ import org.apache.xtable.model.storage.PartitionFileGroup;
 
 /** Extracts all the files for Hudi table represented by {@link InternalTable}. */
 public class HudiDataFileExtractor implements AutoCloseable {
-  private static final SchemaVersion DEFAULT_SCHEMA_VERSION = new SchemaVersion(1, null);
   private final HoodieTableMetadata tableMetadata;
   private final HoodieTableMetaClient metaClient;
   private final HoodieEngineContext engineContext;
@@ -397,7 +395,6 @@ public class HudiDataFileExtractor implements AutoCloseable {
       List<PartitionValue> partitionValues, HoodieBaseFile hoodieBaseFile) {
     long rowCount = 0L;
     return InternalDataFile.builder()
-        .schemaVersion(DEFAULT_SCHEMA_VERSION)
         .physicalPath(hoodieBaseFile.getPath())
         .fileFormat(getFileFormat(FSUtils.getFileExtension(hoodieBaseFile.getPath())))
         .partitionValues(partitionValues)
