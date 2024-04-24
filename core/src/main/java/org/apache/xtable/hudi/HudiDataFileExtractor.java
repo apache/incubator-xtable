@@ -59,8 +59,10 @@ import org.apache.hudi.common.table.view.TableFileSystemView;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 
 import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.exception.ParseException;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.SchemaVersion;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -117,7 +119,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
               : FSUtils.getAllPartitionPaths(engineContext, metadataConfig, basePath.toString());
       return getInternalDataFilesForPartitions(allPartitionPaths, table);
     } catch (IOException ex) {
-      throw new OneIOException(
+      throw new ReadException(
           "Unable to read partitions for table " + metaClient.getTableConfig().getTableName(), ex);
     }
   }
@@ -245,11 +247,11 @@ public class HudiDataFileExtractor implements AutoCloseable {
           // these do not impact the base files
           break;
         default:
-          throw new OneIOException("Unexpected commit type " + instant.getAction());
+          throw new NotSupportedException("Unexpected commit type " + instant.getAction());
       }
       return AddedAndRemovedFiles.builder().added(addedFiles).removed(removedFiles).build();
     } catch (IOException ex) {
-      throw new OneIOException("Unable to read commit metadata for commit " + instant, ex);
+      throw new ReadException("Unable to read commit metadata for commit " + instant, ex);
     }
   }
 
@@ -269,7 +271,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                 }
                 return new URI(basePathUri.getScheme(), path, null).toString();
               } catch (URISyntaxException e) {
-                throw new OneIOException("Unable to parse path " + path, e);
+                throw new ParseException("Unable to parse path " + path, e);
               }
             })
         .filter(uri -> !FSUtils.isLogFile(new Path(uri).getName()))
@@ -372,7 +374,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
       }
       fileSystemViewManager.close();
     } catch (Exception e) {
-      throw new OneIOException(
+      throw new ReadException(
           "Could not close table metadata for table " + metaClient.getTableConfig().getTableName());
     }
   }

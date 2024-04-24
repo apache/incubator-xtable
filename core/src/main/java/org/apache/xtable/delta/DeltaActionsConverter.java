@@ -89,7 +89,7 @@ public class DeltaActionsConverter {
         .build();
   }
 
-  public FileFormat convertToOneTableFileFormat(String provider) {
+  public FileFormat convertToFileFormat(String provider) {
     if (provider.equals("parquet")) {
       return FileFormat.APACHE_PARQUET;
     } else if (provider.equals("orc")) {

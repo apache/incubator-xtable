@@ -35,7 +35,7 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.exception.TableNotFoundException;
 
-import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -117,7 +117,7 @@ class HudiTableManager {
                   .collect(Collectors.joining(",")))
           .initTable(configuration, tableDataPath);
     } catch (IOException ex) {
-      throw new OneIOException("Unable to initialize Hudi table", ex);
+      throw new UpdateException("Unable to initialize Hudi table", ex);
     }
   }
 

@@ -82,7 +82,7 @@ public class IcebergSchemaExtractor {
     Schema partialSchema = new Schema(nestedFields);
     Set<Integer> recordKeyIds =
         recordKeyFields.stream()
-            .map(keyField -> partialSchema.findField(convertFromOneTablePath(keyField.getPath())))
+            .map(keyField -> partialSchema.findField(convertFromXTablePath(keyField.getPath())))
             .filter(Objects::nonNull)
             .map(Types.NestedField::fieldId)
             .collect(Collectors.toSet());
@@ -90,7 +90,7 @@ public class IcebergSchemaExtractor {
       List<String> missingFieldPaths =
           recordKeyFields.stream()
               .map(InternalField::getPath)
-              .filter(path -> partialSchema.findField(convertFromOneTablePath(path)) == null)
+              .filter(path -> partialSchema.findField(convertFromXTablePath(path)) == null)
               .collect(CustomCollectors.toList(recordKeyFields.size()));
       log.error("Missing field IDs for record key field paths: " + missingFieldPaths);
       throw new SchemaExtractorException(
@@ -134,7 +134,7 @@ public class IcebergSchemaExtractor {
         .collect(CustomCollectors.toList(iceFields.size()));
   }
 
-  static String convertFromOneTablePath(String path) {
+  static String convertFromXTablePath(String path) {
     return path.replace(InternalField.Constants.MAP_KEY_FIELD_NAME, MAP_KEY_FIELD_NAME)
         .replace(InternalField.Constants.MAP_VALUE_FIELD_NAME, MAP_VALUE_FIELD_NAME)
         .replace(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME, LIST_ELEMENT_FIELD_NAME);

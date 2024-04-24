@@ -11,10 +11,10 @@ For more information on creating external schemas, refer to
 [Redshift docs](https://docs.aws.amazon.com/redshift/latest/dg/c-spectrum-external-schemas.html#c-spectrum-external-catalogs).
 
 ### Hudi and Iceberg tables
-The following query creates an external schema `onetable_synced_schema` using the Glue database `glue_database_name`
+The following query creates an external schema `xtable_synced_schema` using the Glue database `glue_database_name`
 
 ```sql md title="sql"
-CREATE EXTERNAL SCHEMA onetable_synced_schema
+CREATE EXTERNAL SCHEMA xtable_synced_schema
 FROM DATA CATALOG
 DATABASE <glue_database_name>
 IAM_ROLE 'arn:aws:iam::<accountId>:role/<roleName>'
@@ -30,7 +30,7 @@ Redshift can infer the tables present in the Glue database automatically. You ca
 
 ```sql md title="sql"
 SELECT *
-FROM onetable_synced_schema.<table_name>;
+FROM xtable_synced_schema.<table_name>;
 ```
 
 ### Delta Lake table
@@ -48,7 +48,7 @@ You have two options to create and query Delta tables in Redshift Spectrum:
 You can then use a similar approach to query the Hudi and Iceberg tables mentioned above.
 
 ```sql md title="sql"
-CREATE EXTERNAL SCHEMA onetable_synced_schema_delta
+CREATE EXTERNAL SCHEMA xtable_synced_schema_delta
 FROM DATA CATALOG
 DATABASE <delta_glue_database_name>
 IAM_ROLE 'arn:aws:iam::<accountId>:role/<roleName>'
@@ -57,5 +57,5 @@ CREATE EXTERNAL DATABASE IF NOT EXISTS;
 
 ```sql md title="sql"
 SELECT *
-FROM onetable_synced_schema_delta.<table_name>;
+FROM xtable_synced_schema_delta.<table_name>;
 ```

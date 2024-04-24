@@ -82,7 +82,7 @@ public interface ConversionTarget {
   /** Completes the sync and performs any cleanup required. */
   void completeSync();
 
-  /** Returns the onetable metadata persisted in the target */
+  /** Returns the xtable metadata persisted in the target */
   Optional<TableSyncMetadata> getTableMetadata();
 
   /** Returns the TableFormat name the client syncs to */

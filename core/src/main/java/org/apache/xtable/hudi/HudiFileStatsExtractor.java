@@ -274,7 +274,7 @@ public class HudiFileStatsExtractor {
   }
 
   private String getFieldNameForStats(InternalField field, boolean isReadFromMetadataTable) {
-    String convertedDotPath = HudiSchemaExtractor.convertFromOneTablePath(field.getPath());
+    String convertedDotPath = HudiSchemaExtractor.convertFromXTablePath(field.getPath());
     // the array field naming is different for metadata table
     if (isReadFromMetadataTable) {
       return convertedDotPath.replace(ARRAY_DOT_FIELD, PARQUET_ELMENT_DOT_FIELD);

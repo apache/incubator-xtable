@@ -38,7 +38,7 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
@@ -139,7 +139,7 @@ public class ConversionController {
       }
       return syncResultsMerged;
     } catch (IOException ioException) {
-      throw new OneIOException("Failed to close source converter", ioException);
+      throw new ReadException("Failed to close source converter", ioException);
     }
   }
 

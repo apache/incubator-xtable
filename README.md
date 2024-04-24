@@ -94,7 +94,7 @@ catalogOptions: # all other options are passed through in a map
 ```
 5. run with `java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--convertersConfig converters.yaml] [--icebergCatalogConfig catalog.yaml]`
 The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Sample hadoop configurations for configuring the converters 
-can be found in the [onetable-hadoop-defaults.xml](https://github.com/apache/incubator-xtable/blob/main/utilities/src/main/resources/onetable-hadoop-defaults.xml) file.
+can be found in the [xtable-hadoop-defaults.xml](https://github.com/apache/incubator-xtable/blob/main/utilities/src/main/resources/xtable-hadoop-defaults.xml) file.
 The custom hadoop configurations can be passed in with the `--hadoopConfig [custom-hadoop-config-file]` option.
 The config in custom hadoop config file will override the default hadoop configurations. For an example
 of a custom hadoop config file, see [hadoop.xml](https://xtable.apache.org/docs/fabric#step-2-translate-source-table-to-delta-lake-format-using-apache-xtable-incubating).
@@ -107,7 +107,7 @@ For setting up the repo on IntelliJ, open the project and change the java versio
 You have found a bug, or have a cool idea you that want to contribute to the project ? Please file a GitHub issue [here](https://github.com/apache/incubator-xtable/issues)
 
 ## Adding a new target format
-Adding a new target format requires a developer implement [ConversionTarget](./api/src/main/java/org/apache/xtable/spi/sync/ConversionTarget.java). Once you have implemented that interface, you can integrate it into the [OneTableClient](./core/src/main/java/org/apache/xtable/client/OneTableClient.java). If you think others may find that target useful, please raise a Pull Request to add it to the project.
+Adding a new target format requires a developer implement [ConversionTarget](./api/src/main/java/org/apache/xtable/spi/sync/ConversionTarget.java). Once you have implemented that interface, you can integrate it into the [ConversionController](./core/src/main/java/org/apache/xtable/conversion/ConversionController.java). If you think others may find that target useful, please raise a Pull Request to add it to the project.
 
 ## Overview of the sync process
 ![img.png](assets/images/sync_flow.jpg)

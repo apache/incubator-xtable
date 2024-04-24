@@ -81,7 +81,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.conversion.PerTableConfig;
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.exception.ReadException;
+import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
@@ -304,7 +305,7 @@ public class HudiConversionTarget implements ConversionTarget {
                               .getExtraMetadata();
                         }
                       } catch (IOException ex) {
-                        throw new OneIOException("Unable to read Hudi commit metadata", ex);
+                        throw new ReadException("Unable to read Hudi commit metadata", ex);
                       }
                     })
                 .flatMap(TableSyncMetadata::fromMap));
@@ -359,7 +360,7 @@ public class HudiConversionTarget implements ConversionTarget {
           // reuse existing table schema if no schema is provided as part of this commit
           schema = new TableSchemaResolver(metaClient).getTableAvroSchema();
         } catch (Exception ex) {
-          throw new OneIOException("Unable to read Hudi table schema", ex);
+          throw new ReadException("Unable to read Hudi table schema", ex);
         }
       }
       HoodieWriteConfig writeConfig =
@@ -426,7 +427,7 @@ public class HudiConversionTarget implements ConversionTarget {
       try {
         partitionsToClean = planner.getPartitionPathsToClean(earliestInstant);
       } catch (IOException ex) {
-        throw new OneIOException("Unable to get partitions to clean", ex);
+        throw new ReadException("Unable to get partitions to clean", ex);
       }
       if (partitionsToClean.isEmpty()) {
         return;
@@ -532,7 +533,7 @@ public class HudiConversionTarget implements ConversionTarget {
         activeTimeline.transitionCleanInflightToComplete(
             inflightClean, TimelineMetadataUtils.serializeCleanMetadata(cleanMetadata));
       } catch (Exception ex) {
-        throw new OneIOException("Unable to clean Hudi timeline", ex);
+        throw new UpdateException("Unable to clean Hudi timeline", ex);
       }
     }
 
@@ -543,7 +544,7 @@ public class HudiConversionTarget implements ConversionTarget {
         HoodieTimelineArchiver archiver = new HoodieTimelineArchiver(config, table);
         archiver.archiveIfRequired(engineContext, true);
       } catch (IOException ex) {
-        throw new OneIOException("Unable to archive Hudi timeline", ex);
+        throw new UpdateException("Unable to archive Hudi timeline", ex);
       }
     }
 

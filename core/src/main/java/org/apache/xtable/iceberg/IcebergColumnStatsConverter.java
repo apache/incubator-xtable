@@ -61,7 +61,7 @@ public class IcebergColumnStatsConverter {
         columnStats -> {
           InternalField field = columnStats.getField();
           Types.NestedField icebergField =
-              schema.findField(IcebergSchemaExtractor.convertFromOneTablePath(field.getPath()));
+              schema.findField(IcebergSchemaExtractor.convertFromXTablePath(field.getPath()));
           int fieldId = icebergField.fieldId();
           columnSizes.put(fieldId, columnStats.getTotalSize());
           valueCounts.put(fieldId, columnStats.getNumValues());

@@ -261,7 +261,7 @@ public class DeltaConversionTarget implements ConversionTarget {
       transaction.updateMetadata(metadata, false);
       transaction.commit(
           actions,
-          new DeltaOperations.Update(Option.apply(Literal.fromObject("onetable-delta-sync"))));
+          new DeltaOperations.Update(Option.apply(Literal.fromObject("xtable-delta-sync"))));
     }
 
     private Map<String, String> getConfigurationsForDeltaSync() {

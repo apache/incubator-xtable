@@ -55,7 +55,7 @@ public class HudiSchemaExtractor implements SchemaExtractor<Schema> {
     return converter.toInternalSchema(schema);
   }
 
-  static String convertFromOneTablePath(String path) {
+  static String convertFromXTablePath(String path) {
     return path.replace(InternalField.Constants.MAP_KEY_FIELD_NAME, MAP_KEY_FIELD_NAME)
         .replace(InternalField.Constants.MAP_VALUE_FIELD_NAME, MAP_VALUE_FIELD_NAME)
         .replace(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME, LIST_ELEMENT_FIELD_NAME);

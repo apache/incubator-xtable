@@ -135,7 +135,7 @@ public class ITHudiConversionSourceSource {
 
       HudiConversionSource hudiClient =
           getHudiSourceClient(
-              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
+              CONFIGURATION, table.getBasePath(), partitionConfig.getXTableConfig());
       // Get the current snapshot
       InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
       ValidationTestHelper.validateSnapshot(
@@ -183,7 +183,7 @@ public class ITHudiConversionSourceSource {
 
       HudiConversionSource hudiClient =
           getHudiSourceClient(
-              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
+              CONFIGURATION, table.getBasePath(), partitionConfig.getXTableConfig());
       // Get the current snapshot
       InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
       ValidationTestHelper.validateSnapshot(
@@ -225,7 +225,7 @@ public class ITHudiConversionSourceSource {
 
       HudiConversionSource hudiClient =
           getHudiSourceClient(
-              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
+              CONFIGURATION, table.getBasePath(), partitionConfig.getXTableConfig());
       // commitInstant1 is not safe for incremental sync as cleaner has run after and touched
       // related files.
       assertFalse(
@@ -390,7 +390,7 @@ public class ITHudiConversionSourceSource {
 
       HudiConversionSource hudiClient =
           getHudiSourceClient(
-              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
+              CONFIGURATION, table.getBasePath(), partitionConfig.getXTableConfig());
       // Get the current snapshot
       InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
       ValidationTestHelper.validateSnapshot(
@@ -445,7 +445,7 @@ public class ITHudiConversionSourceSource {
 
       HudiConversionSource hudiClient =
           getHudiSourceClient(
-              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
+              CONFIGURATION, table.getBasePath(), partitionConfig.getXTableConfig());
       // Get the current snapshot
       InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
       ValidationTestHelper.validateSnapshot(
@@ -511,7 +511,7 @@ public class ITHudiConversionSourceSource {
 
       HudiConversionSource hudiClient =
           getHudiSourceClient(
-              CONFIGURATION, table.getBasePath(), partitionConfig.getOneTableConfig());
+              CONFIGURATION, table.getBasePath(), partitionConfig.getXTableConfig());
       // Get the current snapshot
       InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
       ValidationTestHelper.validateSnapshot(internalSnapshot, baseFilesAfterCommit4);
@@ -560,7 +560,7 @@ public class ITHudiConversionSourceSource {
   }
 
   private HudiConversionSource getHudiSourceClient(
-      Configuration conf, String basePath, String onetablePartitionConfig) {
+      Configuration conf, String basePath, String xTablePartitionConfig) {
     HoodieTableMetaClient hoodieTableMetaClient =
         HoodieTableMetaClient.builder()
             .setConf(conf)
@@ -569,9 +569,7 @@ public class ITHudiConversionSourceSource {
             .build();
     HudiSourcePartitionSpecExtractor partitionSpecExtractor =
         new ConfigurationBasedPartitionSpecExtractor(
-            HudiSourceConfigImpl.builder()
-                .partitionFieldSpecConfig(onetablePartitionConfig)
-                .build());
+            HudiSourceConfigImpl.builder().partitionFieldSpecConfig(xTablePartitionConfig).build());
     return new HudiConversionSource(hoodieTableMetaClient, partitionSpecExtractor);
   }
 

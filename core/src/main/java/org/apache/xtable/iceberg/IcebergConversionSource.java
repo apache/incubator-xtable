@@ -37,7 +37,7 @@ import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
 
 import org.apache.xtable.conversion.PerTableConfig;
-import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
@@ -150,7 +150,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
       }
       partitionedDataFiles = PartitionFileGroup.fromFiles(irFiles);
     } catch (IOException e) {
-      throw new OneIOException("Failed to fetch current snapshot files from Iceberg source", e);
+      throw new ReadException("Failed to fetch current snapshot files from Iceberg source", e);
     }
 
     return InternalSnapshot.builder()
@@ -164,7 +164,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   private InternalDataFile fromIceberg(
       DataFile file, PartitionSpec partitionSpec, InternalTable internalTable) {
     List<PartitionValue> partitionValues =
-        partitionConverter.toOneTable(internalTable, file.partition(), partitionSpec);
+        partitionConverter.toXTable(internalTable, file.partition(), partitionSpec);
     return dataFileExtractor.fromIceberg(file, partitionValues, internalTable.getReadSchema());
   }
 

@@ -104,7 +104,7 @@ public class RunSync {
     try {
       cmd = parser.parse(OPTIONS, args);
     } catch (ParseException e) {
-      new HelpFormatter().printHelp("onetable.jar", OPTIONS, true);
+      new HelpFormatter().printHelp("xtable.jar", OPTIONS, true);
       return;
     }
 
@@ -184,7 +184,7 @@ public class RunSync {
   @VisibleForTesting
   static Configuration loadHadoopConf(byte[] customConfig) {
     Configuration conf = new Configuration();
-    conf.addResource("onetable-hadoop-defaults.xml");
+    conf.addResource("xtable-hadoop-defaults.xml");
     if (customConfig != null) {
       conf.addResource(new ByteArrayInputStream(customConfig), "customConfigStream");
     }
@@ -203,7 +203,7 @@ public class RunSync {
       throws IOException {
     // get resource stream from default converter config yaml file
     try (InputStream inputStream =
-        RunSync.class.getClassLoader().getResourceAsStream("onetable-conversion-defaults.yaml")) {
+        RunSync.class.getClassLoader().getResourceAsStream("xtable-conversion-defaults.yaml")) {
       TableFormatConverters converters =
           YAML_MAPPER.readValue(inputStream, TableFormatConverters.class);
       if (customConfigs != null) {

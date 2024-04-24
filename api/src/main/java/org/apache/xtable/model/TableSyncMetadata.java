@@ -41,7 +41,7 @@ public class TableSyncMetadata {
    * Property name for the lastInstantSynced field from SyncResult, used for persisting
    * lastInstantSynced in the table metadata/properties
    */
-  public static final String ONETABLE_LAST_INSTANT_SYNCED_PROP = "ONETABLE_LAST_INSTANT_SYNCED";
+  public static final String XTABLE_LAST_INSTANT_SYNCED_PROP = "XTABLE_LAST_INSTANT_SYNCED";
   /**
    * Property name for the list of instants to consider during the next sync. This list may include
    * out-of-order instants that could be missed without explicit tracking.
@@ -54,7 +54,7 @@ public class TableSyncMetadata {
 
   public Map<String, String> asMap() {
     Map<String, String> map = new HashMap<>();
-    map.put(ONETABLE_LAST_INSTANT_SYNCED_PROP, lastInstantSynced.toString());
+    map.put(XTABLE_LAST_INSTANT_SYNCED_PROP, lastInstantSynced.toString());
     map.put(
         INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP,
         convertInstantsToConsiderForNextSyncToString());
@@ -65,8 +65,8 @@ public class TableSyncMetadata {
     if (properties != null) {
       Instant lastInstantSynced = null;
       List<Instant> instantsToConsiderForNextSync = null;
-      if (properties.containsKey(ONETABLE_LAST_INSTANT_SYNCED_PROP)) {
-        lastInstantSynced = Instant.parse(properties.get(ONETABLE_LAST_INSTANT_SYNCED_PROP));
+      if (properties.containsKey(XTABLE_LAST_INSTANT_SYNCED_PROP)) {
+        lastInstantSynced = Instant.parse(properties.get(XTABLE_LAST_INSTANT_SYNCED_PROP));
       }
       if (properties.containsKey(INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP)) {
         instantsToConsiderForNextSync =

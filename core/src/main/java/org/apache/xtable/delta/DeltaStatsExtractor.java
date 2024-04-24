@@ -42,7 +42,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.apache.xtable.collectors.CustomCollectors;
-import org.apache.xtable.exception.OneIOException;
+import org.apache.xtable.model.exception.ParseException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
@@ -201,7 +201,7 @@ public class DeltaStatsExtractor {
               })
           .collect(CustomCollectors.toList(fields.size()));
     } catch (IOException ex) {
-      throw new OneIOException("Unable to parse stats json", ex);
+      throw new ParseException("Unable to parse stats json", ex);
     }
   }
 

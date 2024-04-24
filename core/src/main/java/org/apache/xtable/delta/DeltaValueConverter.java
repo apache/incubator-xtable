@@ -33,7 +33,6 @@ import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.exception.OneIOException;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
@@ -75,7 +74,8 @@ public class DeltaValueConverter {
       try {
         instant = dateFormat.parse(value.toString()).toInstant();
       } catch (ParseException ex) {
-        throw new OneIOException("Unable to parse time from column stats", ex);
+        throw new org.apache.xtable.model.exception.ParseException(
+            "Unable to parse time from column stats", ex);
       }
     }
     InternalSchema.MetadataValue timestampPrecision =
@@ -186,7 +186,8 @@ public class DeltaValueConverter {
         DateFormat formatter = getDateFormat(dateFormat);
         return formatter.parse(value).toInstant().toEpochMilli();
       } catch (ParseException ex) {
-        throw new OneIOException("Unable to parse partition value", ex);
+        throw new org.apache.xtable.model.exception.ParseException(
+            "Unable to parse partition value", ex);
       }
     }
   }

@@ -150,8 +150,8 @@ public class TestDeltaSync {
                     .build())
             .build());
     InternalSchema schema2 = getInternalSchema().toBuilder().fields(fields2).build();
-    InternalTable table1 = getOneTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
-    InternalTable table2 = getOneTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
+    InternalTable table1 = getInternalTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
+    InternalTable table2 = getInternalTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
 
     InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList(), basePath);
     InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
@@ -186,7 +186,7 @@ public class TestDeltaSync {
             .transformType(PartitionTransformType.VALUE)
             .build();
     InternalTable table =
-        getOneTable(
+        getInternalTable(
             tableName,
             basePath,
             schema,
@@ -245,7 +245,7 @@ public class TestDeltaSync {
             .transformType(PartitionTransformType.VALUE)
             .build();
     InternalTable table =
-        getOneTable(
+        getInternalTable(
             tableName,
             basePath,
             schema,
@@ -312,7 +312,7 @@ public class TestDeltaSync {
             .transformType(transformType)
             .build();
     InternalTable table =
-        getOneTable(
+        getInternalTable(
             tableName,
             basePath,
             schema,
@@ -362,7 +362,7 @@ public class TestDeltaSync {
         JavaConverters.seqAsJavaList(translatedExpression)
             .get(0)
             .toString()
-            .contains(String.format("onetable_partition_col_%s_timestamp_field", transformType)));
+            .contains(String.format("xtable_partition_col_%s_timestamp_field", transformType)));
   }
 
   private static Stream<Arguments> timestampPartitionTestingArgs() {
@@ -413,7 +413,7 @@ public class TestDeltaSync {
         .build();
   }
 
-  private InternalTable getOneTable(
+  private InternalTable getInternalTable(
       String tableName,
       Path basePath,
       InternalSchema schema,

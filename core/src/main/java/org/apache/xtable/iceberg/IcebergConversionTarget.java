@@ -19,7 +19,7 @@
 package org.apache.xtable.iceberg;
 
 import static org.apache.xtable.model.TableSyncMetadata.INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP;
-import static org.apache.xtable.model.TableSyncMetadata.ONETABLE_LAST_INSTANT_SYNCED_PROP;
+import static org.apache.xtable.model.TableSyncMetadata.XTABLE_LAST_INSTANT_SYNCED_PROP;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -275,7 +275,7 @@ public class IcebergConversionTarget implements ConversionTarget {
           Transaction transaction = table.newTransaction();
           transaction
               .updateProperties()
-              .remove(ONETABLE_LAST_INSTANT_SYNCED_PROP)
+              .remove(XTABLE_LAST_INSTANT_SYNCED_PROP)
               .remove(INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP)
               .commit();
           transaction.commitTransaction();
