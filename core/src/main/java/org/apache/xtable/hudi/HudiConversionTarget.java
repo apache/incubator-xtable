@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -84,7 +83,7 @@ import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.TableSyncMetadata;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -308,7 +307,10 @@ public class HudiConversionTarget implements ConversionTarget {
                         throw new ReadException("Unable to read Hudi commit metadata", ex);
                       }
                     })
-                .flatMap(TableSyncMetadata::fromMap));
+                .flatMap(
+                    metadata ->
+                        TableSyncMetadata.fromJson(
+                            metadata.get(TableSyncMetadata.XTABLE_METADATA))));
   }
 
   @Override
@@ -549,7 +551,8 @@ public class HudiConversionTarget implements ConversionTarget {
     }
 
     private Option<Map<String, String>> getExtraMetadata() {
-      Map<String, String> extraMetadata = new HashMap<>(tableSyncMetadata.asMap());
+      Map<String, String> extraMetadata =
+          Collections.singletonMap(TableSyncMetadata.XTABLE_METADATA, tableSyncMetadata.toJson());
       return Option.of(extraMetadata);
     }
 

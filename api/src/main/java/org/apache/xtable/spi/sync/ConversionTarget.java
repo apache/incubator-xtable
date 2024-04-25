@@ -25,7 +25,7 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.apache.xtable.conversion.PerTableConfig;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.TableSyncMetadata;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;

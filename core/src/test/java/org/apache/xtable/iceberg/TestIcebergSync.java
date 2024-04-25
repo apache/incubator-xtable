@@ -84,7 +84,7 @@ import org.apache.xtable.ITConversionController;
 import org.apache.xtable.conversion.PerTableConfigImpl;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.TableSyncMetadata;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;

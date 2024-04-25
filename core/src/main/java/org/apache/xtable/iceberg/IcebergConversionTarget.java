@@ -18,13 +18,9 @@
  
 package org.apache.xtable.iceberg;
 
-import static org.apache.xtable.model.TableSyncMetadata.INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP;
-import static org.apache.xtable.model.TableSyncMetadata.XTABLE_LAST_INSTANT_SYNCED_PROP;
-
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import lombok.extern.log4j.Log4j2;
@@ -45,7 +41,7 @@ import org.apache.iceberg.exceptions.NotFoundException;
 
 import org.apache.xtable.conversion.PerTableConfig;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.TableSyncMetadata;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
@@ -179,9 +175,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   @Override
   public void syncMetadata(TableSyncMetadata metadata) {
     UpdateProperties updateProperties = transaction.updateProperties();
-    for (Map.Entry<String, String> stateProperty : metadata.asMap().entrySet()) {
-      updateProperties.set(stateProperty.getKey(), stateProperty.getValue());
-    }
+    updateProperties.set(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
     if (!table.properties().containsKey(TableProperties.WRITE_DATA_LOCATION)) {
       // Required for a consistent write location when writing back to the table as Iceberg
       updateProperties.set(TableProperties.WRITE_DATA_LOCATION, basePath);
@@ -240,7 +234,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     if (table == null) {
       return Optional.empty();
     }
-    return TableSyncMetadata.fromMap(table.properties());
+    return TableSyncMetadata.fromJson(table.properties().get(TableSyncMetadata.XTABLE_METADATA));
   }
 
   @Override
@@ -273,11 +267,7 @@ public class IcebergConversionTarget implements ConversionTarget {
           // in the subsequent sync round.
           table.manageSnapshots().rollbackTo(currentSnapshot.parentId()).commit();
           Transaction transaction = table.newTransaction();
-          transaction
-              .updateProperties()
-              .remove(XTABLE_LAST_INSTANT_SYNCED_PROP)
-              .remove(INFLIGHT_COMMITS_TO_CONSIDER_FOR_NEXT_SYNC_PROP)
-              .commit();
+          transaction.updateProperties().remove(TableSyncMetadata.XTABLE_METADATA).commit();
           transaction.commitTransaction();
         }
       }
