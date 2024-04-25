@@ -57,7 +57,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.xtable.conversion.PerTableConfig;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.TableSyncMetadata;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
@@ -202,9 +202,12 @@ public class DeltaConversionTarget implements ConversionTarget {
 
   @Override
   public Optional<TableSyncMetadata> getTableMetadata() {
-    return TableSyncMetadata.fromMap(
-        JavaConverters.mapAsJavaMapConverter(deltaLog.snapshot().metadata().configuration())
-            .asJava());
+    return TableSyncMetadata.fromJson(
+        deltaLog
+            .snapshot()
+            .metadata()
+            .configuration()
+            .getOrElse(TableSyncMetadata.XTABLE_METADATA, () -> null));
   }
 
   @Override
@@ -265,9 +268,10 @@ public class DeltaConversionTarget implements ConversionTarget {
     }
 
     private Map<String, String> getConfigurationsForDeltaSync() {
-      Map<String, String> configMap = new HashMap<>(metadata.asMap());
+      Map<String, String> configMap = new HashMap<>();
       configMap.put(DeltaConfigs.MIN_READER_VERSION().key(), MIN_READER_VERSION);
       configMap.put(DeltaConfigs.MIN_WRITER_VERSION().key(), MIN_WRITER_VERSION);
+      configMap.put(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
       // Sets retention for the Delta Log, does not impact underlying files in the table
       configMap.put(
           DeltaConfigs.LOG_RETENTION().key(), String.format("interval %d hours", retentionInHours));

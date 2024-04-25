@@ -43,7 +43,7 @@ import org.apache.hudi.common.util.Option;
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.TableSyncMetadata;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
