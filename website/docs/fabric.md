@@ -115,7 +115,7 @@ the table's data path in ADLS storage account.
 2. In the `New Shortcut` dialog, select `Azure Delta Lake Storaget Gen2` as the `External Source`
 > ![Select external source](/images/fabric/shortcut_1_2.png)
 
-4. In the `New Shortcut` dialog, enter the `Connection settings` and authorize Fabric to access the storage account.
+3. In the `New Shortcut` dialog, enter the `Connection settings` and authorize Fabric to access the storage account.
 > ![Enter connection settings](/images/fabric/shortcut_1_3.png)
 
 4. In the `New Shortcut` dialog, enter the `Shortcut settings` and click `Create`.
