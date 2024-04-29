@@ -57,7 +57,7 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-
+import org.apache.spark.sql.delta.DeltaConfigs;
 import org.apache.spark.sql.delta.GeneratedColumn;
 
 import scala.collection.JavaConverters;
@@ -406,6 +406,8 @@ public class TestDeltaSync {
         internalDataFiles.size(), count, "Number of files from DeltaScan don't match expectation");
   }
 
+
+
   private InternalSnapshot buildSnapshot(InternalTable table, InternalDataFile... dataFiles) {
     return InternalSnapshot.builder()
         .table(table)
@@ -508,4 +510,5 @@ public class TestDeltaSync {
             .set("spark.master", "local[2]");
     return SparkSession.builder().config(sparkConf).getOrCreate();
   }
+
 }

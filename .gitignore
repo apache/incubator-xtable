@@ -41,3 +41,4 @@ target/
 *.crc
 demo/jars/*
 demo/notebook/.ipynb_checkpoints/*
+/.history

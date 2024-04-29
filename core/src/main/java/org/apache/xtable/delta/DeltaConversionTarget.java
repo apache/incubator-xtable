@@ -32,6 +32,8 @@ import lombok.Setter;
 import lombok.ToString;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.expressions.Literal;
 import org.apache.spark.sql.types.StructField;
@@ -65,12 +67,16 @@ import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.ConversionTarget;
 
+// to support getting the min read and writer dynamically
+import io.delta.tables.*;
+
 public class DeltaConversionTarget implements ConversionTarget {
-  private static final String MIN_READER_VERSION = String.valueOf(1);
+  // private static final String MIN_READER_VERSION = String.valueOf(1);
   // gets access to generated columns.
-  private static final String MIN_WRITER_VERSION = String.valueOf(4);
+  // private static final String MIN_WRITER_VERSION = String.valueOf(4);
 
   private DeltaLog deltaLog;
+  private DeltaTable deltaTable;
   private DeltaSchemaExtractor schemaExtractor;
   private DeltaPartitionExtractor partitionExtractor;
   private DeltaDataFileUpdatesExtractor dataFileUpdatesExtractor;
@@ -78,6 +84,9 @@ public class DeltaConversionTarget implements ConversionTarget {
   private String tableName;
   private int logRetentionInHours;
   private TransactionState transactionState;
+
+  private String minReaderVersion;
+  private String minWriterVersion;
 
   public DeltaConversionTarget() {}
 
@@ -121,6 +130,9 @@ public class DeltaConversionTarget implements ConversionTarget {
       DeltaPartitionExtractor partitionExtractor,
       DeltaDataFileUpdatesExtractor dataFileUpdatesExtractor) {
     DeltaLog deltaLog = DeltaLog.forTable(sparkSession, tableDataPath);
+    DeltaTable deltaTable = DeltaTable.forPath(sparkSession, tableDataPath);
+    minReaderVersion = String.valueOf(1);
+    minWriterVersion = String.valueOf(4);
     boolean deltaTableExists = deltaLog.tableExists();
     if (!deltaTableExists) {
       deltaLog.ensureLogDirectoryExist();
@@ -129,6 +141,7 @@ public class DeltaConversionTarget implements ConversionTarget {
     this.partitionExtractor = partitionExtractor;
     this.dataFileUpdatesExtractor = dataFileUpdatesExtractor;
     this.deltaLog = deltaLog;
+    this.deltaTable = deltaTable;
     this.tableName = tableName;
     this.logRetentionInHours = logRetentionInHours;
   }
@@ -268,9 +281,23 @@ public class DeltaConversionTarget implements ConversionTarget {
     }
 
     private Map<String, String> getConfigurationsForDeltaSync() {
+
+      // The output of detail() method has only one row with the following schema.
+      // deltaTable.detail() is added to the constructor for this class, and sets 
+      // a private variable to of deltaTable 
+
+      // limit the results to the attributes needed
+      Dataset<Row> record = deltaTable.detail().select("minWriterVersion", "minReaderVersion");
+
+      // Collect the first row and extract data (in this instance the function only yields a single row)
+      Row row = record.first();
+
+      minWriterVersion = row.getAs("minWriterVersion").toString();
+      minReaderVersion = row.getAs("minReaderVersion").toString();
+      
       Map<String, String> configMap = new HashMap<>();
-      configMap.put(DeltaConfigs.MIN_READER_VERSION().key(), MIN_READER_VERSION);
-      configMap.put(DeltaConfigs.MIN_WRITER_VERSION().key(), MIN_WRITER_VERSION);
+      configMap.put(DeltaConfigs.MIN_READER_VERSION().key(), minReaderVersion);
+      configMap.put(DeltaConfigs.MIN_WRITER_VERSION().key(), minWriterVersion);
       configMap.put(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
       // Sets retention for the Delta Log, does not impact underlying files in the table
       configMap.put(
