@@ -20,7 +20,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <artifactId>xtable-core</artifactId>
-    <name>core</name>
+    <name>xtable-core</name>
 
     <parent>
         <groupId>org.apache.xtable</groupId>
@@ -35,7 +35,7 @@
         </dependency>
         <dependency>
             <groupId>org.apache.xtable</groupId>
-            <artifactId>hudi-utils</artifactId>
+            <artifactId>xtable-hudi-support-utils</artifactId>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

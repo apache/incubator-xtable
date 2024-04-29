@@ -25,11 +25,12 @@
         <version>0.1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>hudi-support</artifactId>
+    <artifactId>xtable-hudi-support</artifactId>
     <packaging>pom</packaging>
 
+
     <modules>
-        <module>extensions</module>
-        <module>utils</module>
+        <module>xtable-hudi-support-utils</module>
+        <module>xtable-hudi-support-extensions</module>
     </modules>
 </project>
