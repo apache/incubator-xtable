@@ -34,10 +34,10 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>api</module>
-        <module>core</module>
-        <module>utilities</module>
-        <module>hudi-support</module>
+        <module>xtable-api</module>
+        <module>xtable-core</module>
+        <module>xtable-utilities</module>
+        <module>xtable-hudi-support</module>
     </modules>
 
     <properties>
@@ -89,7 +89,7 @@
             </dependency>
             <dependency>
                 <groupId>org.apache.xtable</groupId>
-                <artifactId>hudi-utils</artifactId>
+                <artifactId>xtable-hudi-support-utils</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

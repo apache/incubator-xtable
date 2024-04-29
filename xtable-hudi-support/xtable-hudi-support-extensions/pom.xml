@@ -19,18 +19,18 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <artifactId>hudi-extensions</artifactId>
+    <artifactId>xtable-hudi-support-extensions</artifactId>
 
     <parent>
         <groupId>org.apache.xtable</groupId>
-        <artifactId>hudi-support</artifactId>
+        <artifactId>xtable-hudi-support</artifactId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
 
     <dependencies>
         <dependency>
             <groupId>org.apache.xtable</groupId>
-            <artifactId>hudi-utils</artifactId>
+            <artifactId>xtable-hudi-support-utils</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.xtable</groupId>

@@ -351,7 +351,7 @@ Authentication for GCP requires service account credentials to be exported. i.e.
 In your terminal under the cloned Apache XTable™ (Incubating) directory, run the below command.
 
 ```shell md title="shell"
-java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
+java -jar xtable-utilities/target/xtable-utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
 ```
 
 **Optional:**

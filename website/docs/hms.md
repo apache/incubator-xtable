@@ -88,7 +88,7 @@ datasets:
 
 From your terminal under the cloned Apache XTable™ (Incubating) directory, run the sync process using the below command.
 ```shell md title="shell"
-java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
+java -jar xtable-utilities/target/xtable-utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
 ```
 
 :::tip Note:

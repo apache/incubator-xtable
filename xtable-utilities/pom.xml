@@ -25,7 +25,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>utilities</artifactId>
+    <artifactId>xtable-utilities</artifactId>
 
     <dependencies>
         <dependency>
