@@ -18,6 +18,7 @@ version: "3.9"
 services:
   trino:
     container_name: trino
+    hostname: trino
     ports:
       - '8080:8080'
     image: 'trinodb/trino:428'
@@ -27,6 +28,7 @@ services:
 
   presto:
     container_name: presto
+    hostname: presto
     ports:
       - '8082:8082'
     image: 'prestodb/presto:0.283'
