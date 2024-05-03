@@ -19,7 +19,6 @@
 package org.apache.xtable.delta;
 
 import static org.junit.jupiter.api.Assertions.*;
-
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
@@ -35,10 +34,13 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import io.delta.tables.DeltaTable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.serializer.KryoSerializer;
+import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -70,6 +72,7 @@ import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.spark.sql.delta.DeltaConfigs;
 
 public class ITDeltaConversionTargetSource {
 
@@ -730,5 +733,26 @@ public class ITDeltaConversionTargetSource {
             .map(oneDf -> oneDf.getPhysicalPath())
             .collect(Collectors.toSet());
     return filePathsRemoved.contains(activePath);
+  }
+
+  @Test
+  public void getConfigurationsForDeltaSync() {
+
+    String tableName = GenericTable.getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+            new TestSparkDeltaTable(
+                    tableName, tempDir, sparkSession, "timestamp", false);
+    testSparkDeltaTable.insertRowsForTimestampPartition();
+    DeltaTable dt = testSparkDeltaTable.getDeltaTable();
+    Dataset<Row> record = dt.detail().select("minWriterVersion", "minReaderVersion");
+
+    // Collect the first row and extract data (in this instance the function only yields a single row)
+    Row row = record.first();
+
+    String minWriterVersion = row.getAs("minWriterVersion").toString();
+    String minReaderVersion = row.getAs("minReaderVersion").toString();
+    // Assert the results
+    assertEquals("7", minWriterVersion);
+    assertEquals("3", minReaderVersion);
   }
 }

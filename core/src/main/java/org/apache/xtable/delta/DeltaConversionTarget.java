@@ -121,6 +121,7 @@ public class DeltaConversionTarget implements ConversionTarget {
         dataFileUpdatesExtractor);
   }
 
+
   private void _init(
       String tableDataPath,
       String tableName,
@@ -280,6 +281,7 @@ public class DeltaConversionTarget implements ConversionTarget {
           new DeltaOperations.Update(Option.apply(Literal.fromObject("xtable-delta-sync"))));
     }
 
+    @VisibleForTesting
     private Map<String, String> getConfigurationsForDeltaSync() {
 
       // The output of detail() method has only one row with the following schema.
