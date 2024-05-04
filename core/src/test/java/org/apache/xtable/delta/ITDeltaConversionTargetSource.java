@@ -741,7 +741,7 @@ public class ITDeltaConversionTargetSource {
     String tableName = GenericTable.getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
             new TestSparkDeltaTable(
-                    tableName, tempDir, sparkSession, "timestamp", false);
+                    tableName, tempDir, sparkSession, "timestamp_field", false);
     testSparkDeltaTable.insertRowsForTimestampPartition();
     DeltaTable dt = testSparkDeltaTable.getDeltaTable();
     Dataset<Row> record = dt.detail().select("minWriterVersion", "minReaderVersion");

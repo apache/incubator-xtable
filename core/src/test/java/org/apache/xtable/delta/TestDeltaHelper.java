@@ -154,6 +154,29 @@ public class TestDeltaHelper {
           .partitionedBy("yearOfBirth");
     } else if ("level".equals(partitionField)) {
       tableBuilder.partitionedBy(partitionField);
+    } else if ("timestamp_field".equals(partitionField)){
+      tableBuilder
+              .addColumn(
+                      DeltaTable.columnBuilder("YEAR")
+                              .dataType(IntegerType)
+                              .generatedAlwaysAs("YEAR(timestamp_field)")
+                              .build())
+              .addColumn(
+                      DeltaTable.columnBuilder("MONTH")
+                              .dataType(IntegerType)
+                              .generatedAlwaysAs("MONTH(timestamp_field)")
+                              .build())
+              .addColumn(
+                      DeltaTable.columnBuilder("DAY")
+                              .dataType(IntegerType)
+                              .generatedAlwaysAs("DAY(timestamp_field)")
+                              .build())
+              .addColumn(
+                      DeltaTable.columnBuilder("HOUR")
+                              .dataType(IntegerType)
+                              .generatedAlwaysAs("HOUR(timestamp_field)")
+                              .build())
+              .partitionedBy("timestamp_field");
     } else if (partitionField != null) {
       throw new IllegalArgumentException("Unexpected partition field: " + partitionField);
     }
