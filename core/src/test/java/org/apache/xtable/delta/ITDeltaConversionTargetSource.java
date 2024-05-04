@@ -72,7 +72,7 @@ import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.spark.sql.delta.DeltaConfigs;
+
 
 public class ITDeltaConversionTargetSource {
 
