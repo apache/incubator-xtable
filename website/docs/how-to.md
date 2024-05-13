@@ -105,7 +105,7 @@ from pyspark.sql.types import *
 
 # initialize the bucket
 table_name = "people"
-local_base_path = "/tmp/hudi-dataset"
+local_base_path = "file:/tmp/hudi-dataset"
 
 records = [
    (1, 'John', 25, 'NYC', '2023-09-28 00:00:00'),
@@ -148,7 +148,7 @@ from pyspark.sql.types import *
 
 # initialize the bucket
 table_name = "people"
-local_base_path = "/tmp/delta-dataset"
+local_base_path = "file:/tmp/delta-dataset"
 
 records = [
    (1, 'John', 25, 'NYC', '2023-09-28 00:00:00'),
@@ -185,7 +185,7 @@ from pyspark.sql.types import *
 
 # initialize the bucket
 table_name = "people"
-local_base_path = "/tmp/iceberg-dataset"
+local_base_path = "file:/tmp/iceberg-dataset"
 
 records = [
    (1, 'John', 25, 'NYC', '2023-09-28 00:00:00'),

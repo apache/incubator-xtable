@@ -16,7 +16,12 @@
 # limitations under the License.
 #
 ## Create the require jars for the demo and copy them into a directory we'll mount in our notebook container
-cd .. && mvn install -am -pl core -DskipTests -T 2
+
+CURRENT_DIR="$( cd "$(dirname "$0")" ; pwd -P )"
+XTABLE_HOME="$( cd "$(dirname "$CURRENT_DIR")" ; pwd -P )"
+cd $XTABLE_HOME
+
+mvn install -am -pl xtable-core -DskipTests -T 2
 mkdir -p demo/jars
 cp xtable-hudi-support/xtable-hudi-support-utils/target/xtable-hudi-support-utils-0.1.0-SNAPSHOT.jar demo/jars
 cp xtable-api/target/xtable-api-0.1.0-SNAPSHOT.jar demo/jars
