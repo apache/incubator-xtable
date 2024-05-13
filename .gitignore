@@ -1,6 +1,9 @@
 # Compiled class file
 *.class
 
+# vscode configs
+.vscode/*
+
 # Log file
 *.log
 
@@ -41,3 +44,4 @@ target/
 *.crc
 demo/jars/*
 demo/notebook/.ipynb_checkpoints/*
+/.history

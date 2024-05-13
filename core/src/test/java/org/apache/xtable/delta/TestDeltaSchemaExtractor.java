@@ -391,8 +391,8 @@ public class TestDeltaSchemaExtractor {
 
     StructType structRepresentationTimestampNtz =
         new StructType()
-            .add("requiredTimestampNtz", DataTypes.LongType, false)
-            .add("optionalTimestampNtz", DataTypes.LongType, true);
+            .add("requiredTimestampNtz", DataTypes.TimestampNTZType, false)
+            .add("optionalTimestampNtz", DataTypes.TimestampNTZType, true);
 
     Assertions.assertEquals(
         structRepresentationTimestamp,
@@ -892,4 +892,5 @@ public class TestDeltaSchemaExtractor {
     Assertions.assertEquals(
         internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
+
 }

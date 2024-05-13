@@ -44,7 +44,10 @@ import com.google.common.base.Preconditions;
 
 import io.delta.tables.DeltaTable;
 
+import org.apache.spark.sql.types.DataTypes;
 import org.apache.xtable.delta.TestDeltaHelper;
+
+import static org.apache.spark.sql.types.DataTypes.TimestampNTZType;
 
 @Getter
 public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable {
@@ -110,6 +113,20 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
     return rows;
   }
 
+  public List<Row> insertRowsForTimestampPartition() {
+    List<Row> rows = testDeltaHelper.generateRows(10);
+    Dataset<Row> df = sparkSession.createDataFrame(rows, testDeltaHelper.getTableStructSchema());
+    // Add a TimestampNTZ column manually if not already included
+    df.schema().add(DataTypes.createStructField("timestamp_ntz", TimestampNTZType, false));
+    // Writing the DataFrame to Delta format, partitioned by the TimestampNTZ column
+    df.write()
+            .format("delta")
+            .mode("append")
+            .partitionBy("timestamp_ntz")  // Replace "timestamp_ntz" with the actual column name
+            .save(basePath);
+
+    return rows;
+  }
   @Override
   public List<Row> insertRecordsForSpecialPartition(int numRows) {
     return insertRowsForPartition(numRows, SPECIAL_DATE_PARTITION_VALUE, SPECIAL_PARTITION_VALUE);
