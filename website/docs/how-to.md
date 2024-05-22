@@ -24,7 +24,7 @@ history to enable proper point in time queries.
 1. A compute instance where you can run Apache Spark. This can be your local machine, docker,
    or a distributed service like Amazon EMR, Google Cloud's Dataproc, Azure HDInsight etc
 2. Clone the Apache XTable™ (Incubating) [repository](https://github.com/apache/incubator-xtable) and create the
-   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
+   `xtable-utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 3. Optional: Setup access to write to and/or read from distributed storage services like:
    * Amazon S3 by following the steps 
    [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) to install AWSCLIv2 
