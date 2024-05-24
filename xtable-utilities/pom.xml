@@ -89,13 +89,6 @@
            <scope>compile</scope>
        </dependency>
 
-        <!-- Hive dependencies -->
-        <dependency>
-            <groupId>org.apache.hive</groupId>
-            <artifactId>hive-common</artifactId>
-            <scope>compile</scope>
-        </dependency>
-
         <dependency>
            <groupId>org.apache.parquet</groupId>
            <artifactId>parquet-avro</artifactId>
