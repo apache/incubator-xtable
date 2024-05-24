@@ -43,4 +43,8 @@ header:
     - '**/LICENSE'
     - '**/NOTICE'
     - '**/.gitkeep'
+    - 'demo/data/**'
+    - 'website/node_modules/**'
+    - 'website/build/**'
+    - 'website/.docusaurus/**'
   comment: on-failure
