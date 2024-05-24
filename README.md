@@ -99,36 +99,6 @@ The custom hadoop configurations can be passed in with the `--hadoopConfig [cust
 The config in custom hadoop config file will override the default hadoop configurations. For an example
 of a custom hadoop config file, see [hadoop.xml](https://xtable.apache.org/docs/fabric#step-2-translate-source-table-to-delta-lake-format-using-apache-xtable-incubating).
 
-# New file type spotless automatic formatting and modification operation
-
-When a new type of file is merged into the warehouse, it is possible that the `spotless-maven-plugin` will not add the license header by default, and when it is detected by ci and prompted to add the `license header`, what we have to do is to modify the project. The modified part of `pom.xml` under the root path is as follows:
-
-```xml
-<formats>
-    <format>
-        <includes>
-            <include>**/*.properties</include>
-            <include>**/*.config</include>
-        </includes>
-        <excludes>
-            <exclude>demo/data/**</exclude>
-            <exclude>${target.dir.pattern}</exclude>
-            <exclude>website/node_modules/**</exclude>
-            <exclude>website/build/**</exclude>
-            <exclude>website/.docusaurus/**</exclude>
-        </excludes>
-        <licenseHeader>
-            <file>style/text-license-header</file>
-            <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
-        </licenseHeader>
-    </format>
-</formats>
-```
-
-Newly added file types need to be added in `include`
-
-And execute mvn spotless:check to verify
-
 # Contributing
 ## Setup
 For setting up the repo on IntelliJ, open the project and change the java version to Java11 in File->ProjectStructure
