@@ -57,6 +57,7 @@
         <delta.version>2.4.0</delta.version>
         <jackson.version>2.17.1</jackson.version>
         <spotless.version>2.43.0</spotless.version>
+        <apache.rat.version>0.16.1</apache.rat.version>
         <google.java.format.version>1.8</google.java.format.version>
         <delta.standalone.version>0.5.0</delta.standalone.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -595,6 +596,65 @@
                     <trimStackTrace>false</trimStackTrace>
                     <argLine>-Xmx1024m</argLine>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <version>${apache.rat.version}</version>
+                <configuration>
+                    <consoleOutput>true</consoleOutput>
+                    <licenses>
+                        <license>
+                            <family>AL</family>
+                            <text>Licensed under the Apache License, Version 2.0 (the
+                                "License")</text>
+                            <text>Licensed to the Apache Software Foundation (ASF) under
+                                one
+                                or more contributor license agreements; and to You under
+                                the
+                                Apache License, Version 2.0.</text>
+                            <text>http://www.apache.org/licenses/LICENSE-2.0</text>
+                            <text>https://www.apache.org/licenses/LICENSE-2.0</text>
+                            <text>http://www.apache.org/licenses/LICENSE-2.0.html</text>
+                            <text>https://www.apache.org/licenses/LICENSE-2.0.html</text>
+                            <text>http://www.apache.org/licenses/LICENSE-2.0.txt</text>
+                            <text>https://www.apache.org/licenses/LICENSE-2.0.txt</text>
+                        </license>
+                    </licenses>
+                    <families>
+                        <family>
+                            <id>AL</id>
+                            <name>Apache License Version 2.0</name>
+                        </family>
+                    </families>
+                    <excludes>
+                        <exclude>NOTICE</exclude>
+                        <exclude>DISCLAIMER</exclude>
+                        <exclude>**/.*</exclude>
+                        <exclude>**/*.json</exclude>
+                        <exclude>**/*.log</exclude>
+                        <exclude>**/*.png</exclude>
+                        <exclude>**/*.jpg</exclude>
+                        <exclude>**/*.ipynb</exclude>
+                        <exclude>**/demo/data/**</exclude>
+                        <exclude>**/website/**</exclude>
+                        <exclude>**/*NOTICE*</exclude>
+                        <exclude>**/*LICENSE*</exclude>
+                        <exclude>**/dependency-reduced-pom.xml</exclude>
+                        <exclude>**/target/**</exclude>
+                        <exclude>**/generated-sources/**</exclude>
+                        <exclude>.github/**</exclude>
+                        <exclude>**/*.iml</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
