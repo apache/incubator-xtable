@@ -637,6 +637,9 @@
                         <exclude>**/*.jpg</exclude>
                         <exclude>**/*.ipynb</exclude>
                         <exclude>**/demo/data/**</exclude>
+                        <exclude>**/demo-s3/data/**</exclude>
+                        <exclude>**/demo-s3/spark/cache/**</exclude>
+                        <exclude>**/demo-s3/spark/jars/**</exclude>
                         <exclude>**/website/**</exclude>
                         <exclude>**/*NOTICE*</exclude>
                         <exclude>**/*LICENSE*</exclude>
