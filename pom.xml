@@ -22,7 +22,7 @@
 
     <groupId>org.apache.xtable</groupId>
     <artifactId>xtable</artifactId>
-    <name>xtable</name>
+    <name>incubator-xtable</name>
 
     <parent>
         <groupId>org.apache</groupId>
