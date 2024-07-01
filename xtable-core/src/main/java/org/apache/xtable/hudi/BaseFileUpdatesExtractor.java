@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
@@ -236,21 +237,24 @@ public class BaseFileUpdatesExtractor {
 
   private Map<String, HoodieColumnRangeMetadata<Comparable>> convertColStats(
       String fileName, List<ColumnStat> columnStatMap) {
-    return columnStatMap.stream()
-        .filter(
-            entry ->
-                !InternalType.NON_SCALAR_TYPES.contains(entry.getField().getSchema().getDataType()))
-        .map(
-            columnStat ->
-                HoodieColumnRangeMetadata.<Comparable>create(
-                    fileName,
-                    convertFromXTablePath(columnStat.getField().getPath()),
-                    (Comparable) columnStat.getRange().getMinValue(),
-                    (Comparable) columnStat.getRange().getMaxValue(),
-                    columnStat.getNumNulls(),
-                    columnStat.getNumValues(),
-                    columnStat.getTotalSize(),
-                    -1L))
+
+    Stream<HoodieColumnRangeMetadata<Comparable>> metadataStream = columnStatMap.stream()
+            .filter(
+                    entry ->
+                            !InternalType.NON_SCALAR_TYPES.contains(entry.getField().getSchema().getDataType()))
+            .map(
+                    columnStat ->
+                            HoodieColumnRangeMetadata.<Comparable>create(
+                                    fileName,
+                                    convertFromXTablePath(columnStat.getField().getPath()),
+                                    (Comparable) columnStat.getRange().getMinValue(),
+                                    (Comparable) columnStat.getRange().getMaxValue(),
+                                    columnStat.getNumNulls(),
+                                    columnStat.getNumValues(),
+                                    columnStat.getTotalSize(),
+                                    -1L));
+
+    return metadataStream
         .collect(Collectors.toMap(HoodieColumnRangeMetadata::getColumnName, Function.identity()));
   }
 
