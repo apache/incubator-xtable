@@ -18,7 +18,7 @@
 
 # Apache XTable™ (Incubating)
 
-[![Build Status](https://dev.azure.com/apache-xtable-ci-org/apache-xtable-ci/_apis/build/status%2Fapachextable-ci.xtable-mirror?branchName=main)](https://dev.azure.com/apache-xtable-ci-org/apache-xtable-ci/_build/latest?definitionId=2&branchName=main)
+[![Maven CI Build](https://github.com/apache/incubator-xtable/actions/workflows/mvn-ci-build.yml/badge.svg)](https://github.com/apache/incubator-xtable/actions/workflows/mvn-ci-build.yml)
 
 Apache XTable™ (Incubating) is a cross-table converter for table formats that facilitates omni-directional interoperability across
 data processing systems and query engines. Currently, Apache XTable™ supports widely adopted open-source table formats such as
