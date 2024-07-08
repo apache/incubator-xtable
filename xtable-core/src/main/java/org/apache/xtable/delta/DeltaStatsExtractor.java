@@ -21,6 +21,7 @@ package org.apache.xtable.delta;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +36,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.Value;
+
+import org.apache.commons.lang3.StringUtils;
 
 import org.apache.spark.sql.delta.actions.AddFile;
 
@@ -173,6 +176,9 @@ public class DeltaStatsExtractor {
   }
 
   public List<ColumnStat> getColumnStatsForFile(AddFile addFile, List<InternalField> fields) {
+    if (StringUtils.isEmpty(addFile.stats())) {
+      return Collections.emptyList();
+    }
     // TODO: Additional work needed to track maps & arrays.
     try {
       DeltaStats deltaStats = MAPPER.readValue(addFile.stats(), DeltaStats.class);
