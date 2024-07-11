@@ -629,7 +629,7 @@
                     </families>
                     <excludes>
                         <exclude>NOTICE</exclude>
-                        <exclude>DISCLAIMER</exclude>
+                        <exclude>DISCLAIMER*</exclude>
                         <exclude>**/.*</exclude>
                         <exclude>**/*.json</exclude>
                         <exclude>**/*.log</exclude>
