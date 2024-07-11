@@ -35,7 +35,7 @@ future.
 1. Use Java11 for building the project. If you are using some other java version, you can use [jenv](https://github.com/jenv/jenv) to use multiple java versions locally.
 2. Build the project using `mvn clean package`. Use `mvn clean package -DskipTests` to skip tests while building.
 3. Use `mvn clean test` or `mvn test` to run all unit tests. If you need to run only a specific test you can do this
-   by something like `mvn test -Dtest=TestDeltaSync -pl core`.
+   by something like `mvn test -Dtest=TestDeltaSync -pl xtable-core`.
 4. Similarly, use `mvn clean verify` or `mvn verify` to run integration tests.
 
 # Style guide
