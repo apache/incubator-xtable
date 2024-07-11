@@ -21,7 +21,7 @@ package org.apache.xtable.conversion;
 import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
 
 public interface HudiSourceConfig {
-  public String getPartitionSpecExtractorClass();
+  String getPartitionSpecExtractorClass();
 
   SourcePartitionSpecExtractor loadSourcePartitionSpecExtractor();
 }
