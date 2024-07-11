@@ -29,7 +29,7 @@ import lombok.extern.jackson.Jacksonized;
 /**
  * Stores the field ID information for a given schema. This allows Hudi to track consistent IDs for
  * fields across commits. The lastIdUsed is the highest ID value previously used. Field IDs should
- * be monotomically increasing.
+ * be monotonically increasing.
  */
 @Value
 @Jacksonized
