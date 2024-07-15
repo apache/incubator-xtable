@@ -21,10 +21,11 @@ services:
     hostname: trino
     ports:
       - '8080:8080'
-    image: 'trinodb/trino:428'
+    image: 'trinodb/trino:418'
     volumes:
       - ./trino/catalog:/etc/trino/catalog
       - ./data:/home/data
+      - ./trino/config/log.properties:/etc/trino/log.properties
 
   presto:
     container_name: presto
