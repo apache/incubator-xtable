@@ -543,6 +543,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${maven-enforcer-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>enforce-logging-and-java-version</id>
@@ -563,6 +564,12 @@
                                     <maxJdkVersion>${java.version}</maxJdkVersion>
                                     <ignoredScopes>test</ignoredScopes>
                                 </enforceBytecodeVersion>
+                                <requireJavaVersion>
+                                    <version>[${source.java.version},)</version>
+                                    <message>
+                                        At least JDK ${source.java.version} is required to build this project.
+                                    </message>
+                                </requireJavaVersion>
                             </rules>
                         </configuration>
                     </execution>
