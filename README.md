@@ -1,24 +1,41 @@
-# OneTable
+<!--
+ - Licensed to the Apache Software Foundation (ASF) under one
+ - or more contributor license agreements.  See the NOTICE file
+ - distributed with this work for additional information
+ - regarding copyright ownership.  The ASF licenses this file
+ - to you under the Apache License, Version 2.0 (the
+ - "License"); you may not use this file except in compliance
+ - with the License.  You may obtain a copy of the License at
+ - 
+ -     http://www.apache.org/licenses/LICENSE-2.0
+ - 
+ - Unless required by applicable law or agreed to in writing, software
+ - distributed under the License is distributed on an "AS IS" BASIS,
+ - WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ - See the License for the specific language governing permissions and 
+ - limitations under the License.
+-->
 
-[![Build Status](https://dev.azure.com/onetable-io/onetable-io/_apis/build/status%2Fonetable-io.onetable?branchName=main)](https://dev.azure.com/onetable-io/onetable-io/_build/latest?definitionId=1&branchName=main)
+# Apache XTable™ (Incubating)
 
-OneTable is an omni-directional converter for table formats that facilitates interoperability across data processing systems
-and query engines.
-Currently, OneTable supports widely adopted open-source table formats such as Apache Hudi, Apache Iceberg, and Delta Lake.
+[![Maven CI Build](https://github.com/apache/incubator-xtable/actions/workflows/mvn-ci-build.yml/badge.svg)](https://github.com/apache/incubator-xtable/actions/workflows/mvn-ci-build.yml)
 
-OneTable simplifies data lake operations by leveraging a common model for table representation.
-This allows users to write data in one format while still benefiting from integrations and features available in other
-formats.
-For instance, OneTable enables existing Hudi users to seamlessly work with Databricks's Photon Engine or query Iceberg
-tables with Snowflake.
-Creating transformations from one format to another is straightforward and only requires the implementation of a few interfaces,
-which we believe will facilitate the expansion of supported source and target formats in the future.
+Apache XTable™ (Incubating) is a cross-table converter for table formats that facilitates omni-directional interoperability across
+data processing systems and query engines. Currently, Apache XTable™ supports widely adopted open-source table formats such as
+Apache Hudi, Apache Iceberg, and Delta Lake.
+
+Apache XTable™ simplifies data lake operations by leveraging a common model for table representation. This allows users to write
+data in one format while still benefiting from integrations and features available in other formats. For instance,
+Apache XTable™ enables existing Hudi users to seamlessly work with Databricks's Photon Engine or query Iceberg tables with
+Snowflake. Creating transformations from one format to another is straightforward and only requires the implementation
+of a few interfaces, which we believe will facilitate the expansion of supported source and target formats in the
+future.
 
 # Building the project and running tests.
 1. Use Java11 for building the project. If you are using some other java version, you can use [jenv](https://github.com/jenv/jenv) to use multiple java versions locally.
 2. Build the project using `mvn clean package`. Use `mvn clean package -DskipTests` to skip tests while building.
 3. Use `mvn clean test` or `mvn test` to run all unit tests. If you need to run only a specific test you can do this
-   by something like `mvn test -Dtest=TestDeltaSync -pl core`.
+   by something like `mvn test -Dtest=TestDeltaSync -pl xtable-core`.
 4. Similarly, use `mvn clean verify` or `mvn verify` to run integration tests.
 
 # Style guide
@@ -53,7 +70,8 @@ datasets:
     tableBasePath: abfs://container@storage.dfs.core.windows.net/multi-partition-dataset
     tableName: multi_partition_dataset
 ```
-- `tableFormats` is a list of formats you want to create from your source tables
+- `sourceFormat`  is the format of the source table that you want to convert
+- `targetFormats` is a list of formats you want to create from your source tables
 - `tableBasePath` is the basePath of the table
 - `tableDataPath` is an optional field specifying the path to the data files. If not specified, the tableBasePath will be used. For Iceberg source tables, you will need to specify the `/data` path.
 - `namespace` is an optional field specifying the namespace of the table and will be used when syncing to a catalog.
@@ -66,23 +84,23 @@ datasets:
     - `DAY`: same as `YEAR` but with day granularity
     - `HOUR`: same as `YEAR` but with hour granularity
   - `format`: if your partition type is `YEAR`, `MONTH`, `DAY`, or `HOUR` specify the format for the date string as it appears in your file paths
-3. The default implementations of table format clients can be replaced with custom implementations by specifying a client configs yaml file in the format below:
+3. The default implementations of table format converters can be replaced with custom implementations by specifying a converter configs yaml file in the format below:
 ```yaml
-# sourceClientProviderClass: The class name of a table format's client factory, where the client is
+# conversionSourceProviderClass: The class name of a table format's converter factory, where the converter is
 #     used for reading from a table of this format. All user configurations, including hadoop config
-#     and client specific configuration, will be available to the factory for instantiation of the
-#     client.
-# targetClientProviderClass: The class name of a table format's client factory, where the client is
+#     and converter specific configuration, will be available to the factory for instantiation of the
+#     converter.
+# conversionTargetProviderClass: The class name of a table format's converter factory, where the converter is
 #     used for writing to a table of this format.
-# configuration: A map of configuration values specific to this client.
-tableFormatsClients:
+# configuration: A map of configuration values specific to this converter.
+tableFormatConverters:
     HUDI:
-      sourceClientProviderClass: io.onetable.hudi.HudiSourceClientProvider
+      conversionSourceProviderClass: org.apache.xtable.hudi.HudiConversionSourceProvider
     DELTA:
-      targetClientProviderClass: io.onetable.delta.DeltaClient
+      conversionTargetProviderClass: org.apache.xtable.delta.DeltaConversionTarget
       configuration:
         spark.master: local[2]
-        spark.app.name: onetableclient
+        spark.app.name: xtable
 ```
 4. A catalog can be used when reading and updating Iceberg tables. The catalog can be specified in a yaml file and passed in with the `--icebergCatalogConfig` option. The format of the catalog config file is:
 ```yaml
@@ -92,20 +110,22 @@ catalogOptions: # all other options are passed through in a map
   key1: value1
   key2: value2
 ```
-5. run with `java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--clientsConfig clients.yaml] [--icebergCatalogConfig catalog.yaml]`
-The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Authentication for AWS is done with 
-`com.amazonaws.auth.DefaultAWSCredentialsProviderChain`. To override this setting, specify a different implementation 
-with the `--awsCredentialsProvider` option.
+5. run with `java -jar xtable-utilities/target/xtable-utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--convertersConfig converters.yaml] [--icebergCatalogConfig catalog.yaml]`
+The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Sample hadoop configurations for configuring the converters 
+can be found in the [xtable-hadoop-defaults.xml](https://github.com/apache/incubator-xtable/blob/main/utilities/src/main/resources/xtable-hadoop-defaults.xml) file.
+The custom hadoop configurations can be passed in with the `--hadoopConfig [custom-hadoop-config-file]` option.
+The config in custom hadoop config file will override the default hadoop configurations. For an example
+of a custom hadoop config file, see [hadoop.xml](https://xtable.apache.org/docs/fabric#step-2-translate-source-table-to-delta-lake-format-using-apache-xtable-incubating).
 
 # Contributing
 ## Setup
 For setting up the repo on IntelliJ, open the project and change the java version to Java11 in File->ProjectStructure
 ![img.png](style/IDE.png)
 
-You have found a bug, or have a cool idea you that want to contribute to the project ? Please file a GitHub issue [here](https://github.com/onetable-io/onetable/issues)
+You have found a bug, or have a cool idea you that want to contribute to the project ? Please file a GitHub issue [here](https://github.com/apache/incubator-xtable/issues)
 
 ## Adding a new target format
-Adding a new target format requires a developer implement [TargetClient](./api/src/main/java/io/onetable/spi/sync/TargetClient.java). Once you have implemented that interface, you can integrate it into the [OneTableClient](./core/src/main/java/io/onetable/client/OneTableClient.java). If you think others may find that target useful, please raise a Pull Request to add it to the project.
+Adding a new target format requires a developer implement [ConversionTarget](./api/src/main/java/org/apache/xtable/spi/sync/ConversionTarget.java). Once you have implemented that interface, you can integrate it into the [ConversionController](./core/src/main/java/org/apache/xtable/conversion/ConversionController.java). If you think others may find that target useful, please raise a Pull Request to add it to the project.
 
 ## Overview of the sync process
 ![img.png](assets/images/sync_flow.jpg)

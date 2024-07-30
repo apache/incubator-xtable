@@ -8,9 +8,9 @@ import TabItem from '@theme/TabItem';
 
 # Features and Limitations
 ## Features
-OneTable provides users with the ability to translate metadata from one table format to another.  
+Apache XTable™ (Incubating) provides users with the ability to translate metadata from one table format to another.  
 
-OneTable provides two sync modes, "incremental" and "full." The incremental mode is more lightweight and has better performance, especially on large tables. If there is anything that prevents the incremental mode from working properly, the tool will fall back to the full sync mode.
+Apache XTable™ (Incubating) provides two sync modes, "incremental" and "full." The incremental mode is more lightweight and has better performance, especially on large tables. If there is anything that prevents the incremental mode from working properly, the tool will fall back to the full sync mode.
 
 This sync provides users with the following:   
 1. Syncing of data files along with their column level statistics and partition metadata 
@@ -29,7 +29,7 @@ This sync provides users with the following:
   - the metadata table (`hoodie.metadata.enable=true`) and 
   - hive style partitioning (`hoodie.datasource.write.hive_style_partitioning=true`) wherever applicable when reading the data.
 - Be sure to enable `parquet.avro.write-old-list-structure=false` for proper compatibility with lists when syncing from Hudi to Iceberg.
-- When using Hudi as the source for an Iceberg target, you may require field IDs set in the parquet schema. To enable that, follow the instructions [here](https://github.com/onetable-io/onetable/tree/main/hudi-support/extensions).
+- When using Hudi as the source for an Iceberg target, you may require field IDs set in the parquet schema. To enable that, follow the instructions [here](https://github.com/apache/incubator-xtable/tree/main/xtable-hudi-support/xtable-hudi-support-extensions).
 
 ### Delta
 - When using Delta as the source for an Iceberg target, you may require field IDs set in the parquet schema. To enable that, follow the instructions for enabling column mapping [here](https://docs.delta.io/latest/delta-column-mapping.html).

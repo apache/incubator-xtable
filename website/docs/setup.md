@@ -1,10 +1,10 @@
 # Installation
 
-This page covers the essential steps to setup OneTable in your environment.
+This page covers the essential steps to setup Apache XTable™ (incubating) in your environment.
 
 ## Pre-requisites
 1. Building the project requires Java 11 and Maven to be setup and configured using PATH or environment variables. 
-2. Clone the OneTable project GitHub [repository](https://github.com/onetable-io/onetable) in your environment.
+2. Clone the Apache XTable™ (Incubating) project GitHub [repository](https://github.com/apache/incubator-xtable) in your environment.
 
 ## Steps
 #### Building the project 
@@ -19,8 +19,8 @@ For skipping the tests while building, add `-DskipTests`.
 mvn clean package -DskipTests
 ```
 
-For more information on the steps, follow the project's GitHub [README.md](https://github.com/onetable-io/onetable/blob/main/README.md) 
+For more information on the steps, follow the project's GitHub [README.md](https://github.com/apache/incubator-xtable/blob/main/README.md) 
 
 ## Next Steps
-See the [Quickstart](/docs/how-to) guide to learn to use OneTable to add interoperability between
+See the [Quickstart](/docs/how-to) guide to learn to use Apache XTable™ (Incubating) to add interoperability between
 different table formats.

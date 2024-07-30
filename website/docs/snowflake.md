@@ -8,13 +8,13 @@ title: "Snowflake"
 Currently, Snowflake supports [Iceberg tables through External Tables](https://www.snowflake.com/blog/expanding-the-data-cloud-with-apache-iceberg/)
 and also [Native Iceberg Tables](https://www.snowflake.com/blog/iceberg-tables-powering-open-standards-with-snowflake-innovations/).
 
-:::danger LIMITATION:
+:::note NOTE:
 Iceberg on Snowflake is currently supported in
-[private preview](https://www.snowflake.com/guides/what-are-apache-iceberg-tables/#:~:text=Apache%20Iceberg%20is%20currently%20supported,with%20customer%2Dmanaged%20cloud%20storage)
+[public preview](https://www.snowflake.com/blog/build-open-data-lakehouse-iceberg-tables/)
 :::
 
 ## Steps:
-These are high level steps to help you integrate OneTable synced Iceberg tables on Snowflake. For more additional information
+These are high level steps to help you integrate Apache XTable™ (Incubating) synced Iceberg tables on Snowflake. For more additional information
 refer to the [Getting started with Iceberg tables](https://docs.snowflake.com/LIMITEDACCESS/iceberg-2023/tables-iceberg-getting-started).
 
 ### Create an external volume

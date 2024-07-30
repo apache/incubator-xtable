@@ -1,6 +1,24 @@
-# OneTable Website Source Code
+<!--
+ - Licensed to the Apache Software Foundation (ASF) under one
+ - or more contributor license agreements.  See the NOTICE file
+ - distributed with this work for additional information
+ - regarding copyright ownership.  The ASF licenses this file
+ - to you under the Apache License, Version 2.0 (the
+ - "License"); you may not use this file except in compliance
+ - with the License.  You may obtain a copy of the License at
+ - 
+ -     http://www.apache.org/licenses/LICENSE-2.0
+ - 
+ - Unless required by applicable law or agreed to in writing, software
+ - distributed under the License is distributed on an "AS IS" BASIS,
+ - WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ - See the License for the specific language governing permissions and 
+ - limitations under the License.
+-->
 
-This repo hosts the source code of [OneTable](https://onetable.dev)
+# Apache XTable™ (Incubating) Website Source Code
+
+This repo hosts the source code of [Apache XTable™ (Incubating)](https://github.com/apache/incubator-xtable)
 
 ## Prerequisite
 
@@ -47,6 +65,20 @@ npm run serve
 1. Place the new file into the `docs` folder.
 2. Include the reference for the new file into the `sidebars.js` file.
 
+## Blogs
+### Adding new external blogs (redirection)
+1. Create a `.mdx` file similar to `website/blog/onetable-now-oss.mdx`
+2. Add relevant thumbnail image to `website/static/images/<folder-name>` folder
+3. Make sure to add the appropriate redirection link in the `.mdx` file
+> For thumbnail images, we recommend using **1200x600px** and `.png` format.
+
+### Adding inline blogs
+1. Create a `.md` file with all the content inline following Markdown syntax
+2. Place relevant images in the `website/static/images/<folder-name>` folder and refer to it in the blog
+
+> [!NOTE]  
+> You may see broken thumbnails for the blogs during `npm start` or `npm serve` because the images needs to be rendered from the main repo. This can only be tested after being merged to the main branch.
+
 
 ## Maintainers
-OneTable Community
+[Apache XTable™ (Incubating) Community](https://incubator.apache.org/projects/xtable.html)

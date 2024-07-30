@@ -6,14 +6,14 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'OneTable',
-  favicon: 'img/onetable_favicon.png',
-  url: 'https://onetable.dev',
+  title: 'Apache XTable™ (Incubating)',
+  favicon: 'images/xtable-favicon.png',
+  url: 'https://xtable.apache.org',
   baseUrl: '/',
 
   // GitHub pages deployment config.
-  organizationName: 'onetable-io',
-  projectName: 'onetable',
+  organizationName: 'apache',
+  projectName: 'incubator-xtable',
 
   onBrokenLinks: 'ignore',
   onBrokenMarkdownLinks: 'warn',
@@ -45,12 +45,12 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        title: 'OneTable',
+        title: 'Apache XTable™ (Incubating)',
         logo: {
-          alt: 'OneTable Logo',
+          alt: 'Apache XTable™ (Incubating) Logo',
           href: 'pathname:///',
           target: '_self',
-          src: 'img/OneTableLogo.png',
+          src: 'images/xtable-icon.png',
         },
         items: [
           {
@@ -60,10 +60,11 @@ const config = {
             label: 'Docs',
           },
           {
-            href: 'https://github.com/onetable-io/onetable',
+            href: 'https://github.com/apache/incubator-xtable',
             label: 'GitHub',
             position: 'right',
           },
+          {to: 'blog', label: 'Blogs', position: 'left'},
         ],
       },
       prism: {

@@ -1,44 +1,68 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>io.onetable</groupId>
-    <artifactId>onetable</artifactId>
-    <name>onetable</name>
+
+    <groupId>org.apache.xtable</groupId>
+    <artifactId>xtable</artifactId>
+    <name>xtable</name>
+
+    <parent>
+        <groupId>org.apache</groupId>
+        <artifactId>apache</artifactId>
+        <version>31</version>
+    </parent>
+
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <modules>
-        <module>api</module>
-        <module>core</module>
-        <module>utilities</module>
-        <module>hudi-support</module>
+        <module>xtable-api</module>
+        <module>xtable-core</module>
+        <module>xtable-utilities</module>
+        <module>xtable-hudi-support</module>
     </modules>
 
     <properties>
         <java.version>8</java.version>
         <avro.version>1.11.3</avro.version>
-        <log4j.version>2.17.2</log4j.version>
+        <log4j.version>2.22.0</log4j.version>
         <junit.version>5.9.0</junit.version>
         <lombok.version>1.18.30</lombok.version>
+        <hadoop.version>3.3.6</hadoop.version>
         <hudi.version>0.14.0</hudi.version>
         <parquet.version>1.12.2</parquet.version>
-        <scala.version>2.12.10</scala.version>
+        <scala.version>2.12.15</scala.version>
         <scala.version.prefix>2.12</scala.version.prefix>
-        <spark.version>3.2.1</spark.version>
-        <spark.version.prefix>3.2</spark.version.prefix>
-        <iceberg.version>1.3.1</iceberg.version>
-        <delta.version>2.0.2</delta.version>
-        <jackson.version>2.14.2</jackson.version>
-        <test.plugin.version>2.22.2</test.plugin.version>
-        <spotless.version>2.27.2</spotless.version>
+        <spark.version>3.4.2</spark.version>
+        <spark.version.prefix>3.4</spark.version.prefix>
+        <iceberg.version>1.4.2</iceberg.version>
+        <delta.version>2.4.0</delta.version>
+        <jackson.version>2.17.1</jackson.version>
+        <spotless.version>2.43.0</spotless.version>
+        <apache.rat.version>0.16.1</apache.rat.version>
         <google.java.format.version>1.8</google.java.format.version>
         <maven-enforcer-plugin.version>3.3.0</maven-enforcer-plugin.version>
         <delta.standalone.version>0.5.0</delta.standalone.version>
-        <maven-compiler-plugin.version>3.10.1</maven-compiler-plugin.version>
-        <maven-shade-plugin.version>3.4.0</maven-shade-plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <target.dir.pattern>**/target/**</target.dir.pattern>
         <!-- Test properties -->
         <skipTests>false</skipTests>
         <skipUTs>${skipTests}</skipUTs>
@@ -56,18 +80,18 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>io.onetable</groupId>
-                <artifactId>onetable-api</artifactId>
+                <groupId>org.apache.xtable</groupId>
+                <artifactId>xtable-api</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.onetable</groupId>
-                <artifactId>onetable-core</artifactId>
+                <groupId>org.apache.xtable</groupId>
+                <artifactId>xtable-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>io.onetable</groupId>
-                <artifactId>hudi-utils</artifactId>
+                <groupId>org.apache.xtable</groupId>
+                <artifactId>xtable-hudi-support-utils</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -115,12 +139,7 @@
             </dependency>
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
-                <artifactId>log4j-slf4j-impl</artifactId>
-                <version>${log4j.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.logging.log4j</groupId>
-                <artifactId>log4j-1.2-api</artifactId>
+                <artifactId>log4j-slf4j2-impl</artifactId>
                 <version>${log4j.version}</version>
             </dependency>
             <dependency>
@@ -151,6 +170,14 @@
                         <groupId>log4j</groupId>
                         <artifactId>log4j</artifactId>
                     </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.zookeeper</groupId>
+                        <artifactId>zookeeper</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
             <dependency>
@@ -166,11 +193,15 @@
                         <groupId>log4j</groupId>
                         <artifactId>log4j</artifactId>
                     </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.zookeeper</groupId>
+                        <artifactId>zookeeper</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.apache.hudi</groupId>
-                <artifactId>hudi-utilities_2.12</artifactId>
+                <artifactId>hudi-sync-common</artifactId>
                 <version>${hudi.version}</version>
                 <scope>provided</scope>
             </dependency>
@@ -244,6 +275,10 @@
                         <groupId>log4j</groupId>
                         <artifactId>log4j</artifactId>
                     </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.zookeeper</groupId>
+                        <artifactId>zookeeper</artifactId>
+                    </exclusion>
                 </exclusions>
                 <scope>provided</scope>
             </dependency>
@@ -264,7 +299,7 @@
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-common</artifactId>
-                <version>3.3.6</version>
+                <version>${hadoop.version}</version>
                 <scope>provided</scope>
                 <exclusions>
                     <exclusion>
@@ -279,18 +314,32 @@
                         <groupId>log4j</groupId>
                         <artifactId>log4j</artifactId>
                     </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.zookeeper</groupId>
+                        <artifactId>zookeeper</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-client-api</artifactId>
+                <version>${hadoop.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-client-runtime</artifactId>
+                <version>${hadoop.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-aws</artifactId>
-                <version>3.2.2</version>
+                <version>${hadoop.version}</version>
                 <scope>runtime</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-azure</artifactId>
-                <version>3.2.2</version>
+                <version>${hadoop.version}</version>
                 <scope>runtime</scope>
             </dependency>
             <dependency>
@@ -302,21 +351,8 @@
             <dependency>
                 <groupId>com.google.cloud.bigdataoss</groupId>
                 <artifactId>gcs-connector</artifactId>
-                <version>hadoop3-2.2.8</version>
+                <version>hadoop3-2.2.22</version>
                 <scope>runtime</scope>
-            </dependency>
-
-            <!-- Hive -->
-            <dependency>
-                <groupId>org.apache.hive</groupId>
-                <artifactId>hive-common</artifactId>
-                <version>3.1.3</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>log4j</groupId>
-                        <artifactId>log4j</artifactId>
-                    </exclusion>
-                </exclusions>
             </dependency>
 
             <!-- Protobuf -->
@@ -421,10 +457,51 @@
                 <artifactId>commons-lang3</artifactId>
                 <version>3.12.0</version>
             </dependency>
+
+            <!-- Manage transitive dependency versions that have vulnerabilities reported -->
+            <dependency>
+                <groupId>org.xerial.snappy</groupId>
+                <artifactId>snappy-java</artifactId>
+                <version>1.1.10.5</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-compress</artifactId>
+                <version>1.26.1</version>
+            </dependency>
             <dependency>
                 <groupId>io.netty</groupId>
-                <artifactId>netty-all</artifactId>
-                <version>4.1.74.Final</version>
+                <artifactId>netty-bom</artifactId>
+                <version>4.1.110.Final</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-bom</artifactId>
+                <version>9.4.54.v20240208</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.nimbusds</groupId>
+                <artifactId>nimbus-jose-jwt</artifactId>
+                <version>9.37.3</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.ivy</groupId>
+                <artifactId>ivy</artifactId>
+                <version>2.5.2</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-configuration2</artifactId>
+                <version>2.10.1</version>
+            </dependency>
+            <dependency>
+                <groupId>org.codehaus.jettison</groupId>
+                <artifactId>jettison</artifactId>
+                <version>1.5.4</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -435,7 +512,6 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-shade-plugin</artifactId>
-                    <version>${maven-shade-plugin.version}</version>
                     <executions>
                         <execution>
                             <phase>package</phase>
@@ -467,7 +543,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
-                <version>${maven-enforcer-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>enforce-logging-and-java-version</id>
@@ -503,7 +578,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven-compiler-plugin.version}</version>
                 <configuration>
                     <release>${java.version}</release>
                 </configuration>
@@ -511,7 +585,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>${test.plugin.version}</version>
                 <configuration>
                     <skip>${skipUTs}</skip>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
@@ -521,7 +594,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
-                <version>${test.plugin.version}</version>
                 <executions>
                     <execution>
                         <goals>
@@ -540,6 +612,65 @@
                 </configuration>
             </plugin>
             <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <version>${apache.rat.version}</version>
+                <configuration>
+                    <consoleOutput>true</consoleOutput>
+                    <licenses>
+                        <license>
+                            <family>AL</family>
+                            <text>Licensed under the Apache License, Version 2.0 (the
+                                "License")</text>
+                            <text>Licensed to the Apache Software Foundation (ASF) under
+                                one
+                                or more contributor license agreements; and to You under
+                                the
+                                Apache License, Version 2.0.</text>
+                            <text>http://www.apache.org/licenses/LICENSE-2.0</text>
+                            <text>https://www.apache.org/licenses/LICENSE-2.0</text>
+                            <text>http://www.apache.org/licenses/LICENSE-2.0.html</text>
+                            <text>https://www.apache.org/licenses/LICENSE-2.0.html</text>
+                            <text>http://www.apache.org/licenses/LICENSE-2.0.txt</text>
+                            <text>https://www.apache.org/licenses/LICENSE-2.0.txt</text>
+                        </license>
+                    </licenses>
+                    <families>
+                        <family>
+                            <id>AL</id>
+                            <name>Apache License Version 2.0</name>
+                        </family>
+                    </families>
+                    <excludes>
+                        <exclude>NOTICE</exclude>
+                        <exclude>DISCLAIMER*</exclude>
+                        <exclude>**/.*</exclude>
+                        <exclude>**/*.json</exclude>
+                        <exclude>**/*.log</exclude>
+                        <exclude>**/*.png</exclude>
+                        <exclude>**/*.jpg</exclude>
+                        <exclude>**/*.ipynb</exclude>
+                        <exclude>**/demo/data/**</exclude>
+                        <exclude>**/website/**</exclude>
+                        <exclude>**/*NOTICE*</exclude>
+                        <exclude>**/*LICENSE*</exclude>
+                        <exclude>**/dependency-reduced-pom.xml</exclude>
+                        <exclude>**/target/**</exclude>
+                        <exclude>**/generated-sources/**</exclude>
+                        <exclude>.github/**</exclude>
+                        <exclude>**/*.iml</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
                 <version>${spotless.version}</version>
@@ -551,13 +682,96 @@
                             <groupArtifact>com.google.googlejavaformat:google-java-format</groupArtifact>
                         </googleJavaFormat>
                         <importOrder>
-                            <order>java,javax,org,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,com,io.onetable</order>
+                            <order>java,javax,lombok,org,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,scala,com,io.delta,org.apache.xtable</order>
                         </importOrder>
                         <removeUnusedImports/>
+                        <excludes>
+                            <exclude>${target.dir.pattern}</exclude>
+                        </excludes>
                         <licenseHeader>
                             <file>style/license-header</file>
                         </licenseHeader>
                     </java>
+                    <python>
+                        <includes>
+                            <include>**/*.py</include>
+                        </includes>
+                        <excludes>
+                            <exclude>${target.dir.pattern}</exclude>
+                            <exclude>website/node_modules/**</exclude>
+                            <exclude>website/build/**</exclude>
+                            <exclude>website/.docusaurus/**</exclude>
+                        </excludes>
+                        <black/>
+                    </python>
+                    <yaml>
+                        <includes>
+                            <include>**/*.yml</include>
+                            <include>**/*.yaml</include>
+                        </includes>
+                        <excludes>
+                            <exclude>${target.dir.pattern}</exclude>
+                            <exclude>website/node_modules/**</exclude>
+                            <exclude>website/build/**</exclude>
+                            <exclude>website/.docusaurus/**</exclude>
+                        </excludes>
+                        <licenseHeader>
+                            <file>style/text-license-header</file>
+                            <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
+                        </licenseHeader>
+                    </yaml>
+                    <shell>
+                        <includes>
+                            <include>**/*.sh</include>
+                        </includes>
+                        <excludes>
+                            <exclude>${target.dir.pattern}</exclude>
+                            <exclude>website/node_modules/**</exclude>
+                            <exclude>website/build/**</exclude>
+                            <exclude>website/.docusaurus/**</exclude>
+                        </excludes>
+                        <licenseHeader>
+                            <file>style/text-license-header</file>
+                            <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
+                            <skipLinesMatching>^#!.+?$</skipLinesMatching>
+                        </licenseHeader>
+                    </shell>
+                    <pom>
+                        <includes>
+                            <include>**/*.xml</include>
+                        </includes>
+                        <excludes>
+                            <exclude>.idea/**</exclude>
+                            <exclude>${target.dir.pattern}</exclude>
+                            <exclude>website/node_modules/**</exclude>
+                            <exclude>website/build/**</exclude>
+                            <exclude>website/.docusaurus/**</exclude>
+                        </excludes>
+                        <licenseHeader>
+                            <file>style/xml-license-header</file>
+                            <delimiter>^&lt;project|^&lt;configuration|^&lt;Configuration|^&lt;extensions|^&lt;component</delimiter>
+                            <skipLinesMatching>^&lt;.*xml.+?$</skipLinesMatching>
+                        </licenseHeader>
+                    </pom>
+                    <formats>
+                        <format>
+                            <includes>
+                                <include>**/*.properties</include>
+                                <include>**/*.config</include>
+                            </includes>
+                            <excludes>
+                                <exclude>demo/data/**</exclude>
+                                <exclude>${target.dir.pattern}</exclude>
+                                <exclude>website/node_modules/**</exclude>
+                                <exclude>website/build/**</exclude>
+                                <exclude>website/.docusaurus/**</exclude>
+                            </excludes>
+                            <licenseHeader>
+                                <file>style/text-license-header</file>
+                                <delimiter>(^[a-zA-Z0-9_-]|^#[a-zA-Z0-9_-]|^##.+?$)</delimiter>
+                            </licenseHeader>
+                        </format>
+                    </formats>
                 </configuration>
                 <executions>
                     <execution>
@@ -571,11 +785,4 @@
         </plugins>
     </build>
 
-    <distributionManagement>
-        <repository>
-            <id>github</id>
-            <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/onetable-io/onetable</url>
-        </repository>
-    </distributionManagement>
 </project>

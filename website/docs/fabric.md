@@ -8,8 +8,8 @@ import TabItem from '@theme/TabItem';
 
 # Querying from Microsoft Fabric
 This guide offers a short tutorial on how to query Apache Iceberg and Apache Hudi tables in Microsoft Fabric utilizing 
-the translation capabilities of OneTable. This tutorial is intended solely for demonstration and to verify the 
-compatibility of OneTable's output with Fabric. The tutorial leverages the currently[^1] available features in Fabric, like 
+the translation capabilities of Apache XTable™ (Incubating). This tutorial is intended solely for demonstration and to verify the 
+compatibility of Apache XTable™ (Incubating) output with Fabric. The tutorial leverages the currently[^1] available features in Fabric, like 
 `Shortcuts`.
 
 
@@ -26,7 +26,7 @@ to data in other file systems.
 
 ## Tutorial
 The objective of the following tutorial is to translate an Iceberg or Hudi table in ADLS storage account into Delta Lake
-format using OneTable. After translation, this table will be accessible for querying from various Fabric engines,
+format using Apache XTable™ (Incubating). After translation, this table will be accessible for querying from various Fabric engines,
 including T-SQL, Spark, and Power BI.
 
 ### Pre-requisites
@@ -51,8 +51,8 @@ spark.hadoop.fs.azure.account.oauth2.client.id=<client-id>
 spark.hadoop.fs.azure.account.oauth2.client.secret=<client-secret>
 ```
 
-### Step 2. Translate source table to Delta Lake format using OneTable
-This step translates the table `people` originally in Iceberg or Hudi format to Delta Lake format using OneTable.
+### Step 2. Translate source table to Delta Lake format using Apache XTable™ (Incubating)™
+This step translates the table `people` originally in Iceberg or Hudi format to Delta Lake format using Apache XTable™ (Incubating).
 The primary actions for the translation are documented in 
 [Creating your first interoperable table - Running Sync](/docs/how-to#running-sync) tutorial section. 
 However, since the table is in ADLS, you need to update datasets path and hadoop configurations.
@@ -98,7 +98,7 @@ An example hadoop configuration for authenticating to ADLS storage account is as
 ```
 
 ```shell md title="shell"
-java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml --hadoopConfig hadoop.xml
+java -jar xtable-utilities/target/xtable-utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml --hadoopConfig hadoop.xml
 ```
 
 Running the above command will translate the table `people` in Iceberg or Hudi format to Delta Lake format. To validate
@@ -115,7 +115,7 @@ the table's data path in ADLS storage account.
 2. In the `New Shortcut` dialog, select `Azure Delta Lake Storaget Gen2` as the `External Source`
 > ![Select external source](/images/fabric/shortcut_1_2.png)
 
-4. In the `New Shortcut` dialog, enter the `Connection settings` and authorize Fabric to access the storage account.
+3. In the `New Shortcut` dialog, enter the `Connection settings` and authorize Fabric to access the storage account.
 > ![Enter connection settings](/images/fabric/shortcut_1_3.png)
 
 4. In the `New Shortcut` dialog, enter the `Shortcut settings` and click `Create`.

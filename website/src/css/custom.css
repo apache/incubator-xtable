@@ -84,3 +84,8 @@ html[data-theme='dark'] {
 
   --docusaurus-highlighted-code-line-bg: rgba(105, 105, 105, 0.3);
 }
+
+.blogThumbnail {
+    padding-left: 0;
+    padding-right: 48px;
+}

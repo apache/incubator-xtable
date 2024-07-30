@@ -7,7 +7,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Syncing to Glue Data Catalog
-This document walks through the steps to register a OneTable synced table in Glue Data Catalog on AWS.
+This document walks through the steps to register an Apache XTable™ (Incubating) synced table in Glue Data Catalog on AWS.
 
 ## Pre-requisites
 1. Source table(s) (Hudi/Delta/Iceberg) already written to Amazon S3.
@@ -18,12 +18,12 @@ This document walks through the steps to register a OneTable synced table in Glu
    [AWS docs](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) and
    also set up access credentials by following the steps
    [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html)
-3. Clone the OneTable [repository](https://github.com/onetable-io/onetable) and create the
-   `utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
+3. Clone the Apache XTable™ (Incubating) [repository](https://github.com/apache/incubator-xtable) and create the
+   `xtable-utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 
 ## Steps
 ### Running sync
-Create `my_config.yaml` in the cloned OneTable directory.
+Create `my_config.yaml` in the cloned Apache XTable™ (Incubating) directory.
 
 <Tabs
 groupId="table-format"
@@ -81,10 +81,10 @@ datasets:
 Replace with appropriate values for `sourceFormat`, `tableBasePath` and `tableName` fields.
 :::
 
-From your terminal under the cloned onetable directory, run the sync process using the below command.
+From your terminal under the cloned xtable directory, run the sync process using the below command.
 
  ```shell md title="shell"
- java -jar utilities/target/utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
+ java -jar xtable-utilities/target/xtable-utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
  ```
 
 :::tip Note:
@@ -96,7 +96,7 @@ with metadata files which contains the information that helps query engines inte
 From your terminal, create a glue database.
    
  ```shell md title="shell"
- aws glue create-database --database-input "{\"Name\":\"onetable_synced_db\"}"
+ aws glue create-database --database-input "{\"Name\":\"xtable_synced_db\"}"
  ```
 
 From your terminal, create a glue crawler. Modify the `<yourAccountId>`, `<yourRoleName>` 
@@ -121,21 +121,21 @@ values={[
 <TabItem value="hudi">
 
 ```shell md title="shell"
-aws glue create-crawler --name onetable_crawler --role arn:aws:iam::${accountId}:role/service-role/${roleName} --database onetable_synced_db --targets "{\"HudiTargets\":[{\"Paths\":[\"${s3DataPath}\"]}]}"
+aws glue create-crawler --name xtable_crawler --role arn:aws:iam::${accountId}:role/service-role/${roleName} --database xtable_synced_db --targets "{\"HudiTargets\":[{\"Paths\":[\"${s3DataPath}\"]}]}"
 ```
 
 </TabItem>
 <TabItem value="delta">
 
 ```shell md title="shell"
-aws glue create-crawler --name onetable_crawler --role arn:aws:iam::${accountId}:role/service-role/${roleName} --database onetable_synced_db --targets "{\"DeltaTargets\":[{\"Paths\":[\"${s3DataPath}\"]}]}"
+aws glue create-crawler --name xtable_crawler --role arn:aws:iam::${accountId}:role/service-role/${roleName} --database xtable_synced_db --targets "{\"DeltaTargets\":[{\"Paths\":[\"${s3DataPath}\"]}]}"
 ```
 
 </TabItem>
 <TabItem value="iceberg">
 
 ```shell md title="shell"
-aws glue create-crawler --name onetable_crawler --role arn:aws:iam::${accountId}:role/service-role/${roleName} --database onetable_synced_db --targets "{\"IcebergTargets\":[{\"Paths\":[\"${s3DataPath}\"]}]}"
+aws glue create-crawler --name xtable_crawler --role arn:aws:iam::${accountId}:role/service-role/${roleName} --database xtable_synced_db --targets "{\"IcebergTargets\":[{\"Paths\":[\"${s3DataPath}\"]}]}"
 ```
 
 </TabItem>
@@ -144,7 +144,7 @@ aws glue create-crawler --name onetable_crawler --role arn:aws:iam::${accountId}
 From your terminal, run the glue crawler.
 
 ```shell md title="shell"
- aws glue start-crawler --name onetable_crawler
+ aws glue start-crawler --name xtable_crawler
 ```
 Once the crawler succeeds, you’ll be able to query this Iceberg table from Athena,
 EMR and/or Redshift query engines.
@@ -174,7 +174,7 @@ After the crawler runs successfully, you can inspect the catalogued tables in Gl
 and also query the table in Amazon Athena like below:
 
 ```sql
-SELECT * FROM onetable_synced_db.<table_name>;
+SELECT * FROM xtable_synced_db.<table_name>;
 ```
 
 </TabItem>
@@ -185,7 +185,7 @@ After the crawler runs successfully, you can inspect the catalogued tables in Gl
 and also query the table in Amazon Athena like below:
 
 ```sql
-SELECT * FROM onetable_synced_db.<table_name>;
+SELECT * FROM xtable_synced_db.<table_name>;
 ```
 
 </TabItem>
@@ -193,6 +193,6 @@ SELECT * FROM onetable_synced_db.<table_name>;
 
 ## Conclusion
 In this guide we saw how to,
-1. sync a source table to create metadata for the desired target table formats using OneTable
+1. sync a source table to create metadata for the desired target table formats using Apache XTable™ (Incubating)
 2. catalog the data in the target table format in Glue Data Catalog
 3. query the target table using Amazon Athena
