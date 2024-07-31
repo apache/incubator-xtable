@@ -27,6 +27,8 @@ USER appuser
 # Copy the executable from the "package" stage.
 COPY --from=package build/target/app.jar ./app.jar
 
+# It's necessary to added opens to run spark on java >= 17
+# https://stackoverflow.com/questions/73465937/apache-spark-3-3-0-breaks-on-java-17-with-cannot-access-class-sun-nio-ch-direct
 ENTRYPOINT [ 
             "java", \
             "--add-opens=java.base/sun.nio.hb=ALL-UNNAMED", \
