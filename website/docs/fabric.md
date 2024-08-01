@@ -98,7 +98,7 @@ An example hadoop configuration for authenticating to ADLS storage account is as
 ```
 
 ```shell md title="shell"
-java -jar xtable-utilities/target/xtable-utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml --hadoopConfig hadoop.xml
+java -jar xtable-utilities/target/incubator-xtable-utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml --hadoopConfig hadoop.xml
 ```
 
 Running the above command will translate the table `people` in Iceberg or Hudi format to Delta Lake format. To validate

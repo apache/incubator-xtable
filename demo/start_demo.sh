@@ -23,9 +23,9 @@ cd $XTABLE_HOME
 
 mvn install -am -pl xtable-core -DskipTests -T 2
 mkdir -p demo/jars
-cp xtable-hudi-support/xtable-hudi-support-utils/target/xtable-hudi-support-utils-0.1.0-SNAPSHOT.jar demo/jars
-cp xtable-api/target/xtable-api-0.1.0-SNAPSHOT.jar demo/jars
-cp xtable-core/target/xtable-core-0.1.0-SNAPSHOT.jar demo/jars
+cp xtable-hudi-support/xtable-hudi-support-utils/target/incubator-xtable-hudi-support-utils-0.1.0-SNAPSHOT.jar demo/jars
+cp xtable-api/target/incubator-xtable-api-0.1.0-SNAPSHOT.jar demo/jars
+cp xtable-core/target/incubator-xtable-core-0.1.0-SNAPSHOT.jar demo/jars
 
 cd demo
 docker-compose up
