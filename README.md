@@ -117,6 +117,19 @@ The custom hadoop configurations can be passed in with the `--hadoopConfig [cust
 The config in custom hadoop config file will override the default hadoop configurations. For an example
 of a custom hadoop config file, see [hadoop.xml](https://xtable.apache.org/docs/fabric#step-2-translate-source-table-to-delta-lake-format-using-apache-xtable-incubating).
 
+# Running using docker
+
+In order to run using docker, you must mount the config files on the container. The follow commands how to:
+
+```
+docker run \
+  -v ./xtable/config.yml:/xtable/config.yml \
+  -v ./xtable/core-site.xml:/xtable/core-site.xml \
+  -v ./xtable/catalog.yml:/xtable/catalog.yml \
+  registry.gitlab.com/pedalin/xtable-docker-image:4420d2b6 \
+  --datasetConfig /xtable/config.yml --hadoopConfig /xtable/core-site.xml --icebergCatalogConfig xtable/catalog.yml
+```
+
 # Contributing
 ## Setup
 For setting up the repo on IntelliJ, open the project and change the java version to Java11 in File->ProjectStructure
