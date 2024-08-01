@@ -21,11 +21,11 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>org.apache.xtable</groupId>
-        <artifactId>xtable</artifactId>
+        <artifactId>incubator-xtable</artifactId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>xtable-hudi-support</artifactId>
+    <artifactId>incubator-xtable-hudi-support</artifactId>
     <packaging>pom</packaging>
 
 

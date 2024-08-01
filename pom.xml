@@ -21,7 +21,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.apache.xtable</groupId>
-    <artifactId>xtable</artifactId>
+    <artifactId>incubator-xtable</artifactId>
     <name>xtable</name>
 
     <parent>
@@ -46,8 +46,14 @@
         <log4j.version>2.22.0</log4j.version>
         <junit.version>5.9.0</junit.version>
         <lombok.version>1.18.30</lombok.version>
+        <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
         <hadoop.version>3.3.6</hadoop.version>
         <hudi.version>0.14.0</hudi.version>
+        <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
+        <maven-javadoc-plugin.version>3.8.0</maven-javadoc-plugin.version>
+        <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
+        <maven-deploy-plugin.version>3.1.1</maven-deploy-plugin.version>
+        <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
         <parquet.version>1.12.2</parquet.version>
         <scala.version>2.12.15</scala.version>
         <scala.version.prefix>2.12</scala.version.prefix>
@@ -62,6 +68,8 @@
         <delta.standalone.version>0.5.0</delta.standalone.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <target.dir.pattern>**/target/**</target.dir.pattern>
+        <delombok.output.dir>${project.build.directory}/delombok</delombok.output.dir>
+
         <!-- Test properties -->
         <skipTests>false</skipTests>
         <skipUTs>${skipTests}</skipUTs>
@@ -80,17 +88,17 @@
         <dependencies>
             <dependency>
                 <groupId>org.apache.xtable</groupId>
-                <artifactId>xtable-api</artifactId>
+                <artifactId>incubator-xtable-api</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.xtable</groupId>
-                <artifactId>xtable-core</artifactId>
+                <artifactId>incubator-xtable-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.xtable</groupId>
-                <artifactId>xtable-hudi-support-utils</artifactId>
+                <artifactId>incubator-xtable-hudi-support-utils</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -540,6 +548,25 @@
         </pluginManagement>
         <plugins>
             <plugin>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok-maven-plugin</artifactId>
+                <version>${lombok-maven-plugin.version}</version>
+                <configuration>
+                    <sourceDirectory>${project.basedir}/src/main/java</sourceDirectory>
+                    <addOutputDirectory>false</addOutputDirectory>
+                    <outputDirectory>${delombok.output.dir}</outputDirectory>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>delombok</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
                 <executions>
@@ -596,6 +623,31 @@
                     <trimStackTrace>false</trimStackTrace>
                     <argLine>-Xmx1024m</argLine>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>${maven-release-plugin.version}</version>
+                <configuration>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                    <useReleaseProfile>false</useReleaseProfile>
+                    <releaseProfiles>release</releaseProfiles>
+                    <goals>deploy</goals>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <version>${maven-deploy-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>default-deploy</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>deploy</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.rat</groupId>
@@ -770,4 +822,78 @@
         </plugins>
     </build>
 
+    <repositories>
+        <repository>
+            <id>Maven Central</id>
+            <name>Maven Repository</name>
+            <url>https://repo.maven.apache.org/maven2</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <profiles>
+        <profile>
+            <id>release</id>
+            <activation>
+                <property>
+                    <name>deployArtifacts</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>${maven-source-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>${maven-javadoc-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <doclint>none</doclint>
+                            <source>1.8</source>
+                            <sourcepath>${delombok.output.dir}</sourcepath>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>${maven-gpg-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
