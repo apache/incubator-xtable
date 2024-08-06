@@ -119,14 +119,15 @@ of a custom hadoop config file, see [hadoop.xml](https://xtable.apache.org/docs/
 
 # Running using docker
 
-In order to run using docker, you must mount the config files on the container. The follow commands how to:
+1. Build the docker image using `docker builld . -t xtable`
+2. Mount the config files on the container and run the container:
 
 ```
 docker run \
   -v ./xtable/config.yml:/xtable/config.yml \
   -v ./xtable/core-site.xml:/xtable/core-site.xml \
   -v ./xtable/catalog.yml:/xtable/catalog.yml \
-  registry.gitlab.com/pedalin/xtable-docker-image:4420d2b6 \
+  xtable \
   --datasetConfig /xtable/config.yml --hadoopConfig /xtable/core-site.xml --icebergCatalogConfig xtable/catalog.yml
 ```
 
