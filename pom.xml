@@ -21,7 +21,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.apache.xtable</groupId>
-    <artifactId>incubator-xtable</artifactId>
+    <artifactId>xtable</artifactId>
     <name>xtable</name>
 
     <parent>
@@ -88,17 +88,17 @@
         <dependencies>
             <dependency>
                 <groupId>org.apache.xtable</groupId>
-                <artifactId>incubator-xtable-api</artifactId>
+                <artifactId>xtable-api</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.xtable</groupId>
-                <artifactId>incubator-xtable-core</artifactId>
+                <artifactId>xtable-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.xtable</groupId>
-                <artifactId>incubator-xtable-hudi-support-utils</artifactId>
+                <artifactId>xtable-hudi-support-utils</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
