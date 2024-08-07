@@ -25,7 +25,7 @@ This document walks through the steps to register an Apache XTable™ (Incubatin
    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service_account_key.json
    ```
 5. Clone the Apache XTable™ (Incubating) [repository](https://github.com/apache/incubator-xtable) and create the
-   `incubator-xtable-utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
+   `xtable-utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 6. Download the [BigLake Iceberg JAR](gs://spark-lib/biglake/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar) locally.
    Apache XTable™ (Incubating) requires the JAR to be present in the classpath.
 
@@ -117,7 +117,7 @@ catalogOptions:
 From your terminal under the cloned Apache XTable™ (Incubating) directory, run the sync process using the below command.
 
 ```shell md title="shell"
-java -cp xtable-utilities/target/incubator-xtable-utilities-0.1.0-SNAPSHOT-bundled.jar:/path/to/downloaded/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar org.apache.xtable.utilities.RunSync  --datasetConfig my_config.yaml --icebergCatalogConfig catalog.yaml
+java -cp xtable-utilities/target/xtable-utilities-0.1.0-SNAPSHOT-bundled.jar:/path/to/downloaded/biglake-catalog-iceberg1.2.0-0.1.0-with-dependencies.jar org.apache.xtable.utilities.RunSync  --datasetConfig my_config.yaml --icebergCatalogConfig catalog.yaml
 ```
 
 :::tip Note:

@@ -35,9 +35,9 @@ If you are not planning on using Iceberg, then you do not need to add these to y
 :::
 
 #### Steps to add additional configurations to the Hudi writers:
-1. Add the extensions jar (`incubator-xtable-hudi-extensions-0.1.0-SNAPSHOT-bundled.jar`) to your class path  
+1. Add the extensions jar (`xtable-hudi-extensions-0.1.0-SNAPSHOT-bundled.jar`) to your class path  
    For example, if you're using the Hudi [quick-start guide](https://hudi.apache.org/docs/quick-start-guide#spark-shellsql)
-   for spark you can just add `--jars incubator-xtable-hudi-extensions-0.1.0-SNAPSHOT-bundled.jar` to the end of the command.
+   for spark you can just add `--jars xtable-hudi-extensions-0.1.0-SNAPSHOT-bundled.jar` to the end of the command.
 2. Set the following configurations in your writer options:
    ```shell md title="shell"
    hoodie.avro.write.support.class: org.apache.xtable.hudi.extensions.HoodieAvroWriteSupportWithFieldIds
