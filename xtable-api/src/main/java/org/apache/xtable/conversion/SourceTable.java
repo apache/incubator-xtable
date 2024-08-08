@@ -16,20 +16,31 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.iceberg;
+package org.apache.xtable.conversion;
 
-import org.apache.iceberg.Snapshot;
+import java.util.Properties;
 
-import org.apache.xtable.conversion.ConversionSourceProvider;
-import org.apache.xtable.conversion.SourceTable;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NonNull;
 
-/** A concrete implementation of {@link ConversionSourceProvider} for Hudi table format. */
-public class IcebergConversionSourceProvider extends ConversionSourceProvider<Snapshot> {
-  @Override
-  public IcebergConversionSource getConversionSourceInstance(SourceTable sourceTableConfig) {
-    return IcebergConversionSource.builder()
-        .sourceTableConfig(sourceTableConfig)
-        .hadoopConf(hadoopConf)
-        .build();
+@EqualsAndHashCode(callSuper = true)
+@Getter
+public class SourceTable extends ExternalTable {
+  /** The path to the data files, defaults to the metadataPath */
+  @NonNull private final String dataPath;
+
+  @Builder(toBuilder = true)
+  public SourceTable(
+      String name,
+      String formatName,
+      String basePath,
+      String dataPath,
+      String[] namespace,
+      CatalogConfig catalogConfig,
+      Properties additionalProperties) {
+    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties);
+    this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
   }
 }

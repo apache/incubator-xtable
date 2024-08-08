@@ -24,6 +24,7 @@ import static org.apache.xtable.hudi.HudiTestUtil.initTableAndGetMetaClient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
@@ -69,7 +70,7 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.metadata.HoodieBackedTableMetadata;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
-import org.apache.xtable.conversion.PerTableConfigImpl;
+import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
@@ -582,11 +583,11 @@ public class ITHudiConversionSourceTarget {
 
   private HudiConversionTarget getTargetClient() {
     return new HudiConversionTarget(
-        PerTableConfigImpl.builder()
-            .tableBasePath(tableBasePath)
-            .targetTableFormats(Collections.singletonList(TableFormat.HUDI))
-            .tableName("test_table")
-            .targetMetadataRetentionInHours(4)
+        TargetTable.builder()
+            .basePath(tableBasePath)
+            .formatName(TableFormat.HUDI)
+            .name("test_table")
+            .metadataRetention(Duration.of(4, ChronoUnit.HOURS))
             .build(),
         CONFIGURATION,
         3);

@@ -26,7 +26,9 @@ import static org.junit.jupiter.api.parallel.ExecutionMode.SAME_THREAD;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -76,7 +78,7 @@ import io.delta.standalone.expressions.Literal;
 import io.delta.standalone.types.IntegerType;
 import io.delta.standalone.types.StringType;
 
-import org.apache.xtable.conversion.PerTableConfigImpl;
+import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
@@ -126,11 +128,11 @@ public class TestDeltaSync {
     Files.createDirectories(basePath);
     conversionTarget =
         new DeltaConversionTarget(
-            PerTableConfigImpl.builder()
-                .tableName(tableName)
-                .tableBasePath(basePath.toString())
-                .targetMetadataRetentionInHours(1)
-                .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
+            TargetTable.builder()
+                .name(tableName)
+                .basePath(basePath.toString())
+                .metadataRetention(Duration.of(1, ChronoUnit.HOURS))
+                .formatName(TableFormat.DELTA)
                 .build(),
             sparkSession);
   }

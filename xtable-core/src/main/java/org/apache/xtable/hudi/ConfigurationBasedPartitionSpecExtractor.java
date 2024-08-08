@@ -36,13 +36,13 @@ import org.apache.xtable.schema.SchemaFieldFinder;
  */
 @AllArgsConstructor
 public class ConfigurationBasedPartitionSpecExtractor implements HudiSourcePartitionSpecExtractor {
-  private final HudiSourceConfigImpl config;
+  private final HudiSourceConfig config;
 
   @Override
   public List<InternalPartitionField> spec(InternalSchema tableSchema) {
     List<InternalPartitionField> partitionFields =
         new ArrayList<>(config.getPartitionFieldSpecs().size());
-    for (HudiSourceConfigImpl.PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
+    for (HudiSourceConfig.PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
       InternalField sourceField =
           SchemaFieldFinder.getInstance()
               .findFieldByPath(tableSchema, fieldSpec.getSourceFieldPath());

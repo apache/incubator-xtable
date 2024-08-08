@@ -26,12 +26,12 @@ import org.apache.hudi.sync.common.HoodieSyncConfig;
 
 public class XTableSyncConfig extends HoodieSyncConfig implements Serializable {
 
-  public static final ConfigProperty<String> ONE_TABLE_FORMATS =
+  public static final ConfigProperty<String> XTABLE_FORMATS =
       ConfigProperty.key("hoodie.xtable.formats.to.sync")
           .defaultValue("DELTA,ICEBERG")
           .withDocumentation("Comma separated list of formats to sync.");
 
-  public static final ConfigProperty<Integer> ONE_TABLE_TARGET_METADATA_RETENTION_HOURS =
+  public static final ConfigProperty<Integer> XTABLE_TARGET_METADATA_RETENTION_HOURS =
       ConfigProperty.key("hoodie.xtable.target.metadata.retention.hr")
           .defaultValue(24 * 7)
           .withDocumentation("Retention in hours for metadata in target table.");

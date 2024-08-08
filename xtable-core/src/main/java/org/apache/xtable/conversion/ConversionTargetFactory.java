@@ -38,19 +38,17 @@ public class ConversionTargetFactory {
 
   /**
    * Create a fully initialized instance of the ConversionTarget represented by the given Table
-   * Format name. Initialization is done with the config provided through PerTableConfig and
+   * Format name. Initialization is done with the config provided through TargetTable and
    * Configuration params.
    *
-   * @param tableFormat
-   * @param perTableConfig
-   * @param configuration
-   * @return
+   * @param targetTable the spec of the target
+   * @param configuration hadoop configuration
+   * @return an intialized {@link ConversionTarget}
    */
-  public ConversionTarget createForFormat(
-      String tableFormat, PerTableConfig perTableConfig, Configuration configuration) {
-    ConversionTarget conversionTarget = createConversionTargetForName(tableFormat);
+  public ConversionTarget createForFormat(TargetTable targetTable, Configuration configuration) {
+    ConversionTarget conversionTarget = createConversionTargetForName(targetTable.getFormatName());
 
-    conversionTarget.init(perTableConfig, configuration);
+    conversionTarget.init(targetTable, configuration);
     return conversionTarget;
   }
 

@@ -18,8 +18,6 @@
  
 package org.apache.xtable.conversion;
 
-import java.util.Map;
-
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.xtable.spi.extractor.ConversionSource;
@@ -33,16 +31,9 @@ public abstract class ConversionSourceProvider<COMMIT> {
   /** The Hadoop configuration to use when reading from the source table. */
   protected Configuration hadoopConf;
 
-  /** The configuration for the source. */
-  protected Map<String, String> sourceConf;
-
-  /** The configuration for the table to read from. */
-  protected PerTableConfig sourceTableConfig;
-
   /** Initializes the provider various source specific configurations. */
-  public void init(Configuration hadoopConf, Map<String, String> sourceConf) {
+  public void init(Configuration hadoopConf) {
     this.hadoopConf = hadoopConf;
-    this.sourceConf = sourceConf;
   }
 
   /**
@@ -54,5 +45,5 @@ public abstract class ConversionSourceProvider<COMMIT> {
    * @return the conversion source
    */
   public abstract ConversionSource<COMMIT> getConversionSourceInstance(
-      PerTableConfig sourceTableConfig);
+      SourceTable sourceTableConfig);
 }

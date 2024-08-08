@@ -18,26 +18,30 @@
  
 package org.apache.xtable.conversion;
 
-import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.apache.xtable.model.sync.SyncMode;
+import org.junit.jupiter.api.Test;
 
-public interface PerTableConfig {
-  int getTargetMetadataRetentionInHours();
+class TestSourceTable {
+  @Test
+  void dataPathDefaultsToMetadataPath() {
+    String basePath = "file:///path/to/table";
+    SourceTable sourceTable =
+        SourceTable.builder().name("name").formatName("hudi").basePath(basePath).build();
+    assertEquals(basePath, sourceTable.getDataPath());
+  }
 
-  String getTableBasePath();
-
-  String getTableDataPath();
-
-  String getTableName();
-
-  HudiSourceConfig getHudiSourceConfig();
-
-  List<String> getTargetTableFormats();
-
-  SyncMode getSyncMode();
-
-  String[] getNamespace();
-
-  CatalogConfig getIcebergCatalogConfig();
+  @Test
+  void dataPathIsSanitized() {
+    String basePath = "file:///path/to/table";
+    String dataPath = "file:///path/to/table//data";
+    SourceTable sourceTable =
+        SourceTable.builder()
+            .name("name")
+            .formatName("hudi")
+            .basePath(basePath)
+            .dataPath(dataPath)
+            .build();
+    assertEquals("file:///path/to/table/data", sourceTable.getDataPath());
+  }
 }

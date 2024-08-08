@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -52,7 +51,7 @@ import org.apache.xtable.spi.sync.TableFormatSync;
 
 /**
  * Responsible for completing the entire lifecycle of the sync process given {@link
- * PerTableConfigImpl}. This is done in three steps,
+ * ConversionConfig}. This is done in three steps,
  *
  * <ul>
  *   <li>1. Extracting snapshot {@link InternalSnapshot} from the source table format.
@@ -72,33 +71,31 @@ public class ConversionController {
   }
 
   /**
-   * Runs a sync for the given source table configuration in PerTableConfig.
+   * Runs a sync for the given source table configuration in ConversionConfig.
    *
    * @param config A per table level config containing tableBasePath, partitionFieldSpecConfig,
    *     targetTableFormats and syncMode
    * @param conversionSourceProvider A provider for the {@link ConversionSource} instance, {@link
-   *     ConversionSourceProvider#init(Configuration, Map)} must be called before calling this
-   *     method.
+   *     ConversionSourceProvider#init(Configuration)} must be called before calling this method.
    * @return Returns a map containing the table format, and it's sync result. Run sync for a table
    *     with the provided per table level configuration.
    */
   public <COMMIT> Map<String, SyncResult> sync(
-      PerTableConfig config, ConversionSourceProvider<COMMIT> conversionSourceProvider) {
-    if (config.getTargetTableFormats() == null || config.getTargetTableFormats().isEmpty()) {
+      ConversionConfig config, ConversionSourceProvider<COMMIT> conversionSourceProvider) {
+    if (config.getTargetTables() == null || config.getTargetTables().isEmpty()) {
       throw new IllegalArgumentException("Please provide at-least one format to sync");
     }
 
     try (ConversionSource<COMMIT> conversionSource =
-        conversionSourceProvider.getConversionSourceInstance(config)) {
+        conversionSourceProvider.getConversionSourceInstance(config.getSourceTable())) {
       ExtractFromSource<COMMIT> source = ExtractFromSource.of(conversionSource);
 
       Map<String, ConversionTarget> conversionTargetByFormat =
-          config.getTargetTableFormats().stream()
+          config.getTargetTables().stream()
               .collect(
                   Collectors.toMap(
-                      Function.identity(),
-                      tableFormat ->
-                          conversionTargetFactory.createForFormat(tableFormat, config, conf)));
+                      TargetTable::getFormatName,
+                      targetTable -> conversionTargetFactory.createForFormat(targetTable, conf)));
       // State for each TableFormat
       Map<String, Optional<TableSyncMetadata>> lastSyncMetadataByFormat =
           conversionTargetByFormat.entrySet().stream()
@@ -152,11 +149,11 @@ public class ConversionController {
   }
 
   private <COMMIT> Map<String, ConversionTarget> getFormatsToSyncIncrementally(
-      PerTableConfig perTableConfig,
+      ConversionConfig conversionConfig,
       Map<String, ConversionTarget> conversionTargetByFormat,
       Map<String, Optional<TableSyncMetadata>> lastSyncMetadataByFormat,
       ConversionSource<COMMIT> conversionSource) {
-    if (perTableConfig.getSyncMode() == SyncMode.FULL) {
+    if (conversionConfig.getSyncMode() == SyncMode.FULL) {
       // Full sync requested by config, hence no incremental sync.
       return Collections.emptyMap();
     }

@@ -54,7 +54,7 @@ import scala.collection.Seq;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import org.apache.xtable.conversion.PerTableConfig;
+import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
@@ -76,16 +76,16 @@ public class DeltaConversionTarget implements ConversionTarget {
   private DeltaDataFileUpdatesExtractor dataFileUpdatesExtractor;
 
   private String tableName;
-  private int logRetentionInHours;
+  private long logRetentionInHours;
   private TransactionState transactionState;
 
   public DeltaConversionTarget() {}
 
-  public DeltaConversionTarget(PerTableConfig perTableConfig, SparkSession sparkSession) {
+  public DeltaConversionTarget(TargetTable targetTable, SparkSession sparkSession) {
     this(
-        perTableConfig.getTableDataPath(),
-        perTableConfig.getTableName(),
-        perTableConfig.getTargetMetadataRetentionInHours(),
+        targetTable.getBasePath(),
+        targetTable.getName(),
+        targetTable.getMetadataRetention().toHours(),
         sparkSession,
         DeltaSchemaExtractor.getInstance(),
         DeltaPartitionExtractor.getInstance(),
@@ -96,7 +96,7 @@ public class DeltaConversionTarget implements ConversionTarget {
   DeltaConversionTarget(
       String tableDataPath,
       String tableName,
-      int logRetentionInHours,
+      long logRetentionInHours,
       SparkSession sparkSession,
       DeltaSchemaExtractor schemaExtractor,
       DeltaPartitionExtractor partitionExtractor,
@@ -115,7 +115,7 @@ public class DeltaConversionTarget implements ConversionTarget {
   private void _init(
       String tableDataPath,
       String tableName,
-      int logRetentionInHours,
+      long logRetentionInHours,
       SparkSession sparkSession,
       DeltaSchemaExtractor schemaExtractor,
       DeltaPartitionExtractor partitionExtractor,
@@ -134,13 +134,13 @@ public class DeltaConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void init(PerTableConfig perTableConfig, Configuration configuration) {
+  public void init(TargetTable targetTable, Configuration configuration) {
     SparkSession sparkSession = DeltaConversionUtils.buildSparkSession(configuration);
 
     _init(
-        perTableConfig.getTableDataPath(),
-        perTableConfig.getTableName(),
-        perTableConfig.getTargetMetadataRetentionInHours(),
+        targetTable.getBasePath(),
+        targetTable.getName(),
+        targetTable.getMetadataRetention().toHours(),
         sparkSession,
         DeltaSchemaExtractor.getInstance(),
         DeltaPartitionExtractor.getInstance(),
@@ -221,7 +221,7 @@ public class DeltaConversionTarget implements ConversionTarget {
     private final OptimisticTransaction transaction;
     private final Instant commitTime;
     private final DeltaLog deltaLog;
-    private final int retentionInHours;
+    private final long retentionInHours;
     @Getter private final List<String> partitionColumns;
     private final String tableName;
     @Getter private StructType latestSchema;
@@ -230,7 +230,7 @@ public class DeltaConversionTarget implements ConversionTarget {
     @Setter private Seq<Action> actions;
 
     private TransactionState(
-        DeltaLog deltaLog, String tableName, Instant latestCommitTime, int retentionInHours) {
+        DeltaLog deltaLog, String tableName, Instant latestCommitTime, long retentionInHours) {
       this.deltaLog = deltaLog;
       this.transaction = deltaLog.startTransaction();
       this.latestSchema = deltaLog.snapshot().schema();

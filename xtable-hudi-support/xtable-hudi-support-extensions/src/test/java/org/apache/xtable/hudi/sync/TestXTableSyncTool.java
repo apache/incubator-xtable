@@ -98,7 +98,7 @@ public class TestXTableSyncTool {
     writeBasicHudiTable(path, options);
 
     Properties properties = new Properties();
-    properties.put(XTableSyncConfig.ONE_TABLE_FORMATS.key(), "iceberg,DELTA");
+    properties.put(XTableSyncConfig.XTABLE_FORMATS.key(), "iceberg,DELTA");
     properties.put(KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME.key(), partitionPath);
     properties.put(HoodieSyncConfig.META_SYNC_BASE_PATH.key(), path);
     properties.putAll(options);

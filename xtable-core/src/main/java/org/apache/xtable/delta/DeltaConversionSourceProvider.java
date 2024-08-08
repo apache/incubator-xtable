@@ -23,18 +23,18 @@ import org.apache.spark.sql.SparkSession;
 import io.delta.tables.DeltaTable;
 
 import org.apache.xtable.conversion.ConversionSourceProvider;
-import org.apache.xtable.conversion.PerTableConfig;
+import org.apache.xtable.conversion.SourceTable;
 
 /** A concrete implementation of {@link ConversionSourceProvider} for Delta Lake table format. */
 public class DeltaConversionSourceProvider extends ConversionSourceProvider<Long> {
   @Override
-  public DeltaConversionSource getConversionSourceInstance(PerTableConfig perTableConfig) {
+  public DeltaConversionSource getConversionSourceInstance(SourceTable sourceTable) {
     SparkSession sparkSession = DeltaConversionUtils.buildSparkSession(hadoopConf);
-    DeltaTable deltaTable = DeltaTable.forPath(sparkSession, perTableConfig.getTableBasePath());
+    DeltaTable deltaTable = DeltaTable.forPath(sparkSession, sourceTable.getBasePath());
     return DeltaConversionSource.builder()
         .sparkSession(sparkSession)
-        .tableName(perTableConfig.getTableName())
-        .basePath(perTableConfig.getTableBasePath())
+        .tableName(sourceTable.getName())
+        .basePath(sourceTable.getBasePath())
         .deltaTable(deltaTable)
         .deltaLog(deltaTable.deltaLog())
         .build();

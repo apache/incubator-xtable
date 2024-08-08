@@ -25,6 +25,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.stream.Collectors;
 
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
@@ -44,17 +46,16 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.annotations.VisibleForTesting;
 
+import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
-import org.apache.xtable.conversion.PerTableConfig;
-import org.apache.xtable.conversion.PerTableConfigImpl;
-import org.apache.xtable.hudi.ConfigurationBasedPartitionSpecExtractor;
-import org.apache.xtable.hudi.HudiSourceConfigImpl;
+import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.reflection.ReflectionUtils;
-import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
 
 /**
  * Provides a standalone runner for the sync process. See README.md for more details on how to run
@@ -129,7 +130,7 @@ public class RunSync {
     String sourceFormat = datasetConfig.sourceFormat;
     customConfig = getCustomConfigurations(cmd, CONVERTERS_CONFIG_PATH);
     TableFormatConverters tableFormatConverters = loadTableFormatConversionConfigs(customConfig);
-    ConversionConfig sourceConversionConfig =
+    TableFormatConverters.ConversionConfig sourceConversionConfig =
         tableFormatConverters.getTableFormatConverters().get(sourceFormat);
     if (sourceConversionConfig == null) {
       throw new IllegalArgumentException(
@@ -140,7 +141,7 @@ public class RunSync {
     String sourceProviderClass = sourceConversionConfig.conversionSourceProviderClass;
     ConversionSourceProvider<?> conversionSourceProvider =
         ReflectionUtils.createInstanceOfClass(sourceProviderClass);
-    conversionSourceProvider.init(hadoopConf, sourceConversionConfig.configuration);
+    conversionSourceProvider.init(hadoopConf);
 
     List<String> tableFormatList = datasetConfig.getTargetFormats();
     ConversionController conversionController = new ConversionController(hadoopConf);
@@ -149,24 +150,45 @@ public class RunSync {
           "Running sync for basePath {} for following table formats {}",
           table.getTableBasePath(),
           tableFormatList);
-      PerTableConfig config =
-          PerTableConfigImpl.builder()
-              .tableBasePath(table.getTableBasePath())
-              .tableName(table.getTableName())
+      Properties sourceProperties = new Properties();
+      if (table.getPartitionSpec() != null) {
+        sourceProperties.put(
+            HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec());
+      }
+      SourceTable sourceTable =
+          SourceTable.builder()
+              .name(table.getTableName())
+              .basePath(table.getTableBasePath())
               .namespace(table.getNamespace() == null ? null : table.getNamespace().split("\\."))
-              .tableDataPath(table.getTableDataPath())
-              .icebergCatalogConfig(icebergCatalogConfig)
-              .hudiSourceConfig(
-                  HudiSourceConfigImpl.builder()
-                      .partitionSpecExtractorClass(
-                          ConfigurationBasedPartitionSpecExtractor.class.getName())
-                      .partitionFieldSpecConfig(table.getPartitionSpec())
-                      .build())
-              .targetTableFormats(tableFormatList)
+              .dataPath(table.getTableDataPath())
+              .catalogConfig(icebergCatalogConfig)
+              .additionalProperties(sourceProperties)
+              .formatName(sourceFormat)
+              .build();
+      List<TargetTable> targetTables =
+          tableFormatList.stream()
+              .map(
+                  tableFormat ->
+                      TargetTable.builder()
+                          .name(table.getTableName())
+                          .basePath(table.getTableBasePath())
+                          .namespace(
+                              table.getNamespace() == null
+                                  ? null
+                                  : table.getNamespace().split("\\."))
+                          .catalogConfig(icebergCatalogConfig)
+                          .formatName(tableFormat)
+                          .build())
+              .collect(Collectors.toList());
+
+      ConversionConfig conversionConfig =
+          ConversionConfig.builder()
+              .sourceTable(sourceTable)
+              .targetTables(targetTables)
               .syncMode(SyncMode.INCREMENTAL)
               .build();
       try {
-        conversionController.sync(config, conversionSourceProvider);
+        conversionController.sync(conversionConfig, conversionSourceProvider);
       } catch (Exception e) {
         log.error(String.format("Error running sync for %s", table.getTableBasePath()), e);
       }

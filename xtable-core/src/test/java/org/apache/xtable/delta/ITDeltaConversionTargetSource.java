@@ -53,8 +53,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestSparkDeltaTable;
 import org.apache.xtable.ValidationTestHelper;
-import org.apache.xtable.conversion.PerTableConfig;
-import org.apache.xtable.conversion.PerTableConfigImpl;
+import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
@@ -149,7 +148,7 @@ public class ITDeltaConversionTargetSource {
     hadoopConf.set("fs.defaultFS", "file:///");
 
     conversionSourceProvider = new DeltaConversionSourceProvider();
-    conversionSourceProvider.init(hadoopConf, null);
+    conversionSourceProvider.init(hadoopConf);
   }
 
   @Test
@@ -165,11 +164,11 @@ public class ITDeltaConversionTargetSource {
             + basePath
             + "' AS SELECT * FROM VALUES (1, 2)");
     // Create Delta source
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(tableName)
-            .tableBasePath(basePath.toString())
-            .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
             .build();
     DeltaConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
@@ -223,11 +222,11 @@ public class ITDeltaConversionTargetSource {
             + basePath
             + "' AS SELECT 'SingleValue' AS part_col, 1 AS col1, 2 AS col2");
     // Create Delta source
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(tableName)
-            .tableBasePath(basePath.toString())
-            .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
             .build();
     DeltaConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
@@ -311,11 +310,11 @@ public class ITDeltaConversionTargetSource {
             + tableName
             + "` VALUES(1, CAST('2012-02-12 00:12:34' AS TIMESTAMP))");
     // Create Delta source
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(tableName)
-            .tableBasePath(basePath.toString())
-            .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
             .build();
     DeltaConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
@@ -350,11 +349,11 @@ public class ITDeltaConversionTargetSource {
 
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(testSparkDeltaTable.getTableName())
-            .tableBasePath(testSparkDeltaTable.getBasePath())
-            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
             .build();
     DeltaConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
@@ -390,11 +389,11 @@ public class ITDeltaConversionTargetSource {
     // Insert 50 rows to 2018 partition.
     List<Row> commit1Rows = testSparkDeltaTable.insertRowsForPartition(50, 2018);
     Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(testSparkDeltaTable.getTableName())
-            .tableBasePath(testSparkDeltaTable.getBasePath())
-            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
             .build();
     DeltaConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
@@ -458,11 +457,11 @@ public class ITDeltaConversionTargetSource {
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(testSparkDeltaTable.getTableName())
-            .tableBasePath(testSparkDeltaTable.getBasePath())
-            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
             .build();
     DeltaConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
@@ -506,11 +505,11 @@ public class ITDeltaConversionTargetSource {
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(testSparkDeltaTable.getTableName())
-            .tableBasePath(testSparkDeltaTable.getBasePath())
-            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
             .build();
     DeltaConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
@@ -563,11 +562,11 @@ public class ITDeltaConversionTargetSource {
     testSparkDeltaTable.insertRowsForPartition(20, partitionValueToDelete);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(testSparkDeltaTable.getTableName())
-            .tableBasePath(testSparkDeltaTable.getBasePath())
-            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
             .build();
     DeltaConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
@@ -623,11 +622,11 @@ public class ITDeltaConversionTargetSource {
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
-    PerTableConfig tableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(testSparkDeltaTable.getTableName())
-            .tableBasePath(testSparkDeltaTable.getBasePath())
-            .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG))
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
             .build();
     DeltaConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);

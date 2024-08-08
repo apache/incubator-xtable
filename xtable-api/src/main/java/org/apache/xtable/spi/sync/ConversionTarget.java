@@ -23,7 +23,7 @@ import java.util.Optional;
 
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.xtable.conversion.PerTableConfig;
+import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -89,5 +89,5 @@ public interface ConversionTarget {
   String getTableFormat();
 
   /** Initializes the client with provided configuration */
-  void init(PerTableConfig perTableConfig, Configuration configuration);
+  void init(TargetTable targetTable, Configuration configuration);
 }

@@ -29,7 +29,6 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -46,8 +45,7 @@ import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.data.Record;
 
 import org.apache.xtable.TestIcebergTable;
-import org.apache.xtable.conversion.PerTableConfig;
-import org.apache.xtable.conversion.PerTableConfigImpl;
+import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
@@ -65,7 +63,7 @@ public class ITIcebergConversionTargetSource {
   @BeforeEach
   void setup() {
     sourceProvider = new IcebergConversionSourceProvider();
-    sourceProvider.init(hadoopConf, null);
+    sourceProvider.init(hadoopConf);
   }
 
   @ParameterizedTest
@@ -97,11 +95,11 @@ public class ITIcebergConversionTargetSource {
       testIcebergTable.insertRows(50);
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
-      PerTableConfig tableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(testIcebergTable.getTableName())
-              .tableBasePath(testIcebergTable.getBasePath())
-              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+      SourceTable tableConfig =
+          SourceTable.builder()
+              .name(testIcebergTable.getTableName())
+              .basePath(testIcebergTable.getBasePath())
+              .formatName(TableFormat.ICEBERG)
               .build();
       IcebergConversionSource conversionSource =
           sourceProvider.getConversionSourceInstance(tableConfig);
@@ -157,11 +155,11 @@ public class ITIcebergConversionTargetSource {
       testIcebergTable.insertRecordsForPartition(20, partitionValueToDelete);
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
-      PerTableConfig tableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(testIcebergTable.getTableName())
-              .tableBasePath(testIcebergTable.getBasePath())
-              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+      SourceTable tableConfig =
+          SourceTable.builder()
+              .name(testIcebergTable.getTableName())
+              .basePath(testIcebergTable.getBasePath())
+              .formatName(TableFormat.ICEBERG)
               .build();
       IcebergConversionSource conversionSource =
           sourceProvider.getConversionSourceInstance(tableConfig);
@@ -217,11 +215,11 @@ public class ITIcebergConversionTargetSource {
       testIcebergTable.insertRecordsForPartition(20, partitionValueToDelete);
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
-      PerTableConfig tableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(testIcebergTable.getTableName())
-              .tableBasePath(testIcebergTable.getBasePath())
-              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+      SourceTable tableConfig =
+          SourceTable.builder()
+              .name(testIcebergTable.getTableName())
+              .basePath(testIcebergTable.getBasePath())
+              .formatName(TableFormat.ICEBERG)
               .build();
       IcebergConversionSource conversionSource =
           sourceProvider.getConversionSourceInstance(tableConfig);
@@ -277,11 +275,11 @@ public class ITIcebergConversionTargetSource {
       testIcebergTable.insertRows(50);
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
-      PerTableConfig tableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(testIcebergTable.getTableName())
-              .tableBasePath(testIcebergTable.getBasePath())
-              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+      SourceTable tableConfig =
+          SourceTable.builder()
+              .name(testIcebergTable.getTableName())
+              .basePath(testIcebergTable.getBasePath())
+              .formatName(TableFormat.ICEBERG)
               .build();
       IcebergConversionSource conversionSource =
           sourceProvider.getConversionSourceInstance(tableConfig);
@@ -318,12 +316,11 @@ public class ITIcebergConversionTargetSource {
       // Insert 50 rows to INFO partition.
       List<Record> commit1Rows = testIcebergTable.insertRecordsForPartition(50, "INFO");
       Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
-      PerTableConfig tableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(testIcebergTable.getTableName())
-              .tableBasePath(testIcebergTable.getBasePath())
-              .tableDataPath(testIcebergTable.getDataPath())
-              .targetTableFormats(Arrays.asList(TableFormat.HUDI, TableFormat.DELTA))
+      SourceTable tableConfig =
+          SourceTable.builder()
+              .name(testIcebergTable.getTableName())
+              .basePath(testIcebergTable.getBasePath())
+              .formatName(TableFormat.ICEBERG)
               .build();
 
       // Upsert all rows inserted before, so all files are replaced.
