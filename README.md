@@ -32,7 +32,7 @@ of a few interfaces, which we believe will facilitate the expansion of supported
 future.
 
 # Building the project and running tests.
-1. Use Java11 for building the project. If you are using some other java version, you can use [jenv](https://github.com/jenv/jenv) to use multiple java versions locally.
+1. Use Java 11 for building the project. If you are using another Java version, you can use [jenv](https://github.com/jenv/jenv) to use multiple Java versions locally.
 2. Build the project using `mvn clean package`. Use `mvn clean package -DskipTests` to skip tests while building.
 3. Use `mvn clean test` or `mvn test` to run all unit tests. If you need to run only a specific test you can do this
    by something like `mvn test -Dtest=TestDeltaSync -pl xtable-core`.
@@ -119,7 +119,7 @@ of a custom hadoop config file, see [hadoop.xml](https://xtable.apache.org/docs/
 
 # Running using docker
 
-1. Build the docker image using `docker builld . -t xtable`
+1. Build the docker image using `docker build . -t xtable`
 2. Mount the config files on the container and run the container:
 
 ```
@@ -133,7 +133,7 @@ docker run \
 
 # Contributing
 ## Setup
-For setting up the repo on IntelliJ, open the project and change the java version to Java11 in File->ProjectStructure
+For setting up the repo on IntelliJ, open the project and change the Java version to Java 11 in File->ProjectStructure
 ![img.png](style/IDE.png)
 
 You have found a bug, or have a cool idea you that want to contribute to the project ? Please file a GitHub issue [here](https://github.com/apache/incubator-xtable/issues)
