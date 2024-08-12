@@ -23,7 +23,7 @@
     <groupId>org.apache.xtable</groupId>
     <artifactId>xtable</artifactId>
     <name>xtable</name>
-
+    <inceptionYear>2024</inceptionYear>
     <parent>
         <groupId>org.apache</groupId>
         <artifactId>apache</artifactId>
@@ -547,6 +547,20 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-remote-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>process-resource-bundles</id>
+                        <configuration>
+                            <properties>
+                                <projectName>Apache XTable (incubating)</projectName>
+                            </properties>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok-maven-plugin</artifactId>
