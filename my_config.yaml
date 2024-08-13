@@ -1,0 +1,8 @@
+sourceFormat: HUDI
+targetFormats:
+  - DELTA
+  - ICEBERG
+datasets:
+  -
+    tableBasePath: s3://diplakehouse/churn_test/
+    tableName: churn_datanew
