@@ -26,6 +26,7 @@
     </parent>
 
     <artifactId>xtable-hudi-support</artifactId>
+    <name>Apache XTable (incubating) Hudi Support</name>
     <packaging>pom</packaging>
 
 
