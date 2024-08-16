@@ -21,7 +21,7 @@
     <parent>
         <groupId>org.apache.xtable</groupId>
         <artifactId>xtable</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.1.0-incubating</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
