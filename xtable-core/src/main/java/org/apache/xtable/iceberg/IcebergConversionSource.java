@@ -20,23 +20,35 @@ package org.apache.xtable.iceberg;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.iceberg.*;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.hadoop.HadoopFileIO;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
 
-import org.apache.xtable.conversion.PerTableConfig;
+import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -46,15 +58,18 @@ import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.PartitionValue;
-import org.apache.xtable.model.storage.*;
+import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.extractor.ConversionSource;
 
 @Log4j2
 @Builder
 public class IcebergConversionSource implements ConversionSource<Snapshot> {
   @NonNull private final Configuration hadoopConf;
-  @NonNull private final PerTableConfig sourceTableConfig;
+  @NonNull private final SourceTable sourceTableConfig;
 
   @Getter(lazy = true, value = AccessLevel.PACKAGE)
   private final Table sourceTable = initSourceTable();
@@ -73,15 +88,15 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   private Table initSourceTable() {
     IcebergTableManager tableManager = IcebergTableManager.of(hadoopConf);
     String[] namespace = sourceTableConfig.getNamespace();
-    String tableName = sourceTableConfig.getTableName();
+    String tableName = sourceTableConfig.getName();
     TableIdentifier tableIdentifier =
         namespace == null
             ? TableIdentifier.of(tableName)
             : TableIdentifier.of(Namespace.of(namespace), tableName);
     return tableManager.getTable(
-        (IcebergCatalogConfig) sourceTableConfig.getIcebergCatalogConfig(),
+        (IcebergCatalogConfig) sourceTableConfig.getCatalogConfig(),
         tableIdentifier,
-        sourceTableConfig.getTableBasePath());
+        sourceTableConfig.getBasePath());
   }
 
   private FileIO initTableOps() {

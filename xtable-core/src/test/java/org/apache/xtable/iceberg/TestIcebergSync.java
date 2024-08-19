@@ -37,7 +37,9 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -81,7 +83,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 
 import org.apache.xtable.ITConversionController;
-import org.apache.xtable.conversion.PerTableConfigImpl;
+import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
@@ -189,11 +191,11 @@ public class TestIcebergSync {
 
   private IcebergConversionTarget getConversionTarget() {
     return new IcebergConversionTarget(
-        PerTableConfigImpl.builder()
-            .tableBasePath(basePath.toString())
-            .tableName(tableName)
-            .targetMetadataRetentionInHours(1)
-            .targetTableFormats(Collections.singletonList(TableFormat.ICEBERG))
+        TargetTable.builder()
+            .basePath(basePath.toString())
+            .name(tableName)
+            .metadataRetention(Duration.of(1, ChronoUnit.HOURS))
+            .formatName(TableFormat.ICEBERG)
             .build(),
         CONFIGURATION,
         mockSchemaExtractor,
