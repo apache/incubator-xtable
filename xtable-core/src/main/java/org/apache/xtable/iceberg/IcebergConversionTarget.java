@@ -39,7 +39,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NotFoundException;
 
-import org.apache.xtable.conversion.PerTableConfig;
+import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -70,7 +70,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   public IcebergConversionTarget() {}
 
   IcebergConversionTarget(
-      PerTableConfig perTableConfig,
+      TargetTable targetTable,
       Configuration configuration,
       IcebergSchemaExtractor schemaExtractor,
       IcebergSchemaSync schemaSync,
@@ -79,7 +79,7 @@ public class IcebergConversionTarget implements ConversionTarget {
       IcebergDataFileUpdatesSync dataFileUpdatesExtractor,
       IcebergTableManager tableManager) {
     _init(
-        perTableConfig,
+        targetTable,
         configuration,
         schemaExtractor,
         schemaSync,
@@ -90,7 +90,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   }
 
   private void _init(
-      PerTableConfig perTableConfig,
+      TargetTable targetTable,
       Configuration configuration,
       IcebergSchemaExtractor schemaExtractor,
       IcebergSchemaSync schemaSync,
@@ -103,17 +103,17 @@ public class IcebergConversionTarget implements ConversionTarget {
     this.partitionSpecExtractor = partitionSpecExtractor;
     this.partitionSpecSync = partitionSpecSync;
     this.dataFileUpdatesExtractor = dataFileUpdatesExtractor;
-    String tableName = perTableConfig.getTableName();
-    this.basePath = perTableConfig.getTableBasePath();
+    String tableName = targetTable.getName();
+    this.basePath = targetTable.getBasePath();
     this.configuration = configuration;
-    this.snapshotRetentionInHours = perTableConfig.getTargetMetadataRetentionInHours();
-    String[] namespace = perTableConfig.getNamespace();
+    this.snapshotRetentionInHours = (int) targetTable.getMetadataRetention().toHours();
+    String[] namespace = targetTable.getNamespace();
     this.tableIdentifier =
         namespace == null
             ? TableIdentifier.of(tableName)
             : TableIdentifier.of(Namespace.of(namespace), tableName);
     this.tableManager = tableManager;
-    this.catalogConfig = (IcebergCatalogConfig) perTableConfig.getIcebergCatalogConfig();
+    this.catalogConfig = (IcebergCatalogConfig) targetTable.getCatalogConfig();
 
     if (tableManager.tableExists(catalogConfig, tableIdentifier, basePath)) {
       // Load the table state if it already exists
@@ -124,9 +124,9 @@ public class IcebergConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void init(PerTableConfig perTableConfig, Configuration configuration) {
+  public void init(TargetTable targetTable, Configuration configuration) {
     _init(
-        perTableConfig,
+        targetTable,
         configuration,
         IcebergSchemaExtractor.getInstance(),
         IcebergSchemaSync.getInstance(),

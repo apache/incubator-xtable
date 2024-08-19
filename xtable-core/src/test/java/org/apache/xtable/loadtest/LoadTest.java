@@ -18,9 +18,12 @@
  
 package org.apache.xtable.loadtest;
 
+import static org.apache.xtable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
+
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
+import java.util.Properties;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -34,11 +37,13 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.config.HoodieArchivalConfig;
 
+import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestJavaHudiTable;
+import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
-import org.apache.xtable.conversion.PerTableConfig;
-import org.apache.xtable.conversion.PerTableConfigImpl;
+import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
@@ -56,7 +61,7 @@ public class LoadTest {
   @BeforeEach
   public void setup() {
     hudiConversionSourceProvider = new HudiConversionSourceProvider();
-    hudiConversionSourceProvider.init(CONFIGURATION, Collections.emptyMap());
+    hudiConversionSourceProvider.init(CONFIGURATION);
   }
 
   @Test
@@ -75,16 +80,15 @@ public class LoadTest {
                 .collect(Collectors.toList()),
             false);
       }
-      PerTableConfig perTableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(tableName)
-              .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
-              .tableBasePath(table.getBasePath())
-              .syncMode(SyncMode.FULL)
-              .build();
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              SyncMode.FULL,
+              tableName,
+              table,
+              Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA));
       ConversionController conversionController = new ConversionController(CONFIGURATION);
       long start = System.currentTimeMillis();
-      conversionController.sync(perTableConfig, hudiConversionSourceProvider);
+      conversionController.sync(conversionConfig, hudiConversionSourceProvider);
       long end = System.currentTimeMillis();
       System.out.println("Full sync took " + (end - start) + "ms");
     }
@@ -104,16 +108,15 @@ public class LoadTest {
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, "level:SIMPLE", HoodieTableType.COPY_ON_WRITE, archivalConfig)) {
       table.insertRecords(1, "partition0", false);
-      PerTableConfig perTableConfig =
-          PerTableConfigImpl.builder()
-              .tableName(tableName)
-              .targetTableFormats(Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA))
-              .tableBasePath(table.getBasePath())
-              .syncMode(SyncMode.INCREMENTAL)
-              .build();
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              SyncMode.INCREMENTAL,
+              tableName,
+              table,
+              Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA));
       // sync once to establish first commit
       ConversionController conversionController = new ConversionController(CONFIGURATION);
-      conversionController.sync(perTableConfig, hudiConversionSourceProvider);
+      conversionController.sync(conversionConfig, hudiConversionSourceProvider);
       for (int i = 0; i < numCommits; i++) {
         table.insertRecords(
             1,
@@ -124,9 +127,40 @@ public class LoadTest {
       }
 
       long start = System.currentTimeMillis();
-      conversionController.sync(perTableConfig, hudiConversionSourceProvider);
+      conversionController.sync(conversionConfig, hudiConversionSourceProvider);
       long end = System.currentTimeMillis();
       System.out.println("Incremental sync took " + (end - start) + "ms");
     }
+  }
+
+  private static ConversionConfig getTableSyncConfig(
+      SyncMode syncMode, String tableName, GenericTable table, List<String> targetTableFormats) {
+    Properties sourceProperties = new Properties();
+    sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, "level:VALUE");
+    SourceTable sourceTable =
+        SourceTable.builder()
+            .name(tableName)
+            .formatName(TableFormat.HUDI)
+            .basePath(table.getBasePath())
+            .dataPath(table.getDataPath())
+            .additionalProperties(sourceProperties)
+            .build();
+
+    List<TargetTable> targetTables =
+        targetTableFormats.stream()
+            .map(
+                formatName ->
+                    TargetTable.builder()
+                        .name(tableName)
+                        .formatName(formatName)
+                        .basePath(table.getBasePath())
+                        .build())
+            .collect(Collectors.toList());
+
+    return ConversionConfig.builder()
+        .sourceTable(sourceTable)
+        .targetTables(targetTables)
+        .syncMode(syncMode)
+        .build();
   }
 }
