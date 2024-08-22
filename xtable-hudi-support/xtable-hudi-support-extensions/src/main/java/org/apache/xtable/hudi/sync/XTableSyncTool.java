@@ -18,8 +18,11 @@
  
 package org.apache.xtable.hudi.sync;
 
+import static org.apache.xtable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
+import static org.apache.xtable.model.storage.TableFormat.HUDI;
+
+import java.time.Duration;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -34,11 +37,11 @@ import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 import org.apache.hudi.sync.common.HoodieSyncConfig;
 import org.apache.hudi.sync.common.HoodieSyncTool;
 
+import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
-import org.apache.xtable.conversion.PerTableConfig;
-import org.apache.xtable.conversion.PerTableConfigImpl;
+import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
-import org.apache.xtable.hudi.HudiSourceConfigImpl;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
@@ -55,39 +58,57 @@ public class XTableSyncTool extends HoodieSyncTool {
     super(props, hadoopConf);
     this.config = new XTableSyncConfig(props);
     this.hudiConversionSourceProvider = new HudiConversionSourceProvider();
-    hudiConversionSourceProvider.init(hadoopConf, Collections.emptyMap());
+    hudiConversionSourceProvider.init(hadoopConf);
   }
 
   @Override
   public void syncHoodieTable() {
     List<String> formatsToSync =
-        Arrays.stream(config.getString(XTableSyncConfig.ONE_TABLE_FORMATS).split(","))
+        Arrays.stream(config.getString(XTableSyncConfig.XTABLE_FORMATS).split(","))
             .map(format -> format.toUpperCase())
             .collect(Collectors.toList());
     String basePath = config.getString(HoodieSyncConfig.META_SYNC_BASE_PATH);
     String tableName = config.getString(HoodieTableConfig.HOODIE_TABLE_NAME_KEY);
-    PerTableConfig perTableConfig =
-        PerTableConfigImpl.builder()
-            .tableName(tableName)
-            .tableBasePath(basePath)
-            .targetTableFormats(formatsToSync)
-            .hudiSourceConfig(
-                HudiSourceConfigImpl.builder()
-                    .partitionFieldSpecConfig(getPartitionSpecConfig())
-                    .build())
+    Properties sourceProperties = new Properties();
+    sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, getPartitionSpecConfig());
+    SourceTable sourceTable =
+        SourceTable.builder()
+            .name(tableName)
+            .formatName(HUDI)
+            .basePath(basePath)
+            .additionalProperties(sourceProperties)
+            .build();
+    Duration metadataRetention =
+        config.contains(XTableSyncConfig.XTABLE_TARGET_METADATA_RETENTION_HOURS)
+            ? Duration.ofHours(
+                config.getInt(XTableSyncConfig.XTABLE_TARGET_METADATA_RETENTION_HOURS))
+            : null;
+    List<TargetTable> targetTables =
+        formatsToSync.stream()
+            .map(
+                format ->
+                    TargetTable.builder()
+                        .basePath(basePath)
+                        .metadataRetention(metadataRetention)
+                        .formatName(format)
+                        .name(tableName)
+                        .build())
+            .collect(Collectors.toList());
+    ConversionConfig conversionConfig =
+        ConversionConfig.builder()
+            .sourceTable(sourceTable)
+            .targetTables(targetTables)
             .syncMode(SyncMode.INCREMENTAL)
-            .targetMetadataRetentionInHours(
-                config.getInt(XTableSyncConfig.ONE_TABLE_TARGET_METADATA_RETENTION_HOURS))
             .build();
     Map<String, SyncResult> results =
-        new ConversionController(hadoopConf).sync(perTableConfig, hudiConversionSourceProvider);
+        new ConversionController(hadoopConf).sync(conversionConfig, hudiConversionSourceProvider);
     String failingFormats =
         results.entrySet().stream()
             .filter(
                 entry ->
                     entry.getValue().getStatus().getStatusCode()
                         != SyncResult.SyncStatusCode.SUCCESS)
-            .map(entry -> entry.getKey().toString())
+            .map(Map.Entry::getKey)
             .collect(Collectors.joining(","));
     if (!failingFormats.isEmpty()) {
       throw new HoodieException("Unable to sync to InternalTable for formats: " + failingFormats);

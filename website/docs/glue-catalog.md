@@ -19,7 +19,7 @@ This document walks through the steps to register an Apache XTable™ (Incubatin
    also set up access credentials by following the steps
    [here](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html)
 3. Clone the Apache XTable™ (Incubating) [repository](https://github.com/apache/incubator-xtable) and create the
-   `xtable-utilities-0.1.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
+   `xtable-utilities-0.2.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 
 ## Steps
 ### Running sync
@@ -84,7 +84,7 @@ Replace with appropriate values for `sourceFormat`, `tableBasePath` and `tableNa
 From your terminal under the cloned xtable directory, run the sync process using the below command.
 
  ```shell md title="shell"
- java -jar xtable-utilities/target/xtable-utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
+ java -jar xtable-utilities/target/xtable-utilities-0.2.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
  ```
 
 :::tip Note:
