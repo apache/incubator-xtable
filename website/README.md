@@ -105,6 +105,10 @@ npm run serve
 1. Create a `.mdx` file similar to `website/releases/release-0.1.0-incubating.mdx`
 2. Update the [downloads](releases/downloads.mdx) file to include the new release similar to the existing releases
 
+## Changes to the website homepage
+1. The homepage is a `.html` file located at `website/static/index.html`
+2. If you're making changes to the page, test it locally using `python 3 -m http.server` and visiting http://localhost:8000/ before pushing the changes.
+
 
 ## Maintainers
 [Apache XTable™ (Incubating) Community](https://incubator.apache.org/projects/xtable.html)
