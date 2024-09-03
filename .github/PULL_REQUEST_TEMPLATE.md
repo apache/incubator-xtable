@@ -28,5 +28,5 @@ This change added tests and can be verified as follows:
 *(example:)*
 
 - *Added integration tests for end-to-end.*
-- *Added HudiSchemaEvolutionTest to verify the change.*
+- *Added TestConversionController to verify the change.*
 - *Manually verified the change by running a job locally.*

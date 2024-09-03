@@ -23,6 +23,18 @@ const config = {
     locales: ['en'],
   },
 
+  // add new pages here
+    plugins: [
+      [
+        '@docusaurus/plugin-content-docs',
+        {
+          id: 'releases',
+          path: 'releases',
+          routeBasePath: 'releases',
+        },
+      ],
+    ],
+
   presets: [
     [
       'classic',
@@ -65,6 +77,7 @@ const config = {
             position: 'right',
           },
           {to: 'blog', label: 'Blogs', position: 'left'},
+          {to: 'releases/downloads', label: 'Downloads', position: 'left'},
         ],
       },
       prism: {

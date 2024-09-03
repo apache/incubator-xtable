@@ -569,7 +569,7 @@ public class ITHudiConversionSourceSource {
             .build();
     HudiSourcePartitionSpecExtractor partitionSpecExtractor =
         new ConfigurationBasedPartitionSpecExtractor(
-            HudiSourceConfigImpl.builder().partitionFieldSpecConfig(xTablePartitionConfig).build());
+            HudiSourceConfig.fromPartitionFieldSpecConfig(xTablePartitionConfig));
     return new HudiConversionSource(hoodieTableMetaClient, partitionSpecExtractor);
   }
 

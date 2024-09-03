@@ -23,15 +23,15 @@
     <groupId>org.apache.xtable</groupId>
     <artifactId>xtable</artifactId>
     <name>xtable</name>
+    <inceptionYear>2024</inceptionYear>
+    <version>0.2.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
 
     <parent>
         <groupId>org.apache</groupId>
         <artifactId>apache</artifactId>
-        <version>31</version>
+        <version>33</version>
     </parent>
-
-    <version>0.1.0-SNAPSHOT</version>
-    <packaging>pom</packaging>
 
     <modules>
         <module>xtable-api</module>
@@ -41,13 +41,19 @@
     </modules>
 
     <properties>
-        <java.version>8</java.version>
+        <maven.compiler.target>8</maven.compiler.target>
         <avro.version>1.11.3</avro.version>
         <log4j.version>2.22.0</log4j.version>
         <junit.version>5.9.0</junit.version>
         <lombok.version>1.18.30</lombok.version>
+        <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
         <hadoop.version>3.3.6</hadoop.version>
         <hudi.version>0.14.0</hudi.version>
+        <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
+        <maven-javadoc-plugin.version>3.8.0</maven-javadoc-plugin.version>
+        <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
+        <maven-deploy-plugin.version>3.1.1</maven-deploy-plugin.version>
+        <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
         <parquet.version>1.12.2</parquet.version>
         <scala.version>2.12.15</scala.version>
         <scala.version.prefix>2.12</scala.version.prefix>
@@ -57,10 +63,13 @@
         <delta.version>2.4.0</delta.version>
         <jackson.version>2.17.1</jackson.version>
         <spotless.version>2.43.0</spotless.version>
+        <apache.rat.version>0.16.1</apache.rat.version>
         <google.java.format.version>1.8</google.java.format.version>
         <delta.standalone.version>0.5.0</delta.standalone.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <target.dir.pattern>**/target/**</target.dir.pattern>
+        <delombok.output.dir>${project.build.directory}/delombok</delombok.output.dir>
+
         <!-- Test properties -->
         <skipTests>false</skipTests>
         <skipUTs>${skipTests}</skipUTs>
@@ -540,6 +549,39 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-remote-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>process-resource-bundles</id>
+                        <configuration>
+                            <properties>
+                                <projectName>Apache XTable (incubating)</projectName>
+                            </properties>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok-maven-plugin</artifactId>
+                <version>${lombok-maven-plugin.version}</version>
+                <configuration>
+                    <sourceDirectory>${project.basedir}/src/main/java</sourceDirectory>
+                    <addOutputDirectory>false</addOutputDirectory>
+                    <outputDirectory>${delombok.output.dir}</outputDirectory>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>delombok</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
                 <executions>
                     <execution>
@@ -563,9 +605,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <release>${java.version}</release>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -595,6 +634,90 @@
                     <trimStackTrace>false</trimStackTrace>
                     <argLine>-Xmx1024m</argLine>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>${maven-release-plugin.version}</version>
+                <configuration>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                    <useReleaseProfile>false</useReleaseProfile>
+                    <releaseProfiles>release</releaseProfiles>
+                    <goals>deploy</goals>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <version>${maven-deploy-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>default-deploy</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>deploy</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <version>${apache.rat.version}</version>
+                <configuration>
+                    <consoleOutput>true</consoleOutput>
+                    <licenses>
+                        <license>
+                            <family>AL</family>
+                            <text>Licensed under the Apache License, Version 2.0 (the
+                                "License")</text>
+                            <text>Licensed to the Apache Software Foundation (ASF) under
+                                one
+                                or more contributor license agreements; and to You under
+                                the
+                                Apache License, Version 2.0.</text>
+                            <text>http://www.apache.org/licenses/LICENSE-2.0</text>
+                            <text>https://www.apache.org/licenses/LICENSE-2.0</text>
+                            <text>http://www.apache.org/licenses/LICENSE-2.0.html</text>
+                            <text>https://www.apache.org/licenses/LICENSE-2.0.html</text>
+                            <text>http://www.apache.org/licenses/LICENSE-2.0.txt</text>
+                            <text>https://www.apache.org/licenses/LICENSE-2.0.txt</text>
+                        </license>
+                    </licenses>
+                    <families>
+                        <family>
+                            <id>AL</id>
+                            <name>Apache License Version 2.0</name>
+                        </family>
+                    </families>
+                    <excludes>
+                        <exclude>NOTICE</exclude>
+                        <exclude>DISCLAIMER*</exclude>
+                        <exclude>**/.*</exclude>
+                        <exclude>**/*.json</exclude>
+                        <exclude>**/*.log</exclude>
+                        <exclude>**/*.png</exclude>
+                        <exclude>**/*.jpg</exclude>
+                        <exclude>**/*.ipynb</exclude>
+                        <exclude>**/demo/data/**</exclude>
+                        <exclude>**/website/**</exclude>
+                        <exclude>**/*NOTICE*</exclude>
+                        <exclude>**/*LICENSE*</exclude>
+                        <exclude>**/dependency-reduced-pom.xml</exclude>
+                        <exclude>**/target/**</exclude>
+                        <exclude>**/generated-sources/**</exclude>
+                        <exclude>.github/**</exclude>
+                        <exclude>**/*.iml</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
@@ -710,4 +833,78 @@
         </plugins>
     </build>
 
+    <repositories>
+        <repository>
+            <id>Maven Central</id>
+            <name>Maven Repository</name>
+            <url>https://repo.maven.apache.org/maven2</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <profiles>
+        <profile>
+            <id>release</id>
+            <activation>
+                <property>
+                    <name>deployArtifacts</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>${maven-source-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>${maven-javadoc-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <doclint>none</doclint>
+                            <source>1.8</source>
+                            <sourcepath>${delombok.output.dir}</sourcepath>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>${maven-gpg-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

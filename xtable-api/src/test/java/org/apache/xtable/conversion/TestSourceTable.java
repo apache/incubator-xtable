@@ -18,10 +18,30 @@
  
 package org.apache.xtable.conversion;
 
-import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public interface HudiSourceConfig {
-  public String getPartitionSpecExtractorClass();
+import org.junit.jupiter.api.Test;
 
-  SourcePartitionSpecExtractor loadSourcePartitionSpecExtractor();
+class TestSourceTable {
+  @Test
+  void dataPathDefaultsToMetadataPath() {
+    String basePath = "file:///path/to/table";
+    SourceTable sourceTable =
+        SourceTable.builder().name("name").formatName("hudi").basePath(basePath).build();
+    assertEquals(basePath, sourceTable.getDataPath());
+  }
+
+  @Test
+  void dataPathIsSanitized() {
+    String basePath = "file:///path/to/table";
+    String dataPath = "file:///path/to/table//data";
+    SourceTable sourceTable =
+        SourceTable.builder()
+            .name("name")
+            .formatName("hudi")
+            .basePath(basePath)
+            .dataPath(dataPath)
+            .build();
+    assertEquals("file:///path/to/table/data", sourceTable.getDataPath());
+  }
 }

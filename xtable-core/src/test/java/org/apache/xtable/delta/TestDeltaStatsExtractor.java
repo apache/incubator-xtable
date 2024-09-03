@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -181,6 +182,15 @@ public class TestDeltaStatsExtractor {
                 .range(Range.vector(10, 20))
                 .build());
     assertEquals(expected, actual);
+  }
+
+  @Test
+  void convertNullStatsToInternalRepresentation() {
+    List<InternalField> fields = getSchemaFields();
+    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, null, null, null);
+    DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
+    List<ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
+    assertEquals(Collections.emptyList(), actual);
   }
 
   private List<InternalField> getSchemaFields() {

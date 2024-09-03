@@ -26,7 +26,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -48,8 +47,7 @@ import org.apache.iceberg.io.DataWriter;
 import org.apache.iceberg.parquet.Parquet;
 import org.apache.iceberg.types.Types;
 
-import org.apache.xtable.conversion.PerTableConfig;
-import org.apache.xtable.conversion.PerTableConfigImpl;
+import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
@@ -77,7 +75,7 @@ class TestIcebergConversionTargetSource {
     hadoopConf.set("fs.defaultFS", "file:///");
 
     sourceProvider = new IcebergConversionSourceProvider();
-    sourceProvider.init(hadoopConf, null);
+    sourceProvider.init(hadoopConf);
 
     tableManager = IcebergTableManager.of(hadoopConf);
 
@@ -91,7 +89,7 @@ class TestIcebergConversionTargetSource {
   @Test
   void getTableTest(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestTableWithData(workingDir.toString());
-    PerTableConfig sourceTableConfig = getPerTableConfig(catalogSales);
+    SourceTable sourceTableConfig = getPerTableConfig(catalogSales);
 
     IcebergConversionSource conversionSource =
         sourceProvider.getConversionSourceInstance(sourceTableConfig);
@@ -123,7 +121,7 @@ class TestIcebergConversionTargetSource {
     Table catalogSales = createTestTableWithData(workingDir.toString());
     Snapshot iceCurrentSnapshot = catalogSales.currentSnapshot();
 
-    PerTableConfig sourceTableConfig = getPerTableConfig(catalogSales);
+    SourceTable sourceTableConfig = getPerTableConfig(catalogSales);
 
     IcebergDataFileExtractor spyDataFileExtractor = spy(IcebergDataFileExtractor.builder().build());
     IcebergPartitionValueConverter spyPartitionConverter =
@@ -384,7 +382,7 @@ class TestIcebergConversionTargetSource {
   }
 
   private IcebergConversionSource getIcebergConversionSource(Table catalogSales) {
-    PerTableConfig tableConfig = getPerTableConfig(catalogSales);
+    SourceTable tableConfig = getPerTableConfig(catalogSales);
 
     return IcebergConversionSource.builder()
         .hadoopConf(hadoopConf)
@@ -392,11 +390,11 @@ class TestIcebergConversionTargetSource {
         .build();
   }
 
-  private static PerTableConfig getPerTableConfig(Table catalogSales) {
-    return PerTableConfigImpl.builder()
-        .tableName(catalogSales.name())
-        .tableBasePath(catalogSales.location())
-        .targetTableFormats(Collections.singletonList(TableFormat.DELTA))
+  private static SourceTable getPerTableConfig(Table catalogSales) {
+    return SourceTable.builder()
+        .name(catalogSales.name())
+        .basePath(catalogSales.location())
+        .formatName(TableFormat.ICEBERG)
         .build();
   }
 

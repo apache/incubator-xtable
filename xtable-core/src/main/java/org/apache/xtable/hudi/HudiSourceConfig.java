@@ -22,29 +22,41 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Properties;
 
-import lombok.Builder;
 import lombok.Value;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.xtable.conversion.HudiSourceConfig;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.reflection.ReflectionUtils;
 
 /** Configuration of Hudi source format for the sync process. */
 @Value
-public class HudiSourceConfigImpl implements HudiSourceConfig {
+public class HudiSourceConfig {
+  public static final String PARTITION_SPEC_EXTRACTOR_CLASS =
+      "xtable.hudi.source.partition_spec_extractor_class";
+  public static final String PARTITION_FIELD_SPEC_CONFIG =
+      "xtable.hudi.source.partition_field_spec_config";
+
   String partitionSpecExtractorClass;
   List<PartitionFieldSpec> partitionFieldSpecs;
 
-  @Builder
-  public HudiSourceConfigImpl(String partitionSpecExtractorClass, String partitionFieldSpecConfig) {
-    this.partitionSpecExtractorClass =
-        partitionSpecExtractorClass == null
-            ? ConfigurationBasedPartitionSpecExtractor.class.getName()
-            : partitionSpecExtractorClass;
-    this.partitionFieldSpecs = parsePartitionFieldSpecs(partitionFieldSpecConfig);
+  public static HudiSourceConfig fromPartitionFieldSpecConfig(String partitionFieldSpecConfig) {
+    return new HudiSourceConfig(
+        ConfigurationBasedPartitionSpecExtractor.class.getName(),
+        parsePartitionFieldSpecs(partitionFieldSpecConfig));
+  }
+
+  public static HudiSourceConfig fromProperties(Properties properties) {
+    String partitionSpecExtractorClass =
+        properties.getProperty(
+            PARTITION_SPEC_EXTRACTOR_CLASS,
+            ConfigurationBasedPartitionSpecExtractor.class.getName());
+    String partitionFieldSpecString = properties.getProperty(PARTITION_FIELD_SPEC_CONFIG);
+    List<PartitionFieldSpec> partitionFieldSpecs =
+        parsePartitionFieldSpecs(partitionFieldSpecString);
+    return new HudiSourceConfig(partitionSpecExtractorClass, partitionFieldSpecs);
   }
 
   @Value
