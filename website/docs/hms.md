@@ -87,8 +87,9 @@ datasets:
 :::
 
 From your terminal under the cloned Apache XTable™ (Incubating) directory, run the sync process using the below command.
-```shell md title="shell"
-java -jar xtable-utilities/target/xtable-utilities-0.2.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
+```shell in JDBC md title="shell in JDBC"
+java -jar xtable-utilities/target/xtable-utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
+
 ```
 
 :::tip Note:
@@ -114,6 +115,17 @@ A Hudi table can directly be synced to the Hive Metastore using Hive Sync Tool
 and subsequently be queried by different query engines. For more information on the Hive Sync Tool, check 
 [Hudi Hive Metastore](https://hudi.apache.org/docs/syncing_metastore) docs.
 
+```shell md title="shell with HMS example"
+cd $HUDI_HOME/hudi-sync/hudi-hive-sync ; \
+./run_sync_tool.sh  \
+--metastore-uris '<thrift_url>' \
+--partitioned-by <partition_field> \
+--base-path '<path/to/s3/synced/hudi/table>' \
+--database <database_name> \
+--table <tableName> \
+--sync-mode hms 
+```
+
 ```shell md title="shell"
 cd $HUDI_HOME/hudi-sync/hudi-hive-sync
 
@@ -122,7 +134,7 @@ cd $HUDI_HOME/hudi-sync/hudi-hive-sync
 --user <username> \
 --pass <password> \
 --partitioned-by <partition_field> \
---base-path <'/path/to/synced/hudi/table'> \
+--base-path '<path/to/synced/hudi/table>' \
 --database <database_name> \
 --table <tableName>
 ```
@@ -217,6 +229,14 @@ using query engines like `Presto` and/or `Trino`. Check out the guides for query
 ```sql md title="sql"
 SELECT * FROM iceberg_db.<table_name>;
 ```
+
+```sql md title="sql for Iceberg, Hudi and Delta Lake in S3"
+select * from hudi.hudi_db.people;
+select * from delta.delta_db.people;
+select * from iceberg.iceberg_db.people;
+```
+
+In the example demo docker image, you can find the catalog configurations.
 
 </TabItem>
 </Tabs>
