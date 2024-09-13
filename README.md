@@ -18,7 +18,7 @@
 
 # Apache XTable™ (Incubating)
 
-[![Build Status](https://dev.azure.com/apache-xtable-ci-org/apache-xtable-ci/_apis/build/status%2Fapachextable-ci.xtable-mirror?branchName=main)](https://dev.azure.com/apache-xtable-ci-org/apache-xtable-ci/_build/latest?definitionId=2&branchName=main)
+[![Maven CI Build](https://github.com/apache/incubator-xtable/actions/workflows/mvn-ci-build.yml/badge.svg)](https://github.com/apache/incubator-xtable/actions/workflows/mvn-ci-build.yml)
 
 Apache XTable™ (Incubating) is a cross-table converter for table formats that facilitates omni-directional interoperability across
 data processing systems and query engines. Currently, Apache XTable™ supports widely adopted open-source table formats such as
@@ -32,10 +32,10 @@ of a few interfaces, which we believe will facilitate the expansion of supported
 future.
 
 # Building the project and running tests.
-1. Use Java11 for building the project. If you are using some other java version, you can use [jenv](https://github.com/jenv/jenv) to use multiple java versions locally.
+1. Use Java 11 for building the project. If you are using another Java version, you can use [jenv](https://github.com/jenv/jenv) to use multiple Java versions locally.
 2. Build the project using `mvn clean package`. Use `mvn clean package -DskipTests` to skip tests while building.
 3. Use `mvn clean test` or `mvn test` to run all unit tests. If you need to run only a specific test you can do this
-   by something like `mvn test -Dtest=TestDeltaSync -pl core`.
+   by something like `mvn test -Dtest=TestDeltaSync -pl xtable-core`.
 4. Similarly, use `mvn clean verify` or `mvn verify` to run integration tests.
 
 # Style guide
@@ -110,16 +110,30 @@ catalogOptions: # all other options are passed through in a map
   key1: value1
   key2: value2
 ```
-5. run with `java -jar xtable-utilities/target/xtable-utilities-0.1.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--convertersConfig converters.yaml] [--icebergCatalogConfig catalog.yaml]`
+5. run with `java -jar xtable-utilities/target/xtable-utilities-0.2.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--convertersConfig converters.yaml] [--icebergCatalogConfig catalog.yaml]`
 The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Sample hadoop configurations for configuring the converters 
 can be found in the [xtable-hadoop-defaults.xml](https://github.com/apache/incubator-xtable/blob/main/utilities/src/main/resources/xtable-hadoop-defaults.xml) file.
 The custom hadoop configurations can be passed in with the `--hadoopConfig [custom-hadoop-config-file]` option.
 The config in custom hadoop config file will override the default hadoop configurations. For an example
 of a custom hadoop config file, see [hadoop.xml](https://xtable.apache.org/docs/fabric#step-2-translate-source-table-to-delta-lake-format-using-apache-xtable-incubating).
 
+# Running using docker
+
+1. Build the docker image using `docker build . -t xtable`
+2. Mount the config files on the container and run the container:
+
+```
+docker run \
+  -v ./xtable/config.yml:/xtable/config.yml \
+  -v ./xtable/core-site.xml:/xtable/core-site.xml \
+  -v ./xtable/catalog.yml:/xtable/catalog.yml \
+  xtable \
+  --datasetConfig /xtable/config.yml --hadoopConfig /xtable/core-site.xml --icebergCatalogConfig xtable/catalog.yml
+```
+
 # Contributing
 ## Setup
-For setting up the repo on IntelliJ, open the project and change the java version to Java11 in File->ProjectStructure
+For setting up the repo on IntelliJ, open the project and change the Java version to Java 11 in File->ProjectStructure
 ![img.png](style/IDE.png)
 
 You have found a bug, or have a cool idea you that want to contribute to the project ? Please file a GitHub issue [here](https://github.com/apache/incubator-xtable/issues)

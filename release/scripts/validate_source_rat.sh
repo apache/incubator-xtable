@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -14,24 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-steps:
-  - task: Cache@2
-    inputs:
-      key: 'maven | "$(Agent.OS)" | **/pom.xml'
-      restoreKeys: |
-        maven | "$(Agent.OS)"
-        maven
-      path: $(MAVEN_CACHE_FOLDER)
-    displayName: Cache Maven local repo
-  - task: Maven@4
-    inputs:
-      mavenPomFile: 'pom.xml'
-      options: $(MAVEN_OPTS)
-      mavenOptions: '-Xmx4096m'
-      javaHomeOption: 'path'
-      jdkDirectory: '/usr/lib/jvm/java-11-openjdk-amd64'
-      jdkVersionOption: '1.11'
-      jdkArchitectureOption: 'x64'
-      publishJUnitResults: true
-      testResultsFiles: '**/surefire-reports/TEST-*.xml'
-      goals: 'install'
+echo "Running RAT Check"
+(bash -c "mvn apache-rat:check -DdeployArtifacts=true") || (echo -e "\t\t Rat Check Failed. [ERROR]\n\t\t Please run with --verbose to get details\n" && exit 1)
+echo -e "\t\tRAT Check Passed [OK]\n"
