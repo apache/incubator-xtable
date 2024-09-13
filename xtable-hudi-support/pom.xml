@@ -26,8 +26,8 @@
     </parent>
 
     <artifactId>xtable-hudi-support</artifactId>
+    <name>XTable Project Hudi Support Parent POM</name>
     <packaging>pom</packaging>
-
 
     <modules>
         <module>xtable-hudi-support-utils</module>
