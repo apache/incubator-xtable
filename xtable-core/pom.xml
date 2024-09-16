@@ -47,7 +47,7 @@
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.module</groupId>
-            <artifactId>jackson-module-scala_2.12</artifactId>
+            <artifactId>jackson-module-scala_${scala.version.prefix}</artifactId>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
