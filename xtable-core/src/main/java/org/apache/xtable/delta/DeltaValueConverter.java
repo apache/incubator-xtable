@@ -44,6 +44,12 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 public class DeltaValueConverter {
   private static final String DATE_FORMAT_STR = "yyyy-MM-dd HH:mm:ss";
   private static final TimeZone TIME_ZONE = TimeZone.getTimeZone("UTC");
+  protected static final String NAN_VALUE = "NaN";
+  protected static final String INFINITY_VALUE = "Infinity";
+  protected static final String POSITIVE_INFINITY_VALUE = "+Infinity";
+  protected static final String POSITIVE_INF_VALUE = "+INF";
+  protected static final String NEGATIVE_INFINITY_VALUE = "-Infinity";
+  protected static final String NEGATIVE_INF_VALUE = "-INF";
 
   static DateFormat getDateFormat(String dataFormatString) {
     DateFormat dateFormat = new SimpleDateFormat(dataFormatString);
@@ -194,9 +200,35 @@ public class DeltaValueConverter {
 
   private static Object castObjectToInternalType(Object value, InternalType valueType) {
     switch (valueType) {
+      case DOUBLE:
+        if (value instanceof String)
+          switch (value.toString()) {
+            case NAN_VALUE:
+              return Double.NaN;
+            case POSITIVE_INF_VALUE:
+            case POSITIVE_INFINITY_VALUE:
+            case INFINITY_VALUE:
+              return Double.POSITIVE_INFINITY;
+            case NEGATIVE_INF_VALUE:
+            case NEGATIVE_INFINITY_VALUE:
+              return Double.NEGATIVE_INFINITY;
+          }
+        break;
       case FLOAT:
         if (value instanceof Double) {
           return ((Double) value).floatValue();
+        } else if (value instanceof String) {
+          switch (value.toString()) {
+            case NAN_VALUE:
+              return Float.NaN;
+            case POSITIVE_INF_VALUE:
+            case POSITIVE_INFINITY_VALUE:
+            case INFINITY_VALUE:
+              return Float.POSITIVE_INFINITY;
+            case NEGATIVE_INF_VALUE:
+            case NEGATIVE_INFINITY_VALUE:
+              return Float.NEGATIVE_INFINITY;
+          }
         }
         break;
       case DECIMAL:
