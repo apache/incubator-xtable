@@ -199,3 +199,31 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+========================================================================
+Apache 2.0 licenses
+========================================================================
+
+The following components are provided under the Apache License. See project link for details.
+The text of each license is the standard Apache 2.0 license.
+
+ -------------------------------------------------------------------------------
+
+ This product includes code from Apache Hudi
+
+ * org.apache.xtable.hudi.HudiInstantUtils adapted from org.apache.hudi.common.table.timeline.HoodieActiveTimeline
+
+ Copyright 2001-2024 The Apache Software Foundation
+
+ Home page: https://hudi.apache.org/
+ License: http://www.apache.org/licenses/LICENSE-2.0
+
+ -------------------------------------------------------------------------------
+
+ This product includes code from Apache Spark
+
+ * org.apache.xtable.hudi.HudiSchemaExtractor adapted from org.apache.spark.sql.avro.SchemaConverters
+
+Copyright: 2014 and onwards The Apache Software Foundation
+Home page: http://spark.apache.org/
+License: http://www.apache.org/licenses/LICENSE-2.0
