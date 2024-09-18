@@ -82,6 +82,15 @@ public class TestDeltaValueConverter {
     assertThrows(ParseException.class, () -> strictDateFormat.parse(wrongDateTime));
   }
 
+  @ParameterizedTest
+  @MethodSource("nonNumericValuesForColStats")
+  void formattedDifferentNonNumericValuesFromDeltaColumnStat(
+      Object fieldValue, InternalSchema fieldSchema, Object expectedDeltaValue) {
+    Object internalRepresentation =
+        DeltaValueConverter.convertFromDeltaColumnStatValue(fieldValue, fieldSchema);
+    assertEquals(internalRepresentation, expectedDeltaValue);
+  }
+
   private static Stream<Arguments> valuesWithSchemaProviderForColStats() {
     return Stream.of(
         Arguments.of(
@@ -186,5 +195,23 @@ public class TestDeltaValueConverter {
             PartitionTransformType.YEAR,
             "yyyy",
             "2022"));
+  }
+
+  private static Stream<Arguments> nonNumericValuesForColStats() {
+    InternalSchema doubleSchema =
+        InternalSchema.builder().name("double").dataType(InternalType.DOUBLE).build();
+    InternalSchema floatSchema =
+        InternalSchema.builder().name("float").dataType(InternalType.FLOAT).build();
+    return Stream.of(
+        Arguments.of("NaN", doubleSchema, Double.NaN),
+        Arguments.of("Infinity", doubleSchema, Double.POSITIVE_INFINITY),
+        Arguments.of("-Infinity", doubleSchema, Double.NEGATIVE_INFINITY),
+        Arguments.of("+Infinity", doubleSchema, Double.POSITIVE_INFINITY),
+        Arguments.of("NaN", floatSchema, Float.NaN),
+        Arguments.of("Infinity", floatSchema, Float.POSITIVE_INFINITY),
+        Arguments.of("-Infinity", floatSchema, Float.NEGATIVE_INFINITY),
+        Arguments.of("+Infinity", floatSchema, Float.POSITIVE_INFINITY),
+        Arguments.of(Double.NaN, doubleSchema, Double.NaN),
+        Arguments.of(Double.POSITIVE_INFINITY, doubleSchema, Double.POSITIVE_INFINITY));
   }
 }
