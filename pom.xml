@@ -82,6 +82,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <target.dir.pattern>**/target/**</target.dir.pattern>
         <delombok.output.dir>${project.build.directory}/delombok</delombok.output.dir>
+        <apache-jar-resource-bundle.version>1.7</apache-jar-resource-bundle.version>
+        <apache-incubator-disclaimer-resource-bundle.version>1.7</apache-incubator-disclaimer-resource-bundle.version>
 
         <!-- Test properties -->
         <skipTests>false</skipTests>
@@ -571,8 +573,8 @@
                                 <projectName>Apache XTable (incubating)</projectName>
                             </properties>
                             <resourceBundles>
-                                <resourceBundle>org.apache:apache-jar-resource-bundle:1.4</resourceBundle>
-                                <resourceBundle>org.apache.apache.resources:apache-incubator-disclaimer-resource-bundle:1.2-SNAPSHOT</resourceBundle>
+                                <resourceBundle>org.apache.apache.resources:apache-jar-resource-bundle:${apache-jar-resource-bundle.version}</resourceBundle>
+                                <resourceBundle>org.apache.apache.resources:apache-incubator-disclaimer-resource-bundle:${apache-incubator-disclaimer-resource-bundle.version}</resourceBundle>
                             </resourceBundles>
                         </configuration>
                     </execution>
