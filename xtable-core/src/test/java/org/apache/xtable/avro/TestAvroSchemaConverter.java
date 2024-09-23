@@ -844,4 +844,49 @@ public class TestAvroSchemaConverter {
             .build();
     assertEquals(internalSchema, AvroSchemaConverter.getInstance().toInternalSchema(schemaWithIds));
   }
+
+  @Test
+  public void testIcebergToAvroUUIDSupport() {
+    String schemaName = "testRecord";
+    String doc = "What's up doc";
+    Schema avroRepresentation =
+        new Schema.Parser()
+            .parse(
+                "{\"type\":\"record\",\"name\":\"testRecord\",\"doc\":\"What's up doc\",\"fields\":["
+                    + "{\"name\":\"requiredUUID\",\"type\":{\"type\":\"fixed\",\"name\":\"required_uuid\",\"size\":16,\"xtableLogicalType\":\"uuid\"}},"
+                    + "{\"name\":\"optionalUUID\",\"type\":[\"null\",{\"type\":\"fixed\",\"name\":\"optional_uuid\",\"size\":16,\"xtableLogicalType\":\"uuid\"}],\"default\":null}"
+                    + "]}");
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name(schemaName)
+            .comment(doc)
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("requiredUUID")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("required_uuid")
+                                .dataType(InternalType.UUID)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("optionalUUID")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("optional_uuid")
+                                .dataType(InternalType.UUID)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+    assertEquals(
+        avroRepresentation, AvroSchemaConverter.getInstance().fromInternalSchema(internalSchema));
+    assertEquals(
+        internalSchema, AvroSchemaConverter.getInstance().toInternalSchema(avroRepresentation));
+  }
 }

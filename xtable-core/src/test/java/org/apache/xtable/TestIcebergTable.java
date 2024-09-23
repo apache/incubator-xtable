@@ -88,7 +88,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
         hadoopConf,
         DEFAULT_RECORD_KEY_FIELD,
         Collections.singletonList(partitionField),
-        false);
+        TestIcebergDataHelper.SchemaType.COMMON);
   }
 
   public static TestIcebergTable forSchemaWithAdditionalColumnsAndPartitioning(
@@ -99,7 +99,18 @@ public class TestIcebergTable implements GenericTable<Record, String> {
         hadoopConf,
         DEFAULT_RECORD_KEY_FIELD,
         Collections.singletonList(partitionField),
-        true);
+        TestIcebergDataHelper.SchemaType.COMMON_WITH_ADDITIONAL_COLUMNS);
+  }
+
+  public static TestIcebergTable forSchemaWithUUIDColumns(
+      String tableName, String partitionField, Path tempDir, Configuration hadoopConf) {
+    return new TestIcebergTable(
+        tableName,
+        tempDir,
+        hadoopConf,
+        DEFAULT_RECORD_KEY_FIELD,
+        Collections.singletonList(partitionField),
+        TestIcebergDataHelper.SchemaType.COMMON_WITH_UUID_COLUMN);
   }
 
   public TestIcebergTable(
@@ -108,12 +119,12 @@ public class TestIcebergTable implements GenericTable<Record, String> {
       Configuration hadoopConf,
       String recordKeyField,
       List<String> partitionFields,
-      boolean includeAdditionalColumns) {
+      TestIcebergDataHelper.SchemaType schemaType) {
     this.tableName = tableName;
     this.basePath = tempDir.toUri().toString();
     this.icebergDataHelper =
         TestIcebergDataHelper.createIcebergDataHelper(
-            recordKeyField, filterNullFields(partitionFields), includeAdditionalColumns);
+            recordKeyField, filterNullFields(partitionFields), schemaType);
     this.schema = icebergDataHelper.getTableSchema();
 
     PartitionSpec partitionSpec = icebergDataHelper.getPartitionSpec();

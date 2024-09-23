@@ -78,6 +78,8 @@ public class InternalSchema {
     MILLIS
   }
 
+  public static final String XTABLE_LOGICAL_TYPE = "xtableLogicalType";
+
   /**
    * Performs a level-order traversal of the schema and returns a list of all fields. Use this
    * method to get a list that includes nested fields. Use {@link InternalSchema#getFields()} when

@@ -25,6 +25,7 @@ import java.util.Map;
 
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
+import org.apache.spark.sql.types.MetadataBuilder;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -889,6 +890,48 @@ public class TestDeltaSchemaExtractor {
                         .name("birthDate")
                         .build()))
             .build();
+    Assertions.assertEquals(
+        internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+  }
+
+  @Test
+  public void testIcebergToDeltaUUIDSupport() {
+    Metadata metadata =
+        new MetadataBuilder().putString(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid").build();
+    StructType structRepresentation =
+        new StructType()
+            .add("requiredUUID", DataTypes.BinaryType, false, metadata)
+            .add("optionalUUID", DataTypes.BinaryType, true, metadata);
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("requiredUUID")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("binary")
+                                .dataType(InternalType.UUID)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("optionalUUID")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("binary")
+                                .dataType(InternalType.UUID)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+    Assertions.assertEquals(
+        structRepresentation,
+        DeltaSchemaExtractor.getInstance().fromInternalSchema(internalSchema));
     Assertions.assertEquals(
         internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }

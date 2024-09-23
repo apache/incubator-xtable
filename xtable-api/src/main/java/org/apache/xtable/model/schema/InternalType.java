@@ -38,6 +38,7 @@ public enum InternalType {
   LIST,
   MAP,
   UNION,
+  UUID,
   FIXED,
   STRING,
   BYTES,
