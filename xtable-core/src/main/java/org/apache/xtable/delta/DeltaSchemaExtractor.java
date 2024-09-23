@@ -33,6 +33,7 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.DecimalType;
 import org.apache.spark.sql.types.MapType;
 import org.apache.spark.sql.types.Metadata;
+import org.apache.spark.sql.types.MetadataBuilder;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
@@ -73,7 +74,7 @@ public class DeltaSchemaExtractor {
                         field.getName(),
                         convertFieldType(field),
                         field.getSchema().isNullable(),
-                        Metadata.empty()))
+                        getMetaData(field.getSchema().getDataType())))
             .toArray(StructField[]::new);
     return new StructType(fields);
   }
@@ -90,6 +91,7 @@ public class DeltaSchemaExtractor {
         return DataTypes.LongType;
       case BYTES:
       case FIXED:
+      case UUID:
         return DataTypes.BinaryType;
       case BOOLEAN:
         return DataTypes.BooleanType;
@@ -142,12 +144,24 @@ public class DeltaSchemaExtractor {
     }
   }
 
+  private Metadata getMetaData(InternalType type) {
+    if (type == InternalType.UUID) {
+      return new MetadataBuilder().putString(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid").build();
+    } else {
+      return Metadata.empty();
+    }
+  }
+
   public InternalSchema toInternalSchema(StructType structType) {
-    return toInternalSchema(structType, null, false, null);
+    return toInternalSchema(structType, null, false, null, null);
   }
 
   private InternalSchema toInternalSchema(
-      DataType dataType, String parentPath, boolean nullable, String comment) {
+      DataType dataType,
+      String parentPath,
+      boolean nullable,
+      String comment,
+      Metadata originalMetadata) {
     Map<InternalSchema.MetadataKey, Object> metadata = null;
     List<InternalField> fields = null;
     InternalType type;
@@ -172,7 +186,12 @@ public class DeltaSchemaExtractor {
         type = InternalType.DOUBLE;
         break;
       case "binary":
-        type = InternalType.BYTES;
+        if (originalMetadata.contains(InternalSchema.XTABLE_LOGICAL_TYPE)
+            && "uuid".equals(originalMetadata.getString(InternalSchema.XTABLE_LOGICAL_TYPE))) {
+          type = InternalType.UUID;
+        } else {
+          type = InternalType.BYTES;
+        }
         break;
       case "long":
         type = InternalType.LONG;
@@ -210,7 +229,8 @@ public class DeltaSchemaExtractor {
                               field.dataType(),
                               SchemaUtils.getFullyQualifiedPath(parentPath, field.name()),
                               field.nullable(),
-                              fieldComment);
+                              fieldComment,
+                              field.metadata());
                       return InternalField.builder()
                           .name(field.name())
                           .fieldId(fieldId)
@@ -238,6 +258,7 @@ public class DeltaSchemaExtractor {
                 SchemaUtils.getFullyQualifiedPath(
                     parentPath, InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME),
                 arrayType.containsNull(),
+                null,
                 null);
         InternalField elementField =
             InternalField.builder()
@@ -256,6 +277,7 @@ public class DeltaSchemaExtractor {
                 SchemaUtils.getFullyQualifiedPath(
                     parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
                 false,
+                null,
                 null);
         InternalField keyField =
             InternalField.builder()
@@ -269,6 +291,7 @@ public class DeltaSchemaExtractor {
                 SchemaUtils.getFullyQualifiedPath(
                     parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
                 mapType.valueContainsNull(),
+                null,
                 null);
         InternalField valueField =
             InternalField.builder()

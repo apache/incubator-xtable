@@ -372,7 +372,7 @@ public class TestIcebergSchemaExtractor {
                         .schema(
                             InternalSchema.builder()
                                 .name("uuid")
-                                .dataType(InternalType.FIXED)
+                                .dataType(InternalType.UUID)
                                 .isNullable(false)
                                 .metadata(fixedMetadata)
                                 .build())
@@ -383,7 +383,7 @@ public class TestIcebergSchemaExtractor {
                         .schema(
                             InternalSchema.builder()
                                 .name("uuid")
-                                .dataType(InternalType.FIXED)
+                                .dataType(InternalType.UUID)
                                 .isNullable(true)
                                 .metadata(fixedMetadata)
                                 .build())
@@ -391,6 +391,7 @@ public class TestIcebergSchemaExtractor {
                         .build()))
             .build();
     assertEquals(expectedSchema, (SCHEMA_EXTRACTOR.fromIceberg(inputSchema)));
+    assertTrue(inputSchema.sameSchema(SCHEMA_EXTRACTOR.toIceberg(expectedSchema)));
   }
 
   @Test

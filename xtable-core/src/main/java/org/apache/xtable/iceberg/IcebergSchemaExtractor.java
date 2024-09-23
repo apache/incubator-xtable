@@ -199,6 +199,8 @@ public class IcebergSchemaExtractor {
         return Types.DecimalType.of(precision, scale);
       case RECORD:
         return Types.StructType.of(convertFields(field.getSchema(), fieldIdTracker));
+      case UUID:
+        return Types.UUIDType.get();
       case MAP:
         InternalField key =
             field.getSchema().getFields().stream()
@@ -305,7 +307,7 @@ public class IcebergSchemaExtractor {
                 InternalSchema.MetadataKey.FIXED_BYTES_SIZE, fixedType.length());
         break;
       case UUID:
-        type = InternalType.FIXED;
+        type = InternalType.UUID;
         metadata = Collections.singletonMap(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 16);
         break;
       case STRUCT:

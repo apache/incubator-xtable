@@ -159,6 +159,7 @@ public class HudiPartitionValuesExtractor {
         break;
       case FIXED:
       case BYTES:
+      case UUID:
         parsedValue = valueAsString.getBytes(StandardCharsets.UTF_8);
         break;
       case BOOLEAN:

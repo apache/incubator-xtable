@@ -132,8 +132,13 @@ public class AvroSchemaConverter {
           break;
         }
         if (schema.getType() == Schema.Type.FIXED) {
-          metadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, schema.getFixedSize());
-          newDataType = InternalType.FIXED;
+          String xtableLogicalType = schema.getProp(InternalSchema.XTABLE_LOGICAL_TYPE);
+          if ("uuid".equals(xtableLogicalType)) {
+            newDataType = InternalType.UUID;
+          } else {
+            metadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, schema.getFixedSize());
+            newDataType = InternalType.FIXED;
+          }
         } else {
           newDataType = InternalType.BYTES;
         }
@@ -435,6 +440,11 @@ public class AvroSchemaConverter {
             Schema.createFixed(
                 internalSchema.getName(), internalSchema.getComment(), null, fixedSize),
             internalSchema);
+      case UUID:
+        Schema uuidSchema =
+            Schema.createFixed(internalSchema.getName(), internalSchema.getComment(), null, 16);
+        uuidSchema.addProp(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid");
+        return finalizeSchema(uuidSchema, internalSchema);
       default:
         throw new UnsupportedSchemaTypeException(
             "Encountered unhandled type during InternalSchema to Avro conversion: "

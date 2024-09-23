@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.net.URI;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -38,12 +39,14 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -82,6 +85,10 @@ import org.apache.iceberg.hadoop.HadoopTables;
 
 import org.apache.spark.sql.delta.DeltaLog;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.ImmutableList;
 
 import org.apache.xtable.conversion.ConversionConfig;
@@ -100,6 +107,7 @@ public class ITConversionController {
   @TempDir public static Path tempDir;
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;
@@ -137,6 +145,19 @@ public class ITConversionController {
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceTableFormat, syncMode, isPartitioned));
         }
+      }
+    }
+    return arguments.stream();
+  }
+
+  private static Stream<Arguments> generateTestParametersForUUID() {
+    List<Arguments> arguments = new ArrayList<>();
+    for (SyncMode syncMode : SyncMode.values()) {
+      for (boolean isPartitioned : new boolean[] {true, false}) {
+        // TODO: Add Hudi UUID support later (https://github.com/apache/incubator-xtable/issues/543)
+        // Current spark parquet reader can not handle fix-size byte array with UUID logic type
+        List<String> targetTableFormats = Arrays.asList(DELTA);
+        arguments.add(Arguments.of(ICEBERG, targetTableFormats, syncMode, isPartitioned));
       }
     }
     return arguments.stream();
@@ -258,6 +279,54 @@ public class ITConversionController {
         conversionController.sync(conversionConfig, conversionSourceProvider);
         checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 300);
       }
+    }
+  }
+
+  // The test content is the simplified version of testVariousOperations
+  // The difference is that the data source from Iceberg contains UUID columns
+  @ParameterizedTest
+  @MethodSource("generateTestParametersForUUID")
+  public void testVariousOperationsWithUUID(
+      String sourceTableFormat,
+      List<String> targetTableFormats,
+      SyncMode syncMode,
+      boolean isPartitioned) {
+    String tableName = getTableName();
+    ConversionController conversionController = new ConversionController(jsc.hadoopConfiguration());
+    String partitionConfig = null;
+    if (isPartitioned) {
+      partitionConfig = "level:VALUE";
+    }
+    ConversionSourceProvider<?> conversionSourceProvider =
+        getConversionSourceProvider(sourceTableFormat);
+    List<?> insertRecords;
+    try (GenericTable table =
+        GenericTable.getInstanceWithUUIDColumns(
+            tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
+      insertRecords = table.insertRows(100);
+
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              sourceTableFormat,
+              syncMode,
+              tableName,
+              table,
+              targetTableFormats,
+              partitionConfig,
+              null);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 100);
+
+      // Upsert some records and sync again
+      table.upsertRows(insertRecords.subList(0, 20));
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 100);
+
+      table.deleteRows(insertRecords.subList(30, 50));
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 80);
+      checkDatasetEquivalenceWithFilter(
+          sourceTableFormat, table, targetTableFormats, table.getFilterQuery());
     }
   }
 
@@ -797,13 +866,84 @@ public class ITConversionController {
             // if count is not known ahead of time, ensure datasets are non-empty
             assertFalse(dataset1Rows.isEmpty());
           }
+
+          if (containsUUIDFields(dataset1Rows) && containsUUIDFields(dataset2Rows)) {
+            compareDatasetWithUUID(dataset1Rows, dataset2Rows);
+          } else {
+            assertEquals(
+                dataset1Rows,
+                dataset2Rows,
+                String.format(
+                    "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
+                    sourceFormat, format));
+          }
+        });
+  }
+
+  /**
+   * Compares two datasets where dataset1Rows is for Iceberg and dataset2Rows is for other formats
+   * (such as Delta or Hudi). - For the "uuid_field", if present, the UUID from dataset1 (Iceberg)
+   * is compared with the Base64-encoded UUID from dataset2 (other formats), after decoding. - For
+   * all other fields, the values are compared directly. - If neither row contains the "uuid_field",
+   * the rows are compared as plain JSON strings.
+   *
+   * @param dataset1Rows List of JSON rows representing the dataset in Iceberg format (UUID is
+   *     stored as a string).
+   * @param dataset2Rows List of JSON rows representing the dataset in other formats (UUID might be
+   *     Base64-encoded).
+   */
+  private void compareDatasetWithUUID(List<String> dataset1Rows, List<String> dataset2Rows) {
+    for (int i = 0; i < dataset1Rows.size(); i++) {
+      String row1 = dataset1Rows.get(i);
+      String row2 = dataset2Rows.get(i);
+      if (row1.contains("uuid_field") && row2.contains("uuid_field")) {
+        try {
+          JsonNode node1 = OBJECT_MAPPER.readTree(row1);
+          JsonNode node2 = OBJECT_MAPPER.readTree(row2);
+
+          // check uuid field
+          String uuidStr1 = node1.get("uuid_field").asText();
+          byte[] bytes = Base64.getDecoder().decode(node2.get("uuid_field").asText());
+          ByteBuffer bb = ByteBuffer.wrap(bytes);
+          UUID uuid2 = new UUID(bb.getLong(), bb.getLong());
+          String uuidStr2 = uuid2.toString();
           assertEquals(
-              dataset1Rows,
-              dataset2Rows,
+              uuidStr1,
+              uuidStr2,
               String.format(
                   "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
-                  sourceFormat, format));
-        });
+                  uuidStr1, uuidStr2));
+
+          // check other fields
+          ((ObjectNode) node1).remove("uuid_field");
+          ((ObjectNode) node2).remove("uuid_field");
+          assertEquals(
+              node1.toString(),
+              node2.toString(),
+              String.format(
+                  "Datasets are not equivalent when comparing other fields. Source: %s, Target: %s",
+                  node1, node2));
+        } catch (JsonProcessingException e) {
+          throw new RuntimeException(e);
+        }
+      } else {
+        assertEquals(
+            row1,
+            row2,
+            String.format(
+                "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
+                row1, row2));
+      }
+    }
+  }
+
+  private boolean containsUUIDFields(List<String> rows) {
+    for (String row : rows) {
+      if (row.contains("\"uuid_field\"")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static Stream<Arguments> addBasicPartitionCases(Stream<Arguments> arguments) {

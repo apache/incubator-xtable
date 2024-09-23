@@ -127,6 +127,22 @@ public interface GenericTable<T, Q> extends AutoCloseable {
     }
   }
 
+  static GenericTable getInstanceWithUUIDColumns(
+      String tableName,
+      Path tempDir,
+      SparkSession sparkSession,
+      JavaSparkContext jsc,
+      String sourceFormat,
+      boolean isPartitioned) {
+    switch (sourceFormat) {
+      case ICEBERG:
+        return TestIcebergTable.forSchemaWithUUIDColumns(
+            tableName, isPartitioned ? "level" : null, tempDir, jsc.hadoopConfiguration());
+      default:
+        throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
+    }
+  }
+
   static String getTableName() {
     return "test_table_" + UUID.randomUUID().toString().replaceAll("-", "_");
   }

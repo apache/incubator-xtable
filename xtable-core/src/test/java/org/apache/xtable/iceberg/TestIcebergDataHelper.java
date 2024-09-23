@@ -104,12 +104,16 @@ public class TestIcebergDataHelper {
       Arrays.asList(
           NestedField.optional(31, "additional_column1", Types.StringType.get()),
           NestedField.optional(32, "additional_column2", Types.LongType.get()));
+  private static final List<Types.NestedField> UUID_FIELDS =
+      Arrays.asList(NestedField.optional(33, "uuid_field", Types.UUIDType.get()));
   private static final Schema BASE_SCHEMA = new Schema(COMMON_FIELDS);
   private static final Schema SCHEMA_WITH_ADDITIONAL_COLUMNS =
       new Schema(
           Stream.concat(COMMON_FIELDS.stream(), ADDITIONAL_FIELDS.stream())
               .collect(Collectors.toList()));
-
+  private static final Schema SCHEMA_WITH_UUID_COLUMN =
+      new Schema(
+          Stream.concat(COMMON_FIELDS.stream(), UUID_FIELDS.stream()).collect(Collectors.toList()));
   private static final OffsetDateTime EPOCH = Instant.ofEpochSecond(0).atOffset(ZoneOffset.UTC);
   private static final LocalDate EPOCH_DAY = EPOCH.toLocalDate();
 
@@ -117,9 +121,15 @@ public class TestIcebergDataHelper {
   String recordKeyField;
   List<String> partitionFieldNames;
 
+  public static enum SchemaType {
+    COMMON,
+    COMMON_WITH_ADDITIONAL_COLUMNS,
+    COMMON_WITH_UUID_COLUMN,
+  }
+
   public static TestIcebergDataHelper createIcebergDataHelper(
-      String recordKeyField, List<String> partitionFields, boolean includeAdditionalColumns) {
-    Schema tableSchema = getSchema(includeAdditionalColumns);
+      String recordKeyField, List<String> partitionFields, SchemaType schemaType) {
+    Schema tableSchema = getSchema(schemaType);
     return TestIcebergDataHelper.builder()
         .tableSchema(tableSchema)
         .recordKeyField(recordKeyField)
@@ -127,8 +137,17 @@ public class TestIcebergDataHelper {
         .build();
   }
 
-  private static Schema getSchema(boolean includeAdditionalColumns) {
-    return includeAdditionalColumns ? SCHEMA_WITH_ADDITIONAL_COLUMNS : BASE_SCHEMA;
+  private static Schema getSchema(SchemaType schemaType) {
+    switch (schemaType) {
+      case COMMON:
+        return BASE_SCHEMA;
+      case COMMON_WITH_ADDITIONAL_COLUMNS:
+        return SCHEMA_WITH_ADDITIONAL_COLUMNS;
+      case COMMON_WITH_UUID_COLUMN:
+        return SCHEMA_WITH_UUID_COLUMN;
+      default:
+        throw new IllegalArgumentException("Unknown schema type: " + schemaType);
+    }
   }
 
   public List<Record> generateInsertRecords(int numRecords) {
@@ -299,7 +318,11 @@ public class TestIcebergDataHelper {
       case STRUCT:
         return generateInsertRecord(timeLowerBound, timeUpperBound, fieldType.asStructType());
       case UUID:
-        return UUID.randomUUID().toString();
+        UUID uuid = UUID.randomUUID();
+        ByteBuffer byteBuffer = ByteBuffer.wrap(new byte[16]);
+        byteBuffer.putLong(uuid.getMostSignificantBits());
+        byteBuffer.putLong(uuid.getLeastSignificantBits());
+        return byteBuffer.array();
       case LIST:
         Types.ListType listType = (Types.ListType) fieldType;
         int listSize = RANDOM.nextInt(5) + 1;
