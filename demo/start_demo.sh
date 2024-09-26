@@ -25,7 +25,7 @@ mvn install -am -pl xtable-core -DskipTests -T 2
 mkdir -p demo/jars
 cp xtable-hudi-support/xtable-hudi-support-utils/target/xtable-hudi-support-utils-0.2.0-SNAPSHOT.jar demo/jars
 cp xtable-api/target/xtable-api-0.2.0-SNAPSHOT.jar demo/jars
-cp xtable-core/target/xtable-core-0.2.0-SNAPSHOT.jar demo/jars
+cp xtable-core/target/xtable-core_2.12-0.2.0-SNAPSHOT.jar demo/jars
 
 cd demo
 docker-compose up

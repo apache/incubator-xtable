@@ -48,12 +48,13 @@
 
     <modules>
         <module>xtable-api</module>
+        <module>xtable-hudi-support</module>
         <module>xtable-core</module>
         <module>xtable-utilities</module>
-        <module>xtable-hudi-support</module>
     </modules>
 
     <properties>
+        <project.version>0.2.0-SNAPSHOT</project.version>
         <maven.compiler.target>8</maven.compiler.target>
         <avro.version>1.11.3</avro.version>
         <log4j.version>2.22.0</log4j.version>
@@ -68,8 +69,10 @@
         <maven-deploy-plugin.version>3.1.1</maven-deploy-plugin.version>
         <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
         <parquet.version>1.12.2</parquet.version>
-        <scala.version>2.12.15</scala.version>
-        <scala.version.prefix>2.12</scala.version.prefix>
+        <scala12.version>2.12.20</scala12.version>
+        <scala13.version>2.13.14</scala13.version>
+        <scala.version>${scala12.version}</scala.version>
+        <scala.binary.version>2.12</scala.binary.version>
         <spark.version>3.4.2</spark.version>
         <spark.version.prefix>3.4</spark.version.prefix>
         <iceberg.version>1.4.2</iceberg.version>
@@ -84,7 +87,8 @@
         <delombok.output.dir>${project.build.directory}/delombok</delombok.output.dir>
         <apache-jar-resource-bundle.version>1.7</apache-jar-resource-bundle.version>
         <apache-incubator-disclaimer-resource-bundle.version>1.7</apache-incubator-disclaimer-resource-bundle.version>
-
+        <scala-collection-compat.version>2.8.1</scala-collection-compat.version>
+        
         <!-- Test properties -->
         <skipTests>false</skipTests>
         <skipUTs>${skipTests}</skipUTs>
@@ -126,8 +130,8 @@
             </dependency>
             <dependency>
                 <groupId>org.scala-lang.modules</groupId>
-                <artifactId>scala-collection-compat_${scala.version.prefix}</artifactId>
-                <version>2.8.1</version>
+                <artifactId>scala-collection-compat_${scala.binary.version}</artifactId>
+                <version>${scala-collection-compat.version}</version>
             </dependency>
 
             <!-- Avro -->
@@ -230,7 +234,7 @@
             </dependency>
             <dependency>
                 <groupId>org.apache.hudi</groupId>
-                <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.version.prefix}</artifactId>
+                <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.binary.version}</artifactId>
                 <version>${hudi.version}</version>
                 <scope>test</scope>
             </dependency>
@@ -266,7 +270,7 @@
             </dependency>
             <dependency>
                 <groupId>org.apache.iceberg</groupId>
-                <artifactId>iceberg-spark-runtime-${spark.version.prefix}_${scala.version.prefix}</artifactId>
+                <artifactId>iceberg-spark-runtime-${spark.version.prefix}_${scala.binary.version}</artifactId>
                 <version>${iceberg.version}</version>
                 <scope>test</scope>
             </dependency>
@@ -274,12 +278,12 @@
             <!-- Delta -->
             <dependency>
                 <groupId>io.delta</groupId>
-                <artifactId>delta-core_${scala.version.prefix}</artifactId>
+                <artifactId>delta-core_${scala.binary.version}</artifactId>
                 <version>${delta.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.delta</groupId>
-                <artifactId>delta-standalone_${scala.version.prefix}</artifactId>
+                <artifactId>delta-standalone_${scala.binary.version}</artifactId>
                 <version>${delta.standalone.version}</version>
                 <scope>test</scope>
             </dependency>
@@ -287,7 +291,7 @@
             <!-- Spark -->
             <dependency>
                 <groupId>org.apache.spark</groupId>
-                <artifactId>spark-core_${scala.version.prefix}</artifactId>
+                <artifactId>spark-core_${scala.binary.version}</artifactId>
                 <version>${spark.version}</version>
                 <exclusions>
                     <exclusion>
@@ -307,7 +311,7 @@
             </dependency>
             <dependency>
                 <groupId>org.apache.spark</groupId>
-                <artifactId>spark-sql_${scala.version.prefix}</artifactId>
+                <artifactId>spark-sql_${scala.binary.version}</artifactId>
                 <version>${spark.version}</version>
                 <scope>provided</scope>
             </dependency>
@@ -465,7 +469,7 @@
             </dependency>
             <dependency>
                 <groupId>com.fasterxml.jackson.module</groupId>
-                <artifactId>jackson-module-scala_${scala.version.prefix}</artifactId>
+                <artifactId>jackson-module-scala_${scala.binary.version}</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
 
@@ -868,6 +872,53 @@
     </repositories>
 
     <profiles>
+        <!--Scala 2.12 Profile -->
+        <profile>
+            <id>scala-2.12</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <scala.version>${scala12.version}</scala.version>
+                <scala.binary.version>2.12</scala.binary.version>
+            </properties>
+            <build>
+                <pluginManagement/>
+            </build>
+        </profile>
+
+        <!--Scala 2.13 Profile -->
+        <!-- Once hudi supports scala 2.13 then enable following profile -->
+        <profile>
+            <id>scala-2.13</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <properties>
+                <scala.version>${scala13.version}</scala.version>
+                <scala.binary.version>2.13</scala.binary.version>
+            </properties>
+            <build>
+                <pluginManagement>
+                    <plugins>
+                        <plugin>
+                            <groupId>net.alchim31.maven</groupId>
+                            <artifactId>scala-maven-plugin</artifactId>
+                            <configuration>
+                                <args>
+                                    <arg>-unchecked</arg>
+                                    <arg>-deprecation</arg>
+                                    <arg>-feature</arg>
+                                    <arg>-explaintypes</arg>
+                                    <arg>-target:jvm-1.8</arg>
+                                </args>
+                                <compilerPlugins/>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </pluginManagement>
+            </build>
+        </profile>
         <profile>
             <id>release</id>
             <activation>

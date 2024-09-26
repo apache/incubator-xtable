@@ -38,6 +38,10 @@ future.
    by something like `mvn test -Dtest=TestDeltaSync -pl xtable-core`.
 4. Similarly, use `mvn clean verify` or `mvn verify` to run integration tests.
 
+**Note:** When using Maven version 3.9 or above, Maven automatically caches the build. To ignore build caching, you can 
+add the `-Dmaven.build.cache.enabled=false` parameter. For example, `mvn clean package -DskipTests -Dmaven.build.cache.enabled=false`
+
+
 # Style guide
 1. We use [Maven Spotless plugin](https://github.com/diffplug/spotless/tree/main/plugin-maven) and 
    [Google java format](https://github.com/google/google-java-format) for code style.
@@ -46,7 +50,7 @@ future.
 
 # Running the bundled jar
 1. Get a pre-built bundled jar or create the jar with `mvn install -DskipTests`
-2. create a yaml file that follows the format below:
+2. Create a yaml file that follows the format below:
 ```yaml
 sourceFormat: HUDI
 targetFormats:
@@ -110,7 +114,7 @@ catalogOptions: # all other options are passed through in a map
   key1: value1
   key2: value2
 ```
-5. run with `java -jar xtable-utilities/target/xtable-utilities-0.2.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--convertersConfig converters.yaml] [--icebergCatalogConfig catalog.yaml]`
+5. Run with `java -jar xtable-utilities/target/xtable-utilities_2.12-0.2.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml [--hadoopConfig hdfs-site.xml] [--convertersConfig converters.yaml] [--icebergCatalogConfig catalog.yaml]`
 The bundled jar includes hadoop dependencies for AWS, Azure, and GCP. Sample hadoop configurations for configuring the converters 
 can be found in the [xtable-hadoop-defaults.xml](https://github.com/apache/incubator-xtable/blob/main/utilities/src/main/resources/xtable-hadoop-defaults.xml) file.
 The custom hadoop configurations can be passed in with the `--hadoopConfig [custom-hadoop-config-file]` option.

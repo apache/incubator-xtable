@@ -17,7 +17,7 @@ This document walks through the steps to register an Apache XTable™ (Incubatin
 3. Create a Unity Catalog metastore in Databricks as outlined [here](https://docs.gcp.databricks.com/data-governance/unity-catalog/create-metastore.html#create-a-unity-catalog-metastore).
 4. Create an external location in Databricks as outlined [here](https://docs.databricks.com/en/sql/language-manual/sql-ref-syntax-ddl-create-location.html).
 5. Clone the Apache XTable™ (Incubating) [repository](https://github.com/apache/incubator-xtable) and create the
-   `xtable-utilities-0.2.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
+   `xtable-utilities_2.12-0.2.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 
 ## Pre-requisites (for open-source Unity Catalog)
 1. Source table(s) (Hudi/Iceberg) already written to external storage locations like S3/GCS/ADLS or local.
@@ -48,7 +48,7 @@ datasets:
 From your terminal under the cloned Apache XTable™ (Incubating) directory, run the sync process using the below command.
 
 ```shell md title="shell"
-java -jar xtable-utilities/target/xtable-utilities-0.2.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
+java -jar xtable-utilities/target/xtable-utilities_2.12-0.2.0-SNAPSHOT-bundled.jar --datasetConfig my_config.yaml
 ```
 
 :::tip Note: 

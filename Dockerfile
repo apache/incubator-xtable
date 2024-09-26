@@ -23,7 +23,7 @@ WORKDIR /build
 COPY ./ ./
 RUN --mount=type=cache,target=/root/.m2 \
     MAVEN_OPTS=-Dorg.slf4j.simpleLogger.defaultLogLevel=warn mvn  -B  package -DskipTests 
-RUN mv xtable-utilities/target/xtable-utilities-$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)-bundled.jar target/app.jar
+RUN mv xtable-utilities/target/xtable-utilities_2.12-$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)-bundled.jar target/app.jar
 
 FROM eclipse-temurin:17-jre-jammy AS final
 
