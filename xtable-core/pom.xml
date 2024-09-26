@@ -25,17 +25,19 @@
         <version>0.2.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>xtable-core</artifactId>
+    <artifactId>xtable-core_${scala.binary.version}</artifactId>
     <name>XTable Project Core</name>
 
     <dependencies>
         <dependency>
             <groupId>org.apache.xtable</groupId>
             <artifactId>xtable-api</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.xtable</groupId>
             <artifactId>xtable-hudi-support-utils</artifactId>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
@@ -47,7 +49,7 @@
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.module</groupId>
-            <artifactId>jackson-module-scala_${scala.version.prefix}</artifactId>
+            <artifactId>jackson-module-scala_${scala.binary.version}</artifactId>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
@@ -69,7 +71,7 @@
         <!-- Hudi dependencies -->
         <dependency>
             <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.version.prefix}</artifactId>
+            <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.binary.version}</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -94,11 +96,11 @@
         <!-- Delta dependencies -->
         <dependency>
             <groupId>io.delta</groupId>
-            <artifactId>delta-core_${scala.version.prefix}</artifactId>
+            <artifactId>delta-core_${scala.binary.version}</artifactId>
         </dependency>
         <dependency>
             <groupId>io.delta</groupId>
-            <artifactId>delta-standalone_${scala.version.prefix}</artifactId>
+            <artifactId>delta-standalone_${scala.binary.version}</artifactId>
         </dependency>
 
         <!-- Hadoop dependencies -->
@@ -120,16 +122,16 @@
         <!-- Spark/Iceberg/Hudi dependencies for reading/writing tables -->
         <dependency>
             <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-spark-runtime-${spark.version.prefix}_${scala.version.prefix}</artifactId>
+            <artifactId>iceberg-spark-runtime-${spark.version.prefix}_${scala.binary.version}</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.version.prefix}</artifactId>
+            <artifactId>spark-core_${scala.binary.version}</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-sql_${scala.version.prefix}</artifactId>
+            <artifactId>spark-sql_${scala.binary.version}</artifactId>
         </dependency>
 
         <!-- Mockito -->
