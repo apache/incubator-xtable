@@ -152,7 +152,7 @@ EMR and/or Redshift query engines.
 
 
 #### Method 2: Using XTable APIs to sync with AWS Glue Data Catalog directly
-This applies for iceberg target format only.
+This applies for Iceberg target format only.
 
 **Pre-requisites:**
 * Download iceberg-aws-X.X.X.jar from the [Maven repository](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws)
@@ -161,7 +161,7 @@ This applies for iceberg target format only.
 Create a `glue-sync-config.yaml` file:
 
 ```yaml md title="yaml"
-sourceFormat: HUDI
+sourceFormat: HUDI|DELTA # choose only one
 targetFormats:
    - ICEBERG
 datasets:
@@ -176,7 +176,7 @@ Create a `glue-sync-catalog.yaml` file:
 
 ```yaml md title="yaml"
 catalogImpl: org.apache.iceberg.aws.glue.GlueCatalog
-catalogName: xtable
+catalogName: <catalog_name>
 catalogOptions:
    io-impl: org.apache.iceberg.aws.s3.S3FileIO
    warehouse: s3://path/to/source
@@ -188,7 +188,7 @@ Sample command to sync the table with Glue Data Catalog:
 java -cp /path/to/xtable-utilities-0.2.0-SNAPSHOT-bundled.jar:/path/to/iceberg-aws-1.3.1.jar:/path/to/bundle-2.23.9.jar org.apache.xtable.utilities.RunSync  --datasetConfig glue-sync-config.yaml --icebergCatalogConfig glue-sync-catalog.yaml
 ```
 ### Validating the results
-After the crawler runs successfully, you can inspect the catalogued tables in Glue
+Once the sync is complete (or in case of Glue Crawler option, once the crawler succeeds) you can inspect the catalogued tables in Glue
 and also query the table in Amazon Athena like below:
 
 <Tabs
