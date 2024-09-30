@@ -8,11 +8,6 @@ title: "Snowflake"
 Currently, Snowflake supports [Iceberg tables through External Tables](https://www.snowflake.com/blog/expanding-the-data-cloud-with-apache-iceberg/)
 and also [Native Iceberg Tables](https://www.snowflake.com/blog/iceberg-tables-powering-open-standards-with-snowflake-innovations/).
 
-:::note NOTE:
-Iceberg on Snowflake is currently supported in
-[public preview](https://www.snowflake.com/blog/build-open-data-lakehouse-iceberg-tables/)
-:::
-
 ## Steps:
 These are high level steps to help you integrate Apache XTable™ (Incubating) synced Iceberg tables on Snowflake. For more additional information
 refer to the [Getting started with Iceberg tables](https://docs.snowflake.com/LIMITEDACCESS/iceberg-2023/tables-iceberg-getting-started).
@@ -96,7 +91,7 @@ catalogOptions:
   jdbc.password: <snowflake-password>
 ```
 
-Sample command to sync the table with Glue Data Catalog:
+Sample command to sync the table with Snowflake:
 ```shell md title="shell"
 java -cp /path/to/iceberg-spark-runtime-3.2_2.12-1.4.2.jar:/path/to/xtable-utilities-0.2.0-SNAPSHOT-bundled.jar:/path/to/snowflake-jdbc-3.13.28.jar:/path/to/iceberg-aws-1.4.2.jar:/Users/sagarl/Downloads/bundle-2.23.9.jar org.apache.xtable.utilities.RunSync  --datasetConfig snowflake-sync-config.yaml --icebergCatalogConfig snowflake-sync-catalog.yaml
 ```
