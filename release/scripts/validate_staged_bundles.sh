@@ -26,7 +26,7 @@ declare -a extensions=("-javadoc.jar" "-javadoc.jar.asc" "-javadoc.jar.md5" "-ja
 "-sources.jar.asc" "-sources.jar.md5" "-sources.jar.sha1" ".jar" ".jar.asc" ".jar.md5" ".jar.sha1" ".pom" ".pom.asc"
 ".pom.md5" ".pom.sha1")
 
-declare -a bundles=("xtable-api" "xtable-core" "xtable-hudi-support-extensions" "xtable-hudi-support-utils" "xtable-utilities" )
+declare -a bundles=("xtable-api" "xtable-core_2.12" "xtable-hudi-support-extensions_2.12" "xtable-hudi-support-utils")
 
 NOW=$(date +%s)
 TMP_DIR_FOR_BUNDLES=/tmp/${NOW}

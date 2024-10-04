@@ -63,7 +63,7 @@ rsync -a \
   --exclude ".git" --exclude ".gitignore" --exclude ".gitattributes" --exclude ".travis.yml" \
   --exclude ".github" --exclude "target" --exclude ".idea" --exclude "*.iml" --exclude ".DS_Store" \
   --exclude "build-target" --exclude ".rubydeps" --exclude "rfc" --exclude "docker/images" \
-  --exclude "assets" --exclude "demo" --exclude "website" --exclude "style/IDE.png" . apache-xtable-$RELEASE_VERSION
+  --exclude "assets" --exclude "demo" --exclude "website" --exclude "style/IDE.png" --exclude "xtable-utilities" . apache-xtable-$RELEASE_VERSION
 
 tar czf ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz apache-xtable-$RELEASE_VERSION
 gpg --armor --local-user E391B3E8179C4FD9BB8BF72002AB8E945EFD1E91 --detach-sig ${RELEASE_DIR}/apache-xtable-${RELEASE_VERSION}.src.tgz
