@@ -69,6 +69,7 @@
         <maven-deploy-plugin.version>3.1.1</maven-deploy-plugin.version>
         <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
         <parquet.version>1.12.2</parquet.version>
+        <protobuf.version>3.25.5</protobuf.version>
         <scala12.version>2.12.20</scala12.version>
         <scala13.version>2.13.14</scala13.version>
         <scala.version>${scala12.version}</scala.version>
@@ -386,12 +387,12 @@
             <dependency>
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java</artifactId>
-                <version>3.21.9</version>
+                <version>${protobuf.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java-util</artifactId>
-                <version>3.21.9</version>
+                <version>${protobuf.version}</version>
             </dependency>
 
             <!-- Guava -->
