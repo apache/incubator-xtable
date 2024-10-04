@@ -71,20 +71,24 @@
         <dependency>
             <groupId>com.esotericsoftware</groupId>
             <artifactId>kryo</artifactId>
+            <scope>test</scope>
         </dependency>
 
         <!-- Junit -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-params</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>
