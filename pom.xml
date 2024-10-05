@@ -637,6 +637,7 @@
                     <skip>${skipUTs}</skip>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <trimStackTrace>false</trimStackTrace>
+                    <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
                 </configuration>
             </plugin>
             <plugin>
@@ -657,6 +658,7 @@
                     <forkCount>6</forkCount>
                     <trimStackTrace>false</trimStackTrace>
                     <argLine>-Xmx1024m</argLine>
+                    <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
                 </configuration>
             </plugin>
             <plugin>
