@@ -1,0 +1,30 @@
+version: V1
+
+onehouseClientConfig:
+    # can be obtained from the Onehouse console
+    projectId: c3eb3868-6979-41cd-9018-952d29a43337
+    apiKey: asU2Pb3XaNAc4JwkkWpNUQ== 
+    apiSecret: IBaLVxloIzU36heBooOBsPp5MhD6ijjyIk88zvH2ggs=
+    userId: x2gblCN8xNSurvCsqDaGJ84zy913 
+
+fileSystemConfiguration:
+    # Provide either s3Config or gcsConfig
+    s3Config:
+        region: us-east-1
+        accessKey: admin
+        accessSecret: password
+        endpoint: http://minio:9000
+
+metadataExtractorConfig:
+    jobRunMode: ONCE
+    pathExclusionPatterns: 
+    parserConfig:
+        - lake: delta
+          databases:
+            - name: people
+              basePaths: ["s3://warehouse/people"]
+        - lake: iceberg
+          databases:
+            - name: taxis
+              basePaths: ["s3://warehouse/iceberg_db/taxis"]
+        # Add additional lakes and databases as needed

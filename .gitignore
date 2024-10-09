@@ -41,3 +41,11 @@ target/
 *.crc
 demo/jars/*
 demo/notebook/.ipynb_checkpoints/*
+
+# Demo-s3 files
+*.crc
+demo-s3/jars/*.jar
+demo-s3/notebook/.ipynb_checkpoints/*
+demo-s3/spark/cache/**
+demo-s3/spark/cache/**/*
+demo-s3/spark/jars/*
