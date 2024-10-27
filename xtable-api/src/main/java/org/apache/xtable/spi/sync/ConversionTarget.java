@@ -90,4 +90,14 @@ public interface ConversionTarget {
 
   /** Initializes the client with provided configuration */
   void init(TargetTable targetTable, Configuration configuration);
+
+  /**
+   * Retrieves the commit identifier from the target table that corresponds to a given source table
+   * commit identifier
+   *
+   * @param sourceIdentifier the unique identifier of the source table commit
+   * @return an {@link Optional} containing the target commit identifier if a corresponding commit
+   *     exists, or an empty {@link Optional} if no match is found
+   */
+  Optional<String> getTargetCommitIdentifier(String sourceIdentifier);
 }
