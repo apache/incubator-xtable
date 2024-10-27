@@ -20,12 +20,14 @@ package org.apache.xtable.spi.extractor;
 
 import java.io.Closeable;
 import java.time.Instant;
+import java.util.Optional;
 
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 
 /**
  * A client that provides the major functionality for extracting the state at a given instant in a
@@ -64,6 +66,15 @@ public interface ConversionSource<COMMIT> extends Closeable {
    * @return {@link CommitsBacklog} to process.
    */
   CommitsBacklog<COMMIT> getCommitsBacklog(InstantsForIncrementalSync instantsForIncrementalSync);
+
+  /**
+   * Extracts the rollback snapshot as {@link InternalSnapshot} from the changes since the last sync
+   * of the source table.
+   *
+   * @param lastSyncMetadata The last sync metadata
+   * @return {@link InternalSnapshot} represent the rollback snapshot
+   */
+  Optional<InternalSnapshot> getRollbackSnapshot(TableSyncMetadata lastSyncMetadata);
 
   /**
    * Determines whether an incremental sync is safe from a given instant. This method checks for a

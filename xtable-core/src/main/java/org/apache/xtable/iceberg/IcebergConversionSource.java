@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -37,6 +38,7 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.HistoryEntry;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
@@ -55,6 +57,7 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -256,6 +259,23 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
       currentSnapshotId = currentSnapshot.parentId();
     }
     return true;
+  }
+
+  /*
+   * Extract rollback snapshot by checking if the current snapshot
+   * matches any entry in the table's history.
+   */
+  @Override
+  public Optional<InternalSnapshot> getRollbackSnapshot(TableSyncMetadata lastSyncMetadata) {
+    Table iceTable = getSourceTable();
+    long currentSnapshotId = iceTable.currentSnapshot().snapshotId();
+    for (HistoryEntry historyEntry : iceTable.history()) {
+      if (historyEntry.snapshotId() == currentSnapshotId) {
+        return Optional.of(getCurrentSnapshot());
+      }
+    }
+
+    return Optional.empty();
   }
 
   @Override

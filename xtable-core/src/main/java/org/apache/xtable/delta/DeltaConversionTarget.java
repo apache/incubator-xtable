@@ -41,6 +41,7 @@ import org.apache.spark.sql.delta.DeltaConfigs;
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.DeltaOperations;
 import org.apache.spark.sql.delta.OptimisticTransaction;
+import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.Action;
 import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.Format;
@@ -213,6 +214,28 @@ public class DeltaConversionTarget implements ConversionTarget {
   @Override
   public String getTableFormat() {
     return TableFormat.DELTA;
+  }
+
+  @Override
+  public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
+    Snapshot currentSnapshot = deltaLog.currentSnapshot().snapshot();
+
+    // Iterate backward from the current version
+    for (long version = currentSnapshot.version(); version >= 0; version--) {
+      Snapshot snapshot = deltaLog.getSnapshotAt(version, null);
+      Optional<TableSyncMetadata> metadata =
+          TableSyncMetadata.fromJson(
+              snapshot
+                  .metadata()
+                  .configuration()
+                  .getOrElse(TableSyncMetadata.XTABLE_METADATA, () -> null));
+      if (metadata.isPresent()
+          && String.valueOf(metadata.get().getSourceIdentifier()).equals(sourceIdentifier)) {
+        return Optional.of(String.valueOf(snapshot.version()));
+      }
+    }
+
+    return Optional.empty();
   }
 
   @EqualsAndHashCode

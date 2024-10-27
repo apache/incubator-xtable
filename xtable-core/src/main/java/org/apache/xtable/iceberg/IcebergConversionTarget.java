@@ -242,6 +242,19 @@ public class IcebergConversionTarget implements ConversionTarget {
     return TableFormat.ICEBERG;
   }
 
+  @Override
+  public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
+    for (Snapshot snapshot : table.snapshots()) {
+      Optional<TableSyncMetadata> metadata =
+          TableSyncMetadata.fromJson(snapshot.summary().get(TableSyncMetadata.XTABLE_METADATA));
+      if (metadata.isPresent()
+          && String.valueOf(metadata.get().getSourceIdentifier()).equals(sourceIdentifier)) {
+        return Optional.of(String.valueOf(snapshot.snapshotId()));
+      }
+    }
+    return Optional.empty();
+  }
+
   private void rollbackCorruptCommits() {
     if (table == null) {
       // there is no existing table so exit early

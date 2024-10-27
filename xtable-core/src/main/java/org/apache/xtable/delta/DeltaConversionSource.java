@@ -31,6 +31,7 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.spark.sql.SparkSession;
 
+import org.apache.spark.sql.delta.DeltaHistory;
 import org.apache.spark.sql.delta.DeltaHistoryManager;
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.Snapshot;
@@ -39,6 +40,7 @@ import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import scala.Option;
+import scala.collection.Seq;
 
 import io.delta.tables.DeltaTable;
 
@@ -48,6 +50,7 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
@@ -157,6 +160,36 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     // earliest commit of the table, hence the additional check.
     Instant deltaCommitInstant = Instant.ofEpochMilli(deltaCommitAtOrBeforeInstant.getTimestamp());
     return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
+  }
+
+  /**
+   * Extracts the rollback snapshot through the following steps: 1. Retrieve all commits made after
+   * the last sync 2. Identify the latest restore log among these commits 3. Return the {@link
+   * InternalSnapshot} from the latest restore log
+   */
+  @Override
+  public Optional<InternalSnapshot> getRollbackSnapshot(TableSyncMetadata lastSyncMetadata) {
+    DeltaHistoryManager.Commit deltaCommitAtLastSyncInstant =
+        deltaLog
+            .history()
+            .getActiveCommitAtTime(
+                Timestamp.from(lastSyncMetadata.getLastInstantSynced()), true, false, true);
+    long lastSyncVersion = deltaCommitAtLastSyncInstant.getVersion();
+    Seq<DeltaHistory> deltaCommits = deltaLog.history().getHistory(lastSyncVersion, null);
+    // Using find to get first "RESTORE" operation from history (latest to oldest)
+    Option<DeltaHistory> restoreLog =
+        deltaCommits.find(history -> "RESTORE".equals(history.operation()));
+    if (restoreLog.isDefined()) {
+      DeltaHistory unwrapRestoreLog = restoreLog.get();
+      InternalTable table = getTable(unwrapRestoreLog.getVersion());
+      Snapshot snapshot = deltaLog.getSnapshotAt(lastSyncVersion, Option.empty());
+      return Optional.of(
+          InternalSnapshot.builder()
+              .table(table)
+              .partitionedDataFiles(getInternalDataFiles(snapshot, table.getReadSchema()))
+              .build());
+    }
+    return Optional.empty();
   }
 
   @Override

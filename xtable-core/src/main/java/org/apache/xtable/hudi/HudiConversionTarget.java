@@ -316,6 +316,35 @@ public class HudiConversionTarget implements ConversionTarget {
     return TableFormat.HUDI;
   }
 
+  @Override
+  public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
+    if (!metaClient.isPresent()) {
+      return Optional.empty();
+    }
+    HoodieTimeline completedTimeline =
+        metaClient.get().getActiveTimeline().filterCompletedInstants();
+    for (HoodieInstant instant : completedTimeline.getInstants()) {
+      Option<byte[]> instantDetails =
+          metaClient.get().getActiveTimeline().getInstantDetails(instant);
+      if (!instantDetails.isPresent()) {
+        continue;
+      }
+      try {
+        HoodieCommitMetadata commitMetadata =
+            HoodieCommitMetadata.fromBytes(instantDetails.get(), HoodieCommitMetadata.class);
+        String metadataJson =
+            commitMetadata.getExtraMetadata().get(TableSyncMetadata.XTABLE_METADATA);
+        Optional<TableSyncMetadata> xTableMetadata = TableSyncMetadata.fromJson(metadataJson);
+        if (xTableMetadata.isPresent()
+            && xTableMetadata.get().getSourceIdentifier().equals(sourceIdentifier)) {
+          return Optional.of(sourceIdentifier);
+        }
+      } catch (IOException ignored) {
+      }
+    }
+    return Optional.empty();
+  }
+
   private HoodieTableMetaClient getMetaClient() {
     return metaClient.orElseThrow(
         () -> new IllegalStateException("beginSync must be called before calling this method"));

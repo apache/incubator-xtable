@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import lombok.Builder;
@@ -49,6 +50,7 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.spi.extractor.ConversionSource;
 
 public class HudiConversionSource implements ConversionSource<HoodieInstant> {
@@ -153,6 +155,39 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
   @Override
   public String getCommitIdentifier(HoodieInstant commit) {
     return commit.getTimestamp() + "_" + commit.getAction();
+  }
+
+  @Override
+  public Optional<InternalSnapshot> getRollbackSnapshot(TableSyncMetadata lastSyncMetadata) {
+    String lastSyncCommit =
+        HudiInstantUtils.convertInstantToCommit(lastSyncMetadata.getLastInstantSynced());
+    HoodieTimeline pendingTimeline = getCompletedCommits().findInstantsAfter(lastSyncCommit);
+    List<HoodieInstant> instantsAfterLastSync = pendingTimeline.getInstants();
+    Optional<HoodieInstant> rollbackInstant =
+        instantsAfterLastSync.stream()
+            .filter(instant -> "rollback".equalsIgnoreCase(instant.getAction()))
+            .findFirst();
+    if (rollbackInstant.isPresent()) {
+      String rollbackTimestamp = rollbackInstant.get().getTimestamp();
+      List<HoodieInstant> pendingInstants =
+          pendingTimeline.findInstantsBeforeOrEquals(rollbackTimestamp).getInstants();
+      InternalTable table = getTable(rollbackInstant.get());
+      return Optional.of(
+          InternalSnapshot.builder()
+              .table(table)
+              .partitionedDataFiles(dataFileExtractor.getFilesCurrentState(table))
+              .pendingCommits(
+                  pendingInstants.stream()
+                      .map(
+                          hoodieInstant ->
+                              HudiInstantUtils.parseFromInstantTime(hoodieInstant.getTimestamp()))
+                      .collect(CustomCollectors.toList(pendingInstants.size())))
+              .sourceIdentifier(
+                  rollbackInstant.get().getTimestamp() + "_" + rollbackInstant.get().getAction())
+              .build());
+    }
+
+    return Optional.empty();
   }
 
   private boolean doesCommitExistsAsOfInstant(Instant instant) {
