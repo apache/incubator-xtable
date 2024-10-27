@@ -89,6 +89,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(getInternalDataFiles(snapshot, table.getReadSchema()))
+        .sourceIdentifier(String.valueOf(snapshot.version()))
         .build();
   }
 
@@ -156,6 +157,11 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     // earliest commit of the table, hence the additional check.
     Instant deltaCommitInstant = Instant.ofEpochMilli(deltaCommitAtOrBeforeInstant.getTimestamp());
     return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
+  }
+
+  @Override
+  public String getCommitIdentifier(Long commit) {
+    return String.valueOf(commit);
   }
 
   private DeltaIncrementalChangesState getChangesState() {

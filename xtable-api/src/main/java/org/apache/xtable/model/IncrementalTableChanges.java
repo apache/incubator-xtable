@@ -33,4 +33,5 @@ public class IncrementalTableChanges {
   Iterator<TableChange> tableChanges;
   // pending commits before latest commit(write) on the table.
   @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
+  @Builder.Default String sourceIdentifier = "";
 }

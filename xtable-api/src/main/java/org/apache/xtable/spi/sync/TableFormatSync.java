@@ -73,7 +73,8 @@ public class TableFormatSync {
                 internalTable,
                 target -> target.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
                 startTime,
-                snapshot.getPendingCommits()));
+                snapshot.getPendingCommits(),
+                snapshot.getSourceIdentifier()));
       } catch (Exception e) {
         log.error("Failed to sync snapshot", e);
         results.put(
@@ -121,7 +122,8 @@ public class TableFormatSync {
                   change.getTableAsOfChange(),
                   target -> target.syncFilesForDiff(change.getFilesDiff()),
                   startTime,
-                  changes.getPendingCommits()));
+                  changes.getPendingCommits(),
+                  changes.getSourceIdentifier()));
         } catch (Exception e) {
           log.error("Failed to sync table changes", e);
           resultsForFormat.add(buildResultForError(SyncMode.INCREMENTAL, startTime, e));
@@ -149,7 +151,8 @@ public class TableFormatSync {
       InternalTable tableState,
       SyncFiles fileSyncMethod,
       Instant startTime,
-      List<Instant> pendingCommits) {
+      List<Instant> pendingCommits,
+      String sourceIdentifier) {
     // initialize the sync
     conversionTarget.beginSync(tableState);
     // sync schema updates
@@ -160,7 +163,7 @@ public class TableFormatSync {
     fileSyncMethod.sync(conversionTarget);
     // Persist the latest commit time in table properties for incremental syncs.
     TableSyncMetadata latestState =
-        TableSyncMetadata.of(tableState.getLatestCommitTime(), pendingCommits);
+        TableSyncMetadata.of(tableState.getLatestCommitTime(), pendingCommits, sourceIdentifier);
     conversionTarget.syncMetadata(latestState);
     conversionTarget.completeSync();
 

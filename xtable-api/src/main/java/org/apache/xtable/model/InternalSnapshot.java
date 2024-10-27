@@ -41,6 +41,9 @@ import org.apache.xtable.model.storage.PartitionFileGroup;
 public class InternalSnapshot {
   // The instant of the Snapshot
   String version;
+  // The source table snapshot identifier
+  // Snapshot ID in Iceberg, version ID in Delta, and instant <timestamp_action> in Hudi
+  String sourceIdentifier;
   // Table reference
   InternalTable table;
   // Data files grouped by partition

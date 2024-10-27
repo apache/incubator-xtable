@@ -92,6 +92,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
             .findInstantsBefore(latestCommit.getTimestamp())
             .getInstants();
     InternalTable table = getTable(latestCommit);
+    HoodieInstant lastPendingInstant = pendingInstants.get(pendingInstants.size() - 1);
     return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(dataFileExtractor.getFilesCurrentState(table))
@@ -101,6 +102,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
                     hoodieInstant ->
                         HudiInstantUtils.parseFromInstantTime(hoodieInstant.getTimestamp()))
                 .collect(CustomCollectors.toList(pendingInstants.size())))
+        .sourceIdentifier(lastPendingInstant.getTimestamp() + "_" + latestCommit.getAction())
         .build();
   }
 
@@ -146,6 +148,11 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
     return doesCommitExistsAsOfInstant(instant) && !isAffectedByCleanupProcess(instant);
+  }
+
+  @Override
+  public String getCommitIdentifier(HoodieInstant commit) {
+    return commit.getTimestamp() + "_" + commit.getAction();
   }
 
   private boolean doesCommitExistsAsOfInstant(Instant instant) {

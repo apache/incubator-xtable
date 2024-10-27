@@ -157,6 +157,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         .version(String.valueOf(currentSnapshot.snapshotId()))
         .table(irTable)
         .partitionedDataFiles(partitionedDataFiles)
+        .sourceIdentifier(String.valueOf(currentSnapshot.snapshotId()))
         .build();
   }
 
@@ -255,6 +256,11 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
       currentSnapshotId = currentSnapshot.parentId();
     }
     return true;
+  }
+
+  @Override
+  public String getCommitIdentifier(Snapshot commit) {
+    return String.valueOf(commit.snapshotId());
   }
 
   @Override
