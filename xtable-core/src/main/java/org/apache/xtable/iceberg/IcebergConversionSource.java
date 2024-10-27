@@ -165,6 +165,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         .version(String.valueOf(currentSnapshot.snapshotId()))
         .table(irTable)
         .partitionedDataFiles(partitionedDataFiles)
+        .sourceIdentifier(getCommitIdentifier(currentSnapshot))
         .build();
   }
 
@@ -196,7 +197,11 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         DataFilesDiff.builder().filesAdded(dataFilesAdded).filesRemoved(dataFilesRemoved).build();
 
     InternalTable table = getTable(snapshot);
-    return TableChange.builder().tableAsOfChange(table).filesDiff(filesDiff).build();
+    return TableChange.builder()
+        .tableAsOfChange(table)
+        .filesDiff(filesDiff)
+        .sourceIdentifier(getCommitIdentifier(snapshot))
+        .build();
   }
 
   @Override
@@ -263,6 +268,11 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
       currentSnapshotId = currentSnapshot.parentId();
     }
     return true;
+  }
+
+  @Override
+  public String getCommitIdentifier(Snapshot commit) {
+    return String.valueOf(commit.snapshotId());
   }
 
   @Override

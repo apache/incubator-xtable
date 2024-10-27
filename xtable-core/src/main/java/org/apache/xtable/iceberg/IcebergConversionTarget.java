@@ -21,6 +21,7 @@ package org.apache.xtable.iceberg;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import lombok.extern.log4j.Log4j2;
@@ -66,6 +67,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   private Transaction transaction;
   private Table table;
   private InternalTable internalTableState;
+  private TableSyncMetadata tableSyncMetadata;
 
   public IcebergConversionTarget() {}
 
@@ -174,6 +176,8 @@ public class IcebergConversionTarget implements ConversionTarget {
 
   @Override
   public void syncMetadata(TableSyncMetadata metadata) {
+    tableSyncMetadata = metadata;
+
     UpdateProperties updateProperties = transaction.updateProperties();
     updateProperties.set(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
     if (!table.properties().containsKey(TableProperties.WRITE_DATA_LOCATION)) {
@@ -200,13 +204,18 @@ public class IcebergConversionTarget implements ConversionTarget {
         transaction,
         partitionedDataFiles,
         transaction.table().schema(),
-        transaction.table().spec());
+        transaction.table().spec(),
+        tableSyncMetadata);
   }
 
   @Override
   public void syncFilesForDiff(DataFilesDiff dataFilesDiff) {
     dataFileUpdatesExtractor.applyDiff(
-        transaction, dataFilesDiff, transaction.table().schema(), transaction.table().spec());
+        transaction,
+        dataFilesDiff,
+        transaction.table().schema(),
+        transaction.table().spec(),
+        tableSyncMetadata);
   }
 
   @Override
@@ -221,6 +230,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     transaction.commitTransaction();
     transaction = null;
     internalTableState = null;
+    tableSyncMetadata = null;
   }
 
   private void safeDelete(String file) {
@@ -240,6 +250,33 @@ public class IcebergConversionTarget implements ConversionTarget {
   @Override
   public String getTableFormat() {
     return TableFormat.ICEBERG;
+  }
+
+  @Override
+  public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
+    for (Snapshot snapshot : table.snapshots()) {
+      Map<String, String> summary = snapshot.summary();
+      String sourceMetadataJson = summary.get(TableSyncMetadata.XTABLE_METADATA);
+      if (sourceMetadataJson == null) {
+        continue;
+      }
+
+      try {
+        Optional<TableSyncMetadata> optionalMetadata =
+            TableSyncMetadata.fromJson(sourceMetadataJson);
+        if (!optionalMetadata.isPresent()) {
+          continue;
+        }
+
+        TableSyncMetadata metadata = optionalMetadata.get();
+        if (sourceIdentifier.equals(metadata.getSourceIdentifier())) {
+          return Optional.of(String.valueOf(snapshot.snapshotId()));
+        }
+      } catch (Exception e) {
+        log.warn("Failed to parse parse snapshot metadata for {}", snapshot.snapshotId(), e);
+      }
+    }
+    return Optional.empty();
   }
 
   private void rollbackCorruptCommits() {

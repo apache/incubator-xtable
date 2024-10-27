@@ -54,13 +54,13 @@ import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieFileGroup;
-import org.apache.hudi.common.model.HoodieReplaceCommitMetadata;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
+import org.apache.hudi.common.table.timeline.TimelineUtils;
 import org.apache.hudi.common.table.view.TableFileSystemView;
 import org.apache.hudi.common.util.CleanerUtils;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
@@ -287,28 +287,7 @@ public class HudiConversionTarget implements ConversionTarget {
                 .filterCompletedInstants()
                 .lastInstant()
                 .toJavaOptional()
-                .map(
-                    instant -> {
-                      try {
-                        if (instant.getAction().equals(HoodieTimeline.REPLACE_COMMIT_ACTION)) {
-                          return HoodieReplaceCommitMetadata.fromBytes(
-                                  client.getActiveTimeline().getInstantDetails(instant).get(),
-                                  HoodieReplaceCommitMetadata.class)
-                              .getExtraMetadata();
-                        } else {
-                          return HoodieCommitMetadata.fromBytes(
-                                  client.getActiveTimeline().getInstantDetails(instant).get(),
-                                  HoodieCommitMetadata.class)
-                              .getExtraMetadata();
-                        }
-                      } catch (IOException ex) {
-                        throw new ReadException("Unable to read Hudi commit metadata", ex);
-                      }
-                    })
-                .flatMap(
-                    metadata ->
-                        TableSyncMetadata.fromJson(
-                            metadata.get(TableSyncMetadata.XTABLE_METADATA))));
+                .flatMap(instant -> getMetadata(instant, client)));
   }
 
   @Override
@@ -316,9 +295,54 @@ public class HudiConversionTarget implements ConversionTarget {
     return TableFormat.HUDI;
   }
 
+  @Override
+  public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
+    if (!metaClient.isPresent()) {
+      return Optional.empty();
+    }
+    return getTargetCommitIdentifier(sourceIdentifier, metaClient.get());
+  }
+
+  Optional<String> getTargetCommitIdentifier(
+      String sourceIdentifier, HoodieTableMetaClient metaClient) {
+
+    HoodieTimeline commitTimeline = metaClient.getCommitsTimeline();
+
+    for (HoodieInstant instant : commitTimeline.getInstants()) {
+      try {
+        Optional<TableSyncMetadata> optionalMetadata = getMetadata(instant, metaClient);
+        if (!optionalMetadata.isPresent()) {
+          continue;
+        }
+
+        TableSyncMetadata metadata = optionalMetadata.get();
+        if (sourceIdentifier.equals(metadata.getSourceIdentifier())) {
+          return Optional.of(instant.getTimestamp());
+        }
+      } catch (Exception e) {
+        log.warn("Failed to parse commit metadata for instant: {}", instant, e);
+      }
+    }
+    return Optional.empty();
+  }
+
   private HoodieTableMetaClient getMetaClient() {
     return metaClient.orElseThrow(
         () -> new IllegalStateException("beginSync must be called before calling this method"));
+  }
+
+  private Optional<TableSyncMetadata> getMetadata(
+      HoodieInstant instant, HoodieTableMetaClient metaClient) {
+    try {
+      HoodieCommitMetadata commitMetadata =
+          TimelineUtils.getCommitMetadata(instant, metaClient.getActiveTimeline());
+      String sourceMetadataJson =
+          commitMetadata.getExtraMetadata().get(TableSyncMetadata.XTABLE_METADATA);
+      return TableSyncMetadata.fromJson(sourceMetadataJson);
+    } catch (Exception e) {
+      log.warn("Failed to parse commit metadata for instant: {}", instant, e);
+      return Optional.empty();
+    }
   }
 
   static class CommitState {

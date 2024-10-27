@@ -19,6 +19,7 @@
 package org.apache.xtable.model;
 
 import lombok.Builder;
+import lombok.NonNull;
 import lombok.Value;
 
 import org.apache.xtable.model.storage.DataFilesDiff;
@@ -36,4 +37,7 @@ public class TableChange {
 
   /** The {@link InternalTable} at the commit time to which this table change belongs. */
   InternalTable tableAsOfChange;
+
+  // Commit identifier in source table
+  @NonNull String sourceIdentifier;
 }
