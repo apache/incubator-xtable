@@ -30,8 +30,10 @@ import lombok.Value;
 @Value
 @Builder
 public class IncrementalTableChanges {
+  public static final String DEFAULT_IDENTIFIER = "";
+
   Iterator<TableChange> tableChanges;
   // pending commits before latest commit(write) on the table.
   @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
-  @Builder.Default String sourceIdentifier = "";
+  @Builder.Default String sourceIdentifier = DEFAULT_IDENTIFIER;
 }

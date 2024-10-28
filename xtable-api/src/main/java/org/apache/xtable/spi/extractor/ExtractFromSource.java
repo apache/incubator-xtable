@@ -49,12 +49,16 @@ public class ExtractFromSource<COMMIT> {
         commitsBacklog.getCommitsToProcess().stream()
             .map(conversionSource::getTableChangeForCommit)
             .iterator();
-    COMMIT lastCommit =
-        commitsBacklog.getCommitsToProcess().get(commitsBacklog.getCommitsToProcess().size() - 1);
+    String sourceIdentifier = IncrementalTableChanges.DEFAULT_IDENTIFIER;
+    if (!commitsBacklog.getCommitsToProcess().isEmpty()) {
+      COMMIT lastCommit =
+          commitsBacklog.getCommitsToProcess().get(commitsBacklog.getCommitsToProcess().size() - 1);
+      sourceIdentifier = conversionSource.getCommitIdentifier(lastCommit);
+    }
     return IncrementalTableChanges.builder()
         .tableChanges(tableChangeIterator)
         .pendingCommits(commitsBacklog.getInFlightInstants())
-        .sourceIdentifier(conversionSource.getCommitIdentifier(lastCommit))
+        .sourceIdentifier(sourceIdentifier)
         .build();
   }
 

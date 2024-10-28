@@ -187,6 +187,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
           InternalSnapshot.builder()
               .table(table)
               .partitionedDataFiles(getInternalDataFiles(snapshot, table.getReadSchema()))
+              .sourceIdentifier(String.valueOf(snapshot.version()))
               .build());
     }
     return Optional.empty();

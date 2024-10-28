@@ -58,10 +58,9 @@ public class TableSyncMetadata {
   String sourceIdentifier;
 
   public static TableSyncMetadata of(
-          Instant lastInstantSynced,
-          List<Instant> instantsToConsiderForNextSync) {
+      Instant lastInstantSynced, List<Instant> instantsToConsiderForNextSync) {
     return new TableSyncMetadata(
-            lastInstantSynced, instantsToConsiderForNextSync, CURRENT_VERSION, DEFAULT_IDENTIFIER);
+        lastInstantSynced, instantsToConsiderForNextSync, CURRENT_VERSION, DEFAULT_IDENTIFIER);
   }
 
   public static TableSyncMetadata of(

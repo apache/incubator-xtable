@@ -91,6 +91,6 @@ public interface ConversionTarget {
   /** Initializes the client with provided configuration */
   void init(TargetTable targetTable, Configuration configuration);
 
-  /**  Return the commit identifier from target table */
+  /** Return the commit identifier from target table */
   Optional<String> getTargetCommitIdentifier(String sourceIdentifier);
 }

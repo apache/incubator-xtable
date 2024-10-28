@@ -39,11 +39,13 @@ import org.apache.xtable.model.storage.PartitionFileGroup;
 @Value
 @Builder
 public class InternalSnapshot {
+  public static final String DEFAULT_IDENTIFIER = "";
+
   // The instant of the Snapshot
   String version;
   // The source table snapshot identifier
   // Snapshot ID in Iceberg, version ID in Delta, and instant <timestamp_action> in Hudi
-  String sourceIdentifier;
+  @Builder.Default String sourceIdentifier = DEFAULT_IDENTIFIER;
   // Table reference
   InternalTable table;
   // Data files grouped by partition
