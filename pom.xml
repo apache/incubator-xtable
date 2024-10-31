@@ -29,7 +29,7 @@
     <artifactId>xtable</artifactId>
     <name>XTable Project Parent POM</name>
     <inceptionYear>2024</inceptionYear>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.2.0-incubating</version>
     <packaging>pom</packaging>
     <url>https://xtable.apache.org/</url>
 
@@ -50,7 +50,6 @@
         <module>xtable-api</module>
         <module>xtable-hudi-support</module>
         <module>xtable-core</module>
-        <module>xtable-utilities</module>
     </modules>
 
     <properties>
