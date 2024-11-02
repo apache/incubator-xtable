@@ -59,6 +59,7 @@ import org.apache.xtable.schema.SchemaUtils;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaSchemaExtractor {
   private static final String DELTA_COLUMN_MAPPING_ID = "delta.columnMapping.id";
+  private static final String COMMENT = "comment";
   private static final DeltaSchemaExtractor INSTANCE = new DeltaSchemaExtractor();
 
   public static DeltaSchemaExtractor getInstance() {
@@ -74,7 +75,7 @@ public class DeltaSchemaExtractor {
                         field.getName(),
                         convertFieldType(field),
                         field.getSchema().isNullable(),
-                        getMetaData(field.getSchema().getDataType())))
+                        getMetaData(field.getSchema())))
             .toArray(StructField[]::new);
     return new StructType(fields);
   }
@@ -144,12 +145,16 @@ public class DeltaSchemaExtractor {
     }
   }
 
-  private Metadata getMetaData(InternalType type) {
+  private Metadata getMetaData(InternalSchema schema) {
+    InternalType type = schema.getDataType();
+    MetadataBuilder metadataBuilder = new MetadataBuilder();
     if (type == InternalType.UUID) {
-      return new MetadataBuilder().putString(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid").build();
-    } else {
-      return Metadata.empty();
+      metadataBuilder.putString(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid");
     }
+    if (schema.getComment() != null) {
+      metadataBuilder.putString(COMMENT, schema.getComment());
+    }
+    return metadataBuilder.build();
   }
 
   public InternalSchema toInternalSchema(StructType structType) {

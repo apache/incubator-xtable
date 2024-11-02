@@ -56,6 +56,7 @@ public class TestDeltaSchemaExtractor {
                                 .name("boolean")
                                 .dataType(InternalType.BOOLEAN)
                                 .isNullable(false)
+                                .comment("requiredBooleanComment")
                                 .build())
                         .build(),
                     InternalField.builder()
@@ -226,7 +227,7 @@ public class TestDeltaSchemaExtractor {
 
     StructType structRepresentation =
         new StructType()
-            .add("requiredBoolean", DataTypes.BooleanType, false)
+            .add("requiredBoolean", DataTypes.BooleanType, false, "requiredBooleanComment")
             .add("optionalBoolean", DataTypes.BooleanType, true)
             .add("requiredInt", DataTypes.IntegerType, false)
             .add("optionalInt", DataTypes.IntegerType, true)
@@ -268,6 +269,7 @@ public class TestDeltaSchemaExtractor {
                                 .name("fixed")
                                 .dataType(InternalType.FIXED)
                                 .isNullable(false)
+                                .comment("comment")
                                 .build())
                         .build(),
                     InternalField.builder()
@@ -296,6 +298,7 @@ public class TestDeltaSchemaExtractor {
                                 .name("binary")
                                 .dataType(InternalType.BYTES)
                                 .isNullable(false)
+                                .comment("comment")
                                 .build())
                         .build(),
                     InternalField.builder()
@@ -311,7 +314,7 @@ public class TestDeltaSchemaExtractor {
             .build();
     StructType structRepresentation =
         new StructType()
-            .add("requiredFixed", DataTypes.BinaryType, false)
+            .add("requiredFixed", DataTypes.BinaryType, false, "comment")
             .add("optionalFixed", DataTypes.BinaryType, true);
 
     Assertions.assertEquals(
@@ -681,6 +684,7 @@ public class TestDeltaSchemaExtractor {
                                 .name("struct")
                                 .dataType(InternalType.RECORD)
                                 .isNullable(true)
+                                .comment("comment")
                                 .fields(
                                     Arrays.asList(
                                         InternalField.builder()
@@ -691,6 +695,7 @@ public class TestDeltaSchemaExtractor {
                                                     .name("integer")
                                                     .dataType(InternalType.INT)
                                                     .isNullable(true)
+                                                    .comment("nestedOptionalIntComment")
                                                     .build())
                                             .defaultValue(
                                                 InternalField.Constants.NULL_DEFAULT_VALUE)
@@ -740,13 +745,18 @@ public class TestDeltaSchemaExtractor {
             .add(
                 "nestedOne",
                 new StructType()
-                    .add("nestedOptionalInt", DataTypes.IntegerType, true)
+                    .add(
+                        "nestedOptionalInt",
+                        DataTypes.IntegerType,
+                        true,
+                        "nestedOptionalIntComment")
                     .add("nestedRequiredDouble", DataTypes.DoubleType, false)
                     .add(
                         "nestedTwo",
                         new StructType().add("doublyNestedString", DataTypes.StringType, true),
                         false),
-                true);
+                true,
+                "comment");
     Assertions.assertEquals(
         structRepresentation,
         DeltaSchemaExtractor.getInstance().fromInternalSchema(internalSchema));

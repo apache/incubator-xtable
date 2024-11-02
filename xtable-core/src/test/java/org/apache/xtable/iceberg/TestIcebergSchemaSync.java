@@ -43,14 +43,15 @@ public class TestIcebergSchemaSync {
 
   private static final Schema SCHEMA =
       new Schema(
-          Types.NestedField.required(1, "timestamp_field", Types.TimestampType.withoutZone()),
+          Types.NestedField.required(
+              1, "timestamp_field", Types.TimestampType.withoutZone(), "doc"),
           Types.NestedField.optional(2, "date_field", Types.DateType.get()),
           Types.NestedField.required(3, "group_id", Types.IntegerType.get()),
           Types.NestedField.required(
               4,
               "record",
               Types.StructType.of(
-                  Types.NestedField.required(5, "string_field", Types.StringType.get()),
+                  Types.NestedField.required(5, "string_field", Types.StringType.get(), "doc"),
                   Types.NestedField.required(6, "int_field", Types.IntegerType.get()))),
           Types.NestedField.required(
               7,
@@ -228,6 +229,112 @@ public class TestIcebergSchemaSync {
     verify(mockUpdateSchema).commit();
   }
 
+  @Test
+  void testAddFieldComment() {
+    UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
+    when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
+    Types.NestedField updated =
+        Types.NestedField.optional(2, "date_field", Types.DateType.get(), "doc");
+    Schema latest = addCommentToDefault(updated, 2);
+
+    schemaSync.sync(SCHEMA, latest, mockTransaction);
+
+    verify(mockUpdateSchema).updateColumnDoc("date_field", "doc");
+    verify(mockUpdateSchema).commit();
+  }
+
+  @Test
+  void testDropFieldComment() {
+    UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
+    when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
+    Types.NestedField updated =
+        Types.NestedField.optional(1, "timestamp_field", Types.DateType.get());
+    Schema latest = addCommentToDefault(updated, 1);
+
+    schemaSync.sync(SCHEMA, latest, mockTransaction);
+
+    verify(mockUpdateSchema).updateColumnDoc("timestamp_field", null);
+    verify(mockUpdateSchema).commit();
+  }
+
+  @Test
+  void tesUpdatedFieldComment() {
+    UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
+    when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
+    Types.NestedField updated =
+        Types.NestedField.optional(1, "timestamp_field", Types.DateType.get(), "new comment");
+    Schema latest = addCommentToDefault(updated, 1);
+
+    schemaSync.sync(SCHEMA, latest, mockTransaction);
+
+    verify(mockUpdateSchema).updateColumnDoc("timestamp_field", "new comment");
+    verify(mockUpdateSchema).commit();
+  }
+
+  @Test
+  void testAddNestedFieldComment() {
+    UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
+    when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
+    Types.NestedField updated =
+        Types.NestedField.required(
+            4,
+            "record",
+            Types.StructType.of(
+                Types.NestedField.required(5, "string_field", Types.StringType.get(), "doc"),
+                Types.NestedField.required(6, "int_field", Types.IntegerType.get(), "doc")));
+    Schema latest = addCommentToDefault(updated, 4);
+
+    schemaSync.sync(SCHEMA, latest, mockTransaction);
+
+    verify(mockUpdateSchema).updateColumnDoc("int_field", "doc");
+    verify(mockUpdateSchema).commit();
+  }
+
+  @Test
+  void testAddListFieldComment() {
+    UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
+    when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
+    Types.NestedField updated =
+        Types.NestedField.required(
+            10,
+            "array_field",
+            Types.ListType.ofRequired(
+                11,
+                Types.StructType.of(
+                    Types.NestedField.required(15, "element_string", Types.StringType.get(), "doc"),
+                    Types.NestedField.optional(16, "element_int", Types.IntegerType.get()))));
+    Schema latest = addCommentToDefault(updated, 10);
+
+    schemaSync.sync(SCHEMA, latest, mockTransaction);
+
+    verify(mockUpdateSchema).updateColumnDoc("element_string", "doc");
+    verify(mockUpdateSchema).commit();
+  }
+
+  @Test
+  void testAddMapFieldComment() {
+    UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
+    when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
+    Types.NestedField updated =
+        Types.NestedField.required(
+            7,
+            "map_field",
+            Types.MapType.ofRequired(
+                8,
+                9,
+                Types.StructType.of(
+                    Types.NestedField.required(12, "key_string", Types.StringType.get())),
+                Types.StructType.of(
+                    Types.NestedField.required(13, "value_string", Types.StringType.get(), "doc"),
+                    Types.NestedField.optional(14, "value_int", Types.IntegerType.get()))));
+    Schema latest = addCommentToDefault(updated, 7);
+
+    schemaSync.sync(SCHEMA, latest, mockTransaction);
+
+    verify(mockUpdateSchema).updateColumnDoc("value_string", "doc");
+    verify(mockUpdateSchema).commit();
+  }
+
   private Schema addColumnToDefault(Schema schema, Types.NestedField field, Integer parentId) {
     List<Types.NestedField> fields = new ArrayList<>();
     for (Types.NestedField existingField : schema.columns()) {
@@ -251,6 +358,18 @@ public class TestIcebergSchemaSync {
     return new Schema(fields);
   }
 
+  private Schema addCommentToDefault(Types.NestedField updated, int fieldId) {
+    List<Types.NestedField> fields = new ArrayList<>();
+    for (Types.NestedField existingField : SCHEMA.columns()) {
+      if (existingField.fieldId() == fieldId) {
+        fields.add(updated);
+      } else {
+        fields.add(existingField);
+      }
+    }
+    return new Schema(fields);
+  }
+
   private Schema updateFieldRequired(int fieldId) {
     List<Types.NestedField> fields = new ArrayList<>();
     for (Types.NestedField existingField : SCHEMA.columns()) {
@@ -260,7 +379,8 @@ public class TestIcebergSchemaSync {
                 existingField.fieldId(),
                 !existingField.isOptional(),
                 existingField.name(),
-                existingField.type()));
+                existingField.type(),
+                existingField.doc()));
       } else {
         fields.add(existingField);
       }
