@@ -21,6 +21,7 @@ package org.apache.xtable.iceberg;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -131,6 +132,12 @@ public class IcebergSchemaSync {
           updates.put(
               latestColumn.fieldId(), () -> updateSchema.requireColumn(latestColumn.name()));
         }
+      }
+      // update the comment of the column
+      if (!Objects.equals(currentColumn.doc(), latestColumn.doc())) {
+        updates.put(
+            latestColumn.fieldId(),
+            () -> updateSchema.updateColumnDoc(latestColumn.name(), latestColumn.doc()));
       }
       if (latestColumn.type().isStructType()) {
         updates.putAll(
