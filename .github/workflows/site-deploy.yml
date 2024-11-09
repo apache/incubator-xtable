@@ -53,6 +53,7 @@ jobs:
         with:
           personal_token: ${{ secrets.XTABLE_SITE_DEPLOY }}
           external_repository: apache/incubator-xtable-site
+          keep_files: false
           publish_branch: main
           publish_dir: ./website/build
           user_name: ${{ github.actor }}
