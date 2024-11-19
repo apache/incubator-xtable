@@ -8,11 +8,6 @@ title: "Snowflake"
 Currently, Snowflake supports [Iceberg tables through External Tables](https://www.snowflake.com/blog/expanding-the-data-cloud-with-apache-iceberg/)
 and also [Native Iceberg Tables](https://www.snowflake.com/blog/iceberg-tables-powering-open-standards-with-snowflake-innovations/).
 
-:::note NOTE:
-Iceberg on Snowflake is currently supported in
-[public preview](https://www.snowflake.com/blog/build-open-data-lakehouse-iceberg-tables/)
-:::
-
 ## Steps:
 These are high level steps to help you integrate Apache XTable™ (Incubating) synced Iceberg tables on Snowflake. For more additional information
 refer to the [Getting started with Iceberg tables](https://docs.snowflake.com/LIMITEDACCESS/iceberg-2023/tables-iceberg-getting-started).
