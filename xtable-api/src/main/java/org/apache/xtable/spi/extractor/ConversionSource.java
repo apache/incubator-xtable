@@ -20,14 +20,12 @@ package org.apache.xtable.spi.extractor;
 
 import java.io.Closeable;
 import java.time.Instant;
-import java.util.Optional;
 
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.metadata.TableSyncMetadata;
 
 /**
  * A client that provides the major functionality for extracting the state at a given instant in a

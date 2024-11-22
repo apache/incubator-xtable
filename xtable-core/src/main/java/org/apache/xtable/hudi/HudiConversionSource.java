@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import lombok.Builder;
@@ -50,7 +49,6 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.spi.extractor.ConversionSource;
 
 public class HudiConversionSource implements ConversionSource<HoodieInstant> {

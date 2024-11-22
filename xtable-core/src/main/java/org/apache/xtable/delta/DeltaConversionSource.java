@@ -31,7 +31,6 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.spark.sql.SparkSession;
 
-import org.apache.spark.sql.delta.DeltaHistory;
 import org.apache.spark.sql.delta.DeltaHistoryManager;
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.Snapshot;
@@ -40,7 +39,6 @@ import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import scala.Option;
-import scala.collection.Seq;
 
 import io.delta.tables.DeltaTable;
 
@@ -50,7 +48,6 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;

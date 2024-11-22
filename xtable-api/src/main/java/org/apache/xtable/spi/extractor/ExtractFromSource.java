@@ -19,7 +19,6 @@
 package org.apache.xtable.spi.extractor;
 
 import java.util.Iterator;
-import java.util.Optional;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -29,7 +28,6 @@ import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.metadata.TableSyncMetadata;
 
 @AllArgsConstructor(staticName = "of")
 @Getter
