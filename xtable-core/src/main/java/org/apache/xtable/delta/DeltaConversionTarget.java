@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,12 +45,14 @@ import org.apache.spark.sql.delta.OptimisticTransaction;
 import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.Action;
 import org.apache.spark.sql.delta.actions.AddFile;
+import org.apache.spark.sql.delta.actions.CommitInfo;
 import org.apache.spark.sql.delta.actions.Format;
 import org.apache.spark.sql.delta.actions.Metadata;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import scala.Option;
 import scala.Some;
+import scala.Tuple2;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
@@ -149,9 +152,14 @@ public class DeltaConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void beginSync(InternalTable table) {
+  public void beginSync(InternalTable table, String sourceIdentifier) {
     this.transactionState =
-        new TransactionState(deltaLog, tableName, table.getLatestCommitTime(), logRetentionInHours);
+        new TransactionState(
+            deltaLog,
+            tableName,
+            table.getLatestCommitTime(),
+            logRetentionInHours,
+            sourceIdentifier);
   }
 
   @Override
@@ -218,20 +226,49 @@ public class DeltaConversionTarget implements ConversionTarget {
 
   @Override
   public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
+    long sourceIdentifierVal = Long.parseLong(sourceIdentifier);
     Snapshot currentSnapshot = deltaLog.currentSnapshot().snapshot();
 
-    // Iterate backward from the current version
-    for (long version = currentSnapshot.version(); version >= 0; version--) {
-      Snapshot snapshot = deltaLog.getSnapshotAt(version, null);
-      Optional<TableSyncMetadata> metadata =
-          TableSyncMetadata.fromJson(
-              snapshot
-                  .metadata()
-                  .configuration()
-                  .getOrElse(TableSyncMetadata.XTABLE_METADATA, () -> null));
-      if (metadata.isPresent()
-          && String.valueOf(metadata.get().getSourceIdentifier()).equals(sourceIdentifier)) {
-        return Optional.of(String.valueOf(snapshot.version()));
+    Iterator<Tuple2<Object, Seq<Action>>> versionIterator =
+        JavaConverters.asJavaIteratorConverter(
+                deltaLog.getChanges(currentSnapshot.version(), false))
+            .asJava();
+    while (versionIterator.hasNext()) {
+      Tuple2<Object, Seq<Action>> currentChange = versionIterator.next();
+      Long targetVersion = currentSnapshot.version();
+      List<Action> actions = JavaConverters.seqAsJavaListConverter(currentChange._2()).asJava();
+
+      // Find the CommitInfo in the changes belongs to certain version
+      Optional<CommitInfo> commitInfo =
+          actions.stream()
+              .filter(action -> action instanceof CommitInfo)
+              .map(action -> (CommitInfo) action)
+              .findFirst();
+      if (!commitInfo.isPresent()) {
+        continue;
+      }
+
+      Option<scala.collection.immutable.Map<String, String>> tags = commitInfo.get().tags();
+      if (tags.isEmpty()) {
+        continue;
+      }
+
+      Option<String> curSourceIdentifierOption = tags.get().get("XTABLE_SOURCE_IDENTIFIER");
+      if (curSourceIdentifierOption.isEmpty()) {
+        continue;
+      }
+
+      String curSourceIdentifier = curSourceIdentifierOption.get();
+
+      if (sourceIdentifier.equals(curSourceIdentifier)) {
+        return Optional.of(String.valueOf(targetVersion));
+      }
+
+      // Stop further processing if less than sourceIdentifier.
+      // Since we're iterating in reverse order (newest to oldest), any later commits will also be
+      // smaller.
+      if (Long.parseLong(curSourceIdentifier) < sourceIdentifierVal) {
+        return Optional.empty();
       }
     }
 
@@ -245,6 +282,7 @@ public class DeltaConversionTarget implements ConversionTarget {
     private final Instant commitTime;
     private final DeltaLog deltaLog;
     private final long retentionInHours;
+    private final String sourceIdentifier;
     @Getter private final List<String> partitionColumns;
     private final String tableName;
     @Getter private StructType latestSchema;
@@ -253,7 +291,11 @@ public class DeltaConversionTarget implements ConversionTarget {
     @Setter private Seq<Action> actions;
 
     private TransactionState(
-        DeltaLog deltaLog, String tableName, Instant latestCommitTime, long retentionInHours) {
+        DeltaLog deltaLog,
+        String tableName,
+        Instant latestCommitTime,
+        long retentionInHours,
+        String sourceIdentifier) {
       this.deltaLog = deltaLog;
       this.transaction = deltaLog.startTransaction();
       this.latestSchema = deltaLog.snapshot().schema();
@@ -261,6 +303,7 @@ public class DeltaConversionTarget implements ConversionTarget {
       this.partitionColumns = new ArrayList<>();
       this.tableName = tableName;
       this.retentionInHours = retentionInHours;
+      this.sourceIdentifier = sourceIdentifier;
     }
 
     private void addColumn(StructField field) {
@@ -287,7 +330,8 @@ public class DeltaConversionTarget implements ConversionTarget {
       transaction.updateMetadata(metadata, false);
       transaction.commit(
           actions,
-          new DeltaOperations.Update(Option.apply(Literal.fromObject("xtable-delta-sync"))));
+          new DeltaOperations.Update(Option.apply(Literal.fromObject("xtable-delta-sync"))),
+          ScalaUtils.convertJavaMapToScala(getCommitTags()));
     }
 
     private Map<String, String> getConfigurationsForDeltaSync() {
@@ -322,6 +366,12 @@ public class DeltaConversionTarget implements ConversionTarget {
       }
       // fallback to existing deltalog value
       return deltaLog.snapshot().metadata().format();
+    }
+
+    private Map<String, String> getCommitTags() {
+      Map<String, String> tags = new HashMap<>();
+      tags.put("XTABLE_SOURCE_IDENTIFIER", sourceIdentifier);
+      return tags;
     }
   }
 }

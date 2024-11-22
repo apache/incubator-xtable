@@ -192,7 +192,11 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         DataFilesDiff.builder().filesAdded(dataFilesAdded).filesRemoved(dataFilesRemoved).build();
 
     InternalTable table = getTable(snapshot);
-    return TableChange.builder().tableAsOfChange(table).filesDiff(filesDiff).build();
+    return TableChange.builder()
+        .tableAsOfChange(table)
+        .filesDiff(filesDiff)
+        .sourceIdentifier(getCommitIdentifier(snapshot))
+        .build();
   }
 
   @Override

@@ -42,7 +42,6 @@ import org.apache.xtable.model.exception.ParseException;
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class TableSyncMetadata {
   private static final int CURRENT_VERSION = 0;
-  private static final String DEFAULT_IDENTIFIER = "";
   private static final ObjectMapper MAPPER =
       new ObjectMapper()
           .registerModule(new JavaTimeModule())
@@ -55,20 +54,10 @@ public class TableSyncMetadata {
   Instant lastInstantSynced;
   List<Instant> instantsToConsiderForNextSync;
   int version;
-  String sourceIdentifier;
 
   public static TableSyncMetadata of(
       Instant lastInstantSynced, List<Instant> instantsToConsiderForNextSync) {
-    return new TableSyncMetadata(
-        lastInstantSynced, instantsToConsiderForNextSync, CURRENT_VERSION, DEFAULT_IDENTIFIER);
-  }
-
-  public static TableSyncMetadata of(
-      Instant lastInstantSynced,
-      List<Instant> instantsToConsiderForNextSync,
-      String sourceIdentifier) {
-    return new TableSyncMetadata(
-        lastInstantSynced, instantsToConsiderForNextSync, CURRENT_VERSION, sourceIdentifier);
+    return new TableSyncMetadata(lastInstantSynced, instantsToConsiderForNextSync, CURRENT_VERSION);
   }
 
   public String toJson() {

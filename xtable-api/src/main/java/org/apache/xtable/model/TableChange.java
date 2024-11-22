@@ -36,4 +36,6 @@ public class TableChange {
 
   /** The {@link InternalTable} at the commit time to which this table change belongs. */
   InternalTable tableAsOfChange;
+
+  String sourceIdentifier;
 }

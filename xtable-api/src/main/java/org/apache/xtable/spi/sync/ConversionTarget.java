@@ -76,8 +76,9 @@ public interface ConversionTarget {
    * Starts the sync and performs any initialization required
    *
    * @param table the table that will be synced
+   * @param sourceIdentifier
    */
-  void beginSync(InternalTable table);
+  void beginSync(InternalTable table, String sourceIdentifier);
 
   /** Completes the sync and performs any cleanup required. */
   void completeSync();

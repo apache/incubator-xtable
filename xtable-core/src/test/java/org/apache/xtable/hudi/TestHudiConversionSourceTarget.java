@@ -248,13 +248,14 @@ public class TestHudiConversionSourceTarget {
   void beginSyncForExistingTable() {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     HudiConversionTarget targetClient = getTargetClient(mockMetaClient);
+    String sourceIdentifier = "0";
 
-    targetClient.beginSync(TABLE);
+    targetClient.beginSync(TABLE, sourceIdentifier);
     // verify meta client timeline refreshed
     verify(mockMetaClient).reloadActiveTimeline();
     // verify existing meta client is used to create commit state
     verify(mockCommitStateCreator)
-        .create(mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS);
+        .create(mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS, sourceIdentifier);
   }
 
   private Pair<HudiConversionTarget.CommitState, HoodieTableMetaClient> initMocksForBeginSync(
@@ -267,9 +268,9 @@ public class TestHudiConversionSourceTarget {
     when(mockHudiTableManager.initializeHudiTable(BASE_PATH, TABLE)).thenReturn(mockMetaClient);
     HudiConversionTarget.CommitState mockCommitState = mock(HudiConversionTarget.CommitState.class);
     when(mockCommitStateCreator.create(
-            mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS))
+            mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS, "0"))
         .thenReturn(mockCommitState);
-    targetClient.beginSync(TABLE);
+    targetClient.beginSync(TABLE, "0");
     return Pair.of(mockCommitState, mockMetaClient);
   }
 }

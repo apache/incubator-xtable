@@ -125,6 +125,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
         .filesDiff(
             dataFileExtractor.getDiffForCommit(
                 hoodieInstantForDiff, table, hoodieInstantForDiff, visibleTimeline))
+        .sourceIdentifier(getCommitIdentifier(hoodieInstantForDiff))
         .build();
   }
 

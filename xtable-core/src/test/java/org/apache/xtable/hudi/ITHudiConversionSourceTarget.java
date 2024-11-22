@@ -197,10 +197,11 @@ public class ITHudiConversionSourceTarget {
             .fileAdded(getTestFile(partitionPath, fileName))
             .fileRemoved(fileToRemove)
             .build();
+    String sourceIdentifier = "0";
     // perform sync
     HudiConversionTarget targetClient = getTargetClient();
     InternalTable initialState = getState(Instant.now());
-    targetClient.beginSync(initialState);
+    targetClient.beginSync(initialState, sourceIdentifier);
     targetClient.syncFilesForDiff(dataFilesDiff);
     targetClient.syncSchema(SCHEMA);
     TableSyncMetadata latestState =
@@ -238,9 +239,10 @@ public class ITHudiConversionSourceTarget {
                             .build()))
                 .build());
     // sync snapshot and metadata
+    String sourceIdentifier = "0";
     InternalTable initialState = getState(Instant.now());
     HudiConversionTarget targetClient = getTargetClient();
-    targetClient.beginSync(initialState);
+    targetClient.beginSync(initialState, sourceIdentifier);
     targetClient.syncFilesForSnapshot(snapshot);
     TableSyncMetadata latestState =
         TableSyncMetadata.of(initialState.getLatestCommitTime(), Collections.emptyList());
@@ -282,10 +284,11 @@ public class ITHudiConversionSourceTarget {
                             .range(Range.scalar("partitionPath"))
                             .build()))
                 .build());
+    String sourceIdentifier1 = "1";
     // sync snapshot and metadata
     InternalTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));
     HudiConversionTarget targetClient = getTargetClient();
-    targetClient.beginSync(initialState);
+    targetClient.beginSync(initialState, sourceIdentifier1);
     targetClient.syncFilesForSnapshot(snapshot);
     TableSyncMetadata latestState =
         TableSyncMetadata.of(initialState.getLatestCommitTime(), Collections.emptyList());
@@ -307,11 +310,13 @@ public class ITHudiConversionSourceTarget {
     // create a new commit that removes fileName1 and adds fileName2
     String fileName2 = "file_2.parquet";
     String filePath2 = getFilePath(partitionPath, fileName2);
+    String sourceIdentifier2 = "2";
     incrementalSync(
         targetClient,
         Collections.singletonList(getTestFile(partitionPath, fileName2)),
         Collections.singletonList(getTestFile(partitionPath, fileName1)),
-        Instant.now().minus(12, ChronoUnit.HOURS));
+        Instant.now().minus(12, ChronoUnit.HOURS),
+        sourceIdentifier2);
 
     assertFileGroupCorrectness(
         metaClient, partitionPath, Arrays.asList(file0Pair, Pair.of(fileName2, filePath2)));
@@ -327,29 +332,35 @@ public class ITHudiConversionSourceTarget {
     // create a new commit that removes fileName2 and adds fileName3
     String fileName3 = "file_3.parquet";
     String filePath3 = getFilePath(partitionPath, fileName3);
+    String sourceIdentifier3 = "3";
     incrementalSync(
         targetClient,
         Collections.singletonList(getTestFile(partitionPath, fileName3)),
         Collections.singletonList(getTestFile(partitionPath, fileName2)),
-        Instant.now().minus(8, ChronoUnit.HOURS));
+        Instant.now().minus(8, ChronoUnit.HOURS),
+        sourceIdentifier3);
 
     // create a commit that just adds fileName4
     String fileName4 = "file_4.parquet";
     String filePath4 = getFilePath(partitionPath, fileName4);
+    String sourceIdentifier4 = "4";
     incrementalSync(
         targetClient,
         Collections.singletonList(getTestFile(partitionPath, fileName4)),
         Collections.emptyList(),
-        Instant.now());
+        Instant.now(),
+        sourceIdentifier4);
 
     // create another commit that should trigger archival of the first two commits
     String fileName5 = "file_5.parquet";
     String filePath5 = getFilePath(partitionPath, fileName5);
+    String sourceIdentifier5 = "5";
     incrementalSync(
         targetClient,
         Collections.singletonList(getTestFile(partitionPath, fileName5)),
         Collections.emptyList(),
-        Instant.now());
+        Instant.now(),
+        sourceIdentifier5);
 
     assertFileGroupCorrectness(
         metaClient,
@@ -376,11 +387,12 @@ public class ITHudiConversionSourceTarget {
       ConversionTarget conversionTarget,
       List<InternalDataFile> filesToAdd,
       List<InternalDataFile> filesToRemove,
-      Instant commitStart) {
+      Instant commitStart,
+      String sourceIdentifier) {
     DataFilesDiff dataFilesDiff2 =
         DataFilesDiff.builder().filesAdded(filesToAdd).filesRemoved(filesToRemove).build();
     InternalTable state3 = getState(commitStart);
-    conversionTarget.beginSync(state3);
+    conversionTarget.beginSync(state3, sourceIdentifier);
     conversionTarget.syncFilesForDiff(dataFilesDiff2);
     TableSyncMetadata latestState =
         TableSyncMetadata.of(state3.getLatestCommitTime(), Collections.emptyList());

@@ -123,7 +123,7 @@ public class TableFormatSync {
                   target -> target.syncFilesForDiff(change.getFilesDiff()),
                   startTime,
                   changes.getPendingCommits(),
-                  changes.getSourceIdentifier()));
+                  change.getSourceIdentifier()));
         } catch (Exception e) {
           log.error("Failed to sync table changes", e);
           resultsForFormat.add(buildResultForError(SyncMode.INCREMENTAL, startTime, e));
@@ -154,7 +154,7 @@ public class TableFormatSync {
       List<Instant> pendingCommits,
       String sourceIdentifier) {
     // initialize the sync
-    conversionTarget.beginSync(tableState);
+    conversionTarget.beginSync(tableState, sourceIdentifier);
     // sync schema updates
     conversionTarget.syncSchema(tableState.getReadSchema());
     // sync partition updates
@@ -163,7 +163,7 @@ public class TableFormatSync {
     fileSyncMethod.sync(conversionTarget);
     // Persist the latest commit time in table properties for incremental syncs.
     TableSyncMetadata latestState =
-        TableSyncMetadata.of(tableState.getLatestCommitTime(), pendingCommits, sourceIdentifier);
+        TableSyncMetadata.of(tableState.getLatestCommitTime(), pendingCommits);
     conversionTarget.syncMetadata(latestState);
     conversionTarget.completeSync();
 

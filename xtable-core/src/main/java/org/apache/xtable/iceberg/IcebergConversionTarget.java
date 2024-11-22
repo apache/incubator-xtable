@@ -21,6 +21,7 @@ package org.apache.xtable.iceberg;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import lombok.extern.log4j.Log4j2;
@@ -66,6 +67,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   private Transaction transaction;
   private Table table;
   private InternalTable internalTableState;
+  private String sourceIdentifier;
 
   public IcebergConversionTarget() {}
 
@@ -139,10 +141,11 @@ public class IcebergConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void beginSync(InternalTable internalTable) {
+  public void beginSync(InternalTable internalTable, String sourceIdentifier) {
     initializeTableIfRequired(internalTable);
     transaction = table.newTransaction();
     internalTableState = internalTable;
+    this.sourceIdentifier = sourceIdentifier;
   }
 
   private void initializeTableIfRequired(InternalTable internalTable) {
@@ -200,13 +203,18 @@ public class IcebergConversionTarget implements ConversionTarget {
         transaction,
         partitionedDataFiles,
         transaction.table().schema(),
-        transaction.table().spec());
+        transaction.table().spec(),
+        sourceIdentifier);
   }
 
   @Override
   public void syncFilesForDiff(DataFilesDiff dataFilesDiff) {
     dataFileUpdatesExtractor.applyDiff(
-        transaction, dataFilesDiff, transaction.table().schema(), transaction.table().spec());
+        transaction,
+        dataFilesDiff,
+        transaction.table().schema(),
+        transaction.table().spec(),
+        sourceIdentifier);
   }
 
   @Override
@@ -221,6 +229,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     transaction.commitTransaction();
     transaction = null;
     internalTableState = null;
+    sourceIdentifier = null;
   }
 
   private void safeDelete(String file) {
@@ -244,12 +253,21 @@ public class IcebergConversionTarget implements ConversionTarget {
 
   @Override
   public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
+    long sourceIdentifierVal = Long.parseLong(sourceIdentifier);
     for (Snapshot snapshot : table.snapshots()) {
-      Optional<TableSyncMetadata> metadata =
-          TableSyncMetadata.fromJson(snapshot.summary().get(TableSyncMetadata.XTABLE_METADATA));
-      if (metadata.isPresent()
-          && String.valueOf(metadata.get().getSourceIdentifier()).equals(sourceIdentifier)) {
-        return Optional.of(String.valueOf(snapshot.snapshotId()));
+      Map<String, String> summary = snapshot.summary();
+      String curSourceIdentifier = summary.get("XTABLE_SOURCE_IDENTIFIER");
+      if (curSourceIdentifier == null) {
+        continue;
+      }
+
+      if (sourceIdentifier.equals(curSourceIdentifier)) {
+        return Optional.of(curSourceIdentifier);
+      }
+
+      long curSourceIdentifierVal = Long.parseLong(curSourceIdentifier);
+      if (curSourceIdentifierVal < sourceIdentifierVal) {
+        return Optional.empty();
       }
     }
     return Optional.empty();

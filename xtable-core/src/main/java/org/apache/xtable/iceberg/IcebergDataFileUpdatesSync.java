@@ -46,7 +46,8 @@ public class IcebergDataFileUpdatesSync {
       Transaction transaction,
       List<PartitionFileGroup> partitionedDataFiles,
       Schema schema,
-      PartitionSpec partitionSpec) {
+      PartitionSpec partitionSpec,
+      String sourceIdentifier) {
 
     Map<String, DataFile> previousFiles = new HashMap<>();
     try (CloseableIterable<FileScanTask> iterator = table.newScan().planFiles()) {
@@ -60,21 +61,34 @@ public class IcebergDataFileUpdatesSync {
     FilesDiff<InternalDataFile, DataFile> diff =
         DataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
-    applyDiff(transaction, diff.getFilesAdded(), diff.getFilesRemoved(), schema, partitionSpec);
+    applyDiff(
+        transaction,
+        diff.getFilesAdded(),
+        diff.getFilesRemoved(),
+        schema,
+        partitionSpec,
+        sourceIdentifier);
   }
 
   public void applyDiff(
       Transaction transaction,
       DataFilesDiff dataFilesDiff,
       Schema schema,
-      PartitionSpec partitionSpec) {
+      PartitionSpec partitionSpec,
+      String sourceIdentifier) {
 
     Collection<DataFile> filesRemoved =
         dataFilesDiff.getFilesRemoved().stream()
             .map(file -> getDataFile(partitionSpec, schema, file))
             .collect(Collectors.toList());
 
-    applyDiff(transaction, dataFilesDiff.getFilesAdded(), filesRemoved, schema, partitionSpec);
+    applyDiff(
+        transaction,
+        dataFilesDiff.getFilesAdded(),
+        filesRemoved,
+        schema,
+        partitionSpec,
+        sourceIdentifier);
   }
 
   private void applyDiff(
@@ -82,10 +96,12 @@ public class IcebergDataFileUpdatesSync {
       Collection<InternalDataFile> filesAdded,
       Collection<DataFile> filesRemoved,
       Schema schema,
-      PartitionSpec partitionSpec) {
+      PartitionSpec partitionSpec,
+      String sourceIdentifier) {
     OverwriteFiles overwriteFiles = transaction.newOverwrite();
     filesAdded.forEach(f -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, f)));
     filesRemoved.forEach(overwriteFiles::deleteFile);
+    overwriteFiles.set("XTABLE_SOURCE_IDENTIFIER", sourceIdentifier);
     overwriteFiles.commit();
   }
 
