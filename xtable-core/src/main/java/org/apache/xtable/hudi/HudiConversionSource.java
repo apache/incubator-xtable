@@ -94,11 +94,6 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
             .findInstantsBefore(latestCommit.getTimestamp())
             .getInstants();
     InternalTable table = getTable(latestCommit);
-    String sourceIdentifer = InternalSnapshot.DEFAULT_IDENTIFIER;
-    if (!pendingInstants.isEmpty()) {
-      HoodieInstant lastPendingInstant = pendingInstants.get(pendingInstants.size() - 1);
-      sourceIdentifer = lastPendingInstant.getTimestamp() + "_" + lastPendingInstant.getAction();
-    }
     return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(dataFileExtractor.getFilesCurrentState(table))
@@ -108,7 +103,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
                     hoodieInstant ->
                         HudiInstantUtils.parseFromInstantTime(hoodieInstant.getTimestamp()))
                 .collect(CustomCollectors.toList(pendingInstants.size())))
-        .sourceIdentifier(sourceIdentifer)
+        .sourceIdentifier(getCommitIdentifier(latestCommit))
         .build();
   }
 

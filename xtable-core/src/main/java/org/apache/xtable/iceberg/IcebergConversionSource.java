@@ -160,7 +160,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         .version(String.valueOf(currentSnapshot.snapshotId()))
         .table(irTable)
         .partitionedDataFiles(partitionedDataFiles)
-        .sourceIdentifier(String.valueOf(currentSnapshot.snapshotId()))
+        .sourceIdentifier(getCommitIdentifier(currentSnapshot))
         .build();
   }
 
