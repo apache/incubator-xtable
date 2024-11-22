@@ -50,6 +50,7 @@ public class TableSyncMetadata {
 
   /** Property name for the XTABLE metadata in the table metadata/properties */
   public static final String XTABLE_METADATA = "XTABLE_METADATA";
+
   public static final String XTABLE_SOURCE_IDENTIFIER = "XTABLE_SOURCE_IDENTIFIER";
 
   Instant lastInstantSynced;

@@ -253,7 +253,8 @@ public class DeltaConversionTarget implements ConversionTarget {
         continue;
       }
 
-      Option<String> curSourceIdentifierOption = tags.get().get(TableSyncMetadata.XTABLE_SOURCE_IDENTIFIER);
+      Option<String> curSourceIdentifierOption =
+          tags.get().get(TableSyncMetadata.XTABLE_SOURCE_IDENTIFIER);
       if (curSourceIdentifierOption.isEmpty()) {
         continue;
       }
