@@ -152,7 +152,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
 
   @Override
   public String getCommitIdentifier(HoodieInstant commit) {
-    return commit.getTimestamp() + "_" + commit.getAction();
+    return commit.getTimestamp();
   }
 
   private boolean doesCommitExistsAsOfInstant(Instant instant) {
