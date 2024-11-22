@@ -157,39 +157,6 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
     return commit.getTimestamp() + "_" + commit.getAction();
   }
 
-  @Override
-  public Optional<InternalSnapshot> getRollbackSnapshot(TableSyncMetadata lastSyncMetadata) {
-    String lastSyncCommit =
-        HudiInstantUtils.convertInstantToCommit(lastSyncMetadata.getLastInstantSynced());
-    HoodieTimeline pendingTimeline = getCompletedCommits().findInstantsAfter(lastSyncCommit);
-    List<HoodieInstant> instantsAfterLastSync = pendingTimeline.getInstants();
-    Optional<HoodieInstant> rollbackInstant =
-        instantsAfterLastSync.stream()
-            .filter(instant -> "rollback".equalsIgnoreCase(instant.getAction()))
-            .findFirst();
-    if (rollbackInstant.isPresent()) {
-      String rollbackTimestamp = rollbackInstant.get().getTimestamp();
-      List<HoodieInstant> pendingInstants =
-          pendingTimeline.findInstantsBeforeOrEquals(rollbackTimestamp).getInstants();
-      InternalTable table = getTable(rollbackInstant.get());
-      return Optional.of(
-          InternalSnapshot.builder()
-              .table(table)
-              .partitionedDataFiles(dataFileExtractor.getFilesCurrentState(table))
-              .pendingCommits(
-                  pendingInstants.stream()
-                      .map(
-                          hoodieInstant ->
-                              HudiInstantUtils.parseFromInstantTime(hoodieInstant.getTimestamp()))
-                      .collect(CustomCollectors.toList(pendingInstants.size())))
-              .sourceIdentifier(
-                  rollbackInstant.get().getTimestamp() + "_" + rollbackInstant.get().getAction())
-              .build());
-    }
-
-    return Optional.empty();
-  }
-
   private boolean doesCommitExistsAsOfInstant(Instant instant) {
     HoodieInstant hoodieInstant = getCommitAtInstant(instant);
     return hoodieInstant != null;

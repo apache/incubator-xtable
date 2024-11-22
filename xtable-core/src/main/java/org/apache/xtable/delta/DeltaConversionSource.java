@@ -166,37 +166,6 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
   }
 
-  /**
-   * Extracts the rollback snapshot through the following steps: 1. Retrieve all commits made after
-   * the last sync 2. Identify the latest restore log among these commits 3. Return the {@link
-   * InternalSnapshot} from the latest restore log
-   */
-  @Override
-  public Optional<InternalSnapshot> getRollbackSnapshot(TableSyncMetadata lastSyncMetadata) {
-    DeltaHistoryManager.Commit deltaCommitAtLastSyncInstant =
-        deltaLog
-            .history()
-            .getActiveCommitAtTime(
-                Timestamp.from(lastSyncMetadata.getLastInstantSynced()), true, false, true);
-    long lastSyncVersion = deltaCommitAtLastSyncInstant.getVersion();
-    Seq<DeltaHistory> deltaCommits = deltaLog.history().getHistory(lastSyncVersion, null);
-    // Using find to get first "RESTORE" operation from history (latest to oldest)
-    Option<DeltaHistory> restoreLog =
-        deltaCommits.find(history -> "RESTORE".equals(history.operation()));
-    if (restoreLog.isDefined()) {
-      DeltaHistory unwrapRestoreLog = restoreLog.get();
-      InternalTable table = getTable(unwrapRestoreLog.getVersion());
-      Snapshot snapshot = deltaLog.getSnapshotAt(lastSyncVersion, Option.empty());
-      return Optional.of(
-          InternalSnapshot.builder()
-              .table(table)
-              .partitionedDataFiles(getInternalDataFiles(snapshot, table.getReadSchema()))
-              .sourceIdentifier(String.valueOf(snapshot.version()))
-              .build());
-    }
-    return Optional.empty();
-  }
-
   @Override
   public String getCommitIdentifier(Long commit) {
     return String.valueOf(commit);

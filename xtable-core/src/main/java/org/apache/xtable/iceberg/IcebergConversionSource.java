@@ -265,23 +265,6 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
     return true;
   }
 
-  /*
-   * Extract rollback snapshot by checking if the current snapshot
-   * matches any entry in the table's history.
-   */
-  @Override
-  public Optional<InternalSnapshot> getRollbackSnapshot(TableSyncMetadata lastSyncMetadata) {
-    Table iceTable = getSourceTable();
-    long currentSnapshotId = iceTable.currentSnapshot().snapshotId();
-    for (HistoryEntry historyEntry : iceTable.history()) {
-      if (historyEntry.snapshotId() == currentSnapshotId) {
-        return Optional.of(getCurrentSnapshot());
-      }
-    }
-
-    return Optional.empty();
-  }
-
   @Override
   public String getCommitIdentifier(Snapshot commit) {
     return String.valueOf(commit.snapshotId());

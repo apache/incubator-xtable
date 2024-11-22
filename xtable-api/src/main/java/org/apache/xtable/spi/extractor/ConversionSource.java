@@ -68,15 +68,6 @@ public interface ConversionSource<COMMIT> extends Closeable {
   CommitsBacklog<COMMIT> getCommitsBacklog(InstantsForIncrementalSync instantsForIncrementalSync);
 
   /**
-   * Extracts the rollback snapshot as {@link InternalSnapshot} from the changes since the last sync
-   * of the source table.
-   *
-   * @param lastSyncMetadata The last sync metadata
-   * @return {@link InternalSnapshot} represent the rollback snapshot
-   */
-  Optional<InternalSnapshot> getRollbackSnapshot(TableSyncMetadata lastSyncMetadata);
-
-  /**
    * Determines whether an incremental sync is safe from a given instant. This method checks for a
    * couple of things: the existence of a commit at or before the provided instant and whether the
    * instant has been impacted by any table cleanup operations, (Ex: Cleaner runs in Hudi, Vacuum in

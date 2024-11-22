@@ -296,44 +296,6 @@ class TestIcebergConversionTargetSource {
     // validatePendingCommits(catalogSales, snapshot1, snapshot2, snapshot3b, snapshot4);
   }
 
-  @Test
-  public void testGetRollbackSnapshot(@TempDir Path workingDir) throws IOException {
-    // Step 1: Create a test Iceberg table with initial data
-    Table catalogSales = createTestTableWithData(workingDir.toString());
-    SourceTable sourceTableConfig = getPerTableConfig(catalogSales);
-    IcebergConversionSource conversionSource =
-        sourceProvider.getConversionSourceInstance(sourceTableConfig);
-    Snapshot snapshot1 = catalogSales.currentSnapshot();
-
-    // Step 2: Add 2 more data and sync
-    String dataFilePath =
-        String.join("/", catalogSales.location(), "data", UUID.randomUUID() + ".parquet");
-    catalogSales
-        .newAppend()
-        .appendFile(generateTestDataFile(10, catalogSales, dataFilePath))
-        .commit();
-    dataFilePath =
-        String.join("/", catalogSales.location(), "data", UUID.randomUUID() + ".parquet");
-    catalogSales
-        .newAppend()
-        .appendFile(generateTestDataFile(20, catalogSales, dataFilePath))
-        .commit();
-    // Verify that we have 3 snapshots
-    assertEquals(3, catalogSales.history().size());
-
-    // Step 3: Perform a rollback to Snapshot 1
-    catalogSales.manageSnapshots().rollbackTo(snapshot1.snapshotId()).commit();
-
-    // Step 4: Check the correctness of rollback snapshot
-    TableSyncMetadata fakeLastSyncMetadata =
-        TableSyncMetadata.of(Instant.ofEpochMilli(0), Collections.emptyList());
-    Optional<InternalSnapshot> rolledBackSnapshot =
-        conversionSource.getRollbackSnapshot(fakeLastSyncMetadata);
-    assertTrue(rolledBackSnapshot.isPresent());
-    assertEquals(
-        String.valueOf(snapshot1.snapshotId()), rolledBackSnapshot.get().getSourceIdentifier());
-  }
-
   private void validatePendingCommits(Table table, Snapshot lastSync, Snapshot... snapshots) {
     InstantsForIncrementalSync instant =
         InstantsForIncrementalSync.builder()

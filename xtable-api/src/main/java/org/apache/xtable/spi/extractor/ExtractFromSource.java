@@ -54,8 +54,4 @@ public class ExtractFromSource<COMMIT> {
         .pendingCommits(commitsBacklog.getInFlightInstants())
         .build();
   }
-
-  public Optional<InternalSnapshot> extractRollbackSnapshot(TableSyncMetadata lastSyncMetadata) {
-    return conversionSource.getRollbackSnapshot(lastSyncMetadata);
-  }
 }
