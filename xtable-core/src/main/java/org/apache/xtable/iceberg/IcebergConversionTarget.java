@@ -256,7 +256,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     long sourceIdentifierVal = Long.parseLong(sourceIdentifier);
     for (Snapshot snapshot : table.snapshots()) {
       Map<String, String> summary = snapshot.summary();
-      String curSourceIdentifier = summary.get("XTABLE_SOURCE_IDENTIFIER");
+      String curSourceIdentifier = summary.get(TableSyncMetadata.XTABLE_SOURCE_IDENTIFIER);
       if (curSourceIdentifier == null) {
         continue;
       }

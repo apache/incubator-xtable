@@ -253,7 +253,7 @@ public class DeltaConversionTarget implements ConversionTarget {
         continue;
       }
 
-      Option<String> curSourceIdentifierOption = tags.get().get("XTABLE_SOURCE_IDENTIFIER");
+      Option<String> curSourceIdentifierOption = tags.get().get(TableSyncMetadata.XTABLE_SOURCE_IDENTIFIER);
       if (curSourceIdentifierOption.isEmpty()) {
         continue;
       }
@@ -370,7 +370,7 @@ public class DeltaConversionTarget implements ConversionTarget {
 
     private Map<String, String> getCommitTags() {
       Map<String, String> tags = new HashMap<>();
-      tags.put("XTABLE_SOURCE_IDENTIFIER", sourceIdentifier);
+      tags.put(TableSyncMetadata.XTABLE_SOURCE_IDENTIFIER, sourceIdentifier);
       return tags;
     }
   }

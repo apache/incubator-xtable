@@ -328,19 +328,22 @@ public class HudiConversionTarget implements ConversionTarget {
     if (!metaClient.isPresent()) {
       return Optional.empty();
     }
+
     HoodieTimeline completedTimeline =
         metaClient.get().getActiveTimeline().filterCompletedInstants();
+
     for (HoodieInstant instant : completedTimeline.getInstants()) {
       Option<byte[]> instantDetails =
           metaClient.get().getActiveTimeline().getInstantDetails(instant);
       if (!instantDetails.isPresent()) {
         continue;
       }
+
       try {
         HoodieCommitMetadata commitMetadata =
             HoodieCommitMetadata.fromBytes(instantDetails.get(), HoodieCommitMetadata.class);
         String curSourceIdentifier =
-            commitMetadata.getExtraMetadata().get("XTABLE_SOURCE_IDENTIFIER");
+            commitMetadata.getExtraMetadata().get(TableSyncMetadata.XTABLE_SOURCE_IDENTIFIER);
         if (curSourceIdentifier == null) {
           continue;
         }
@@ -348,12 +351,13 @@ public class HudiConversionTarget implements ConversionTarget {
         if (sourceIdentifier.equals(curSourceIdentifier)) {
           return Optional.of(sourceIdentifier);
         }
+
         long curSourceIdentifierVal = Long.parseLong(curSourceIdentifier);
         if (curSourceIdentifierVal < sourceIdentifierVal) {
           return Optional.empty();
         }
-
-      } catch (IOException ignored) {
+      } catch (IOException e) {
+        log.warn("Failed to parse commit metadata for instant: {}", instant, e);
       }
     }
     return Optional.empty();
@@ -597,7 +601,7 @@ public class HudiConversionTarget implements ConversionTarget {
     private Option<Map<String, String>> getExtraMetadata() {
       Map<String, String> extraMetadata = new HashMap<>();
       extraMetadata.put(TableSyncMetadata.XTABLE_METADATA, tableSyncMetadata.toJson());
-      extraMetadata.put("XTABLE_SOURCE_IDENTIFIER", sourceIdentifier);
+      extraMetadata.put(TableSyncMetadata.XTABLE_SOURCE_IDENTIFIER, sourceIdentifier);
       return Option.of(extraMetadata);
     }
 

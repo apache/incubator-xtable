@@ -30,6 +30,7 @@ import org.apache.iceberg.io.CloseableIterable;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -101,7 +102,7 @@ public class IcebergDataFileUpdatesSync {
     OverwriteFiles overwriteFiles = transaction.newOverwrite();
     filesAdded.forEach(f -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, f)));
     filesRemoved.forEach(overwriteFiles::deleteFile);
-    overwriteFiles.set("XTABLE_SOURCE_IDENTIFIER", sourceIdentifier);
+    overwriteFiles.set(TableSyncMetadata.XTABLE_SOURCE_IDENTIFIER, sourceIdentifier);
     overwriteFiles.commit();
   }
 
