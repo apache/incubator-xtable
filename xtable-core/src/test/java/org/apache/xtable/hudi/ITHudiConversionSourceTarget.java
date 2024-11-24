@@ -22,6 +22,7 @@ import static org.apache.xtable.hudi.HudiTestUtil.createWriteStatus;
 import static org.apache.xtable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.apache.xtable.hudi.HudiTestUtil.initTableAndGetMetaClient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -32,6 +33,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -284,8 +286,9 @@ public class ITHudiConversionSourceTarget {
                             .range(Range.scalar("partitionPath"))
                             .build()))
                 .build());
-    String sourceIdentifier1 = "1";
+
     // sync snapshot and metadata
+    String sourceIdentifier1 = "1";
     InternalTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));
     HudiConversionTarget targetClient = getTargetClient();
     targetClient.beginSync(initialState, sourceIdentifier1);
@@ -306,6 +309,10 @@ public class ITHudiConversionSourceTarget {
             CONTEXT, getHoodieWriteConfig(metaClient).getMetadataConfig(), tableBasePath, true)) {
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
     }
+    Optional<String> targetIdentifier =
+        targetClient.getTargetCommitIdentifier(sourceIdentifier1, metaClient);
+    assertTrue(targetIdentifier.isPresent());
+    assertEquals(sourceIdentifier1, targetIdentifier.get());
 
     // create a new commit that removes fileName1 and adds fileName2
     String fileName2 = "file_2.parquet";
@@ -328,6 +335,10 @@ public class ITHudiConversionSourceTarget {
       // new file stats should be present
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName2);
     }
+    Optional<String> targetIdentifier2 =
+        targetClient.getTargetCommitIdentifier(sourceIdentifier2, metaClient);
+    assertTrue(targetIdentifier2.isPresent());
+    assertEquals(sourceIdentifier2, targetIdentifier2.get());
 
     // create a new commit that removes fileName2 and adds fileName3
     String fileName3 = "file_3.parquet";
@@ -378,6 +389,21 @@ public class ITHudiConversionSourceTarget {
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName3);
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName4);
     }
+    Optional<String> targetIdentifier3 =
+        targetClient.getTargetCommitIdentifier(sourceIdentifier3, metaClient);
+    assertTrue(targetIdentifier3.isPresent());
+    assertEquals(sourceIdentifier3, targetIdentifier3.get());
+
+    Optional<String> targetIdentifier4 =
+        targetClient.getTargetCommitIdentifier(sourceIdentifier4, metaClient);
+    assertTrue(targetIdentifier4.isPresent());
+    assertEquals(sourceIdentifier4, targetIdentifier4.get());
+
+    Optional<String> targetIdentifier5 =
+        targetClient.getTargetCommitIdentifier(sourceIdentifier5, metaClient);
+    assertTrue(targetIdentifier5.isPresent());
+    assertEquals(sourceIdentifier5, targetIdentifier5.get());
+
     // the first commit to the timeline should be archived
     assertEquals(
         2, metaClient.getArchivedTimeline().reload().filterCompletedInstants().countInstants());
