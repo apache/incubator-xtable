@@ -265,10 +265,8 @@ public class DeltaConversionTarget implements ConversionTarget {
         return Optional.of(String.valueOf(targetVersion));
       }
 
-      // Stop further processing if less than sourceIdentifier.
-      // Since we're iterating in reverse order (newest to oldest), any later commits will also be
-      // smaller.
-      if (Long.parseLong(curSourceIdentifier) < sourceIdentifierVal) {
+      // Stop if greater than sourceIdentifier since we're iterating from oldest to newest
+      if (Long.parseLong(curSourceIdentifier) > sourceIdentifierVal) {
         return Optional.empty();
       }
     }

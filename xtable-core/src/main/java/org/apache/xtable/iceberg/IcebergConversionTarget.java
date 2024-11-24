@@ -266,7 +266,8 @@ public class IcebergConversionTarget implements ConversionTarget {
       }
 
       long curSourceIdentifierVal = Long.parseLong(curSourceIdentifier);
-      if (curSourceIdentifierVal < sourceIdentifierVal) {
+      // Stop if greater than sourceIdentifier since we're iterating from oldest to newest
+      if (curSourceIdentifierVal > sourceIdentifierVal) {
         return Optional.empty();
       }
     }

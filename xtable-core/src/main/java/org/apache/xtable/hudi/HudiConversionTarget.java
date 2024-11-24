@@ -324,22 +324,25 @@ public class HudiConversionTarget implements ConversionTarget {
 
   @Override
   public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
-    long sourceIdentifierVal = Long.parseLong(sourceIdentifier);
     if (!metaClient.isPresent()) {
       return Optional.empty();
     }
+    return getTargetCommitIdentifier(sourceIdentifier, metaClient.get());
+  }
 
-    HoodieTimeline completedTimeline =
-        metaClient.get().getActiveTimeline().filterCompletedInstants();
+  public Optional<String> getTargetCommitIdentifier(
+      String sourceIdentifier, HoodieTableMetaClient metaClient) {
+    long sourceIdentifierVal = Long.parseLong(sourceIdentifier);
+
+    HoodieTimeline completedTimeline = metaClient.getActiveTimeline().filterCompletedInstants();
 
     for (HoodieInstant instant : completedTimeline.getInstants()) {
-      Option<byte[]> instantDetails =
-          metaClient.get().getActiveTimeline().getInstantDetails(instant);
-      if (!instantDetails.isPresent()) {
-        continue;
-      }
-
       try {
+        Option<byte[]> instantDetails = metaClient.getActiveTimeline().getInstantDetails(instant);
+        if (!instantDetails.isPresent()) {
+          continue;
+        }
+
         HoodieCommitMetadata commitMetadata =
             HoodieCommitMetadata.fromBytes(instantDetails.get(), HoodieCommitMetadata.class);
         String curSourceIdentifier =
@@ -353,10 +356,11 @@ public class HudiConversionTarget implements ConversionTarget {
         }
 
         long curSourceIdentifierVal = Long.parseLong(curSourceIdentifier);
-        if (curSourceIdentifierVal < sourceIdentifierVal) {
+        // Stop if greater than sourceIdentifier since we're iterating from oldest to newest
+        if (curSourceIdentifierVal > sourceIdentifierVal) {
           return Optional.empty();
         }
-      } catch (IOException e) {
+      } catch (Exception e) {
         log.warn("Failed to parse commit metadata for instant: {}", instant, e);
       }
     }
