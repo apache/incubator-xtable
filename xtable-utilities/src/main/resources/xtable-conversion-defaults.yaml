@@ -27,6 +27,8 @@
 ## configuration: A map of configuration values specific to this converter.
 
 tableFormatConverters:
+    PARQUET:
+      conversionSourceProviderClass: org.apache.xtable.parquet.ParquetConversionSourceProvider
     HUDI:
       conversionSourceProviderClass: org.apache.xtable.hudi.HudiConversionSourceProvider
     DELTA:
