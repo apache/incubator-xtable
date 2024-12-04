@@ -49,6 +49,8 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.metadata.SourceMetadata;
+import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.extractor.ConversionSource;
 
 public class HudiConversionSource implements ConversionSource<HoodieInstant> {
@@ -101,7 +103,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
                     hoodieInstant ->
                         HudiInstantUtils.parseFromInstantTime(hoodieInstant.getTimestamp()))
                 .collect(CustomCollectors.toList(pendingInstants.size())))
-        .sourceIdentifier(getCommitIdentifier(latestCommit))
+        .sourceMetadata(getSourceMetadata(latestCommit))
         .build();
   }
 
@@ -118,7 +120,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
         .filesDiff(
             dataFileExtractor.getDiffForCommit(
                 hoodieInstantForDiff, table, hoodieInstantForDiff, visibleTimeline))
-        .sourceIdentifier(getCommitIdentifier(hoodieInstantForDiff))
+        .sourceMetadata(getSourceMetadata(hoodieInstantForDiff))
         .build();
   }
 
@@ -303,5 +305,12 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
   private static class CommitsPair {
     @Builder.Default List<HoodieInstant> completedCommits = Collections.emptyList();
     @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
+  }
+
+  private SourceMetadata getSourceMetadata(HoodieInstant instant) {
+    return SourceMetadata.builder()
+        .sourceIdentifier(getCommitIdentifier(instant))
+        .tableFormat(TableFormat.HUDI)
+        .build();
   }
 }

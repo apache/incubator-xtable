@@ -31,6 +31,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.SparkSession;
@@ -61,6 +62,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -69,6 +71,7 @@ import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.ConversionTarget;
 
+@Log4j2
 public class DeltaConversionTarget implements ConversionTarget {
   private static final String MIN_READER_VERSION = String.valueOf(1);
   // gets access to generated columns.
@@ -152,14 +155,10 @@ public class DeltaConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void beginSync(InternalTable table, String sourceIdentifier) {
+  public void beginSync(InternalTable table, SourceMetadata sourceMetadata) {
     this.transactionState =
         new TransactionState(
-            deltaLog,
-            tableName,
-            table.getLatestCommitTime(),
-            logRetentionInHours,
-            sourceIdentifier);
+            deltaLog, tableName, table.getLatestCommitTime(), logRetentionInHours, sourceMetadata);
   }
 
   @Override
@@ -253,21 +252,23 @@ public class DeltaConversionTarget implements ConversionTarget {
         continue;
       }
 
-      Option<String> curSourceIdentifierOption =
-          tags.get().get(TableSyncMetadata.XTABLE_SOURCE_IDENTIFIER);
-      if (curSourceIdentifierOption.isEmpty()) {
+      Option<String> sourceMetadataJson = tags.get().get(TableSyncMetadata.XTABLE_SOURCE_METADATA);
+      if (sourceMetadataJson.isEmpty()) {
         continue;
       }
 
-      String curSourceIdentifier = curSourceIdentifierOption.get();
+      try {
+        SourceMetadata sourceMetadata = SourceMetadata.fromJson(sourceMetadataJson.get());
+        if (sourceIdentifier.equals(sourceMetadata.getSourceIdentifier())) {
+          return Optional.of(String.valueOf(targetVersion));
+        }
 
-      if (sourceIdentifier.equals(curSourceIdentifier)) {
-        return Optional.of(String.valueOf(targetVersion));
-      }
-
-      // Stop if greater than sourceIdentifier since we're iterating from oldest to newest
-      if (Long.parseLong(curSourceIdentifier) > sourceIdentifierVal) {
-        return Optional.empty();
+        // Stop if greater than sourceIdentifier since we're iterating from oldest to newest
+        if (Long.parseLong(sourceMetadata.getSourceIdentifier()) > sourceIdentifierVal) {
+          return Optional.empty();
+        }
+      } catch (Exception e) {
+        log.warn("Failed to parse commit metadata for commit: {}", targetVersion, e);
       }
     }
 
@@ -281,7 +282,7 @@ public class DeltaConversionTarget implements ConversionTarget {
     private final Instant commitTime;
     private final DeltaLog deltaLog;
     private final long retentionInHours;
-    private final String sourceIdentifier;
+    private final SourceMetadata sourceMetadata;
     @Getter private final List<String> partitionColumns;
     private final String tableName;
     @Getter private StructType latestSchema;
@@ -294,7 +295,7 @@ public class DeltaConversionTarget implements ConversionTarget {
         String tableName,
         Instant latestCommitTime,
         long retentionInHours,
-        String sourceIdentifier) {
+        SourceMetadata sourceMetadata) {
       this.deltaLog = deltaLog;
       this.transaction = deltaLog.startTransaction();
       this.latestSchema = deltaLog.snapshot().schema();
@@ -302,7 +303,7 @@ public class DeltaConversionTarget implements ConversionTarget {
       this.partitionColumns = new ArrayList<>();
       this.tableName = tableName;
       this.retentionInHours = retentionInHours;
-      this.sourceIdentifier = sourceIdentifier;
+      this.sourceMetadata = sourceMetadata;
     }
 
     private void addColumn(StructField field) {
@@ -369,7 +370,7 @@ public class DeltaConversionTarget implements ConversionTarget {
 
     private Map<String, String> getCommitTags() {
       Map<String, String> tags = new HashMap<>();
-      tags.put(TableSyncMetadata.XTABLE_SOURCE_IDENTIFIER, sourceIdentifier);
+      tags.put(TableSyncMetadata.XTABLE_SOURCE_METADATA, sourceMetadata.toJson());
       return tags;
     }
   }

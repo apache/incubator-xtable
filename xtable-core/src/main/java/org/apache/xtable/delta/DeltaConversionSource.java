@@ -48,11 +48,13 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.extractor.ConversionSource;
 import org.apache.xtable.spi.extractor.DataFileIterator;
 
@@ -89,7 +91,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(getInternalDataFiles(snapshot, table.getReadSchema()))
-        .sourceIdentifier(getCommitIdentifier(snapshot.version()))
+        .sourceMetadata(getSourceMetadata(snapshot.version()))
         .build();
   }
 
@@ -129,7 +131,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     return TableChange.builder()
         .tableAsOfChange(tableAtVersion)
         .filesDiff(dataFilesDiff)
-        .sourceIdentifier(getCommitIdentifier(versionNumber))
+        .sourceMetadata(getSourceMetadata(versionNumber))
         .build();
   }
 
@@ -195,5 +197,12 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   @Override
   public void close() {
     // nothing to close
+  }
+
+  private SourceMetadata getSourceMetadata(long version) {
+    return SourceMetadata.builder()
+        .sourceIdentifier(getCommitIdentifier(version))
+        .tableFormat(TableFormat.DELTA)
+        .build();
   }
 }

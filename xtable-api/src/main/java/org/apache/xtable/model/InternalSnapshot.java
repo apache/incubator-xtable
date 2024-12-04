@@ -25,6 +25,7 @@ import java.util.List;
 import lombok.Builder;
 import lombok.Value;
 
+import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 /**
@@ -39,17 +40,14 @@ import org.apache.xtable.model.storage.PartitionFileGroup;
 @Value
 @Builder
 public class InternalSnapshot {
-  public static final String DEFAULT_IDENTIFIER = "";
-
   // The instant of the Snapshot
   String version;
-  // The source table snapshot identifier
-  // Snapshot ID in Iceberg, version ID in Delta, and instant <timestamp_action> in Hudi
-  @Builder.Default String sourceIdentifier = DEFAULT_IDENTIFIER;
   // Table reference
   InternalTable table;
   // Data files grouped by partition
   List<PartitionFileGroup> partitionedDataFiles;
   // pending commits before latest commit on the table.
   @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
+  // Metadata about source table
+  SourceMetadata sourceMetadata;
 }

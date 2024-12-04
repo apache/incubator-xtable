@@ -30,6 +30,7 @@ import org.apache.iceberg.io.CloseableIterable;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FilesDiff;
@@ -48,7 +49,7 @@ public class IcebergDataFileUpdatesSync {
       List<PartitionFileGroup> partitionedDataFiles,
       Schema schema,
       PartitionSpec partitionSpec,
-      String sourceIdentifier) {
+      SourceMetadata sourceMetadata) {
 
     Map<String, DataFile> previousFiles = new HashMap<>();
     try (CloseableIterable<FileScanTask> iterator = table.newScan().planFiles()) {
@@ -68,7 +69,7 @@ public class IcebergDataFileUpdatesSync {
         diff.getFilesRemoved(),
         schema,
         partitionSpec,
-        sourceIdentifier);
+        sourceMetadata);
   }
 
   public void applyDiff(
@@ -76,7 +77,7 @@ public class IcebergDataFileUpdatesSync {
       DataFilesDiff dataFilesDiff,
       Schema schema,
       PartitionSpec partitionSpec,
-      String sourceIdentifier) {
+      SourceMetadata sourceMetadata) {
 
     Collection<DataFile> filesRemoved =
         dataFilesDiff.getFilesRemoved().stream()
@@ -89,7 +90,7 @@ public class IcebergDataFileUpdatesSync {
         filesRemoved,
         schema,
         partitionSpec,
-        sourceIdentifier);
+        sourceMetadata);
   }
 
   private void applyDiff(
@@ -98,11 +99,11 @@ public class IcebergDataFileUpdatesSync {
       Collection<DataFile> filesRemoved,
       Schema schema,
       PartitionSpec partitionSpec,
-      String sourceIdentifier) {
+      SourceMetadata sourceMetadata) {
     OverwriteFiles overwriteFiles = transaction.newOverwrite();
     filesAdded.forEach(f -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, f)));
     filesRemoved.forEach(overwriteFiles::deleteFile);
-    overwriteFiles.set(TableSyncMetadata.XTABLE_SOURCE_IDENTIFIER, sourceIdentifier);
+    overwriteFiles.set(TableSyncMetadata.XTABLE_SOURCE_METADATA, sourceMetadata.toJson());
     overwriteFiles.commit();
   }
 

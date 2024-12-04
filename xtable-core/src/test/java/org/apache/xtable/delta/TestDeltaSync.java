@@ -82,6 +82,7 @@ import io.delta.standalone.types.StringType;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -421,10 +422,12 @@ public class TestDeltaSync {
 
   private InternalSnapshot buildSnapshot(
       InternalTable table, String sourceIdentifier, InternalDataFile... dataFiles) {
+    SourceMetadata sourceMetadata =
+        SourceMetadata.builder().sourceIdentifier(sourceIdentifier).build();
     return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(PartitionFileGroup.fromFiles(Arrays.asList(dataFiles)))
-        .sourceIdentifier(sourceIdentifier)
+        .sourceMetadata(sourceMetadata)
         .build();
   }
 
