@@ -134,7 +134,15 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
   }
 
   @SneakyThrows
+  @Override
   public void deleteRows(List<Row> deleteRows) {
+    String idsToDelete =
+        deleteRows.stream().map(row -> row.get(0).toString()).collect(Collectors.joining(", "));
+    deltaTable.delete("id in (" + idsToDelete + ")");
+  }
+
+  @SneakyThrows
+  public void mergeDeleteRows(List<Row> deleteRows) {
     List<Row> deletes = testDeltaHelper.transformForUpsertsOrDeletes(deleteRows, false);
     Dataset<Row> deleteDataset =
         sparkSession.createDataFrame(deletes, testDeltaHelper.getTableStructSchema());
