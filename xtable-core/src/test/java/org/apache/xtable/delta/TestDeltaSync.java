@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -81,6 +82,7 @@ import io.delta.standalone.types.StringType;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -159,16 +161,22 @@ public class TestDeltaSync {
     InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
     InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList(), basePath);
 
-    InternalSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
-    InternalSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table1, "0", dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, "1", dataFile2, dataFile3);
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
+    Optional<String> targetIdentifier1 = conversionTarget.getTargetCommitIdentifier("0");
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2)), null);
+    assertTrue(targetIdentifier1.isPresent());
+    assertEquals("0", targetIdentifier1.get());
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
+    Optional<String> targetIdentifier2 = conversionTarget.getTargetCommitIdentifier("1");
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile2, dataFile3)), null);
+    assertTrue(targetIdentifier2.isPresent());
+    assertEquals("1", targetIdentifier2.get());
   }
 
   @Test
@@ -409,9 +417,17 @@ public class TestDeltaSync {
   }
 
   private InternalSnapshot buildSnapshot(InternalTable table, InternalDataFile... dataFiles) {
+    return buildSnapshot(table, "", dataFiles);
+  }
+
+  private InternalSnapshot buildSnapshot(
+      InternalTable table, String sourceIdentifier, InternalDataFile... dataFiles) {
+    SourceMetadata sourceMetadata =
+        SourceMetadata.builder().sourceIdentifier(sourceIdentifier).build();
     return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(PartitionFileGroup.fromFiles(Arrays.asList(dataFiles)))
+        .sourceMetadata(sourceMetadata)
         .build();
   }
 

@@ -37,6 +37,7 @@ import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
@@ -73,7 +74,8 @@ public class TableFormatSync {
                 internalTable,
                 target -> target.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
                 startTime,
-                snapshot.getPendingCommits()));
+                snapshot.getPendingCommits(),
+                snapshot.getSourceMetadata()));
       } catch (Exception e) {
         log.error("Failed to sync snapshot", e);
         results.put(
@@ -121,7 +123,8 @@ public class TableFormatSync {
                   change.getTableAsOfChange(),
                   target -> target.syncFilesForDiff(change.getFilesDiff()),
                   startTime,
-                  changes.getPendingCommits()));
+                  changes.getPendingCommits(),
+                  change.getSourceMetadata()));
         } catch (Exception e) {
           log.error("Failed to sync table changes", e);
           resultsForFormat.add(buildResultForError(SyncMode.INCREMENTAL, startTime, e));
@@ -149,9 +152,10 @@ public class TableFormatSync {
       InternalTable tableState,
       SyncFiles fileSyncMethod,
       Instant startTime,
-      List<Instant> pendingCommits) {
+      List<Instant> pendingCommits,
+      SourceMetadata sourceMetadata) {
     // initialize the sync
-    conversionTarget.beginSync(tableState);
+    conversionTarget.beginSync(tableState, sourceMetadata);
     // sync schema updates
     conversionTarget.syncSchema(tableState.getReadSchema());
     // sync partition updates

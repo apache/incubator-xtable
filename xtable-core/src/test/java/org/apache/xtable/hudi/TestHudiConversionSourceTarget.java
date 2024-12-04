@@ -43,6 +43,7 @@ import org.apache.hudi.common.util.Option;
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -248,28 +249,31 @@ public class TestHudiConversionSourceTarget {
   void beginSyncForExistingTable() {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     HudiConversionTarget targetClient = getTargetClient(mockMetaClient);
+    SourceMetadata sourceMetadata = SourceMetadata.builder().sourceIdentifier("0").build();
 
-    targetClient.beginSync(TABLE);
+    targetClient.beginSync(TABLE, sourceMetadata);
     // verify meta client timeline refreshed
     verify(mockMetaClient).reloadActiveTimeline();
     // verify existing meta client is used to create commit state
     verify(mockCommitStateCreator)
-        .create(mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS);
+        .create(
+            mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS, sourceMetadata.toJson());
   }
 
   private Pair<HudiConversionTarget.CommitState, HoodieTableMetaClient> initMocksForBeginSync(
       HudiConversionTarget targetClient) {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
+    SourceMetadata sourceMetadata = SourceMetadata.builder().sourceIdentifier("0").build();
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.getRecordKeyFields())
         .thenReturn(Option.of(new String[] {"record_key_field"}));
     when(mockHudiTableManager.initializeHudiTable(BASE_PATH, TABLE)).thenReturn(mockMetaClient);
     HudiConversionTarget.CommitState mockCommitState = mock(HudiConversionTarget.CommitState.class);
     when(mockCommitStateCreator.create(
-            mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS))
+            mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS, sourceMetadata.toJson()))
         .thenReturn(mockCommitState);
-    targetClient.beginSync(TABLE);
+    targetClient.beginSync(TABLE, sourceMetadata);
     return Pair.of(mockCommitState, mockMetaClient);
   }
 }

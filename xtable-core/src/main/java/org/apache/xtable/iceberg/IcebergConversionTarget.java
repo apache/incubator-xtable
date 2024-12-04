@@ -21,6 +21,7 @@ package org.apache.xtable.iceberg;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import lombok.extern.log4j.Log4j2;
@@ -41,6 +42,7 @@ import org.apache.iceberg.exceptions.NotFoundException;
 
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -66,6 +68,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   private Transaction transaction;
   private Table table;
   private InternalTable internalTableState;
+  private SourceMetadata sourceMetadata;
 
   public IcebergConversionTarget() {}
 
@@ -139,10 +142,11 @@ public class IcebergConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void beginSync(InternalTable internalTable) {
+  public void beginSync(InternalTable internalTable, SourceMetadata sourceMetadata) {
     initializeTableIfRequired(internalTable);
     transaction = table.newTransaction();
     internalTableState = internalTable;
+    this.sourceMetadata = sourceMetadata;
   }
 
   private void initializeTableIfRequired(InternalTable internalTable) {
@@ -200,13 +204,18 @@ public class IcebergConversionTarget implements ConversionTarget {
         transaction,
         partitionedDataFiles,
         transaction.table().schema(),
-        transaction.table().spec());
+        transaction.table().spec(),
+        sourceMetadata);
   }
 
   @Override
   public void syncFilesForDiff(DataFilesDiff dataFilesDiff) {
     dataFileUpdatesExtractor.applyDiff(
-        transaction, dataFilesDiff, transaction.table().schema(), transaction.table().spec());
+        transaction,
+        dataFilesDiff,
+        transaction.table().schema(),
+        transaction.table().spec(),
+        sourceMetadata);
   }
 
   @Override
@@ -221,6 +230,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     transaction.commitTransaction();
     transaction = null;
     internalTableState = null;
+    sourceMetadata = null;
   }
 
   private void safeDelete(String file) {
@@ -240,6 +250,34 @@ public class IcebergConversionTarget implements ConversionTarget {
   @Override
   public String getTableFormat() {
     return TableFormat.ICEBERG;
+  }
+
+  @Override
+  public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
+    long sourceIdentifierVal = Long.parseLong(sourceIdentifier);
+    for (Snapshot snapshot : table.snapshots()) {
+      Map<String, String> summary = snapshot.summary();
+      String sourceMetadataJson = summary.get(TableSyncMetadata.XTABLE_SOURCE_METADATA);
+      if (sourceMetadataJson == null) {
+        continue;
+      }
+
+      try {
+        SourceMetadata sourceMetadata = SourceMetadata.fromJson(sourceMetadataJson);
+        if (sourceIdentifier.equals(sourceMetadata.getSourceIdentifier())) {
+          return Optional.of(sourceMetadata.getSourceIdentifier());
+        }
+
+        long curSourceIdentifierVal = Long.parseLong(sourceMetadata.getSourceIdentifier());
+        // Stop if greater than sourceIdentifier since we're iterating from oldest to newest
+        if (curSourceIdentifierVal > sourceIdentifierVal) {
+          return Optional.empty();
+        }
+      } catch (Exception e) {
+        log.warn("Failed to parse parse snapshot metadata for {}", snapshot.snapshotId(), e);
+      }
+    }
+    return Optional.empty();
   }
 
   private void rollbackCorruptCommits() {

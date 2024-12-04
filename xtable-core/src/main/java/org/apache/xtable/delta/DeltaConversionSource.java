@@ -48,11 +48,13 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.extractor.ConversionSource;
 import org.apache.xtable.spi.extractor.DataFileIterator;
 
@@ -89,6 +91,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(getInternalDataFiles(snapshot, table.getReadSchema()))
+        .sourceMetadata(getSourceMetadata(snapshot.version()))
         .build();
   }
 
@@ -125,7 +128,11 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     }
     DataFilesDiff dataFilesDiff =
         DataFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
-    return TableChange.builder().tableAsOfChange(tableAtVersion).filesDiff(dataFilesDiff).build();
+    return TableChange.builder()
+        .tableAsOfChange(tableAtVersion)
+        .filesDiff(dataFilesDiff)
+        .sourceMetadata(getSourceMetadata(versionNumber))
+        .build();
   }
 
   @Override
@@ -158,6 +165,11 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
   }
 
+  @Override
+  public String getCommitIdentifier(Long commit) {
+    return String.valueOf(commit);
+  }
+
   private DeltaIncrementalChangesState getChangesState() {
     return deltaIncrementalChangesState.orElseThrow(
         () -> new IllegalStateException("DeltaIncrementalChangesState is not initialized"));
@@ -185,5 +197,12 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   @Override
   public void close() {
     // nothing to close
+  }
+
+  private SourceMetadata getSourceMetadata(long version) {
+    return SourceMetadata.builder()
+        .sourceIdentifier(getCommitIdentifier(version))
+        .tableFormat(TableFormat.DELTA)
+        .build();
   }
 }

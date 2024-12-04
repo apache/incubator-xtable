@@ -55,6 +55,7 @@ import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -157,6 +158,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         .version(String.valueOf(currentSnapshot.snapshotId()))
         .table(irTable)
         .partitionedDataFiles(partitionedDataFiles)
+        .sourceMetadata(getSourceMetadata(currentSnapshot))
         .build();
   }
 
@@ -188,7 +190,11 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         DataFilesDiff.builder().filesAdded(dataFilesAdded).filesRemoved(dataFilesRemoved).build();
 
     InternalTable table = getTable(snapshot);
-    return TableChange.builder().tableAsOfChange(table).filesDiff(filesDiff).build();
+    return TableChange.builder()
+        .tableAsOfChange(table)
+        .filesDiff(filesDiff)
+        .sourceMetadata(getSourceMetadata(snapshot))
+        .build();
   }
 
   @Override
@@ -258,7 +264,19 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   }
 
   @Override
+  public String getCommitIdentifier(Snapshot commit) {
+    return String.valueOf(commit.snapshotId());
+  }
+
+  @Override
   public void close() {
     getTableOps().close();
+  }
+
+  private SourceMetadata getSourceMetadata(Snapshot snapshot) {
+    return SourceMetadata.builder()
+        .sourceIdentifier(getCommitIdentifier(snapshot))
+        .tableFormat(TableFormat.ICEBERG)
+        .build();
   }
 }

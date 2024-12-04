@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -83,6 +84,7 @@ import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -180,7 +182,8 @@ public class HudiConversionTarget implements ConversionTarget {
         HoodieTableMetaClient metaClient,
         String instantTime,
         int timelineRetentionInHours,
-        int maxNumDeltaCommitsBeforeCompaction);
+        int maxNumDeltaCommitsBeforeCompaction,
+        String sourceMetadataJson);
   }
 
   @Override
@@ -258,7 +261,7 @@ public class HudiConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void beginSync(InternalTable table) {
+  public void beginSync(InternalTable table, SourceMetadata sourceMetadata) {
     if (!metaClient.isPresent()) {
       metaClient = Optional.of(hudiTableManager.initializeHudiTable(tableDataPath, table));
     } else {
@@ -268,7 +271,11 @@ public class HudiConversionTarget implements ConversionTarget {
     String instant = HudiInstantUtils.convertInstantToCommit(table.getLatestCommitTime());
     this.commitState =
         commitStateCreator.create(
-            getMetaClient(), instant, timelineRetentionInHours, maxNumDeltaCommitsBeforeCompaction);
+            getMetaClient(),
+            instant,
+            timelineRetentionInHours,
+            maxNumDeltaCommitsBeforeCompaction,
+            sourceMetadata.toJson());
   }
 
   @Override
@@ -316,6 +323,53 @@ public class HudiConversionTarget implements ConversionTarget {
     return TableFormat.HUDI;
   }
 
+  @Override
+  public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
+    if (!metaClient.isPresent()) {
+      return Optional.empty();
+    }
+    return getTargetCommitIdentifier(sourceIdentifier, metaClient.get());
+  }
+
+  public Optional<String> getTargetCommitIdentifier(
+      String sourceIdentifier, HoodieTableMetaClient metaClient) {
+    long sourceIdentifierVal = Long.parseLong(sourceIdentifier);
+
+    HoodieTimeline completedTimeline = metaClient.getActiveTimeline().filterCompletedInstants();
+
+    for (HoodieInstant instant : completedTimeline.getInstants()) {
+      try {
+        Option<byte[]> instantDetails = metaClient.getActiveTimeline().getInstantDetails(instant);
+        if (!instantDetails.isPresent()) {
+          continue;
+        }
+
+        HoodieCommitMetadata commitMetadata =
+            HoodieCommitMetadata.fromBytes(instantDetails.get(), HoodieCommitMetadata.class);
+        String sourceMetadataJson =
+            commitMetadata.getExtraMetadata().get(TableSyncMetadata.XTABLE_SOURCE_METADATA);
+        if (sourceMetadataJson == null) {
+          continue;
+        }
+
+        SourceMetadata sourceMetadata = SourceMetadata.fromJson(sourceMetadataJson);
+
+        if (sourceIdentifier.equals(sourceMetadata.getSourceIdentifier())) {
+          return Optional.of(sourceIdentifier);
+        }
+
+        long curSourceIdentifierVal = Long.parseLong(sourceMetadata.getSourceIdentifier());
+        // Stop if greater than sourceIdentifier since we're iterating from oldest to newest
+        if (curSourceIdentifierVal > sourceIdentifierVal) {
+          return Optional.empty();
+        }
+      } catch (Exception e) {
+        log.warn("Failed to parse commit metadata for instant: {}", instant, e);
+      }
+    }
+    return Optional.empty();
+  }
+
   private HoodieTableMetaClient getMetaClient() {
     return metaClient.orElseThrow(
         () -> new IllegalStateException("beginSync must be called before calling this method"));
@@ -326,6 +380,7 @@ public class HudiConversionTarget implements ConversionTarget {
     @Getter private final String instantTime;
     private final int timelineRetentionInHours;
     private final int maxNumDeltaCommitsBeforeCompaction;
+    private final String sourceMetadataJson;
     private List<WriteStatus> writeStatuses;
     @Setter private Schema schema;
     @Setter private TableSyncMetadata tableSyncMetadata;
@@ -335,7 +390,8 @@ public class HudiConversionTarget implements ConversionTarget {
         HoodieTableMetaClient metaClient,
         String instantTime,
         int timelineRetentionInHours,
-        int maxNumDeltaCommitsBeforeCompaction) {
+        int maxNumDeltaCommitsBeforeCompaction,
+        String sourceMetadataJson) {
       this.metaClient = metaClient;
       this.instantTime = instantTime;
       this.timelineRetentionInHours = timelineRetentionInHours;
@@ -344,6 +400,7 @@ public class HudiConversionTarget implements ConversionTarget {
       this.writeStatuses = Collections.emptyList();
       this.tableSyncMetadata = null;
       this.partitionToReplacedFileIds = Collections.emptyMap();
+      this.sourceMetadataJson = sourceMetadataJson;
     }
 
     public void setReplaceMetadata(BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata) {
@@ -549,8 +606,9 @@ public class HudiConversionTarget implements ConversionTarget {
     }
 
     private Option<Map<String, String>> getExtraMetadata() {
-      Map<String, String> extraMetadata =
-          Collections.singletonMap(TableSyncMetadata.XTABLE_METADATA, tableSyncMetadata.toJson());
+      Map<String, String> extraMetadata = new HashMap<>();
+      extraMetadata.put(TableSyncMetadata.XTABLE_METADATA, tableSyncMetadata.toJson());
+      extraMetadata.put(TableSyncMetadata.XTABLE_SOURCE_METADATA, sourceMetadataJson);
       return Option.of(extraMetadata);
     }
 
