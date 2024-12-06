@@ -16,13 +16,11 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.spi.sync;
+package org.apache.xtable.model.exception;
 
-import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.catalog.CatalogType;
+public class CatalogRefreshException extends InternalException {
 
-public interface CatalogSyncClient extends AutoCloseable {
-  void syncTable(InternalTable table);
-
-  CatalogType getCatalogType();
+  protected CatalogRefreshException(String message, Throwable e) {
+    super(ErrorCode.CATALOG_REFRESH_EXCEPTION, message, e);
+  }
 }

@@ -16,13 +16,16 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.catalog;
+package org.apache.xtable.spi.sync;
 
 import org.apache.xtable.conversion.ExternalCatalog.TableIdentifier;
-import org.apache.xtable.exception.CatalogRefreshException;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.catalog.CatalogType;
 
 public interface CatalogSyncOperations<DATABASE, TABLE> extends AutoCloseable {
+  String getCatalogIdentifier();
+
+  CatalogType getCatalogType();
 
   String getTableFormat();
 
@@ -38,8 +41,7 @@ public interface CatalogSyncOperations<DATABASE, TABLE> extends AutoCloseable {
 
   void createTable(InternalTable table, TableIdentifier tableIdentifier);
 
-  void refreshTable(InternalTable table, TABLE catalogTable, TableIdentifier tableIdentifier)
-      throws CatalogRefreshException;
+  void refreshTable(InternalTable table, TABLE catalogTable, TableIdentifier tableIdentifier);
 
   void createOrReplaceTable(InternalTable table, TableIdentifier tableIdentifier);
 

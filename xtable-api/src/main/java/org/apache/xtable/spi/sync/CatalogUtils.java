@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.catalog;
+package org.apache.xtable.spi.sync;
 
 import java.net.URI;
 import java.util.Arrays;
@@ -27,10 +27,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.Path;
 
 public class CatalogUtils {
-
   private static final List<String> S3_FS_SCHEMES = Arrays.asList("s3", "s3a", "s3n");
 
-  public static boolean hasStorageDescriptorLocationChanged(
+  static boolean hasStorageDescriptorLocationChanged(
       String storageDescriptorLocation, String tableBasePath) {
 
     if (StringUtils.isEmpty(storageDescriptorLocation)) {
