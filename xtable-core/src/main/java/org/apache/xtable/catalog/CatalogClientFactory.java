@@ -16,26 +16,28 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.exception;
+package org.apache.xtable.catalog;
 
-import lombok.Getter;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
-@Getter
-public enum ErrorCode {
-  INVALID_CONFIGURATION(10001),
-  INVALID_PARTITION_SPEC(10002),
-  INVALID_PARTITION_VALUE(10003),
-  READ_EXCEPTION(10004),
-  UPDATE_EXCEPTION(10005),
-  INVALID_SCHEMA(10006),
-  UNSUPPORTED_SCHEMA_TYPE(10007),
-  UNSUPPORTED_FEATURE(10008),
-  PARSE_EXCEPTION(10009),
-  CATALOG_REFRESH_EXCEPTION(10010);
+import org.apache.xtable.conversion.ExternalCatalog;
+import org.apache.xtable.model.catalog.CatalogType;
+import org.apache.xtable.spi.sync.CatalogSyncClient;
 
-  private final int errorCode;
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public class CatalogClientFactory {
+  private static final CatalogClientFactory INSTANCE = new CatalogClientFactory();
 
-  ErrorCode(int errorCode) {
-    this.errorCode = errorCode;
+  public static CatalogClientFactory getInstance() {
+    return INSTANCE;
+  }
+
+  public CatalogSyncClient createForCatalogAndFormat(
+      String tableFormat, ExternalCatalog externalCatalog) {
+    if (externalCatalog.getCatalogType() == CatalogType.HMS) {
+      // TODO: Create CatalogSyncOperations based on tableFormat and catalogType.
+    }
+    return null;
   }
 }

@@ -18,6 +18,7 @@
  
 package org.apache.xtable.conversion;
 
+import java.util.Collections;
 import java.util.List;
 
 import lombok.Builder;
@@ -36,15 +37,21 @@ public class ConversionConfig {
   List<TargetTable> targetTables;
   // The mode, incremental or snapshot
   SyncMode syncMode;
+  // One or more external catalogs to sync the table metadata to
+  List<ExternalCatalog> externalCatalogs;
 
   @Builder
   ConversionConfig(
-      @NonNull SourceTable sourceTable, List<TargetTable> targetTables, SyncMode syncMode) {
+      @NonNull SourceTable sourceTable,
+      List<TargetTable> targetTables,
+      SyncMode syncMode,
+      List<ExternalCatalog> externalCatalogs) {
     this.sourceTable = sourceTable;
     this.targetTables = targetTables;
     Preconditions.checkArgument(
         targetTables != null && !targetTables.isEmpty(),
         "Please provide at-least one format to sync");
     this.syncMode = syncMode == null ? SyncMode.INCREMENTAL : syncMode;
+    this.externalCatalogs = externalCatalogs == null ? Collections.emptyList() : externalCatalogs;
   }
 }
