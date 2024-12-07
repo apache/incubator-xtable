@@ -37,7 +37,6 @@ tableFormatConverters:
       configuration:
         spark.master: local[2]
         spark.app.name: xtable
-        spark.databricks.delta.commitValidation.enabled: false
     ICEBERG:
       conversionSourceProviderClass: org.apache.xtable.iceberg.IcebergConversionSourceProvider
       conversionTargetProviderClass: org.apache.xtable.iceberg.IcebergConversionTarget
