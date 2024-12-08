@@ -26,6 +26,9 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import lombok.Data;
@@ -69,6 +72,8 @@ public class RunSync {
   private static final String HADOOP_CONFIG_PATH = "p";
   private static final String CONVERTERS_CONFIG_PATH = "c";
   private static final String ICEBERG_CATALOG_CONFIG_PATH = "i";
+  private static final String CONTINUOUS_MODE = "m";
+  private static final String CONTINUOUS_MODE_INTERVAL = "t";
   private static final String HELP_OPTION = "h";
 
   private static final Options OPTIONS =
@@ -96,6 +101,14 @@ public class RunSync {
               true,
               "The path to a yaml file containing Iceberg catalog configuration. The configuration will be "
                   + "used for any Iceberg source or target.")
+          .addOption(CONTINUOUS_MODE,
+              "continuousMode",
+              false,
+              "Runs the tool on a scheduled loop. On each iteration, the process will reload the configurations from the provided file path allowing the user to update the tables managed by the job without restarting the job.")
+          .addOption(CONTINUOUS_MODE_INTERVAL,
+              "continuousModeInterval",
+              true,
+              "The interval in seconds to schedule the loop. Requires --continuousMode to be set.")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   public static void main(String[] args) throws IOException {
@@ -115,6 +128,22 @@ public class RunSync {
       return;
     }
 
+    if (cmd.hasOption(CONTINUOUS_MODE)) {
+      ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
+      long intervalInSeconds = Long.parseLong(cmd.getOptionValue(CONTINUOUS_MODE_INTERVAL, "1"));
+      executorService.scheduleAtFixedRate(() -> {
+        try {
+          runSync(cmd);
+        } catch (IOException ex) {
+          log.error("Sync operation failed", ex);
+        }
+      }, 0, intervalInSeconds, TimeUnit.SECONDS);
+    } else {
+      runSync(cmd);
+    }
+  }
+
+  private static void runSync(CommandLine cmd) throws IOException {
     DatasetConfig datasetConfig = new DatasetConfig();
     try (InputStream inputStream =
         Files.newInputStream(Paths.get(cmd.getOptionValue(DATASET_CONFIG_OPTION)))) {
