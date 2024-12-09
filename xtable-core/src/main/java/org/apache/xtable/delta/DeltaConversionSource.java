@@ -21,8 +21,10 @@ package org.apache.xtable.delta;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -99,11 +101,16 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     Snapshot snapshotAtVersion = deltaLog.getSnapshotAt(versionNumber, Option.empty());
     FileFormat fileFormat =
         actionsConverter.convertToFileFormat(snapshotAtVersion.metadata().format().provider());
-    Set<InternalDataFile> addedFiles = new HashSet<>();
-    Set<InternalDataFile> removedFiles = new HashSet<>();
+
+    // All 3 of the following data structures use data file's absolute path as the key
+    Map<String, InternalDataFile> addedFiles = new HashMap<>();
+    Map<String, InternalDataFile> removedFiles = new HashMap<>();
+    // Set of data file paths for which deletion vectors exists.
+    Set<String> deletionVectors = new HashSet<>();
+
     for (Action action : actionsForVersion) {
       if (action instanceof AddFile) {
-        addedFiles.add(
+        InternalDataFile dataFile =
             actionsConverter.convertAddActionToInternalDataFile(
                 (AddFile) action,
                 snapshotAtVersion,
@@ -112,19 +119,47 @@ public class DeltaConversionSource implements ConversionSource<Long> {
                 tableAtVersion.getReadSchema().getFields(),
                 true,
                 DeltaPartitionExtractor.getInstance(),
-                DeltaStatsExtractor.getInstance()));
+                DeltaStatsExtractor.getInstance());
+        addedFiles.put(dataFile.getPhysicalPath(), dataFile);
+        String deleteVectorPath =
+            actionsConverter.extractDeletionVectorFile(snapshotAtVersion, (AddFile) action);
+        if (deleteVectorPath != null) {
+          deletionVectors.add(deleteVectorPath);
+        }
       } else if (action instanceof RemoveFile) {
-        removedFiles.add(
+        InternalDataFile dataFile =
             actionsConverter.convertRemoveActionToInternalDataFile(
                 (RemoveFile) action,
                 snapshotAtVersion,
                 fileFormat,
                 tableAtVersion.getPartitioningFields(),
-                DeltaPartitionExtractor.getInstance()));
+                DeltaPartitionExtractor.getInstance());
+        removedFiles.put(dataFile.getPhysicalPath(), dataFile);
       }
     }
+
+    // In Delta Lake if delete vector information is added for an existing data file, as a result of
+    // a delete operation, then a new RemoveFile action is added to the commit log to remove the old
+    // entry which is replaced by a new entry, AddFile with delete vector information. Since the
+    // same data file is removed and added, we need to remove it from the added and removed file
+    // maps which are used to track actual added and removed data files.
+    for (String deletionVector : deletionVectors) {
+      // validate that a Remove action is also added for the data file
+      if (removedFiles.containsKey(deletionVector)) {
+        addedFiles.remove(deletionVector);
+        removedFiles.remove(deletionVector);
+      } else {
+        log.warn(
+            "No Remove action found for the data file for which deletion vector is added {}. This is unexpected.",
+            deletionVector);
+      }
+    }
+
     DataFilesDiff dataFilesDiff =
-        DataFilesDiff.builder().filesAdded(addedFiles).filesRemoved(removedFiles).build();
+        DataFilesDiff.builder()
+            .filesAdded(addedFiles.values())
+            .filesRemoved(removedFiles.values())
+            .build();
     return TableChange.builder().tableAsOfChange(tableAtVersion).filesDiff(dataFilesDiff).build();
   }
 

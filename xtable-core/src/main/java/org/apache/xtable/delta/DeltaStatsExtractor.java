@@ -34,15 +34,20 @@ import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Value;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.spark.sql.delta.actions.AddFile;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.exception.ParseException;
@@ -56,6 +61,7 @@ import org.apache.xtable.model.stat.Range;
  * DeltaStatsExtractor extracts column stats and also responsible for their serialization leveraging
  * {@link DeltaValueConverter}.
  */
+@Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaStatsExtractor {
   private static final Set<InternalType> FIELD_TYPES_WITH_STATS_SUPPORT =
@@ -74,8 +80,12 @@ public class DeltaStatsExtractor {
 
   private static final DeltaStatsExtractor INSTANCE = new DeltaStatsExtractor();
 
-  private static final String PATH_DELIMITER = "\\.";
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  /* this data structure collects type names of all unrecognized Delta Lake stats. For instance
+  data file stats in presence of delete vectors would contain 'tightBounds' stat which is
+  currently not handled by XTable */
+  private final Set<String> unsupportedStats = new HashSet<>();
 
   public static DeltaStatsExtractor getInstance() {
     return INSTANCE;
@@ -182,6 +192,8 @@ public class DeltaStatsExtractor {
     // TODO: Additional work needed to track maps & arrays.
     try {
       DeltaStats deltaStats = MAPPER.readValue(addFile.stats(), DeltaStats.class);
+      collectUnsupportedStats(deltaStats.getAdditionalStats());
+
       Map<String, Object> fieldPathToMaxValue = flattenStatMap(deltaStats.getMaxValues());
       Map<String, Object> fieldPathToMinValue = flattenStatMap(deltaStats.getMinValues());
       Map<String, Object> fieldPathToNullCount = flattenStatMap(deltaStats.getNullCount());
@@ -209,6 +221,20 @@ public class DeltaStatsExtractor {
     } catch (IOException ex) {
       throw new ParseException("Unable to parse stats json", ex);
     }
+  }
+
+  private void collectUnsupportedStats(Map<String, Object> additionalStats) {
+    if (additionalStats == null || additionalStats.isEmpty()) {
+      return;
+    }
+
+    additionalStats.keySet().stream()
+        .filter(key -> !unsupportedStats.contains(key))
+        .forEach(
+            key -> {
+              log.info("Unrecognized/unsupported Delta data file stat: {}", key);
+              unsupportedStats.add(key);
+            });
   }
 
   /**
@@ -239,6 +265,17 @@ public class DeltaStatsExtractor {
     return result;
   }
 
+  /**
+   * Returns the names of all unsupported stats that have been discovered during the parsing of
+   * Delta Lake stats.
+   *
+   * @return set of unsupported stats
+   */
+  @VisibleForTesting
+  Set<String> getUnsupportedStats() {
+    return Collections.unmodifiableSet(unsupportedStats);
+  }
+
   @Builder
   @Value
   private static class DeltaStats {
@@ -246,6 +283,16 @@ public class DeltaStatsExtractor {
     Map<String, Object> minValues;
     Map<String, Object> maxValues;
     Map<String, Object> nullCount;
+
+    /* this is a catch-all for any additional stats that are not explicitly handled */
+    @JsonIgnore
+    @Getter(lazy = true)
+    Map<String, Object> additionalStats = new HashMap<>();
+
+    @JsonAnySetter
+    public void setAdditionalStat(String key, Object value) {
+      getAdditionalStats().put(key, value);
+    }
   }
 
   @Value
