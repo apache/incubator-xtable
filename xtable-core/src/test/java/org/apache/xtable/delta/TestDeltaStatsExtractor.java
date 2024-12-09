@@ -20,6 +20,7 @@ package org.apache.xtable.delta;
 
 import static org.apache.xtable.testutil.ColumnStatMapUtil.getColumnStats;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -150,10 +151,16 @@ public class TestDeltaStatsExtractor {
     deltaStats.put("maxValues", maxValues);
     deltaStats.put("nullCount", nullValues);
     deltaStats.put("numRecords", 100);
+    deltaStats.put("tightBounds", Boolean.TRUE);
+    deltaStats.put("nonExisting", minValues);
     String stats = MAPPER.writeValueAsString(deltaStats);
     AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
     DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
     List<ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
+    Set<String> unsupportedStats = extractor.getUnsupportedStats();
+    assertEquals(2, unsupportedStats.size());
+    assertTrue(unsupportedStats.contains("tightBounds"));
+    assertTrue(unsupportedStats.contains("nonExisting"));
 
     List<ColumnStat> expected =
         Arrays.asList(

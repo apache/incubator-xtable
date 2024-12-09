@@ -21,6 +21,7 @@ package org.apache.xtable.delta;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -42,7 +43,13 @@ import scala.Option;
 
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestSparkDeltaTable;
+import org.apache.xtable.ValidationTestHelper;
+import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.model.CommitsBacklog;
+import org.apache.xtable.model.InstantsForIncrementalSync;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.storage.TableFormat;
 
 public class ITDeltaDeleteVectorConvert {
   @TempDir private static Path tempDir;
@@ -147,18 +154,32 @@ public class ITDeltaDeleteVectorConvert {
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
     assertEquals(228L, testSparkDeltaTable.getNumRows());
 
-    // TODO conversion fails if delete vectors are enabled, this is because of missing handlers for
-    // deletion files.
-    // TODO pending for another PR
-    //    SourceTable tableConfig =
-    //        SourceTable.builder()
-    //            .name(testSparkDeltaTable.getTableName())
-    //            .basePath(testSparkDeltaTable.getBasePath())
-    //            .formatName(TableFormat.DELTA)
-    //            .build();
-    //    DeltaConversionSource conversionSource =
-    //        conversionSourceProvider.getConversionSourceInstance(tableConfig);
-    //    InternalSnapshot internalSnapshot = conversionSource.getCurrentSnapshot();
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
+            .build();
+    DeltaConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+    InternalSnapshot internalSnapshot = conversionSource.getCurrentSnapshot();
+
+    //    validateDeltaPartitioning(internalSnapshot);
+    ValidationTestHelper.validateSnapshot(
+        internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+
+    // Get changes in incremental format.
+    InstantsForIncrementalSync instantsForIncrementalSync =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+            .build();
+    CommitsBacklog<Long> commitsBacklog =
+        conversionSource.getCommitsBacklog(instantsForIncrementalSync);
+    for (Long version : commitsBacklog.getCommitsToProcess()) {
+      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
+      allTableChanges.add(tableChange);
+    }
+    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
   }
 
   private void validateDeletedRecordCount(
