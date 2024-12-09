@@ -29,6 +29,7 @@
 tableFormatConverters:
     HUDI:
       conversionSourceProviderClass: org.apache.xtable.hudi.HudiConversionSourceProvider
+      conversionTargetProviderClass: org.apache.xtable.hudi.HudiConversionTarget
     DELTA:
       conversionSourceProviderClass: org.apache.xtable.delta.DeltaConversionSourceProvider
       conversionTargetProviderClass: org.apache.xtable.delta.DeltaConversionTarget
