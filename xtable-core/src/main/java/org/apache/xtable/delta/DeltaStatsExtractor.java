@@ -246,6 +246,7 @@ public class DeltaStatsExtractor {
     Map<String, Object> minValues;
     Map<String, Object> maxValues;
     Map<String, Object> nullCount;
+    boolean tightBounds;
   }
 
   @Value
