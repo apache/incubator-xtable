@@ -99,9 +99,12 @@ public class TestTableFormatSync {
     assertEquals(
         SyncResult.SyncStatus.builder()
             .statusCode(SyncResult.SyncStatusCode.ERROR)
-            .errorMessage("Failure")
-            .errorDescription("Failed to sync FULL")
-            .canRetryOnFailure(true)
+            .errorDetails(
+                SyncResult.ErrorDetails.builder()
+                    .errorMessage("Failure")
+                    .errorDescription("Failed to sync FULL")
+                    .canRetryOnFailure(true)
+                    .build())
             .build(),
         failureResult.getStatus());
 
@@ -176,9 +179,12 @@ public class TestTableFormatSync {
     assertEquals(
         SyncResult.SyncStatus.builder()
             .statusCode(SyncResult.SyncStatusCode.ERROR)
-            .errorMessage("Failure")
-            .errorDescription("Failed to sync INCREMENTAL")
-            .canRetryOnFailure(true)
+            .errorDetails(
+                SyncResult.ErrorDetails.builder()
+                    .errorMessage("Failure")
+                    .errorDescription("Failed to sync INCREMENTAL")
+                    .canRetryOnFailure(true)
+                    .build())
             .build(),
         partialSuccessResults.get(1).getStatus());
 

@@ -18,9 +18,14 @@
  
 package org.apache.xtable.model.exception;
 
+/** Exception thrown when refresh operation (updating table format metadata) in catalog fails. */
 public class CatalogRefreshException extends InternalException {
 
-  protected CatalogRefreshException(String message, Throwable e) {
+  public CatalogRefreshException(String message, Throwable e) {
     super(ErrorCode.CATALOG_REFRESH_EXCEPTION, message, e);
+  }
+
+  public CatalogRefreshException(String message) {
+    super(ErrorCode.CATALOG_REFRESH_EXCEPTION, message);
   }
 }

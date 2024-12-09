@@ -184,9 +184,12 @@ public class TableFormatSync {
         .status(
             SyncResult.SyncStatus.builder()
                 .statusCode(SyncResult.SyncStatusCode.ERROR)
-                .errorMessage(e.getMessage())
-                .errorDescription("Failed to sync " + mode.name())
-                .canRetryOnFailure(true)
+                .errorDetails(
+                    SyncResult.ErrorDetails.builder()
+                        .errorMessage(e.getMessage())
+                        .errorDescription("Failed to sync " + mode.name())
+                        .canRetryOnFailure(true)
+                        .build())
                 .build())
         .syncStartTime(startTime)
         .syncDuration(Duration.between(startTime, Instant.now()))

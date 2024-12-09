@@ -19,15 +19,14 @@
 package org.apache.xtable.spi.sync;
 
 import java.net.URI;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Objects;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.Path;
 
+import org.apache.xtable.model.exception.CatalogRefreshException;
+
 public class CatalogUtils {
-  private static final List<String> S3_FS_SCHEMES = Arrays.asList("s3", "s3a", "s3n");
 
   static boolean hasStorageDescriptorLocationChanged(
       String storageDescriptorLocation, String tableBasePath) {
@@ -38,19 +37,17 @@ public class CatalogUtils {
     URI storageDescriptorUri = new Path(storageDescriptorLocation).toUri();
     URI basePathUri = new Path(tableBasePath).toUri();
 
-    // In case of s3 path, compare without schemes
-    boolean includeScheme =
-        !S3_FS_SCHEMES.contains(basePathUri.getScheme())
-            || !S3_FS_SCHEMES.contains(storageDescriptorUri.getScheme());
-    storageDescriptorLocation = getPath(storageDescriptorUri, includeScheme);
-    tableBasePath = getPath(basePathUri, includeScheme);
-    return !Objects.equals(storageDescriptorLocation, tableBasePath);
-  }
-
-  private static String getPath(URI uri, boolean includeScheme) {
-    if (includeScheme) {
-      return uri.toString();
+    if (storageDescriptorUri.equals(basePathUri)
+        || storageDescriptorUri.getScheme().startsWith(basePathUri.getScheme())
+        || basePathUri.getScheme().startsWith(storageDescriptorUri.getScheme())) {
+      String storageDescriptorLocationIdentifier =
+          storageDescriptorUri.getAuthority() + storageDescriptorUri.getPath();
+      String tableBasePathIdentifier = basePathUri.getAuthority() + basePathUri.getPath();
+      return !Objects.equals(storageDescriptorLocationIdentifier, tableBasePathIdentifier);
     }
-    return uri.getAuthority() + uri.getPath();
+    throw new CatalogRefreshException(
+        String.format(
+            "Storage scheme has changed for table catalogStorageDescriptorUri %s basePathUri %s",
+            storageDescriptorUri, basePathUri));
   }
 }

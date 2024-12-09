@@ -60,12 +60,8 @@ public class SyncResult {
         SyncStatus.builder().statusCode(SyncStatusCode.SUCCESS).build();
     // Status code
     SyncStatusCode statusCode;
-    // error Message if any
-    String errorMessage;
-    // Readable description of the error
-    String errorDescription;
-    // Can the client retry for this type of error (Transient error=true, persistent error=false)
-    boolean canRetryOnFailure;
+    // errorDetails if any
+    ErrorDetails errorDetails;
   }
 
   /** Represents status for catalog sync status operation */
