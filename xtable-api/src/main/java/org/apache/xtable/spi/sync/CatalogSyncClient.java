@@ -20,12 +20,11 @@ package org.apache.xtable.spi.sync;
 
 import org.apache.xtable.conversion.ExternalCatalog.TableIdentifier;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.catalog.CatalogType;
 
-public interface CatalogSyncOperations<DATABASE, TABLE> extends AutoCloseable {
+public interface CatalogSyncClient<TABLE> extends AutoCloseable {
   String getCatalogIdentifier();
 
-  CatalogType getCatalogType();
+  String getCatalogImpl();
 
   String getTableFormat();
 
@@ -33,7 +32,7 @@ public interface CatalogSyncOperations<DATABASE, TABLE> extends AutoCloseable {
 
   String getStorageDescriptorLocation(TABLE table);
 
-  DATABASE getDatabase(String databaseName);
+  boolean hasDatabase(String databaseName);
 
   void createDatabase(String databaseName);
 

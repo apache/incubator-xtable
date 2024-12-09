@@ -34,7 +34,6 @@ import org.apache.commons.lang3.StringUtils;
 
 import org.apache.xtable.conversion.ExternalCatalog;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.exception.CatalogRefreshException;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.model.sync.SyncResult.CatalogSyncStatus;
 
@@ -47,31 +46,42 @@ public class CatalogSync {
     return INSTANCE;
   }
 
-  public Map<String, List<CatalogSyncStatus>> syncTable(
-      Collection<CatalogSyncOperations> catalogSyncOperations, InternalTable table) {
+  public <TABLE> Map<String, List<CatalogSyncStatus>> syncTable(
+      Collection<CatalogSyncClient<TABLE>> catalogSyncClients, InternalTable table) {
     Map<String, List<CatalogSyncStatus>> results = new HashMap<>();
-    for (CatalogSyncOperations catalogSyncOperation : catalogSyncOperations) {
-      results.computeIfAbsent(catalogSyncOperation.getTableFormat(), k -> new ArrayList<>());
-      results
-          .get(catalogSyncOperation.getTableFormat())
-          .add(getCatalogSyncStatus(catalogSyncOperation, table));
+    for (CatalogSyncClient<TABLE> catalogSyncClient : catalogSyncClients) {
+      results.computeIfAbsent(catalogSyncClient.getTableFormat(), k -> new ArrayList<>());
+      try {
+        results
+            .get(catalogSyncClient.getTableFormat())
+            .add(getCatalogSyncStatus(catalogSyncClient, table));
+      } catch (Exception e) {
+        log.error(
+            "Catalog sync failed for table {} using catalogSync {}",
+            table.getBasePath(),
+            catalogSyncClient.getCatalogImpl());
+        results
+            .get(catalogSyncClient.getTableFormat())
+            .add(
+                getCatalogSyncFailureStatus(
+                    catalogSyncClient.getCatalogIdentifier(),
+                    catalogSyncClient.getCatalogImpl(),
+                    e));
+      }
     }
     return results;
   }
 
-  private CatalogSyncStatus getCatalogSyncStatus(
-      CatalogSyncOperations catalogSyncOperation, InternalTable table) {
-    ExternalCatalog.TableIdentifier tableIdentifier = catalogSyncOperation.getTableIdentifier();
-    boolean doesDatabaseExists =
-        catalogSyncOperation.getDatabase(tableIdentifier.getDatabaseName()) != null;
-    if (!doesDatabaseExists) {
-      catalogSyncOperation.createDatabase(tableIdentifier.getDatabaseName());
+  private <TABLE> CatalogSyncStatus getCatalogSyncStatus(
+      CatalogSyncClient<TABLE> catalogSyncClient, InternalTable table) {
+    ExternalCatalog.TableIdentifier tableIdentifier = catalogSyncClient.getTableIdentifier();
+    if (catalogSyncClient.hasDatabase(tableIdentifier.getDatabaseName())) {
+      catalogSyncClient.createDatabase(tableIdentifier.getDatabaseName());
     }
-    Object catalogTable = catalogSyncOperation.getTable(tableIdentifier);
-    String storageDescriptorLocation =
-        catalogSyncOperation.getStorageDescriptorLocation(catalogTable);
+    TABLE catalogTable = catalogSyncClient.getTable(tableIdentifier);
+    String storageDescriptorLocation = catalogSyncClient.getStorageDescriptorLocation(catalogTable);
     if (catalogTable == null) {
-      catalogSyncOperation.createTable(table, tableIdentifier);
+      catalogSyncClient.createTable(table, tableIdentifier);
     } else if (hasStorageDescriptorLocationChanged(
         storageDescriptorLocation, table.getBasePath())) {
       // Replace table if there is a mismatch between hmsTable location and Xtable basePath.
@@ -85,19 +95,27 @@ public class CatalogSync {
           "StorageDescriptor location changed from {} to {}, re-creating table",
           oldLocation,
           table.getBasePath());
-      catalogSyncOperation.createOrReplaceTable(table, tableIdentifier);
+      catalogSyncClient.createOrReplaceTable(table, tableIdentifier);
     } else {
-      try {
-        log.debug("Table metadata changed, refreshing table");
-        catalogSyncOperation.refreshTable(table, catalogTable, tableIdentifier);
-      } catch (CatalogRefreshException e) {
-        log.warn("Table refresh failed, re-creating table", e);
-        catalogSyncOperation.createOrReplaceTable(table, tableIdentifier);
-      }
+      log.debug("Table metadata changed, refreshing table");
+      catalogSyncClient.refreshTable(table, catalogTable, tableIdentifier);
     }
     return CatalogSyncStatus.builder()
-        .catalogIdentifier(catalogSyncOperation.getCatalogIdentifier())
+        .catalogIdentifier(catalogSyncClient.getCatalogIdentifier())
         .statusCode(SyncResult.SyncStatusCode.SUCCESS)
+        .build();
+  }
+
+  private CatalogSyncStatus getCatalogSyncFailureStatus(
+      String catalogIdentifier, String catalogImpl, Exception e) {
+    return CatalogSyncStatus.builder()
+        .catalogIdentifier(catalogIdentifier)
+        .statusCode(SyncResult.SyncStatusCode.ERROR)
+        .errorDetails(
+            SyncResult.ErrorDetails.builder()
+                .errorMessage(e.getMessage())
+                .errorDescription("catalogSync failed for " + catalogImpl)
+                .build())
         .build();
   }
 }

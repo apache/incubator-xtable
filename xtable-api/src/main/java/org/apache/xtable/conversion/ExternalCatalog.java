@@ -24,8 +24,6 @@ import lombok.Builder;
 import lombok.NonNull;
 import lombok.Value;
 
-import org.apache.xtable.model.catalog.CatalogType;
-
 /**
  * This class represents the configuration for an external catalog. It holds information required to
  * interact with the catalog, such as its identifier, type, table formats to sync and other catalog
@@ -41,7 +39,7 @@ public class ExternalCatalog {
   @NonNull String catalogIdentifier;
 
   /** The type of catalog. */
-  @NonNull CatalogType catalogType;
+  @NonNull String catalogType;
 
   /**
    * The table formats that will be synced to this catalog along with their {@link TableIdentifier}.
