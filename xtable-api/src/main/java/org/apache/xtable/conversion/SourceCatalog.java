@@ -18,28 +18,23 @@
  
 package org.apache.xtable.conversion;
 
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
 
-/**
- * Defines a reference to an external catalog, used for conversion between source and target
- * catalogs.
- */
+@EqualsAndHashCode(callSuper = true)
 @Getter
-@EqualsAndHashCode
-public class ExternalCatalog {
-  /**
-   * An identifier to be used for the catalog if there are multiple catalogs of the same type but in
-   * different accounts or regions.
-   */
-  @NonNull String catalogIdentifier;
+public class SourceCatalog extends ExternalCatalog {
+  /** The source table present in the {@link SourceCatalog} */
+  SourceTable sourceTable;
 
-  /** Configuration of the catalog - catalogImpl, catalogName and properties. */
-  @NonNull CatalogConfig catalogConfig;
-
-  public ExternalCatalog(@NonNull String catalogIdentifier, @NonNull CatalogConfig catalogConfig) {
-    this.catalogIdentifier = catalogIdentifier;
-    this.catalogConfig = catalogConfig;
+  @Builder(toBuilder = true)
+  SourceCatalog(
+      @NonNull String catalogIdentifier,
+      @NonNull CatalogConfig catalogConfig,
+      @NonNull SourceTable sourceTable) {
+    super(catalogIdentifier, catalogConfig);
+    this.sourceTable = sourceTable;
   }
 }

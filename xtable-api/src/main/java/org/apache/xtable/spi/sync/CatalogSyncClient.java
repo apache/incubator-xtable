@@ -18,8 +18,8 @@
  
 package org.apache.xtable.spi.sync;
 
-import org.apache.xtable.conversion.ExternalCatalog.TableIdentifier;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
 public interface CatalogSyncClient<TABLE> extends AutoCloseable {
   /**
@@ -43,7 +43,7 @@ public interface CatalogSyncClient<TABLE> extends AutoCloseable {
   String getTableFormat();
 
   /** Returns the unique identifier for the table being synced to catalog. */
-  TableIdentifier getTableIdentifier();
+  CatalogTableIdentifier getTableIdentifier();
 
   /** Returns the storage location of the table synced to the catalog. */
   String getStorageDescriptorLocation(TABLE table);
@@ -59,23 +59,24 @@ public interface CatalogSyncClient<TABLE> extends AutoCloseable {
    * org.apache.hadoop.hive.metastore.api.Table, Glue uses
    * software.amazon.awssdk.services.glue.model.Table etc.
    */
-  TABLE getTable(TableIdentifier tableIdentifier);
+  TABLE getTable(CatalogTableIdentifier tableIdentifier);
 
   /**
    * Create a table in the catalog using the canonical InternalTable representation and
    * tableIdentifier.
    */
-  void createTable(InternalTable table, TableIdentifier tableIdentifier);
+  void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier);
 
   /** Refreshes the table metadata in the catalog with tableIdentifier. */
-  void refreshTable(InternalTable table, TABLE catalogTable, TableIdentifier tableIdentifier);
+  void refreshTable(
+      InternalTable table, TABLE catalogTable, CatalogTableIdentifier tableIdentifier);
 
   /**
    * Tries to re-create the table in the catalog replacing state with the new canonical
    * InternalTable representation and tableIdentifier.
    */
-  void createOrReplaceTable(InternalTable table, TableIdentifier tableIdentifier);
+  void createOrReplaceTable(InternalTable table, CatalogTableIdentifier tableIdentifier);
 
   /** Drops a table from the catalog. */
-  void dropTable(InternalTable table, TableIdentifier tableIdentifier);
+  void dropTable(InternalTable table, CatalogTableIdentifier tableIdentifier);
 }

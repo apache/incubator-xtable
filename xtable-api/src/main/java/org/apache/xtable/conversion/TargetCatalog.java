@@ -18,28 +18,35 @@
  
 package org.apache.xtable.conversion;
 
+import java.util.Map;
+
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
 
-/**
- * Defines a reference to an external catalog, used for conversion between source and target
- * catalogs.
- */
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
+
+@EqualsAndHashCode(callSuper = true)
 @Getter
-@EqualsAndHashCode
-public class ExternalCatalog {
+public class TargetCatalog extends ExternalCatalog {
+
+  /** The target table that will be synced to {@link TargetCatalog} */
+  TargetTable targetTable;
+
   /**
-   * An identifier to be used for the catalog if there are multiple catalogs of the same type but in
-   * different accounts or regions.
+   * The table formats that will be synced to this catalog along with their {@link
+   * CatalogTableIdentifier}. Eg: ICEBERG -> {marketing, price}, HUDI -> {marketing, price_hudi},
+   * DELTA -> {delta_tables, price}
    */
-  @NonNull String catalogIdentifier;
+  @NonNull Map<String, CatalogTableIdentifier> tableFormatsToSync;
 
-  /** Configuration of the catalog - catalogImpl, catalogName and properties. */
-  @NonNull CatalogConfig catalogConfig;
-
-  public ExternalCatalog(@NonNull String catalogIdentifier, @NonNull CatalogConfig catalogConfig) {
-    this.catalogIdentifier = catalogIdentifier;
-    this.catalogConfig = catalogConfig;
+  @Builder(toBuilder = true)
+  public TargetCatalog(
+      @NonNull String catalogIdentifier,
+      @NonNull CatalogConfig catalogConfig,
+      @NonNull Map<String, CatalogTableIdentifier> tableFormatsToSync) {
+    super(catalogIdentifier, catalogConfig);
+    this.tableFormatsToSync = tableFormatsToSync;
   }
 }

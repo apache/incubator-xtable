@@ -16,30 +16,29 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.conversion;
+package org.apache.xtable.model.catalog;
 
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
+import lombok.Builder;
 import lombok.NonNull;
+import lombok.Value;
 
-/**
- * Defines a reference to an external catalog, used for conversion between source and target
- * catalogs.
- */
-@Getter
-@EqualsAndHashCode
-public class ExternalCatalog {
+/** This class represents the unique identifier for a table in a catalog. */
+@Value
+@Builder
+public class CatalogTableIdentifier {
   /**
-   * An identifier to be used for the catalog if there are multiple catalogs of the same type but in
-   * different accounts or regions.
+   * Catalogs have the ability to group tables logically, databaseName is the identifier for such
+   * logical classification. The alternate names for this field include namespace, schemaName etc.
    */
-  @NonNull String catalogIdentifier;
+  @NonNull String databaseName;
 
-  /** Configuration of the catalog - catalogImpl, catalogName and properties. */
-  @NonNull CatalogConfig catalogConfig;
+  /**
+   * The table name used when syncing the table to the catalog. NOTE: This name can be different
+   * from the table name in storage.
+   */
+  @NonNull String tableName;
 
-  public ExternalCatalog(@NonNull String catalogIdentifier, @NonNull CatalogConfig catalogConfig) {
-    this.catalogIdentifier = catalogIdentifier;
-    this.catalogConfig = catalogConfig;
+  public String getId() {
+    return String.format("%s-%s", databaseName, tableName);
   }
 }

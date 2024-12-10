@@ -32,8 +32,8 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.commons.lang3.StringUtils;
 
-import org.apache.xtable.conversion.ExternalCatalog;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.model.sync.SyncResult.CatalogSyncStatus;
 
@@ -74,7 +74,7 @@ public class CatalogSync {
 
   private <TABLE> CatalogSyncStatus getCatalogSyncStatus(
       CatalogSyncClient<TABLE> catalogSyncClient, InternalTable table) {
-    ExternalCatalog.TableIdentifier tableIdentifier = catalogSyncClient.getTableIdentifier();
+    CatalogTableIdentifier tableIdentifier = catalogSyncClient.getTableIdentifier();
     if (!catalogSyncClient.hasDatabase(tableIdentifier.getDatabaseName())) {
       catalogSyncClient.createDatabase(tableIdentifier.getDatabaseName());
     }

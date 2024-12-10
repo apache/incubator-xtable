@@ -38,8 +38,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import org.apache.xtable.conversion.ExternalCatalog;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -48,28 +48,19 @@ import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncResult;
 
 @ExtendWith(MockitoExtension.class)
-public class TestCatalogSync<TABLE> {
+public class TestExternalCatalogSync<TABLE> {
 
   private final CatalogSyncClient<TABLE> mockClient1 = mock(CatalogSyncClient.class);
   private final CatalogSyncClient<TABLE> mockClient2 = mock(CatalogSyncClient.class);
   private final CatalogSyncClient<TABLE> mockClient3 = mock(CatalogSyncClient.class);
   private final CatalogSyncClient<TABLE> mockClient4 = mock(CatalogSyncClient.class);
 
-  private final ExternalCatalog.TableIdentifier tableIdentifier1 =
-      ExternalCatalog.TableIdentifier.builder()
-          .databaseName("database1")
-          .tableName("table1")
-          .build();
-  private final ExternalCatalog.TableIdentifier tableIdentifier2 =
-      ExternalCatalog.TableIdentifier.builder()
-          .databaseName("database2")
-          .tableName("table2")
-          .build();
-  private final ExternalCatalog.TableIdentifier tableIdentifier3 =
-      ExternalCatalog.TableIdentifier.builder()
-          .databaseName("database3")
-          .tableName("table3")
-          .build();
+  private final CatalogTableIdentifier tableIdentifier1 =
+      CatalogTableIdentifier.builder().databaseName("database1").tableName("table1").build();
+  private final CatalogTableIdentifier tableIdentifier2 =
+      CatalogTableIdentifier.builder().databaseName("database2").tableName("table2").build();
+  private final CatalogTableIdentifier tableIdentifier3 =
+      CatalogTableIdentifier.builder().databaseName("database3").tableName("table3").build();
 
   @Mock TABLE mockTable;
   private final InternalTable internalTable =
