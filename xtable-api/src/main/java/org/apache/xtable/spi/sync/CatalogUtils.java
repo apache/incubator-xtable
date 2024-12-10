@@ -26,8 +26,16 @@ import org.apache.hadoop.fs.Path;
 
 import org.apache.xtable.model.exception.CatalogRefreshException;
 
+/** Utility methods used by CatalogSync. */
 public class CatalogUtils {
 
+  /**
+   * Returns whether the location of the table in catalog is same as the one currently in storage.
+   *
+   * @param storageDescriptorLocation location of the table in catalog.
+   * @param tableBasePath location of the table in source table.
+   * @return equality of both the locations.
+   */
   static boolean hasStorageDescriptorLocationChanged(
       String storageDescriptorLocation, String tableBasePath) {
 
@@ -38,6 +46,8 @@ public class CatalogUtils {
     URI basePathUri = new Path(tableBasePath).toUri();
 
     if (storageDescriptorUri.equals(basePathUri)
+        || storageDescriptorUri.getScheme() == null
+        || basePathUri.getScheme() == null
         || storageDescriptorUri.getScheme().startsWith(basePathUri.getScheme())
         || basePathUri.getScheme().startsWith(storageDescriptorUri.getScheme())) {
       String storageDescriptorLocationIdentifier =

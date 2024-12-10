@@ -75,7 +75,7 @@ public class CatalogSync {
   private <TABLE> CatalogSyncStatus getCatalogSyncStatus(
       CatalogSyncClient<TABLE> catalogSyncClient, InternalTable table) {
     ExternalCatalog.TableIdentifier tableIdentifier = catalogSyncClient.getTableIdentifier();
-    if (catalogSyncClient.hasDatabase(tableIdentifier.getDatabaseName())) {
+    if (!catalogSyncClient.hasDatabase(tableIdentifier.getDatabaseName())) {
       catalogSyncClient.createDatabase(tableIdentifier.getDatabaseName());
     }
     TABLE catalogTable = catalogSyncClient.getTable(tableIdentifier);

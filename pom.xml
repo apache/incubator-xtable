@@ -68,7 +68,7 @@
         <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
         <maven-deploy-plugin.version>3.1.1</maven-deploy-plugin.version>
         <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
-        <mockito.version>4.8.0</mockito.version>
+        <mockito.version>5.2.0</mockito.version>
         <parquet.version>1.12.2</parquet.version>
         <protobuf.version>3.25.5</protobuf.version>
         <scala12.version>2.12.20</scala12.version>

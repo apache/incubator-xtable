@@ -26,8 +26,9 @@ import lombok.Value;
 
 /**
  * This class represents the configuration for an external catalog. It holds information required to
- * interact with the catalog, such as its identifier, type, table formats to sync and other catalog
- * specific properties related to permissions, catalog uris, access-tokens etc.
+ * interact with the catalog, such as its identifier, catalogConfig (contains type, impl and other
+ * catalog specific properties related to permissions, catalog uris, access-tokens etc.), table
+ * formats to sync.
  */
 @Value
 @Builder
@@ -38,21 +39,14 @@ public class ExternalCatalog {
    */
   @NonNull String catalogIdentifier;
 
-  /** The type of catalog. */
-  @NonNull String catalogType;
-
+  /** Configuration of the catalog - catalogImpl, catalogName and properties. */
+  @NonNull CatalogConfig catalogConfig;
   /**
    * The table formats that will be synced to this catalog along with their {@link TableIdentifier}.
    * Eg: ICEBERG -> {marketing, price}, HUDI -> {marketing, price_hudi}, DELTA -> {delta_tables,
    * price}
    */
   @NonNull Map<String, TableIdentifier> tableFormatsToSync;
-
-  /**
-   * These are properties specific for each catalog, it can be parsed into POJO for the specific
-   * catalog eg: GlueCatalogConfig
-   */
-  @NonNull Map<String, String> catalogProperties;
 
   /** This class represents the unique identifier for a table in a catalog. */
   @Value
