@@ -331,7 +331,7 @@ public class HudiConversionTarget implements ConversionTarget {
     return getTargetCommitIdentifier(sourceIdentifier, metaClient.get());
   }
 
-  public Optional<String> getTargetCommitIdentifier(
+  private Optional<String> getTargetCommitIdentifier(
       String sourceIdentifier, HoodieTableMetaClient metaClient) {
     long sourceIdentifierVal = Long.parseLong(sourceIdentifier);
 
