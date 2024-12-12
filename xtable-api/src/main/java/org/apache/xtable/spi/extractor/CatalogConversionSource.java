@@ -16,27 +16,12 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.conversion;
+package org.apache.xtable.spi.extractor;
 
-import java.util.Properties;
+import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-
-@EqualsAndHashCode(callSuper = true)
-@Getter
-public class SourceTable extends ExternalTable {
-
-  @Builder(toBuilder = true)
-  public SourceTable(
-      String name,
-      String formatName,
-      String basePath,
-      String dataPath,
-      String[] namespace,
-      CatalogConfig catalogConfig,
-      Properties additionalProperties) {
-    super(name, formatName, basePath, dataPath, namespace, catalogConfig, additionalProperties);
-  }
+public interface CatalogConversionSource {
+  /** Returns the source table object present in the catalog. */
+  SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier);
 }

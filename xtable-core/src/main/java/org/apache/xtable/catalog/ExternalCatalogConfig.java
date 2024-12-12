@@ -16,27 +16,28 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.conversion;
+package org.apache.xtable.catalog;
 
-import java.util.Properties;
+import java.util.Collections;
+import java.util.Map;
 
 import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
+import lombok.NonNull;
+import lombok.Value;
 
-@EqualsAndHashCode(callSuper = true)
-@Getter
-public class SourceTable extends ExternalTable {
+import org.apache.xtable.conversion.CatalogConfig;
 
-  @Builder(toBuilder = true)
-  public SourceTable(
-      String name,
-      String formatName,
-      String basePath,
-      String dataPath,
-      String[] namespace,
-      CatalogConfig catalogConfig,
-      Properties additionalProperties) {
-    super(name, formatName, basePath, dataPath, namespace, catalogConfig, additionalProperties);
+@Value
+@Builder
+public class ExternalCatalogConfig implements CatalogConfig {
+  String catalogType;
+  @NonNull String catalogImpl;
+  @NonNull String catalogName;
+  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
+
+  public static ExternalCatalogConfig fromCatalogType(
+      String catalogType, String catalogId, Map<String, String> properties) {
+    // TODO: Choose existing implementation based on catalogType.
+    return ExternalCatalogConfig.builder().build();
   }
 }

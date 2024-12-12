@@ -166,7 +166,7 @@ public class TableFormatSync {
 
     return SyncResult.builder()
         .mode(mode)
-        .status(SyncResult.SyncStatus.SUCCESS)
+        .tableFormatSyncStatus(SyncResult.SyncStatus.SUCCESS)
         .syncStartTime(startTime)
         .syncDuration(Duration.between(startTime, Instant.now()))
         .lastInstantSynced(tableState.getLatestCommitTime())
@@ -181,12 +181,15 @@ public class TableFormatSync {
   private SyncResult buildResultForError(SyncMode mode, Instant startTime, Exception e) {
     return SyncResult.builder()
         .mode(mode)
-        .status(
+        .tableFormatSyncStatus(
             SyncResult.SyncStatus.builder()
                 .statusCode(SyncResult.SyncStatusCode.ERROR)
-                .errorMessage(e.getMessage())
-                .errorDescription("Failed to sync " + mode.name())
-                .canRetryOnFailure(true)
+                .errorDetails(
+                    SyncResult.ErrorDetails.builder()
+                        .errorMessage(e.getMessage())
+                        .errorDescription("Failed to sync " + mode.name())
+                        .canRetryOnFailure(true)
+                        .build())
                 .build())
         .syncStartTime(startTime)
         .syncDuration(Duration.between(startTime, Instant.now()))
