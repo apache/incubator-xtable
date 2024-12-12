@@ -22,7 +22,9 @@ import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
 /**
- * An interface for syncing {@link InternalTable} object to {@link TABLE} object defined by the catalog.
+ * An interface for syncing {@link InternalTable} object to {@link TABLE} object defined by the
+ * catalog.
+ *
  * @param <TABLE>
  */
 public interface CatalogSyncClient<TABLE> extends AutoCloseable {
