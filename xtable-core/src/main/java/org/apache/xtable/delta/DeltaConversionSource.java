@@ -82,6 +82,13 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   }
 
   @Override
+  public InternalTable getCurrentTable() {
+    DeltaLog deltaLog = DeltaLog.forTable(sparkSession, basePath);
+    Snapshot snapshot = deltaLog.snapshot();
+    return getTable(snapshot.version());
+  }
+
+  @Override
   public InternalSnapshot getCurrentSnapshot() {
     DeltaLog deltaLog = DeltaLog.forTable(sparkSession, basePath);
     Snapshot snapshot = deltaLog.snapshot();

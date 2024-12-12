@@ -43,6 +43,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatcher;
 
+import org.apache.xtable.catalog.CatalogConversionFactory;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -54,6 +55,7 @@ import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.spi.extractor.ConversionSource;
+import org.apache.xtable.spi.sync.CatalogSync;
 import org.apache.xtable.spi.sync.ConversionTarget;
 import org.apache.xtable.spi.sync.TableFormatSync;
 
@@ -65,7 +67,10 @@ public class TestConversionController {
   private final ConversionSource<Instant> mockConversionSource = mock(ConversionSource.class);
   private final ConversionTargetFactory mockConversionTargetFactory =
       mock(ConversionTargetFactory.class);
+  private final CatalogConversionFactory mockCatalogConversionFactory =
+      mock(CatalogConversionFactory.class);
   private final TableFormatSync tableFormatSync = mock(TableFormatSync.class);
+  private final CatalogSync catalogSync = mock(CatalogSync.class);
   private final ConversionTarget mockConversionTarget1 = mock(ConversionTarget.class);
   private final ConversionTarget mockConversionTarget2 = mock(ConversionTarget.class);
 
@@ -96,7 +101,12 @@ public class TestConversionController {
             eq(internalSnapshot)))
         .thenReturn(perTableResults);
     ConversionController conversionController =
-        new ConversionController(mockConf, mockConversionTargetFactory, tableFormatSync);
+        new ConversionController(
+            mockConf,
+            mockConversionTargetFactory,
+            mockCatalogConversionFactory,
+            tableFormatSync,
+            catalogSync);
     Map<String, SyncResult> result =
         conversionController.sync(conversionConfig, mockConversionSourceProvider);
     assertEquals(perTableResults, result);
@@ -182,7 +192,12 @@ public class TestConversionController {
     expectedSyncResult.put(TableFormat.ICEBERG, getLastSyncResult(icebergSyncResults));
     expectedSyncResult.put(TableFormat.DELTA, getLastSyncResult(deltaSyncResults));
     ConversionController conversionController =
-        new ConversionController(mockConf, mockConversionTargetFactory, tableFormatSync);
+        new ConversionController(
+            mockConf,
+            mockConversionTargetFactory,
+            mockCatalogConversionFactory,
+            tableFormatSync,
+            catalogSync);
     Map<String, SyncResult> result =
         conversionController.sync(conversionConfig, mockConversionSourceProvider);
     assertEquals(expectedSyncResult, result);
@@ -226,7 +241,12 @@ public class TestConversionController {
             eq(internalSnapshot)))
         .thenReturn(syncResults);
     ConversionController conversionController =
-        new ConversionController(mockConf, mockConversionTargetFactory, tableFormatSync);
+        new ConversionController(
+            mockConf,
+            mockConversionTargetFactory,
+            mockCatalogConversionFactory,
+            tableFormatSync,
+            catalogSync);
     Map<String, SyncResult> result =
         conversionController.sync(conversionConfig, mockConversionSourceProvider);
     assertEquals(syncResults, result);
@@ -310,7 +330,12 @@ public class TestConversionController {
     expectedSyncResult.put(TableFormat.ICEBERG, syncResult);
     expectedSyncResult.put(TableFormat.DELTA, getLastSyncResult(deltaSyncResults));
     ConversionController conversionController =
-        new ConversionController(mockConf, mockConversionTargetFactory, tableFormatSync);
+        new ConversionController(
+            mockConf,
+            mockConversionTargetFactory,
+            mockCatalogConversionFactory,
+            tableFormatSync,
+            catalogSync);
     Map<String, SyncResult> result =
         conversionController.sync(conversionConfig, mockConversionSourceProvider);
     assertEquals(expectedSyncResult, result);
@@ -368,7 +393,12 @@ public class TestConversionController {
     // Iceberg and Delta have no commits to sync
     Map<String, SyncResult> expectedSyncResult = Collections.emptyMap();
     ConversionController conversionController =
-        new ConversionController(mockConf, mockConversionTargetFactory, tableFormatSync);
+        new ConversionController(
+            mockConf,
+            mockConversionTargetFactory,
+            mockCatalogConversionFactory,
+            tableFormatSync,
+            catalogSync);
     Map<String, SyncResult> result =
         conversionController.sync(conversionConfig, mockConversionSourceProvider);
     assertEquals(expectedSyncResult, result);
@@ -392,7 +422,7 @@ public class TestConversionController {
     return SyncResult.builder()
         .mode(syncMode)
         .lastInstantSynced(lastSyncedInstant)
-        .status(SyncResult.SyncStatus.SUCCESS)
+        .tableFormatSyncStatus(SyncResult.SyncStatus.SUCCESS)
         .build();
   }
 

@@ -166,7 +166,7 @@ public class TableFormatSync {
 
     return SyncResult.builder()
         .mode(mode)
-        .status(SyncResult.SyncStatus.SUCCESS)
+        .tableFormatSyncStatus(SyncResult.SyncStatus.SUCCESS)
         .syncStartTime(startTime)
         .syncDuration(Duration.between(startTime, Instant.now()))
         .lastInstantSynced(tableState.getLatestCommitTime())
@@ -181,7 +181,7 @@ public class TableFormatSync {
   private SyncResult buildResultForError(SyncMode mode, Instant startTime, Exception e) {
     return SyncResult.builder()
         .mode(mode)
-        .status(
+        .tableFormatSyncStatus(
             SyncResult.SyncStatus.builder()
                 .statusCode(SyncResult.SyncStatusCode.ERROR)
                 .errorDetails(

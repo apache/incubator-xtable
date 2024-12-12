@@ -16,31 +16,12 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.conversion;
+package org.apache.xtable.spi.extractor;
 
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NonNull;
-
+import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
-@EqualsAndHashCode(callSuper = true)
-@Getter
-public class TargetCatalog extends ExternalCatalog {
-  /**
-   * The table formats that will be synced to this catalog along with their {@link
-   * CatalogTableIdentifier}. Eg: ICEBERG -> {marketing, price}, HUDI -> {marketing, price_hudi},
-   * DELTA -> {delta_tables, price}
-   */
-  @NonNull CatalogTableIdentifier catalogTableIdentifier;
-
-  @Builder(toBuilder = true)
-  public TargetCatalog(
-      @NonNull String catalogId,
-      @NonNull CatalogConfig catalogConfig,
-      @NonNull CatalogTableIdentifier catalogTableIdentifier) {
-    super(catalogId, catalogConfig);
-    this.catalogTableIdentifier = catalogTableIdentifier;
-  }
+public interface CatalogConversionSource {
+  /** Returns the source table object present in the catalog. */
+  SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier);
 }

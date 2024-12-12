@@ -20,6 +20,8 @@ package org.apache.xtable.conversion;
 
 import java.util.Properties;
 
+import javax.annotation.Nullable;
+
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
@@ -38,6 +40,8 @@ class ExternalTable {
   protected final @NonNull String formatName;
   /** The path to the root of the table or the metadata directory depending on the format */
   protected final @NonNull String basePath;
+  /** The path to the data files, defaults to the metadataPath */
+  protected final @NonNull String dataPath;
   /** Optional namespace for the table */
   protected final String[] namespace;
   /** The configuration for interacting with the catalog that manages this table */
@@ -50,12 +54,14 @@ class ExternalTable {
       @NonNull String name,
       @NonNull String formatName,
       @NonNull String basePath,
+      @Nullable String dataPath,
       String[] namespace,
       CatalogConfig catalogConfig,
       Properties additionalProperties) {
     this.name = name;
     this.formatName = formatName;
     this.basePath = sanitizeBasePath(basePath);
+    this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
     this.namespace = namespace;
     this.catalogConfig = catalogConfig;
     this.additionalProperties = additionalProperties;

@@ -28,18 +28,18 @@ import lombok.NonNull;
  */
 @Getter
 @EqualsAndHashCode
-public class ExternalCatalog {
+class ExternalCatalog {
   /**
    * An identifier to be used for the catalog if there are multiple catalogs of the same type but in
    * different accounts or regions.
    */
-  @NonNull String catalogIdentifier;
+  @NonNull String catalogId;
 
   /** Configuration of the catalog - catalogImpl, catalogName and properties. */
   @NonNull CatalogConfig catalogConfig;
 
-  public ExternalCatalog(@NonNull String catalogIdentifier, @NonNull CatalogConfig catalogConfig) {
-    this.catalogIdentifier = catalogIdentifier;
+  public ExternalCatalog(@NonNull String catalogId, @NonNull CatalogConfig catalogConfig) {
+    this.catalogId = catalogId;
     this.catalogConfig = catalogConfig;
   }
 }

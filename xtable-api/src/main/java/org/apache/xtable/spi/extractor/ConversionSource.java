@@ -42,6 +42,13 @@ public interface ConversionSource<COMMIT> extends Closeable {
   InternalTable getTable(COMMIT commit);
 
   /**
+   * Extracts the {@link InternalTable} as of latest state.
+   *
+   * @return {@link InternalTable} representing the current table.
+   */
+  InternalTable getCurrentTable();
+
+  /**
    * Extracts the {@link InternalSnapshot} as of latest state.
    *
    * @return {@link InternalSnapshot} representing the current snapshot.
