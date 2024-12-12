@@ -132,6 +132,13 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   }
 
   @Override
+  public InternalTable getCurrentTable() {
+    Table iceTable = getSourceTable();
+    Snapshot currentSnapshot = iceTable.currentSnapshot();
+    return getTable(currentSnapshot);
+  }
+
+  @Override
   public InternalSnapshot getCurrentSnapshot() {
     Table iceTable = getSourceTable();
 

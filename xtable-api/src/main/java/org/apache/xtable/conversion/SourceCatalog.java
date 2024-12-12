@@ -18,25 +18,16 @@
  
 package org.apache.xtable.conversion;
 
-import java.util.Properties;
-
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NonNull;
 
 @EqualsAndHashCode(callSuper = true)
 @Getter
-public class SourceTable extends ExternalTable {
-
+public class SourceCatalog extends ExternalCatalog {
   @Builder(toBuilder = true)
-  public SourceTable(
-      String name,
-      String formatName,
-      String basePath,
-      String dataPath,
-      String[] namespace,
-      CatalogConfig catalogConfig,
-      Properties additionalProperties) {
-    super(name, formatName, basePath, dataPath, namespace, catalogConfig, additionalProperties);
+  SourceCatalog(@NonNull String catalogId, @NonNull CatalogConfig catalogConfig) {
+    super(catalogId, catalogConfig);
   }
 }
