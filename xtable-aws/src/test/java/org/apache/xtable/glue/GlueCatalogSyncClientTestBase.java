@@ -49,17 +49,17 @@ public class GlueCatalogSyncClientTestBase {
   @Mock protected GlueSchemaExtractor mockGlueSchemaExtractor;
   protected Configuration mockConfiguration = new Configuration();
 
-  protected static final String TEST_DATABASE = "glue_db";
-  protected static final String TEST_TABLE = "glue_table";
+  protected static final String TEST_GLUE_DATABASE = "glue_db";
+  protected static final String TEST_GLUE_TABLE = "glue_table";
   protected static final String TEST_GLUE_CATALOG_ID = "aws-account-id";
   protected static final String TEST_BASE_PATH = "base-path";
-  protected static final InternalTable TEST_ONETABLE =
+  protected static final InternalTable TEST_INTERNAL_TABLE =
       InternalTable.builder()
           .basePath(TEST_BASE_PATH)
           .readSchema(InternalSchema.builder().fields(Collections.emptyList()).build())
           .build();
   protected static final CatalogTableIdentifier TEST_CATALOG_TABLE_IDENTIFIER =
-      CatalogTableIdentifier.builder().databaseName(TEST_DATABASE).tableName(TEST_TABLE).build();
+      CatalogTableIdentifier.builder().databaseName(TEST_GLUE_DATABASE).tableName(TEST_GLUE_TABLE).build();
 
   protected GetDatabaseRequest getDbRequest(String dbName) {
     return GetDatabaseRequest.builder().catalogId(TEST_GLUE_CATALOG_ID).name(dbName).build();
@@ -96,7 +96,7 @@ public class GlueCatalogSyncClientTestBase {
                 .parameters(parameters)
                 .storageDescriptor(
                     StorageDescriptor.builder()
-                        .location(TEST_ONETABLE.getBasePath())
+                        .location(TEST_INTERNAL_TABLE.getBasePath())
                         .columns(Collections.emptyList())
                         .build())
                 .build())
@@ -116,7 +116,7 @@ public class GlueCatalogSyncClientTestBase {
                 .parameters(parameters)
                 .storageDescriptor(
                     StorageDescriptor.builder()
-                        .location(TEST_ONETABLE.getBasePath())
+                        .location(TEST_INTERNAL_TABLE.getBasePath())
                         .columns(Collections.emptyList())
                         .build())
                 .build())

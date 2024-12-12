@@ -66,8 +66,8 @@ public class RunSync {
 
   public static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
   private static final String DATASET_CONFIG_OPTION = "d";
-  static final String HADOOP_CONFIG_PATH = "p";
-  static final String CONVERTERS_CONFIG_PATH = "c";
+  private static final String HADOOP_CONFIG_PATH = "p";
+  private static final String CONVERTERS_CONFIG_PATH = "c";
   private static final String ICEBERG_CATALOG_CONFIG_PATH = "i";
   private static final String HELP_OPTION = "h";
 
