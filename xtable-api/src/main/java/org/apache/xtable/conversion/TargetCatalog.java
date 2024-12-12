@@ -18,25 +18,29 @@
  
 package org.apache.xtable.conversion;
 
-import java.util.Properties;
-
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.NonNull;
+
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
 @EqualsAndHashCode(callSuper = true)
 @Getter
-public class SourceTable extends ExternalTable {
+public class TargetCatalog extends ExternalCatalog {
+  /**
+   * The table formats that will be synced to this catalog along with their {@link
+   * CatalogTableIdentifier}. Eg: ICEBERG -> {marketing, price}, HUDI -> {marketing, price_hudi},
+   * DELTA -> {delta_tables, price}
+   */
+  @NonNull CatalogTableIdentifier catalogTableIdentifier;
 
   @Builder(toBuilder = true)
-  public SourceTable(
-      String name,
-      String formatName,
-      String basePath,
-      String dataPath,
-      String[] namespace,
-      CatalogConfig catalogConfig,
-      Properties additionalProperties) {
-    super(name, formatName, basePath, dataPath, namespace, catalogConfig, additionalProperties);
+  public TargetCatalog(
+      @NonNull String catalogId,
+      @NonNull CatalogConfig catalogConfig,
+      @NonNull CatalogTableIdentifier catalogTableIdentifier) {
+    super(catalogId, catalogConfig);
+    this.catalogTableIdentifier = catalogTableIdentifier;
   }
 }

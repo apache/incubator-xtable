@@ -27,15 +27,15 @@ public class TestExternalTable {
   @Test
   void sanitizePath() {
     ExternalTable tooManySlashes =
-        new ExternalTable("name", "hudi", "s3://bucket//path", null, null, null);
+        new ExternalTable("name", "hudi", "s3://bucket//path", null, null, null, null);
     assertEquals("s3://bucket/path", tooManySlashes.getBasePath());
 
     ExternalTable localFilePath =
-        new ExternalTable("name", "hudi", "/local/data//path", null, null, null);
+        new ExternalTable("name", "hudi", "/local/data//path", null, null, null, null);
     assertEquals("file:///local/data/path", localFilePath.getBasePath());
 
     ExternalTable properLocalFilePath =
-        new ExternalTable("name", "hudi", "file:///local/data//path", null, null, null);
+        new ExternalTable("name", "hudi", "file:///local/data//path", null, null, null, null);
     assertEquals("file:///local/data/path", properLocalFilePath.getBasePath());
   }
 
@@ -43,14 +43,14 @@ public class TestExternalTable {
   void errorIfRequiredArgsNotSet() {
     assertThrows(
         NullPointerException.class,
-        () -> new ExternalTable("name", "hudi", null, null, null, null));
+        () -> new ExternalTable("name", "hudi", null, null, null, null, null));
 
     assertThrows(
         NullPointerException.class,
-        () -> new ExternalTable("name", null, "file://bucket/path", null, null, null));
+        () -> new ExternalTable("name", null, "file://bucket/path", null, null, null, null));
 
     assertThrows(
         NullPointerException.class,
-        () -> new ExternalTable(null, "hudi", "file://bucket/path", null, null, null));
+        () -> new ExternalTable(null, "hudi", "file://bucket/path", null, null, null, null));
   }
 }

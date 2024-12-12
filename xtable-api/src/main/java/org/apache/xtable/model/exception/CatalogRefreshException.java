@@ -16,27 +16,16 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.conversion;
+package org.apache.xtable.model.exception;
 
-import java.util.Properties;
+/** Exception thrown when refresh operation (updating table format metadata) in catalog fails. */
+public class CatalogRefreshException extends InternalException {
 
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
+  public CatalogRefreshException(String message, Throwable e) {
+    super(ErrorCode.CATALOG_REFRESH_EXCEPTION, message, e);
+  }
 
-@EqualsAndHashCode(callSuper = true)
-@Getter
-public class SourceTable extends ExternalTable {
-
-  @Builder(toBuilder = true)
-  public SourceTable(
-      String name,
-      String formatName,
-      String basePath,
-      String dataPath,
-      String[] namespace,
-      CatalogConfig catalogConfig,
-      Properties additionalProperties) {
-    super(name, formatName, basePath, dataPath, namespace, catalogConfig, additionalProperties);
+  public CatalogRefreshException(String message) {
+    super(ErrorCode.CATALOG_REFRESH_EXCEPTION, message);
   }
 }

@@ -16,27 +16,29 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.conversion;
-
-import java.util.Properties;
+package org.apache.xtable.model.catalog;
 
 import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
+import lombok.NonNull;
+import lombok.Value;
 
-@EqualsAndHashCode(callSuper = true)
-@Getter
-public class SourceTable extends ExternalTable {
+/** This class represents the unique identifier for a table in a catalog. */
+@Value
+@Builder
+public class CatalogTableIdentifier {
+  /**
+   * Catalogs have the ability to group tables logically, databaseName is the identifier for such
+   * logical classification. The alternate names for this field include namespace, schemaName etc.
+   */
+  @NonNull String databaseName;
 
-  @Builder(toBuilder = true)
-  public SourceTable(
-      String name,
-      String formatName,
-      String basePath,
-      String dataPath,
-      String[] namespace,
-      CatalogConfig catalogConfig,
-      Properties additionalProperties) {
-    super(name, formatName, basePath, dataPath, namespace, catalogConfig, additionalProperties);
+  /**
+   * The table name used when syncing the table to the catalog. NOTE: This name can be different
+   * from the table name in storage.
+   */
+  @NonNull String tableName;
+
+  public String getId() {
+    return String.format("%s-%s", databaseName, tableName);
   }
 }

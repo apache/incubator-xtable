@@ -20,6 +20,8 @@ package org.apache.xtable.conversion;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 
 import lombok.Builder;
@@ -30,18 +32,22 @@ import lombok.Getter;
 @EqualsAndHashCode(callSuper = true)
 public class TargetTable extends ExternalTable {
   private final Duration metadataRetention;
+  private final List<TargetCatalog> targetCatalogs;
 
   @Builder(toBuilder = true)
   public TargetTable(
       String name,
       String formatName,
       String basePath,
+      String dataPath,
       String[] namespace,
       CatalogConfig catalogConfig,
       Duration metadataRetention,
-      Properties additionalProperties) {
-    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties);
+      Properties additionalProperties,
+      List<TargetCatalog> targetCatalogs) {
+    super(name, formatName, basePath, dataPath, namespace, catalogConfig, additionalProperties);
     this.metadataRetention =
         metadataRetention == null ? Duration.of(7, ChronoUnit.DAYS) : metadataRetention;
+    this.targetCatalogs = targetCatalogs == null ? Collections.emptyList() : targetCatalogs;
   }
 }
