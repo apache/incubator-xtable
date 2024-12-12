@@ -195,7 +195,7 @@ public class RunSync {
     }
   }
 
-  private static byte[] getCustomConfigurations(CommandLine cmd, String option) throws IOException {
+  static byte[] getCustomConfigurations(CommandLine cmd, String option) throws IOException {
     byte[] customConfig = null;
     if (cmd.hasOption(option)) {
       customConfig = Files.readAllBytes(Paths.get(cmd.getOptionValue(option)));

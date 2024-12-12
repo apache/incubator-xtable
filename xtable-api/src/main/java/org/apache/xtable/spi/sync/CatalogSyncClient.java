@@ -26,7 +26,7 @@ public interface CatalogSyncClient<TABLE> extends AutoCloseable {
    * Returns a unique identifier for the catalog, allows user to sync table to multiple catalogs of
    * the same type eg: HMS catalogs with url1, HMS catalog with url2.
    */
-  String getCatalogIdentifier();
+  String getCatalogId();
 
   /**
    * Returns the full class name which implements the interface for CatalogSyncClient.

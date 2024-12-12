@@ -77,6 +77,19 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
   }
 
   @Override
+  public InternalTable getCurrentTable() {
+    HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
+    HoodieTimeline completedTimeline = activeTimeline.filterCompletedInstants();
+    // get latest commit
+    HoodieInstant latestCommit =
+        completedTimeline
+            .lastInstant()
+            .orElseThrow(
+                () -> new ReadException("Unable to read latest commit from Hudi source table"));
+    return getTable(latestCommit);
+  }
+
+  @Override
   public InternalSnapshot getCurrentSnapshot() {
     HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
     HoodieTimeline completedTimeline = activeTimeline.filterCompletedInstants();

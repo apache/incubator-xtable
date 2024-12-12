@@ -16,34 +16,28 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.conversion;
+package org.apache.xtable.catalog;
 
-import java.util.List;
+import java.util.Collections;
+import java.util.Map;
 
 import lombok.Builder;
+import lombok.NonNull;
 import lombok.Value;
 
-import com.google.common.base.Preconditions;
-
-import org.apache.xtable.model.sync.SyncMode;
+import org.apache.xtable.conversion.CatalogConfig;
 
 @Value
-public class CatalogConversionConfig {
-  // The source of the catalog sync.
-  SourceCatalog sourceCatalog;
-  // One or more target catalogs to sync the table metadata to
-  List<TargetCatalog> targetCatalogs;
-  // The mode, incremental or snapshot
-  SyncMode syncMode;
+@Builder
+public class ExternalCatalogConfig implements CatalogConfig {
+  String catalogType;
+  @NonNull String catalogImpl;
+  @NonNull String catalogName;
+  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
 
-  @Builder
-  public CatalogConversionConfig(
-      SourceCatalog sourceCatalog, List<TargetCatalog> targetCatalogs, SyncMode syncMode) {
-    this.sourceCatalog = sourceCatalog;
-    this.targetCatalogs = targetCatalogs;
-    Preconditions.checkArgument(
-        targetCatalogs != null && !targetCatalogs.isEmpty(),
-        "Please provide at-least one format to sync");
-    this.syncMode = syncMode == null ? SyncMode.INCREMENTAL : syncMode;
+  public static ExternalCatalogConfig fromCatalogType(
+      String catalogType, String catalogId, Map<String, String> properties) {
+    // TODO: Choose existing implementation based on catalogType.
+    return ExternalCatalogConfig.builder().build();
   }
 }

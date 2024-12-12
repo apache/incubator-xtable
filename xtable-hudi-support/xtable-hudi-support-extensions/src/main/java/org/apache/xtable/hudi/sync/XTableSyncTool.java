@@ -106,7 +106,7 @@ public class XTableSyncTool extends HoodieSyncTool {
         results.entrySet().stream()
             .filter(
                 entry ->
-                    entry.getValue().getStatus().getStatusCode()
+                    entry.getValue().getTableFormatSyncStatus().getStatusCode()
                         != SyncResult.SyncStatusCode.SUCCESS)
             .map(Map.Entry::getKey)
             .collect(Collectors.joining(","));

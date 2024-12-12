@@ -32,11 +32,14 @@ import java.util.stream.Stream;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.extern.log4j.Log4j2;
 
+import org.apache.commons.beanutils.BeanUtils;
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.xtable.catalog.CatalogConversionFactory;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -46,6 +49,8 @@ import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.spi.extractor.ConversionSource;
 import org.apache.xtable.spi.extractor.ExtractFromSource;
+import org.apache.xtable.spi.sync.CatalogSync;
+import org.apache.xtable.spi.sync.CatalogSyncClient;
 import org.apache.xtable.spi.sync.ConversionTarget;
 import org.apache.xtable.spi.sync.TableFormatSync;
 
@@ -64,10 +69,17 @@ import org.apache.xtable.spi.sync.TableFormatSync;
 public class ConversionController {
   private final Configuration conf;
   private final ConversionTargetFactory conversionTargetFactory;
+  private final CatalogConversionFactory catalogConversionFactory;
   private final TableFormatSync tableFormatSync;
+  private final CatalogSync catalogSync;
 
   public ConversionController(Configuration conf) {
-    this(conf, ConversionTargetFactory.getInstance(), TableFormatSync.getInstance());
+    this(
+        conf,
+        ConversionTargetFactory.getInstance(),
+        CatalogConversionFactory.getInstance(),
+        TableFormatSync.getInstance(),
+        CatalogSync.getInstance());
   }
 
   /**
@@ -89,71 +101,123 @@ public class ConversionController {
     try (ConversionSource<COMMIT> conversionSource =
         conversionSourceProvider.getConversionSourceInstance(config.getSourceTable())) {
       ExtractFromSource<COMMIT> source = ExtractFromSource.of(conversionSource);
-
-      Map<String, ConversionTarget> conversionTargetByFormat =
-          config.getTargetTables().stream()
-              .collect(
-                  Collectors.toMap(
-                      TargetTable::getFormatName,
-                      targetTable -> conversionTargetFactory.createForFormat(targetTable, conf)));
-      // State for each TableFormat
-      Map<String, Optional<TableSyncMetadata>> lastSyncMetadataByFormat =
-          conversionTargetByFormat.entrySet().stream()
-              .collect(
-                  Collectors.toMap(
-                      Map.Entry::getKey, entry -> entry.getValue().getTableMetadata()));
-      Map<String, ConversionTarget> formatsToSyncIncrementally =
-          getFormatsToSyncIncrementally(
-              config,
-              conversionTargetByFormat,
-              lastSyncMetadataByFormat,
-              source.getConversionSource());
-      Map<String, ConversionTarget> formatsToSyncBySnapshot =
-          conversionTargetByFormat.entrySet().stream()
-              .filter(entry -> !formatsToSyncIncrementally.containsKey(entry.getKey()))
-              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-      SyncResultForTableFormats syncResultForSnapshotSync =
-          formatsToSyncBySnapshot.isEmpty()
-              ? SyncResultForTableFormats.builder().build()
-              : syncSnapshot(formatsToSyncBySnapshot, source);
-      SyncResultForTableFormats syncResultForIncrementalSync =
-          formatsToSyncIncrementally.isEmpty()
-              ? SyncResultForTableFormats.builder().build()
-              : syncIncrementalChanges(
-                  formatsToSyncIncrementally, lastSyncMetadataByFormat, source);
-      Map<String, SyncResult> syncResultsMerged =
-          new HashMap<>(syncResultForIncrementalSync.getLastSyncResult());
-      syncResultsMerged.putAll(syncResultForSnapshotSync.getLastSyncResult());
-      String successfulSyncs =
-          getFormatsWithStatusCode(syncResultsMerged, SyncResult.SyncStatusCode.SUCCESS);
-      if (!successfulSyncs.isEmpty()) {
-        log.info("Sync is successful for the following formats {}", successfulSyncs);
-      }
-      String failedSyncs =
-          getFormatsWithStatusCode(syncResultsMerged, SyncResult.SyncStatusCode.ERROR);
-      if (!failedSyncs.isEmpty()) {
-        log.error("Sync failed for the following formats {}", failedSyncs);
-      }
-      return syncResultsMerged;
+      return syncTableFormats(config, source, config.getSyncMode());
     } catch (IOException ioException) {
       throw new ReadException("Failed to close source converter", ioException);
     }
   }
 
+  public Map<String, SyncResult> syncCatalogs(
+      ConversionConfig config, Map<String, ConversionSourceProvider> conversionSourceProvider) {
+    if (config.getTargetTables() == null || config.getTargetTables().isEmpty()) {
+      throw new IllegalArgumentException("Please provide at-least one format to sync");
+    }
+    try (ConversionSource conversionSource =
+        conversionSourceProvider
+            .get(config.getSourceTable().getFormatName())
+            .getConversionSourceInstance(config.getSourceTable())) {
+      ExtractFromSource source = ExtractFromSource.of(conversionSource);
+      Map<String, SyncResult> tableFormatSyncResults =
+          syncTableFormats(config, source, config.getSyncMode());
+      Map<String, SyncResult> catalogSyncResults = new HashMap<>();
+      for (TargetTable targetTable : config.getTargetTables()) {
+        List<CatalogSyncClient> catalogSyncClients =
+            targetTable.getTargetCatalogs().stream()
+                .map(
+                    targetCatalog ->
+                        catalogConversionFactory.createForCatalog(
+                            targetCatalog, targetTable.getFormatName(), conf))
+                .collect(Collectors.toList());
+        catalogSyncResults.put(
+            targetTable.getFormatName(),
+            syncCatalogsForTable(
+                targetTable,
+                catalogSyncClients,
+                conversionSourceProvider.get(targetTable.getFormatName())));
+      }
+      mergeSyncResults(tableFormatSyncResults, catalogSyncResults);
+      return tableFormatSyncResults;
+    } catch (IOException ioException) {
+      throw new ReadException("Failed to close source converter", ioException);
+    }
+  }
+
+  private <COMMIT> Map<String, SyncResult> syncTableFormats(
+      ConversionConfig config, ExtractFromSource<COMMIT> source, SyncMode syncMode) {
+    Map<String, ConversionTarget> conversionTargetByFormat =
+        config.getTargetTables().stream()
+            .filter(
+                targetTable ->
+                    !targetTable.getFormatName().equals(config.getSourceTable().getFormatName()))
+            .collect(
+                Collectors.toMap(
+                    TargetTable::getFormatName,
+                    targetTable -> conversionTargetFactory.createForFormat(targetTable, conf)));
+
+    Map<String, Optional<TableSyncMetadata>> lastSyncMetadataByFormat =
+        conversionTargetByFormat.entrySet().stream()
+            .collect(
+                Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getTableMetadata()));
+    Map<String, ConversionTarget> formatsToSyncIncrementally =
+        getFormatsToSyncIncrementally(
+            syncMode,
+            conversionTargetByFormat,
+            lastSyncMetadataByFormat,
+            source.getConversionSource());
+    Map<String, ConversionTarget> formatsToSyncBySnapshot =
+        conversionTargetByFormat.entrySet().stream()
+            .filter(entry -> !formatsToSyncIncrementally.containsKey(entry.getKey()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    SyncResultForTableFormats syncResultForSnapshotSync =
+        formatsToSyncBySnapshot.isEmpty()
+            ? SyncResultForTableFormats.builder().build()
+            : syncSnapshot(formatsToSyncBySnapshot, source);
+    SyncResultForTableFormats syncResultForIncrementalSync =
+        formatsToSyncIncrementally.isEmpty()
+            ? SyncResultForTableFormats.builder().build()
+            : syncIncrementalChanges(formatsToSyncIncrementally, lastSyncMetadataByFormat, source);
+    Map<String, SyncResult> syncResultsMerged =
+        new HashMap<>(syncResultForIncrementalSync.getLastSyncResult());
+    syncResultsMerged.putAll(syncResultForSnapshotSync.getLastSyncResult());
+    String successfulSyncs =
+        getFormatsWithStatusCode(syncResultsMerged, SyncResult.SyncStatusCode.SUCCESS);
+    if (!successfulSyncs.isEmpty()) {
+      log.info("Sync is successful for the following formats {}", successfulSyncs);
+    }
+    String failedSyncs =
+        getFormatsWithStatusCode(syncResultsMerged, SyncResult.SyncStatusCode.ERROR);
+    if (!failedSyncs.isEmpty()) {
+      log.error("Sync failed for the following formats {}", failedSyncs);
+    }
+    return syncResultsMerged;
+  }
+
+  @SneakyThrows
+  private SyncResult syncCatalogsForTable(
+      TargetTable targetTable,
+      List<CatalogSyncClient> catalogSyncClients,
+      ConversionSourceProvider conversionSourceProvider) {
+    SourceTable sourceTable = SourceTable.builder().build();
+    BeanUtils.copyProperties(sourceTable, targetTable);
+    return catalogSync.syncTable(
+        catalogSyncClients,
+        conversionSourceProvider.getConversionSourceInstance(sourceTable).getCurrentTable());
+  }
+
   private static String getFormatsWithStatusCode(
       Map<String, SyncResult> syncResultsMerged, SyncResult.SyncStatusCode statusCode) {
     return syncResultsMerged.entrySet().stream()
-        .filter(entry -> entry.getValue().getStatus().getStatusCode() == statusCode)
+        .filter(entry -> entry.getValue().getTableFormatSyncStatus().getStatusCode() == statusCode)
         .map(Map.Entry::getKey)
         .collect(Collectors.joining(","));
   }
 
   private <COMMIT> Map<String, ConversionTarget> getFormatsToSyncIncrementally(
-      ConversionConfig conversionConfig,
+      SyncMode syncMode,
       Map<String, ConversionTarget> conversionTargetByFormat,
       Map<String, Optional<TableSyncMetadata>> lastSyncMetadataByFormat,
       ConversionSource<COMMIT> conversionSource) {
-    if (conversionConfig.getSyncMode() == SyncMode.FULL) {
+    if (syncMode == SyncMode.FULL) {
       // Full sync requested by config, hence no incremental sync.
       return Collections.emptyMap();
     }
@@ -266,6 +330,22 @@ public class ConversionController {
         .lastSyncInstant(mostOutOfSyncCommit.get())
         .pendingCommits(allPendingInstants)
         .build();
+  }
+
+  private void mergeSyncResults(
+      Map<String, SyncResult> syncResultsMerged, Map<String, SyncResult> catalogSyncResults) {
+    catalogSyncResults.forEach(
+        (tableFormat, catalogSyncResult) -> {
+          syncResultsMerged.computeIfPresent(
+              tableFormat,
+              (k, syncResult) ->
+                  syncResult.toBuilder()
+                      .syncDuration(
+                          syncResult.getSyncDuration().plus(catalogSyncResult.getSyncDuration()))
+                      .catalogSyncStatusList(catalogSyncResult.getCatalogSyncStatusList())
+                      .build());
+          syncResultsMerged.computeIfAbsent(tableFormat, k -> catalogSyncResult);
+        });
   }
 
   @Value

@@ -31,7 +31,7 @@ import lombok.Value;
  * @since 0.1
  */
 @Value
-@Builder
+@Builder(toBuilder = true)
 public class SyncResult {
   // Mode used for the sync
   SyncMode mode;
@@ -40,7 +40,7 @@ public class SyncResult {
   // Duration
   Duration syncDuration;
   // Status of the sync
-  SyncStatus status;
+  SyncStatus tableFormatSyncStatus;
   // The Sync Mode recommended for the next sync (Usually filled on an error)
   SyncMode recommendedSyncMode;
   // The sync status for each catalog.
@@ -69,7 +69,7 @@ public class SyncResult {
   @Builder
   public static class CatalogSyncStatus {
     // Catalog Identifier.
-    String catalogIdentifier;
+    String catalogId;
     // Status code
     SyncStatusCode statusCode;
     // errorDetails if any

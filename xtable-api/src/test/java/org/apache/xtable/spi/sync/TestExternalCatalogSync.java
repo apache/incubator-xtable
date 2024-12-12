@@ -31,7 +31,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,7 +44,6 @@ import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
-import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncResult;
 
 @ExtendWith(MockitoExtension.class)
@@ -78,11 +77,6 @@ public class TestExternalCatalogSync<TABLE> {
 
   @Test
   void testSyncTable() {
-    when(mockClient1.getTableFormat()).thenReturn(TableFormat.HUDI);
-    when(mockClient2.getTableFormat()).thenReturn(TableFormat.ICEBERG);
-    when(mockClient3.getTableFormat()).thenReturn(TableFormat.DELTA);
-    when(mockClient4.getTableFormat()).thenReturn("Invalid_Format");
-
     when(mockClient1.getTableIdentifier()).thenReturn(tableIdentifier1);
     when(mockClient2.getTableIdentifier()).thenReturn(tableIdentifier2);
     when(mockClient3.getTableIdentifier()).thenReturn(tableIdentifier3);
@@ -99,20 +93,23 @@ public class TestExternalCatalogSync<TABLE> {
     when(mockClient2.getStorageDescriptorLocation(any())).thenReturn("/tmp/test");
     when(mockClient3.getStorageDescriptorLocation(any())).thenReturn("/tmp/test");
 
-    when(mockClient4.getCatalogIdentifier()).thenReturn("catalogId4");
+    when(mockClient4.getCatalogId()).thenReturn("catalogId4");
     when(mockClient4.getCatalogImpl()).thenReturn("catalogImpl4");
 
-    Map<String, List<SyncResult.CatalogSyncStatus>> results =
+    List<SyncResult.CatalogSyncStatus> results =
         CatalogSync.getInstance()
             .syncTable(
-                Arrays.asList(mockClient1, mockClient2, mockClient3, mockClient4), internalTable);
-    List<SyncResult.CatalogSyncStatus> errorStatus = results.get("Invalid_Format");
+                Arrays.asList(mockClient1, mockClient2, mockClient3, mockClient4), internalTable)
+            .getCatalogSyncStatusList();
+    List<SyncResult.CatalogSyncStatus> errorStatus =
+        results.stream()
+            .filter(status -> status.getStatusCode().equals(SyncResult.SyncStatusCode.ERROR))
+            .collect(Collectors.toList());
     assertEquals(SyncResult.SyncStatusCode.ERROR, errorStatus.get(0).getStatusCode());
     assertEquals(
         3,
-        results.values().stream()
-            .flatMap(
-                statusList -> statusList.stream().map(SyncResult.CatalogSyncStatus::getStatusCode))
+        results.stream()
+            .map(SyncResult.CatalogSyncStatus::getStatusCode)
             .filter(statusCode -> statusCode.equals(SyncResult.SyncStatusCode.SUCCESS))
             .count());
 

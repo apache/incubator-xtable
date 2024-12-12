@@ -26,15 +26,8 @@ import lombok.NonNull;
 @EqualsAndHashCode(callSuper = true)
 @Getter
 public class SourceCatalog extends ExternalCatalog {
-  /** The source table present in the {@link SourceCatalog} */
-  SourceTable sourceTable;
-
   @Builder(toBuilder = true)
-  SourceCatalog(
-      @NonNull String catalogIdentifier,
-      @NonNull CatalogConfig catalogConfig,
-      @NonNull SourceTable sourceTable) {
-    super(catalogIdentifier, catalogConfig);
-    this.sourceTable = sourceTable;
+  SourceCatalog(@NonNull String catalogId, @NonNull CatalogConfig catalogConfig) {
+    super(catalogId, catalogConfig);
   }
 }
