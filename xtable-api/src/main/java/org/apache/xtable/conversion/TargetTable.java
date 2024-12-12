@@ -32,6 +32,7 @@ import lombok.Getter;
 @EqualsAndHashCode(callSuper = true)
 public class TargetTable extends ExternalTable {
   private final Duration metadataRetention;
+  /** Each target table can be synced to multiple target catalogs */
   private final List<TargetCatalog> targetCatalogs;
 
   @Builder(toBuilder = true)

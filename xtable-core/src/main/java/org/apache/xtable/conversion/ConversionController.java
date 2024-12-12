@@ -124,9 +124,7 @@ public class ConversionController {
         List<CatalogSyncClient> catalogSyncClients =
             targetTable.getTargetCatalogs().stream()
                 .map(
-                    targetCatalog ->
-                        catalogConversionFactory.createForCatalog(
-                            targetCatalog, targetTable.getFormatName(), conf))
+                    targetCatalog -> catalogConversionFactory.createForCatalog(targetCatalog, conf))
                 .collect(Collectors.toList());
         catalogSyncResults.put(
             targetTable.getFormatName(),
@@ -201,6 +199,8 @@ public class ConversionController {
     BeanUtils.copyProperties(sourceTable, targetTable);
     return catalogSync.syncTable(
         catalogSyncClients,
+        // We get the latest state of InternalTable for TargetTable and sync it to
+        // catalogSyncClients.
         conversionSourceProvider.getConversionSourceInstance(sourceTable).getCurrentTable());
   }
 

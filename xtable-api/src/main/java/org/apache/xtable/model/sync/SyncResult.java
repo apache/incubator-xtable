@@ -39,7 +39,7 @@ public class SyncResult {
   Instant syncStartTime;
   // Duration
   Duration syncDuration;
-  // Status of the sync
+  // Status of the tableFormat sync
   SyncStatus tableFormatSyncStatus;
   // The Sync Mode recommended for the next sync (Usually filled on an error)
   SyncMode recommendedSyncMode;

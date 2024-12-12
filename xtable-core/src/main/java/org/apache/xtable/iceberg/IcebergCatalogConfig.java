@@ -30,8 +30,8 @@ import org.apache.xtable.conversion.CatalogConfig;
 /**
  * Iceberg requires a catalog to perform any operation, if no catalog is provided the default
  * catalog (HadoopCatalog or storage based catalog) is used. For syncing iceberg to multiple
- * catalogs, you can populate ExternalCatalog which allows syncing the latest version of iceberg
- * metadata to multiple catalogs.
+ * catalogs, you can use {@link org.apache.xtable.catalog.ExternalCatalogConfig} instead which
+ * allows syncing the latest version of iceberg metadata to multiple catalogs.
  */
 @Value
 @Builder

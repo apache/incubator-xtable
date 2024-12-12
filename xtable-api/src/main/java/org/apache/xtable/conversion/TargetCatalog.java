@@ -29,9 +29,8 @@ import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 @Getter
 public class TargetCatalog extends ExternalCatalog {
   /**
-   * The table formats that will be synced to this catalog along with their {@link
-   * CatalogTableIdentifier}. Eg: ICEBERG -> {marketing, price}, HUDI -> {marketing, price_hudi},
-   * DELTA -> {delta_tables, price}
+   * The tableIdentifiers(databaseName, tableName) that will be used when syncing it to the {@link
+   * TargetCatalog}.
    */
   @NonNull CatalogTableIdentifier catalogTableIdentifier;
 

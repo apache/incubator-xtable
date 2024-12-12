@@ -18,27 +18,15 @@
  
 package org.apache.xtable.catalog;
 
-import java.util.Collections;
-import java.util.Map;
+import static org.junit.jupiter.api.Assertions.*;
 
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+import org.junit.jupiter.api.Test;
 
-import org.apache.xtable.conversion.CatalogConfig;
+class TestCatalogConversionFactory {
 
-/** Defines the configuration for {@link org.apache.xtable.conversion.ExternalCatalog} */
-@Value
-@Builder
-public class ExternalCatalogConfig implements CatalogConfig {
-  String catalogType;
-  @NonNull String catalogImpl;
-  @NonNull String catalogName;
-  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
+  @Test
+  void createSourceForConfig() {}
 
-  public static ExternalCatalogConfig fromCatalogType(
-      String catalogType, String catalogId, Map<String, String> properties) {
-    // TODO: Choose existing implementation based on catalogType.
-    return ExternalCatalogConfig.builder().build();
-  }
+  @Test
+  void createForCatalog() {}
 }
