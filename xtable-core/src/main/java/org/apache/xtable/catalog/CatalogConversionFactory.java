@@ -41,7 +41,7 @@ public class CatalogConversionFactory {
    * @param configuration hadoop configuration
    * @return
    */
-  public static CatalogConversionSource createSourceForConfig(
+  public static CatalogConversionSource createCatalogConversionSource(
       SourceCatalog sourceCatalog, Configuration configuration) {
     return ReflectionUtils.createInstanceOfClass(
         sourceCatalog.getCatalogConfig().getCatalogImpl(), sourceCatalog, configuration);
@@ -55,7 +55,7 @@ public class CatalogConversionFactory {
    * @param configuration hadoop configuration
    * @return
    */
-  public CatalogSyncClient createForCatalog(
+  public CatalogSyncClient createCatalogSyncClient(
       TargetCatalog targetCatalog, Configuration configuration) {
     return ReflectionUtils.createInstanceOfClass(
         targetCatalog.getCatalogConfig().getCatalogImpl(), targetCatalog, configuration);

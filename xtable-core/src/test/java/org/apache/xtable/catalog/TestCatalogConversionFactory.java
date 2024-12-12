@@ -18,15 +18,122 @@
  
 package org.apache.xtable.catalog;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.Collections;
+
+import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
+
+import org.apache.xtable.conversion.SourceCatalog;
+import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.conversion.TargetCatalog;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
+import org.apache.xtable.spi.extractor.CatalogConversionSource;
+import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 class TestCatalogConversionFactory {
 
   @Test
-  void createSourceForConfig() {}
+  void createSourceForConfig() {
+    SourceCatalog sourceCatalog =
+        SourceCatalog.builder()
+            .catalogId("catalogId")
+            .catalogConfig(
+                ExternalCatalogConfig.builder()
+                    .catalogName("catalogName")
+                    .catalogImpl(TestCatalogImpl.class.getName())
+                    .catalogOptions(Collections.emptyMap())
+                    .build())
+            .build();
+    CatalogConversionSource catalogConversionSource =
+        CatalogConversionFactory.createCatalogConversionSource(sourceCatalog, new Configuration());
+    assertEquals(catalogConversionSource.getClass().getName(), TestCatalogImpl.class.getName());
+  }
 
   @Test
-  void createForCatalog() {}
+  void createForCatalog() {
+    TargetCatalog targetCatalog =
+        TargetCatalog.builder()
+            .catalogId("catalogId")
+            .catalogConfig(
+                ExternalCatalogConfig.builder()
+                    .catalogName("catalogName")
+                    .catalogImpl(TestCatalogImpl.class.getName())
+                    .catalogOptions(Collections.emptyMap())
+                    .build())
+            .catalogTableIdentifier(
+                CatalogTableIdentifier.builder()
+                    .databaseName("target-database")
+                    .tableName("target-tableName")
+                    .build())
+            .build();
+    CatalogSyncClient catalogSyncClient =
+        CatalogConversionFactory.getInstance()
+            .createCatalogSyncClient(targetCatalog, new Configuration());
+    assertEquals(catalogSyncClient.getClass().getName(), TestCatalogImpl.class.getName());
+  }
+
+  public static class TestCatalogImpl
+      implements CatalogSyncClient<Object>, CatalogConversionSource {
+
+    public TestCatalogImpl(SourceCatalog sourceCatalog, Configuration hadoopConf) {}
+
+    public TestCatalogImpl(TargetCatalog targetCatalog, Configuration hadoopConf) {}
+
+    @Override
+    public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
+      return null;
+    }
+
+    @Override
+    public String getCatalogId() {
+      return null;
+    }
+
+    @Override
+    public String getCatalogImpl() {
+      return null;
+    }
+
+    @Override
+    public CatalogTableIdentifier getTableIdentifier() {
+      return null;
+    }
+
+    @Override
+    public String getStorageDescriptorLocation(Object o) {
+      return null;
+    }
+
+    @Override
+    public boolean hasDatabase(String databaseName) {
+      return false;
+    }
+
+    @Override
+    public void createDatabase(String databaseName) {}
+
+    @Override
+    public Object getTable(CatalogTableIdentifier tableIdentifier) {
+      return null;
+    }
+
+    @Override
+    public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {}
+
+    @Override
+    public void refreshTable(
+        InternalTable table, Object catalogTable, CatalogTableIdentifier tableIdentifier) {}
+
+    @Override
+    public void createOrReplaceTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {}
+
+    @Override
+    public void dropTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {}
+
+    @Override
+    public void close() throws Exception {}
+  }
 }

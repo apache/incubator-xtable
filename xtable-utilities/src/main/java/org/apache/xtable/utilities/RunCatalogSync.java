@@ -66,8 +66,8 @@ import org.apache.xtable.utilities.RunCatalogSync.DatasetConfig.TargetTableIdent
 
 /**
  * Provides standalone process for reading tables from a source catalog and synchronizing their
- * state in target tables, supports table format conversion as well if the target catalog chooses a
- * different format from source table
+ * state in target tables, supports table format conversion as well if the target table chooses a
+ * different format from source table.
  */
 public class RunCatalogSync {
   public static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
@@ -123,7 +123,7 @@ public class RunCatalogSync {
             .collect(Collectors.toMap(DatasetConfig.Catalog::getCatalogId, Function.identity()));
     SourceCatalog sourceCatalog = getSourceCatalog(datasetConfig.getSourceCatalog());
     CatalogConversionSource catalogConversionSource =
-        CatalogConversionFactory.createSourceForConfig(sourceCatalog, hadoopConf);
+        CatalogConversionFactory.createCatalogConversionSource(sourceCatalog, hadoopConf);
     ConversionController conversionController = new ConversionController(hadoopConf);
     for (DatasetConfig.Dataset dataset : datasetConfig.getDatasets()) {
       SourceTable sourceTable = null;

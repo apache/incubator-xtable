@@ -124,7 +124,8 @@ public class ConversionController {
         List<CatalogSyncClient> catalogSyncClients =
             targetTable.getTargetCatalogs().stream()
                 .map(
-                    targetCatalog -> catalogConversionFactory.createForCatalog(targetCatalog, conf))
+                    targetCatalog ->
+                        catalogConversionFactory.createCatalogSyncClient(targetCatalog, conf))
                 .collect(Collectors.toList());
         catalogSyncResults.put(
             targetTable.getFormatName(),
