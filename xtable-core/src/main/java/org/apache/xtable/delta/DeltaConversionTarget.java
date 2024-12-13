@@ -223,7 +223,6 @@ public class DeltaConversionTarget implements ConversionTarget {
 
   @Override
   public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
-    long sourceIdentifierVal = Long.parseLong(sourceIdentifier);
     Snapshot currentSnapshot = deltaLog.currentSnapshot().snapshot();
 
     Iterator<Tuple2<Object, Seq<Action>>> versionIterator =
@@ -265,11 +264,6 @@ public class DeltaConversionTarget implements ConversionTarget {
         TableSyncMetadata metadata = optionalMetadata.get();
         if (sourceIdentifier.equals(metadata.getSourceIdentifier())) {
           return Optional.of(String.valueOf(targetVersion));
-        }
-
-        // Stop if greater than sourceIdentifier since we're iterating from oldest to newest
-        if (Long.parseLong(metadata.getSourceIdentifier()) > sourceIdentifierVal) {
-          return Optional.empty();
         }
       } catch (Exception e) {
         log.warn("Failed to parse commit metadata for commit: {}", targetVersion, e);

@@ -253,7 +253,6 @@ public class IcebergConversionTarget implements ConversionTarget {
 
   @Override
   public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
-    long sourceIdentifierVal = Long.parseLong(sourceIdentifier);
     for (Snapshot snapshot : table.snapshots()) {
       Map<String, String> summary = snapshot.summary();
       String sourceMetadataJson = summary.get(TableSyncMetadata.XTABLE_METADATA);
@@ -270,13 +269,7 @@ public class IcebergConversionTarget implements ConversionTarget {
 
         TableSyncMetadata metadata = optionalMetadata.get();
         if (sourceIdentifier.equals(metadata.getSourceIdentifier())) {
-          return Optional.of(metadata.getSourceIdentifier());
-        }
-
-        long curSourceIdentifierVal = Long.parseLong(metadata.getSourceIdentifier());
-        // Stop if greater than sourceIdentifier since we're iterating from oldest to newest
-        if (curSourceIdentifierVal > sourceIdentifierVal) {
-          return Optional.empty();
+          return Optional.of(String.valueOf(snapshot.snapshotId()));
         }
       } catch (Exception e) {
         log.warn("Failed to parse parse snapshot metadata for {}", snapshot.snapshotId(), e);

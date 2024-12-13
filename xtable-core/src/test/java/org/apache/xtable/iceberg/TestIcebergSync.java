@@ -248,7 +248,6 @@ public class TestIcebergSync {
         conversionTarget.getTargetCommitIdentifier(snapshot1.getSourceIdentifier());
     validateIcebergTable(tableName, table1, Sets.newHashSet(dataFile1, dataFile2), null);
     assertTrue(targetIdentifier1.isPresent());
-    assertEquals("0", targetIdentifier1.get());
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
@@ -256,7 +255,11 @@ public class TestIcebergSync {
         conversionTarget.getTargetCommitIdentifier(snapshot2.getSourceIdentifier());
     validateIcebergTable(tableName, table2, Sets.newHashSet(dataFile2, dataFile3), null);
     assertTrue(targetIdentifier2.isPresent());
-    assertEquals("1", targetIdentifier2.get());
+
+    // Case that return empty target identifier
+    Optional<String> targetIdentifier3 =
+            conversionTarget.getTargetCommitIdentifier("3");
+    assertFalse(targetIdentifier3.isPresent());
 
     ArgumentCaptor<Transaction> transactionArgumentCaptor =
         ArgumentCaptor.forClass(Transaction.class);

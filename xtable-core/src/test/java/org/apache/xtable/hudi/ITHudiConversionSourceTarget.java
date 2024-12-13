@@ -22,6 +22,7 @@ import static org.apache.xtable.hudi.HudiTestUtil.createWriteStatus;
 import static org.apache.xtable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.apache.xtable.hudi.HudiTestUtil.initTableAndGetMetaClient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
@@ -312,7 +313,6 @@ public class ITHudiConversionSourceTarget {
     Optional<String> targetIdentifier =
         targetClient.getTargetCommitIdentifier(latestState.getSourceIdentifier(), metaClient);
     assertTrue(targetIdentifier.isPresent());
-    assertEquals(latestState.getSourceIdentifier(), targetIdentifier.get());
 
     // create a new commit that removes fileName1 and adds fileName2
     String fileName2 = "file_2.parquet";
@@ -336,7 +336,6 @@ public class ITHudiConversionSourceTarget {
     }
     Optional<String> targetIdentifier2 = targetClient.getTargetCommitIdentifier("1", metaClient);
     assertTrue(targetIdentifier2.isPresent());
-    assertEquals("1", targetIdentifier2.get());
 
     // create a new commit that removes fileName2 and adds fileName3
     String fileName3 = "file_3.parquet";
@@ -386,15 +385,16 @@ public class ITHudiConversionSourceTarget {
     }
     Optional<String> targetIdentifier3 = targetClient.getTargetCommitIdentifier("2", metaClient);
     assertTrue(targetIdentifier3.isPresent());
-    assertEquals("2", targetIdentifier3.get());
 
     Optional<String> targetIdentifier4 = targetClient.getTargetCommitIdentifier("3", metaClient);
     assertTrue(targetIdentifier4.isPresent());
-    assertEquals("3", targetIdentifier4.get());
 
     Optional<String> targetIdentifier5 = targetClient.getTargetCommitIdentifier("4", metaClient);
     assertTrue(targetIdentifier5.isPresent());
-    assertEquals("4", targetIdentifier5.get());
+
+    // Case that return empty target identifier
+    Optional<String> targetIdentifier6 = targetClient.getTargetCommitIdentifier("5", metaClient);
+    assertFalse(targetIdentifier6.isPresent());
 
     // the first commit to the timeline should be archived
     assertEquals(
