@@ -42,7 +42,6 @@ import org.apache.iceberg.exceptions.NotFoundException;
 
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -68,7 +67,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   private Transaction transaction;
   private Table table;
   private InternalTable internalTableState;
-  private SourceMetadata sourceMetadata;
+  private TableSyncMetadata tableSyncMetadata;
 
   public IcebergConversionTarget() {}
 
@@ -142,11 +141,10 @@ public class IcebergConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void beginSync(InternalTable internalTable, SourceMetadata sourceMetadata) {
+  public void beginSync(InternalTable internalTable) {
     initializeTableIfRequired(internalTable);
     transaction = table.newTransaction();
     internalTableState = internalTable;
-    this.sourceMetadata = sourceMetadata;
   }
 
   private void initializeTableIfRequired(InternalTable internalTable) {
@@ -178,8 +176,9 @@ public class IcebergConversionTarget implements ConversionTarget {
 
   @Override
   public void syncMetadata(TableSyncMetadata metadata) {
+    tableSyncMetadata = metadata;
+
     UpdateProperties updateProperties = transaction.updateProperties();
-    updateProperties.set(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
     if (!table.properties().containsKey(TableProperties.WRITE_DATA_LOCATION)) {
       // Required for a consistent write location when writing back to the table as Iceberg
       updateProperties.set(TableProperties.WRITE_DATA_LOCATION, basePath);
@@ -205,7 +204,7 @@ public class IcebergConversionTarget implements ConversionTarget {
         partitionedDataFiles,
         transaction.table().schema(),
         transaction.table().spec(),
-        sourceMetadata);
+        tableSyncMetadata);
   }
 
   @Override
@@ -215,7 +214,7 @@ public class IcebergConversionTarget implements ConversionTarget {
         dataFilesDiff,
         transaction.table().schema(),
         transaction.table().spec(),
-        sourceMetadata);
+        tableSyncMetadata);
   }
 
   @Override
@@ -230,7 +229,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     transaction.commitTransaction();
     transaction = null;
     internalTableState = null;
-    sourceMetadata = null;
+    tableSyncMetadata = null;
   }
 
   private void safeDelete(String file) {
@@ -257,18 +256,24 @@ public class IcebergConversionTarget implements ConversionTarget {
     long sourceIdentifierVal = Long.parseLong(sourceIdentifier);
     for (Snapshot snapshot : table.snapshots()) {
       Map<String, String> summary = snapshot.summary();
-      String sourceMetadataJson = summary.get(TableSyncMetadata.XTABLE_SOURCE_METADATA);
+      String sourceMetadataJson = summary.get(TableSyncMetadata.XTABLE_METADATA);
       if (sourceMetadataJson == null) {
         continue;
       }
 
       try {
-        SourceMetadata sourceMetadata = SourceMetadata.fromJson(sourceMetadataJson);
-        if (sourceIdentifier.equals(sourceMetadata.getSourceIdentifier())) {
-          return Optional.of(sourceMetadata.getSourceIdentifier());
+        Optional<TableSyncMetadata> optionalMetadata =
+            TableSyncMetadata.fromJson(sourceMetadataJson);
+        if (!optionalMetadata.isPresent()) {
+          return Optional.empty();
         }
 
-        long curSourceIdentifierVal = Long.parseLong(sourceMetadata.getSourceIdentifier());
+        TableSyncMetadata metadata = optionalMetadata.get();
+        if (sourceIdentifier.equals(metadata.getSourceIdentifier())) {
+          return Optional.of(metadata.getSourceIdentifier());
+        }
+
+        long curSourceIdentifierVal = Long.parseLong(metadata.getSourceIdentifier());
         // Stop if greater than sourceIdentifier since we're iterating from oldest to newest
         if (curSourceIdentifierVal > sourceIdentifierVal) {
           return Optional.empty();

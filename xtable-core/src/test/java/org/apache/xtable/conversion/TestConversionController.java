@@ -73,7 +73,7 @@ public class TestConversionController {
   void testAllSnapshotSyncAsPerConfig() {
     SyncMode syncMode = SyncMode.FULL;
     InternalTable internalTable = getInternalTable();
-    InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1");
+    InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1", "0");
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
     Map<String, SyncResult> perTableResults = new HashMap<>();
@@ -146,10 +146,12 @@ public class TestConversionController {
     CommitsBacklog<Instant> commitsBacklog =
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
     Optional<TableSyncMetadata> conversionTarget1Metadata =
-        Optional.of(TableSyncMetadata.of(icebergLastSyncInstant, pendingInstantsForIceberg));
+        Optional.of(
+            TableSyncMetadata.of(icebergLastSyncInstant, pendingInstantsForIceberg, "TEST", "0"));
     when(mockConversionTarget1.getTableMetadata()).thenReturn(conversionTarget1Metadata);
     Optional<TableSyncMetadata> conversionTarget2Metadata =
-        Optional.of(TableSyncMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta));
+        Optional.of(
+            TableSyncMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta, "TEST", "0"));
     when(mockConversionTarget2.getTableMetadata()).thenReturn(conversionTarget2Metadata);
     when(mockConversionSource.getCommitsBacklog(instantsForIncrementalSync))
         .thenReturn(commitsBacklog);
@@ -193,7 +195,7 @@ public class TestConversionController {
     SyncMode syncMode = SyncMode.INCREMENTAL;
     InternalTable internalTable = getInternalTable();
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
-    InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1");
+    InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1", "0");
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
     Map<String, SyncResult> syncResults = new HashMap<>();
     syncResults.put(TableFormat.ICEBERG, syncResult);
@@ -216,9 +218,11 @@ public class TestConversionController {
 
     // Both Iceberg and Delta last synced at instantAt5 and have no pending instants.
     when(mockConversionTarget1.getTableMetadata())
-        .thenReturn(Optional.of(TableSyncMetadata.of(instantAt5, Collections.emptyList())));
+        .thenReturn(
+            Optional.of(TableSyncMetadata.of(instantAt5, Collections.emptyList(), "TEST", "0")));
     when(mockConversionTarget2.getTableMetadata())
-        .thenReturn(Optional.of(TableSyncMetadata.of(instantAt5, Collections.emptyList())));
+        .thenReturn(
+            Optional.of(TableSyncMetadata.of(instantAt5, Collections.emptyList(), "TEST", "0")));
 
     when(mockConversionSource.getCurrentSnapshot()).thenReturn(internalSnapshot);
     when(tableFormatSync.syncSnapshot(
@@ -273,9 +277,12 @@ public class TestConversionController {
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
     when(mockConversionTarget1.getTableMetadata())
         .thenReturn(
-            Optional.of(TableSyncMetadata.of(icebergLastSyncInstant, pendingInstantsForIceberg)));
+            Optional.of(
+                TableSyncMetadata.of(
+                    icebergLastSyncInstant, pendingInstantsForIceberg, "TEST", "0")));
     Optional<TableSyncMetadata> conversionTarget2Metadata =
-        Optional.of(TableSyncMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta));
+        Optional.of(
+            TableSyncMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta, "TEST", "0"));
     when(mockConversionTarget2.getTableMetadata()).thenReturn(conversionTarget2Metadata);
     when(mockConversionSource.getCommitsBacklog(instantsForIncrementalSync))
         .thenReturn(commitsBacklog);
@@ -288,7 +295,7 @@ public class TestConversionController {
     // Iceberg needs to sync by snapshot since instant15 is affected by table clean-up.
     InternalTable internalTable = getInternalTable();
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
-    InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1");
+    InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1", "0");
     SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour);
     Map<String, SyncResult> snapshotResult =
         Collections.singletonMap(TableFormat.ICEBERG, syncResult);
@@ -347,10 +354,12 @@ public class TestConversionController {
     CommitsBacklog<Instant> commitsBacklog =
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
     Optional<TableSyncMetadata> conversionTarget1Metadata =
-        Optional.of(TableSyncMetadata.of(icebergLastSyncInstant, Collections.emptyList()));
+        Optional.of(
+            TableSyncMetadata.of(icebergLastSyncInstant, Collections.emptyList(), "TEST", "0"));
     when(mockConversionTarget1.getTableMetadata()).thenReturn(conversionTarget1Metadata);
     Optional<TableSyncMetadata> conversionTarget2Metadata =
-        Optional.of(TableSyncMetadata.of(deltaLastSyncInstant, Collections.emptyList()));
+        Optional.of(
+            TableSyncMetadata.of(deltaLastSyncInstant, Collections.emptyList(), "TEST", "0"));
     when(mockConversionTarget2.getTableMetadata()).thenReturn(conversionTarget2Metadata);
     when(mockConversionSource.getCommitsBacklog(instantsForIncrementalSync))
         .thenReturn(commitsBacklog);
@@ -396,8 +405,13 @@ public class TestConversionController {
         .build();
   }
 
-  private InternalSnapshot buildSnapshot(InternalTable internalTable, String version) {
-    return InternalSnapshot.builder().table(internalTable).version(version).build();
+  private InternalSnapshot buildSnapshot(
+      InternalTable internalTable, String version, String sourceIdentifier) {
+    return InternalSnapshot.builder()
+        .table(internalTable)
+        .version(version)
+        .sourceIdentifier(sourceIdentifier)
+        .build();
   }
 
   private InternalTable getInternalTable() {

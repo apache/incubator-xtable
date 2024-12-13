@@ -43,7 +43,6 @@ import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
-import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -77,13 +76,13 @@ public class TestTableFormatSync {
             .table(startingTableState)
             .partitionedDataFiles(fileGroups)
             .pendingCommits(pendingCommitInstants)
-            .sourceMetadata(SourceMetadata.builder().sourceIdentifier("0").build())
+            .sourceIdentifier("0")
             .build();
     when(mockConversionTarget1.getTableFormat()).thenReturn(TableFormat.ICEBERG);
     when(mockConversionTarget2.getTableFormat()).thenReturn(TableFormat.DELTA);
     doThrow(new RuntimeException("Failure"))
         .when(mockConversionTarget1)
-        .beginSync(startingTableState, snapshot.getSourceMetadata());
+        .beginSync(startingTableState);
     Map<String, SyncResult> result =
         TableFormatSync.getInstance()
             .syncSnapshot(Arrays.asList(mockConversionTarget1, mockConversionTarget2), snapshot);
@@ -111,7 +110,7 @@ public class TestTableFormatSync {
         mockConversionTarget2,
         startingTableState,
         pendingCommitInstants,
-        snapshot.getSourceMetadata().getSourceIdentifier());
+        snapshot.getSourceIdentifier());
     verify(mockConversionTarget2).syncFilesForSnapshot(fileGroups);
     verify(mockConversionTarget2).completeSync();
     verify(mockConversionTarget1, never()).completeSync();
@@ -132,7 +131,7 @@ public class TestTableFormatSync {
         TableChange.builder()
             .tableAsOfChange(tableState1)
             .filesDiff(dataFilesDiff1)
-            .sourceMetadata(SourceMetadata.builder().sourceIdentifier("0").build())
+            .sourceIdentifier("0")
             .build();
     InternalTable tableState2 = getTableState(2);
     DataFilesDiff dataFilesDiff2 = getFilesDiff(2);
@@ -140,7 +139,7 @@ public class TestTableFormatSync {
         TableChange.builder()
             .tableAsOfChange(tableState2)
             .filesDiff(dataFilesDiff2)
-            .sourceMetadata(SourceMetadata.builder().sourceIdentifier("1").build())
+            .sourceIdentifier("1")
             .build();
     InternalTable tableState3 = getTableState(3);
     DataFilesDiff dataFilesDiff3 = getFilesDiff(3);
@@ -148,7 +147,7 @@ public class TestTableFormatSync {
         TableChange.builder()
             .tableAsOfChange(tableState3)
             .filesDiff(dataFilesDiff3)
-            .sourceMetadata(SourceMetadata.builder().sourceIdentifier("2").build())
+            .sourceIdentifier("2")
             .build();
 
     List<Instant> pendingCommitInstants = Collections.singletonList(Instant.now());
@@ -156,9 +155,7 @@ public class TestTableFormatSync {
     when(mockConversionTarget2.getTableFormat()).thenReturn(TableFormat.DELTA);
     // throw exception on second change and show that first change is still returned for this format
     // and other conversionTarget is not affected
-    doThrow(new RuntimeException("Failure"))
-        .when(mockConversionTarget1)
-        .beginSync(tableState2, tableChange2.getSourceMetadata());
+    doThrow(new RuntimeException("Failure")).when(mockConversionTarget1).beginSync(tableState2);
 
     List<TableChange> tableChanges = Arrays.asList(tableChange1, tableChange2, tableChange3);
     IncrementalTableChanges incrementalTableChanges =
@@ -170,10 +167,12 @@ public class TestTableFormatSync {
     Map<ConversionTarget, TableSyncMetadata> conversionTargetWithMetadata = new HashMap<>();
     conversionTargetWithMetadata.put(
         mockConversionTarget1,
-        TableSyncMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
+        TableSyncMetadata.of(
+            Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList(), "TEST", "0"));
     conversionTargetWithMetadata.put(
         mockConversionTarget2,
-        TableSyncMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
+        TableSyncMetadata.of(
+            Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList(), "TEST", "1"));
 
     Map<String, List<SyncResult>> result =
         TableFormatSync.getInstance()
@@ -217,25 +216,25 @@ public class TestTableFormatSync {
         mockConversionTarget1,
         tableState1,
         pendingCommitInstants,
-        tableChange1.getSourceMetadata().getSourceIdentifier());
+        tableChange1.getSourceIdentifier());
     verify(mockConversionTarget1).syncFilesForDiff(dataFilesDiff1);
     verifyBaseConversionTargetCalls(
         mockConversionTarget2,
         tableState1,
         pendingCommitInstants,
-        tableChange1.getSourceMetadata().getSourceIdentifier());
+        tableChange1.getSourceIdentifier());
     verify(mockConversionTarget2).syncFilesForDiff(dataFilesDiff1);
     verifyBaseConversionTargetCalls(
         mockConversionTarget2,
         tableState2,
         pendingCommitInstants,
-        tableChange2.getSourceMetadata().getSourceIdentifier());
+        tableChange2.getSourceIdentifier());
     verify(mockConversionTarget2).syncFilesForDiff(dataFilesDiff2);
     verifyBaseConversionTargetCalls(
         mockConversionTarget2,
         tableState3,
         pendingCommitInstants,
-        tableChange3.getSourceMetadata().getSourceIdentifier());
+        tableChange3.getSourceIdentifier());
     verify(mockConversionTarget2).syncFilesForDiff(dataFilesDiff3);
     verify(mockConversionTarget1, times(1)).completeSync();
     verify(mockConversionTarget2, times(3)).completeSync();
@@ -250,7 +249,7 @@ public class TestTableFormatSync {
         TableChange.builder()
             .tableAsOfChange(tableState1)
             .filesDiff(dataFilesDiff1)
-            .sourceMetadata(SourceMetadata.builder().sourceIdentifier("0").build())
+            .sourceIdentifier("0")
             .build();
     InternalTable tableState2 = getTableState(2);
     DataFilesDiff dataFilesDiff2 = getFilesDiff(2);
@@ -258,7 +257,7 @@ public class TestTableFormatSync {
         TableChange.builder()
             .tableAsOfChange(tableState2)
             .filesDiff(dataFilesDiff2)
-            .sourceMetadata(SourceMetadata.builder().sourceIdentifier("1").build())
+            .sourceIdentifier("1")
             .build();
     InternalTable tableState3 = getTableState(3);
     DataFilesDiff dataFilesDiff3 = getFilesDiff(3);
@@ -266,7 +265,7 @@ public class TestTableFormatSync {
         TableChange.builder()
             .tableAsOfChange(tableState3)
             .filesDiff(dataFilesDiff3)
-            .sourceMetadata(SourceMetadata.builder().sourceIdentifier("2").build())
+            .sourceIdentifier("2")
             .build();
 
     List<Instant> pendingCommitInstants = Collections.singletonList(Instant.now());
@@ -287,12 +286,17 @@ public class TestTableFormatSync {
         mockConversionTarget1,
         TableSyncMetadata.of(
             tableChange2.getTableAsOfChange().getLatestCommitTime(),
-            Collections.singletonList(tableChange1.getTableAsOfChange().getLatestCommitTime())));
+            Collections.singletonList(tableChange1.getTableAsOfChange().getLatestCommitTime()),
+            "TEST",
+            tableChange2.getSourceIdentifier()));
     // mockConversionTarget2 will have synced the first table change previously
     conversionTargetWithMetadata.put(
         mockConversionTarget2,
         TableSyncMetadata.of(
-            tableChange1.getTableAsOfChange().getLatestCommitTime(), Collections.emptyList()));
+            tableChange1.getTableAsOfChange().getLatestCommitTime(),
+            Collections.emptyList(),
+            "TEST",
+            tableChange1.getSourceIdentifier()));
 
     Map<String, List<SyncResult>> result =
         TableFormatSync.getInstance()
@@ -331,13 +335,13 @@ public class TestTableFormatSync {
         mockConversionTarget1,
         tableState1,
         pendingCommitInstants,
-        tableChange1.getSourceMetadata().getSourceIdentifier());
+        tableChange1.getSourceIdentifier());
     verify(mockConversionTarget1).syncFilesForDiff(dataFilesDiff1);
     verifyBaseConversionTargetCalls(
         mockConversionTarget1,
         tableState3,
         pendingCommitInstants,
-        tableChange3.getSourceMetadata().getSourceIdentifier());
+        tableChange3.getSourceIdentifier());
     verify(mockConversionTarget1).syncFilesForDiff(dataFilesDiff3);
     verify(mockConversionTarget1, times(2)).completeSync();
     // conversionTarget2 syncs table changes 2 and 3
@@ -345,13 +349,13 @@ public class TestTableFormatSync {
         mockConversionTarget2,
         tableState2,
         pendingCommitInstants,
-        tableChange2.getSourceMetadata().getSourceIdentifier());
+        tableChange2.getSourceIdentifier());
     verify(mockConversionTarget2).syncFilesForDiff(dataFilesDiff2);
     verifyBaseConversionTargetCalls(
         mockConversionTarget2,
         tableState3,
         pendingCommitInstants,
-        tableChange3.getSourceMetadata().getSourceIdentifier());
+        tableChange3.getSourceIdentifier());
     verify(mockConversionTarget2).syncFilesForDiff(dataFilesDiff3);
     verify(mockConversionTarget2, times(2)).completeSync();
   }
@@ -365,7 +369,7 @@ public class TestTableFormatSync {
         TableChange.builder()
             .tableAsOfChange(tableState1)
             .filesDiff(dataFilesDiff1)
-            .sourceMetadata(SourceMetadata.builder().sourceIdentifier("0").build())
+            .sourceIdentifier("0")
             .build();
 
     List<Instant> pendingCommitInstants = Collections.emptyList();
@@ -382,11 +386,13 @@ public class TestTableFormatSync {
     Map<ConversionTarget, TableSyncMetadata> conversionTargetWithMetadata = new HashMap<>();
     // mockConversionTarget1 will have nothing to sync
     conversionTargetWithMetadata.put(
-        mockConversionTarget1, TableSyncMetadata.of(Instant.now(), Collections.emptyList()));
+        mockConversionTarget1,
+        TableSyncMetadata.of(Instant.now(), Collections.emptyList(), "TEST", "0"));
     // mockConversionTarget2 will have synced the first table change previously
     conversionTargetWithMetadata.put(
         mockConversionTarget2,
-        TableSyncMetadata.of(Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList()));
+        TableSyncMetadata.of(
+            Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList(), "TEST", "1"));
 
     Map<String, List<SyncResult>> result =
         TableFormatSync.getInstance()
@@ -401,7 +407,7 @@ public class TestTableFormatSync {
           assertSyncResultTimes(syncResult, start);
         });
 
-    verify(mockConversionTarget1, never()).beginSync(any(), any());
+    verify(mockConversionTarget1, never()).beginSync(any());
     verify(mockConversionTarget1, never()).syncFilesForDiff(any());
     verify(mockConversionTarget1, never()).completeSync();
 
@@ -409,7 +415,7 @@ public class TestTableFormatSync {
         mockConversionTarget2,
         tableState1,
         pendingCommitInstants,
-        tableChange1.getSourceMetadata().getSourceIdentifier());
+        tableChange1.getSourceIdentifier());
     verify(mockConversionTarget2).syncFilesForDiff(dataFilesDiff1);
   }
 
@@ -452,14 +458,15 @@ public class TestTableFormatSync {
       InternalTable startingTableState,
       List<Instant> pendingCommitInstants,
       String sourceIdentifier) {
-    verify(mockConversionTarget)
-        .beginSync(
-            startingTableState,
-            SourceMetadata.builder().sourceIdentifier(sourceIdentifier).build());
+    verify(mockConversionTarget).beginSync(startingTableState);
     verify(mockConversionTarget).syncSchema(startingTableState.getReadSchema());
     verify(mockConversionTarget).syncPartitionSpec(startingTableState.getPartitioningFields());
     verify(mockConversionTarget)
         .syncMetadata(
-            TableSyncMetadata.of(startingTableState.getLatestCommitTime(), pendingCommitInstants));
+            TableSyncMetadata.of(
+                startingTableState.getLatestCommitTime(),
+                pendingCommitInstants,
+                startingTableState.getTableFormat(),
+                sourceIdentifier));
   }
 }

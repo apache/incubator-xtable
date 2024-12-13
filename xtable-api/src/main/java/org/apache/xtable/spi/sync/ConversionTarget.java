@@ -25,7 +25,6 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -77,9 +76,8 @@ public interface ConversionTarget {
    * Starts the sync and performs any initialization required
    *
    * @param table the table that will be synced
-   * @param sourceMetadata The source table metadata for current round of sync
    */
-  void beginSync(InternalTable table, SourceMetadata sourceMetadata);
+  void beginSync(InternalTable table);
 
   /** Completes the sync and performs any cleanup required. */
   void completeSync();

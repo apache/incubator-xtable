@@ -86,7 +86,6 @@ import org.apache.xtable.ITConversionController;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -246,8 +245,7 @@ public class TestIcebergSync {
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
     Optional<String> targetIdentifier1 =
-        conversionTarget.getTargetCommitIdentifier(
-            snapshot1.getSourceMetadata().getSourceIdentifier());
+        conversionTarget.getTargetCommitIdentifier(snapshot1.getSourceIdentifier());
     validateIcebergTable(tableName, table1, Sets.newHashSet(dataFile1, dataFile2), null);
     assertTrue(targetIdentifier1.isPresent());
     assertEquals("0", targetIdentifier1.get());
@@ -255,8 +253,7 @@ public class TestIcebergSync {
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
     Optional<String> targetIdentifier2 =
-        conversionTarget.getTargetCommitIdentifier(
-            snapshot2.getSourceMetadata().getSourceIdentifier());
+        conversionTarget.getTargetCommitIdentifier(snapshot2.getSourceIdentifier());
     validateIcebergTable(tableName, table2, Sets.newHashSet(dataFile2, dataFile3), null);
     assertTrue(targetIdentifier2.isPresent());
     assertEquals("1", targetIdentifier2.get());
@@ -698,12 +695,10 @@ public class TestIcebergSync {
 
   private InternalSnapshot buildSnapshot(
       InternalTable table, String sourceIdentifier, InternalDataFile... dataFiles) {
-    SourceMetadata sourceMetadata =
-        SourceMetadata.builder().sourceIdentifier(sourceIdentifier).build();
     return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(PartitionFileGroup.fromFiles(Arrays.asList(dataFiles)))
-        .sourceMetadata(sourceMetadata)
+        .sourceIdentifier(sourceIdentifier)
         .build();
   }
 

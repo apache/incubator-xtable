@@ -30,7 +30,6 @@ import org.apache.iceberg.io.CloseableIterable;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FilesDiff;
@@ -49,7 +48,7 @@ public class IcebergDataFileUpdatesSync {
       List<PartitionFileGroup> partitionedDataFiles,
       Schema schema,
       PartitionSpec partitionSpec,
-      SourceMetadata sourceMetadata) {
+      TableSyncMetadata metadata) {
 
     Map<String, DataFile> previousFiles = new HashMap<>();
     try (CloseableIterable<FileScanTask> iterator = table.newScan().planFiles()) {
@@ -64,12 +63,7 @@ public class IcebergDataFileUpdatesSync {
         DataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
     applyDiff(
-        transaction,
-        diff.getFilesAdded(),
-        diff.getFilesRemoved(),
-        schema,
-        partitionSpec,
-        sourceMetadata);
+        transaction, diff.getFilesAdded(), diff.getFilesRemoved(), schema, partitionSpec, metadata);
   }
 
   public void applyDiff(
@@ -77,7 +71,7 @@ public class IcebergDataFileUpdatesSync {
       DataFilesDiff dataFilesDiff,
       Schema schema,
       PartitionSpec partitionSpec,
-      SourceMetadata sourceMetadata) {
+      TableSyncMetadata metadata) {
 
     Collection<DataFile> filesRemoved =
         dataFilesDiff.getFilesRemoved().stream()
@@ -85,12 +79,7 @@ public class IcebergDataFileUpdatesSync {
             .collect(Collectors.toList());
 
     applyDiff(
-        transaction,
-        dataFilesDiff.getFilesAdded(),
-        filesRemoved,
-        schema,
-        partitionSpec,
-        sourceMetadata);
+        transaction, dataFilesDiff.getFilesAdded(), filesRemoved, schema, partitionSpec, metadata);
   }
 
   private void applyDiff(
@@ -99,11 +88,11 @@ public class IcebergDataFileUpdatesSync {
       Collection<DataFile> filesRemoved,
       Schema schema,
       PartitionSpec partitionSpec,
-      SourceMetadata sourceMetadata) {
+      TableSyncMetadata metadata) {
     OverwriteFiles overwriteFiles = transaction.newOverwrite();
     filesAdded.forEach(f -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, f)));
     filesRemoved.forEach(overwriteFiles::deleteFile);
-    overwriteFiles.set(TableSyncMetadata.XTABLE_SOURCE_METADATA, sourceMetadata.toJson());
+    overwriteFiles.set(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
     overwriteFiles.commit();
   }
 

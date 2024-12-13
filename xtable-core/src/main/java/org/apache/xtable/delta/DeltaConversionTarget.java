@@ -62,7 +62,6 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.metadata.SourceMetadata;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -155,10 +154,9 @@ public class DeltaConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void beginSync(InternalTable table, SourceMetadata sourceMetadata) {
+  public void beginSync(InternalTable table) {
     this.transactionState =
-        new TransactionState(
-            deltaLog, tableName, table.getLatestCommitTime(), logRetentionInHours, sourceMetadata);
+        new TransactionState(deltaLog, tableName, table.getLatestCommitTime(), logRetentionInHours);
   }
 
   @Override
@@ -252,19 +250,25 @@ public class DeltaConversionTarget implements ConversionTarget {
         continue;
       }
 
-      Option<String> sourceMetadataJson = tags.get().get(TableSyncMetadata.XTABLE_SOURCE_METADATA);
+      Option<String> sourceMetadataJson = tags.get().get(TableSyncMetadata.XTABLE_METADATA);
       if (sourceMetadataJson.isEmpty()) {
         continue;
       }
 
       try {
-        SourceMetadata sourceMetadata = SourceMetadata.fromJson(sourceMetadataJson.get());
-        if (sourceIdentifier.equals(sourceMetadata.getSourceIdentifier())) {
+        Optional<TableSyncMetadata> optionalMetadata =
+            TableSyncMetadata.fromJson(sourceMetadataJson.get());
+        if (!optionalMetadata.isPresent()) {
+          return Optional.empty();
+        }
+
+        TableSyncMetadata metadata = optionalMetadata.get();
+        if (sourceIdentifier.equals(metadata.getSourceIdentifier())) {
           return Optional.of(String.valueOf(targetVersion));
         }
 
         // Stop if greater than sourceIdentifier since we're iterating from oldest to newest
-        if (Long.parseLong(sourceMetadata.getSourceIdentifier()) > sourceIdentifierVal) {
+        if (Long.parseLong(metadata.getSourceIdentifier()) > sourceIdentifierVal) {
           return Optional.empty();
         }
       } catch (Exception e) {
@@ -282,7 +286,6 @@ public class DeltaConversionTarget implements ConversionTarget {
     private final Instant commitTime;
     private final DeltaLog deltaLog;
     private final long retentionInHours;
-    private final SourceMetadata sourceMetadata;
     @Getter private final List<String> partitionColumns;
     private final String tableName;
     @Getter private StructType latestSchema;
@@ -291,11 +294,7 @@ public class DeltaConversionTarget implements ConversionTarget {
     @Setter private Seq<Action> actions;
 
     private TransactionState(
-        DeltaLog deltaLog,
-        String tableName,
-        Instant latestCommitTime,
-        long retentionInHours,
-        SourceMetadata sourceMetadata) {
+        DeltaLog deltaLog, String tableName, Instant latestCommitTime, long retentionInHours) {
       this.deltaLog = deltaLog;
       this.transaction = deltaLog.startTransaction();
       this.latestSchema = deltaLog.snapshot().schema();
@@ -303,7 +302,6 @@ public class DeltaConversionTarget implements ConversionTarget {
       this.partitionColumns = new ArrayList<>();
       this.tableName = tableName;
       this.retentionInHours = retentionInHours;
-      this.sourceMetadata = sourceMetadata;
     }
 
     private void addColumn(StructField field) {
@@ -338,7 +336,6 @@ public class DeltaConversionTarget implements ConversionTarget {
       Map<String, String> configMap = new HashMap<>();
       configMap.put(DeltaConfigs.MIN_READER_VERSION().key(), MIN_READER_VERSION);
       configMap.put(DeltaConfigs.MIN_WRITER_VERSION().key(), MIN_WRITER_VERSION);
-      configMap.put(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
       // Sets retention for the Delta Log, does not impact underlying files in the table
       configMap.put(
           DeltaConfigs.LOG_RETENTION().key(), String.format("interval %d hours", retentionInHours));
@@ -370,7 +367,7 @@ public class DeltaConversionTarget implements ConversionTarget {
 
     private Map<String, String> getCommitTags() {
       Map<String, String> tags = new HashMap<>();
-      tags.put(TableSyncMetadata.XTABLE_SOURCE_METADATA, sourceMetadata.toJson());
+      tags.put(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
       return tags;
     }
   }
