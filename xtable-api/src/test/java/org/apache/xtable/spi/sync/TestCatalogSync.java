@@ -84,6 +84,8 @@ public class TestCatalogSync<TABLE> {
     when(mockClient1.hasDatabase("database1")).thenReturn(false);
     when(mockClient2.hasDatabase("database2")).thenReturn(true);
     when(mockClient3.hasDatabase("database3")).thenReturn(true);
+    when(mockClient4.hasDatabase("database4"))
+        .thenThrow(new UnsupportedOperationException("No catalog impl"));
 
     when(mockClient1.getTable(tableIdentifier1)).thenReturn(mockTable);
     when(mockClient2.getTable(tableIdentifier2)).thenReturn(null);
