@@ -41,9 +41,6 @@ public interface CatalogSyncClient<TABLE> extends AutoCloseable {
    */
   String getCatalogImpl();
 
-  /** Returns the unique identifier for the table being synced to catalog. */
-  CatalogTableIdentifier getTableIdentifier();
-
   /** Returns the storage location of the table synced to the catalog. */
   String getStorageDescriptorLocation(TABLE table);
 

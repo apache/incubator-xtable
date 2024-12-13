@@ -20,17 +20,13 @@ package org.apache.xtable.utilities;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.Collections;
-
 import lombok.SneakyThrows;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 
-import org.apache.xtable.catalog.ExternalCatalogConfig;
-import org.apache.xtable.conversion.SourceCatalog;
+import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
-import org.apache.xtable.conversion.TargetCatalog;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
@@ -44,14 +40,13 @@ class TestRunCatalogSync {
     String catalogConfigYamlPath =
         TestRunCatalogSync.class.getClassLoader().getResource("catalogConfig.yaml").getPath();
     String[] args = {"-catalogConfig", catalogConfigYamlPath};
-    RunCatalogSync.main(args);
+    // Ensure yaml gets parsed and no op-sync implemented in TestCatalogImpl is called.
+    assertDoesNotThrow(() -> RunCatalogSync.main(args));
   }
 
   public static class TestCatalogImpl implements CatalogConversionSource, CatalogSyncClient {
 
-    public TestCatalogImpl(SourceCatalog sourceCatalog, Configuration hadoopConf) {}
-
-    public TestCatalogImpl(TargetCatalog targetCatalog, Configuration hadoopConf) {}
+    public TestCatalogImpl(ExternalCatalogConfig catalogConfig, Configuration hadoopConf) {}
 
     @Override
     public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
@@ -59,12 +54,6 @@ class TestRunCatalogSync {
           .name("source_table_name")
           .basePath("file://base_path/v1/")
           .formatName("ICEBERG")
-          .catalogConfig(
-              ExternalCatalogConfig.builder()
-                  .catalogImpl("catalog_impl")
-                  .catalogName("source-1")
-                  .catalogOptions(Collections.emptyMap())
-                  .build())
           .build();
     }
 
@@ -75,11 +64,6 @@ class TestRunCatalogSync {
 
     @Override
     public String getCatalogImpl() {
-      return null;
-    }
-
-    @Override
-    public CatalogTableIdentifier getTableIdentifier() {
       return null;
     }
 

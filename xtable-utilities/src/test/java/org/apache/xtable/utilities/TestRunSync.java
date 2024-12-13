@@ -135,7 +135,7 @@ class TestRunSync {
             + "  option2: value2";
     IcebergCatalogConfig catalogConfig = RunSync.loadIcebergCatalogConfig(icebergConfig.getBytes());
     Assertions.assertEquals("org.apache.xtable.CatalogImpl", catalogConfig.getCatalogImpl());
-    Assertions.assertEquals("test", catalogConfig.getCatalogName());
+    Assertions.assertEquals("test", catalogConfig.getCatalogId());
     Assertions.assertEquals(2, catalogConfig.getCatalogOptions().size());
     Assertions.assertEquals("value1", catalogConfig.getCatalogOptions().get("option1"));
     Assertions.assertEquals("value2", catalogConfig.getCatalogOptions().get("option2"));

@@ -16,27 +16,23 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.conversion;
+package org.apache.xtable.catalog;
 
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NonNull;
+import java.util.Map;
 
-/**
- * Defines a reference to an external catalog, it's the base class for {@link SourceCatalog} and
- * {@link TargetCatalog}.
- */
-@Getter
-@EqualsAndHashCode
-class ExternalCatalog {
-  /** A unique identifier defined by the user for each catalog. */
-  @NonNull String catalogId;
+import org.apache.xtable.conversion.ExternalCatalogConfig;
 
-  /** Configuration of the catalog - catalogImpl, catalogName and properties. */
-  @NonNull CatalogConfig catalogConfig;
+/** A factory class which returns {@link ExternalCatalogConfig} based on catalogType. */
+public class ExternalCatalogConfigFactory {
 
-  public ExternalCatalog(@NonNull String catalogId, @NonNull CatalogConfig catalogConfig) {
-    this.catalogId = catalogId;
-    this.catalogConfig = catalogConfig;
+  public static ExternalCatalogConfig fromCatalogType(
+      String catalogType, String catalogId, Map<String, String> properties) {
+    // TODO: Choose existing implementation based on catalogType.
+    String catalogImpl = "";
+    return ExternalCatalogConfig.builder()
+        .catalogImpl(catalogImpl)
+        .catalogId(catalogId)
+        .catalogOptions(properties)
+        .build();
   }
 }

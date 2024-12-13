@@ -29,7 +29,7 @@ import java.util.Map;
 public interface CatalogConfig {
   String getCatalogImpl();
 
-  String getCatalogName();
+  String getCatalogId();
 
   Map<String, String> getCatalogOptions();
 }

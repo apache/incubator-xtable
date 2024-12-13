@@ -19,15 +19,24 @@
 package org.apache.xtable.conversion;
 
 import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.NonNull;
+import lombok.Value;
 
-@EqualsAndHashCode(callSuper = true)
-@Getter
-public class SourceCatalog extends ExternalCatalog {
-  @Builder(toBuilder = true)
-  SourceCatalog(@NonNull String catalogId, @NonNull CatalogConfig catalogConfig) {
-    super(catalogId, catalogConfig);
-  }
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
+
+/**
+ * TargetCatalogConfig contains the parameters that are required when syncing {@link TargetTable} to
+ * a catalog.
+ */
+@Value
+@Builder
+public class TargetCatalogConfig {
+  /**
+   * The tableIdentifiers(databaseName, tableName) that will be used when syncing {@link
+   * TargetTable} to the catalog.
+   */
+  @NonNull CatalogTableIdentifier catalogTableIdentifier;
+
+  /** Configuration for the catalog. */
+  @NonNull ExternalCatalogConfig catalogConfig;
 }

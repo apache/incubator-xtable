@@ -25,9 +25,9 @@ import java.util.Collections;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 
-import org.apache.xtable.conversion.SourceCatalog;
+import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
-import org.apache.xtable.conversion.TargetCatalog;
+import org.apache.xtable.conversion.TargetCatalogConfig;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
@@ -37,15 +37,11 @@ class TestCatalogConversionFactory {
 
   @Test
   void createSourceForConfig() {
-    SourceCatalog sourceCatalog =
-        SourceCatalog.builder()
+    ExternalCatalogConfig sourceCatalog =
+        ExternalCatalogConfig.builder()
             .catalogId("catalogId")
-            .catalogConfig(
-                ExternalCatalogConfig.builder()
-                    .catalogName("catalogName")
-                    .catalogImpl(TestCatalogImpl.class.getName())
-                    .catalogOptions(Collections.emptyMap())
-                    .build())
+            .catalogImpl(TestCatalogImpl.class.getName())
+            .catalogOptions(Collections.emptyMap())
             .build();
     CatalogConversionSource catalogConversionSource =
         CatalogConversionFactory.createCatalogConversionSource(sourceCatalog, new Configuration());
@@ -54,12 +50,11 @@ class TestCatalogConversionFactory {
 
   @Test
   void createForCatalog() {
-    TargetCatalog targetCatalog =
-        TargetCatalog.builder()
-            .catalogId("catalogId")
+    TargetCatalogConfig targetCatalogConfig =
+        TargetCatalogConfig.builder()
             .catalogConfig(
                 ExternalCatalogConfig.builder()
-                    .catalogName("catalogName")
+                    .catalogId("catalogId")
                     .catalogImpl(TestCatalogImpl.class.getName())
                     .catalogOptions(Collections.emptyMap())
                     .build())
@@ -71,16 +66,14 @@ class TestCatalogConversionFactory {
             .build();
     CatalogSyncClient catalogSyncClient =
         CatalogConversionFactory.getInstance()
-            .createCatalogSyncClient(targetCatalog, new Configuration());
+            .createCatalogSyncClient(targetCatalogConfig.getCatalogConfig(), new Configuration());
     assertEquals(catalogSyncClient.getClass().getName(), TestCatalogImpl.class.getName());
   }
 
   public static class TestCatalogImpl
       implements CatalogSyncClient<Object>, CatalogConversionSource {
 
-    public TestCatalogImpl(SourceCatalog sourceCatalog, Configuration hadoopConf) {}
-
-    public TestCatalogImpl(TargetCatalog targetCatalog, Configuration hadoopConf) {}
+    public TestCatalogImpl(ExternalCatalogConfig catalogConfig, Configuration hadoopConf) {}
 
     @Override
     public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
@@ -94,11 +87,6 @@ class TestCatalogConversionFactory {
 
     @Override
     public String getCatalogImpl() {
-      return null;
-    }
-
-    @Override
-    public CatalogTableIdentifier getTableIdentifier() {
       return null;
     }
 
