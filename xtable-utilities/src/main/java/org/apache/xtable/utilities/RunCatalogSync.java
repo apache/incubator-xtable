@@ -34,6 +34,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import lombok.Data;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -69,11 +70,12 @@ import org.apache.xtable.utilities.RunCatalogSync.DatasetConfig.TargetTableIdent
  * state in target tables, supports table format conversion as well if the target table chooses a
  * different format from source table.
  */
+@Log4j2
 public class RunCatalogSync {
   public static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
-  private static final String CATALOG_SOURCE_AND_TARGET_CONFIG_PATH = "c";
-  private static final String HADOOP_CONFIG_PATH = "p";
-  private static final String CONVERTERS_CONFIG_PATH = "c";
+  private static final String CATALOG_SOURCE_AND_TARGET_CONFIG_PATH = "catalogConfig";
+  private static final String HADOOP_CONFIG_PATH = "hadoopConfig";
+  private static final String CONVERTERS_CONFIG_PATH = "convertersConfig";
   private static final String HELP_OPTION = "h";
   private static final Map<String, ConversionSourceProvider> CONVERSION_SOURCE_PROVIDERS =
       new HashMap<>();
@@ -85,6 +87,18 @@ public class RunCatalogSync {
               "catalogSyncConfig",
               true,
               "The path to a yaml file containing source and target tables catalog configurations along with the table identifiers that need to synced")
+          .addOption(
+              HADOOP_CONFIG_PATH,
+              "hadoopConfig",
+              true,
+              "Hadoop config xml file path containing configs necessary to access the "
+                  + "file system. These configs will override the default configs.")
+          .addOption(
+              CONVERTERS_CONFIG_PATH,
+              "convertersConfig",
+              true,
+              "The path to a yaml file containing InternalTable converter configurations. "
+                  + "These configs will override the default")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   public static void main(String[] args) throws Exception {
@@ -183,9 +197,13 @@ public class RunCatalogSync {
       tableFormats.addAll(
           targetTables.stream().map(TargetTable::getFormatName).collect(Collectors.toList()));
       tableFormats = tableFormats.stream().distinct().collect(Collectors.toList());
-      conversionController.syncCatalogs(
-          conversionConfig,
-          getConversionSourceProviders(tableFormats, tableFormatConverters, hadoopConf));
+      try {
+        conversionController.syncCatalogs(
+            conversionConfig,
+            getConversionSourceProviders(tableFormats, tableFormatConverters, hadoopConf));
+      } catch (Exception e) {
+        log.error(String.format("Error running sync for %s", sourceTable.getBasePath()), e);
+      }
     }
   }
 

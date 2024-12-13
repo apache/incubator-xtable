@@ -39,7 +39,6 @@ public class CatalogConversionFactory {
    *
    * @param sourceCatalog definition for the source catalog
    * @param configuration hadoop configuration
-   * @return
    */
   public static CatalogConversionSource createCatalogConversionSource(
       SourceCatalog sourceCatalog, Configuration configuration) {
@@ -53,7 +52,6 @@ public class CatalogConversionFactory {
    *
    * @param targetCatalog definition for the target catalog
    * @param configuration hadoop configuration
-   * @return
    */
   public CatalogSyncClient createCatalogSyncClient(
       TargetCatalog targetCatalog, Configuration configuration) {
