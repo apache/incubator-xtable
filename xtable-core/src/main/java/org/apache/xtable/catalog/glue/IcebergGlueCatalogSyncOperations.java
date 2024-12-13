@@ -42,17 +42,19 @@ import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.TableInput;
 import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 
-public class IcebergGlueCatalogSyncHelper {
+class IcebergGlueCatalogSyncOperations {
 
   private final GlueCatalogSyncClient syncClient;
   private final HadoopTables hadoopTables;
 
-  IcebergGlueCatalogSyncHelper(GlueCatalogSyncClient syncClient) {
+  IcebergGlueCatalogSyncOperations(GlueCatalogSyncClient syncClient) {
+    super();
     this.syncClient = syncClient;
     this.hadoopTables = new HadoopTables(syncClient.getConfiguration());
   }
 
-  IcebergGlueCatalogSyncHelper(GlueCatalogSyncClient syncClient, HadoopTables hadoopTables) {
+  IcebergGlueCatalogSyncOperations(GlueCatalogSyncClient syncClient, HadoopTables hadoopTables) {
+    super();
     this.syncClient = syncClient;
     this.hadoopTables = hadoopTables;
   }

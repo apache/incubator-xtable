@@ -18,8 +18,11 @@
  
 package org.apache.xtable.catalog.glue;
 
+import java.util.Properties;
+
 import org.apache.hadoop.conf.Configuration;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
@@ -35,11 +38,11 @@ import software.amazon.awssdk.services.glue.model.Table;
 
 public class GlueCatalogConversionSource implements CatalogConversionSource {
 
-  protected static final String TABLE_TYPE_PROP = "table_type";
-  protected final SourceCatalog sourceCatalog;
-  protected final GlueCatalogConfig glueCatalogConfig;
-  protected final GlueClient glueClient;
-  protected final Configuration configuration;
+  private static final String TABLE_TYPE_PROP = "table_type";
+  private final SourceCatalog sourceCatalog;
+  private final GlueCatalogConfig glueCatalogConfig;
+  private final GlueClient glueClient;
+  private final Configuration configuration;
 
   public GlueCatalogConversionSource(SourceCatalog sourceCatalog, Configuration configuration) {
     this.sourceCatalog = sourceCatalog;
@@ -49,7 +52,8 @@ public class GlueCatalogConversionSource implements CatalogConversionSource {
     this.configuration = configuration;
   }
 
-  public GlueCatalogConversionSource(
+  @VisibleForTesting
+  GlueCatalogConversionSource(
       SourceCatalog sourceCatalog,
       GlueClient glueClient,
       GlueCatalogConfig glueCatalogConfig,
@@ -74,10 +78,15 @@ public class GlueCatalogConversionSource implements CatalogConversionSource {
       String tableFormat = table.parameters().get(TABLE_TYPE_PROP);
       Preconditions.checkArgument(
           !Strings.isNullOrEmpty(tableFormat), "TableFormat must not be null or empty");
+      Properties tableProperties = new Properties();
+      tableProperties.putAll(table.parameters());
       return SourceTable.builder()
           .name(table.name())
           .basePath(table.storageDescriptor().location())
+          // TODO: check if dataPath needs to be populated
           .formatName(tableFormat)
+          .catalogConfig(sourceCatalog.getCatalogConfig())
+          .additionalProperties(tableProperties)
           .build();
     } catch (Exception e) {
       throw new RuntimeException("Failed to get table: " + tableIdentifier.getId(), e);

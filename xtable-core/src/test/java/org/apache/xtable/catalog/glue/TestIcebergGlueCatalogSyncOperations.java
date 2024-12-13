@@ -53,21 +53,21 @@ import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 import software.amazon.awssdk.services.glue.model.UpdateTableResponse;
 
 @ExtendWith(MockitoExtension.class)
-public class TestIcebergGlueCatalogSyncHelper extends GlueCatalogSyncTestBase {
+public class TestIcebergGlueCatalogSyncOperations extends GlueCatalogSyncTestBase {
 
   @Mock private HadoopTables mockIcebergHadoopTables;
   @Mock private BaseTable mockIcebergBaseTable;
   @Mock private TableOperations mockIcebergTableOperations;
   @Mock private TableMetadata mockIcebergTableMetadata;
   @Mock private GlueCatalogSyncClient mockGlueCatalogSyncClient;
-  private IcebergGlueCatalogSyncHelper icebergGlueCatalogSyncHelper;
+  private IcebergGlueCatalogSyncOperations icebergGlueCatalogSyncOperations;
 
-  private IcebergGlueCatalogSyncHelper createIcebergGlueCatalogSyncHelper() {
-    return new IcebergGlueCatalogSyncHelper(mockGlueCatalogSyncClient, mockIcebergHadoopTables);
+  private IcebergGlueCatalogSyncOperations createIcebergGlueCatalogSyncHelper() {
+    return new IcebergGlueCatalogSyncOperations(mockGlueCatalogSyncClient, mockIcebergHadoopTables);
   }
 
   void setupCommonMocks() {
-    icebergGlueCatalogSyncHelper = createIcebergGlueCatalogSyncHelper();
+    icebergGlueCatalogSyncOperations = createIcebergGlueCatalogSyncHelper();
     when(mockGlueCatalogSyncClient.getGlueCatalogConfig()).thenReturn(mockGlueCatalogConfig);
     when(mockGlueCatalogSyncClient.getGlueClient()).thenReturn(mockGlueClient);
     when(mockGlueCatalogSyncClient.getSchemaExtractor()).thenReturn(mockGlueSchemaExtractor);
@@ -99,19 +99,19 @@ public class TestIcebergGlueCatalogSyncHelper extends GlueCatalogSyncTestBase {
         createTableRequest(
             TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(),
             TEST_CATALOG_TABLE_IDENTIFIER.getTableName(),
-            icebergGlueCatalogSyncHelper.getTableParameters(mockIcebergBaseTable));
+            icebergGlueCatalogSyncOperations.getTableParameters(mockIcebergBaseTable));
     if (shouldFail) {
       when(mockGlueClient.createTable(createTableRequest))
           .thenThrow(new RuntimeException("something went wrong"));
       assertThrows(
           CatalogSyncException.class,
           () ->
-              icebergGlueCatalogSyncHelper.createTable(
+              icebergGlueCatalogSyncOperations.createTable(
                   TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER));
     } else {
       when(mockGlueClient.createTable(createTableRequest))
           .thenReturn(CreateTableResponse.builder().build());
-      icebergGlueCatalogSyncHelper.createTable(
+      icebergGlueCatalogSyncOperations.createTable(
           TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
     }
     verify(mockGlueClient, times(1)).createTable(createTableRequest);
@@ -129,7 +129,7 @@ public class TestIcebergGlueCatalogSyncHelper extends GlueCatalogSyncTestBase {
     Table glueTable = Table.builder().parameters(glueTableParams).build();
     Map<String, String> parameters = new HashMap<>();
     parameters.put(PREVIOUS_METADATA_LOCATION_PROP, glueTableParams.get(METADATA_LOCATION_PROP));
-    parameters.putAll(icebergGlueCatalogSyncHelper.getTableParameters(mockIcebergBaseTable));
+    parameters.putAll(icebergGlueCatalogSyncOperations.getTableParameters(mockIcebergBaseTable));
     when(mockGlueSchemaExtractor.toColumns(
             TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema(), glueTable))
         .thenReturn(Collections.emptyList());
@@ -144,11 +144,11 @@ public class TestIcebergGlueCatalogSyncHelper extends GlueCatalogSyncTestBase {
       assertThrows(
           CatalogSyncException.class,
           () ->
-              icebergGlueCatalogSyncHelper.refreshTable(
+              icebergGlueCatalogSyncOperations.refreshTable(
                   TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER));
     } else {
       when(mockGlueClient.updateTable(tableReq)).thenReturn(UpdateTableResponse.builder().build());
-      icebergGlueCatalogSyncHelper.refreshTable(
+      icebergGlueCatalogSyncOperations.refreshTable(
           TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
     }
     verify(mockGlueClient, times(1)).updateTable(tableReq);
@@ -158,13 +158,13 @@ public class TestIcebergGlueCatalogSyncHelper extends GlueCatalogSyncTestBase {
 
   @Test
   void testGetTableParameters() {
-    icebergGlueCatalogSyncHelper = createIcebergGlueCatalogSyncHelper();
+    icebergGlueCatalogSyncOperations = createIcebergGlueCatalogSyncHelper();
     mockIcebergMetadataFileLocation();
     Map<String, String> expected = new HashMap<>();
     expected.put(TABLE_TYPE_PROP, TableFormat.ICEBERG);
     expected.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION);
     Map<String, String> tableParameters =
-        icebergGlueCatalogSyncHelper.getTableParameters(mockIcebergBaseTable);
+        icebergGlueCatalogSyncOperations.getTableParameters(mockIcebergBaseTable);
     assertEquals(expected, tableParameters);
   }
 }

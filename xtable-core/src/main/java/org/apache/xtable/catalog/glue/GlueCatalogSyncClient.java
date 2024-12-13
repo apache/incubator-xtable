@@ -25,6 +25,8 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import org.apache.xtable.conversion.TargetCatalog;
 import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.exception.NotSupportedException;
@@ -54,7 +56,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
   @Getter protected final GlueCatalogConfig glueCatalogConfig;
   @Getter protected final Configuration configuration;
   @Getter protected final GlueSchemaExtractor schemaExtractor;
-  protected final IcebergGlueCatalogSyncHelper icebergGlueCatalogSyncHelper;
+  protected final IcebergGlueCatalogSyncOperations icebergGlueCatalogSyncOperations;
 
   public GlueCatalogSyncClient(TargetCatalog targetCatalog, Configuration configuration) {
     this.targetCatalog = targetCatalog;
@@ -63,22 +65,23 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
     this.glueClient = new DefaultGlueClientFactory(glueCatalogConfig).getGlueClient();
     this.configuration = new Configuration(configuration);
     this.schemaExtractor = GlueSchemaExtractor.getInstance();
-    this.icebergGlueCatalogSyncHelper = new IcebergGlueCatalogSyncHelper(this);
+    this.icebergGlueCatalogSyncOperations = new IcebergGlueCatalogSyncOperations(this);
   }
 
+  @VisibleForTesting
   GlueCatalogSyncClient(
       TargetCatalog targetCatalog,
       Configuration configuration,
       GlueCatalogConfig glueCatalogConfig,
       GlueClient glueClient,
       GlueSchemaExtractor schemaExtractor,
-      IcebergGlueCatalogSyncHelper icebergGlueCatalogSyncHelper) {
+      IcebergGlueCatalogSyncOperations icebergGlueCatalogSyncOperations) {
     this.targetCatalog = targetCatalog;
     this.configuration = new Configuration(configuration);
     this.glueCatalogConfig = glueCatalogConfig;
     this.glueClient = glueClient;
     this.schemaExtractor = schemaExtractor;
-    this.icebergGlueCatalogSyncHelper = icebergGlueCatalogSyncHelper;
+    this.icebergGlueCatalogSyncOperations = icebergGlueCatalogSyncOperations;
   }
 
   @Override
@@ -161,7 +164,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
   public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
     switch (table.getTableFormat()) {
       case TableFormat.ICEBERG:
-        icebergGlueCatalogSyncHelper.createTable(table, tableIdentifier);
+        icebergGlueCatalogSyncOperations.createTable(table, tableIdentifier);
         return;
       default:
         throw new NotSupportedException(
@@ -174,7 +177,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
       InternalTable table, Table catalogTable, CatalogTableIdentifier tableIdentifier) {
     switch (table.getTableFormat()) {
       case TableFormat.ICEBERG:
-        icebergGlueCatalogSyncHelper.refreshTable(table, catalogTable, tableIdentifier);
+        icebergGlueCatalogSyncOperations.refreshTable(table, catalogTable, tableIdentifier);
         break;
       default:
         throw new NotSupportedException(
