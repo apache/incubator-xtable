@@ -33,18 +33,29 @@ public class CatalogConversionFactory {
     return INSTANCE;
   }
 
-  public static CatalogConversionSource createSourceForConfig(
+  /**
+   * Returns an implementation class for {@link CatalogConversionSource} that's used for converting
+   * table definitions in the catalog to {@link org.apache.xtable.conversion.SourceTable} object.
+   *
+   * @param sourceCatalog definition for the source catalog
+   * @param configuration hadoop configuration
+   */
+  public static CatalogConversionSource createCatalogConversionSource(
       SourceCatalog sourceCatalog, Configuration configuration) {
     return ReflectionUtils.createInstanceOfClass(
         sourceCatalog.getCatalogConfig().getCatalogImpl(), sourceCatalog, configuration);
   }
 
-  public CatalogSyncClient createForCatalog(
-      TargetCatalog targetCatalog, String tableFormat, Configuration configuration) {
+  /**
+   * Returns an implementation class for {@link CatalogSyncClient} that's used for syncing {@link
+   * org.apache.xtable.conversion.TargetTable} to a catalog.
+   *
+   * @param targetCatalog definition for the target catalog
+   * @param configuration hadoop configuration
+   */
+  public CatalogSyncClient createCatalogSyncClient(
+      TargetCatalog targetCatalog, Configuration configuration) {
     return ReflectionUtils.createInstanceOfClass(
-        targetCatalog.getCatalogConfig().getCatalogImpl(),
-        targetCatalog,
-        tableFormat,
-        configuration);
+        targetCatalog.getCatalogConfig().getCatalogImpl(), targetCatalog, configuration);
   }
 }

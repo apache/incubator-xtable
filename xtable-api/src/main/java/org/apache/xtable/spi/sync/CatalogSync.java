@@ -37,6 +37,7 @@ import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.model.sync.SyncResult.CatalogSyncStatus;
 
+/** Provides the functionality to sync metadata from InternalTable to multiple target catalogs */
 @Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class CatalogSync {

@@ -47,7 +47,7 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.sync.SyncResult;
 
 @ExtendWith(MockitoExtension.class)
-public class TestExternalCatalogSync<TABLE> {
+public class TestCatalogSync<TABLE> {
 
   private final CatalogSyncClient<TABLE> mockClient1 = mock(CatalogSyncClient.class);
   private final CatalogSyncClient<TABLE> mockClient2 = mock(CatalogSyncClient.class);

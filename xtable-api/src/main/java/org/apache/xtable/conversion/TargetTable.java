@@ -32,6 +32,7 @@ import lombok.Getter;
 @EqualsAndHashCode(callSuper = true)
 public class TargetTable extends ExternalTable {
   private final Duration metadataRetention;
+  /** Each target table can be synced to multiple target catalogs */
   private final List<TargetCatalog> targetCatalogs;
 
   @Builder(toBuilder = true)
@@ -39,13 +40,12 @@ public class TargetTable extends ExternalTable {
       String name,
       String formatName,
       String basePath,
-      String dataPath,
       String[] namespace,
       CatalogConfig catalogConfig,
       Duration metadataRetention,
       Properties additionalProperties,
       List<TargetCatalog> targetCatalogs) {
-    super(name, formatName, basePath, dataPath, namespace, catalogConfig, additionalProperties);
+    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties);
     this.metadataRetention =
         metadataRetention == null ? Duration.of(7, ChronoUnit.DAYS) : metadataRetention;
     this.targetCatalogs = targetCatalogs == null ? Collections.emptyList() : targetCatalogs;

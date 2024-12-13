@@ -18,6 +18,8 @@
  
 package org.apache.xtable.conversion;
 
+import static org.apache.xtable.conversion.ConversionUtils.convertToSourceTable;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collection;
@@ -36,7 +38,6 @@ import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.extern.log4j.Log4j2;
 
-import org.apache.commons.beanutils.BeanUtils;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.xtable.catalog.CatalogConversionFactory;
@@ -125,8 +126,7 @@ public class ConversionController {
             targetTable.getTargetCatalogs().stream()
                 .map(
                     targetCatalog ->
-                        catalogConversionFactory.createForCatalog(
-                            targetCatalog, targetTable.getFormatName(), conf))
+                        catalogConversionFactory.createCatalogSyncClient(targetCatalog, conf))
                 .collect(Collectors.toList());
         catalogSyncResults.put(
             targetTable.getFormatName(),
@@ -197,11 +197,13 @@ public class ConversionController {
       TargetTable targetTable,
       List<CatalogSyncClient> catalogSyncClients,
       ConversionSourceProvider conversionSourceProvider) {
-    SourceTable sourceTable = SourceTable.builder().build();
-    BeanUtils.copyProperties(sourceTable, targetTable);
     return catalogSync.syncTable(
         catalogSyncClients,
-        conversionSourceProvider.getConversionSourceInstance(sourceTable).getCurrentTable());
+        // We get the latest state of InternalTable for TargetTable
+        // and then synchronize it to catalogSyncClients.
+        conversionSourceProvider
+            .getConversionSourceInstance(convertToSourceTable(targetTable))
+            .getCurrentTable());
   }
 
   private static String getFormatsWithStatusCode(

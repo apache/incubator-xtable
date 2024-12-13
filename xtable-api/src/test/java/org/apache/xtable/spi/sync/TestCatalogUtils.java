@@ -30,7 +30,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.xtable.model.exception.CatalogRefreshException;
 
-public class TestExternalCatalogUtils {
+public class TestCatalogUtils {
 
   static Stream<Arguments> storageLocationTestArgs() {
     return Stream.of(

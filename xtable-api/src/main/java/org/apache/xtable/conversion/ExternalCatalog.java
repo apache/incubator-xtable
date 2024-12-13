@@ -23,16 +23,13 @@ import lombok.Getter;
 import lombok.NonNull;
 
 /**
- * Defines a reference to an external catalog, used for conversion between source and target
- * catalogs.
+ * Defines a reference to an external catalog, it's the base class for {@link SourceCatalog} and
+ * {@link TargetCatalog}.
  */
 @Getter
 @EqualsAndHashCode
 class ExternalCatalog {
-  /**
-   * An identifier to be used for the catalog if there are multiple catalogs of the same type but in
-   * different accounts or regions.
-   */
+  /** A unique identifier defined by the user for each catalog. */
   @NonNull String catalogId;
 
   /** Configuration of the catalog - catalogImpl, catalogName and properties. */

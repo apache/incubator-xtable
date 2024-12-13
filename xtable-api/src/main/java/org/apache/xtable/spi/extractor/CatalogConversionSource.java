@@ -21,6 +21,12 @@ package org.apache.xtable.spi.extractor;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
+/**
+ * A client for converting the table with tableIdentifier {@link CatalogTableIdentifier} in {@link
+ * org.apache.xtable.conversion.SourceCatalog} to SourceTable object. {@link SourceTable} can be
+ * used by downstream consumers for syncing it to multiple {@link
+ * org.apache.xtable.conversion.TargetTable}
+ */
 public interface CatalogConversionSource {
   /** Returns the source table object present in the catalog. */
   SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier);

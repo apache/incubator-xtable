@@ -21,6 +21,12 @@ package org.apache.xtable.spi.sync;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
+/**
+ * An interface for syncing {@link InternalTable} object to {@link TABLE} object defined by the
+ * catalog.
+ *
+ * @param <TABLE>
+ */
 public interface CatalogSyncClient<TABLE> extends AutoCloseable {
   /**
    * Returns a unique identifier for the catalog, allows user to sync table to multiple catalogs of
@@ -34,13 +40,6 @@ public interface CatalogSyncClient<TABLE> extends AutoCloseable {
    * @return catalogImplClassName
    */
   String getCatalogImpl();
-
-  /**
-   * Returns the table format for the table being synced to catalog.
-   *
-   * @return tableFormat
-   */
-  String getTableFormat();
 
   /** Returns the unique identifier for the table being synced to catalog. */
   CatalogTableIdentifier getTableIdentifier();

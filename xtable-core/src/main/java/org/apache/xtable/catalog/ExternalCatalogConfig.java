@@ -27,6 +27,7 @@ import lombok.Value;
 
 import org.apache.xtable.conversion.CatalogConfig;
 
+/** Defines the configuration for {@link org.apache.xtable.conversion.ExternalCatalog} */
 @Value
 @Builder
 public class ExternalCatalogConfig implements CatalogConfig {
@@ -38,6 +39,11 @@ public class ExternalCatalogConfig implements CatalogConfig {
   public static ExternalCatalogConfig fromCatalogType(
       String catalogType, String catalogId, Map<String, String> properties) {
     // TODO: Choose existing implementation based on catalogType.
-    return ExternalCatalogConfig.builder().build();
+    String catalogImpl = "";
+    return ExternalCatalogConfig.builder()
+        .catalogImpl(catalogImpl)
+        .catalogName(catalogId)
+        .catalogOptions(properties)
+        .build();
   }
 }
