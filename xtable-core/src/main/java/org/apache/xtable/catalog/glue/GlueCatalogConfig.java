@@ -32,6 +32,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+/** Configurations for setting up Glue client and running Glue catalog operations */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -63,6 +64,7 @@ public class GlueCatalogConfig {
    */
   @Setter private Map<String, String> clientCredentialConfigs;
 
+  /** Creates GlueCatalogConfig from given key-value map */
   public static GlueCatalogConfig of(Map<String, String> properties) {
     try {
       GlueCatalogConfig glueCatalogConfig =

@@ -36,6 +36,7 @@ import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.Table;
 
+/** AWS Glue implementation for CatalogConversionSource */
 public class GlueCatalogConversionSource implements CatalogConversionSource {
 
   private static final String TABLE_TYPE_PROP = "table_type";

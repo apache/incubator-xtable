@@ -45,6 +45,7 @@ import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.Table;
 
+/** AWS Glue implementation for CatalogSyncClient for registering InternalTable in Glue */
 @Log4j2
 public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
 

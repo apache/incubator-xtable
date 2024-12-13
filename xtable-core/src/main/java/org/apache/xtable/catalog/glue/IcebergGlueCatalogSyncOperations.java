@@ -42,6 +42,7 @@ import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.TableInput;
 import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 
+/** Iceberg specific table operations for Glue catalog sync */
 class IcebergGlueCatalogSyncOperations {
 
   private final GlueCatalogSyncClient syncClient;
