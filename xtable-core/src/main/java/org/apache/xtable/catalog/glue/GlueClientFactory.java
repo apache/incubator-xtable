@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.glue;
+package org.apache.xtable.catalog.glue;
 
 import software.amazon.awssdk.services.glue.GlueClient;
 

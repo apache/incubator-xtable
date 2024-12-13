@@ -16,9 +16,9 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.glue;
+package org.apache.xtable.catalog.glue;
 
-import static org.apache.xtable.glue.GlueSchemaExtractor.getColumnProperty;
+import static org.apache.xtable.catalog.glue.GlueSchemaExtractor.getColumnProperty;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

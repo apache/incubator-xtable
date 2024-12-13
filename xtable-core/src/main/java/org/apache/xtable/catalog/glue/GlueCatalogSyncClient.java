@@ -16,18 +16,21 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.glue;
+package org.apache.xtable.catalog.glue;
 
 import java.time.ZonedDateTime;
 
+import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.xtable.conversion.TargetCatalog;
 import org.apache.xtable.exception.CatalogSyncException;
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
+import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 import software.amazon.awssdk.services.glue.GlueClient;
@@ -41,16 +44,17 @@ import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.Table;
 
 @Log4j2
-public abstract class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
+public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
 
   protected static final String GLUE_EXTERNAL_TABLE_TYPE = "EXTERNAL_TABLE";
   private static final String TEMP_SUFFIX = "_temp";
 
   protected final TargetCatalog targetCatalog;
-  protected final GlueClient glueClient;
-  protected final GlueCatalogConfig glueCatalogConfig;
-  protected final Configuration configuration;
-  protected final GlueSchemaExtractor schemaExtractor;
+  @Getter protected final GlueClient glueClient;
+  @Getter protected final GlueCatalogConfig glueCatalogConfig;
+  @Getter protected final Configuration configuration;
+  @Getter protected final GlueSchemaExtractor schemaExtractor;
+  protected final IcebergGlueCatalogSyncHelper icebergGlueCatalogSyncHelper;
 
   public GlueCatalogSyncClient(TargetCatalog targetCatalog, Configuration configuration) {
     this.targetCatalog = targetCatalog;
@@ -59,6 +63,7 @@ public abstract class GlueCatalogSyncClient implements CatalogSyncClient<Table> 
     this.glueClient = new DefaultGlueClientFactory(glueCatalogConfig).getGlueClient();
     this.configuration = new Configuration(configuration);
     this.schemaExtractor = GlueSchemaExtractor.getInstance();
+    this.icebergGlueCatalogSyncHelper = new IcebergGlueCatalogSyncHelper(this);
   }
 
   GlueCatalogSyncClient(
@@ -66,17 +71,24 @@ public abstract class GlueCatalogSyncClient implements CatalogSyncClient<Table> 
       Configuration configuration,
       GlueCatalogConfig glueCatalogConfig,
       GlueClient glueClient,
-      GlueSchemaExtractor schemaExtractor) {
+      GlueSchemaExtractor schemaExtractor,
+      IcebergGlueCatalogSyncHelper icebergGlueCatalogSyncHelper) {
     this.targetCatalog = targetCatalog;
     this.configuration = new Configuration(configuration);
     this.glueCatalogConfig = glueCatalogConfig;
     this.glueClient = glueClient;
     this.schemaExtractor = schemaExtractor;
+    this.icebergGlueCatalogSyncHelper = icebergGlueCatalogSyncHelper;
   }
 
   @Override
   public String getCatalogId() {
     return targetCatalog.getCatalogId();
+  }
+
+  @Override
+  public String getCatalogImpl() {
+    return this.getClass().getCanonicalName();
   }
 
   @Override
@@ -146,6 +158,31 @@ public abstract class GlueCatalogSyncClient implements CatalogSyncClient<Table> 
   }
 
   @Override
+  public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
+    switch (table.getTableFormat()) {
+      case TableFormat.ICEBERG:
+        icebergGlueCatalogSyncHelper.createTable(table, tableIdentifier);
+        return;
+      default:
+        throw new NotSupportedException(
+            "GlueCatalogSync not supported for " + table.getTableFormat());
+    }
+  }
+
+  @Override
+  public void refreshTable(
+      InternalTable table, Table catalogTable, CatalogTableIdentifier tableIdentifier) {
+    switch (table.getTableFormat()) {
+      case TableFormat.ICEBERG:
+        icebergGlueCatalogSyncHelper.refreshTable(table, catalogTable, tableIdentifier);
+        break;
+      default:
+        throw new NotSupportedException(
+            "GlueCatalogSync not supported for " + table.getTableFormat());
+    }
+  }
+
+  @Override
   public void createOrReplaceTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
     // validate before dropping the table
     validateTempTableCreation(table, tableIdentifier);
@@ -167,6 +204,13 @@ public abstract class GlueCatalogSyncClient implements CatalogSyncClient<Table> 
     }
   }
 
+  @Override
+  public void close() throws Exception {
+    if (glueClient != null) {
+      glueClient.close();
+    }
+  }
+
   /**
    * creates a temp table with new metadata and properties to ensure table creation succeeds before
    * dropping the table and recreating it. This ensures that actual table is not dropped in case
@@ -183,12 +227,5 @@ public abstract class GlueCatalogSyncClient implements CatalogSyncClient<Table> 
             .build();
     createTable(table, tempTableIdentifier);
     dropTable(table, tempTableIdentifier);
-  }
-
-  @Override
-  public void close() throws Exception {
-    if (glueClient != null) {
-      glueClient.close();
-    }
   }
 }

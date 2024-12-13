@@ -16,9 +16,9 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.glue;
+package org.apache.xtable.catalog.glue;
 
-import static org.apache.xtable.glue.GlueCatalogSyncClient.GLUE_EXTERNAL_TABLE_TYPE;
+import static org.apache.xtable.catalog.glue.GlueCatalogSyncClient.GLUE_EXTERNAL_TABLE_TYPE;
 
 import java.util.Collections;
 import java.util.Map;
@@ -26,9 +26,12 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.mockito.Mock;
 
+import org.apache.xtable.catalog.ExternalCatalogConfig;
+import org.apache.xtable.conversion.TargetCatalog;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.storage.TableFormat;
 
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
@@ -42,24 +45,42 @@ import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.TableInput;
 import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 
-public class GlueCatalogSyncClientTestBase {
+public class GlueCatalogSyncTestBase {
 
   @Mock protected GlueClient mockGlueClient;
   @Mock protected GlueCatalogConfig mockGlueCatalogConfig;
   @Mock protected GlueSchemaExtractor mockGlueSchemaExtractor;
-  protected Configuration mockConfiguration = new Configuration();
+  protected final Configuration testConfiguration = new Configuration();
 
   protected static final String TEST_GLUE_DATABASE = "glue_db";
   protected static final String TEST_GLUE_TABLE = "glue_table";
   protected static final String TEST_GLUE_CATALOG_ID = "aws-account-id";
   protected static final String TEST_BASE_PATH = "base-path";
-  protected static final InternalTable TEST_INTERNAL_TABLE =
+  protected static final String TEST_CATALOG_IDENTIFIER = "aws-glue-1";
+  protected static final String ICEBERG_METADATA_FILE_LOCATION = "base-path/metadata";
+  protected static final InternalTable TEST_ICEBERG_INTERNAL_TABLE =
       InternalTable.builder()
           .basePath(TEST_BASE_PATH)
+          .tableFormat(TableFormat.ICEBERG)
+          .readSchema(InternalSchema.builder().fields(Collections.emptyList()).build())
+          .build();
+  protected static final InternalTable TEST_HUDI_INTERNAL_TABLE =
+      InternalTable.builder()
+          .basePath(TEST_BASE_PATH)
+          .tableFormat(TableFormat.HUDI)
           .readSchema(InternalSchema.builder().fields(Collections.emptyList()).build())
           .build();
   protected static final CatalogTableIdentifier TEST_CATALOG_TABLE_IDENTIFIER =
-      CatalogTableIdentifier.builder().databaseName(TEST_GLUE_DATABASE).tableName(TEST_GLUE_TABLE).build();
+      CatalogTableIdentifier.builder()
+          .databaseName(TEST_GLUE_DATABASE)
+          .tableName(TEST_GLUE_TABLE)
+          .build();
+  protected static final TargetCatalog mockTargetCatalog =
+      TargetCatalog.builder()
+          .catalogId(TEST_CATALOG_IDENTIFIER)
+          .catalogTableIdentifier(TEST_CATALOG_TABLE_IDENTIFIER)
+          .catalogConfig(ExternalCatalogConfig.builder().catalogImpl("").catalogName("").build())
+          .build();
 
   protected GetDatabaseRequest getDbRequest(String dbName) {
     return GetDatabaseRequest.builder().catalogId(TEST_GLUE_CATALOG_ID).name(dbName).build();
@@ -79,7 +100,7 @@ public class GlueCatalogSyncClientTestBase {
         .databaseInput(
             DatabaseInput.builder()
                 .name(dbName)
-                .description("Created by " + IcebergGlueCatalogSyncClient.class.getName())
+                .description("Created by " + GlueCatalogSyncClient.class.getName())
                 .build())
         .build();
   }
@@ -96,7 +117,7 @@ public class GlueCatalogSyncClientTestBase {
                 .parameters(parameters)
                 .storageDescriptor(
                     StorageDescriptor.builder()
-                        .location(TEST_INTERNAL_TABLE.getBasePath())
+                        .location(TEST_ICEBERG_INTERNAL_TABLE.getBasePath())
                         .columns(Collections.emptyList())
                         .build())
                 .build())
@@ -116,7 +137,7 @@ public class GlueCatalogSyncClientTestBase {
                 .parameters(parameters)
                 .storageDescriptor(
                     StorageDescriptor.builder()
-                        .location(TEST_INTERNAL_TABLE.getBasePath())
+                        .location(TEST_ICEBERG_INTERNAL_TABLE.getBasePath())
                         .columns(Collections.emptyList())
                         .build())
                 .build())

@@ -16,94 +16,76 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.glue;
+package org.apache.xtable.catalog.glue;
 
 import static org.apache.iceberg.BaseMetastoreTableOperations.METADATA_LOCATION_PROP;
 import static org.apache.iceberg.BaseMetastoreTableOperations.PREVIOUS_METADATA_LOCATION_PROP;
 import static org.apache.iceberg.BaseMetastoreTableOperations.TABLE_TYPE_PROP;
+import static org.apache.xtable.catalog.glue.GlueCatalogSyncClient.GLUE_EXTERNAL_TABLE_TYPE;
 
 import java.util.HashMap;
 import java.util.Map;
-
-import org.apache.hadoop.conf.Configuration;
 
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.hadoop.HadoopTables;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import org.apache.xtable.conversion.TargetCatalog;
 import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.storage.TableFormat;
 
-import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.CreateTableRequest;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.TableInput;
 import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 
-public class IcebergGlueCatalogSyncClient extends GlueCatalogSyncClient {
+public class IcebergGlueCatalogSyncHelper {
 
+  private final GlueCatalogSyncClient syncClient;
   private final HadoopTables hadoopTables;
 
-  public IcebergGlueCatalogSyncClient(TargetCatalog targetCatalog, Configuration configuration) {
-    super(targetCatalog, configuration);
-    this.hadoopTables = new HadoopTables(configuration);
+  IcebergGlueCatalogSyncHelper(GlueCatalogSyncClient syncClient) {
+    this.syncClient = syncClient;
+    this.hadoopTables = new HadoopTables(syncClient.getConfiguration());
   }
 
-  @VisibleForTesting
-  IcebergGlueCatalogSyncClient(
-      TargetCatalog targetCatalog,
-      Configuration configuration,
-      GlueCatalogConfig glueCatalogConfig,
-      GlueClient glueClient,
-      HadoopTables hadoopTables,
-      GlueSchemaExtractor schemaExtractor) {
-    super(targetCatalog, configuration, glueCatalogConfig, glueClient, schemaExtractor);
+  IcebergGlueCatalogSyncHelper(GlueCatalogSyncClient syncClient, HadoopTables hadoopTables) {
+    this.syncClient = syncClient;
     this.hadoopTables = hadoopTables;
   }
 
-  @Override
-  public String getCatalogImpl() {
-    return this.getClass().getCanonicalName();
-  }
-
-  @Override
-  public String getTableFormat() {
-    return TableFormat.ICEBERG;
-  }
-
-  @Override
   public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
     BaseTable fsTable = loadTableFromFs(table.getBasePath());
     try {
-      glueClient.createTable(
-          CreateTableRequest.builder()
-              .catalogId(glueCatalogConfig.getCatalogId())
-              .databaseName(tableIdentifier.getDatabaseName())
-              .tableInput(
-                  TableInput.builder()
-                      .name(tableIdentifier.getTableName())
-                      .tableType(GLUE_EXTERNAL_TABLE_TYPE)
-                      .parameters(getTableParameters(fsTable))
-                      .storageDescriptor(
-                          StorageDescriptor.builder()
-                              .location(table.getBasePath())
-                              .columns(
-                                  schemaExtractor.toColumns(
-                                      getTableFormat(), table.getReadSchema()))
-                              .build())
-                      .build())
-              .build());
+      syncClient
+          .getGlueClient()
+          .createTable(
+              CreateTableRequest.builder()
+                  .catalogId(syncClient.getGlueCatalogConfig().getCatalogId())
+                  .databaseName(tableIdentifier.getDatabaseName())
+                  .tableInput(
+                      TableInput.builder()
+                          .name(tableIdentifier.getTableName())
+                          .tableType(GLUE_EXTERNAL_TABLE_TYPE)
+                          .parameters(getTableParameters(fsTable))
+                          .storageDescriptor(
+                              StorageDescriptor.builder()
+                                  .location(table.getBasePath())
+                                  .columns(
+                                      syncClient
+                                          .getSchemaExtractor()
+                                          .toColumns(TableFormat.ICEBERG, table.getReadSchema()))
+                                  .build())
+                          .build())
+                  .build());
     } catch (Exception e) {
       throw new CatalogSyncException("Failed to create table: " + tableIdentifier.getId(), e);
     }
   }
 
-  @Override
   public void refreshTable(
       InternalTable table, Table catalogTable, CatalogTableIdentifier tableIdentifier) {
     BaseTable fsTable = loadTableFromFs(table.getBasePath());
@@ -111,34 +93,40 @@ public class IcebergGlueCatalogSyncClient extends GlueCatalogSyncClient {
     parameters.put(PREVIOUS_METADATA_LOCATION_PROP, parameters.get(METADATA_LOCATION_PROP));
     parameters.putAll(getTableParameters(fsTable));
     try {
-      glueClient.updateTable(
-          UpdateTableRequest.builder()
-              .catalogId(glueCatalogConfig.getCatalogId())
-              .databaseName(tableIdentifier.getDatabaseName())
-              .skipArchive(true)
-              .tableInput(
-                  TableInput.builder()
-                      .name(tableIdentifier.getTableName())
-                      .tableType(GLUE_EXTERNAL_TABLE_TYPE)
-                      .parameters(parameters)
-                      .storageDescriptor(
-                          StorageDescriptor.builder()
-                              .location(table.getBasePath())
-                              .columns(
-                                  schemaExtractor.toColumns(
-                                      getTableFormat(), table.getReadSchema(), catalogTable))
-                              .build())
-                      .build())
-              .build());
+      syncClient
+          .getGlueClient()
+          .updateTable(
+              UpdateTableRequest.builder()
+                  .catalogId(syncClient.getGlueCatalogConfig().getCatalogId())
+                  .databaseName(tableIdentifier.getDatabaseName())
+                  .skipArchive(true)
+                  .tableInput(
+                      TableInput.builder()
+                          .name(tableIdentifier.getTableName())
+                          .tableType(GLUE_EXTERNAL_TABLE_TYPE)
+                          .parameters(parameters)
+                          .storageDescriptor(
+                              StorageDescriptor.builder()
+                                  .location(table.getBasePath())
+                                  .columns(
+                                      syncClient
+                                          .getSchemaExtractor()
+                                          .toColumns(
+                                              TableFormat.ICEBERG,
+                                              table.getReadSchema(),
+                                              catalogTable))
+                                  .build())
+                          .build())
+                  .build());
     } catch (Exception e) {
       throw new CatalogSyncException("Failed to refresh table: " + tableIdentifier.getId(), e);
     }
   }
 
   @VisibleForTesting
-  Map<String, String> getTableParameters(BaseTable table) {
+  protected Map<String, String> getTableParameters(BaseTable table) {
     Map<String, String> parameters = new HashMap<>();
-    parameters.put(TABLE_TYPE_PROP, getTableFormat());
+    parameters.put(TABLE_TYPE_PROP, TableFormat.ICEBERG);
     parameters.put(METADATA_LOCATION_PROP, getMetadataFileLocation(table));
     return parameters;
   }
