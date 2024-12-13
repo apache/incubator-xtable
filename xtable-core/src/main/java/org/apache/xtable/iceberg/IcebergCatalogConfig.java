@@ -36,7 +36,7 @@ import org.apache.xtable.conversion.CatalogConfig;
 @Value
 @Builder
 public class IcebergCatalogConfig implements CatalogConfig {
-  @NonNull String catalogId;
+  @NonNull String catalogName;
   @NonNull String catalogImpl;
   @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
 }

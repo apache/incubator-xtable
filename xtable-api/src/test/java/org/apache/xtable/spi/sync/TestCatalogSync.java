@@ -95,7 +95,7 @@ public class TestCatalogSync<TABLE> {
     when(mockClient2.getStorageDescriptorLocation(any())).thenReturn("/tmp/test");
     when(mockClient3.getStorageDescriptorLocation(any())).thenReturn("/tmp/test");
 
-    when(mockClient4.getCatalogId()).thenReturn("catalogId4");
+    when(mockClient4.getCatalogName()).thenReturn("catalogName4");
     when(mockClient4.getCatalogImpl()).thenReturn("catalogImpl4");
 
     Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients =

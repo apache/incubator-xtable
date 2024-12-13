@@ -39,7 +39,7 @@ class TestCatalogConversionFactory {
   void createSourceForConfig() {
     ExternalCatalogConfig sourceCatalog =
         ExternalCatalogConfig.builder()
-            .catalogId("catalogId")
+            .catalogName("catalogName")
             .catalogImpl(TestCatalogImpl.class.getName())
             .catalogOptions(Collections.emptyMap())
             .build();
@@ -54,7 +54,7 @@ class TestCatalogConversionFactory {
         TargetCatalogConfig.builder()
             .catalogConfig(
                 ExternalCatalogConfig.builder()
-                    .catalogId("catalogId")
+                    .catalogName("catalogName")
                     .catalogImpl(TestCatalogImpl.class.getName())
                     .catalogOptions(Collections.emptyMap())
                     .build())
@@ -81,7 +81,7 @@ class TestCatalogConversionFactory {
     }
 
     @Override
-    public String getCatalogId() {
+    public String getCatalogName() {
       return null;
     }
 

@@ -115,7 +115,7 @@ class IcebergTableManager {
             config ->
                 CatalogUtil.loadCatalog(
                     config.getCatalogImpl(),
-                    config.getCatalogId(),
+                    config.getCatalogName(),
                     config.getCatalogOptions(),
                     hadoopConfiguration)));
   }

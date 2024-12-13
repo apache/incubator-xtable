@@ -26,12 +26,12 @@ import org.apache.xtable.conversion.ExternalCatalogConfig;
 public class ExternalCatalogConfigFactory {
 
   public static ExternalCatalogConfig fromCatalogType(
-      String catalogType, String catalogId, Map<String, String> properties) {
+      String catalogType, String catalogName, Map<String, String> properties) {
     // TODO: Choose existing implementation based on catalogType.
     String catalogImpl = "";
     return ExternalCatalogConfig.builder()
         .catalogImpl(catalogImpl)
-        .catalogId(catalogId)
+        .catalogName(catalogName)
         .catalogOptions(properties)
         .build();
   }

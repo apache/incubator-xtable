@@ -55,7 +55,7 @@ public class TestIcebergTableManager {
     IcebergCatalogConfig catalogConfig =
         IcebergCatalogConfig.builder()
             .catalogImpl(StubCatalog.class.getName())
-            .catalogId(catalogName)
+            .catalogName(catalogName)
             .catalogOptions(OPTIONS)
             .build();
     Table mockTable = mock(Table.class);
@@ -74,7 +74,7 @@ public class TestIcebergTableManager {
     IcebergCatalogConfig catalogConfig =
         IcebergCatalogConfig.builder()
             .catalogImpl(StubCatalog.class.getName())
-            .catalogId(catalogName)
+            .catalogName(catalogName)
             .catalogOptions(OPTIONS)
             .build();
     Table mockTable = mock(Table.class);
@@ -98,7 +98,7 @@ public class TestIcebergTableManager {
     IcebergCatalogConfig catalogConfig =
         IcebergCatalogConfig.builder()
             .catalogImpl(StubCatalog.class.getName())
-            .catalogId(catalogName)
+            .catalogName(catalogName)
             .catalogOptions(OPTIONS)
             .build();
     Table mockTable = mock(Table.class);
@@ -131,7 +131,7 @@ public class TestIcebergTableManager {
     IcebergCatalogConfig catalogConfig =
         IcebergCatalogConfig.builder()
             .catalogImpl(StubCatalog.class.getName())
-            .catalogId(catalogName)
+            .catalogName(catalogName)
             .catalogOptions(OPTIONS)
             .build();
     Table mockTable = mock(Table.class);

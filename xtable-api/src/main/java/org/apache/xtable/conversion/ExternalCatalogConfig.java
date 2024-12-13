@@ -30,7 +30,7 @@ import lombok.Value;
 @Builder
 public class ExternalCatalogConfig implements CatalogConfig {
   /** The name of the catalog, it also acts as a unique identifier for each catalog */
-  @NonNull String catalogId;
+  @NonNull String catalogName;
 
   /** The implementation class path for the catalog */
   @NonNull String catalogImpl;

@@ -58,7 +58,7 @@ class TestRunCatalogSync {
     }
 
     @Override
-    public String getCatalogId() {
+    public String getCatalogName() {
       return null;
     }
 

@@ -132,9 +132,9 @@ public class RunCatalogSync {
     RunSync.TableFormatConverters tableFormatConverters =
         loadTableFormatConversionConfigs(customConfig);
 
-    Map<String, DatasetConfig.Catalog> catalogsById =
+    Map<String, DatasetConfig.Catalog> catalogsByName =
         datasetConfig.getTargetCatalogs().stream()
-            .collect(Collectors.toMap(DatasetConfig.Catalog::getCatalogId, Function.identity()));
+            .collect(Collectors.toMap(DatasetConfig.Catalog::getCatalogName, Function.identity()));
     ExternalCatalogConfig sourceCatalogConfig = getCatalogConfig(datasetConfig.getSourceCatalog());
     CatalogConversionSource catalogConversionSource =
         CatalogConversionFactory.createCatalogConversionSource(sourceCatalogConfig, hadoopConf);
@@ -183,7 +183,7 @@ public class RunCatalogSync {
                         targetCatalogTableIdentifier.getCatalogTableIdentifier())
                     .catalogConfig(
                         getCatalogConfig(
-                            catalogsById.get(targetCatalogTableIdentifier.getCatalogId())))
+                            catalogsByName.get(targetCatalogTableIdentifier.getCatalogName())))
                     .build());
       }
       ConversionConfig conversionConfig =
@@ -211,10 +211,10 @@ public class RunCatalogSync {
   static ExternalCatalogConfig getCatalogConfig(DatasetConfig.Catalog catalog) {
     if (!StringUtils.isEmpty(catalog.getCatalogType())) {
       return ExternalCatalogConfigFactory.fromCatalogType(
-          catalog.getCatalogType(), catalog.getCatalogId(), catalog.getCatalogProperties());
+          catalog.getCatalogType(), catalog.getCatalogName(), catalog.getCatalogProperties());
     } else {
       return ExternalCatalogConfig.builder()
-          .catalogId(catalog.getCatalogId())
+          .catalogName(catalog.getCatalogName())
           .catalogImpl(catalog.getCatalogImpl())
           .catalogOptions(catalog.getCatalogProperties())
           .build();
@@ -254,7 +254,7 @@ public class RunCatalogSync {
 
     @Data
     public static class Catalog {
-      private String catalogId;
+      private String catalogName;
       private String catalogType;
       private String catalogImpl;
       private Map<String, String> catalogProperties;
@@ -278,7 +278,7 @@ public class RunCatalogSync {
 
     @Data
     public static class TargetTableIdentifier {
-      String catalogId;
+      String catalogName;
       String tableFormat;
       CatalogTableIdentifier catalogTableIdentifier;
     }
