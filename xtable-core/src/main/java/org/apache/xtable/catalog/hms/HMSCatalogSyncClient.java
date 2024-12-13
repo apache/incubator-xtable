@@ -18,9 +18,6 @@
  
 package org.apache.xtable.catalog.hms;
 
-import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.METASTOREURIS;
-
-import java.lang.reflect.InvocationTargetException;
 import java.time.ZonedDateTime;
 import java.util.Collections;
 
@@ -28,17 +25,13 @@ import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Table;
-import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.thrift.TException;
-
-import org.apache.hudi.common.util.VisibleForTesting;
 
 import org.apache.xtable.conversion.TargetCatalog;
 import org.apache.xtable.exception.CatalogSyncException;
@@ -66,7 +59,7 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table> {
     this.configuration = configuration;
     this.schemaExtractor = HMSSchemaExtractor.getInstance();
     try {
-      this.metaStoreClient = getMSC();
+      this.metaStoreClient = new HMSClient(hmsCatalogConfig, configuration).getMSC();
     } catch (MetaException | HiveException e) {
       throw new CatalogSyncException("HiveMetastoreClient could not be created", e);
     }
@@ -207,28 +200,6 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table> {
             .build();
     createTable(table, tempTableIdentifier);
     dropTable(table, tempTableIdentifier);
-  }
-
-  @VisibleForTesting
-  IMetaStoreClient getMSC() throws MetaException, HiveException {
-    HiveConf hiveConf = new HiveConf(configuration, HiveConf.class);
-    hiveConf.set(METASTOREURIS.varname, hmsCatalogConfig.getServerUrl());
-    IMetaStoreClient metaStoreClient;
-    try {
-      metaStoreClient =
-          ((Hive)
-                  Hive.class
-                      .getMethod("getWithoutRegisterFns", HiveConf.class)
-                      .invoke(null, hiveConf))
-              .getMSC();
-    } catch (NoSuchMethodException
-        | IllegalAccessException
-        | IllegalArgumentException
-        | InvocationTargetException ex) {
-      metaStoreClient = Hive.get(hiveConf).getMSC();
-    }
-    log.debug("Connected to metastore with uri: {}", hmsCatalogConfig.getServerUrl());
-    return metaStoreClient;
   }
 
   @Override
