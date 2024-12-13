@@ -257,8 +257,7 @@ public class TestIcebergSync {
     assertTrue(targetIdentifier2.isPresent());
 
     // Case that return empty target identifier
-    Optional<String> targetIdentifier3 =
-            conversionTarget.getTargetCommitIdentifier("3");
+    Optional<String> targetIdentifier3 = conversionTarget.getTargetCommitIdentifier("3");
     assertFalse(targetIdentifier3.isPresent());
 
     ArgumentCaptor<Transaction> transactionArgumentCaptor =
