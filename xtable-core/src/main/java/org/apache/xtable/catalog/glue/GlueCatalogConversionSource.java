@@ -42,30 +42,25 @@ public class GlueCatalogConversionSource implements CatalogConversionSource {
   private final SourceCatalog sourceCatalog;
   private final GlueCatalogConfig glueCatalogConfig;
   private final GlueClient glueClient;
-  private final Configuration configuration;
 
   public GlueCatalogConversionSource(SourceCatalog sourceCatalog, Configuration configuration) {
     this.sourceCatalog = sourceCatalog;
     this.glueCatalogConfig =
-        GlueCatalogConfig.createConfig(sourceCatalog.getCatalogConfig().getCatalogOptions());
+        GlueCatalogConfig.of(sourceCatalog.getCatalogConfig().getCatalogOptions());
     this.glueClient = new DefaultGlueClientFactory(glueCatalogConfig).getGlueClient();
-    this.configuration = configuration;
   }
 
   @VisibleForTesting
   GlueCatalogConversionSource(
-      SourceCatalog sourceCatalog,
-      GlueClient glueClient,
-      GlueCatalogConfig glueCatalogConfig,
-      Configuration configuration) {
+      SourceCatalog sourceCatalog, GlueClient glueClient, GlueCatalogConfig glueCatalogConfig) {
     this.sourceCatalog = sourceCatalog;
     this.glueCatalogConfig = glueCatalogConfig;
     this.glueClient = glueClient;
-    this.configuration = configuration;
   }
 
   @Override
   public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
+    Table table;
     try {
       GetTableResponse response =
           glueClient.getTable(
@@ -74,22 +69,24 @@ public class GlueCatalogConversionSource implements CatalogConversionSource {
                   .databaseName(tableIdentifier.getDatabaseName())
                   .name(tableIdentifier.getTableName())
                   .build());
-      Table table = response.table();
-      String tableFormat = table.parameters().get(TABLE_TYPE_PROP);
-      Preconditions.checkArgument(
-          !Strings.isNullOrEmpty(tableFormat), "TableFormat must not be null or empty");
-      Properties tableProperties = new Properties();
-      tableProperties.putAll(table.parameters());
-      return SourceTable.builder()
-          .name(table.name())
-          .basePath(table.storageDescriptor().location())
-          // TODO: check if dataPath needs to be populated
-          .formatName(tableFormat)
-          .catalogConfig(sourceCatalog.getCatalogConfig())
-          .additionalProperties(tableProperties)
-          .build();
+      table = response.table();
     } catch (Exception e) {
       throw new RuntimeException("Failed to get table: " + tableIdentifier.getId(), e);
     }
+
+    String tableFormat = table.parameters().get(TABLE_TYPE_PROP);
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(tableFormat), "TableFormat must not be null or empty");
+    Properties tableProperties = new Properties();
+    tableProperties.putAll(table.parameters());
+    return SourceTable.builder()
+        .name(table.name())
+        .basePath(table.storageDescriptor().location())
+        // TODO: check if this holds true for all the formats
+        .dataPath(table.storageDescriptor().location())
+        .formatName(tableFormat)
+        .catalogConfig(sourceCatalog.getCatalogConfig())
+        .additionalProperties(tableProperties)
+        .build();
   }
 }

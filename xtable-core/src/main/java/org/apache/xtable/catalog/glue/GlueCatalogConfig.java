@@ -63,7 +63,7 @@ public class GlueCatalogConfig {
    */
   @Setter private Map<String, String> clientCredentialConfigs;
 
-  public static GlueCatalogConfig createConfig(Map<String, String> properties) {
+  public static GlueCatalogConfig of(Map<String, String> properties) {
     try {
       GlueCatalogConfig glueCatalogConfig =
           OBJECT_MAPPER.readValue(

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.catalog.glue;
+package org.apache.xtable.catalog;
 
 import java.util.Collections;
 import java.util.Map;

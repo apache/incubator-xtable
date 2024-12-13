@@ -48,13 +48,12 @@ class IcebergGlueCatalogSyncOperations {
   private final HadoopTables hadoopTables;
 
   IcebergGlueCatalogSyncOperations(GlueCatalogSyncClient syncClient) {
-    super();
     this.syncClient = syncClient;
     this.hadoopTables = new HadoopTables(syncClient.getConfiguration());
   }
 
+  @VisibleForTesting
   IcebergGlueCatalogSyncOperations(GlueCatalogSyncClient syncClient, HadoopTables hadoopTables) {
-    super();
     this.syncClient = syncClient;
     this.hadoopTables = hadoopTables;
   }

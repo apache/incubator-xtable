@@ -61,7 +61,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
   public GlueCatalogSyncClient(TargetCatalog targetCatalog, Configuration configuration) {
     this.targetCatalog = targetCatalog;
     this.glueCatalogConfig =
-        GlueCatalogConfig.createConfig(targetCatalog.getCatalogConfig().getCatalogOptions());
+        GlueCatalogConfig.of(targetCatalog.getCatalogConfig().getCatalogOptions());
     this.glueClient = new DefaultGlueClientFactory(glueCatalogConfig).getGlueClient();
     this.configuration = new Configuration(configuration);
     this.schemaExtractor = GlueSchemaExtractor.getInstance();

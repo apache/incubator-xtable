@@ -33,6 +33,7 @@ import org.junit.jupiter.api.Test;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
+import org.apache.xtable.catalog.TestSchemaExtractorBase;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
