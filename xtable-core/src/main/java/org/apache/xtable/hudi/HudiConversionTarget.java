@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -602,8 +601,8 @@ public class HudiConversionTarget implements ConversionTarget {
     }
 
     private Option<Map<String, String>> getExtraMetadata() {
-      Map<String, String> extraMetadata = new HashMap<>();
-      extraMetadata.put(TableSyncMetadata.XTABLE_METADATA, tableSyncMetadata.toJson());
+      Map<String, String> extraMetadata =
+          Collections.singletonMap(TableSyncMetadata.XTABLE_METADATA, tableSyncMetadata.toJson());
       return Option.of(extraMetadata);
     }
 
