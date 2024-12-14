@@ -392,7 +392,8 @@ public class ITHudiConversionSourceTarget {
     assertTrue(targetIdentifier5.isPresent());
 
     // Case that return empty target identifier
-    Optional<String> emptyTargetIdentifier = targetClient.getTargetCommitIdentifier("5", metaClient);
+    Optional<String> emptyTargetIdentifier =
+        targetClient.getTargetCommitIdentifier("5", metaClient);
     assertFalse(emptyTargetIdentifier.isPresent());
 
     // the first commit to the timeline should be archived

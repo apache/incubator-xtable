@@ -97,7 +97,7 @@ public interface ConversionTarget {
    *
    * @param sourceIdentifier the unique identifier of the source table commit
    * @return an {@link Optional} containing the target commit identifier if a corresponding commit
-   *    exists, or an empty {@link Optional} if no match is found
+   *     exists, or an empty {@link Optional} if no match is found
    */
   Optional<String> getTargetCommitIdentifier(String sourceIdentifier);
 }

@@ -166,14 +166,16 @@ public class TestDeltaSync {
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
-    Optional<String> targetIdentifier1 = conversionTarget.getTargetCommitIdentifier(snapshot1.getSourceIdentifier());
+    Optional<String> targetIdentifier1 =
+        conversionTarget.getTargetCommitIdentifier(snapshot1.getSourceIdentifier());
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2)), null);
     assertTrue(targetIdentifier1.isPresent());
     assertEquals("0", targetIdentifier1.get());
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
-    Optional<String> targetIdentifier2 = conversionTarget.getTargetCommitIdentifier(snapshot2.getSourceIdentifier());
+    Optional<String> targetIdentifier2 =
+        conversionTarget.getTargetCommitIdentifier(snapshot2.getSourceIdentifier());
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile2, dataFile3)), null);
     assertTrue(targetIdentifier2.isPresent());
     assertEquals("1", targetIdentifier2.get());
