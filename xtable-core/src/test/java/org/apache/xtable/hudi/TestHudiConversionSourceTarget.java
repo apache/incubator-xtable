@@ -249,6 +249,7 @@ public class TestHudiConversionSourceTarget {
   void beginSyncForExistingTable() {
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     HudiConversionTarget targetClient = getTargetClient(mockMetaClient);
+
     targetClient.beginSync(TABLE);
     // verify meta client timeline refreshed
     verify(mockMetaClient).reloadActiveTimeline();

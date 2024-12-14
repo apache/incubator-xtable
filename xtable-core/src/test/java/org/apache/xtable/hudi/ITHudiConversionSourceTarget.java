@@ -287,7 +287,6 @@ public class ITHudiConversionSourceTarget {
                             .range(Range.scalar("partitionPath"))
                             .build()))
                 .build());
-
     // sync snapshot and metadata
     InternalTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));
     HudiConversionTarget targetClient = getTargetClient();
@@ -393,8 +392,8 @@ public class ITHudiConversionSourceTarget {
     assertTrue(targetIdentifier5.isPresent());
 
     // Case that return empty target identifier
-    Optional<String> targetIdentifier6 = targetClient.getTargetCommitIdentifier("5", metaClient);
-    assertFalse(targetIdentifier6.isPresent());
+    Optional<String> emptyTargetIdentifier = targetClient.getTargetCommitIdentifier("5", metaClient);
+    assertFalse(emptyTargetIdentifier.isPresent());
 
     // the first commit to the timeline should be archived
     assertEquals(
