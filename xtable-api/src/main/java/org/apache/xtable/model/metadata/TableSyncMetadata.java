@@ -54,10 +54,20 @@ public class TableSyncMetadata {
   Instant lastInstantSynced;
   List<Instant> instantsToConsiderForNextSync;
   int version;
+  String sourceTableFormat;
+  String sourceIdentifier;
 
   public static TableSyncMetadata of(
-      Instant lastInstantSynced, List<Instant> instantsToConsiderForNextSync) {
-    return new TableSyncMetadata(lastInstantSynced, instantsToConsiderForNextSync, CURRENT_VERSION);
+      Instant lastInstantSynced,
+      List<Instant> instantsToConsiderForNextSync,
+      String sourceTableFormat,
+      String sourceIdentifier) {
+    return new TableSyncMetadata(
+        lastInstantSynced,
+        instantsToConsiderForNextSync,
+        CURRENT_VERSION,
+        sourceTableFormat,
+        sourceIdentifier);
   }
 
   public String toJson() {

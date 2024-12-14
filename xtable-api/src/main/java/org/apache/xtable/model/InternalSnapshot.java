@@ -47,4 +47,6 @@ public class InternalSnapshot {
   List<PartitionFileGroup> partitionedDataFiles;
   // pending commits before latest commit on the table.
   @Builder.Default List<Instant> pendingCommits = Collections.emptyList();
+  // commit identifier in source table
+  @Builder.Default String sourceIdentifier = "";
 }

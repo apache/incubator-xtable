@@ -73,7 +73,8 @@ public class TableFormatSync {
                 internalTable,
                 target -> target.syncFilesForSnapshot(snapshot.getPartitionedDataFiles()),
                 startTime,
-                snapshot.getPendingCommits()));
+                snapshot.getPendingCommits(),
+                snapshot.getSourceIdentifier()));
       } catch (Exception e) {
         log.error("Failed to sync snapshot", e);
         results.put(
@@ -121,7 +122,8 @@ public class TableFormatSync {
                   change.getTableAsOfChange(),
                   target -> target.syncFilesForDiff(change.getFilesDiff()),
                   startTime,
-                  changes.getPendingCommits()));
+                  changes.getPendingCommits(),
+                  change.getSourceIdentifier()));
         } catch (Exception e) {
           log.error("Failed to sync table changes", e);
           resultsForFormat.add(buildResultForError(SyncMode.INCREMENTAL, startTime, e));
@@ -149,19 +151,26 @@ public class TableFormatSync {
       InternalTable tableState,
       SyncFiles fileSyncMethod,
       Instant startTime,
-      List<Instant> pendingCommits) {
+      List<Instant> pendingCommits,
+      String sourceIdentifier) {
     // initialize the sync
     conversionTarget.beginSync(tableState);
+    // Persist the latest commit time in table properties for incremental syncs
+    // Syncing metadata must precede the following steps to ensure that the metadata is available
+    // before committing
+    TableSyncMetadata latestState =
+        TableSyncMetadata.of(
+            tableState.getLatestCommitTime(),
+            pendingCommits,
+            tableState.getTableFormat(),
+            sourceIdentifier);
+    conversionTarget.syncMetadata(latestState);
     // sync schema updates
     conversionTarget.syncSchema(tableState.getReadSchema());
     // sync partition updates
     conversionTarget.syncPartitionSpec(tableState.getPartitioningFields());
     // Update the files in the target table
     fileSyncMethod.sync(conversionTarget);
-    // Persist the latest commit time in table properties for incremental syncs.
-    TableSyncMetadata latestState =
-        TableSyncMetadata.of(tableState.getLatestCommitTime(), pendingCommits);
-    conversionTarget.syncMetadata(latestState);
     conversionTarget.completeSync();
 
     return SyncResult.builder()

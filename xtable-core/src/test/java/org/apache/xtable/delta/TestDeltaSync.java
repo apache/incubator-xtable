@@ -19,6 +19,7 @@
 package org.apache.xtable.delta;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.parallel.ExecutionMode.SAME_THREAD;
@@ -36,6 +37,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -159,16 +161,27 @@ public class TestDeltaSync {
     InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
     InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList(), basePath);
 
-    InternalSnapshot snapshot1 = buildSnapshot(table1, dataFile1, dataFile2);
-    InternalSnapshot snapshot2 = buildSnapshot(table2, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table1, "0", dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, "1", dataFile2, dataFile3);
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
+    Optional<String> targetIdentifier1 =
+        conversionTarget.getTargetCommitIdentifier(snapshot1.getSourceIdentifier());
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2)), null);
+    assertTrue(targetIdentifier1.isPresent());
+    assertEquals("0", targetIdentifier1.get());
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
+    Optional<String> targetIdentifier2 =
+        conversionTarget.getTargetCommitIdentifier(snapshot2.getSourceIdentifier());
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile2, dataFile3)), null);
+    assertTrue(targetIdentifier2.isPresent());
+    assertEquals("1", targetIdentifier2.get());
+
+    Optional<String> emptyTargetIdentifier = conversionTarget.getTargetCommitIdentifier("3");
+    assertFalse(emptyTargetIdentifier.isPresent());
   }
 
   @Test
@@ -214,7 +227,7 @@ public class TestDeltaSync {
     EqualTo equalToExpr =
         new EqualTo(new Column("string_field", new StringType()), Literal.of("warning"));
 
-    InternalSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table, "0", dataFile1, dataFile2, dataFile3);
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
@@ -294,7 +307,7 @@ public class TestDeltaSync {
     EqualTo equalToExpr2 = new EqualTo(new Column("int_field", new IntegerType()), Literal.of(20));
     And CombinedExpr = new And(equalToExpr1, equalToExpr2);
 
-    InternalSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table, "0", dataFile1, dataFile2, dataFile3);
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
     validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile2)), CombinedExpr);
@@ -337,7 +350,7 @@ public class TestDeltaSync {
     InternalDataFile dataFile2 = getDataFile(2, partitionValues1, basePath);
     InternalDataFile dataFile3 = getDataFile(3, partitionValues2, basePath);
 
-    InternalSnapshot snapshot1 = buildSnapshot(table, dataFile1, dataFile2, dataFile3);
+    InternalSnapshot snapshot1 = buildSnapshot(table, "0", dataFile1, dataFile2, dataFile3);
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
@@ -408,10 +421,12 @@ public class TestDeltaSync {
         internalDataFiles.size(), count, "Number of files from DeltaScan don't match expectation");
   }
 
-  private InternalSnapshot buildSnapshot(InternalTable table, InternalDataFile... dataFiles) {
+  private InternalSnapshot buildSnapshot(
+      InternalTable table, String sourceIdentifier, InternalDataFile... dataFiles) {
     return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(PartitionFileGroup.fromFiles(Arrays.asList(dataFiles)))
+        .sourceIdentifier(sourceIdentifier)
         .build();
   }
 
