@@ -54,10 +54,10 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
 
   private static final String TEMP_SUFFIX = "_temp";
   private final ExternalCatalogConfig catalogConfig;
-  @Getter private final HMSCatalogConfig hmsCatalogConfig;
-  @Getter private Configuration configuration;
-  @Getter private IMetaStoreClient metaStoreClient;
-  @Getter private HMSSchemaExtractor schemaExtractor;
+  private final HMSCatalogConfig hmsCatalogConfig;
+  private final Configuration configuration;
+  private final IMetaStoreClient metaStoreClient;
+  @Getter private final HMSSchemaExtractor schemaExtractor;
   private final IcebergHMSCatalogSyncHelper icebergHMSCatalogSyncHelper;
 
   protected HMSCatalogSyncClient(ExternalCatalogConfig catalogConfig, Configuration configuration) {
