@@ -32,6 +32,7 @@ import org.apache.hadoop.conf.Configuration;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 
+import org.apache.xtable.catalog.TableFormatUtils;
 import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.exception.CatalogSyncException;
@@ -278,7 +279,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
     String dataPath;
     switch (tableFormat) {
       case TableFormat.ICEBERG:
-        dataPath = icebergGlueCatalogSyncHelper.dataLocation(tableLocation, table.parameters());
+        dataPath = TableFormatUtils.getIcebergDataLocation(tableLocation, table.parameters());
         break;
       case TableFormat.HUDI:
         dataPath = tableLocation;
