@@ -49,6 +49,8 @@ import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseResponse;
+import software.amazon.awssdk.services.glue.model.CreateTableRequest;
+import software.amazon.awssdk.services.glue.model.CreateTableResponse;
 import software.amazon.awssdk.services.glue.model.Database;
 import software.amazon.awssdk.services.glue.model.DeleteTableRequest;
 import software.amazon.awssdk.services.glue.model.DeleteTableResponse;
@@ -58,21 +60,23 @@ import software.amazon.awssdk.services.glue.model.GetDatabaseResponse;
 import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.Table;
+import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
+import software.amazon.awssdk.services.glue.model.UpdateTableResponse;
 
 @ExtendWith(MockitoExtension.class)
 public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
 
-  @Mock private IcebergGlueCatalogSyncOperations mockIcebergGlueCatalogSyncOperations;
+  @Mock private IcebergTableInputCreator mockIcebergTableInputCreator;
   private GlueCatalogSyncClient glueCatalogSyncClient;
 
   private GlueCatalogSyncClient createGlueCatalogSyncClient() {
     return new GlueCatalogSyncClient(
-        mockTargetCatalog,
+        catalogConfig,
         testConfiguration,
         mockGlueCatalogConfig,
         mockGlueClient,
         mockGlueSchemaExtractor,
-        mockIcebergGlueCatalogSyncOperations);
+        mockIcebergTableInputCreator);
   }
 
   void setupCommonMocks() {
@@ -214,15 +218,23 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
   }
 
   @Test
-  void testCreateTable() {
-    glueCatalogSyncClient = createGlueCatalogSyncClient();
+  void testCreateTable_Success() {
+    setupCommonMocks();
+    CreateTableRequest createTableRequest =
+        createTableRequest(TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(), TEST_TABLE_INPUT);
+    when(mockIcebergTableInputCreator.getCreateTableInput(
+            TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER))
+        .thenReturn(TEST_TABLE_INPUT);
+    when(mockGlueClient.createTable(createTableRequest))
+        .thenReturn(CreateTableResponse.builder().build());
     glueCatalogSyncClient.createTable(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
-    verify(mockIcebergGlueCatalogSyncOperations, times(1))
-        .createTable(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+    verify(mockGlueClient, times(1)).createTable(createTableRequest);
+    verify(mockIcebergTableInputCreator, times(1))
+        .getCreateTableInput(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
   }
 
   @Test
-  void testCreateTable_Failures() {
+  void testCreateTable_UnsupportedTableFormat() {
     glueCatalogSyncClient = createGlueCatalogSyncClient();
 
     // Unsupported table format
@@ -231,34 +243,70 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
         () ->
             glueCatalogSyncClient.createTable(
                 TEST_HUDI_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER));
-    verify(mockIcebergGlueCatalogSyncOperations, never()).createTable(any(), any());
+    verify(mockIcebergTableInputCreator, never()).getCreateTableInput(any(), any());
+    verify(mockGlueClient, never()).createTable(any(CreateTableRequest.class));
+  }
 
-    // error while creating table
+  @Test
+  void testCreateTable_ErrorGettingTableInput() {
+    glueCatalogSyncClient = createGlueCatalogSyncClient();
+
+    // error when getting iceberg table input
     doThrow(new RuntimeException("something went wrong"))
-        .when(mockIcebergGlueCatalogSyncOperations)
-        .createTable(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+        .when(mockIcebergTableInputCreator)
+        .getCreateTableInput(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
     assertThrows(
         RuntimeException.class,
         () ->
             glueCatalogSyncClient.createTable(
                 TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER));
-    verify(mockIcebergGlueCatalogSyncOperations, times(1))
-        .createTable(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+    verify(mockIcebergTableInputCreator, times(1))
+        .getCreateTableInput(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+    verify(mockGlueClient, never()).createTable(any(CreateTableRequest.class));
   }
 
   @Test
-  void testRefreshTable() {
-    glueCatalogSyncClient = createGlueCatalogSyncClient();
-    Table glueTable = Table.builder().parameters(Collections.emptyMap()).build();
+  void testCreateTable_ErrorCreatingTable() {
+    setupCommonMocks();
 
+    // error when creating table
+    CreateTableRequest createTableRequest =
+        createTableRequest(TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(), TEST_TABLE_INPUT);
+    when(mockIcebergTableInputCreator.getCreateTableInput(
+            TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER))
+        .thenReturn(TEST_TABLE_INPUT);
+    when(mockGlueClient.createTable(createTableRequest))
+        .thenThrow(new RuntimeException("something went wrong"));
+    assertThrows(
+        CatalogSyncException.class,
+        () ->
+            glueCatalogSyncClient.createTable(
+                TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER));
+    verify(mockIcebergTableInputCreator, times(1))
+        .getCreateTableInput(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+    verify(mockGlueClient, times(1)).createTable(createTableRequest);
+  }
+
+  @Test
+  void testRefreshTable_Success() {
+    setupCommonMocks();
+    UpdateTableRequest updateTableRequest =
+        updateTableRequest(TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(), TEST_TABLE_INPUT);
+    Table glueTable = Table.builder().parameters(Collections.emptyMap()).build();
+    when(mockIcebergTableInputCreator.getUpdateTableInput(
+            TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER))
+        .thenReturn(TEST_TABLE_INPUT);
+    when(mockGlueClient.updateTable(updateTableRequest))
+        .thenReturn(UpdateTableResponse.builder().build());
     glueCatalogSyncClient.refreshTable(
         TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
-    verify(mockIcebergGlueCatalogSyncOperations, times(1))
-        .refreshTable(TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
+    verify(mockGlueClient, times(1)).updateTable(updateTableRequest);
+    verify(mockIcebergTableInputCreator, times(1))
+        .getUpdateTableInput(TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
   }
 
   @Test
-  void testRefreshTable_Failures() {
+  void testRefreshTable_UnsupportedTableFormat() {
     glueCatalogSyncClient = createGlueCatalogSyncClient();
     Table glueTable = Table.builder().parameters(Collections.emptyMap()).build();
 
@@ -268,19 +316,51 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
         () ->
             glueCatalogSyncClient.refreshTable(
                 TEST_HUDI_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER));
-    verify(mockIcebergGlueCatalogSyncOperations, never()).refreshTable(any(), any(), any());
+    verify(mockIcebergTableInputCreator, never()).getUpdateTableInput(any(), any(), any());
+    verify(mockGlueClient, never()).updateTable(any(UpdateTableRequest.class));
+  }
+
+  @Test
+  void testRefreshTable_ErrorCreatingTableInput() {
+    glueCatalogSyncClient = createGlueCatalogSyncClient();
+    Table glueTable = Table.builder().parameters(Collections.emptyMap()).build();
 
     // error while refreshing table
     doThrow(new RuntimeException("something went wrong"))
-        .when(mockIcebergGlueCatalogSyncOperations)
-        .refreshTable(TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
+        .when(mockIcebergTableInputCreator)
+        .getUpdateTableInput(TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
     assertThrows(
         RuntimeException.class,
         () ->
             glueCatalogSyncClient.refreshTable(
                 TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER));
-    verify(mockIcebergGlueCatalogSyncOperations, times(1))
-        .refreshTable(TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
+    verify(mockIcebergTableInputCreator, times(1))
+        .getUpdateTableInput(TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
+    verify(mockGlueClient, never()).updateTable(any(UpdateTableRequest.class));
+  }
+
+  @Test
+  void testRefreshTable_ErrorRefreshingTable() {
+    setupCommonMocks();
+    Table glueTable = Table.builder().parameters(Collections.emptyMap()).build();
+
+    UpdateTableRequest updateTableRequest =
+        updateTableRequest(TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(), TEST_TABLE_INPUT);
+    when(mockIcebergTableInputCreator.getUpdateTableInput(
+            TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER))
+        .thenReturn(TEST_TABLE_INPUT);
+
+    // error while refreshing table
+    when(mockGlueClient.updateTable(updateTableRequest))
+        .thenThrow(new RuntimeException("something went wrong"));
+    assertThrows(
+        CatalogSyncException.class,
+        () ->
+            glueCatalogSyncClient.refreshTable(
+                TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER));
+    verify(mockIcebergTableInputCreator, times(1))
+        .getUpdateTableInput(TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
+    verify(mockGlueClient, times(1)).updateTable(updateTableRequest);
   }
 
   @Test
@@ -309,10 +389,10 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
       glueCatalogSyncClient.createOrReplaceTable(
           TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
 
-      verify(mockIcebergGlueCatalogSyncOperations, times(1))
-          .createTable(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
-      verify(mockIcebergGlueCatalogSyncOperations, times(1))
-          .createTable(TEST_ICEBERG_INTERNAL_TABLE, tempTableIdentifier);
+      verify(mockIcebergTableInputCreator, times(1))
+          .getCreateTableInput(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+      verify(mockIcebergTableInputCreator, times(1))
+          .getCreateTableInput(TEST_ICEBERG_INTERNAL_TABLE, tempTableIdentifier);
 
       verify(mockGlueClient, times(1)).deleteTable(tempTableDeleteRequest);
       verify(mockGlueClient, times(1)).deleteTable(mainTableDeleteRequest);

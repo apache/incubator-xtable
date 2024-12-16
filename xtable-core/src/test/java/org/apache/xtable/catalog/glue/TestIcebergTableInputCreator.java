@@ -22,7 +22,6 @@ import static org.apache.iceberg.BaseMetastoreTableOperations.METADATA_LOCATION_
 import static org.apache.iceberg.BaseMetastoreTableOperations.PREVIOUS_METADATA_LOCATION_PROP;
 import static org.apache.iceberg.BaseMetastoreTableOperations.TABLE_TYPE_PROP;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,8 +32,6 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -43,35 +40,28 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.hadoop.HadoopTables;
 
-import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.model.storage.TableFormat;
 
-import software.amazon.awssdk.services.glue.model.CreateTableRequest;
-import software.amazon.awssdk.services.glue.model.CreateTableResponse;
 import software.amazon.awssdk.services.glue.model.Table;
-import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
-import software.amazon.awssdk.services.glue.model.UpdateTableResponse;
+import software.amazon.awssdk.services.glue.model.TableInput;
 
 @ExtendWith(MockitoExtension.class)
-public class TestIcebergGlueCatalogSyncOperations extends GlueCatalogSyncTestBase {
+public class TestIcebergTableInputCreator extends GlueCatalogSyncTestBase {
 
   @Mock private HadoopTables mockIcebergHadoopTables;
   @Mock private BaseTable mockIcebergBaseTable;
   @Mock private TableOperations mockIcebergTableOperations;
   @Mock private TableMetadata mockIcebergTableMetadata;
   @Mock private GlueCatalogSyncClient mockGlueCatalogSyncClient;
-  private IcebergGlueCatalogSyncOperations icebergGlueCatalogSyncOperations;
+  private IcebergTableInputCreator icebergTableInputCreator;
 
-  private IcebergGlueCatalogSyncOperations createIcebergGlueCatalogSyncHelper() {
-    return new IcebergGlueCatalogSyncOperations(mockGlueCatalogSyncClient, mockIcebergHadoopTables);
+  private IcebergTableInputCreator createIcebergGlueCatalogSyncHelper() {
+    return new IcebergTableInputCreator(mockGlueCatalogSyncClient, mockIcebergHadoopTables);
   }
 
   void setupCommonMocks() {
-    icebergGlueCatalogSyncOperations = createIcebergGlueCatalogSyncHelper();
-    when(mockGlueCatalogSyncClient.getGlueCatalogConfig()).thenReturn(mockGlueCatalogConfig);
-    when(mockGlueCatalogSyncClient.getGlueClient()).thenReturn(mockGlueClient);
+    icebergTableInputCreator = createIcebergGlueCatalogSyncHelper();
     when(mockGlueCatalogSyncClient.getSchemaExtractor()).thenReturn(mockGlueSchemaExtractor);
-    when(mockGlueCatalogConfig.getCatalogId()).thenReturn(TEST_GLUE_CATALOG_ID);
   }
 
   void mockIcebergHadoopTables() {
@@ -86,85 +76,66 @@ public class TestIcebergGlueCatalogSyncOperations extends GlueCatalogSyncTestBas
         .thenReturn(ICEBERG_METADATA_FILE_LOCATION);
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void testCreateTable(boolean shouldFail) {
+  @Test
+  void testGetCreateTableInput() {
     setupCommonMocks();
     mockIcebergHadoopTables();
     when(mockGlueSchemaExtractor.toColumns(
             TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema()))
         .thenReturn(Collections.emptyList());
 
-    CreateTableRequest createTableRequest =
-        createTableRequest(
-            TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(),
+    TableInput expected =
+        getCreateOrUpdateTableInput(
             TEST_CATALOG_TABLE_IDENTIFIER.getTableName(),
-            icebergGlueCatalogSyncOperations.getTableParameters(mockIcebergBaseTable));
-    if (shouldFail) {
-      when(mockGlueClient.createTable(createTableRequest))
-          .thenThrow(new RuntimeException("something went wrong"));
-      assertThrows(
-          CatalogSyncException.class,
-          () ->
-              icebergGlueCatalogSyncOperations.createTable(
-                  TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER));
-    } else {
-      when(mockGlueClient.createTable(createTableRequest))
-          .thenReturn(CreateTableResponse.builder().build());
-      icebergGlueCatalogSyncOperations.createTable(
-          TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
-    }
-    verify(mockGlueClient, times(1)).createTable(createTableRequest);
+            icebergTableInputCreator.getTableParameters(mockIcebergBaseTable),
+            TEST_ICEBERG_INTERNAL_TABLE);
+    TableInput output =
+        icebergTableInputCreator.getCreateTableInput(
+            TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+    assertEquals(expected, output);
     verify(mockGlueSchemaExtractor, times(1))
         .toColumns(TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema());
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void testRefreshTable(boolean shouldFail) {
+  @Test
+  void testGetUpdateTableInput() {
     setupCommonMocks();
     mockIcebergHadoopTables();
+
     Map<String, String> glueTableParams = new HashMap<>();
     glueTableParams.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION);
     Table glueTable = Table.builder().parameters(glueTableParams).build();
+
     Map<String, String> parameters = new HashMap<>();
     parameters.put(PREVIOUS_METADATA_LOCATION_PROP, glueTableParams.get(METADATA_LOCATION_PROP));
-    parameters.putAll(icebergGlueCatalogSyncOperations.getTableParameters(mockIcebergBaseTable));
+    when(mockIcebergTableMetadata.metadataFileLocation())
+        .thenReturn(ICEBERG_METADATA_FILE_LOCATION_v2);
+    parameters.putAll(icebergTableInputCreator.getTableParameters(mockIcebergBaseTable));
+
     when(mockGlueSchemaExtractor.toColumns(
             TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema(), glueTable))
         .thenReturn(Collections.emptyList());
-    UpdateTableRequest tableReq =
-        updateTableRequest(
-            TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(),
-            TEST_CATALOG_TABLE_IDENTIFIER.getTableName(),
-            parameters);
-    if (shouldFail) {
-      when(mockGlueClient.updateTable(tableReq))
-          .thenThrow(new RuntimeException("something went wrong"));
-      assertThrows(
-          CatalogSyncException.class,
-          () ->
-              icebergGlueCatalogSyncOperations.refreshTable(
-                  TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER));
-    } else {
-      when(mockGlueClient.updateTable(tableReq)).thenReturn(UpdateTableResponse.builder().build());
-      icebergGlueCatalogSyncOperations.refreshTable(
-          TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
-    }
-    verify(mockGlueClient, times(1)).updateTable(tableReq);
+
+    TableInput expected =
+        getCreateOrUpdateTableInput(
+            TEST_CATALOG_TABLE_IDENTIFIER.getTableName(), parameters, TEST_ICEBERG_INTERNAL_TABLE);
+    TableInput output =
+        icebergTableInputCreator.getUpdateTableInput(
+            TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
+    assertEquals(expected, output);
     verify(mockGlueSchemaExtractor, times(1))
         .toColumns(TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema(), glueTable);
   }
 
   @Test
   void testGetTableParameters() {
-    icebergGlueCatalogSyncOperations = createIcebergGlueCatalogSyncHelper();
+    icebergTableInputCreator = createIcebergGlueCatalogSyncHelper();
     mockIcebergMetadataFileLocation();
     Map<String, String> expected = new HashMap<>();
     expected.put(TABLE_TYPE_PROP, TableFormat.ICEBERG);
     expected.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION);
     Map<String, String> tableParameters =
-        icebergGlueCatalogSyncOperations.getTableParameters(mockIcebergBaseTable);
+        icebergTableInputCreator.getTableParameters(mockIcebergBaseTable);
     assertEquals(expected, tableParameters);
   }
 }

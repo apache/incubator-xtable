@@ -18,7 +18,10 @@
  
 package org.apache.xtable.catalog.glue;
 
+import static org.apache.iceberg.BaseMetastoreTableOperations.TABLE_TYPE_PROP;
+
 import java.time.ZonedDateTime;
+import java.util.Properties;
 
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
@@ -26,17 +29,22 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.hadoop.conf.Configuration;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 
-import org.apache.xtable.conversion.TargetCatalog;
+import org.apache.xtable.conversion.ExternalCatalogConfig;
+import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
+import software.amazon.awssdk.services.glue.model.CreateTableRequest;
 import software.amazon.awssdk.services.glue.model.DatabaseInput;
 import software.amazon.awssdk.services.glue.model.DeleteTableRequest;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
@@ -44,60 +52,56 @@ import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.Table;
+import software.amazon.awssdk.services.glue.model.TableInput;
+import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 
 /** AWS Glue implementation for CatalogSyncClient for registering InternalTable in Glue */
 @Log4j2
-public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
+public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogConversionSource {
 
   protected static final String GLUE_EXTERNAL_TABLE_TYPE = "EXTERNAL_TABLE";
   private static final String TEMP_SUFFIX = "_temp";
 
-  protected final TargetCatalog targetCatalog;
+  protected final ExternalCatalogConfig catalogConfig;
   @Getter protected final GlueClient glueClient;
   @Getter protected final GlueCatalogConfig glueCatalogConfig;
   @Getter protected final Configuration configuration;
   @Getter protected final GlueSchemaExtractor schemaExtractor;
-  protected final IcebergGlueCatalogSyncOperations icebergGlueCatalogSyncOperations;
+  protected final IcebergTableInputCreator icebergTableInputCreator;
 
-  public GlueCatalogSyncClient(TargetCatalog targetCatalog, Configuration configuration) {
-    this.targetCatalog = targetCatalog;
-    this.glueCatalogConfig =
-        GlueCatalogConfig.of(targetCatalog.getCatalogConfig().getCatalogOptions());
+  public GlueCatalogSyncClient(ExternalCatalogConfig catalogConfig, Configuration configuration) {
+    this.catalogConfig = catalogConfig;
+    this.glueCatalogConfig = GlueCatalogConfig.of(catalogConfig.getCatalogOptions());
     this.glueClient = new DefaultGlueClientFactory(glueCatalogConfig).getGlueClient();
     this.configuration = new Configuration(configuration);
     this.schemaExtractor = GlueSchemaExtractor.getInstance();
-    this.icebergGlueCatalogSyncOperations = new IcebergGlueCatalogSyncOperations(this);
+    this.icebergTableInputCreator = new IcebergTableInputCreator(this);
   }
 
   @VisibleForTesting
   GlueCatalogSyncClient(
-      TargetCatalog targetCatalog,
+      ExternalCatalogConfig catalogConfig,
       Configuration configuration,
       GlueCatalogConfig glueCatalogConfig,
       GlueClient glueClient,
       GlueSchemaExtractor schemaExtractor,
-      IcebergGlueCatalogSyncOperations icebergGlueCatalogSyncOperations) {
-    this.targetCatalog = targetCatalog;
+      IcebergTableInputCreator icebergTableInputCreator) {
+    this.catalogConfig = catalogConfig;
     this.configuration = new Configuration(configuration);
     this.glueCatalogConfig = glueCatalogConfig;
     this.glueClient = glueClient;
     this.schemaExtractor = schemaExtractor;
-    this.icebergGlueCatalogSyncOperations = icebergGlueCatalogSyncOperations;
+    this.icebergTableInputCreator = icebergTableInputCreator;
   }
 
   @Override
-  public String getCatalogId() {
-    return targetCatalog.getCatalogId();
+  public String getCatalogName() {
+    return catalogConfig.getCatalogName();
   }
 
   @Override
   public String getCatalogImpl() {
     return this.getClass().getCanonicalName();
-  }
-
-  @Override
-  public CatalogTableIdentifier getTableIdentifier() {
-    return targetCatalog.getCatalogTableIdentifier();
   }
 
   @Override
@@ -163,26 +167,50 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
 
   @Override
   public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
+    TableInput tableInput;
     switch (table.getTableFormat()) {
       case TableFormat.ICEBERG:
-        icebergGlueCatalogSyncOperations.createTable(table, tableIdentifier);
-        return;
+        tableInput = icebergTableInputCreator.getCreateTableInput(table, tableIdentifier);
+        break;
       default:
         throw new NotSupportedException(
             "GlueCatalogSync not supported for " + table.getTableFormat());
+    }
+    try {
+      glueClient.createTable(
+          CreateTableRequest.builder()
+              .catalogId(glueCatalogConfig.getCatalogId())
+              .databaseName(tableIdentifier.getDatabaseName())
+              .tableInput(tableInput)
+              .build());
+    } catch (Exception e) {
+      throw new CatalogSyncException("Failed to create table: " + tableIdentifier.getId(), e);
     }
   }
 
   @Override
   public void refreshTable(
       InternalTable table, Table catalogTable, CatalogTableIdentifier tableIdentifier) {
+    TableInput tableInput;
     switch (table.getTableFormat()) {
       case TableFormat.ICEBERG:
-        icebergGlueCatalogSyncOperations.refreshTable(table, catalogTable, tableIdentifier);
+        tableInput =
+            icebergTableInputCreator.getUpdateTableInput(table, catalogTable, tableIdentifier);
         break;
       default:
         throw new NotSupportedException(
             "GlueCatalogSync not supported for " + table.getTableFormat());
+    }
+    try {
+      glueClient.updateTable(
+          UpdateTableRequest.builder()
+              .catalogId(glueCatalogConfig.getCatalogId())
+              .databaseName(tableIdentifier.getDatabaseName())
+              .skipArchive(true)
+              .tableInput(tableInput)
+              .build());
+    } catch (Exception e) {
+      throw new CatalogSyncException("Failed to refresh table: " + tableIdentifier.getId(), e);
     }
   }
 
@@ -231,5 +259,26 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
             .build();
     createTable(table, tempTableIdentifier);
     dropTable(table, tempTableIdentifier);
+  }
+
+  @Override
+  public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
+    Table table = this.getTable(tableIdentifier);
+    Preconditions.checkNotNull(
+        table, String.format("table: %s not found", tableIdentifier.getId()));
+    String tableFormat = table.parameters().get(TABLE_TYPE_PROP);
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(tableFormat), "TableFormat must not be null or empty");
+    Properties tableProperties = new Properties();
+    tableProperties.putAll(table.parameters());
+    return SourceTable.builder()
+        .name(table.name())
+        .basePath(table.storageDescriptor().location())
+        // TODO: check if this holds true for all the formats
+        .dataPath(table.storageDescriptor().location())
+        .formatName(tableFormat)
+        .catalogConfig(catalogConfig)
+        .additionalProperties(tableProperties)
+        .build();
   }
 }

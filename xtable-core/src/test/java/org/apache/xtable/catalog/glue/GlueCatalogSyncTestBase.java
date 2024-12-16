@@ -26,8 +26,7 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.mockito.Mock;
 
-import org.apache.xtable.catalog.ExternalCatalogConfig;
-import org.apache.xtable.conversion.TargetCatalog;
+import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -56,8 +55,9 @@ public class GlueCatalogSyncTestBase {
   protected static final String TEST_GLUE_TABLE = "glue_table";
   protected static final String TEST_GLUE_CATALOG_ID = "aws-account-id";
   protected static final String TEST_BASE_PATH = "base-path";
-  protected static final String TEST_CATALOG_IDENTIFIER = "aws-glue-1";
+  protected static final String TEST_CATALOG_NAME = "aws-glue-1";
   protected static final String ICEBERG_METADATA_FILE_LOCATION = "base-path/metadata";
+  protected static final String ICEBERG_METADATA_FILE_LOCATION_v2 = "base-path/v2-metadata";
   protected static final InternalTable TEST_ICEBERG_INTERNAL_TABLE =
       InternalTable.builder()
           .basePath(TEST_BASE_PATH)
@@ -75,12 +75,13 @@ public class GlueCatalogSyncTestBase {
           .databaseName(TEST_GLUE_DATABASE)
           .tableName(TEST_GLUE_TABLE)
           .build();
-  protected static final TargetCatalog mockTargetCatalog =
-      TargetCatalog.builder()
-          .catalogId(TEST_CATALOG_IDENTIFIER)
-          .catalogTableIdentifier(TEST_CATALOG_TABLE_IDENTIFIER)
-          .catalogConfig(ExternalCatalogConfig.builder().catalogImpl("").catalogName("").build())
+  protected static final ExternalCatalogConfig catalogConfig =
+      ExternalCatalogConfig.builder()
+          .catalogName(TEST_CATALOG_NAME)
+          .catalogImpl(GlueCatalogSyncClient.class.getCanonicalName())
+          .catalogOptions(Collections.emptyMap())
           .build();
+  protected static final TableInput TEST_TABLE_INPUT = TableInput.builder().build();
 
   protected GetDatabaseRequest getDbRequest(String dbName) {
     return GetDatabaseRequest.builder().catalogId(TEST_GLUE_CATALOG_ID).name(dbName).build();
@@ -105,42 +106,34 @@ public class GlueCatalogSyncTestBase {
         .build();
   }
 
-  protected CreateTableRequest createTableRequest(
-      String dbName, String tableName, Map<String, String> parameters) {
-    return CreateTableRequest.builder()
-        .catalogId(TEST_GLUE_CATALOG_ID)
-        .databaseName(dbName)
-        .tableInput(
-            TableInput.builder()
-                .name(tableName)
-                .tableType(GLUE_EXTERNAL_TABLE_TYPE)
-                .parameters(parameters)
-                .storageDescriptor(
-                    StorageDescriptor.builder()
-                        .location(TEST_ICEBERG_INTERNAL_TABLE.getBasePath())
-                        .columns(Collections.emptyList())
-                        .build())
+  protected TableInput getCreateOrUpdateTableInput(
+      String tableName, Map<String, String> params, InternalTable internalTable) {
+    return TableInput.builder()
+        .name(tableName)
+        .tableType(GLUE_EXTERNAL_TABLE_TYPE)
+        .parameters(params)
+        .storageDescriptor(
+            StorageDescriptor.builder()
+                .location(internalTable.getBasePath())
+                .columns(Collections.emptyList())
                 .build())
         .build();
   }
 
-  protected UpdateTableRequest updateTableRequest(
-      String dbName, String tableName, Map<String, String> parameters) {
+  protected CreateTableRequest createTableRequest(String dbName, TableInput tableInput) {
+    return CreateTableRequest.builder()
+        .catalogId(TEST_GLUE_CATALOG_ID)
+        .databaseName(dbName)
+        .tableInput(tableInput)
+        .build();
+  }
+
+  protected UpdateTableRequest updateTableRequest(String dbName, TableInput tableInput) {
     return UpdateTableRequest.builder()
         .catalogId(TEST_GLUE_CATALOG_ID)
         .databaseName(dbName)
         .skipArchive(true)
-        .tableInput(
-            TableInput.builder()
-                .name(tableName)
-                .tableType(GLUE_EXTERNAL_TABLE_TYPE)
-                .parameters(parameters)
-                .storageDescriptor(
-                    StorageDescriptor.builder()
-                        .location(TEST_ICEBERG_INTERNAL_TABLE.getBasePath())
-                        .columns(Collections.emptyList())
-                        .build())
-                .build())
+        .tableInput(tableInput)
         .build();
   }
 
