@@ -136,13 +136,12 @@ public class TestIcebergHMSCatalogSyncHelper extends HMSCatalogSyncClientTestBas
     when(mockIcebergTableMetadata.metadataFileLocation())
         .thenReturn(ICEBERG_METADATA_FILE_LOCATION_V2);
     when(mockIcebergBaseTable.properties()).thenReturn(Collections.emptyMap());
-    tableParams.put(PREVIOUS_METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION);
-    tableParams.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION_V2);
-
-    Table expected =
-        newTable(TEST_HMS_DATABASE, TEST_HMS_TABLE, tableParams, getTestStorageDescriptor());
     Table output =
         mockIcebergHmsCatalogSyncHelper.getUpdatedTable(TEST_ICEBERG_INTERNAL_TABLE, hmsTable);
+    tableParams.put(PREVIOUS_METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION);
+    tableParams.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION_V2);
+    Table expected =
+        newTable(TEST_HMS_DATABASE, TEST_HMS_TABLE, tableParams, getTestStorageDescriptor());
     assertEquals(expected, output);
     assertEquals(tableParams, hmsTable.getParameters());
     verify(mockHmsSchemaExtractor, times(1))

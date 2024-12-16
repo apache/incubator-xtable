@@ -22,6 +22,7 @@ import static org.apache.iceberg.BaseMetastoreTableOperations.TABLE_TYPE_PROP;
 
 import java.time.ZonedDateTime;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Properties;
 
 import lombok.Getter;
@@ -36,9 +37,9 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.thrift.TException;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
+import org.apache.xtable.catalog.TableFormatUtils;
 import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.exception.CatalogSyncException;
@@ -55,7 +56,7 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
   private static final String TEMP_SUFFIX = "_temp";
   private final ExternalCatalogConfig catalogConfig;
   private final HMSCatalogConfig hmsCatalogConfig;
-  private final Configuration configuration;
+  @Getter private final Configuration configuration;
   private final IMetaStoreClient metaStoreClient;
   @Getter private final HMSSchemaExtractor schemaExtractor;
   private final IcebergHMSCatalogSyncHelper icebergHMSCatalogSyncHelper;
@@ -226,19 +227,35 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
   @Override
   public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
     Table table = this.getTable(tableIdentifier);
-    Preconditions.checkNotNull(
-        table, String.format("table: %s not found", tableIdentifier.getId()));
+    if (table == null) {
+      throw new IllegalStateException(
+          String.format("table: %s not found", tableIdentifier.getId()));
+    }
 
-    String tableFormat = table.getParameters().get(TABLE_TYPE_PROP);
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(tableFormat), "TableFormat must not be null or empty");
+    String tableFormat = table.getParameters().get(TABLE_TYPE_PROP).toUpperCase(Locale.ENGLISH);
+    if (!Strings.isNullOrEmpty(tableFormat)) {
+      throw new IllegalStateException("TableFormat must not be null or empty");
+    }
+
+    String tableLocation = table.getSd().getLocation();
+    String dataPath;
+    switch (tableFormat) {
+      case TableFormat.ICEBERG:
+        dataPath = TableFormatUtils.getIcebergDataLocation(tableLocation, table.getParameters());
+        break;
+      case TableFormat.HUDI:
+        dataPath = tableLocation;
+        break;
+      default:
+        throw new NotSupportedException("Unsupported table format: " + tableFormat);
+    }
+
     Properties tableProperties = new Properties();
     tableProperties.putAll(table.getParameters());
     return SourceTable.builder()
         .name(table.getTableName())
-        .basePath(table.getSd().getLocation())
-        // TODO: check if this holds true for all the formats
-        .dataPath(table.getSd().getLocation())
+        .basePath(tableLocation)
+        .dataPath(dataPath)
         .formatName(tableFormat)
         .catalogConfig(catalogConfig)
         .additionalProperties(tableProperties)
