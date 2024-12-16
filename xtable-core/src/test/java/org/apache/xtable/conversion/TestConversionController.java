@@ -47,8 +47,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatcher;
 
+import com.google.common.collect.ImmutableMap;
+
 import org.apache.xtable.catalog.CatalogConversionFactory;
-import org.apache.xtable.catalog.ExternalCatalogConfig;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -421,7 +422,7 @@ public class TestConversionController {
   @Test
   void testNoTableFormatConversionWithMultipleCatalogSync() {
     SyncMode syncMode = SyncMode.INCREMENTAL;
-    List<TargetCatalog> targetCatalogs =
+    List<TargetCatalogConfig> targetCatalogs =
         Arrays.asList(getTargetCatalog("1"), getTargetCatalog("2"));
     InternalTable internalTable = getInternalTable();
     InternalSnapshot internalSnapshot = buildSnapshot(internalTable, "v1");
@@ -456,12 +457,18 @@ public class TestConversionController {
             eq(internalSnapshot)))
         .thenReturn(tableFormatSyncResults);
     // Mocks for catalogSync.
-    when(mockCatalogConversionFactory.createCatalogSyncClient(targetCatalogs.get(0), mockConf))
+    when(mockCatalogConversionFactory.createCatalogSyncClient(
+            targetCatalogs.get(0).getCatalogConfig(), mockConf))
         .thenReturn(mockCatalogSyncClient1);
-    when(mockCatalogConversionFactory.createCatalogSyncClient(targetCatalogs.get(1), mockConf))
+    when(mockCatalogConversionFactory.createCatalogSyncClient(
+            targetCatalogs.get(1).getCatalogConfig(), mockConf))
         .thenReturn(mockCatalogSyncClient2);
     when(catalogSync.syncTable(
-            eq(Arrays.asList(mockCatalogSyncClient1, mockCatalogSyncClient2)), any()))
+            eq(
+                ImmutableMap.of(
+                    targetCatalogs.get(0).getCatalogTableIdentifier(), mockCatalogSyncClient1,
+                    targetCatalogs.get(1).getCatalogTableIdentifier(), mockCatalogSyncClient2)),
+            any()))
         .thenReturn(buildSyncResult(syncMode, Instant.now(), Duration.ofSeconds(3)));
     ConversionController conversionController =
         new ConversionController(
@@ -546,7 +553,9 @@ public class TestConversionController {
   }
 
   private ConversionConfig getTableSyncConfig(
-      List<String> targetTableFormats, SyncMode syncMode, List<TargetCatalog> targetCatalogs) {
+      List<String> targetTableFormats,
+      SyncMode syncMode,
+      List<TargetCatalogConfig> targetCatalogs) {
     SourceTable sourceTable =
         SourceTable.builder()
             .name("tablename")
@@ -562,20 +571,21 @@ public class TestConversionController {
                         .name("tablename")
                         .formatName(formatName)
                         .basePath("/tmp/doesnt/matter")
-                        .targetCatalogs(targetCatalogs)
                         .build())
             .collect(Collectors.toList());
 
     return ConversionConfig.builder()
         .sourceTable(sourceTable)
         .targetTables(targetTables)
+        .targetCatalogs(
+            targetTables.stream()
+                .collect(Collectors.toMap(TargetTable::getId, k -> targetCatalogs)))
         .syncMode(syncMode)
         .build();
   }
 
-  private TargetCatalog getTargetCatalog(String suffix) {
-    return TargetCatalog.builder()
-        .catalogId("catalogId-" + suffix)
+  private TargetCatalogConfig getTargetCatalog(String suffix) {
+    return TargetCatalogConfig.builder()
         .catalogConfig(
             ExternalCatalogConfig.builder()
                 .catalogName("catalogName-" + suffix)

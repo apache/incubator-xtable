@@ -23,8 +23,8 @@ import static org.apache.xtable.spi.sync.CatalogUtils.hasStorageDescriptorLocati
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -48,26 +48,27 @@ public class CatalogSync {
   }
 
   public SyncResult syncTable(
-      Collection<CatalogSyncClient> catalogSyncClients, InternalTable table) {
+      Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients, InternalTable table) {
     List<CatalogSyncStatus> results = new ArrayList<>();
     Instant startTime = Instant.now();
-    for (CatalogSyncClient catalogSyncClient : catalogSyncClients) {
-      try {
-        results.add(getCatalogSyncStatus(catalogSyncClient, table));
-        log.info(
-            "Catalog sync is successful for table {} using catalogSync {}",
-            table.getBasePath(),
-            catalogSyncClient.getCatalogImpl());
-      } catch (Exception e) {
-        log.error(
-            "Catalog sync failed for table {} using catalogSync {}",
-            table.getBasePath(),
-            catalogSyncClient.getCatalogImpl());
-        results.add(
-            getCatalogSyncFailureStatus(
-                catalogSyncClient.getCatalogId(), catalogSyncClient.getCatalogImpl(), e));
-      }
-    }
+    catalogSyncClients.forEach(
+        ((tableIdentifier, catalogSyncClient) -> {
+          try {
+            results.add(getCatalogSyncStatus(catalogSyncClient, tableIdentifier, table));
+            log.info(
+                "Catalog sync is successful for table {} using catalogSync {}",
+                table.getBasePath(),
+                catalogSyncClient.getCatalogImpl());
+          } catch (Exception e) {
+            log.error(
+                "Catalog sync failed for table {} using catalogSync {}",
+                table.getBasePath(),
+                catalogSyncClient.getCatalogImpl());
+            results.add(
+                getCatalogSyncFailureStatus(
+                    catalogSyncClient.getCatalogName(), catalogSyncClient.getCatalogImpl(), e));
+          }
+        }));
     return SyncResult.builder()
         .lastInstantSynced(table.getLatestCommitTime())
         .syncStartTime(startTime)
@@ -77,8 +78,9 @@ public class CatalogSync {
   }
 
   private <TABLE> CatalogSyncStatus getCatalogSyncStatus(
-      CatalogSyncClient<TABLE> catalogSyncClient, InternalTable table) {
-    CatalogTableIdentifier tableIdentifier = catalogSyncClient.getTableIdentifier();
+      CatalogSyncClient<TABLE> catalogSyncClient,
+      CatalogTableIdentifier tableIdentifier,
+      InternalTable table) {
     if (!catalogSyncClient.hasDatabase(tableIdentifier.getDatabaseName())) {
       catalogSyncClient.createDatabase(tableIdentifier.getDatabaseName());
     }
@@ -105,15 +107,15 @@ public class CatalogSync {
       catalogSyncClient.refreshTable(table, catalogTable, tableIdentifier);
     }
     return CatalogSyncStatus.builder()
-        .catalogId(catalogSyncClient.getCatalogId())
+        .catalogName(catalogSyncClient.getCatalogName())
         .statusCode(SyncResult.SyncStatusCode.SUCCESS)
         .build();
   }
 
   private CatalogSyncStatus getCatalogSyncFailureStatus(
-      String catalogId, String catalogImpl, Exception e) {
+      String catalogName, String catalogImpl, Exception e) {
     return CatalogSyncStatus.builder()
-        .catalogId(catalogId)
+        .catalogName(catalogName)
         .statusCode(SyncResult.SyncStatusCode.ERROR)
         .errorDetails(
             SyncResult.ErrorDetails.builder()

@@ -50,13 +50,13 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import org.apache.xtable.catalog.CatalogConversionFactory;
-import org.apache.xtable.catalog.ExternalCatalogConfig;
+import org.apache.xtable.catalog.ExternalCatalogConfigFactory;
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
-import org.apache.xtable.conversion.SourceCatalog;
+import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
-import org.apache.xtable.conversion.TargetCatalog;
+import org.apache.xtable.conversion.TargetCatalogConfig;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.sync.SyncMode;
@@ -132,12 +132,12 @@ public class RunCatalogSync {
     RunSync.TableFormatConverters tableFormatConverters =
         loadTableFormatConversionConfigs(customConfig);
 
-    Map<String, DatasetConfig.Catalog> catalogsById =
+    Map<String, DatasetConfig.Catalog> catalogsByName =
         datasetConfig.getTargetCatalogs().stream()
-            .collect(Collectors.toMap(DatasetConfig.Catalog::getCatalogId, Function.identity()));
-    SourceCatalog sourceCatalog = getSourceCatalog(datasetConfig.getSourceCatalog());
+            .collect(Collectors.toMap(DatasetConfig.Catalog::getCatalogName, Function.identity()));
+    ExternalCatalogConfig sourceCatalogConfig = getCatalogConfig(datasetConfig.getSourceCatalog());
     CatalogConversionSource catalogConversionSource =
-        CatalogConversionFactory.createCatalogConversionSource(sourceCatalog, hadoopConf);
+        CatalogConversionFactory.createCatalogConversionSource(sourceCatalogConfig, hadoopConf);
     ConversionController conversionController = new ConversionController(hadoopConf);
     for (DatasetConfig.Dataset dataset : datasetConfig.getDatasets()) {
       SourceTable sourceTable = null;
@@ -160,36 +160,37 @@ public class RunCatalogSync {
             catalogConversionSource.getSourceTable(
                 dataset.getSourceCatalogTableIdentifier().getCatalogTableIdentifier());
       }
-      Map<String, List<TargetTableIdentifier>> targetTableIdentifiersByFormat =
-          dataset.getTargetCatalogTableIdentifiers().stream()
-              .collect(Collectors.groupingBy(TargetTableIdentifier::getTableFormat));
       List<TargetTable> targetTables = new ArrayList<>();
-      for (Map.Entry<String, List<TargetTableIdentifier>> entry :
-          targetTableIdentifiersByFormat.entrySet()) {
-        String tableFormat = entry.getKey();
-        List<TargetTableIdentifier> targetTableIdentifiers = entry.getValue();
+      Map<String, List<TargetCatalogConfig>> targetCatalogs = new HashMap<>();
+      for (TargetTableIdentifier targetCatalogTableIdentifier :
+          dataset.getTargetCatalogTableIdentifiers()) {
         TargetTable targetTable =
             TargetTable.builder()
                 .name(sourceTable.getName())
                 .basePath(sourceTable.getBasePath())
                 .namespace(sourceTable.getNamespace())
-                .catalogConfig(sourceTable.getCatalogConfig())
-                .formatName(tableFormat)
-                .targetCatalogs(
-                    targetTableIdentifiers.stream()
-                        .map(
-                            t ->
-                                getTargetCatalog(
-                                    catalogsById.get(t.getCatalogId()),
-                                    t.getCatalogTableIdentifier()))
-                        .collect(Collectors.toList()))
+                .formatName(targetCatalogTableIdentifier.getTableFormat())
                 .build();
         targetTables.add(targetTable);
+        if (!targetCatalogs.containsKey(targetTable.getId())) {
+          targetCatalogs.put(targetTable.getId(), new ArrayList<>());
+        }
+        targetCatalogs
+            .get(targetTable.getId())
+            .add(
+                TargetCatalogConfig.builder()
+                    .catalogTableIdentifier(
+                        targetCatalogTableIdentifier.getCatalogTableIdentifier())
+                    .catalogConfig(
+                        getCatalogConfig(
+                            catalogsByName.get(targetCatalogTableIdentifier.getCatalogName())))
+                    .build());
       }
       ConversionConfig conversionConfig =
           ConversionConfig.builder()
               .sourceTable(sourceTable)
               .targetTables(targetTables)
+              .targetCatalogs(targetCatalogs)
               .syncMode(SyncMode.INCREMENTAL)
               .build();
       List<String> tableFormats =
@@ -207,49 +208,17 @@ public class RunCatalogSync {
     }
   }
 
-  static SourceCatalog getSourceCatalog(DatasetConfig.Catalog catalog) {
+  static ExternalCatalogConfig getCatalogConfig(DatasetConfig.Catalog catalog) {
     if (!StringUtils.isEmpty(catalog.getCatalogType())) {
-      return SourceCatalog.builder()
-          .catalogId(catalog.getCatalogId())
-          .catalogConfig(
-              ExternalCatalogConfig.fromCatalogType(
-                  catalog.getCatalogType(), catalog.getCatalogId(), catalog.getCatalogProperties()))
-          .build();
+      return ExternalCatalogConfigFactory.fromCatalogType(
+          catalog.getCatalogType(), catalog.getCatalogName(), catalog.getCatalogProperties());
     } else {
-      return SourceCatalog.builder()
-          .catalogId(catalog.getCatalogId())
-          .catalogConfig(
-              ExternalCatalogConfig.builder()
-                  .catalogName(catalog.getCatalogId())
-                  .catalogImpl(catalog.getCatalogImpl())
-                  .catalogOptions(catalog.getCatalogProperties())
-                  .build())
+      return ExternalCatalogConfig.builder()
+          .catalogName(catalog.getCatalogName())
+          .catalogImpl(catalog.getCatalogImpl())
+          .catalogOptions(catalog.getCatalogProperties())
           .build();
     }
-  }
-
-  static TargetCatalog getTargetCatalog(
-      DatasetConfig.Catalog catalog, CatalogTableIdentifier catalogTableIdentifier) {
-    TargetCatalog.TargetCatalogBuilder builder = TargetCatalog.builder();
-    if (!StringUtils.isEmpty(catalog.getCatalogType())) {
-      builder
-          .catalogId(catalog.getCatalogId())
-          .catalogConfig(
-              ExternalCatalogConfig.fromCatalogType(
-                  catalog.getCatalogType(),
-                  catalog.getCatalogId(),
-                  catalog.getCatalogProperties()));
-    } else {
-      builder
-          .catalogId(catalog.getCatalogId())
-          .catalogConfig(
-              ExternalCatalogConfig.builder()
-                  .catalogName(catalog.getCatalogId())
-                  .catalogImpl(catalog.getCatalogImpl())
-                  .catalogOptions(catalog.getCatalogProperties())
-                  .build());
-    }
-    return builder.catalogTableIdentifier(catalogTableIdentifier).build();
   }
 
   static Map<String, ConversionSourceProvider> getConversionSourceProviders(
@@ -285,7 +254,7 @@ public class RunCatalogSync {
 
     @Data
     public static class Catalog {
-      private String catalogId;
+      private String catalogName;
       private String catalogType;
       private String catalogImpl;
       private Map<String, String> catalogProperties;
@@ -309,7 +278,7 @@ public class RunCatalogSync {
 
     @Data
     public static class TargetTableIdentifier {
-      String catalogId;
+      String catalogName;
       String tableFormat;
       CatalogTableIdentifier catalogTableIdentifier;
     }

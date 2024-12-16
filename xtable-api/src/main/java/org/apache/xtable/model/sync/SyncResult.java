@@ -69,7 +69,7 @@ public class SyncResult {
   @Builder
   public static class CatalogSyncStatus {
     // Catalog Identifier.
-    String catalogId;
+    String catalogName;
     // Status code
     SyncStatusCode statusCode;
     // errorDetails if any
