@@ -21,6 +21,7 @@ package org.apache.xtable.catalog.glue;
 import static org.apache.iceberg.BaseMetastoreTableOperations.TABLE_TYPE_PROP;
 
 import java.time.ZonedDateTime;
+import java.util.Locale;
 import java.util.Properties;
 
 import lombok.Getter;
@@ -29,7 +30,6 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.hadoop.conf.Configuration;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 
 import org.apache.xtable.conversion.ExternalCatalogConfig;
@@ -62,12 +62,12 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
   protected static final String GLUE_EXTERNAL_TABLE_TYPE = "EXTERNAL_TABLE";
   private static final String TEMP_SUFFIX = "_temp";
 
-  protected final ExternalCatalogConfig catalogConfig;
-  @Getter protected final GlueClient glueClient;
-  @Getter protected final GlueCatalogConfig glueCatalogConfig;
-  @Getter protected final Configuration configuration;
-  @Getter protected final GlueSchemaExtractor schemaExtractor;
-  protected final IcebergGlueCatalogSyncHelper icebergGlueCatalogSyncHelper;
+  private final ExternalCatalogConfig catalogConfig;
+  private final GlueClient glueClient;
+  private final GlueCatalogConfig glueCatalogConfig;
+  @Getter private final Configuration configuration;
+  @Getter private final GlueSchemaExtractor schemaExtractor;
+  private final IcebergGlueCatalogSyncHelper icebergGlueCatalogSyncHelper;
 
   public GlueCatalogSyncClient(ExternalCatalogConfig catalogConfig, Configuration configuration) {
     this.catalogConfig = catalogConfig;
@@ -264,18 +264,35 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
   @Override
   public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
     Table table = this.getTable(tableIdentifier);
-    Preconditions.checkNotNull(
-        table, String.format("table: %s not found", tableIdentifier.getId()));
-    String tableFormat = table.parameters().get(TABLE_TYPE_PROP);
-    Preconditions.checkArgument(
-        !Strings.isNullOrEmpty(tableFormat), "TableFormat must not be null or empty");
+    if (table == null) {
+      throw new IllegalStateException(
+          String.format("table: %s not found", tableIdentifier.getId()));
+    }
+
+    String tableFormat = table.parameters().get(TABLE_TYPE_PROP).toUpperCase(Locale.ENGLISH);
+    if (!Strings.isNullOrEmpty(tableFormat)) {
+      throw new IllegalStateException("TableFormat must not be null or empty");
+    }
+
+    String tableLocation = table.storageDescriptor().location();
+    String dataPath;
+    switch (tableFormat) {
+      case TableFormat.ICEBERG:
+        dataPath = icebergGlueCatalogSyncHelper.dataLocation(tableLocation, table.parameters());
+        break;
+      case TableFormat.HUDI:
+        dataPath = tableLocation;
+        break;
+      default:
+        throw new NotSupportedException("Unsupported table format: " + tableFormat);
+    }
+
     Properties tableProperties = new Properties();
     tableProperties.putAll(table.parameters());
     return SourceTable.builder()
         .name(table.name())
-        .basePath(table.storageDescriptor().location())
-        // TODO: check if this holds true for all the formats
-        .dataPath(table.storageDescriptor().location())
+        .basePath(tableLocation)
+        .dataPath(dataPath)
         .formatName(tableFormat)
         .catalogConfig(catalogConfig)
         .additionalProperties(tableProperties)

@@ -110,7 +110,7 @@ public class TestIcebergGlueCatalogSyncHelper extends GlueCatalogSyncTestBase {
     parameters.put(PREVIOUS_METADATA_LOCATION_PROP, glueTableParams.get(METADATA_LOCATION_PROP));
     when(mockIcebergTableMetadata.metadataFileLocation())
         .thenReturn(ICEBERG_METADATA_FILE_LOCATION_v2);
-    parameters.putAll(icebergGlueCatalogSyncHelper.getTableParameters(mockIcebergBaseTable));
+    parameters.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION_v2);
 
     when(mockGlueSchemaExtractor.toColumns(
             TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema(), glueTable))

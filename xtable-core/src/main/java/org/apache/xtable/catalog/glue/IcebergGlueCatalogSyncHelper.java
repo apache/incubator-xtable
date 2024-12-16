@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.hadoop.HadoopTables;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -76,10 +77,11 @@ class IcebergGlueCatalogSyncHelper {
 
   public TableInput getUpdateTableInput(
       InternalTable table, Table catalogTable, CatalogTableIdentifier tableIdentifier) {
-    BaseTable fsTable = loadTableFromFs(table.getBasePath());
+    BaseTable icebergTable = loadTableFromFs(table.getBasePath());
     Map<String, String> parameters = new HashMap<>(catalogTable.parameters());
     parameters.put(PREVIOUS_METADATA_LOCATION_PROP, parameters.get(METADATA_LOCATION_PROP));
-    parameters.putAll(getTableParameters(fsTable));
+    parameters.put(METADATA_LOCATION_PROP, getMetadataFileLocation(icebergTable));
+    parameters.putAll(icebergTable.properties());
     return TableInput.builder()
         .name(tableIdentifier.getTableName())
         .tableType(GLUE_EXTERNAL_TABLE_TYPE)
@@ -96,10 +98,10 @@ class IcebergGlueCatalogSyncHelper {
   }
 
   @VisibleForTesting
-  protected Map<String, String> getTableParameters(BaseTable table) {
-    Map<String, String> parameters = new HashMap<>();
+  protected Map<String, String> getTableParameters(BaseTable icebergTable) {
+    Map<String, String> parameters = new HashMap<>(icebergTable.properties());
     parameters.put(TABLE_TYPE_PROP, TableFormat.ICEBERG);
-    parameters.put(METADATA_LOCATION_PROP, getMetadataFileLocation(table));
+    parameters.put(METADATA_LOCATION_PROP, getMetadataFileLocation(icebergTable));
     return parameters;
   }
 
@@ -109,5 +111,20 @@ class IcebergGlueCatalogSyncHelper {
 
   private String getMetadataFileLocation(BaseTable table) {
     return table.operations().current().metadataFileLocation();
+  }
+
+  /** Get iceberg table data files location */
+  String dataLocation(String tableLocation, Map<String, String> properties) {
+    String dataLocation = properties.get(TableProperties.WRITE_DATA_LOCATION);
+    if (dataLocation == null) {
+      dataLocation = properties.get(TableProperties.WRITE_FOLDER_STORAGE_LOCATION);
+      if (dataLocation == null) {
+        dataLocation = properties.get(TableProperties.OBJECT_STORE_PATH);
+        if (dataLocation == null) {
+          dataLocation = String.format("%s/data", tableLocation);
+        }
+      }
+    }
+    return dataLocation;
   }
 }
