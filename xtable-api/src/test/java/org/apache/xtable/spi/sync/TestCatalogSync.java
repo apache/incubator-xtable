@@ -28,15 +28,17 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.google.common.collect.ImmutableMap;
 
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
@@ -60,6 +62,8 @@ public class TestCatalogSync<TABLE> {
       CatalogTableIdentifier.builder().databaseName("database2").tableName("table2").build();
   private final CatalogTableIdentifier tableIdentifier3 =
       CatalogTableIdentifier.builder().databaseName("database3").tableName("table3").build();
+  private final CatalogTableIdentifier tableIdentifier4 =
+      CatalogTableIdentifier.builder().databaseName("database4").tableName("table4").build();
 
   @Mock TABLE mockTable;
   private final InternalTable internalTable =
@@ -77,13 +81,11 @@ public class TestCatalogSync<TABLE> {
 
   @Test
   void testSyncTable() {
-    when(mockClient1.getTableIdentifier()).thenReturn(tableIdentifier1);
-    when(mockClient2.getTableIdentifier()).thenReturn(tableIdentifier2);
-    when(mockClient3.getTableIdentifier()).thenReturn(tableIdentifier3);
-
     when(mockClient1.hasDatabase("database1")).thenReturn(false);
     when(mockClient2.hasDatabase("database2")).thenReturn(true);
     when(mockClient3.hasDatabase("database3")).thenReturn(true);
+    when(mockClient4.hasDatabase("database4"))
+        .thenThrow(new UnsupportedOperationException("No catalog impl"));
 
     when(mockClient1.getTable(tableIdentifier1)).thenReturn(mockTable);
     when(mockClient2.getTable(tableIdentifier2)).thenReturn(null);
@@ -93,13 +95,19 @@ public class TestCatalogSync<TABLE> {
     when(mockClient2.getStorageDescriptorLocation(any())).thenReturn("/tmp/test");
     when(mockClient3.getStorageDescriptorLocation(any())).thenReturn("/tmp/test");
 
-    when(mockClient4.getCatalogId()).thenReturn("catalogId4");
+    when(mockClient4.getCatalogName()).thenReturn("catalogName4");
     when(mockClient4.getCatalogImpl()).thenReturn("catalogImpl4");
+
+    Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients =
+        ImmutableMap.of(
+            tableIdentifier1, mockClient1,
+            tableIdentifier2, mockClient2,
+            tableIdentifier3, mockClient3,
+            tableIdentifier4, mockClient4);
 
     List<SyncResult.CatalogSyncStatus> results =
         CatalogSync.getInstance()
-            .syncTable(
-                Arrays.asList(mockClient1, mockClient2, mockClient3, mockClient4), internalTable)
+            .syncTable(catalogSyncClients, internalTable)
             .getCatalogSyncStatusList();
     List<SyncResult.CatalogSyncStatus> errorStatus =
         results.stream()

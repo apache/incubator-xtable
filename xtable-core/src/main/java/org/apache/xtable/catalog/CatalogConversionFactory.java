@@ -20,8 +20,7 @@ package org.apache.xtable.catalog;
 
 import org.apache.hadoop.conf.Configuration;
 
-import org.apache.xtable.conversion.SourceCatalog;
-import org.apache.xtable.conversion.TargetCatalog;
+import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.reflection.ReflectionUtils;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
@@ -37,25 +36,25 @@ public class CatalogConversionFactory {
    * Returns an implementation class for {@link CatalogConversionSource} that's used for converting
    * table definitions in the catalog to {@link org.apache.xtable.conversion.SourceTable} object.
    *
-   * @param sourceCatalog definition for the source catalog
+   * @param sourceCatalogConfig configuration for the source catalog
    * @param configuration hadoop configuration
    */
   public static CatalogConversionSource createCatalogConversionSource(
-      SourceCatalog sourceCatalog, Configuration configuration) {
+      ExternalCatalogConfig sourceCatalogConfig, Configuration configuration) {
     return ReflectionUtils.createInstanceOfClass(
-        sourceCatalog.getCatalogConfig().getCatalogImpl(), sourceCatalog, configuration);
+        sourceCatalogConfig.getCatalogImpl(), sourceCatalogConfig, configuration);
   }
 
   /**
    * Returns an implementation class for {@link CatalogSyncClient} that's used for syncing {@link
    * org.apache.xtable.conversion.TargetTable} to a catalog.
    *
-   * @param targetCatalog definition for the target catalog
+   * @param targetCatalogConfig configuration for the target catalog
    * @param configuration hadoop configuration
    */
   public CatalogSyncClient createCatalogSyncClient(
-      TargetCatalog targetCatalog, Configuration configuration) {
+      ExternalCatalogConfig targetCatalogConfig, Configuration configuration) {
     return ReflectionUtils.createInstanceOfClass(
-        targetCatalog.getCatalogConfig().getCatalogImpl(), targetCatalog, configuration);
+        targetCatalogConfig.getCatalogImpl(), targetCatalogConfig, configuration);
   }
 }

@@ -45,6 +45,7 @@ import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
@@ -122,12 +123,14 @@ public class ConversionController {
           syncTableFormats(config, source, config.getSyncMode());
       Map<String, SyncResult> catalogSyncResults = new HashMap<>();
       for (TargetTable targetTable : config.getTargetTables()) {
-        List<CatalogSyncClient> catalogSyncClients =
-            targetTable.getTargetCatalogs().stream()
-                .map(
-                    targetCatalog ->
-                        catalogConversionFactory.createCatalogSyncClient(targetCatalog, conf))
-                .collect(Collectors.toList());
+        Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients =
+            config.getTargetCatalogs().get(targetTable.getId()).stream()
+                .collect(
+                    Collectors.toMap(
+                        TargetCatalogConfig::getCatalogTableIdentifier,
+                        targetCatalog ->
+                            catalogConversionFactory.createCatalogSyncClient(
+                                targetCatalog.getCatalogConfig(), conf)));
         catalogSyncResults.put(
             targetTable.getFormatName(),
             syncCatalogsForTable(
@@ -195,7 +198,7 @@ public class ConversionController {
   @SneakyThrows
   private SyncResult syncCatalogsForTable(
       TargetTable targetTable,
-      List<CatalogSyncClient> catalogSyncClients,
+      Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients,
       ConversionSourceProvider conversionSourceProvider) {
     return catalogSync.syncTable(
         catalogSyncClients,
