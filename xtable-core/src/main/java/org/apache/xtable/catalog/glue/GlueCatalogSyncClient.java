@@ -67,7 +67,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
   @Getter protected final GlueCatalogConfig glueCatalogConfig;
   @Getter protected final Configuration configuration;
   @Getter protected final GlueSchemaExtractor schemaExtractor;
-  protected final IcebergTableInputCreator icebergTableInputCreator;
+  protected final IcebergGlueCatalogSyncHelper icebergGlueCatalogSyncHelper;
 
   public GlueCatalogSyncClient(ExternalCatalogConfig catalogConfig, Configuration configuration) {
     this.catalogConfig = catalogConfig;
@@ -75,7 +75,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
     this.glueClient = new DefaultGlueClientFactory(glueCatalogConfig).getGlueClient();
     this.configuration = new Configuration(configuration);
     this.schemaExtractor = GlueSchemaExtractor.getInstance();
-    this.icebergTableInputCreator = new IcebergTableInputCreator(this);
+    this.icebergGlueCatalogSyncHelper = new IcebergGlueCatalogSyncHelper(this);
   }
 
   @VisibleForTesting
@@ -85,13 +85,13 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
       GlueCatalogConfig glueCatalogConfig,
       GlueClient glueClient,
       GlueSchemaExtractor schemaExtractor,
-      IcebergTableInputCreator icebergTableInputCreator) {
+      IcebergGlueCatalogSyncHelper icebergGlueCatalogSyncHelper) {
     this.catalogConfig = catalogConfig;
     this.configuration = new Configuration(configuration);
     this.glueCatalogConfig = glueCatalogConfig;
     this.glueClient = glueClient;
     this.schemaExtractor = schemaExtractor;
-    this.icebergTableInputCreator = icebergTableInputCreator;
+    this.icebergGlueCatalogSyncHelper = icebergGlueCatalogSyncHelper;
   }
 
   @Override
@@ -170,7 +170,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
     TableInput tableInput;
     switch (table.getTableFormat()) {
       case TableFormat.ICEBERG:
-        tableInput = icebergTableInputCreator.getCreateTableInput(table, tableIdentifier);
+        tableInput = icebergGlueCatalogSyncHelper.getCreateTableInput(table, tableIdentifier);
         break;
       default:
         throw new NotSupportedException(
@@ -195,7 +195,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
     switch (table.getTableFormat()) {
       case TableFormat.ICEBERG:
         tableInput =
-            icebergTableInputCreator.getUpdateTableInput(table, catalogTable, tableIdentifier);
+            icebergGlueCatalogSyncHelper.getUpdateTableInput(table, catalogTable, tableIdentifier);
         break;
       default:
         throw new NotSupportedException(

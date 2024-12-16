@@ -40,18 +40,18 @@ import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.TableInput;
 
 /** Iceberg specific table operations for Glue catalog sync */
-class IcebergTableInputCreator {
+class IcebergGlueCatalogSyncHelper {
 
   private final GlueCatalogSyncClient syncClient;
   private final HadoopTables hadoopTables;
 
-  IcebergTableInputCreator(GlueCatalogSyncClient syncClient) {
+  IcebergGlueCatalogSyncHelper(GlueCatalogSyncClient syncClient) {
     this.syncClient = syncClient;
     this.hadoopTables = new HadoopTables(syncClient.getConfiguration());
   }
 
   @VisibleForTesting
-  IcebergTableInputCreator(GlueCatalogSyncClient syncClient, HadoopTables hadoopTables) {
+  IcebergGlueCatalogSyncHelper(GlueCatalogSyncClient syncClient, HadoopTables hadoopTables) {
     this.syncClient = syncClient;
     this.hadoopTables = hadoopTables;
   }
