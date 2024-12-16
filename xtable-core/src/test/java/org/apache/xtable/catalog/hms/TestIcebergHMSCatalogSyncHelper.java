@@ -19,10 +19,9 @@
 package org.apache.xtable.catalog.hms;
 
 import static org.apache.iceberg.BaseMetastoreTableOperations.METADATA_LOCATION_PROP;
+import static org.apache.iceberg.BaseMetastoreTableOperations.PREVIOUS_METADATA_LOCATION_PROP;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -42,11 +41,8 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.thrift.TException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -56,11 +52,10 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.hadoop.HadoopTables;
 
-import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.model.storage.TableFormat;
 
 @ExtendWith(MockitoExtension.class)
-public class TestIcebergHMSCatalogSyncOperations extends HMSCatalogSyncClientTestBase {
+public class TestIcebergHMSCatalogSyncHelper extends HMSCatalogSyncClientTestBase {
 
   @Mock private HadoopTables mockIcebergHadoopTables;
   @Mock private BaseTable mockIcebergBaseTable;
@@ -68,15 +63,14 @@ public class TestIcebergHMSCatalogSyncOperations extends HMSCatalogSyncClientTes
   @Mock private TableMetadata mockIcebergTableMetadata;
   @Mock HMSCatalogSyncClient mockHMSCatalogSyncClient;
 
-  private IcebergHMSCatalogSyncOperations mockIcebergHmsCatalogSyncClient;
+  private IcebergHMSCatalogSyncHelper mockIcebergHmsCatalogSyncHelper;
 
-  private IcebergHMSCatalogSyncOperations createIcebergHMSCatalogSyncClient() {
-    return new IcebergHMSCatalogSyncOperations(mockHMSCatalogSyncClient, mockIcebergHadoopTables);
+  private IcebergHMSCatalogSyncHelper createIcebergHMSHelper() {
+    return new IcebergHMSCatalogSyncHelper(mockHMSCatalogSyncClient, mockIcebergHadoopTables);
   }
 
   void setupCommonMocks() {
-    mockIcebergHmsCatalogSyncClient = createIcebergHMSCatalogSyncClient();
-    when(mockHMSCatalogSyncClient.getMetaStoreClient()).thenReturn(mockMetaStoreClient);
+    mockIcebergHmsCatalogSyncHelper = createIcebergHMSHelper();
     when(mockHMSCatalogSyncClient.getSchemaExtractor()).thenReturn(mockHmsSchemaExtractor);
   }
 
@@ -93,85 +87,9 @@ public class TestIcebergHMSCatalogSyncOperations extends HMSCatalogSyncClientTes
   }
 
   @SneakyThrows
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void testCreateTable(boolean shouldFail) {
-    setupCommonMocks();
-    mockHadoopTables();
-    when(mockHmsSchemaExtractor.toColumns(
-            TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema()))
-        .thenReturn(Collections.emptyList());
-
-    ZonedDateTime zonedDateTime =
-        Instant.ofEpochMilli(System.currentTimeMillis()).atZone(ZoneId.systemDefault());
-    try (MockedStatic<ZonedDateTime> mockZonedDateTime = mockStatic(ZonedDateTime.class)) {
-      mockZonedDateTime.when(ZonedDateTime::now).thenReturn(zonedDateTime);
-      Table hmsTable =
-          mockIcebergHmsCatalogSyncClient.newTable(
-              TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
-      if (shouldFail) {
-        doThrow(new TException("something went wrong"))
-            .when(mockMetaStoreClient)
-            .createTable(hmsTable);
-        assertThrows(
-            CatalogSyncException.class,
-            () ->
-                mockIcebergHmsCatalogSyncClient.createTable(
-                    TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER));
-      } else {
-        mockIcebergHmsCatalogSyncClient.createTable(
-            TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
-        verify(mockMetaStoreClient, times(1)).createTable(hmsTable);
-      }
-      verify(mockHmsSchemaExtractor, times(2))
-          .toColumns(TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema());
-    }
-  }
-
-  @SneakyThrows
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void testRefreshTable(boolean shouldFail) {
-    setupCommonMocks();
-    mockHadoopTables();
-    when(mockHmsSchemaExtractor.toColumns(
-            TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema()))
-        .thenReturn(Collections.emptyList());
-
-    Map<String, String> tableParams = new HashMap<>();
-    tableParams.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION);
-    Table hmsTable = newTable(TEST_HMS_DATABASE, TEST_HMS_TABLE, tableParams);
-    hmsTable.setSd(getTestStorageDescriptor());
-
-    when(mockIcebergTableMetadata.metadataFileLocation())
-        .thenReturn(ICEBERG_METADATA_FILE_LOCATION_V2);
-    when(mockIcebergBaseTable.properties()).thenReturn(Collections.emptyMap());
-
-    if (shouldFail) {
-      doThrow(new RuntimeException("something went wrong"))
-          .when(mockMetaStoreClient)
-          .alter_table(TEST_HMS_DATABASE, TEST_HMS_TABLE, hmsTable);
-      assertThrows(
-          RuntimeException.class,
-          () ->
-              mockIcebergHmsCatalogSyncClient.refreshTable(
-                  TEST_ICEBERG_INTERNAL_TABLE, hmsTable, TEST_CATALOG_TABLE_IDENTIFIER));
-    } else {
-      mockIcebergHmsCatalogSyncClient.refreshTable(
-          TEST_ICEBERG_INTERNAL_TABLE, hmsTable, TEST_CATALOG_TABLE_IDENTIFIER);
-      verify(mockMetaStoreClient, times(1))
-          .alter_table(TEST_HMS_DATABASE, TEST_HMS_TABLE, hmsTable);
-      assertEquals(
-          hmsTable.getParameters().get(METADATA_LOCATION_PROP), ICEBERG_METADATA_FILE_LOCATION_V2);
-    }
-    verify(mockHmsSchemaExtractor, times(1))
-        .toColumns(TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema());
-  }
-
-  @SneakyThrows
   @Test
-  void testNewHmsTable() {
-    mockIcebergHmsCatalogSyncClient = createIcebergHMSCatalogSyncClient();
+  void testGetNewTable() {
+    mockIcebergHmsCatalogSyncHelper = createIcebergHMSHelper();
     when(mockHMSCatalogSyncClient.getSchemaExtractor()).thenReturn(mockHmsSchemaExtractor);
     mockHadoopTables();
     when(mockHmsSchemaExtractor.toColumns(
@@ -192,7 +110,7 @@ public class TestIcebergHMSCatalogSyncOperations extends HMSCatalogSyncClientTes
 
       assertEquals(
           expected,
-          mockIcebergHmsCatalogSyncClient.newTable(
+          mockIcebergHmsCatalogSyncHelper.getNewTable(
               TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER));
       verify(mockHmsSchemaExtractor, times(1))
           .toColumns(TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema());
@@ -201,9 +119,39 @@ public class TestIcebergHMSCatalogSyncOperations extends HMSCatalogSyncClientTes
     }
   }
 
+  @SneakyThrows
+  @Test
+  void testGetUpdatedTable() {
+    setupCommonMocks();
+    mockHadoopTables();
+    when(mockHmsSchemaExtractor.toColumns(
+            TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema()))
+        .thenReturn(Collections.emptyList());
+
+    Map<String, String> tableParams = new HashMap<>();
+    tableParams.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION);
+    Table hmsTable =
+        newTable(TEST_HMS_DATABASE, TEST_HMS_TABLE, tableParams, getTestStorageDescriptor());
+
+    when(mockIcebergTableMetadata.metadataFileLocation())
+        .thenReturn(ICEBERG_METADATA_FILE_LOCATION_V2);
+    when(mockIcebergBaseTable.properties()).thenReturn(Collections.emptyMap());
+    tableParams.put(PREVIOUS_METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION);
+    tableParams.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION_V2);
+
+    Table expected =
+        newTable(TEST_HMS_DATABASE, TEST_HMS_TABLE, tableParams, getTestStorageDescriptor());
+    Table output =
+        mockIcebergHmsCatalogSyncHelper.getUpdatedTable(TEST_ICEBERG_INTERNAL_TABLE, hmsTable);
+    assertEquals(expected, output);
+    assertEquals(tableParams, hmsTable.getParameters());
+    verify(mockHmsSchemaExtractor, times(1))
+        .toColumns(TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema());
+  }
+
   @Test
   void testGetStorageDescriptor() {
-    mockIcebergHmsCatalogSyncClient = createIcebergHMSCatalogSyncClient();
+    mockIcebergHmsCatalogSyncHelper = createIcebergHMSHelper();
     when(mockHMSCatalogSyncClient.getSchemaExtractor()).thenReturn(mockHmsSchemaExtractor);
     when(mockHmsSchemaExtractor.toColumns(
             TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema()))
@@ -211,19 +159,19 @@ public class TestIcebergHMSCatalogSyncOperations extends HMSCatalogSyncClientTes
     StorageDescriptor expected = getTestStorageDescriptor();
     assertEquals(
         expected,
-        mockIcebergHmsCatalogSyncClient.getStorageDescriptor(TEST_ICEBERG_INTERNAL_TABLE));
+        mockIcebergHmsCatalogSyncHelper.getStorageDescriptor(TEST_ICEBERG_INTERNAL_TABLE));
     verify(mockHmsSchemaExtractor, times(1))
         .toColumns(TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema());
   }
 
   @Test
   void testGetHmsTableParameters() {
-    mockIcebergHmsCatalogSyncClient = createIcebergHMSCatalogSyncClient();
+    mockIcebergHmsCatalogSyncHelper = createIcebergHMSHelper();
     mockMetadataFileLocation();
     when(mockIcebergBaseTable.properties()).thenReturn(Collections.emptyMap());
     Map<String, String> expected = getTestParameters();
     assertEquals(
-        expected, mockIcebergHmsCatalogSyncClient.getTableParameters(mockIcebergBaseTable));
+        expected, mockIcebergHmsCatalogSyncHelper.getTableParameters(mockIcebergBaseTable));
     verify(mockIcebergBaseTable, times(1)).properties();
     verify(mockIcebergHadoopTables, never()).load(any());
   }

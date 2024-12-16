@@ -25,11 +25,11 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.mockito.Mock;
 
-import org.apache.xtable.catalog.ExternalCatalogConfig;
-import org.apache.xtable.conversion.TargetCatalog;
+import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -45,12 +45,12 @@ public class HMSCatalogSyncClientTestBase {
   protected static final String TEST_HMS_DATABASE = "hms_db";
   protected static final String TEST_HMS_TABLE = "hms_table";
   protected static final String TEST_BASE_PATH = "base-path";
-  protected static final String TEST_CATALOG_IDENTIFIER = "hms-1";
-  protected TargetCatalog TEST_TARGET_CATALOG =
-      TargetCatalog.builder()
-          .catalogId(TEST_CATALOG_IDENTIFIER)
-          .catalogTableIdentifier(TEST_CATALOG_TABLE_IDENTIFIER)
-          .catalogConfig(ExternalCatalogConfig.builder().catalogImpl("").catalogName("").build())
+  protected static final String TEST_CATALOG_NAME = "hms-1";
+  protected static final ExternalCatalogConfig TEST_CATALOG_CONFIG =
+      ExternalCatalogConfig.builder()
+          .catalogName(TEST_CATALOG_NAME)
+          .catalogImpl(HMSCatalogSyncClient.class.getCanonicalName())
+          .catalogOptions(Collections.emptyMap())
           .build();
 
   protected static final String ICEBERG_METADATA_FILE_LOCATION = "base-path/metadata";
@@ -82,6 +82,13 @@ public class HMSCatalogSyncClientTestBase {
     table.setDbName(dbName);
     table.setTableName(tableName);
     table.setParameters(params);
+    return table;
+  }
+
+  protected Table newTable(
+      String dbName, String tableName, Map<String, String> params, StorageDescriptor sd) {
+    Table table = newTable(dbName, tableName, params);
+    table.setSd(sd);
     return table;
   }
 

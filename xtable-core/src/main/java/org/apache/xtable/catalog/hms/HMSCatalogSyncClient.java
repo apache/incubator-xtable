@@ -18,8 +18,11 @@
  
 package org.apache.xtable.catalog.hms;
 
+import static org.apache.iceberg.BaseMetastoreTableOperations.TABLE_TYPE_PROP;
+
 import java.time.ZonedDateTime;
 import java.util.Collections;
+import java.util.Properties;
 
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
@@ -33,29 +36,33 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.thrift.TException;
 
-import org.apache.xtable.conversion.TargetCatalog;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+
+import org.apache.xtable.conversion.ExternalCatalogConfig;
+import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 @Log4j2
-public class HMSCatalogSyncClient implements CatalogSyncClient<Table> {
+public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogConversionSource {
 
   private static final String TEMP_SUFFIX = "_temp";
-  private final TargetCatalog targetCatalog;
+  private final ExternalCatalogConfig catalogConfig;
   @Getter private final HMSCatalogConfig hmsCatalogConfig;
   @Getter private Configuration configuration;
   @Getter private IMetaStoreClient metaStoreClient;
   @Getter private HMSSchemaExtractor schemaExtractor;
-  private final IcebergHMSCatalogSyncOperations icebergHMSCatalogSyncOperations;
+  private final IcebergHMSCatalogSyncHelper icebergHMSCatalogSyncHelper;
 
-  protected HMSCatalogSyncClient(TargetCatalog targetCatalog, Configuration configuration) {
-    this.targetCatalog = targetCatalog;
-    this.hmsCatalogConfig =
-        HMSCatalogConfig.of(targetCatalog.getCatalogConfig().getCatalogOptions());
+  protected HMSCatalogSyncClient(ExternalCatalogConfig catalogConfig, Configuration configuration) {
+    this.catalogConfig = catalogConfig;
+    this.hmsCatalogConfig = HMSCatalogConfig.of(catalogConfig.getCatalogOptions());
     this.configuration = configuration;
     this.schemaExtractor = HMSSchemaExtractor.getInstance();
     try {
@@ -63,37 +70,32 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table> {
     } catch (MetaException | HiveException e) {
       throw new CatalogSyncException("HiveMetastoreClient could not be created", e);
     }
-    this.icebergHMSCatalogSyncOperations = new IcebergHMSCatalogSyncOperations(this);
+    this.icebergHMSCatalogSyncHelper = new IcebergHMSCatalogSyncHelper(this);
   }
 
   protected HMSCatalogSyncClient(
-      TargetCatalog targetCatalog,
+      ExternalCatalogConfig catalogConfig,
       HMSCatalogConfig hmsCatalogConfig,
       Configuration configuration,
       IMetaStoreClient metaStoreClient,
       HMSSchemaExtractor schemaExtractor,
-      IcebergHMSCatalogSyncOperations icebergHMSCatalogSyncOperations) {
-    this.targetCatalog = targetCatalog;
+      IcebergHMSCatalogSyncHelper icebergHMSCatalogSyncHelper) {
+    this.catalogConfig = catalogConfig;
     this.hmsCatalogConfig = hmsCatalogConfig;
     this.configuration = configuration;
     this.metaStoreClient = metaStoreClient;
     this.schemaExtractor = schemaExtractor;
-    this.icebergHMSCatalogSyncOperations = icebergHMSCatalogSyncOperations;
+    this.icebergHMSCatalogSyncHelper = icebergHMSCatalogSyncHelper;
   }
 
   @Override
-  public String getCatalogId() {
-    return targetCatalog.getCatalogId();
+  public String getCatalogName() {
+    return catalogConfig.getCatalogName();
   }
 
   @Override
   public String getCatalogImpl() {
     return this.getClass().getCanonicalName();
-  }
-
-  @Override
-  public CatalogTableIdentifier getTableIdentifier() {
-    return targetCatalog.getCatalogTableIdentifier();
   }
 
   @Override
@@ -144,13 +146,19 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table> {
 
   @Override
   public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
+    Table hmsTable;
     switch (table.getTableFormat()) {
       case TableFormat.ICEBERG:
-        icebergHMSCatalogSyncOperations.createTable(table, tableIdentifier);
-        return;
+        hmsTable = icebergHMSCatalogSyncHelper.getNewTable(table, tableIdentifier);
+        break;
       default:
         throw new NotSupportedException(
             "HMSCatalogSyncClient not supported for " + table.getTableFormat());
+    }
+    try {
+      metaStoreClient.createTable(hmsTable);
+    } catch (TException e) {
+      throw new CatalogSyncException("Failed to create table: " + tableIdentifier.getId(), e);
     }
   }
 
@@ -159,11 +167,17 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table> {
       InternalTable table, Table catalogTable, CatalogTableIdentifier tableIdentifier) {
     switch (table.getTableFormat()) {
       case TableFormat.ICEBERG:
-        icebergHMSCatalogSyncOperations.refreshTable(table, catalogTable, tableIdentifier);
+        catalogTable = icebergHMSCatalogSyncHelper.getUpdatedTable(table, catalogTable);
         break;
       default:
         throw new NotSupportedException(
             "HMSCatalogSyncClient not supported for " + table.getTableFormat());
+    }
+    try {
+      metaStoreClient.alter_table(
+          tableIdentifier.getDatabaseName(), tableIdentifier.getTableName(), catalogTable);
+    } catch (TException e) {
+      throw new CatalogSyncException("Failed to refresh table: " + tableIdentifier.getId(), e);
     }
   }
 
@@ -207,5 +221,27 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table> {
     if (metaStoreClient != null) {
       metaStoreClient.close();
     }
+  }
+
+  @Override
+  public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
+    Table table = this.getTable(tableIdentifier);
+    Preconditions.checkNotNull(
+        table, String.format("table: %s not found", tableIdentifier.getId()));
+
+    String tableFormat = table.getParameters().get(TABLE_TYPE_PROP);
+    Preconditions.checkArgument(
+        !Strings.isNullOrEmpty(tableFormat), "TableFormat must not be null or empty");
+    Properties tableProperties = new Properties();
+    tableProperties.putAll(table.getParameters());
+    return SourceTable.builder()
+        .name(table.getTableName())
+        .basePath(table.getSd().getLocation())
+        // TODO: check if this holds true for all the formats
+        .dataPath(table.getSd().getLocation())
+        .formatName(tableFormat)
+        .catalogConfig(catalogConfig)
+        .additionalProperties(tableProperties)
+        .build();
   }
 }

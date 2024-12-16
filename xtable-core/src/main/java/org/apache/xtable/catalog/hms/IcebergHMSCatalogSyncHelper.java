@@ -33,7 +33,6 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.thrift.TException;
 
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.hadoop.HadoopTables;
@@ -44,60 +43,59 @@ import org.apache.iceberg.mr.hive.HiveIcebergStorageHandler;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.storage.TableFormat;
 
-class IcebergHMSCatalogSyncOperations {
+class IcebergHMSCatalogSyncHelper {
 
   private static final String ICEBERG_CATALOG_NAME_PROP = "iceberg.catalog";
   private static final String ICEBERG_HADOOP_TABLE_NAME = "location_based_table";
   private final HMSCatalogSyncClient syncClient;
   private final HadoopTables hadoopTables;
 
-  IcebergHMSCatalogSyncOperations(HMSCatalogSyncClient syncClient) {
+  IcebergHMSCatalogSyncHelper(HMSCatalogSyncClient syncClient) {
     this.syncClient = syncClient;
     this.hadoopTables = new HadoopTables(syncClient.getConfiguration());
   }
 
   @VisibleForTesting
-  IcebergHMSCatalogSyncOperations(HMSCatalogSyncClient syncClient, HadoopTables hadoopTables) {
+  IcebergHMSCatalogSyncHelper(HMSCatalogSyncClient syncClient, HadoopTables hadoopTables) {
     this.syncClient = syncClient;
     this.hadoopTables = hadoopTables;
   }
 
-  public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
+  Table getNewTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
     try {
-      syncClient.getMetaStoreClient().createTable(newTable(table, tableIdentifier));
-    } catch (TException e) {
-      throw new CatalogSyncException("Failed to create table: " + tableIdentifier.getId(), e);
+      Table newTb = new Table();
+      newTb.setDbName(tableIdentifier.getDatabaseName());
+      newTb.setTableName(tableIdentifier.getTableName());
+      newTb.setOwner(UserGroupInformation.getCurrentUser().getShortUserName());
+      newTb.setCreateTime((int) ZonedDateTime.now().toEpochSecond());
+      newTb.setSd(getStorageDescriptor(table));
+      newTb.setTableType(TableType.EXTERNAL_TABLE.toString());
+      newTb.setParameters(getTableParameters(loadTableFromFs(table.getBasePath())));
+      return newTb;
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "Failed to set owner for hms table: " + tableIdentifier.getId(), e);
     }
   }
 
-  public void refreshTable(
-      InternalTable table, Table catalogTable, CatalogTableIdentifier tableIdentifier) {
-    try {
-      BaseTable icebergTable = loadTableFromFs(table.getBasePath());
-      Map<String, String> parameters = catalogTable.getParameters();
-      parameters.putAll(icebergTable.properties());
-      String currentMetadataLocation = parameters.get(METADATA_LOCATION_PROP);
-      parameters.put(PREVIOUS_METADATA_LOCATION_PROP, currentMetadataLocation);
-      parameters.put(METADATA_LOCATION_PROP, getMetadataFileLocation(icebergTable));
-      catalogTable.setParameters(parameters);
-      catalogTable
-          .getSd()
-          .setCols(
-              syncClient
-                  .getSchemaExtractor()
-                  .toColumns(TableFormat.ICEBERG, table.getReadSchema()));
-      syncClient
-          .getMetaStoreClient()
-          .alter_table(
-              tableIdentifier.getDatabaseName(), tableIdentifier.getTableName(), catalogTable);
-    } catch (TException e) {
-      throw new CatalogSyncException("Failed to refresh table: " + tableIdentifier.getId(), e);
-    }
+  Table getUpdatedTable(InternalTable table, Table catalogTable) {
+    BaseTable icebergTable = loadTableFromFs(table.getBasePath());
+    Table copyTb = new Table(catalogTable);
+    Map<String, String> parameters = copyTb.getParameters();
+    parameters.putAll(icebergTable.properties());
+    String currentMetadataLocation = parameters.get(METADATA_LOCATION_PROP);
+    parameters.put(PREVIOUS_METADATA_LOCATION_PROP, currentMetadataLocation);
+    parameters.put(METADATA_LOCATION_PROP, getMetadataFileLocation(icebergTable));
+    copyTb.setParameters(parameters);
+    copyTb
+        .getSd()
+        .setCols(
+            syncClient.getSchemaExtractor().toColumns(TableFormat.ICEBERG, table.getReadSchema()));
+    return copyTb;
   }
 
   @VisibleForTesting
@@ -112,24 +110,6 @@ class IcebergHMSCatalogSyncOperations {
     serDeInfo.setSerializationLib(HiveIcebergSerDe.class.getCanonicalName());
     storageDescriptor.setSerdeInfo(serDeInfo);
     return storageDescriptor;
-  }
-
-  @VisibleForTesting
-  Table newTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
-    try {
-      Table newTb = new Table();
-      newTb.setDbName(tableIdentifier.getDatabaseName());
-      newTb.setTableName(tableIdentifier.getTableName());
-      newTb.setOwner(UserGroupInformation.getCurrentUser().getShortUserName());
-      newTb.setCreateTime((int) ZonedDateTime.now().toEpochSecond());
-      newTb.setSd(getStorageDescriptor(table));
-      newTb.setTableType(TableType.EXTERNAL_TABLE.toString());
-      newTb.setParameters(getTableParameters(loadTableFromFs(table.getBasePath())));
-      return newTb;
-    } catch (IOException e) {
-      throw new CatalogSyncException(
-          "Failed to set owner for hms table: " + tableIdentifier.getId(), e);
-    }
   }
 
   @VisibleForTesting
