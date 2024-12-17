@@ -16,42 +16,28 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.catalog;
+package org.apache.xtable.catalog.hms;
 
-import java.util.Map;
-
-import org.apache.iceberg.TableProperties;
+import org.apache.hadoop.hive.metastore.api.Table;
 
 import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.storage.TableFormat;
 
-public class TableFormatUtils {
+abstract class HMSCatalogSyncRequestProvider {
 
-  public static String getTableDataLocation(
-      String tableFormat, String tableLocation, Map<String, String> properties) {
+  abstract Table getCreateTableInput(InternalTable table, CatalogTableIdentifier tableIdentifier);
+
+  abstract Table getUpdateTableInput(InternalTable table, Table catalogTable);
+
+  static HMSCatalogSyncRequestProvider getInstance(
+      String tableFormat, HMSCatalogSyncClient syncClient) {
     switch (tableFormat) {
       case TableFormat.ICEBERG:
-        return getIcebergDataLocation(tableLocation, properties);
-      case TableFormat.HUDI:
-        return tableLocation;
+        return new IcebergHMSCatalogSyncRequestProvider(syncClient);
       default:
         throw new NotSupportedException("Unsupported table format: " + tableFormat);
     }
-  }
-
-  /** Get iceberg table data files location */
-  private static String getIcebergDataLocation(
-      String tableLocation, Map<String, String> properties) {
-    String dataLocation = properties.get(TableProperties.WRITE_DATA_LOCATION);
-    if (dataLocation == null) {
-      dataLocation = properties.get(TableProperties.WRITE_FOLDER_STORAGE_LOCATION);
-      if (dataLocation == null) {
-        dataLocation = properties.get(TableProperties.OBJECT_STORE_PATH);
-        if (dataLocation == null) {
-          dataLocation = String.format("%s/data", tableLocation);
-        }
-      }
-    }
-    return dataLocation;
   }
 }

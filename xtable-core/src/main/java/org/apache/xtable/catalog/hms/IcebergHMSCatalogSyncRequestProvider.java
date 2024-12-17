@@ -47,25 +47,26 @@ import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.storage.TableFormat;
 
-class IcebergHMSCatalogSyncHelper {
+class IcebergHMSCatalogSyncRequestProvider extends HMSCatalogSyncRequestProvider {
 
   private static final String ICEBERG_CATALOG_NAME_PROP = "iceberg.catalog";
   private static final String ICEBERG_HADOOP_TABLE_NAME = "location_based_table";
   private final HMSCatalogSyncClient syncClient;
   private final HadoopTables hadoopTables;
 
-  IcebergHMSCatalogSyncHelper(HMSCatalogSyncClient syncClient) {
+  IcebergHMSCatalogSyncRequestProvider(HMSCatalogSyncClient syncClient) {
     this.syncClient = syncClient;
     this.hadoopTables = new HadoopTables(syncClient.getConfiguration());
   }
 
   @VisibleForTesting
-  IcebergHMSCatalogSyncHelper(HMSCatalogSyncClient syncClient, HadoopTables hadoopTables) {
+  IcebergHMSCatalogSyncRequestProvider(HMSCatalogSyncClient syncClient, HadoopTables hadoopTables) {
     this.syncClient = syncClient;
     this.hadoopTables = hadoopTables;
   }
 
-  Table getNewTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
+  @Override
+  Table getCreateTableInput(InternalTable table, CatalogTableIdentifier tableIdentifier) {
     try {
       Table newTb = new Table();
       newTb.setDbName(tableIdentifier.getDatabaseName());
@@ -82,7 +83,8 @@ class IcebergHMSCatalogSyncHelper {
     }
   }
 
-  Table getUpdatedTable(InternalTable table, Table catalogTable) {
+  @Override
+  Table getUpdateTableInput(InternalTable table, Table catalogTable) {
     BaseTable icebergTable = loadTableFromFs(table.getBasePath());
     Table copyTb = new Table(catalogTable);
     Map<String, String> parameters = copyTb.getParameters();

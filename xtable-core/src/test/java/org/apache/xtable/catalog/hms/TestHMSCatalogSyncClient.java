@@ -53,13 +53,12 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.apache.xtable.exception.CatalogSyncException;
-import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
 @ExtendWith(MockitoExtension.class)
 public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
 
-  @Mock private IcebergHMSCatalogSyncHelper mockIcebergHmsCatalogSyncHelper;
+  @Mock private HMSCatalogSyncRequestProvider mockHmsCatalogSyncRequestProvider;
   private HMSCatalogSyncClient hmsCatalogSyncClient;
 
   private HMSCatalogSyncClient createHMSCatalogSyncClient() {
@@ -69,7 +68,7 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
         testConfiguration,
         mockMetaStoreClient,
         mockHmsSchemaExtractor,
-        mockIcebergHmsCatalogSyncHelper);
+        mockHmsCatalogSyncRequestProvider);
   }
 
   void setupCommonMocks() {
@@ -180,28 +179,13 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
   void testCreateTable_Success() {
     setupCommonMocks();
     Table testTable = new Table();
-    when(mockIcebergHmsCatalogSyncHelper.getNewTable(
+    when(mockHmsCatalogSyncRequestProvider.getCreateTableInput(
             TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER))
         .thenReturn(testTable);
     hmsCatalogSyncClient.createTable(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
     verify(mockMetaStoreClient, times(1)).createTable(testTable);
-    verify(mockIcebergHmsCatalogSyncHelper, times(1))
-        .getNewTable(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
-  }
-
-  @SneakyThrows
-  @Test
-  void testCreateTable_UnsupportedTableFormat() {
-    setupCommonMocks();
-
-    // Unsupported table format
-    assertThrows(
-        NotSupportedException.class,
-        () ->
-            hmsCatalogSyncClient.createTable(
-                TEST_HUDI_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER));
-    verify(mockIcebergHmsCatalogSyncHelper, never()).getNewTable(any(), any());
-    verify(mockMetaStoreClient, never()).createTable(any());
+    verify(mockHmsCatalogSyncRequestProvider, times(1))
+        .getCreateTableInput(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
   }
 
   @SneakyThrows
@@ -211,15 +195,15 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
 
     // error when getting iceberg table input
     doThrow(new RuntimeException("something went wrong"))
-        .when(mockIcebergHmsCatalogSyncHelper)
-        .getNewTable(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+        .when(mockHmsCatalogSyncRequestProvider)
+        .getCreateTableInput(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
     assertThrows(
         RuntimeException.class,
         () ->
             hmsCatalogSyncClient.createTable(
                 TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER));
-    verify(mockIcebergHmsCatalogSyncHelper, times(1))
-        .getNewTable(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+    verify(mockHmsCatalogSyncRequestProvider, times(1))
+        .getCreateTableInput(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
     verify(mockMetaStoreClient, never()).createTable(any());
   }
 
@@ -230,7 +214,7 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
 
     // error when creating table
     Table testTable = new Table();
-    when(mockIcebergHmsCatalogSyncHelper.getNewTable(
+    when(mockHmsCatalogSyncRequestProvider.getCreateTableInput(
             TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER))
         .thenReturn(testTable);
     doThrow(new TException("something went wrong"))
@@ -241,8 +225,8 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
         () ->
             hmsCatalogSyncClient.createTable(
                 TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER));
-    verify(mockIcebergHmsCatalogSyncHelper, times(1))
-        .getNewTable(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+    verify(mockHmsCatalogSyncRequestProvider, times(1))
+        .getCreateTableInput(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
     verify(mockMetaStoreClient, times(1)).createTable(testTable);
   }
 
@@ -253,30 +237,15 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
     Table origTable = new Table();
     Table updatedTable = new Table(origTable);
     updatedTable.putToParameters(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION_V2);
-    when(mockIcebergHmsCatalogSyncHelper.getUpdatedTable(TEST_ICEBERG_INTERNAL_TABLE, origTable))
+    when(mockHmsCatalogSyncRequestProvider.getUpdateTableInput(
+            TEST_ICEBERG_INTERNAL_TABLE, origTable))
         .thenReturn(updatedTable);
     hmsCatalogSyncClient.refreshTable(
         TEST_ICEBERG_INTERNAL_TABLE, origTable, TEST_CATALOG_TABLE_IDENTIFIER);
     verify(mockMetaStoreClient, times(1))
         .alter_table(TEST_HMS_DATABASE, TEST_HMS_TABLE, updatedTable);
-    verify(mockIcebergHmsCatalogSyncHelper, times(1))
-        .getUpdatedTable(TEST_ICEBERG_INTERNAL_TABLE, origTable);
-  }
-
-  @SneakyThrows
-  @Test
-  void testRefreshTable_UnsupportedTableFormat() {
-    setupCommonMocks();
-
-    // Unsupported table format
-    Table testTable = new Table();
-    assertThrows(
-        NotSupportedException.class,
-        () ->
-            hmsCatalogSyncClient.refreshTable(
-                TEST_HUDI_INTERNAL_TABLE, testTable, TEST_CATALOG_TABLE_IDENTIFIER));
-    verify(mockIcebergHmsCatalogSyncHelper, never()).getUpdatedTable(any(), any());
-    verify(mockMetaStoreClient, never()).alter_table(any(), any(), any());
+    verify(mockHmsCatalogSyncRequestProvider, times(1))
+        .getUpdateTableInput(TEST_ICEBERG_INTERNAL_TABLE, origTable);
   }
 
   @SneakyThrows
@@ -287,15 +256,15 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
     // error when getting iceberg table input
     Table testTable = new Table();
     doThrow(new RuntimeException("something went wrong"))
-        .when(mockIcebergHmsCatalogSyncHelper)
-        .getUpdatedTable(TEST_ICEBERG_INTERNAL_TABLE, testTable);
+        .when(mockHmsCatalogSyncRequestProvider)
+        .getUpdateTableInput(TEST_ICEBERG_INTERNAL_TABLE, testTable);
     assertThrows(
         RuntimeException.class,
         () ->
             hmsCatalogSyncClient.refreshTable(
                 TEST_ICEBERG_INTERNAL_TABLE, testTable, TEST_CATALOG_TABLE_IDENTIFIER));
-    verify(mockIcebergHmsCatalogSyncHelper, times(1))
-        .getUpdatedTable(TEST_ICEBERG_INTERNAL_TABLE, testTable);
+    verify(mockHmsCatalogSyncRequestProvider, times(1))
+        .getUpdateTableInput(TEST_ICEBERG_INTERNAL_TABLE, testTable);
     verify(mockMetaStoreClient, never()).alter_table(any(), any(), any());
   }
 
@@ -308,7 +277,8 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
     Table origTable = new Table();
     Table updatedTable = new Table(origTable);
     updatedTable.putToParameters(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION_V2);
-    when(mockIcebergHmsCatalogSyncHelper.getUpdatedTable(TEST_ICEBERG_INTERNAL_TABLE, origTable))
+    when(mockHmsCatalogSyncRequestProvider.getUpdateTableInput(
+            TEST_ICEBERG_INTERNAL_TABLE, origTable))
         .thenReturn(updatedTable);
     doThrow(new TException("something went wrong"))
         .when(mockMetaStoreClient)
@@ -318,8 +288,8 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
         () ->
             hmsCatalogSyncClient.refreshTable(
                 TEST_ICEBERG_INTERNAL_TABLE, origTable, TEST_CATALOG_TABLE_IDENTIFIER));
-    verify(mockIcebergHmsCatalogSyncHelper, times(1))
-        .getUpdatedTable(TEST_ICEBERG_INTERNAL_TABLE, origTable);
+    verify(mockHmsCatalogSyncRequestProvider, times(1))
+        .getUpdateTableInput(TEST_ICEBERG_INTERNAL_TABLE, origTable);
     verify(mockMetaStoreClient, times(1))
         .alter_table(TEST_HMS_DATABASE, TEST_HMS_TABLE, updatedTable);
   }
@@ -344,10 +314,10 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
       Table table = newTable(TEST_HMS_DATABASE, TEST_HMS_TABLE);
       Table tempTable = newTable(TEST_HMS_DATABASE, tempTableName);
 
-      when(mockIcebergHmsCatalogSyncHelper.getNewTable(
+      when(mockHmsCatalogSyncRequestProvider.getCreateTableInput(
               TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER))
           .thenReturn(table);
-      when(mockIcebergHmsCatalogSyncHelper.getNewTable(
+      when(mockHmsCatalogSyncRequestProvider.getCreateTableInput(
               TEST_ICEBERG_INTERNAL_TABLE, tempTableIdentifier))
           .thenReturn(tempTable);
 
@@ -361,10 +331,10 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
       verify(mockMetaStoreClient, times(1))
           .dropTable(TEST_HMS_DATABASE, tempTableIdentifier.getTableName());
 
-      verify(mockIcebergHmsCatalogSyncHelper, times(1))
-          .getNewTable(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
-      verify(mockIcebergHmsCatalogSyncHelper, times(1))
-          .getNewTable(TEST_ICEBERG_INTERNAL_TABLE, tempTableIdentifier);
+      verify(mockHmsCatalogSyncRequestProvider, times(1))
+          .getCreateTableInput(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+      verify(mockHmsCatalogSyncRequestProvider, times(1))
+          .getCreateTableInput(TEST_ICEBERG_INTERNAL_TABLE, tempTableIdentifier);
     }
   }
 }

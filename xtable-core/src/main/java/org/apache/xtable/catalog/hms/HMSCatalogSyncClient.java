@@ -37,16 +37,15 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.thrift.TException;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 
 import org.apache.xtable.catalog.TableFormatUtils;
 import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.exception.CatalogSyncException;
-import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
-import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 
@@ -59,9 +58,10 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
   @Getter private final Configuration configuration;
   private final IMetaStoreClient metaStoreClient;
   @Getter private final HMSSchemaExtractor schemaExtractor;
-  private final IcebergHMSCatalogSyncHelper icebergHMSCatalogSyncHelper;
+  private final HMSCatalogSyncRequestProvider hmsCatalogSyncRequestProvider;
 
-  protected HMSCatalogSyncClient(ExternalCatalogConfig catalogConfig, Configuration configuration) {
+  public HMSCatalogSyncClient(
+      ExternalCatalogConfig catalogConfig, Configuration configuration, String tableFormat) {
     this.catalogConfig = catalogConfig;
     this.hmsCatalogConfig = HMSCatalogConfig.of(catalogConfig.getCatalogOptions());
     this.configuration = configuration;
@@ -71,22 +71,24 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
     } catch (MetaException | HiveException e) {
       throw new CatalogSyncException("HiveMetastoreClient could not be created", e);
     }
-    this.icebergHMSCatalogSyncHelper = new IcebergHMSCatalogSyncHelper(this);
+    this.hmsCatalogSyncRequestProvider =
+        HMSCatalogSyncRequestProvider.getInstance(tableFormat, this);
   }
 
-  protected HMSCatalogSyncClient(
+  @VisibleForTesting
+  HMSCatalogSyncClient(
       ExternalCatalogConfig catalogConfig,
       HMSCatalogConfig hmsCatalogConfig,
       Configuration configuration,
       IMetaStoreClient metaStoreClient,
       HMSSchemaExtractor schemaExtractor,
-      IcebergHMSCatalogSyncHelper icebergHMSCatalogSyncHelper) {
+      HMSCatalogSyncRequestProvider hmsCatalogSyncRequestProvider) {
     this.catalogConfig = catalogConfig;
     this.hmsCatalogConfig = hmsCatalogConfig;
     this.configuration = configuration;
     this.metaStoreClient = metaStoreClient;
     this.schemaExtractor = schemaExtractor;
-    this.icebergHMSCatalogSyncHelper = icebergHMSCatalogSyncHelper;
+    this.hmsCatalogSyncRequestProvider = hmsCatalogSyncRequestProvider;
   }
 
   @Override
@@ -147,15 +149,7 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
 
   @Override
   public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
-    Table hmsTable;
-    switch (table.getTableFormat()) {
-      case TableFormat.ICEBERG:
-        hmsTable = icebergHMSCatalogSyncHelper.getNewTable(table, tableIdentifier);
-        break;
-      default:
-        throw new NotSupportedException(
-            "HMSCatalogSyncClient not supported for " + table.getTableFormat());
-    }
+    Table hmsTable = hmsCatalogSyncRequestProvider.getCreateTableInput(table, tableIdentifier);
     try {
       metaStoreClient.createTable(hmsTable);
     } catch (TException e) {
@@ -166,14 +160,7 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
   @Override
   public void refreshTable(
       InternalTable table, Table catalogTable, CatalogTableIdentifier tableIdentifier) {
-    switch (table.getTableFormat()) {
-      case TableFormat.ICEBERG:
-        catalogTable = icebergHMSCatalogSyncHelper.getUpdatedTable(table, catalogTable);
-        break;
-      default:
-        throw new NotSupportedException(
-            "HMSCatalogSyncClient not supported for " + table.getTableFormat());
-    }
+    catalogTable = hmsCatalogSyncRequestProvider.getUpdateTableInput(table, catalogTable);
     try {
       metaStoreClient.alter_table(
           tableIdentifier.getDatabaseName(), tableIdentifier.getTableName(), catalogTable);
@@ -238,17 +225,8 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
     }
 
     String tableLocation = table.getSd().getLocation();
-    String dataPath;
-    switch (tableFormat) {
-      case TableFormat.ICEBERG:
-        dataPath = TableFormatUtils.getIcebergDataLocation(tableLocation, table.getParameters());
-        break;
-      case TableFormat.HUDI:
-        dataPath = tableLocation;
-        break;
-      default:
-        throw new NotSupportedException("Unsupported table format: " + tableFormat);
-    }
+    String dataPath =
+        TableFormatUtils.getTableDataLocation(tableFormat, tableLocation, table.getParameters());
 
     Properties tableProperties = new Properties();
     tableProperties.putAll(table.getParameters());
