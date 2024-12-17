@@ -16,42 +16,31 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.catalog;
-
-import java.util.Map;
-
-import org.apache.iceberg.TableProperties;
+package org.apache.xtable.catalog.glue;
 
 import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.storage.TableFormat;
 
-public class TableFormatUtils {
+import software.amazon.awssdk.services.glue.model.Table;
+import software.amazon.awssdk.services.glue.model.TableInput;
 
-  public static String getTableDataLocation(
-      String tableFormat, String tableLocation, Map<String, String> properties) {
+abstract class GlueCatalogSyncRequestProvider {
+
+  abstract TableInput getCreateTableInput(
+      InternalTable table, CatalogTableIdentifier tableIdentifier);
+
+  abstract TableInput getUpdateTableInput(
+      InternalTable table, Table catalogTable, CatalogTableIdentifier tableIdentifier);
+
+  static GlueCatalogSyncRequestProvider getInstance(
+      String tableFormat, GlueCatalogSyncClient syncClient) {
     switch (tableFormat) {
       case TableFormat.ICEBERG:
-        return getIcebergDataLocation(tableLocation, properties);
-      case TableFormat.HUDI:
-        return tableLocation;
+        return new IcebergGlueCatalogSyncRequestProvider(syncClient);
       default:
         throw new NotSupportedException("Unsupported table format: " + tableFormat);
     }
-  }
-
-  /** Get iceberg table data files location */
-  private static String getIcebergDataLocation(
-      String tableLocation, Map<String, String> properties) {
-    String dataLocation = properties.get(TableProperties.WRITE_DATA_LOCATION);
-    if (dataLocation == null) {
-      dataLocation = properties.get(TableProperties.WRITE_FOLDER_STORAGE_LOCATION);
-      if (dataLocation == null) {
-        dataLocation = properties.get(TableProperties.OBJECT_STORE_PATH);
-        if (dataLocation == null) {
-          dataLocation = String.format("%s/data", tableLocation);
-        }
-      }
-    }
-    return dataLocation;
   }
 }

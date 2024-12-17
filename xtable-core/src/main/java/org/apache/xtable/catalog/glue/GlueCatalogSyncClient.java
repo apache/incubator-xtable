@@ -36,10 +36,8 @@ import org.apache.xtable.catalog.TableFormatUtils;
 import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.exception.CatalogSyncException;
-import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
-import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 
@@ -68,15 +66,16 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
   private final GlueCatalogConfig glueCatalogConfig;
   @Getter private final Configuration configuration;
   @Getter private final GlueSchemaExtractor schemaExtractor;
-  private final IcebergGlueCatalogSyncHelper icebergGlueCatalogSyncHelper;
+  private final GlueCatalogSyncRequestProvider glueCatalogSyncRequestProvider;
 
-  public GlueCatalogSyncClient(ExternalCatalogConfig catalogConfig, Configuration configuration) {
+  public GlueCatalogSyncClient(
+      ExternalCatalogConfig catalogConfig, Configuration configuration, String tableFormat) {
     this.catalogConfig = catalogConfig;
     this.glueCatalogConfig = GlueCatalogConfig.of(catalogConfig.getCatalogOptions());
     this.glueClient = new DefaultGlueClientFactory(glueCatalogConfig).getGlueClient();
     this.configuration = new Configuration(configuration);
     this.schemaExtractor = GlueSchemaExtractor.getInstance();
-    this.icebergGlueCatalogSyncHelper = new IcebergGlueCatalogSyncHelper(this);
+    glueCatalogSyncRequestProvider = GlueCatalogSyncRequestProvider.getInstance(tableFormat, this);
   }
 
   @VisibleForTesting
@@ -86,13 +85,13 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
       GlueCatalogConfig glueCatalogConfig,
       GlueClient glueClient,
       GlueSchemaExtractor schemaExtractor,
-      IcebergGlueCatalogSyncHelper icebergGlueCatalogSyncHelper) {
+      GlueCatalogSyncRequestProvider glueCatalogSyncRequestProvider) {
     this.catalogConfig = catalogConfig;
     this.configuration = new Configuration(configuration);
     this.glueCatalogConfig = glueCatalogConfig;
     this.glueClient = glueClient;
     this.schemaExtractor = schemaExtractor;
-    this.icebergGlueCatalogSyncHelper = icebergGlueCatalogSyncHelper;
+    this.glueCatalogSyncRequestProvider = glueCatalogSyncRequestProvider;
   }
 
   @Override
@@ -168,15 +167,8 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
 
   @Override
   public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
-    TableInput tableInput;
-    switch (table.getTableFormat()) {
-      case TableFormat.ICEBERG:
-        tableInput = icebergGlueCatalogSyncHelper.getCreateTableInput(table, tableIdentifier);
-        break;
-      default:
-        throw new NotSupportedException(
-            "GlueCatalogSync not supported for " + table.getTableFormat());
-    }
+    TableInput tableInput =
+        glueCatalogSyncRequestProvider.getCreateTableInput(table, tableIdentifier);
     try {
       glueClient.createTable(
           CreateTableRequest.builder()
@@ -192,16 +184,8 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
   @Override
   public void refreshTable(
       InternalTable table, Table catalogTable, CatalogTableIdentifier tableIdentifier) {
-    TableInput tableInput;
-    switch (table.getTableFormat()) {
-      case TableFormat.ICEBERG:
-        tableInput =
-            icebergGlueCatalogSyncHelper.getUpdateTableInput(table, catalogTable, tableIdentifier);
-        break;
-      default:
-        throw new NotSupportedException(
-            "GlueCatalogSync not supported for " + table.getTableFormat());
-    }
+    TableInput tableInput =
+        glueCatalogSyncRequestProvider.getUpdateTableInput(table, catalogTable, tableIdentifier);
     try {
       glueClient.updateTable(
           UpdateTableRequest.builder()
@@ -276,17 +260,8 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
     }
 
     String tableLocation = table.storageDescriptor().location();
-    String dataPath;
-    switch (tableFormat) {
-      case TableFormat.ICEBERG:
-        dataPath = TableFormatUtils.getIcebergDataLocation(tableLocation, table.parameters());
-        break;
-      case TableFormat.HUDI:
-        dataPath = tableLocation;
-        break;
-      default:
-        throw new NotSupportedException("Unsupported table format: " + tableFormat);
-    }
+    String dataPath =
+        TableFormatUtils.getTableDataLocation(tableFormat, tableLocation, table.parameters());
 
     Properties tableProperties = new Properties();
     tableProperties.putAll(table.parameters());

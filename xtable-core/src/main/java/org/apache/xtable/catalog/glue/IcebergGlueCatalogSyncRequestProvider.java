@@ -40,24 +40,27 @@ import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.TableInput;
 
 /** Iceberg specific table operations for Glue catalog sync */
-class IcebergGlueCatalogSyncHelper {
+class IcebergGlueCatalogSyncRequestProvider extends GlueCatalogSyncRequestProvider {
 
   private final GlueCatalogSyncClient syncClient;
   private final HadoopTables hadoopTables;
 
-  IcebergGlueCatalogSyncHelper(GlueCatalogSyncClient syncClient) {
+  IcebergGlueCatalogSyncRequestProvider(GlueCatalogSyncClient syncClient) {
+    super();
     this.syncClient = syncClient;
     this.hadoopTables = new HadoopTables(syncClient.getConfiguration());
   }
 
   @VisibleForTesting
-  IcebergGlueCatalogSyncHelper(GlueCatalogSyncClient syncClient, HadoopTables hadoopTables) {
+  IcebergGlueCatalogSyncRequestProvider(
+      GlueCatalogSyncClient syncClient, HadoopTables hadoopTables) {
+    super();
     this.syncClient = syncClient;
     this.hadoopTables = hadoopTables;
   }
 
-  public TableInput getCreateTableInput(
-      InternalTable table, CatalogTableIdentifier tableIdentifier) {
+  @Override
+  TableInput getCreateTableInput(InternalTable table, CatalogTableIdentifier tableIdentifier) {
     BaseTable fsTable = loadTableFromFs(table.getBasePath());
     return TableInput.builder()
         .name(tableIdentifier.getTableName())
@@ -74,7 +77,8 @@ class IcebergGlueCatalogSyncHelper {
         .build();
   }
 
-  public TableInput getUpdateTableInput(
+  @Override
+  TableInput getUpdateTableInput(
       InternalTable table, Table catalogTable, CatalogTableIdentifier tableIdentifier) {
     BaseTable icebergTable = loadTableFromFs(table.getBasePath());
     Map<String, String> parameters = new HashMap<>(catalogTable.parameters());
@@ -97,7 +101,7 @@ class IcebergGlueCatalogSyncHelper {
   }
 
   @VisibleForTesting
-  protected Map<String, String> getTableParameters(BaseTable icebergTable) {
+  Map<String, String> getTableParameters(BaseTable icebergTable) {
     Map<String, String> parameters = new HashMap<>(icebergTable.properties());
     parameters.put(TABLE_TYPE_PROP, TableFormat.ICEBERG);
     parameters.put(METADATA_LOCATION_PROP, getMetadataFileLocation(icebergTable));
