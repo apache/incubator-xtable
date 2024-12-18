@@ -26,6 +26,8 @@ import static org.apache.xtable.catalog.glue.GlueCatalogSyncClient.GLUE_EXTERNAL
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.hadoop.conf.Configuration;
+
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.hadoop.HadoopTables;
 
@@ -42,20 +44,19 @@ import software.amazon.awssdk.services.glue.model.TableInput;
 /** Iceberg specific table operations for Glue catalog sync */
 class IcebergGlueCatalogSyncRequestProvider extends GlueCatalogSyncRequestProvider {
 
-  private final GlueCatalogSyncClient syncClient;
+  private final GlueSchemaExtractor schemaExtractor;
   private final HadoopTables hadoopTables;
 
-  IcebergGlueCatalogSyncRequestProvider(GlueCatalogSyncClient syncClient) {
-    super();
-    this.syncClient = syncClient;
-    this.hadoopTables = new HadoopTables(syncClient.getConfiguration());
+  IcebergGlueCatalogSyncRequestProvider(
+      Configuration configuration, GlueSchemaExtractor schemaExtractor) {
+    this.schemaExtractor = schemaExtractor;
+    this.hadoopTables = new HadoopTables(configuration);
   }
 
   @VisibleForTesting
   IcebergGlueCatalogSyncRequestProvider(
-      GlueCatalogSyncClient syncClient, HadoopTables hadoopTables) {
-    super();
-    this.syncClient = syncClient;
+      GlueSchemaExtractor schemaExtractor, HadoopTables hadoopTables) {
+    this.schemaExtractor = schemaExtractor;
     this.hadoopTables = hadoopTables;
   }
 
@@ -69,10 +70,7 @@ class IcebergGlueCatalogSyncRequestProvider extends GlueCatalogSyncRequestProvid
         .storageDescriptor(
             StorageDescriptor.builder()
                 .location(table.getBasePath())
-                .columns(
-                    syncClient
-                        .getSchemaExtractor()
-                        .toColumns(TableFormat.ICEBERG, table.getReadSchema()))
+                .columns(schemaExtractor.toColumns(TableFormat.ICEBERG, table.getReadSchema()))
                 .build())
         .build();
   }
@@ -93,9 +91,8 @@ class IcebergGlueCatalogSyncRequestProvider extends GlueCatalogSyncRequestProvid
             StorageDescriptor.builder()
                 .location(table.getBasePath())
                 .columns(
-                    syncClient
-                        .getSchemaExtractor()
-                        .toColumns(TableFormat.ICEBERG, table.getReadSchema(), catalogTable))
+                    schemaExtractor.toColumns(
+                        TableFormat.ICEBERG, table.getReadSchema(), catalogTable))
                 .build())
         .build();
   }

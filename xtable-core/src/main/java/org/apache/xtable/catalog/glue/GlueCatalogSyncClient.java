@@ -24,7 +24,6 @@ import java.time.ZonedDateTime;
 import java.util.Locale;
 import java.util.Properties;
 
-import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
@@ -64,8 +63,8 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
   private final ExternalCatalogConfig catalogConfig;
   private final GlueClient glueClient;
   private final GlueCatalogConfig glueCatalogConfig;
-  @Getter private final Configuration configuration;
-  @Getter private final GlueSchemaExtractor schemaExtractor;
+  private final Configuration configuration;
+  private final GlueSchemaExtractor schemaExtractor;
   private final GlueCatalogSyncRequestProvider glueCatalogSyncRequestProvider;
 
   public GlueCatalogSyncClient(
@@ -75,7 +74,9 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
     this.glueClient = new DefaultGlueClientFactory(glueCatalogConfig).getGlueClient();
     this.configuration = new Configuration(configuration);
     this.schemaExtractor = GlueSchemaExtractor.getInstance();
-    glueCatalogSyncRequestProvider = GlueCatalogSyncRequestProvider.getInstance(tableFormat, this);
+    glueCatalogSyncRequestProvider =
+        GlueCatalogSyncRequestProvider.getInstance(
+            tableFormat, this.configuration, schemaExtractor);
   }
 
   @VisibleForTesting

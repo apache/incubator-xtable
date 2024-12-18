@@ -18,6 +18,8 @@
  
 package org.apache.xtable.catalog.glue;
 
+import org.apache.hadoop.conf.Configuration;
+
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
@@ -35,10 +37,10 @@ abstract class GlueCatalogSyncRequestProvider {
       InternalTable table, Table catalogTable, CatalogTableIdentifier tableIdentifier);
 
   static GlueCatalogSyncRequestProvider getInstance(
-      String tableFormat, GlueCatalogSyncClient syncClient) {
+      String tableFormat, Configuration configuration, GlueSchemaExtractor schemaExtractor) {
     switch (tableFormat) {
       case TableFormat.ICEBERG:
-        return new IcebergGlueCatalogSyncRequestProvider(syncClient);
+        return new IcebergGlueCatalogSyncRequestProvider(configuration, schemaExtractor);
       default:
         throw new NotSupportedException("Unsupported table format: " + tableFormat);
     }

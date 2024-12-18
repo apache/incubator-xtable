@@ -52,17 +52,15 @@ public class TestIcebergGlueCatalogSyncRequestProvider extends GlueCatalogSyncTe
   @Mock private BaseTable mockIcebergBaseTable;
   @Mock private TableOperations mockIcebergTableOperations;
   @Mock private TableMetadata mockIcebergTableMetadata;
-  @Mock private GlueCatalogSyncClient mockGlueCatalogSyncClient;
   private IcebergGlueCatalogSyncRequestProvider icebergGlueCatalogSyncRequestProvider;
 
   private IcebergGlueCatalogSyncRequestProvider createIcebergGlueCatalogSyncHelper() {
     return new IcebergGlueCatalogSyncRequestProvider(
-        mockGlueCatalogSyncClient, mockIcebergHadoopTables);
+        mockGlueSchemaExtractor, mockIcebergHadoopTables);
   }
 
   void setupCommonMocks() {
     icebergGlueCatalogSyncRequestProvider = createIcebergGlueCatalogSyncHelper();
-    when(mockGlueCatalogSyncClient.getSchemaExtractor()).thenReturn(mockGlueSchemaExtractor);
   }
 
   void mockIcebergHadoopTables() {
