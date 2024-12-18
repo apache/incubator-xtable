@@ -18,34 +18,25 @@
  
 package org.apache.xtable.conversion;
 
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-import java.util.Properties;
+import java.util.Collections;
+import java.util.Map;
 
 import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
+import lombok.NonNull;
+import lombok.Value;
 
-@Getter
-@EqualsAndHashCode(callSuper = true)
-public class TargetTable extends ExternalTable {
-  private final Duration metadataRetention;
+/** Defines the configuration for an external catalog. */
+@Value
+@Builder
+public class ExternalCatalogConfig implements CatalogConfig {
+  /** The name of the catalog, it also acts as a unique identifier for each catalog */
+  @NonNull String catalogName;
 
-  @Builder(toBuilder = true)
-  public TargetTable(
-      String name,
-      String formatName,
-      String basePath,
-      String[] namespace,
-      CatalogConfig catalogConfig,
-      Duration metadataRetention,
-      Properties additionalProperties) {
-    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties);
-    this.metadataRetention =
-        metadataRetention == null ? Duration.of(7, ChronoUnit.DAYS) : metadataRetention;
-  }
+  /** The implementation class path for the catalog */
+  @NonNull String catalogImpl;
 
-  public String getId() {
-    return String.format("%s#%s", sanitizeBasePath(this.basePath), formatName);
-  }
+  /**
+   * The properties for each catalog, used for providing any custom behaviour during catalog sync
+   */
+  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
 }
