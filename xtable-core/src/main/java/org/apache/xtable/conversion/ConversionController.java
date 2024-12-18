@@ -143,7 +143,7 @@ public class ConversionController {
   private static String getFormatsWithStatusCode(
       Map<String, SyncResult> syncResultsMerged, SyncResult.SyncStatusCode statusCode) {
     return syncResultsMerged.entrySet().stream()
-        .filter(entry -> entry.getValue().getStatus().getStatusCode() == statusCode)
+        .filter(entry -> entry.getValue().getTableFormatSyncStatus().getStatusCode() == statusCode)
         .map(Map.Entry::getKey)
         .collect(Collectors.joining(","));
   }

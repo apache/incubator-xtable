@@ -392,7 +392,7 @@ public class TestConversionController {
     return SyncResult.builder()
         .mode(syncMode)
         .lastInstantSynced(lastSyncedInstant)
-        .status(SyncResult.SyncStatus.SUCCESS)
+        .tableFormatSyncStatus(SyncResult.SyncStatus.SUCCESS)
         .build();
   }
 
