@@ -27,6 +27,7 @@ import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -51,17 +52,19 @@ class IcebergHMSCatalogSyncRequestProvider extends HMSCatalogSyncRequestProvider
 
   private static final String ICEBERG_CATALOG_NAME_PROP = "iceberg.catalog";
   private static final String ICEBERG_HADOOP_TABLE_NAME = "location_based_table";
-  private final HMSCatalogSyncClient syncClient;
+  private final HMSSchemaExtractor schemaExtractor;
   private final HadoopTables hadoopTables;
 
-  IcebergHMSCatalogSyncRequestProvider(HMSCatalogSyncClient syncClient) {
-    this.syncClient = syncClient;
-    this.hadoopTables = new HadoopTables(syncClient.getConfiguration());
+  IcebergHMSCatalogSyncRequestProvider(
+      Configuration configuration, HMSSchemaExtractor schemaExtractor) {
+    this.schemaExtractor = schemaExtractor;
+    this.hadoopTables = new HadoopTables(configuration);
   }
 
   @VisibleForTesting
-  IcebergHMSCatalogSyncRequestProvider(HMSCatalogSyncClient syncClient, HadoopTables hadoopTables) {
-    this.syncClient = syncClient;
+  IcebergHMSCatalogSyncRequestProvider(
+      HMSSchemaExtractor schemaExtractor, HadoopTables hadoopTables) {
+    this.schemaExtractor = schemaExtractor;
     this.hadoopTables = hadoopTables;
   }
 
@@ -93,10 +96,7 @@ class IcebergHMSCatalogSyncRequestProvider extends HMSCatalogSyncRequestProvider
     parameters.put(PREVIOUS_METADATA_LOCATION_PROP, currentMetadataLocation);
     parameters.put(METADATA_LOCATION_PROP, getMetadataFileLocation(icebergTable));
     copyTb.setParameters(parameters);
-    copyTb
-        .getSd()
-        .setCols(
-            syncClient.getSchemaExtractor().toColumns(TableFormat.ICEBERG, table.getReadSchema()));
+    copyTb.getSd().setCols(schemaExtractor.toColumns(TableFormat.ICEBERG, table.getReadSchema()));
     return copyTb;
   }
 
@@ -104,7 +104,7 @@ class IcebergHMSCatalogSyncRequestProvider extends HMSCatalogSyncRequestProvider
   StorageDescriptor getStorageDescriptor(InternalTable table) {
     final StorageDescriptor storageDescriptor = new StorageDescriptor();
     storageDescriptor.setCols(
-        syncClient.getSchemaExtractor().toColumns(TableFormat.ICEBERG, table.getReadSchema()));
+        schemaExtractor.toColumns(TableFormat.ICEBERG, table.getReadSchema()));
     storageDescriptor.setLocation(table.getBasePath());
     storageDescriptor.setInputFormat(HiveIcebergInputFormat.class.getCanonicalName());
     storageDescriptor.setOutputFormat(HiveIcebergOutputFormat.class.getCanonicalName());

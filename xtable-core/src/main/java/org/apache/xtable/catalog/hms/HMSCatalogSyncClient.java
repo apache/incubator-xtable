@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Properties;
 
-import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
@@ -55,9 +54,9 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
   private static final String TEMP_SUFFIX = "_temp";
   private final ExternalCatalogConfig catalogConfig;
   private final HMSCatalogConfig hmsCatalogConfig;
-  @Getter private final Configuration configuration;
+  private final Configuration configuration;
   private final IMetaStoreClient metaStoreClient;
-  @Getter private final HMSSchemaExtractor schemaExtractor;
+  private final HMSSchemaExtractor schemaExtractor;
   private final HMSCatalogSyncRequestProvider hmsCatalogSyncRequestProvider;
 
   public HMSCatalogSyncClient(
@@ -72,7 +71,8 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
       throw new CatalogSyncException("HiveMetastoreClient could not be created", e);
     }
     this.hmsCatalogSyncRequestProvider =
-        HMSCatalogSyncRequestProvider.getInstance(tableFormat, this);
+        HMSCatalogSyncRequestProvider.getInstance(
+            tableFormat, this.configuration, this.schemaExtractor);
   }
 
   @VisibleForTesting

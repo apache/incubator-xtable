@@ -18,6 +18,7 @@
  
 package org.apache.xtable.catalog.hms;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.api.Table;
 
 import org.apache.xtable.exception.NotSupportedException;
@@ -32,10 +33,10 @@ abstract class HMSCatalogSyncRequestProvider {
   abstract Table getUpdateTableInput(InternalTable table, Table catalogTable);
 
   static HMSCatalogSyncRequestProvider getInstance(
-      String tableFormat, HMSCatalogSyncClient syncClient) {
+      String tableFormat, Configuration configuration, HMSSchemaExtractor schemaExtractor) {
     switch (tableFormat) {
       case TableFormat.ICEBERG:
-        return new IcebergHMSCatalogSyncRequestProvider(syncClient);
+        return new IcebergHMSCatalogSyncRequestProvider(configuration, schemaExtractor);
       default:
         throw new NotSupportedException("Unsupported table format: " + tableFormat);
     }
