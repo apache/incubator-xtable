@@ -90,9 +90,9 @@ public class TestCatalogSync<TABLE> {
     when(mockClient2.getTable(tableIdentifier2)).thenReturn(null);
     when(mockClient3.getTable(tableIdentifier3)).thenReturn(mockTable);
 
-    when(mockClient1.getStorageDescriptorLocation(any())).thenReturn("/tmp/test_changed");
-    when(mockClient2.getStorageDescriptorLocation(any())).thenReturn("/tmp/test");
-    when(mockClient3.getStorageDescriptorLocation(any())).thenReturn("/tmp/test");
+    when(mockClient1.getStorageLocation(any())).thenReturn("/tmp/test_changed");
+    when(mockClient2.getStorageLocation(any())).thenReturn("/tmp/test");
+    when(mockClient3.getStorageLocation(any())).thenReturn("/tmp/test");
 
     when(mockClient4.getCatalogName()).thenReturn("catalogName4");
 

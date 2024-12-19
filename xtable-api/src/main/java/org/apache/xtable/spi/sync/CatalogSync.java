@@ -87,7 +87,7 @@ public class CatalogSync {
       catalogSyncClient.createDatabase(tableIdentifier.getDatabaseName());
     }
     TABLE catalogTable = catalogSyncClient.getTable(tableIdentifier);
-    String storageDescriptorLocation = catalogSyncClient.getStorageDescriptorLocation(catalogTable);
+    String storageDescriptorLocation = catalogSyncClient.getStorageLocation(catalogTable);
     if (catalogTable == null) {
       catalogSyncClient.createTable(table, tableIdentifier);
     } else if (hasStorageDescriptorLocationChanged(
