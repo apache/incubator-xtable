@@ -54,19 +54,21 @@ public class CatalogSync {
     catalogSyncClients.forEach(
         ((tableIdentifier, catalogSyncClient) -> {
           try {
-            results.add(getCatalogSyncStatus(catalogSyncClient, tableIdentifier, table));
+            results.add(syncCatalog(catalogSyncClient, tableIdentifier, table));
             log.info(
-                "Catalog sync is successful for table {} using catalogSync {}",
+                "Catalog sync is successful for table {} with format {} using catalogSync {}",
                 table.getBasePath(),
-                catalogSyncClient.getCatalogImpl());
+                table.getTableFormat(),
+                catalogSyncClient.getClass().getName());
           } catch (Exception e) {
             log.error(
-                "Catalog sync failed for table {} using catalogSync {}",
+                "Catalog sync failed for table {} with format {} using catalogSync {}",
                 table.getBasePath(),
-                catalogSyncClient.getCatalogImpl());
+                table.getTableFormat(),
+                catalogSyncClient.getClass().getName());
             results.add(
                 getCatalogSyncFailureStatus(
-                    catalogSyncClient.getCatalogName(), catalogSyncClient.getCatalogImpl(), e));
+                    catalogSyncClient.getCatalogName(), catalogSyncClient.getClass().getName(), e));
           }
         }));
     return SyncResult.builder()
@@ -77,7 +79,7 @@ public class CatalogSync {
         .build();
   }
 
-  private <TABLE> CatalogSyncStatus getCatalogSyncStatus(
+  private <TABLE> CatalogSyncStatus syncCatalog(
       CatalogSyncClient<TABLE> catalogSyncClient,
       CatalogTableIdentifier tableIdentifier,
       InternalTable table) {
@@ -85,7 +87,7 @@ public class CatalogSync {
       catalogSyncClient.createDatabase(tableIdentifier.getDatabaseName());
     }
     TABLE catalogTable = catalogSyncClient.getTable(tableIdentifier);
-    String storageDescriptorLocation = catalogSyncClient.getStorageDescriptorLocation(catalogTable);
+    String storageDescriptorLocation = catalogSyncClient.getStorageLocation(catalogTable);
     if (catalogTable == null) {
       catalogSyncClient.createTable(table, tableIdentifier);
     } else if (hasStorageDescriptorLocationChanged(

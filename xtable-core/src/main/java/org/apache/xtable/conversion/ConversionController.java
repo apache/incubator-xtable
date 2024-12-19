@@ -34,7 +34,6 @@ import java.util.stream.Stream;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.Value;
 import lombok.extern.log4j.Log4j2;
 
@@ -109,7 +108,20 @@ public class ConversionController {
     }
   }
 
-  public Map<String, SyncResult> syncCatalogs(
+  /**
+   * Synchronizes the source table in conversion config to multiple target catalogs. If the
+   * configuration for the target table uses a different table format, synchronizes the table format
+   * first before syncing it to target catalog
+   *
+   * @param config A per table level config containing source table, target tables, target catalogs
+   *     and syncMode.
+   * @param conversionSourceProvider A provider for the {@link ConversionSource} instance for each
+   *     tableFormat, {@link ConversionSourceProvider#init(Configuration)} must be called before
+   *     calling this method.
+   * @return Returns a map containing the table format, and it's sync result. Run sync for a table *
+   *     with the provided per table level configuration.
+   */
+  public Map<String, SyncResult> syncTableAcrossCatalogs(
       ConversionConfig config, Map<String, ConversionSourceProvider> conversionSourceProvider) {
     if (config.getTargetTables() == null || config.getTargetTables().isEmpty()) {
       throw new IllegalArgumentException("Please provide at-least one format to sync");
@@ -124,7 +136,7 @@ public class ConversionController {
       Map<String, SyncResult> catalogSyncResults = new HashMap<>();
       for (TargetTable targetTable : config.getTargetTables()) {
         Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients =
-            config.getTargetCatalogs().get(targetTable.getId()).stream()
+            config.getTargetCatalogs().get(targetTable).stream()
                 .collect(
                     Collectors.toMap(
                         TargetCatalogConfig::getCatalogTableIdentifier,
@@ -133,7 +145,7 @@ public class ConversionController {
                                 targetCatalog.getCatalogConfig(), conf)));
         catalogSyncResults.put(
             targetTable.getFormatName(),
-            syncCatalogsForTable(
+            syncCatalogsForTargetTable(
                 targetTable,
                 catalogSyncClients,
                 conversionSourceProvider.get(targetTable.getFormatName())));
@@ -195,8 +207,16 @@ public class ConversionController {
     return syncResultsMerged;
   }
 
-  @SneakyThrows
-  private SyncResult syncCatalogsForTable(
+  /**
+   * Synchronizes the target table to multiple target catalogs.
+   *
+   * @param targetTable target table that needs to synced.
+   * @param catalogSyncClients Collection of catalog sync clients along with their table identifiers
+   *     for each target catalog.
+   * @param conversionSourceProvider A provider for the {@link ConversionSource} instance for the
+   *     table format of targetTable.
+   */
+  private SyncResult syncCatalogsForTargetTable(
       TargetTable targetTable,
       Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients,
       ConversionSourceProvider conversionSourceProvider) {

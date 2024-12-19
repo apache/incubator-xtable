@@ -21,7 +21,6 @@ package org.apache.xtable.spi.sync;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,10 +50,10 @@ import org.apache.xtable.model.sync.SyncResult;
 @ExtendWith(MockitoExtension.class)
 public class TestCatalogSync<TABLE> {
 
-  private final CatalogSyncClient<TABLE> mockClient1 = mock(CatalogSyncClient.class);
-  private final CatalogSyncClient<TABLE> mockClient2 = mock(CatalogSyncClient.class);
-  private final CatalogSyncClient<TABLE> mockClient3 = mock(CatalogSyncClient.class);
-  private final CatalogSyncClient<TABLE> mockClient4 = mock(CatalogSyncClient.class);
+  @Mock CatalogSyncClient<TABLE> mockClient1;
+  @Mock CatalogSyncClient<TABLE> mockClient2;
+  @Mock CatalogSyncClient<TABLE> mockClient3;
+  @Mock CatalogSyncClient<TABLE> mockClient4;
 
   private final CatalogTableIdentifier tableIdentifier1 =
       CatalogTableIdentifier.builder().databaseName("database1").tableName("table1").build();
@@ -91,12 +90,11 @@ public class TestCatalogSync<TABLE> {
     when(mockClient2.getTable(tableIdentifier2)).thenReturn(null);
     when(mockClient3.getTable(tableIdentifier3)).thenReturn(mockTable);
 
-    when(mockClient1.getStorageDescriptorLocation(any())).thenReturn("/tmp/test_changed");
-    when(mockClient2.getStorageDescriptorLocation(any())).thenReturn("/tmp/test");
-    when(mockClient3.getStorageDescriptorLocation(any())).thenReturn("/tmp/test");
+    when(mockClient1.getStorageLocation(any())).thenReturn("/tmp/test_changed");
+    when(mockClient2.getStorageLocation(any())).thenReturn("/tmp/test");
+    when(mockClient3.getStorageLocation(any())).thenReturn("/tmp/test");
 
     when(mockClient4.getCatalogName()).thenReturn("catalogName4");
-    when(mockClient4.getCatalogImpl()).thenReturn("catalogImpl4");
 
     Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients =
         ImmutableMap.of(
