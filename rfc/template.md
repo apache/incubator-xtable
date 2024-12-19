@@ -33,22 +33,22 @@ GH Feature Request: <link to umbrella JIRA>
 
 ## Abstract
 
-Describe the problem you are trying to solve and a brief description of why it’s needed
+Describe the problem you are trying to solve and a brief description of why it’s needed.
 
 ## Background
-Introduce any much background context which is relevant or necessary to understand the feature and design choices.
+Introduce any background context which is relevant or necessary to understand the feature and design choices.
 
 ## Implementation
 Describe the new thing you want to do in appropriate detail, how it fits into the project architecture.
-Provide a detailed description of how you intend to implement this feature.This may be fairly extensive and have large subsections of its own.
-Or it may be a few sentences. Use judgement based on the scope of the change.
+Provide a detailed description of how you intend to implement this feature.This may be fairly extensive and have large subsections of its own or it may be a few sentences. 
+Use judgement based on the scope of the change.
 
 ## Rollout/Adoption Plan
 
 - What impact (if any) will there be on existing users?
-- If we are changing behavior how will we phase out the older behavior?
+- Are there any breaking changes as part of this change ? 
+- If we are changing behavior how will we phase out the older behavior ? When will we remove the existing behavior ? 
 - If we need special migration tools, describe them here.
-- When will we remove the existing behavior
 
 ## Test Plan
 
