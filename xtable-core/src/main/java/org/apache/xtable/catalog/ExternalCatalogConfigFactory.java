@@ -28,11 +28,14 @@ public class ExternalCatalogConfigFactory {
   public static ExternalCatalogConfig fromCatalogType(
       String catalogType, String catalogId, Map<String, String> properties) {
     // TODO: Choose existing implementation based on catalogType.
-    String catalogImpl = "";
+    String catalogSyncClientImpl = "";
+    String catalogConversionSourceImpl = "";
     return ExternalCatalogConfig.builder()
-        .catalogImpl(catalogImpl)
+        .catalogType(catalogType)
+        .catalogSyncClientImpl(catalogSyncClientImpl)
+        .catalogConversionSourceImpl(catalogConversionSourceImpl)
         .catalogId(catalogId)
-        .catalogOptions(properties)
+        .catalogProperties(properties)
         .build();
   }
 }

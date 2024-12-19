@@ -142,7 +142,9 @@ public class ConversionController {
                         TargetCatalogConfig::getCatalogTableIdentifier,
                         targetCatalog ->
                             catalogConversionFactory.createCatalogSyncClient(
-                                targetCatalog.getCatalogConfig(), conf)));
+                                targetCatalog.getCatalogConfig(),
+                                targetTable.getFormatName(),
+                                conf)));
         catalogSyncResults.put(
             targetTable.getFormatName(),
             syncCatalogsForTargetTable(

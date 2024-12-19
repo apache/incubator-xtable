@@ -51,18 +51,10 @@ public class ITTestUtils {
     Assertions.assertEquals(partitioningFields, internalTable.getPartitioningFields());
   }
 
-  public static class TestCatalogImpl implements CatalogConversionSource, CatalogSyncClient {
+  public static class TestCatalogSyncImpl implements CatalogSyncClient {
 
-    public TestCatalogImpl(ExternalCatalogConfig catalogConfig, Configuration hadoopConf) {}
-
-    @Override
-    public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
-      return SourceTable.builder()
-          .name("source_table_name")
-          .basePath("file://base_path/v1/")
-          .formatName("ICEBERG")
-          .build();
-    }
+    public TestCatalogSyncImpl(
+        ExternalCatalogConfig catalogConfig, String tableFormat, Configuration hadoopConf) {}
 
     @Override
     public String getCatalogId() {
@@ -102,5 +94,19 @@ public class ITTestUtils {
 
     @Override
     public void close() throws Exception {}
+  }
+
+  public static class TestCatalogConversionSourceImpl implements CatalogConversionSource {
+    public TestCatalogConversionSourceImpl(
+        ExternalCatalogConfig sourceCatalogConfig, Configuration configuration) {}
+
+    @Override
+    public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
+      return SourceTable.builder()
+          .name("source_table_name")
+          .basePath("file://base_path/v1/")
+          .formatName("ICEBERG")
+          .build();
+    }
   }
 }

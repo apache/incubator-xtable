@@ -42,7 +42,7 @@ public class CatalogConversionFactory {
   public static CatalogConversionSource createCatalogConversionSource(
       ExternalCatalogConfig sourceCatalogConfig, Configuration configuration) {
     return ReflectionUtils.createInstanceOfClass(
-        sourceCatalogConfig.getCatalogImpl(), sourceCatalogConfig, configuration);
+        sourceCatalogConfig.getCatalogConversionSourceImpl(), sourceCatalogConfig, configuration);
   }
 
   /**
@@ -53,8 +53,11 @@ public class CatalogConversionFactory {
    * @param configuration hadoop configuration
    */
   public CatalogSyncClient createCatalogSyncClient(
-      ExternalCatalogConfig targetCatalogConfig, Configuration configuration) {
+      ExternalCatalogConfig targetCatalogConfig, String tableFormat, Configuration configuration) {
     return ReflectionUtils.createInstanceOfClass(
-        targetCatalogConfig.getCatalogImpl(), targetCatalogConfig, configuration);
+        targetCatalogConfig.getCatalogSyncClientImpl(),
+        targetCatalogConfig,
+        tableFormat,
+        configuration);
   }
 }

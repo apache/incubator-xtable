@@ -42,7 +42,6 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,7 +49,6 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import org.apache.xtable.catalog.CatalogConversionFactory;
-import org.apache.xtable.catalog.ExternalCatalogConfigFactory;
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
@@ -132,12 +130,12 @@ public class RunCatalogSync {
     RunSync.TableFormatConverters tableFormatConverters =
         loadTableFormatConversionConfigs(customConfig);
 
-    Map<String, DatasetConfig.Catalog> catalogsByName =
+    Map<String, ExternalCatalogConfig> catalogsById =
         datasetConfig.getTargetCatalogs().stream()
-            .collect(Collectors.toMap(DatasetConfig.Catalog::getCatalogId, Function.identity()));
-    ExternalCatalogConfig sourceCatalogConfig = getCatalogConfig(datasetConfig.getSourceCatalog());
+            .collect(Collectors.toMap(ExternalCatalogConfig::getCatalogId, Function.identity()));
     CatalogConversionSource catalogConversionSource =
-        CatalogConversionFactory.createCatalogConversionSource(sourceCatalogConfig, hadoopConf);
+        CatalogConversionFactory.createCatalogConversionSource(
+            datasetConfig.getSourceCatalog(), hadoopConf);
     ConversionController conversionController = new ConversionController(hadoopConf);
     for (DatasetConfig.Dataset dataset : datasetConfig.getDatasets()) {
       SourceTable sourceTable = null;
@@ -181,9 +179,7 @@ public class RunCatalogSync {
                 TargetCatalogConfig.builder()
                     .catalogTableIdentifier(
                         targetCatalogTableIdentifier.getCatalogTableIdentifier())
-                    .catalogConfig(
-                        getCatalogConfig(
-                            catalogsByName.get(targetCatalogTableIdentifier.getCatalogId())))
+                    .catalogConfig(catalogsById.get(targetCatalogTableIdentifier.getCatalogId()))
                     .build());
       }
       ConversionConfig conversionConfig =
@@ -205,19 +201,6 @@ public class RunCatalogSync {
       } catch (Exception e) {
         log.error(String.format("Error running sync for %s", sourceTable.getBasePath()), e);
       }
-    }
-  }
-
-  static ExternalCatalogConfig getCatalogConfig(DatasetConfig.Catalog catalog) {
-    if (!StringUtils.isEmpty(catalog.getCatalogType())) {
-      return ExternalCatalogConfigFactory.fromCatalogType(
-          catalog.getCatalogType(), catalog.getCatalogId(), catalog.getCatalogProperties());
-    } else {
-      return ExternalCatalogConfig.builder()
-          .catalogId(catalog.getCatalogId())
-          .catalogImpl(catalog.getCatalogImpl())
-          .catalogOptions(catalog.getCatalogProperties())
-          .build();
     }
   }
 
@@ -252,36 +235,17 @@ public class RunCatalogSync {
      * Configuration of the source catalog from which XTable will read. It must contain all the
      * necessary connection and access details for describing and listing tables
      */
-    private Catalog sourceCatalog;
+    private ExternalCatalogConfig sourceCatalog;
     /**
      * Defines configuration one or more target catalogs, to which XTable will write or update
      * tables. Unlike the source, these catalogs must be writable
      */
-    private List<Catalog> targetCatalogs;
+    private List<ExternalCatalogConfig> targetCatalogs;
     /** A list of datasets that specify how a source table maps to one or more target tables. */
     private List<Dataset> datasets;
 
     /** Configuration for catalog. */
-    @Data
-    public static class Catalog {
-      /** A user defined unique identifier for the catalog. */
-      private String catalogId;
-      /**
-       * The type of the source catalog. This might be a specific type understood by XTable, such as
-       * Hive, Glue etc.
-       */
-      private String catalogType;
-      /**
-       * (Optional) A fully qualified class name that implements the interfaces for
-       * CatalogSyncClient, it can be used if the implementation for catalogType doesn't exist in
-       * XTable. This is an optional field.
-       */
-      private String catalogImpl;
-      /**
-       * A collection of configs used to configure access or connection properties for the catalog.
-       */
-      private Map<String, String> catalogProperties;
-    }
+    ExternalCatalogConfig catalogConfig;
 
     @Data
     public static class Dataset {
@@ -306,8 +270,8 @@ public class RunCatalogSync {
     @Data
     public static class TargetTableIdentifier {
       /**
-       * The user defined unique identifier of the target {@link Catalog} where the table will be
-       * created or updated
+       * The user defined unique identifier of the target catalog where the table will be created or
+       * updated
        */
       String catalogId;
       /**

@@ -459,10 +459,10 @@ public class TestConversionController {
         .thenReturn(tableFormatSyncResults);
     // Mocks for catalogSync.
     when(mockCatalogConversionFactory.createCatalogSyncClient(
-            targetCatalogs.get(0).getCatalogConfig(), mockConf))
+            eq(targetCatalogs.get(0).getCatalogConfig()), any(), eq(mockConf)))
         .thenReturn(mockCatalogSyncClient1);
     when(mockCatalogConversionFactory.createCatalogSyncClient(
-            targetCatalogs.get(1).getCatalogConfig(), mockConf))
+            eq(targetCatalogs.get(1).getCatalogConfig()), any(), eq(mockConf)))
         .thenReturn(mockCatalogSyncClient2);
     when(catalogSync.syncTable(
             eq(
@@ -590,8 +590,8 @@ public class TestConversionController {
         .catalogConfig(
             ExternalCatalogConfig.builder()
                 .catalogId("catalogId-" + suffix)
-                .catalogImpl("catalogImpl-" + suffix)
-                .catalogOptions(Collections.emptyMap())
+                .catalogSyncClientImpl("catalogImpl-" + suffix)
+                .catalogProperties(Collections.emptyMap())
                 .build())
         .catalogTableIdentifier(
             CatalogTableIdentifier.builder()

@@ -30,7 +30,8 @@ import org.apache.xtable.conversion.TargetCatalogConfig;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
-import org.apache.xtable.testutil.ITTestUtils.TestCatalogImpl;
+import org.apache.xtable.testutil.ITTestUtils.TestCatalogConversionSourceImpl;
+import org.apache.xtable.testutil.ITTestUtils.TestCatalogSyncImpl;
 
 class TestCatalogConversionFactory {
 
@@ -39,12 +40,14 @@ class TestCatalogConversionFactory {
     ExternalCatalogConfig sourceCatalog =
         ExternalCatalogConfig.builder()
             .catalogId("catalogId")
-            .catalogImpl(TestCatalogImpl.class.getName())
-            .catalogOptions(Collections.emptyMap())
+            .catalogConversionSourceImpl(TestCatalogConversionSourceImpl.class.getName())
+            .catalogProperties(Collections.emptyMap())
             .build();
     CatalogConversionSource catalogConversionSource =
         CatalogConversionFactory.createCatalogConversionSource(sourceCatalog, new Configuration());
-    assertEquals(catalogConversionSource.getClass().getName(), TestCatalogImpl.class.getName());
+    assertEquals(
+        catalogConversionSource.getClass().getName(),
+        TestCatalogConversionSourceImpl.class.getName());
   }
 
   @Test
@@ -54,8 +57,8 @@ class TestCatalogConversionFactory {
             .catalogConfig(
                 ExternalCatalogConfig.builder()
                     .catalogId("catalogId")
-                    .catalogImpl(TestCatalogImpl.class.getName())
-                    .catalogOptions(Collections.emptyMap())
+                    .catalogSyncClientImpl(TestCatalogSyncImpl.class.getName())
+                    .catalogProperties(Collections.emptyMap())
                     .build())
             .catalogTableIdentifier(
                 CatalogTableIdentifier.builder()
@@ -65,7 +68,8 @@ class TestCatalogConversionFactory {
             .build();
     CatalogSyncClient catalogSyncClient =
         CatalogConversionFactory.getInstance()
-            .createCatalogSyncClient(targetCatalogConfig.getCatalogConfig(), new Configuration());
-    assertEquals(catalogSyncClient.getClass().getName(), TestCatalogImpl.class.getName());
+            .createCatalogSyncClient(
+                targetCatalogConfig.getCatalogConfig(), "TABLE_FORMAT", new Configuration());
+    assertEquals(catalogSyncClient.getClass().getName(), TestCatalogSyncImpl.class.getName());
   }
 }
