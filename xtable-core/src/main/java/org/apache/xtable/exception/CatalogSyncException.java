@@ -16,30 +16,18 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.catalog;
+package org.apache.xtable.exception;
 
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+import org.apache.xtable.model.exception.ErrorCode;
+import org.apache.xtable.model.exception.InternalException;
 
-/** This class represents the unique identifier for a table in a catalog. */
-@Value
-@Builder
-public class CatalogTableIdentifier {
-  /**
-   * Catalogs have the ability to group tables logically, databaseName is the identifier for such
-   * logical classification. The alternate names for this field include namespace, schemaName etc.
-   */
-  @NonNull String databaseName;
+public class CatalogSyncException extends InternalException {
 
-  /**
-   * The table name used when syncing the table to the catalog. NOTE: This name can be different
-   * from the table name in storage.
-   */
-  @NonNull String tableName;
+  public CatalogSyncException(ErrorCode errorCode, String message, Throwable e) {
+    super(errorCode, message, e);
+  }
 
-  @Override
-  public String toString() {
-    return String.format("%s.%s", databaseName, tableName);
+  public CatalogSyncException(String message, Throwable e) {
+    super(ErrorCode.CATALOG_SYNC_GENERIC_EXCEPTION, message, e);
   }
 }
