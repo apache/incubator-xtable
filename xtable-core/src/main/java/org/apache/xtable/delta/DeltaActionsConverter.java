@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.Path;
 
 import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.AddFile;
+import org.apache.spark.sql.delta.actions.DeletionVectorDescriptor;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import org.apache.xtable.exception.NotSupportedException;
@@ -105,5 +106,25 @@ public class DeltaActionsConverter {
       return dataFilePath;
     }
     return tableBasePath + Path.SEPARATOR + dataFilePath;
+  }
+
+  /**
+   * Extracts the representation of the deletion vector information corresponding to an AddFile
+   * action. Currently, this method extracts and returns the path to the data file for which a
+   * deletion vector data is present.
+   *
+   * @param snapshot the commit snapshot
+   * @param addFile the add file action
+   * @return the deletion vector representation (path of data file), or null if no deletion vector
+   *     is present
+   */
+  public String extractDeletionVectorFile(Snapshot snapshot, AddFile addFile) {
+    DeletionVectorDescriptor deletionVector = addFile.deletionVector();
+    if (deletionVector == null) {
+      return null;
+    }
+
+    String dataFilePath = addFile.path();
+    return getFullPathToFile(snapshot, dataFilePath);
   }
 }

@@ -40,6 +40,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -488,7 +489,7 @@ public class TestConversionController {
             Arrays.asList(ICEBERG, DELTA),
             syncResult.toBuilder().syncDuration(Duration.ofSeconds(4)).build());
     Map<String, SyncResult> result =
-        conversionController.syncCatalogs(conversionConfig, conversionSourceProviders);
+        conversionController.syncTableAcrossCatalogs(conversionConfig, conversionSourceProviders);
     assertEquals(mergedSyncResults, result);
   }
 
@@ -579,7 +580,7 @@ public class TestConversionController {
         .targetTables(targetTables)
         .targetCatalogs(
             targetTables.stream()
-                .collect(Collectors.toMap(TargetTable::getId, k -> targetCatalogs)))
+                .collect(Collectors.toMap(Function.identity(), k -> targetCatalogs)))
         .syncMode(syncMode)
         .build();
   }
