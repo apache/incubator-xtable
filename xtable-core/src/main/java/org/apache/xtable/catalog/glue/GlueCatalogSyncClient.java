@@ -79,8 +79,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
             tableFormat, this.configuration, schemaExtractor);
   }
 
-  public GlueCatalogSyncClient(
-      ExternalCatalogConfig catalogConfig, Configuration configuration) {
+  public GlueCatalogSyncClient(ExternalCatalogConfig catalogConfig, Configuration configuration) {
     this.catalogConfig = catalogConfig;
     this.glueCatalogConfig = GlueCatalogConfig.of(catalogConfig.getCatalogOptions());
     this.glueClient = new DefaultGlueClientFactory(glueCatalogConfig).getGlueClient();

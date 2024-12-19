@@ -56,7 +56,7 @@ public class TestIcebergGlueCatalogSyncRequestProvider extends GlueCatalogSyncTe
 
   private IcebergGlueCatalogSyncRequestProvider createIcebergGlueCatalogSyncHelper() {
     return new IcebergGlueCatalogSyncRequestProvider(
-        mockGlueSchemaExtractor, mockIcebergHadoopTables);
+        testConfiguration, mockGlueSchemaExtractor, mockIcebergHadoopTables);
   }
 
   void setupCommonMocks() {

@@ -18,6 +18,8 @@
  
 package org.apache.xtable.catalog.glue;
 
+import lombok.Getter;
+
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.xtable.exception.NotSupportedException;
@@ -29,6 +31,17 @@ import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.TableInput;
 
 abstract class GlueCatalogSyncRequestProvider {
+
+  @Getter private final GlueSchemaExtractor schemaExtractor;
+  @Getter private final Configuration configuration;
+  @Getter private final String tableFormat;
+
+  GlueCatalogSyncRequestProvider(
+      Configuration configuration, GlueSchemaExtractor schemaExtractor, String tableFormat) {
+    this.configuration = configuration;
+    this.schemaExtractor = schemaExtractor;
+    this.tableFormat = tableFormat;
+  }
 
   abstract TableInput getCreateTableInput(
       InternalTable table, CatalogTableIdentifier tableIdentifier);

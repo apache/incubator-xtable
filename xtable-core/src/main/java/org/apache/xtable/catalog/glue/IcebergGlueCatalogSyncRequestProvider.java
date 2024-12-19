@@ -44,19 +44,18 @@ import software.amazon.awssdk.services.glue.model.TableInput;
 /** Iceberg specific table operations for Glue catalog sync */
 class IcebergGlueCatalogSyncRequestProvider extends GlueCatalogSyncRequestProvider {
 
-  private final GlueSchemaExtractor schemaExtractor;
   private final HadoopTables hadoopTables;
 
   IcebergGlueCatalogSyncRequestProvider(
       Configuration configuration, GlueSchemaExtractor schemaExtractor) {
-    this.schemaExtractor = schemaExtractor;
+    super(configuration, schemaExtractor, TableFormat.ICEBERG);
     this.hadoopTables = new HadoopTables(configuration);
   }
 
   @VisibleForTesting
   IcebergGlueCatalogSyncRequestProvider(
-      GlueSchemaExtractor schemaExtractor, HadoopTables hadoopTables) {
-    this.schemaExtractor = schemaExtractor;
+      Configuration configuration, GlueSchemaExtractor schemaExtractor, HadoopTables hadoopTables) {
+    super(configuration, schemaExtractor, TableFormat.ICEBERG);
     this.hadoopTables = hadoopTables;
   }
 
@@ -70,7 +69,7 @@ class IcebergGlueCatalogSyncRequestProvider extends GlueCatalogSyncRequestProvid
         .storageDescriptor(
             StorageDescriptor.builder()
                 .location(table.getBasePath())
-                .columns(schemaExtractor.toColumns(TableFormat.ICEBERG, table.getReadSchema()))
+                .columns(getSchemaExtractor().toColumns(getTableFormat(), table.getReadSchema()))
                 .build())
         .build();
   }
@@ -91,8 +90,8 @@ class IcebergGlueCatalogSyncRequestProvider extends GlueCatalogSyncRequestProvid
             StorageDescriptor.builder()
                 .location(table.getBasePath())
                 .columns(
-                    schemaExtractor.toColumns(
-                        TableFormat.ICEBERG, table.getReadSchema(), catalogTable))
+                    getSchemaExtractor()
+                        .toColumns(getTableFormat(), table.getReadSchema(), catalogTable))
                 .build())
         .build();
   }
@@ -100,7 +99,7 @@ class IcebergGlueCatalogSyncRequestProvider extends GlueCatalogSyncRequestProvid
   @VisibleForTesting
   Map<String, String> getTableParameters(BaseTable icebergTable) {
     Map<String, String> parameters = new HashMap<>(icebergTable.properties());
-    parameters.put(TABLE_TYPE_PROP, TableFormat.ICEBERG);
+    parameters.put(TABLE_TYPE_PROP, getTableFormat());
     parameters.put(METADATA_LOCATION_PROP, getMetadataFileLocation(icebergTable));
     return parameters;
   }
