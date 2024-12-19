@@ -19,6 +19,7 @@
 package org.apache.xtable.hudi;
 
 import static java.util.stream.Collectors.groupingBy;
+import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.file.Path;
@@ -26,6 +27,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +40,7 @@ import java.util.stream.Stream;
 import lombok.Builder;
 import lombok.Value;
 
+import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
@@ -65,7 +68,13 @@ import org.apache.xtable.ValidationTestHelper;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.storage.DataLayoutStrategy;
+import org.apache.xtable.model.storage.TableFormat;
 
 /**
  * A suite of functional tests that the extraction from Hudi to Intermediate representation works.
@@ -95,6 +104,122 @@ public class ITHudiConversionSourceSource {
     }
     if (sparkSession != null) {
       sparkSession.close();
+    }
+  }
+
+  @Test
+  void getCurrentTableTest() {
+    String tableName = GenericTable.getTableName();
+    Path basePath = tempDir.resolve(tableName);
+    HudiTestUtil.PartitionConfig partitionConfig = HudiTestUtil.PartitionConfig.of(null, null);
+    Schema schema =
+        Schema.createRecord(
+            "testCurrentTable",
+            null,
+            "hudi",
+            false,
+            Arrays.asList(
+                new Schema.Field("field1", Schema.create(Schema.Type.STRING)),
+                new Schema.Field("field2", Schema.create(Schema.Type.STRING))));
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.withSchema(
+            tableName,
+            tempDir,
+            HudiTestUtil.PartitionConfig.of(null, null).getHudiConfig(),
+            HoodieTableType.MERGE_ON_READ,
+            schema)) {
+      table.insertRecords(5, Collections.emptyList(), false);
+      HudiConversionSource hudiClient =
+          getHudiSourceClient(
+              CONFIGURATION, table.getBasePath(), partitionConfig.getXTableConfig());
+      InternalTable internalTable = hudiClient.getCurrentTable();
+      InternalSchema internalSchema =
+          InternalSchema.builder()
+              .name("testCurrentTable")
+              .dataType(InternalType.RECORD)
+              .isNullable(false)
+              .fields(
+                  Arrays.asList(
+                      InternalField.builder()
+                          .name("_hoodie_commit_time")
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(true)
+                                  .build())
+                          .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                          .build(),
+                      InternalField.builder()
+                          .name("_hoodie_commit_seqno")
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(true)
+                                  .build())
+                          .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                          .build(),
+                      InternalField.builder()
+                          .name("_hoodie_record_key")
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(true)
+                                  .build())
+                          .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                          .build(),
+                      InternalField.builder()
+                          .name("_hoodie_partition_path")
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(true)
+                                  .build())
+                          .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                          .build(),
+                      InternalField.builder()
+                          .name("_hoodie_file_name")
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(true)
+                                  .build())
+                          .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                          .build(),
+                      InternalField.builder()
+                          .name("field1")
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(false)
+                                  .build())
+                          .defaultValue(null)
+                          .build(),
+                      InternalField.builder()
+                          .name("field2")
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(false)
+                                  .build())
+                          .defaultValue(null)
+                          .build()))
+              .recordKeyFields(Collections.singletonList(null))
+              .build();
+      validateTable(
+          internalTable,
+          tableName,
+          TableFormat.HUDI,
+          internalSchema,
+          DataLayoutStrategy.FLAT,
+          "file:" + basePath + "_v1",
+          Collections.emptyList());
     }
   }
 
