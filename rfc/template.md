@@ -45,8 +45,8 @@ Use judgement based on the scope of the change.
 
 ## Rollout/Adoption Plan
 
+- Are there any breaking changes as part of this new feature/functionality ?
 - What impact (if any) will there be on existing users?
-- Are there any breaking changes as part of this change ? 
 - If we are changing behavior how will we phase out the older behavior ? When will we remove the existing behavior ? 
 - If we need special migration tools, describe them here.
 
