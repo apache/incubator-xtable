@@ -53,23 +53,25 @@ This will be utility class that parses the user's YAML configuration, synchroniz
 
 User's YAML configuration.
 1. `sourceCatalog`: Configuration of the source catalog from which XTable will read. It must contain all the necessary connection and access details for describing and listing tables.
-    1. `catalogName`: A unique name for the source catalog (e.g., "source-1").
+    1. `catalogId`:  A user-defined unique identifier for the catalog, allows user to sync table to multiple catalogs of the same name/type eg: HMS catalog with url1, HMS catalog with url2.
     2. `catalogType`: The type of the source catalog. This might be a specific type understood by XTable, such as Hive, Glue etc.
-    3. `catalogImpl`(optional): A fully qualified class name that implements the interfaces for `CatalogSyncClient`, it can be used if the implementation for catalogType doesn't exist in XTable.
-    4. `catalogProperties`: A collection of configs used to configure access or connection properties for the catalog 
+    3. `catalogSyncClientImpl`(optional): A fully qualified class name that implements the interfaces for `CatalogSyncClient`, it can be used if the implementation for catalogType doesn't exist in XTable.
+    4. `catalogConversionSourceImpl`(optional): A fully qualified class name that implements the interfaces for `CatalogConversionSource`, it can be used if the implementation for catalogType doesn't exist in XTable.
+    5. `catalogProperties`: A collection of configs used to configure access or connection properties for the catalog.
 2. `targetCatalogs`: Defines configuration one or more target catalogs, to which XTable will write or update tables. Unlike the source, these catalogs must be writable.
 3. `datasets`: A list of datasets that specify how a source table maps to one or more target tables.
    1. `sourceCatalogTableIdentifier`: Identifies the source table in sourceCatalog. This can be done in two ways:
-      1. `catalogTableIdentifier`: Specifies a source table by its database and table name. 
+      1. `catalogTableIdentifier`: Specifies a source table by its catalogName, databaseName and tableName. If catalogName is not provided, the default catalog will be used.   
       2. `storageIdentifier`(optional): Provides direct storage details such as a table’s base path (like an S3 location) and the partition specification. This allows reading from a source even if it is not strictly registered in a catalog, as long as the format and location are known
    2. `targetCatalogTableIdentifiers`: A list of one or more targets that this source table should be written to.
-      1. `catalogName`: The name of the target catalog where the table will be created or updated.
+      1. `catalogId`: The user defined unique identifier of the target catalog where the table will be created or updated. The targetCatalog's id passed here should be one of the `targetCatalogs` defined above.
       2. `tableFormat`: The target table format (e.g., DELTA, HUDI, ICEBERG), specifying how the data will be stored at the target.
-      3. `catalogTableIdentifier`: Specifies the database and table name in the target catalog.
+      3. `catalogTableIdentifier`: Specifies a target table by its catalogName, databaseName and tableName. If catalogName is not provided, the default catalog will be used.
 ```
 sourceCatalog:
   catalogName: "source-1"
   catalogType: "catalog-type-1"
+  catalogConversionSourceImpl: "org.apache.xtable.utilities.CustomCatalogConversionSourceImpl"
   catalogProperties:
     key01: "value01"
     key02: "value02"
@@ -82,7 +84,7 @@ targetCatalogs:
       key12: "value22"
       key13: "value33"
   - catalogName: "target-2"
-    catalogImpl: "org.apache.xtable.utilities.CustomCatalogImpl"
+    catalogSyncClientImpl: "org.apache.xtable.utilities.CustomCatalogSyncClientImpl"
     catalogProperties:
       key21: "value21"
       key22: "value22"
@@ -128,11 +130,11 @@ datasets:
 
 ## Rollout/Adoption Plan
 
-- Are there any breaking changes as part of this new feature/functionality ?
-  - In `SyncResult` status has been refactored to tableFormatSyncStatus for clarity.
+- Are there any breaking changes as part of this new feature/functionality?
+  - In `SyncResult` status has been refactored to `tableFormatSyncStatus` for clarity.
 - What impact (if any) will there be on existing users? 
   - No on existing users, this is a new functionality being added to synchronize tables across catalogs. Existing XTable users can still use the table format sync in `RunSync` without any issues.
-- If we are changing behavior how will we phase out the older behavior? When will we remove the existing behavior ? 
+- If we are changing behavior how will we phase out the older behavior? When will we remove the existing behavior? 
   - N/A
 - If we need special migration tools, describe them here.
   - N/A
