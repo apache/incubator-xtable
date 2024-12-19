@@ -94,7 +94,7 @@ public class TestCatalogSync<TABLE> {
     when(mockClient2.getStorageLocation(any())).thenReturn("/tmp/test");
     when(mockClient3.getStorageLocation(any())).thenReturn("/tmp/test");
 
-    when(mockClient4.getCatalogName()).thenReturn("catalogName4");
+    when(mockClient4.getCatalogId()).thenReturn("catalogId4");
 
     Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients =
         ImmutableMap.of(

@@ -68,7 +68,7 @@ public class CatalogSync {
                 catalogSyncClient.getClass().getName());
             results.add(
                 getCatalogSyncFailureStatus(
-                    catalogSyncClient.getCatalogName(), catalogSyncClient.getClass().getName(), e));
+                    catalogSyncClient.getCatalogId(), catalogSyncClient.getClass().getName(), e));
           }
         }));
     return SyncResult.builder()
@@ -109,15 +109,15 @@ public class CatalogSync {
       catalogSyncClient.refreshTable(table, catalogTable, tableIdentifier);
     }
     return CatalogSyncStatus.builder()
-        .catalogName(catalogSyncClient.getCatalogName())
+        .catalogId(catalogSyncClient.getCatalogId())
         .statusCode(SyncResult.SyncStatusCode.SUCCESS)
         .build();
   }
 
   private CatalogSyncStatus getCatalogSyncFailureStatus(
-      String catalogName, String catalogImpl, Exception e) {
+      String catalogId, String catalogImpl, Exception e) {
     return CatalogSyncStatus.builder()
-        .catalogName(catalogName)
+        .catalogId(catalogId)
         .statusCode(SyncResult.SyncStatusCode.ERROR)
         .errorDetails(
             SyncResult.ErrorDetails.builder()

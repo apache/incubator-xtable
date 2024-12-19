@@ -68,8 +68,8 @@ public class SyncResult {
   @Value
   @Builder
   public static class CatalogSyncStatus {
-    // Catalog Identifier.
-    String catalogName;
+    // A user defined unique catalog identifier.
+    String catalogId;
     // Status code
     SyncStatusCode statusCode;
     // errorDetails if any

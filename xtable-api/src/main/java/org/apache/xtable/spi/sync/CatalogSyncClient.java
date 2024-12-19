@@ -29,10 +29,10 @@ import org.apache.xtable.model.catalog.CatalogTableIdentifier;
  */
 public interface CatalogSyncClient<TABLE> extends AutoCloseable {
   /**
-   * Returns a unique identifier for the catalog, allows user to sync table to multiple catalogs of
-   * the same type eg: HMS catalogs with url1, HMS catalog with url2.
+   * Returns the user-defined unique identifier for the catalog, allows user to sync table to
+   * multiple catalogs of the same name/type eg: HMS catalog with url1, HMS catalog with url2.
    */
-  String getCatalogName();
+  String getCatalogId();
 
   /** Returns the storage location of the table synced to the catalog. */
   String getStorageLocation(TABLE table);
