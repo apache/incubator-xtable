@@ -22,10 +22,29 @@ import lombok.Builder;
 import lombok.NonNull;
 import lombok.Value;
 
-/** This class represents the unique identifier for a table in a catalog. */
+/**
+ * An internal representation of a fully qualified table identifier within a catalog. The naming
+ * convention varies across different catalogs but many of them follow a three level hierarchy, few
+ * examples can be found below.
+ *
+ * <ul>
+ *   <li>1. catalog.database.table
+ *   <li>2. catalog.schema.table
+ *   <li>3. database.schema.table
+ * </ul>
+ *
+ * We have selected the first naming convention and will interoperate among other catalogs following
+ * a different convention.
+ */
 @Value
 @Builder
 public class CatalogTableIdentifier {
+  /**
+   * The top level hierarchy/namespace for organizing tables. Each catalog can have multiple
+   * databases/schemas. This is an optional field as many catalogs have a "default" catalog whose
+   * name varies depending on the catalogType.
+   */
+  String catalogName;
   /**
    * Catalogs have the ability to group tables logically, databaseName is the identifier for such
    * logical classification. The alternate names for this field include namespace, schemaName etc.
