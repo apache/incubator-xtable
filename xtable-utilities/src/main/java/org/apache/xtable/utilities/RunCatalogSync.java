@@ -134,7 +134,7 @@ public class RunCatalogSync {
 
     Map<String, DatasetConfig.Catalog> catalogsByName =
         datasetConfig.getTargetCatalogs().stream()
-            .collect(Collectors.toMap(DatasetConfig.Catalog::getCatalogName, Function.identity()));
+            .collect(Collectors.toMap(DatasetConfig.Catalog::getCatalogId, Function.identity()));
     ExternalCatalogConfig sourceCatalogConfig = getCatalogConfig(datasetConfig.getSourceCatalog());
     CatalogConversionSource catalogConversionSource =
         CatalogConversionFactory.createCatalogConversionSource(sourceCatalogConfig, hadoopConf);
@@ -183,7 +183,7 @@ public class RunCatalogSync {
                         targetCatalogTableIdentifier.getCatalogTableIdentifier())
                     .catalogConfig(
                         getCatalogConfig(
-                            catalogsByName.get(targetCatalogTableIdentifier.getCatalogName())))
+                            catalogsByName.get(targetCatalogTableIdentifier.getCatalogId())))
                     .build());
       }
       ConversionConfig conversionConfig =
@@ -211,10 +211,10 @@ public class RunCatalogSync {
   static ExternalCatalogConfig getCatalogConfig(DatasetConfig.Catalog catalog) {
     if (!StringUtils.isEmpty(catalog.getCatalogType())) {
       return ExternalCatalogConfigFactory.fromCatalogType(
-          catalog.getCatalogType(), catalog.getCatalogName(), catalog.getCatalogProperties());
+          catalog.getCatalogType(), catalog.getCatalogId(), catalog.getCatalogProperties());
     } else {
       return ExternalCatalogConfig.builder()
-          .catalogName(catalog.getCatalogName())
+          .catalogId(catalog.getCatalogId())
           .catalogImpl(catalog.getCatalogImpl())
           .catalogOptions(catalog.getCatalogProperties())
           .build();
@@ -264,8 +264,8 @@ public class RunCatalogSync {
     /** Configuration for catalog. */
     @Data
     public static class Catalog {
-      /** A unique name for the catalog. */
-      private String catalogName;
+      /** A user defined unique identifier for the catalog. */
+      private String catalogId;
       /**
        * The type of the source catalog. This might be a specific type understood by XTable, such as
        * Hive, Glue etc.
@@ -305,8 +305,11 @@ public class RunCatalogSync {
 
     @Data
     public static class TargetTableIdentifier {
-      /** name of the target catalog where the table will be created or updated */
-      String catalogName;
+      /**
+       * The user defined unique identifier of the target {@link Catalog} where the table will be
+       * created or updated
+       */
+      String catalogId;
       /**
        * The target table format (e.g., DELTA, HUDI, ICEBERG), specifying how the data will be
        * stored at the target.

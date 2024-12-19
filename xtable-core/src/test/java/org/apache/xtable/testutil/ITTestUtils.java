@@ -65,7 +65,7 @@ public class ITTestUtils {
     }
 
     @Override
-    public String getCatalogName() {
+    public String getCatalogId() {
       return null;
     }
 

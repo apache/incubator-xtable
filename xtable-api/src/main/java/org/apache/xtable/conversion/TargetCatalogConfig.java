@@ -32,7 +32,7 @@ import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 @Builder
 public class TargetCatalogConfig {
   /**
-   * The tableIdentifiers(databaseName, tableName) that will be used when syncing {@link
+   * The tableIdentifiers(catalogName.databaseName.tableName) that will be used when syncing {@link
    * TargetTable} to the catalog.
    */
   @NonNull CatalogTableIdentifier catalogTableIdentifier;

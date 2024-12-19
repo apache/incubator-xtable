@@ -15,26 +15,26 @@
 # limitations under the License.
 #
 sourceCatalog:
-  catalogName: "source-1"
+  catalogId: "source-1"
   catalogImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogImpl"
   catalogProperties:
     key01: "value1"
     key02: "value2"
     key03: "value3"
 targetCatalogs:
-  - catalogName: "target-1"
+  - catalogId: "target-1"
     catalogImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogImpl"
     catalogProperties:
       key11: "value1"
       key12: "value2"
       key13: "value3"
-  - catalogName: "target-2"
+  - catalogId: "target-2"
     catalogImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogImpl"
     catalogProperties:
       key21: "value1"
       key22: "value2"
       key23: "value3"
-  - catalogName: "target-3"
+  - catalogId: "target-3"
     catalogImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogImpl"
     catalogProperties:
       key31: "value1"
@@ -46,12 +46,12 @@ datasets:
         databaseName: "source-database-1"
         tableName: "source-1"
     targetCatalogTableIdentifiers:
-      - catalogName: "target-1"
+      - catalogId: "target-1"
         tableFormat: "DELTA"
         catalogTableIdentifier:
           databaseName: "target-database-1"
           tableName: "target-tableName-1"
-      - catalogName: "target-2"
+      - catalogId: "target-2"
         tableFormat: "HUDI"
         catalogTableIdentifier:
           databaseName: "target-database-2"
@@ -63,13 +63,14 @@ datasets:
         partitionSpec: cs_sold_date_sk:VALUE
         tableFormat: "HUDI"
     targetCatalogTableIdentifiers:
-      - catalogName: "target-2"
+      - catalogId: "target-2"
         tableFormat: "ICEBERG"
         catalogTableIdentifier:
           databaseName: "target-database-2"
           tableName: "target-tableName-2"
-      - catalogName: "target-3"
+      - catalogId: "target-3"
         tableFormat: "HUDI"
         catalogTableIdentifier:
+          catalogName: "default-catalog-2"
           databaseName: "target-database-3"
           tableName: "target-tableName-3"

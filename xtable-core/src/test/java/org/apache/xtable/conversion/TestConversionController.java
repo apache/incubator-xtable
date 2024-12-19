@@ -589,7 +589,7 @@ public class TestConversionController {
     return TargetCatalogConfig.builder()
         .catalogConfig(
             ExternalCatalogConfig.builder()
-                .catalogName("catalogName-" + suffix)
+                .catalogId("catalogId-" + suffix)
                 .catalogImpl("catalogImpl-" + suffix)
                 .catalogOptions(Collections.emptyMap())
                 .build())

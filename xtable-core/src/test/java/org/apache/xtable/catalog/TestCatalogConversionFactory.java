@@ -38,7 +38,7 @@ class TestCatalogConversionFactory {
   void createSourceForConfig() {
     ExternalCatalogConfig sourceCatalog =
         ExternalCatalogConfig.builder()
-            .catalogName("catalogName")
+            .catalogId("catalogId")
             .catalogImpl(TestCatalogImpl.class.getName())
             .catalogOptions(Collections.emptyMap())
             .build();
@@ -53,7 +53,7 @@ class TestCatalogConversionFactory {
         TargetCatalogConfig.builder()
             .catalogConfig(
                 ExternalCatalogConfig.builder()
-                    .catalogName("catalogName")
+                    .catalogId("catalogId")
                     .catalogImpl(TestCatalogImpl.class.getName())
                     .catalogOptions(Collections.emptyMap())
                     .build())
