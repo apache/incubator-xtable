@@ -82,7 +82,7 @@ class IcebergHMSCatalogSyncRequestProvider extends HMSCatalogSyncRequestProvider
       return newTb;
     } catch (IOException e) {
       throw new RuntimeException(
-          "Failed to set owner for hms table: " + tableIdentifier.getId(), e);
+          "Failed to set owner for hms table: " + tableIdentifier, e);
     }
   }
 

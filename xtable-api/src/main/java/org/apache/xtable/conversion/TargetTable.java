@@ -44,8 +44,4 @@ public class TargetTable extends ExternalTable {
     this.metadataRetention =
         metadataRetention == null ? Duration.of(7, ChronoUnit.DAYS) : metadataRetention;
   }
-
-  public String getId() {
-    return String.format("%s#%s", sanitizeBasePath(this.basePath), formatName);
-  }
 }

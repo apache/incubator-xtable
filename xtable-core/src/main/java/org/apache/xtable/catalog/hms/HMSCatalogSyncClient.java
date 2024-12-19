@@ -75,6 +75,20 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
             tableFormat, this.configuration, this.schemaExtractor);
   }
 
+  public HMSCatalogSyncClient(ExternalCatalogConfig catalogConfig, Configuration configuration) {
+    this.catalogConfig = catalogConfig;
+    this.hmsCatalogConfig = HMSCatalogConfig.of(catalogConfig.getCatalogOptions());
+    this.configuration = configuration;
+    this.schemaExtractor = HMSSchemaExtractor.getInstance();
+    try {
+      this.metaStoreClient = new HMSClient(hmsCatalogConfig, configuration).getMSC();
+    } catch (MetaException | HiveException e) {
+      throw new CatalogSyncException("HiveMetastoreClient could not be created", e);
+    }
+    // TODO: should we keep this null or add some default initialization
+    this.hmsCatalogSyncRequestProvider = null;
+  }
+
   @VisibleForTesting
   HMSCatalogSyncClient(
       ExternalCatalogConfig catalogConfig,
@@ -97,12 +111,7 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
   }
 
   @Override
-  public String getCatalogImpl() {
-    return this.getClass().getCanonicalName();
-  }
-
-  @Override
-  public String getStorageDescriptorLocation(Table table) {
+  public String getStorageLocation(Table table) {
     if (table == null || table.getSd() == null) {
       return null;
     }
@@ -143,7 +152,7 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
     } catch (NoSuchObjectException e) {
       return null;
     } catch (TException e) {
-      throw new CatalogSyncException("Failed to get table: " + tableIdentifier.getId(), e);
+      throw new CatalogSyncException("Failed to get table: " + tableIdentifier, e);
     }
   }
 
@@ -153,7 +162,7 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
     try {
       metaStoreClient.createTable(hmsTable);
     } catch (TException e) {
-      throw new CatalogSyncException("Failed to create table: " + tableIdentifier.getId(), e);
+      throw new CatalogSyncException("Failed to create table: " + tableIdentifier, e);
     }
   }
 
@@ -165,7 +174,7 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
       metaStoreClient.alter_table(
           tableIdentifier.getDatabaseName(), tableIdentifier.getTableName(), catalogTable);
     } catch (TException e) {
-      throw new CatalogSyncException("Failed to refresh table: " + tableIdentifier.getId(), e);
+      throw new CatalogSyncException("Failed to refresh table: " + tableIdentifier, e);
     }
   }
 
@@ -182,7 +191,7 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
     try {
       metaStoreClient.dropTable(tableIdentifier.getDatabaseName(), tableIdentifier.getTableName());
     } catch (TException e) {
-      throw new CatalogSyncException("Failed to drop table: " + tableIdentifier.getId(), e);
+      throw new CatalogSyncException("Failed to drop table: " + tableIdentifier, e);
     }
   }
 
@@ -216,7 +225,7 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table>, CatalogCo
     Table table = this.getTable(tableIdentifier);
     if (table == null) {
       throw new IllegalStateException(
-          String.format("table: %s not found", tableIdentifier.getId()));
+          String.format("table: %s not found", tableIdentifier));
     }
 
     String tableFormat = table.getParameters().get(TABLE_TYPE_PROP).toUpperCase(Locale.ENGLISH);
