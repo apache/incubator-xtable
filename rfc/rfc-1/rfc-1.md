@@ -122,19 +122,19 @@ datasets:
           tableName: "target-tableName-2"
 ```
 
-## Overview of the CatalogSync process
+## Overview of the `RunCatalogSync` process
 ![img.jpg](/Users/vinishreddy/OpenSource/incubator-xtable/assets/images/catalog_sync_flow.jpg)
 
 
 ## Rollout/Adoption Plan
 
+- Are there any breaking changes as part of this new feature/functionality ?
+  - In `SyncResult` status has been refactored to tableFormatSyncStatus for clarity.
 - What impact (if any) will there be on existing users? 
-  - Nope, this is a new functionality being added to synchronize tables across catalogs. Existing XTable users can still use the table format sync using RunSync without any problems.
-- If we are changing behavior how will we phase out the older behavior? 
+  - No on existing users, this is a new functionality being added to synchronize tables across catalogs. Existing XTable users can still use the table format sync in `RunSync` without any issues.
+- If we are changing behavior how will we phase out the older behavior? When will we remove the existing behavior ? 
   - N/A
 - If we need special migration tools, describe them here.
-  - N/A
-- When will we remove the existing behavior
   - N/A
 
 ## Test Plan
