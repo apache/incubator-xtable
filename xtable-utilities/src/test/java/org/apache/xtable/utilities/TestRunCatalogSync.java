@@ -16,27 +16,23 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.iceberg;
+package org.apache.xtable.utilities;
 
-import java.util.Collections;
-import java.util.Map;
+import static org.junit.jupiter.api.Assertions.*;
 
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+import lombok.SneakyThrows;
 
-import org.apache.xtable.conversion.CatalogConfig;
+import org.junit.jupiter.api.Test;
 
-/**
- * Iceberg requires a catalog to perform any operation, if no catalog is provided the default
- * catalog (HadoopCatalog or storage based catalog) is used. For syncing iceberg to multiple
- * catalogs, you can use {@link org.apache.xtable.conversion.ExternalCatalogConfig} instead which
- * allows syncing the latest version of iceberg metadata to multiple catalogs.
- */
-@Value
-@Builder
-public class IcebergCatalogConfig implements CatalogConfig {
-  @NonNull String catalogName;
-  @NonNull String catalogImpl;
-  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
+class TestRunCatalogSync {
+
+  @SneakyThrows
+  @Test
+  void testMain() {
+    String catalogConfigYamlPath =
+        TestRunCatalogSync.class.getClassLoader().getResource("catalogConfig.yaml").getPath();
+    String[] args = {"-catalogConfig", catalogConfigYamlPath};
+    // Ensure yaml gets parsed and no op-sync implemented in TestCatalogImpl is called.
+    assertDoesNotThrow(() -> RunCatalogSync.main(args));
+  }
 }
