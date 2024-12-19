@@ -74,9 +74,20 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
     this.glueClient = new DefaultGlueClientFactory(glueCatalogConfig).getGlueClient();
     this.configuration = new Configuration(configuration);
     this.schemaExtractor = GlueSchemaExtractor.getInstance();
-    glueCatalogSyncRequestProvider =
+    this.glueCatalogSyncRequestProvider =
         GlueCatalogSyncRequestProvider.getInstance(
             tableFormat, this.configuration, schemaExtractor);
+  }
+
+  public GlueCatalogSyncClient(
+      ExternalCatalogConfig catalogConfig, Configuration configuration) {
+    this.catalogConfig = catalogConfig;
+    this.glueCatalogConfig = GlueCatalogConfig.of(catalogConfig.getCatalogOptions());
+    this.glueClient = new DefaultGlueClientFactory(glueCatalogConfig).getGlueClient();
+    this.configuration = new Configuration(configuration);
+    this.schemaExtractor = GlueSchemaExtractor.getInstance();
+    // TODO: should we keep this null or add some default initialization
+    this.glueCatalogSyncRequestProvider = null;
   }
 
   @VisibleForTesting
@@ -101,12 +112,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
   }
 
   @Override
-  public String getCatalogImpl() {
-    return this.getClass().getCanonicalName();
-  }
-
-  @Override
-  public String getStorageDescriptorLocation(Table table) {
+  public String getStorageLocation(Table table) {
     if (table == null || table.storageDescriptor() == null) {
       return null;
     }
@@ -162,7 +168,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
     } catch (EntityNotFoundException e) {
       return null;
     } catch (Exception e) {
-      throw new CatalogSyncException("Failed to get table: " + tableIdentifier.getId(), e);
+      throw new CatalogSyncException("Failed to get table: " + tableIdentifier, e);
     }
   }
 
@@ -178,7 +184,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
               .tableInput(tableInput)
               .build());
     } catch (Exception e) {
-      throw new CatalogSyncException("Failed to create table: " + tableIdentifier.getId(), e);
+      throw new CatalogSyncException("Failed to create table: " + tableIdentifier, e);
     }
   }
 
@@ -196,7 +202,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
               .tableInput(tableInput)
               .build());
     } catch (Exception e) {
-      throw new CatalogSyncException("Failed to refresh table: " + tableIdentifier.getId(), e);
+      throw new CatalogSyncException("Failed to refresh table: " + tableIdentifier, e);
     }
   }
 
@@ -218,7 +224,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
               .name(tableIdentifier.getTableName())
               .build());
     } catch (Exception e) {
-      throw new CatalogSyncException("Failed to drop table: " + tableIdentifier.getId(), e);
+      throw new CatalogSyncException("Failed to drop table: " + tableIdentifier, e);
     }
   }
 
@@ -251,8 +257,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table>, CatalogC
   public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
     Table table = this.getTable(tableIdentifier);
     if (table == null) {
-      throw new IllegalStateException(
-          String.format("table: %s not found", tableIdentifier.getId()));
+      throw new IllegalStateException(String.format("table: %s not found", tableIdentifier));
     }
 
     String tableFormat = table.parameters().get(TABLE_TYPE_PROP).toUpperCase(Locale.ENGLISH);
