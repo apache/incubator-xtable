@@ -26,12 +26,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 
 import org.apache.xtable.conversion.ExternalCatalogConfig;
-import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetCatalogConfig;
-import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
+import org.apache.xtable.testutil.ITTestUtils.TestCatalogImpl;
 
 class TestCatalogConversionFactory {
 
@@ -68,55 +67,5 @@ class TestCatalogConversionFactory {
         CatalogConversionFactory.getInstance()
             .createCatalogSyncClient(targetCatalogConfig.getCatalogConfig(), new Configuration());
     assertEquals(catalogSyncClient.getClass().getName(), TestCatalogImpl.class.getName());
-  }
-
-  public static class TestCatalogImpl
-      implements CatalogSyncClient<Object>, CatalogConversionSource {
-
-    public TestCatalogImpl(ExternalCatalogConfig catalogConfig, Configuration hadoopConf) {}
-
-    @Override
-    public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
-      return null;
-    }
-
-    @Override
-    public String getCatalogName() {
-      return null;
-    }
-
-    @Override
-    public String getStorageDescriptorLocation(Object o) {
-      return null;
-    }
-
-    @Override
-    public boolean hasDatabase(String databaseName) {
-      return false;
-    }
-
-    @Override
-    public void createDatabase(String databaseName) {}
-
-    @Override
-    public Object getTable(CatalogTableIdentifier tableIdentifier) {
-      return null;
-    }
-
-    @Override
-    public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {}
-
-    @Override
-    public void refreshTable(
-        InternalTable table, Object catalogTable, CatalogTableIdentifier tableIdentifier) {}
-
-    @Override
-    public void createOrReplaceTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {}
-
-    @Override
-    public void dropTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {}
-
-    @Override
-    public void close() throws Exception {}
   }
 }

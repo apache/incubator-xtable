@@ -16,26 +16,26 @@
 #
 sourceCatalog:
   catalogName: "source-1"
-  catalogImpl: "org.apache.xtable.utilities.TestRunCatalogSync$TestCatalogImpl"
+  catalogImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogImpl"
   catalogProperties:
     key01: "value1"
     key02: "value2"
     key03: "value3"
 targetCatalogs:
   - catalogName: "target-1"
-    catalogImpl: "org.apache.xtable.utilities.TestRunCatalogSync$TestCatalogImpl"
+    catalogImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogImpl"
     catalogProperties:
       key11: "value1"
       key12: "value2"
       key13: "value3"
   - catalogName: "target-2"
-    catalogImpl: "org.apache.xtable.utilities.TestRunCatalogSync$TestCatalogImpl"
+    catalogImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogImpl"
     catalogProperties:
       key21: "value1"
       key22: "value2"
       key23: "value3"
   - catalogName: "target-3"
-    catalogImpl: "org.apache.xtable.utilities.TestRunCatalogSync$TestCatalogImpl"
+    catalogImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogImpl"
     catalogProperties:
       key31: "value1"
       key32: "value2"

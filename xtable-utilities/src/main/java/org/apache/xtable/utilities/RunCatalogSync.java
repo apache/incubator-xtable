@@ -161,7 +161,7 @@ public class RunCatalogSync {
                 dataset.getSourceCatalogTableIdentifier().getCatalogTableIdentifier());
       }
       List<TargetTable> targetTables = new ArrayList<>();
-      Map<String, List<TargetCatalogConfig>> targetCatalogs = new HashMap<>();
+      Map<TargetTable, List<TargetCatalogConfig>> targetCatalogs = new HashMap<>();
       for (TargetTableIdentifier targetCatalogTableIdentifier :
           dataset.getTargetCatalogTableIdentifiers()) {
         TargetTable targetTable =
@@ -172,11 +172,11 @@ public class RunCatalogSync {
                 .formatName(targetCatalogTableIdentifier.getTableFormat())
                 .build();
         targetTables.add(targetTable);
-        if (!targetCatalogs.containsKey(targetTable.getId())) {
-          targetCatalogs.put(targetTable.getId(), new ArrayList<>());
+        if (!targetCatalogs.containsKey(targetTable)) {
+          targetCatalogs.put(targetTable, new ArrayList<>());
         }
         targetCatalogs
-            .get(targetTable.getId())
+            .get(targetTable)
             .add(
                 TargetCatalogConfig.builder()
                     .catalogTableIdentifier(
@@ -248,18 +248,78 @@ public class RunCatalogSync {
 
   @Data
   public static class DatasetConfig {
+    /**
+     * Configuration of the source catalog from which XTable will read. It must contain all the
+     * necessary connection and access details for describing and listing tables
+     */
     private Catalog sourceCatalog;
+    /**
+     * Defines configuration one or more target catalogs, to which XTable will write or update
+     * tables. Unlike the source, these catalogs must be writable
+     */
     private List<Catalog> targetCatalogs;
+    /** A list of datasets that specify how a source table maps to one or more target tables. */
     private List<Dataset> datasets;
 
+    /** Configuration for catalog. */
     @Data
     public static class Catalog {
+      /** A unique name for the catalog. */
       private String catalogName;
+      /**
+       * The type of the source catalog. This might be a specific type understood by XTable, such as
+       * Hive, Glue etc.
+       */
       private String catalogType;
+      /**
+       * (Optional) A fully qualified class name that implements the interfaces for
+       * CatalogSyncClient, it can be used if the implementation for catalogType doesn't exist in
+       * XTable. This is an optional field.
+       */
       private String catalogImpl;
+      /**
+       * A collection of configs used to configure access or connection properties for the catalog.
+       */
       private Map<String, String> catalogProperties;
     }
 
+    @Data
+    public static class Dataset {
+      /** Identifies the source table in sourceCatalog. */
+      private SourceTableIdentifier sourceCatalogTableIdentifier;
+      /** A list of one or more targets that this source table should be written to. */
+      private List<TargetTableIdentifier> targetCatalogTableIdentifiers;
+    }
+
+    @Data
+    public static class SourceTableIdentifier {
+      /** Specifies the table identifier in the source catalog. */
+      CatalogTableIdentifier catalogTableIdentifier;
+      /**
+       * (Optional) Provides direct storage details such as a table’s base path (like an S3
+       * location) and the partition specification. This allows reading from a source even if it is
+       * not strictly registered in a catalog, as long as the format and location are known
+       */
+      StorageIdentifier storageIdentifier;
+    }
+
+    @Data
+    public static class TargetTableIdentifier {
+      /** name of the target catalog where the table will be created or updated */
+      String catalogName;
+      /**
+       * The target table format (e.g., DELTA, HUDI, ICEBERG), specifying how the data will be
+       * stored at the target.
+       */
+      String tableFormat;
+      /** Specifies the table identifier in the target catalog. */
+      CatalogTableIdentifier catalogTableIdentifier;
+    }
+
+    /**
+     * Configuration in storage for table. This is an optional field in {@link
+     * SourceTableIdentifier}.
+     */
     @Data
     public static class StorageIdentifier {
       String tableFormat;
@@ -268,25 +328,6 @@ public class RunCatalogSync {
       String tableName;
       String partitionSpec;
       String namespace;
-    }
-
-    @Data
-    public static class SourceTableIdentifier {
-      CatalogTableIdentifier catalogTableIdentifier;
-      StorageIdentifier storageIdentifier;
-    }
-
-    @Data
-    public static class TargetTableIdentifier {
-      String catalogName;
-      String tableFormat;
-      CatalogTableIdentifier catalogTableIdentifier;
-    }
-
-    @Data
-    public static class Dataset {
-      private SourceTableIdentifier sourceCatalogTableIdentifier;
-      private List<TargetTableIdentifier> targetCatalogTableIdentifiers;
     }
   }
 }

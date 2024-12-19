@@ -36,8 +36,8 @@ public class ConversionConfig {
   // One or more targets to sync the table metadata to
   List<TargetTable> targetTables;
   // Each target table can be synced to multiple target catalogs, this is map from
-  // targetTableIdentifier to target catalogs.
-  Map<String, List<TargetCatalogConfig>> targetCatalogs;
+  // targetTable to target catalogs.
+  Map<TargetTable, List<TargetCatalogConfig>> targetCatalogs;
   // The mode, incremental or snapshot
   SyncMode syncMode;
 
@@ -45,7 +45,7 @@ public class ConversionConfig {
   ConversionConfig(
       @NonNull SourceTable sourceTable,
       List<TargetTable> targetTables,
-      Map<String, List<TargetCatalogConfig>> targetCatalogs,
+      Map<TargetTable, List<TargetCatalogConfig>> targetCatalogs,
       SyncMode syncMode) {
     this.sourceTable = sourceTable;
     this.targetTables = targetTables;
