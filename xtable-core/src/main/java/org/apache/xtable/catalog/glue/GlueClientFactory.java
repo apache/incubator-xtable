@@ -16,30 +16,21 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.catalog;
+package org.apache.xtable.catalog.glue;
 
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+import software.amazon.awssdk.services.glue.GlueClient;
 
-/** This class represents the unique identifier for a table in a catalog. */
-@Value
-@Builder
-public class CatalogTableIdentifier {
-  /**
-   * Catalogs have the ability to group tables logically, databaseName is the identifier for such
-   * logical classification. The alternate names for this field include namespace, schemaName etc.
-   */
-  @NonNull String databaseName;
+/**
+ * Abstract factory for creating {@link GlueClient} instances configured with {@link
+ * GlueCatalogConfig} settings.
+ */
+public abstract class GlueClientFactory {
 
-  /**
-   * The table name used when syncing the table to the catalog. NOTE: This name can be different
-   * from the table name in storage.
-   */
-  @NonNull String tableName;
+  protected final GlueCatalogConfig glueConfig;
 
-  @Override
-  public String toString() {
-    return String.format("%s.%s", databaseName, tableName);
+  public GlueClientFactory(GlueCatalogConfig glueConfig) {
+    this.glueConfig = glueConfig;
   }
+
+  public abstract GlueClient getGlueClient();
 }
