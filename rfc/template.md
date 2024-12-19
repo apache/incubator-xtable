@@ -52,4 +52,4 @@ Use judgement based on the scope of the change.
 
 ## Test Plan
 
-Describe in few sentences how the RFC will be tested. How will we know that the implementation works as expected? How will we know nothing broke?.
+Describe in few sentences how the RFC will be tested. How will we know that the implementation works as expected? How will we know nothing breaks?
