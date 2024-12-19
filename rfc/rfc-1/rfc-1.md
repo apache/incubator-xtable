@@ -44,19 +44,18 @@ XTable is built on the principle of omnidirectional interoperability, and I'm pr
 ## Implementation
 
 Introducing two new interfaces `CatalogSyncClient` and `CatalogSync`. [[PR]]( https://github.com/apache/incubator-xtable/pull/603)
-1. `CatalogSyncClient` This interface contains methods that are responsible for creating table, refreshing table metadata, dropping table etc. in target catalog. Consider this interface as a translation layer between InternalTable and the catalog's table object. 
-2. `CatalogSync` synchronizes the internal XTable object (InternalTable) to multiple target catalogs using the methods available in `CatalogSyncClient` interface.
+1. `CatalogSyncClient`: This interface contains methods that are responsible for creating table, refreshing table metadata, dropping table etc. in target catalog. Consider this interface as a translation layer between InternalTable and the catalog's table object. 
+2. `CatalogSync`: This interface synchronizes the internal XTable object (InternalTable) to multiple target catalogs using the methods available in `CatalogSyncClient` interface.
 
-For XTable users to define their source/target catalog configurations and synchronize tables will be done through the `RunCatalogSync` class. 
-This will be utility class that parses the user's YAML configuration, synchronizes table format metadata if there's a need for it and then use the interfaces defined above for synchronizing the table in the catalog.
+For XTable users, defining their source/target catalog configurations and synchronizing tables will be handled by the `RunCatalogSync` class. This utility class parses the user’s YAML configuration, synchronizes table format metadata when necessary, and then uses the previously defined interfaces to synchronize the table in the catalog.
 [[PR]]( https://github.com/apache/incubator-xtable/pull/591)
 
 User's YAML configuration.
 1. `sourceCatalog`: Configuration of the source catalog from which XTable will read. It must contain all the necessary connection and access details for describing and listing tables.
     1. `catalogId`:  A user-defined unique identifier for the catalog, allows user to sync table to multiple catalogs of the same name/type eg: HMS catalog with url1, HMS catalog with url2.
     2. `catalogType`: The type of the source catalog. This might be a specific type understood by XTable, such as Hive, Glue etc.
-    3. `catalogSyncClientImpl`(optional): A fully qualified class name that implements the interfaces for `CatalogSyncClient`, it can be used if the implementation for catalogType doesn't exist in XTable.
-    4. `catalogConversionSourceImpl`(optional): A fully qualified class name that implements the interfaces for `CatalogConversionSource`, it can be used if the implementation for catalogType doesn't exist in XTable.
+    3. `catalogSyncClientImpl`(optional): A fully qualified class name that implements the interface for `CatalogSyncClient`, it can be used if the implementation for catalogType doesn't exist in XTable.
+    4. `catalogConversionSourceImpl`(optional): A fully qualified class name that implements the interface for `CatalogConversionSource`, it can be used if the implementation for catalogType doesn't exist in XTable.
     5. `catalogProperties`: A collection of configs used to configure access or connection properties for the catalog.
 2. `targetCatalogs`: Defines configuration one or more target catalogs, to which XTable will write or update tables. Unlike the source, these catalogs must be writable.
 3. `datasets`: A list of datasets that specify how a source table maps to one or more target tables.
