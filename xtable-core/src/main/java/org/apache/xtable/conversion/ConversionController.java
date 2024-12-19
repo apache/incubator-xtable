@@ -136,7 +136,7 @@ public class ConversionController {
       Map<String, SyncResult> catalogSyncResults = new HashMap<>();
       for (TargetTable targetTable : config.getTargetTables()) {
         Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients =
-            config.getTargetCatalogs().get(targetTable.getId()).stream()
+            config.getTargetCatalogs().get(targetTable).stream()
                 .collect(
                     Collectors.toMap(
                         TargetCatalogConfig::getCatalogTableIdentifier,

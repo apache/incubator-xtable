@@ -20,12 +20,18 @@ package org.apache.xtable.testutil;
 
 import java.util.List;
 
+import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 
+import org.apache.xtable.conversion.ExternalCatalogConfig;
+import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
+import org.apache.xtable.spi.extractor.CatalogConversionSource;
+import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 public class ITTestUtils {
 
@@ -43,5 +49,58 @@ public class ITTestUtils {
     Assertions.assertEquals(dataLayoutStrategy, internalTable.getLayoutStrategy());
     Assertions.assertEquals(basePath, internalTable.getBasePath());
     Assertions.assertEquals(partitioningFields, internalTable.getPartitioningFields());
+  }
+
+  public static class TestCatalogImpl implements CatalogConversionSource, CatalogSyncClient {
+
+    public TestCatalogImpl(ExternalCatalogConfig catalogConfig, Configuration hadoopConf) {}
+
+    @Override
+    public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
+      return SourceTable.builder()
+          .name("source_table_name")
+          .basePath("file://base_path/v1/")
+          .formatName("ICEBERG")
+          .build();
+    }
+
+    @Override
+    public String getCatalogName() {
+      return null;
+    }
+
+    @Override
+    public String getStorageLocation(Object o) {
+      return null;
+    }
+
+    @Override
+    public boolean hasDatabase(String databaseName) {
+      return false;
+    }
+
+    @Override
+    public void createDatabase(String databaseName) {}
+
+    @Override
+    public Object getTable(CatalogTableIdentifier tableIdentifier) {
+      return null;
+    }
+
+    @Override
+    public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {}
+
+    @Override
+    public void refreshTable(
+        InternalTable table, Object catalogTable, CatalogTableIdentifier tableIdentifier) {}
+
+    @Override
+    public void createOrReplaceTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {}
+
+    @Override
+    public void dropTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {}
+
+    @Override
+    public void close() throws Exception {}
   }
 }
