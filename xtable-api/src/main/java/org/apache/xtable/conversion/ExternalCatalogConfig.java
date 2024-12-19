@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.iceberg;
+package org.apache.xtable.conversion;
 
 import java.util.Collections;
 import java.util.Map;
@@ -25,18 +25,18 @@ import lombok.Builder;
 import lombok.NonNull;
 import lombok.Value;
 
-import org.apache.xtable.conversion.CatalogConfig;
-
-/**
- * Iceberg requires a catalog to perform any operation, if no catalog is provided the default
- * catalog (HadoopCatalog or storage based catalog) is used. For syncing iceberg to multiple
- * catalogs, you can use {@link org.apache.xtable.catalog.ExternalCatalogConfig} instead which
- * allows syncing the latest version of iceberg metadata to multiple catalogs.
- */
+/** Defines the configuration for an external catalog. */
 @Value
 @Builder
-public class IcebergCatalogConfig implements CatalogConfig {
+public class ExternalCatalogConfig implements CatalogConfig {
+  /** The name of the catalog, it also acts as a unique identifier for each catalog */
   @NonNull String catalogName;
+
+  /** The implementation class path for the catalog */
   @NonNull String catalogImpl;
+
+  /**
+   * The properties for each catalog, used for providing any custom behaviour during catalog sync
+   */
   @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
 }
