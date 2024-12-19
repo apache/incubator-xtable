@@ -39,15 +39,15 @@ Describe the problem you are trying to solve and a brief description of why itâ€
 Introduce any background context which is relevant or necessary to understand the feature and design choices.
 
 ## Implementation
-Describe the new thing you want to do in appropriate detail, how it fits into the project architecture.
-Provide a detailed description of how you intend to implement this feature.This may be fairly extensive and have large subsections of its own or it may be a few sentences. 
+Describe the new thing you want to do in appropriate detail, how it fits into the project architecture.<br>
+Provide a detailed description of how you intend to implement this feature, this may be fairly extensive and have large subsections of its own or it may be a few sentences.<br> 
 Use judgement based on the scope of the change.
 
 ## Rollout/Adoption Plan
 
-- Are there any breaking changes as part of this new feature/functionality ?
+- Are there any breaking changes as part of this new feature/functionality?
 - What impact (if any) will there be on existing users?
-- If we are changing behavior how will we phase out the older behavior ? When will we remove the existing behavior ? 
+- If we are changing behavior how will we phase out the older behavior? When will we remove the existing behavior? 
 - If we need special migration tools, describe them here.
 
 ## Test Plan
