@@ -16,26 +16,25 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.exception;
+package org.apache.xtable.model.catalog;
 
-import lombok.Getter;
+import lombok.Builder;
+import lombok.NonNull;
+import lombok.Value;
 
-@Getter
-public enum ErrorCode {
-  INVALID_CONFIGURATION(10001),
-  INVALID_PARTITION_SPEC(10002),
-  INVALID_PARTITION_VALUE(10003),
-  READ_EXCEPTION(10004),
-  UPDATE_EXCEPTION(10005),
-  INVALID_SCHEMA(10006),
-  UNSUPPORTED_SCHEMA_TYPE(10007),
-  UNSUPPORTED_FEATURE(10008),
-  PARSE_EXCEPTION(10009),
-  CATALOG_REFRESH_EXCEPTION(10010);
+/** This class represents the unique identifier for a table in a catalog. */
+@Value
+@Builder
+public class CatalogTableIdentifier {
+  /**
+   * Catalogs have the ability to group tables logically, databaseName is the identifier for such
+   * logical classification. The alternate names for this field include namespace, schemaName etc.
+   */
+  @NonNull String databaseName;
 
-  private final int errorCode;
-
-  ErrorCode(int errorCode) {
-    this.errorCode = errorCode;
-  }
+  /**
+   * The table name used when syncing the table to the catalog. NOTE: This name can be different
+   * from the table name in storage.
+   */
+  @NonNull String tableName;
 }

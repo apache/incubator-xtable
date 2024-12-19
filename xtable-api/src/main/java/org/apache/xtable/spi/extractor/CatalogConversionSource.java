@@ -16,26 +16,18 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.exception;
+package org.apache.xtable.spi.extractor;
 
-import lombok.Getter;
+import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
-@Getter
-public enum ErrorCode {
-  INVALID_CONFIGURATION(10001),
-  INVALID_PARTITION_SPEC(10002),
-  INVALID_PARTITION_VALUE(10003),
-  READ_EXCEPTION(10004),
-  UPDATE_EXCEPTION(10005),
-  INVALID_SCHEMA(10006),
-  UNSUPPORTED_SCHEMA_TYPE(10007),
-  UNSUPPORTED_FEATURE(10008),
-  PARSE_EXCEPTION(10009),
-  CATALOG_REFRESH_EXCEPTION(10010);
-
-  private final int errorCode;
-
-  ErrorCode(int errorCode) {
-    this.errorCode = errorCode;
-  }
+/**
+ * A client for converting the table with tableIdentifier {@link CatalogTableIdentifier} in {@link
+ * org.apache.xtable.conversion.SourceCatalog} to SourceTable object. {@link SourceTable} can be
+ * used by downstream consumers for syncing it to multiple {@link
+ * org.apache.xtable.conversion.TargetTable}
+ */
+public interface CatalogConversionSource {
+  /** Returns the source table object present in the catalog. */
+  SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier);
 }

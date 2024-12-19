@@ -88,7 +88,7 @@ public class TestTableFormatSync {
 
     assertEquals(2, result.size());
     SyncResult successResult = result.get(TableFormat.DELTA);
-    assertEquals(SyncResult.SyncStatus.SUCCESS, successResult.getStatus());
+    assertEquals(SyncResult.SyncStatus.SUCCESS, successResult.getTableFormatSyncStatus());
     assertEquals(SyncMode.FULL, successResult.getMode());
     assertEquals(startingTableState.getLatestCommitTime(), successResult.getLastInstantSynced());
     assertSyncResultTimes(successResult, start);
@@ -99,11 +99,14 @@ public class TestTableFormatSync {
     assertEquals(
         SyncResult.SyncStatus.builder()
             .statusCode(SyncResult.SyncStatusCode.ERROR)
-            .errorMessage("Failure")
-            .errorDescription("Failed to sync FULL")
-            .canRetryOnFailure(true)
+            .errorDetails(
+                SyncResult.ErrorDetails.builder()
+                    .errorMessage("Failure")
+                    .errorDescription("Failed to sync FULL")
+                    .canRetryOnFailure(true)
+                    .build())
             .build(),
-        failureResult.getStatus());
+        failureResult.getTableFormatSyncStatus());
 
     verifyBaseConversionTargetCalls(
         mockConversionTarget2, startingTableState, pendingCommitInstants);
@@ -168,7 +171,8 @@ public class TestTableFormatSync {
     assertEquals(
         tableChanges.get(0).getTableAsOfChange().getLatestCommitTime(),
         partialSuccessResults.get(0).getLastInstantSynced());
-    assertEquals(SyncResult.SyncStatus.SUCCESS, partialSuccessResults.get(0).getStatus());
+    assertEquals(
+        SyncResult.SyncStatus.SUCCESS, partialSuccessResults.get(0).getTableFormatSyncStatus());
     assertSyncResultTimes(partialSuccessResults.get(0), start);
 
     assertEquals(SyncMode.INCREMENTAL, partialSuccessResults.get(1).getMode());
@@ -176,11 +180,14 @@ public class TestTableFormatSync {
     assertEquals(
         SyncResult.SyncStatus.builder()
             .statusCode(SyncResult.SyncStatusCode.ERROR)
-            .errorMessage("Failure")
-            .errorDescription("Failed to sync INCREMENTAL")
-            .canRetryOnFailure(true)
+            .errorDetails(
+                SyncResult.ErrorDetails.builder()
+                    .errorMessage("Failure")
+                    .errorDescription("Failed to sync INCREMENTAL")
+                    .canRetryOnFailure(true)
+                    .build())
             .build(),
-        partialSuccessResults.get(1).getStatus());
+        partialSuccessResults.get(1).getTableFormatSyncStatus());
 
     // Assert that all 3 changes are properly synced to the other format
     List<SyncResult> successResults = result.get(TableFormat.DELTA);
@@ -190,7 +197,7 @@ public class TestTableFormatSync {
       assertEquals(
           tableChanges.get(i).getTableAsOfChange().getLatestCommitTime(),
           successResults.get(i).getLastInstantSynced());
-      assertEquals(SyncResult.SyncStatus.SUCCESS, successResults.get(i).getStatus());
+      assertEquals(SyncResult.SyncStatus.SUCCESS, successResults.get(i).getTableFormatSyncStatus());
       assertSyncResultTimes(successResults.get(i), start);
     }
 
@@ -257,7 +264,8 @@ public class TestTableFormatSync {
     assertEquals(2, conversionTarget1Results.size());
     for (SyncResult conversionTarget1Result : conversionTarget1Results) {
       assertEquals(SyncMode.INCREMENTAL, conversionTarget1Result.getMode());
-      assertEquals(SyncResult.SyncStatus.SUCCESS, conversionTarget1Result.getStatus());
+      assertEquals(
+          SyncResult.SyncStatus.SUCCESS, conversionTarget1Result.getTableFormatSyncStatus());
       assertSyncResultTimes(conversionTarget1Result, start);
     }
     assertEquals(
@@ -275,7 +283,9 @@ public class TestTableFormatSync {
       assertEquals(
           tableChanges.get(i + 1).getTableAsOfChange().getLatestCommitTime(),
           conversionTarget2Results.get(i).getLastInstantSynced());
-      assertEquals(SyncResult.SyncStatus.SUCCESS, conversionTarget2Results.get(i).getStatus());
+      assertEquals(
+          SyncResult.SyncStatus.SUCCESS,
+          conversionTarget2Results.get(i).getTableFormatSyncStatus());
       assertSyncResultTimes(conversionTarget2Results.get(i), start);
     }
 
@@ -330,7 +340,7 @@ public class TestTableFormatSync {
     conversionTarget2Results.forEach(
         syncResult -> {
           assertEquals(SyncMode.INCREMENTAL, syncResult.getMode());
-          assertEquals(SyncResult.SyncStatus.SUCCESS, syncResult.getStatus());
+          assertEquals(SyncResult.SyncStatus.SUCCESS, syncResult.getTableFormatSyncStatus());
           assertSyncResultTimes(syncResult, start);
         });
 
