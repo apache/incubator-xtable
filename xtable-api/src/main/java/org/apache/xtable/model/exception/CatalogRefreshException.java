@@ -16,27 +16,16 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.iceberg;
+package org.apache.xtable.model.exception;
 
-import java.util.Collections;
-import java.util.Map;
+/** Exception thrown when refresh operation (updating table format metadata) in catalog fails. */
+public class CatalogRefreshException extends InternalException {
 
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
+  public CatalogRefreshException(String message, Throwable e) {
+    super(ErrorCode.CATALOG_REFRESH_EXCEPTION, message, e);
+  }
 
-import org.apache.xtable.conversion.CatalogConfig;
-
-/**
- * Iceberg requires a catalog to perform any operation, if no catalog is provided the default
- * catalog (HadoopCatalog or storage based catalog) is used. For syncing iceberg to multiple
- * catalogs, you can use {@link org.apache.xtable.conversion.ExternalCatalogConfig} instead which
- * allows syncing the latest version of iceberg metadata to multiple catalogs.
- */
-@Value
-@Builder
-public class IcebergCatalogConfig implements CatalogConfig {
-  @NonNull String catalogName;
-  @NonNull String catalogImpl;
-  @NonNull @Builder.Default Map<String, String> catalogOptions = Collections.emptyMap();
+  public CatalogRefreshException(String message) {
+    super(ErrorCode.CATALOG_REFRESH_EXCEPTION, message);
+  }
 }
