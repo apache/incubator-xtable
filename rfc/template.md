@@ -40,8 +40,8 @@ Introduce any background context which is relevant or necessary to understand th
 
 ## Implementation
 Describe the new thing you want to do in appropriate detail, how it fits into the project architecture.<br>
-Provide a detailed description of how you intend to implement this feature, this may be fairly extensive and have large subsections of its own or it may be a few sentences.<br> 
-Use judgement based on the scope of the change.
+Provide a detailed description of how you intend to implement this feature, this may be fairly extensive and have large subsections of its own or it may be a few sentences.<br>
+Use judgement to decide on how detailed the description needs to be based on the scope of the change. If unclear, you can ask questions in dev@xtable.apache.org/slack.
 
 ## Rollout/Adoption Plan
 
