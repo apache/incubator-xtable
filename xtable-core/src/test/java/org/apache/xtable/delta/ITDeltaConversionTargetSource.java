@@ -18,6 +18,7 @@
  
 package org.apache.xtable.delta;
 
+import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.net.URI;
@@ -206,6 +207,44 @@ public class ITDeltaConversionTargetSource {
             .partitionValues(Collections.emptyList())
             .build(),
         snapshot.getPartitionedDataFiles().get(0));
+  }
+
+  @Test
+  void getCurrentTableTest() {
+    // Table name
+    final String tableName = GenericTable.getTableName();
+    final Path basePath = tempDir.resolve(tableName);
+    // Create table with a single row using Spark
+    sparkSession.sql(
+        "CREATE TABLE `"
+            + tableName
+            + "` USING DELTA LOCATION '"
+            + basePath
+            + "' AS SELECT * FROM VALUES (1, 2)");
+    // Create Delta source
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
+            .build();
+    DeltaConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+    // Get current table
+    InternalTable internalTable = conversionSource.getCurrentTable();
+    List<InternalField> fields = Arrays.asList(COL1_INT_FIELD, COL2_INT_FIELD);
+    validateTable(
+        internalTable,
+        tableName,
+        TableFormat.DELTA,
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .fields(fields)
+            .build(),
+        DataLayoutStrategy.FLAT,
+        "file:" + basePath,
+        Collections.emptyList());
   }
 
   @Test
@@ -658,22 +697,6 @@ public class ITDeltaConversionTargetSource {
     InternalPartitionField partitionField = partitionFields.get(0);
     assertEquals("birthDate", partitionField.getSourceField().getName());
     assertEquals(PartitionTransformType.YEAR, partitionField.getTransformType());
-  }
-
-  private static void validateTable(
-      InternalTable internalTable,
-      String tableName,
-      String tableFormat,
-      InternalSchema readSchema,
-      DataLayoutStrategy dataLayoutStrategy,
-      String basePath,
-      List<InternalPartitionField> partitioningFields) {
-    Assertions.assertEquals(tableName, internalTable.getName());
-    Assertions.assertEquals(tableFormat, internalTable.getTableFormat());
-    Assertions.assertEquals(readSchema, internalTable.getReadSchema());
-    Assertions.assertEquals(dataLayoutStrategy, internalTable.getLayoutStrategy());
-    Assertions.assertEquals(basePath, internalTable.getBasePath());
-    Assertions.assertEquals(partitioningFields, internalTable.getPartitioningFields());
   }
 
   private void validatePartitionDataFiles(
