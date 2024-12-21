@@ -42,6 +42,7 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,6 +50,7 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import org.apache.xtable.catalog.CatalogConversionFactory;
+import org.apache.xtable.catalog.ExternalCatalogConfigFactory;
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
@@ -132,10 +134,11 @@ public class RunCatalogSync {
 
     Map<String, ExternalCatalogConfig> catalogsById =
         datasetConfig.getTargetCatalogs().stream()
+            .map(RunCatalogSync::populateCatalogImplementations)
             .collect(Collectors.toMap(ExternalCatalogConfig::getCatalogId, Function.identity()));
     CatalogConversionSource catalogConversionSource =
         CatalogConversionFactory.createCatalogConversionSource(
-            datasetConfig.getSourceCatalog(), hadoopConf);
+            populateCatalogImplementations(datasetConfig.getSourceCatalog()), hadoopConf);
     ConversionController conversionController = new ConversionController(hadoopConf);
     for (DatasetConfig.Dataset dataset : datasetConfig.getDatasets()) {
       SourceTable sourceTable = null;
@@ -227,6 +230,16 @@ public class RunCatalogSync {
       CONVERSION_SOURCE_PROVIDERS.put(tableFormat, conversionSourceProvider);
     }
     return CONVERSION_SOURCE_PROVIDERS;
+  }
+
+  static ExternalCatalogConfig populateCatalogImplementations(ExternalCatalogConfig catalogConfig) {
+    if (!StringUtils.isEmpty(catalogConfig.getCatalogType())) {
+      return ExternalCatalogConfigFactory.fromCatalogType(
+          catalogConfig.getCatalogType(),
+          catalogConfig.getCatalogId(),
+          catalogConfig.getCatalogProperties());
+    }
+    return catalogConfig;
   }
 
   @Data
