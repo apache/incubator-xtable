@@ -56,4 +56,9 @@ public class CatalogTableIdentifier {
    * from the table name in storage.
    */
   @NonNull String tableName;
+
+  @Override
+  public String toString() {
+    return String.format("%s.%s", databaseName, tableName);
+  }
 }
