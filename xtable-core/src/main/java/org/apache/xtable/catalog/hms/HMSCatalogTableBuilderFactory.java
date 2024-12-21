@@ -16,27 +16,25 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.exception;
+package org.apache.xtable.catalog.hms;
 
-import lombok.Getter;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.metastore.api.Table;
 
-@Getter
-public enum ErrorCode {
-  INVALID_CONFIGURATION(10001),
-  INVALID_PARTITION_SPEC(10002),
-  INVALID_PARTITION_VALUE(10003),
-  READ_EXCEPTION(10004),
-  UPDATE_EXCEPTION(10005),
-  INVALID_SCHEMA(10006),
-  UNSUPPORTED_SCHEMA_TYPE(10007),
-  UNSUPPORTED_FEATURE(10008),
-  PARSE_EXCEPTION(10009),
-  CATALOG_REFRESH_EXCEPTION(10010),
-  CATALOG_SYNC_GENERIC_EXCEPTION(10011);
+import org.apache.xtable.catalog.CatalogTableBuilder;
+import org.apache.xtable.catalog.hms.table.IcebergHMSCatalogTableBuilder;
+import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.model.storage.TableFormat;
 
-  private final int errorCode;
+public class HMSCatalogTableBuilderFactory {
 
-  ErrorCode(int errorCode) {
-    this.errorCode = errorCode;
+  public static CatalogTableBuilder<Table> getTableBuilder(
+      String tableFormat, Configuration configuration) {
+    switch (tableFormat) {
+      case TableFormat.ICEBERG:
+        return new IcebergHMSCatalogTableBuilder(configuration);
+      default:
+        throw new NotSupportedException("Unsupported table format: " + tableFormat);
+    }
   }
 }
