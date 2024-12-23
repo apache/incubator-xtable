@@ -18,9 +18,8 @@
  
 package org.apache.xtable.model.catalog;
 
-import lombok.Builder;
+import lombok.Getter;
 import lombok.NonNull;
-import lombok.Value;
 
 /**
  * An internal representation of a fully qualified table identifier within a catalog. The naming
@@ -36,8 +35,7 @@ import lombok.Value;
  * We have selected the first naming convention and will interoperate among other catalogs following
  * a different convention.
  */
-@Value
-@Builder
+@Getter
 public class CatalogTableIdentifier {
   /**
    * The top level hierarchy/namespace for organizing tables. Each catalog can have multiple
@@ -56,4 +54,57 @@ public class CatalogTableIdentifier {
    * from the table name in storage.
    */
   @NonNull String tableName;
+
+  public CatalogTableIdentifier(
+      String catalogName, @NonNull String databaseName, @NonNull String tableName) {
+    this.catalogName = catalogName;
+    this.databaseName = databaseName;
+    this.tableName = tableName;
+  }
+
+  // 2. Use constructor chaining for the two-argument constructor
+  public CatalogTableIdentifier(String databaseName, String tableName) {
+    this(null, databaseName, tableName); // calls the above constructor with catalogName = null
+  }
+
+  /**
+   * Constructs a new {@code CatalogTableIdentifier} from a hierarchical string identifier.
+   *
+   * <p>The identifier is expected to be in one of the following formats:
+   *
+   * <ul>
+   *   <li>{@code database.table} (two parts, no catalog)
+   *   <li>{@code catalog.database.table} (three parts)
+   * </ul>
+   *
+   * If the identifier does not match one of these formats, an {@link IllegalArgumentException} is
+   * thrown.
+   *
+   * @param hierarchicalTableIdentifier The hierarchical string identifier (e.g.,
+   *     "myCatalog.myDatabase.myTable" or "myDatabase.myTable").
+   * @throws IllegalArgumentException If the provided string does not match a valid two-part or
+   *     three-part identifier.
+   */
+  public CatalogTableIdentifier(String hierarchicalTableIdentifier) {
+    String[] parts = hierarchicalTableIdentifier.split("\\.");
+    if (parts.length == 2) {
+      this.catalogName = null;
+      this.databaseName = parts[0];
+      this.tableName = parts[1];
+    } else if (parts.length == 3) {
+      this.catalogName = parts[0];
+      this.databaseName = parts[1];
+      this.tableName = parts[2];
+    } else {
+      throw new IllegalArgumentException("Invalid table identifier " + hierarchicalTableIdentifier);
+    }
+  }
+
+  @Override
+  public String toString() {
+    if (catalogName != null && !catalogName.isEmpty()) {
+      return catalogName + "." + databaseName + "." + tableName;
+    }
+    return databaseName + "." + tableName;
+  }
 }

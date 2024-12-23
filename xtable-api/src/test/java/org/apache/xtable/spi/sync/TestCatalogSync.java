@@ -56,13 +56,13 @@ public class TestCatalogSync<TABLE> {
   @Mock CatalogSyncClient<TABLE> mockClient4;
 
   private final CatalogTableIdentifier tableIdentifier1 =
-      CatalogTableIdentifier.builder().databaseName("database1").tableName("table1").build();
+      new CatalogTableIdentifier("database1", "table1");
   private final CatalogTableIdentifier tableIdentifier2 =
-      CatalogTableIdentifier.builder().databaseName("database2").tableName("table2").build();
+      new CatalogTableIdentifier("database2", "table2");
   private final CatalogTableIdentifier tableIdentifier3 =
-      CatalogTableIdentifier.builder().databaseName("database3").tableName("table3").build();
+      new CatalogTableIdentifier("database3", "table3");
   private final CatalogTableIdentifier tableIdentifier4 =
-      CatalogTableIdentifier.builder().databaseName("database4").tableName("table4").build();
+      new CatalogTableIdentifier("database4", "table4");
 
   @Mock TABLE mockTable;
   private final InternalTable internalTable =
