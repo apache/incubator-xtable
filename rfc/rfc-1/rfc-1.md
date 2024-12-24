@@ -43,9 +43,10 @@ XTable is built on the principle of omnidirectional interoperability, and I'm pr
 
 ## Implementation
 
-Introducing two new interfaces `CatalogSyncClient` and `CatalogSync`. [[PR]]( https://github.com/apache/incubator-xtable/pull/603)
+Introducing the following interfaces. [[PR]]( https://github.com/apache/incubator-xtable/pull/603)
 1. `CatalogSyncClient`: This interface contains methods that are responsible for creating table, refreshing table metadata, dropping table etc. in target catalog. Consider this interface as a translation layer between InternalTable and the catalog's table object. 
 2. `CatalogSync`: This interface synchronizes the internal XTable object (InternalTable) to multiple target catalogs using the methods available in `CatalogSyncClient` interface.
+3. `CatalogTableIdentifier`: Represents a catalog table identifier in a multi-level catalog system. `HierarchicalTableIdentifier` is an internal representation of a fully qualified table identifier within a catalog following the three level hierarchy convention (it's used by all the major catalogs glue, hms, unity etc.). In the future, we can support other conventions by implementing this interface.
 
 For XTable users, defining their source/target catalog configurations and synchronizing tables will be handled by the `RunCatalogSync` class. This utility class parses the user’s YAML configuration, synchronizes table format metadata when necessary, and then uses the previously defined interfaces to synchronize the table in the catalog.
 [[PR]]( https://github.com/apache/incubator-xtable/pull/591)
@@ -60,12 +61,12 @@ User's YAML configuration.
 2. `targetCatalogs`: Defines configuration one or more target catalogs, to which XTable will write or update tables. Unlike the source, these catalogs must be writable.
 3. `datasets`: A list of datasets that specify how a source table maps to one or more target tables.
    1. `sourceCatalogTableIdentifier`: Identifies the source table in sourceCatalog. This can be done in two ways:
-      1. `catalogTableIdentifier`: Specifies a source table by its catalogName, databaseName and tableName. If catalogName is not provided, the default catalog will be used.   
+      1. `tableIdentifier`: Specifies a source table by its 3 level hierarchical fully qualified name - catalogName, databaseName and tableName. If catalogName is not provided, the default catalog will be used.     
       2. `storageIdentifier`(optional): Provides direct storage details such as a table’s base path (like an S3 location) and the partition specification. This allows reading from a source even if it is not strictly registered in a catalog, as long as the format and location are known
    2. `targetCatalogTableIdentifiers`: A list of one or more targets that this source table should be written to.
       1. `catalogId`: The user defined unique identifier of the target catalog where the table will be created or updated. The targetCatalog's id passed here should be one of the `targetCatalogs` defined above.
       2. `tableFormat`: The target table format (e.g., DELTA, HUDI, ICEBERG), specifying how the data will be stored at the target.
-      3. `catalogTableIdentifier`: Specifies a target table by its catalogName, databaseName and tableName. If catalogName is not provided, the default catalog will be used.
+      3. `tableIdentifier`: Specifies a target table by its 3 level hierarchical fully qualified name - catalogName, databaseName and tableName. If catalogName is not provided, the default catalog will be used.
 ```
 sourceCatalog:
   catalogName: "source-1"
@@ -90,25 +91,21 @@ targetCatalogs:
       key23: "value23"
 datasets:
   - sourceCatalogTableIdentifier:
-      catalogTableIdentifier:
-        databaseName: "source-database-1"
-        tableName: "source-1"
+      tableIdentifier:
+        hierarchicalId: "source-database-1.source-1"
     targetCatalogTableIdentifiers:
       - catalogName: "target-1"
         tableFormat: "DELTA"
-        catalogTableIdentifier:
-          databaseName: "target-database-1"
-          tableName: "target-tableName-1"
+        tableIdentifier:
+          hierarchicalId: "target-database-1.target-tableName-1"
       - catalogName: "target-1"
         tableFormat: "ICEBERG"
-        catalogTableIdentifier:
-          databaseName: "target-database-2"
-          tableName: "target-tableName-2-iceberg"
+        tableIdentifier:
+          hierarchicalId: "target-database-2.target-tableName-2-iceberg"
       - catalogName: "target-2"
         tableFormat: "HUDI"
-        catalogTableIdentifier:
-          databaseName: "target-database-2"
-          tableName: "target-tableName-2-delta"
+        tableIdentifier:
+          hierarchicalId: "default-catalog-2.target-database-2.target-tableName-2-hudi"
   - sourceCatalogTableIdentifier:
       storageIdentifier:
         tableBasePath: s3://tpc-ds-datasets/1GB/hudi/catalog_sales
@@ -118,9 +115,8 @@ datasets:
     targetCatalogTableIdentifiers:
       - catalogName: "target-2"
         tableFormat: "ICEBERG"
-        catalogTableIdentifier:
-          databaseName: "target-database-2"
-          tableName: "target-tableName-2"
+        tableIdentifier:
+          hierarchicalId: "target-database-2.target-tableName-2"
 ```
 
 ## Overview of the `RunCatalogSync` process
