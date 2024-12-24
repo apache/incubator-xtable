@@ -23,21 +23,21 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class TestCatalogTableIdentifier {
+class TestHierarchicalTableIdentifier {
 
   @Test
   void testToString() {
-    CatalogTableIdentifier catalogTableIdentifier =
-        new CatalogTableIdentifier("catalogName.databaseName.tableName");
+    HierarchicalTableIdentifier catalogTableIdentifier =
+        new HierarchicalTableIdentifier("catalogName.databaseName.tableName");
     assertEquals("catalogName.databaseName.tableName", catalogTableIdentifier.toString());
   }
 
   @Test
   void testConstructorForHierarchicalTableIdentifier() {
     Assertions.assertDoesNotThrow(
-        () -> new CatalogTableIdentifier("catalogName.databaseName.tableName"));
-    Assertions.assertDoesNotThrow(() -> new CatalogTableIdentifier("databaseName.tableName"));
+        () -> new HierarchicalTableIdentifier("catalogName.databaseName.tableName"));
+    Assertions.assertDoesNotThrow(() -> new HierarchicalTableIdentifier("databaseName.tableName"));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new CatalogTableIdentifier("tableName"));
+        IllegalArgumentException.class, () -> new HierarchicalTableIdentifier("tableName"));
   }
 }

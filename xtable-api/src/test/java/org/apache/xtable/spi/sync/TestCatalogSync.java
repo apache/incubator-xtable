@@ -40,7 +40,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.google.common.collect.ImmutableMap;
 
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.catalog.CatalogTableIdentifier;
+import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -55,14 +55,14 @@ public class TestCatalogSync<TABLE> {
   @Mock CatalogSyncClient<TABLE> mockClient3;
   @Mock CatalogSyncClient<TABLE> mockClient4;
 
-  private final CatalogTableIdentifier tableIdentifier1 =
-      new CatalogTableIdentifier("database1", "table1");
-  private final CatalogTableIdentifier tableIdentifier2 =
-      new CatalogTableIdentifier("database2", "table2");
-  private final CatalogTableIdentifier tableIdentifier3 =
-      new CatalogTableIdentifier("database3", "table3");
-  private final CatalogTableIdentifier tableIdentifier4 =
-      new CatalogTableIdentifier("database4", "table4");
+  private final HierarchicalTableIdentifier tableIdentifier1 =
+      new HierarchicalTableIdentifier("database1", "table1");
+  private final HierarchicalTableIdentifier tableIdentifier2 =
+      new HierarchicalTableIdentifier("database2", "table2");
+  private final HierarchicalTableIdentifier tableIdentifier3 =
+      new HierarchicalTableIdentifier("database3", "table3");
+  private final HierarchicalTableIdentifier tableIdentifier4 =
+      new HierarchicalTableIdentifier("database4", "table4");
 
   @Mock TABLE mockTable;
   private final InternalTable internalTable =
@@ -96,7 +96,7 @@ public class TestCatalogSync<TABLE> {
 
     when(mockClient4.getCatalogId()).thenReturn("catalogId4");
 
-    Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients =
+    Map<HierarchicalTableIdentifier, CatalogSyncClient> catalogSyncClients =
         ImmutableMap.of(
             tableIdentifier1, mockClient1,
             tableIdentifier2, mockClient2,
