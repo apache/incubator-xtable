@@ -29,7 +29,7 @@ class TestHierarchicalTableIdentifier {
   void testToString() {
     HierarchicalTableIdentifier catalogTableIdentifier =
         new HierarchicalTableIdentifier("catalogName.databaseName.tableName");
-    assertEquals("catalogName.databaseName.tableName", catalogTableIdentifier.toString());
+    assertEquals("catalogName.databaseName.tableName", catalogTableIdentifier.getId());
   }
 
   @Test
