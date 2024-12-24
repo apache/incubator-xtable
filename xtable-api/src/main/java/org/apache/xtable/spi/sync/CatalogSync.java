@@ -33,7 +33,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.commons.lang3.StringUtils;
 
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.model.sync.SyncResult.CatalogSyncStatus;
 
@@ -48,7 +48,7 @@ public class CatalogSync {
   }
 
   public SyncResult syncTable(
-      Map<HierarchicalTableIdentifier, CatalogSyncClient> catalogSyncClients, InternalTable table) {
+      Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients, InternalTable table) {
     List<CatalogSyncStatus> results = new ArrayList<>();
     Instant startTime = Instant.now();
     catalogSyncClients.forEach(
@@ -81,10 +81,10 @@ public class CatalogSync {
 
   private <TABLE> CatalogSyncStatus syncCatalog(
       CatalogSyncClient<TABLE> catalogSyncClient,
-      HierarchicalTableIdentifier tableIdentifier,
+      CatalogTableIdentifier tableIdentifier,
       InternalTable table) {
-    if (!catalogSyncClient.hasDatabase(tableIdentifier.getDatabaseName())) {
-      catalogSyncClient.createDatabase(tableIdentifier.getDatabaseName());
+    if (!catalogSyncClient.hasDatabase(tableIdentifier)) {
+      catalogSyncClient.createDatabase(tableIdentifier);
     }
     TABLE catalogTable = catalogSyncClient.getTable(tableIdentifier);
     String storageDescriptorLocation = catalogSyncClient.getStorageLocation(catalogTable);

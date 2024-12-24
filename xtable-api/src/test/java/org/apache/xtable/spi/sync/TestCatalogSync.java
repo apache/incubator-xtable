@@ -40,6 +40,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.google.common.collect.ImmutableMap;
 
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -80,10 +81,10 @@ public class TestCatalogSync<TABLE> {
 
   @Test
   void testSyncTable() {
-    when(mockClient1.hasDatabase("database1")).thenReturn(false);
-    when(mockClient2.hasDatabase("database2")).thenReturn(true);
-    when(mockClient3.hasDatabase("database3")).thenReturn(true);
-    when(mockClient4.hasDatabase("database4"))
+    when(mockClient1.hasDatabase(tableIdentifier1)).thenReturn(false);
+    when(mockClient2.hasDatabase(tableIdentifier2)).thenReturn(true);
+    when(mockClient3.hasDatabase(tableIdentifier3)).thenReturn(true);
+    when(mockClient4.hasDatabase(tableIdentifier4))
         .thenThrow(new UnsupportedOperationException("No catalog impl"));
 
     when(mockClient1.getTable(tableIdentifier1)).thenReturn(mockTable);
@@ -96,7 +97,7 @@ public class TestCatalogSync<TABLE> {
 
     when(mockClient4.getCatalogId()).thenReturn("catalogId4");
 
-    Map<HierarchicalTableIdentifier, CatalogSyncClient> catalogSyncClients =
+    Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients =
         ImmutableMap.of(
             tableIdentifier1, mockClient1,
             tableIdentifier2, mockClient2,
@@ -119,7 +120,7 @@ public class TestCatalogSync<TABLE> {
             .filter(statusCode -> statusCode.equals(SyncResult.SyncStatusCode.SUCCESS))
             .count());
 
-    verify(mockClient1, times(1)).createDatabase("database1");
+    verify(mockClient1, times(1)).createDatabase(tableIdentifier1);
     verify(mockClient1, times(1)).createOrReplaceTable(internalTable, tableIdentifier1);
     verify(mockClient2, times(1)).createTable(eq(internalTable), eq(tableIdentifier2));
     verify(mockClient3, times(1)).refreshTable(eq(internalTable), any(), eq(tableIdentifier3));

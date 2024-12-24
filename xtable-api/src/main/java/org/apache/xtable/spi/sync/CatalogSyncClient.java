@@ -37,11 +37,11 @@ public interface CatalogSyncClient<TABLE> extends AutoCloseable {
   /** Returns the storage location of the table synced to the catalog. */
   String getStorageLocation(TABLE table);
 
-  /** Checks whether a database exists in the catalog. */
-  boolean hasDatabase(String databaseName);
+  /** Checks whether a database used by tableIdentifier exists in the catalog. */
+  boolean hasDatabase(CatalogTableIdentifier tableIdentifier);
 
-  /** Creates a database in the catalog. */
-  void createDatabase(String databaseName);
+  /** Creates a database used by tableIdentifier in the catalog. */
+  void createDatabase(CatalogTableIdentifier tableIdentifier);
 
   /**
    * Return the TABLE object used by the catalog implementation. Eg: HMS uses
