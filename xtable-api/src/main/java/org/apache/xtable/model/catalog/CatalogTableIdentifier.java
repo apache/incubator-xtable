@@ -16,26 +16,10 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.exception;
+package org.apache.xtable.model.catalog;
 
-import lombok.Getter;
-
-@Getter
-public enum ErrorCode {
-  INVALID_CONFIGURATION(10001),
-  INVALID_PARTITION_SPEC(10002),
-  INVALID_PARTITION_VALUE(10003),
-  READ_EXCEPTION(10004),
-  UPDATE_EXCEPTION(10005),
-  INVALID_SCHEMA(10006),
-  UNSUPPORTED_SCHEMA_TYPE(10007),
-  UNSUPPORTED_FEATURE(10008),
-  PARSE_EXCEPTION(10009),
-  CATALOG_REFRESH_EXCEPTION(10010);
-
-  private final int errorCode;
-
-  ErrorCode(int errorCode) {
-    this.errorCode = errorCode;
-  }
+/** Represents a catalog table identifier in a multi-level catalog system. */
+public interface CatalogTableIdentifier {
+  /** Returns the string identifier for the table within its catalog context */
+  String getId();
 }

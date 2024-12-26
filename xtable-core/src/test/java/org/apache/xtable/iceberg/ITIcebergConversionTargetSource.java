@@ -21,6 +21,7 @@ package org.apache.xtable.iceberg;
 import static org.apache.xtable.GenericTable.getTableName;
 import static org.apache.xtable.ValidationTestHelper.validateSnapshot;
 import static org.apache.xtable.ValidationTestHelper.validateTableChanges;
+import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,6 +30,8 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -49,9 +52,14 @@ import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
+import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
 
 public class ITIcebergConversionTargetSource {
@@ -64,6 +72,67 @@ public class ITIcebergConversionTargetSource {
   void setup() {
     sourceProvider = new IcebergConversionSourceProvider();
     sourceProvider.init(hadoopConf);
+  }
+
+  @Test
+  void getCurrentTableTest() {
+    String tableName = getTableName();
+    try (TestIcebergTable testIcebergTable =
+        new TestIcebergTable(
+            tableName,
+            tempDir,
+            hadoopConf,
+            "field1",
+            Collections.singletonList(null),
+            TestIcebergDataHelper.SchemaType.BASIC)) {
+      testIcebergTable.insertRows(50);
+      SourceTable tableConfig =
+          SourceTable.builder()
+              .name(testIcebergTable.getTableName())
+              .basePath(testIcebergTable.getBasePath())
+              .formatName(TableFormat.ICEBERG)
+              .build();
+      IcebergConversionSource conversionSource =
+          sourceProvider.getConversionSourceInstance(tableConfig);
+      InternalTable internalTable = conversionSource.getCurrentTable();
+      InternalSchema internalSchema =
+          InternalSchema.builder()
+              .name("record")
+              .dataType(InternalType.RECORD)
+              .fields(
+                  Arrays.asList(
+                      InternalField.builder()
+                          .name("field1")
+                          .fieldId(1)
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(true)
+                                  .build())
+                          .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                          .build(),
+                      InternalField.builder()
+                          .name("field2")
+                          .fieldId(2)
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(true)
+                                  .build())
+                          .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                          .build()))
+              .build();
+      validateTable(
+          internalTable,
+          testIcebergTable.getBasePath(),
+          TableFormat.ICEBERG,
+          internalSchema,
+          DataLayoutStrategy.FLAT,
+          testIcebergTable.getBasePath(),
+          Collections.emptyList());
+    }
   }
 
   @ParameterizedTest

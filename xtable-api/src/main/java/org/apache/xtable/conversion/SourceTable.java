@@ -28,7 +28,7 @@ import lombok.NonNull;
 @EqualsAndHashCode(callSuper = true)
 @Getter
 public class SourceTable extends ExternalTable {
-  /** The path to the data files, defaults to the metadataPath */
+  /** The path to the data files, defaults to the basePath */
   @NonNull private final String dataPath;
 
   @Builder(toBuilder = true)

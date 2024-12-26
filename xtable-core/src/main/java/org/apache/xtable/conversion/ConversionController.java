@@ -85,7 +85,7 @@ public class ConversionController {
     if (config.getTargetTables() == null || config.getTargetTables().isEmpty()) {
       throw new IllegalArgumentException("Please provide at-least one format to sync");
     }
-    config = ConversionUtils.normalizeTargetPaths(config);
+
     try (ConversionSource<COMMIT> conversionSource =
         conversionSourceProvider.getConversionSourceInstance(config.getSourceTable())) {
       ExtractFromSource<COMMIT> source = ExtractFromSource.of(conversionSource);
@@ -143,7 +143,7 @@ public class ConversionController {
   private static String getFormatsWithStatusCode(
       Map<String, SyncResult> syncResultsMerged, SyncResult.SyncStatusCode statusCode) {
     return syncResultsMerged.entrySet().stream()
-        .filter(entry -> entry.getValue().getStatus().getStatusCode() == statusCode)
+        .filter(entry -> entry.getValue().getTableFormatSyncStatus().getStatusCode() == statusCode)
         .map(Map.Entry::getKey)
         .collect(Collectors.joining(","));
   }
