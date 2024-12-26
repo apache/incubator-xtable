@@ -1013,7 +1013,8 @@ public class ITConversionController {
                     TargetTable.builder()
                         .name(tableName)
                         .formatName(formatName)
-                        .basePath(table.getBasePath())
+                        // set the metadata path to the data path as the default (required by Hudi)
+                        .basePath(table.getDataPath())
                         .metadataRetention(metadataRetention)
                         .build())
             .collect(Collectors.toList());
