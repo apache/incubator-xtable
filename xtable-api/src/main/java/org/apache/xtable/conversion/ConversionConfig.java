@@ -18,6 +18,7 @@
  
 package org.apache.xtable.conversion;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +31,7 @@ import com.google.common.base.Preconditions;
 import org.apache.xtable.model.sync.SyncMode;
 
 @Value
+@Builder
 public class ConversionConfig {
   // The source of the sync
   @NonNull SourceTable sourceTable;
@@ -49,10 +51,10 @@ public class ConversionConfig {
       SyncMode syncMode) {
     this.sourceTable = sourceTable;
     this.targetTables = targetTables;
-    this.targetCatalogs = targetCatalogs;
     Preconditions.checkArgument(
         targetTables != null && !targetTables.isEmpty(),
         "Please provide at-least one format to sync");
+    this.targetCatalogs = targetCatalogs == null ? Collections.emptyMap() : targetCatalogs;
     this.syncMode = syncMode == null ? SyncMode.INCREMENTAL : syncMode;
   }
 }

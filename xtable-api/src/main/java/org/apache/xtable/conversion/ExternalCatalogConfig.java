@@ -59,7 +59,7 @@ public class ExternalCatalogConfig {
   String catalogConversionSourceImpl;
 
   /**
-   * The properties for each catalog, used for providing any custom behaviour during catalog sync
+   * The properties for this catalog, used for providing any custom behaviour during catalog sync
    */
   @NonNull @Builder.Default Map<String, String> catalogProperties = Collections.emptyMap();
 }

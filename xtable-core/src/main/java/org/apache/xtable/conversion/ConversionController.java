@@ -159,6 +159,17 @@ public class ConversionController {
     }
   }
 
+  /**
+   * Synchronizes the given source table format metadata in ConversionConfig to multiple target
+   * formats.
+   *
+   * @param config A per table level config containing tableBasePath, partitionFieldSpecConfig,
+   *     targetTableFormats and syncMode.
+   * @param source An extractor class for {@link ConversionSource} and allows fetching current
+   *     snapshot or incremental table changes.
+   * @param syncMode sync mode is either FULL or INCREMENTAL.
+   * @return Returns a map containing the table format, and it's sync result.
+   */
   private <COMMIT> Map<String, SyncResult> syncTableFormats(
       ConversionConfig config, ExtractFromSource<COMMIT> source, SyncMode syncMode) {
     Map<String, ConversionTarget> conversionTargetByFormat =

@@ -42,6 +42,7 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,6 +50,7 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import org.apache.xtable.catalog.CatalogConversionFactory;
+import org.apache.xtable.catalog.ExternalCatalogConfigFactory;
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
@@ -135,6 +137,7 @@ public class RunCatalogSync {
 
     Map<String, ExternalCatalogConfig> catalogsById =
         datasetConfig.getTargetCatalogs().stream()
+            .map(RunCatalogSync::populateCatalogImplementations)
             .collect(Collectors.toMap(ExternalCatalogConfig::getCatalogId, Function.identity()));
     CatalogConversionSource catalogConversionSource =
         CatalogConversionFactory.createCatalogConversionSource(
@@ -234,12 +237,30 @@ public class RunCatalogSync {
     return CONVERSION_SOURCE_PROVIDERS;
   }
 
+  /**
+   * Returns an implementation class for {@link CatalogTableIdentifier} based on the tableIdentifier
+   * provided by user.
+   */
   static CatalogTableIdentifier getCatalogTableIdentifier(TableIdentifier tableIdentifier) {
     if (tableIdentifier.getHierarchicalId() != null) {
       return ThreePartHierarchicalTableIdentifier.fromDotSeparatedIdentifier(
           tableIdentifier.getHierarchicalId());
     }
     throw new IllegalArgumentException("Invalid tableIdentifier configuration provided");
+  }
+
+  /**
+   * If user provides catalogType, we try to populate the implementation class if it exists in the
+   * class path.
+   */
+  static ExternalCatalogConfig populateCatalogImplementations(ExternalCatalogConfig catalogConfig) {
+    if (!StringUtils.isEmpty(catalogConfig.getCatalogType())) {
+      return ExternalCatalogConfigFactory.fromCatalogType(
+          catalogConfig.getCatalogType(),
+          catalogConfig.getCatalogId(),
+          catalogConfig.getCatalogProperties());
+    }
+    return catalogConfig;
   }
 
   @Data
