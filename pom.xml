@@ -51,6 +51,10 @@
         <module>xtable-hudi-support</module>
         <module>xtable-core</module>
         <module>xtable-utilities</module>
+        <module>xtable-delta</module>
+        <module>xtable-integration-tests</module>
+        <module>xtable-hudi</module>
+        <module>xtable-iceberg</module>
     </modules>
 
     <properties>

@@ -51,7 +51,6 @@ import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
-import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
@@ -153,7 +152,7 @@ public class RunSync {
       Properties sourceProperties = new Properties();
       if (table.getPartitionSpec() != null) {
         sourceProperties.put(
-            HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec());
+            "xtable.hudi.source.partition_field_spec_config", table.getPartitionSpec());
       }
       SourceTable sourceTable =
           SourceTable.builder()
