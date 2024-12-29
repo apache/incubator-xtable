@@ -30,10 +30,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import lombok.Data;
+import lombok.Builder;
+import lombok.Value;
+import lombok.extern.jackson.Jacksonized;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.commons.cli.CommandLine;
@@ -46,7 +50,6 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import org.apache.xtable.catalog.CatalogConversionFactory;
@@ -58,15 +61,18 @@ import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetCatalogConfig;
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
 import org.apache.xtable.model.catalog.ThreePartHierarchicalTableIdentifier;
+import org.apache.xtable.model.storage.CatalogType;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.reflection.ReflectionUtils;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.utilities.RunCatalogSync.DatasetConfig.StorageIdentifier;
 import org.apache.xtable.utilities.RunCatalogSync.DatasetConfig.TableIdentifier;
 import org.apache.xtable.utilities.RunCatalogSync.DatasetConfig.TargetTableIdentifier;
+import org.apache.xtable.utilities.RunSync.TableFormatConverters;
 
 /**
  * Provides standalone process for reading tables from a source catalog and synchronizing their
@@ -120,51 +126,29 @@ public class RunCatalogSync {
       return;
     }
 
-    DatasetConfig datasetConfig = new DatasetConfig();
+    DatasetConfig datasetConfig;
     try (InputStream inputStream =
         Files.newInputStream(
             Paths.get(cmd.getOptionValue(CATALOG_SOURCE_AND_TARGET_CONFIG_PATH)))) {
-      ObjectReader objectReader = YAML_MAPPER.readerForUpdating(datasetConfig);
-      objectReader.readValue(inputStream);
+      datasetConfig = YAML_MAPPER.readValue(inputStream, DatasetConfig.class);
     }
 
     byte[] customConfig = getCustomConfigurations(cmd, HADOOP_CONFIG_PATH);
     Configuration hadoopConf = loadHadoopConf(customConfig);
 
     customConfig = getCustomConfigurations(cmd, CONVERTERS_CONFIG_PATH);
-    RunSync.TableFormatConverters tableFormatConverters =
-        loadTableFormatConversionConfigs(customConfig);
+    TableFormatConverters tableFormatConverters = loadTableFormatConversionConfigs(customConfig);
 
     Map<String, ExternalCatalogConfig> catalogsById =
         datasetConfig.getTargetCatalogs().stream()
             .map(RunCatalogSync::populateCatalogImplementations)
             .collect(Collectors.toMap(ExternalCatalogConfig::getCatalogId, Function.identity()));
-    CatalogConversionSource catalogConversionSource =
-        CatalogConversionFactory.createCatalogConversionSource(
-            datasetConfig.getSourceCatalog(), hadoopConf);
+    Optional<CatalogConversionSource> catalogConversionSource =
+        getCatalogConversionSource(datasetConfig.getSourceCatalog(), hadoopConf);
     ConversionController conversionController = new ConversionController(hadoopConf);
     for (DatasetConfig.Dataset dataset : datasetConfig.getDatasets()) {
-      SourceTable sourceTable = null;
-      if (dataset.getSourceCatalogTableIdentifier().getStorageIdentifier() != null) {
-        StorageIdentifier storageIdentifier =
-            dataset.getSourceCatalogTableIdentifier().getStorageIdentifier();
-        sourceTable =
-            SourceTable.builder()
-                .name(storageIdentifier.getTableName())
-                .basePath(storageIdentifier.getTableBasePath())
-                .namespace(
-                    storageIdentifier.getNamespace() == null
-                        ? null
-                        : storageIdentifier.getNamespace().split("\\."))
-                .dataPath(storageIdentifier.getTableDataPath())
-                .formatName(storageIdentifier.getTableFormat())
-                .build();
-      } else {
-        sourceTable =
-            catalogConversionSource.getSourceTable(
-                getCatalogTableIdentifier(
-                    dataset.getSourceCatalogTableIdentifier().getTableIdentifier()));
-      }
+      SourceTable sourceTable =
+          getSourceTable(dataset.getSourceCatalogTableIdentifier(), catalogConversionSource);
       List<TargetTable> targetTables = new ArrayList<>();
       Map<TargetTable, List<TargetCatalogConfig>> targetCatalogs = new HashMap<>();
       for (TargetTableIdentifier targetCatalogTableIdentifier :
@@ -212,15 +196,57 @@ public class RunCatalogSync {
     }
   }
 
+  static Optional<CatalogConversionSource> getCatalogConversionSource(
+      ExternalCatalogConfig sourceCatalog, Configuration hadoopConf) {
+    if (CatalogType.STORAGE.equals(sourceCatalog.getCatalogType())) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        CatalogConversionFactory.createCatalogConversionSource(sourceCatalog, hadoopConf));
+  }
+
+  static SourceTable getSourceTable(
+      DatasetConfig.SourceTableIdentifier sourceTableIdentifier,
+      Optional<CatalogConversionSource> catalogConversionSource) {
+    SourceTable sourceTable = null;
+    if (sourceTableIdentifier.getStorageIdentifier() != null) {
+      StorageIdentifier storageIdentifier = sourceTableIdentifier.getStorageIdentifier();
+      Properties sourceProperties = new Properties();
+      if (storageIdentifier.getPartitionSpec() != null) {
+        sourceProperties.put(
+            HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, storageIdentifier.getPartitionSpec());
+      }
+      sourceTable =
+          SourceTable.builder()
+              .name(storageIdentifier.getTableName())
+              .basePath(storageIdentifier.getTableBasePath())
+              .namespace(
+                  storageIdentifier.getNamespace() == null
+                      ? null
+                      : storageIdentifier.getNamespace().split("\\."))
+              .dataPath(storageIdentifier.getTableDataPath())
+              .formatName(storageIdentifier.getTableFormat())
+              .additionalProperties(sourceProperties)
+              .build();
+    } else if (catalogConversionSource.isPresent()) {
+      sourceTable =
+          catalogConversionSource
+              .get()
+              .getSourceTable(
+                  getCatalogTableIdentifier(sourceTableIdentifier.getTableIdentifier()));
+    }
+    return sourceTable;
+  }
+
   static Map<String, ConversionSourceProvider> getConversionSourceProviders(
       List<String> tableFormats,
-      RunSync.TableFormatConverters tableFormatConverters,
+      TableFormatConverters tableFormatConverters,
       Configuration hadoopConf) {
     for (String tableFormat : tableFormats) {
       if (CONVERSION_SOURCE_PROVIDERS.containsKey(tableFormat)) {
         continue;
       }
-      RunSync.TableFormatConverters.ConversionConfig sourceConversionConfig =
+      TableFormatConverters.ConversionConfig sourceConversionConfig =
           tableFormatConverters.getTableFormatConverters().get(tableFormat);
       if (sourceConversionConfig == null) {
         throw new IllegalArgumentException(
@@ -263,33 +289,39 @@ public class RunCatalogSync {
     return catalogConfig;
   }
 
-  @Data
+  @Value
+  @Builder
+  @Jacksonized
   public static class DatasetConfig {
     /**
      * Configuration of the source catalog from which XTable will read. It must contain all the
      * necessary connection and access details for describing and listing tables
      */
-    private ExternalCatalogConfig sourceCatalog;
+    ExternalCatalogConfig sourceCatalog;
     /**
      * Defines configuration one or more target catalogs, to which XTable will write or update
      * tables. Unlike the source, these catalogs must be writable
      */
-    private List<ExternalCatalogConfig> targetCatalogs;
+    List<ExternalCatalogConfig> targetCatalogs;
     /** A list of datasets that specify how a source table maps to one or more target tables. */
-    private List<Dataset> datasets;
+    List<Dataset> datasets;
 
     /** Configuration for catalog. */
     ExternalCatalogConfig catalogConfig;
 
-    @Data
+    @Value
+    @Builder
+    @Jacksonized
     public static class Dataset {
       /** Identifies the source table in sourceCatalog. */
-      private SourceTableIdentifier sourceCatalogTableIdentifier;
+      SourceTableIdentifier sourceCatalogTableIdentifier;
       /** A list of one or more targets that this source table should be written to. */
-      private List<TargetTableIdentifier> targetCatalogTableIdentifiers;
+      List<TargetTableIdentifier> targetCatalogTableIdentifiers;
     }
 
-    @Data
+    @Value
+    @Builder
+    @Jacksonized
     public static class SourceTableIdentifier {
       /** Specifies the table identifier in the source catalog. */
       TableIdentifier tableIdentifier;
@@ -301,7 +333,9 @@ public class RunCatalogSync {
       StorageIdentifier storageIdentifier;
     }
 
-    @Data
+    @Value
+    @Builder
+    @Jacksonized
     public static class TargetTableIdentifier {
       /**
        * The user defined unique identifier of the target catalog where the table will be created or
@@ -317,7 +351,9 @@ public class RunCatalogSync {
       TableIdentifier tableIdentifier;
     }
 
-    @Data
+    @Value
+    @Builder
+    @Jacksonized
     public static class TableIdentifier {
       /**
        * Specifics the three level hierarchical table identifier for {@link
@@ -330,7 +366,9 @@ public class RunCatalogSync {
      * Configuration in storage for table. This is an optional field in {@link
      * SourceTableIdentifier}.
      */
-    @Data
+    @Value
+    @Builder
+    @Jacksonized
     public static class StorageIdentifier {
       String tableFormat;
       String tableBasePath;

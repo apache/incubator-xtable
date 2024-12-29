@@ -31,10 +31,7 @@ import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 @Value
 @Builder
 public class TargetCatalogConfig {
-  /**
-   * The tableIdentifiers(catalogName.databaseName.tableName) that will be used when syncing {@link
-   * TargetTable} to the catalog.
-   */
+  /** The tableIdentifier that will be used when syncing {@link TargetTable} to the catalog. */
   @NonNull CatalogTableIdentifier catalogTableIdentifier;
 
   /** Configuration for the catalog. */

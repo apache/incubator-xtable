@@ -16,23 +16,13 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.utilities;
+package org.apache.xtable.model.storage;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import lombok.SneakyThrows;
-
-import org.junit.jupiter.api.Test;
-
-class TestRunCatalogSync {
-
-  @SneakyThrows
-  @Test
-  void testMain() {
-    String catalogConfigYamlPath =
-        TestRunCatalogSync.class.getClassLoader().getResource("catalogConfig.yaml").getPath();
-    String[] args = {"-catalogConfig", catalogConfigYamlPath};
-    // Ensure yaml gets parsed without any errors.
-    assertDoesNotThrow(() -> RunCatalogSync.main(args));
-  }
+/**
+ * Default constants for supported catalog types.
+ *
+ * @since 0.1
+ */
+public class CatalogType {
+  public static final String STORAGE = "STORAGE";
 }
