@@ -120,7 +120,7 @@ datasets:
 ```
 
 ## Overview of the `RunCatalogSync` process
-![img.jpg](/Users/vinishreddy/OpenSource/incubator-xtable/assets/images/catalog_sync_flow.jpg)
+![img.jpg](assets/images/catalog_sync_flow.jpg)
 
 
 ## Rollout/Adoption Plan
