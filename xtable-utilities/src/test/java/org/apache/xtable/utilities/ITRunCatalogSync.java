@@ -56,7 +56,6 @@ public class ITRunCatalogSync {
       File configFile = writeConfigFile(tempDir, table, tableName);
       String[] args = new String[] {"-catalogConfig", configFile.getPath()};
       RunCatalogSync.main(args);
-      // TODO: Validate no exceptions.
     }
   }
 
