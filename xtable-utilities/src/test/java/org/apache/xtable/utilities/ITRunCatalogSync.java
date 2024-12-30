@@ -20,14 +20,18 @@ package org.apache.xtable.utilities;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.concurrent.TimeUnit;
+import java.util.List;
+import java.util.Map;
 
 import lombok.SneakyThrows;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -46,6 +50,15 @@ import org.apache.xtable.utilities.RunCatalogSync.DatasetConfig.TargetTableIdent
 
 public class ITRunCatalogSync {
 
+  private static final List<String> EXPECTED_FUNCTION_CALLS =
+      Arrays.asList(
+          "hasDatabase",
+          "createDatabase",
+          "getTable",
+          "getStorageLocation",
+          "createTable",
+          "getCatalogId");
+
   @Test
   void testCatalogSync(@TempDir Path tempDir) throws Exception {
     String tableName = "test-table";
@@ -56,6 +69,10 @@ public class ITRunCatalogSync {
       File configFile = writeConfigFile(tempDir, table, tableName);
       String[] args = new String[] {"-catalogConfig", configFile.getPath()};
       RunCatalogSync.main(args);
+      validateTargetMetadataIsPresent(table.getBasePath());
+      Map<String, Integer> functionCalls = ITTestUtils.TestCatalogSyncImpl.getFunctionCalls();
+      EXPECTED_FUNCTION_CALLS.forEach(
+          (function -> Assertions.assertEquals(2, functionCalls.get(function))));
     }
   }
 
@@ -112,22 +129,14 @@ public class ITRunCatalogSync {
   }
 
   @SneakyThrows
-  private static void waitForNumIcebergCommits(Path metadataPath, int count) {
-    long start = System.currentTimeMillis();
-    while (System.currentTimeMillis() - start < TimeUnit.MINUTES.toMillis(5)) {
-      if (numIcebergMetadataJsonFiles(metadataPath) == count) {
-        break;
-      }
-      Thread.sleep(5000);
-    }
-  }
-
-  @SneakyThrows
-  private static long numIcebergMetadataJsonFiles(Path path) {
-    long count = 0;
-    if (Files.exists(path)) {
-      count = Files.list(path).filter(p -> p.toString().endsWith("metadata.json")).count();
-    }
-    return count;
+  private void validateTargetMetadataIsPresent(String basePath) {
+    Path icebergMetadataPath = Paths.get(URI.create(basePath + "/metadata"));
+    long icebergMetadataFiles =
+        Files.list(icebergMetadataPath).filter(p -> p.toString().endsWith("metadata.json")).count();
+    Assertions.assertEquals(2, icebergMetadataFiles);
+    Path deltaMetadataPath = Paths.get(URI.create(basePath + "/_delta_log"));
+    long deltaMetadataFiles =
+        Files.list(deltaMetadataPath).filter(p -> p.toString().endsWith(".json")).count();
+    Assertions.assertEquals(1, deltaMetadataFiles);
   }
 }

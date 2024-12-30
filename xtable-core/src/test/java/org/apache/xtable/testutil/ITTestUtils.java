@@ -18,7 +18,9 @@
  
 package org.apache.xtable.testutil;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
@@ -52,48 +54,74 @@ public class ITTestUtils {
   }
 
   public static class TestCatalogSyncImpl implements CatalogSyncClient {
+    private static final Map<String, Integer> FUNCTION_CALLS = new HashMap<>();
 
     public TestCatalogSyncImpl(
         ExternalCatalogConfig catalogConfig, String tableFormat, Configuration hadoopConf) {}
 
     @Override
     public String getCatalogId() {
+      trackFunctionCall();
       return null;
     }
 
     @Override
     public String getStorageLocation(Object o) {
+      trackFunctionCall();
       return null;
     }
 
     @Override
     public boolean hasDatabase(CatalogTableIdentifier tableIdentifier) {
+      trackFunctionCall();
       return false;
     }
 
     @Override
-    public void createDatabase(CatalogTableIdentifier tableIdentifier) {}
+    public void createDatabase(CatalogTableIdentifier tableIdentifier) {
+      trackFunctionCall();
+    }
 
     @Override
     public Object getTable(CatalogTableIdentifier tableIdentifier) {
+      trackFunctionCall();
       return null;
     }
 
     @Override
-    public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {}
+    public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
+      trackFunctionCall();
+    }
 
     @Override
     public void refreshTable(
-        InternalTable table, Object catalogTable, CatalogTableIdentifier tableIdentifier) {}
+        InternalTable table, Object catalogTable, CatalogTableIdentifier tableIdentifier) {
+      trackFunctionCall();
+    }
 
     @Override
-    public void createOrReplaceTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {}
+    public void createOrReplaceTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
+      trackFunctionCall();
+    }
 
     @Override
-    public void dropTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {}
+    public void dropTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
+      trackFunctionCall();
+    }
 
     @Override
-    public void close() throws Exception {}
+    public void close() throws Exception {
+      trackFunctionCall();
+    }
+
+    private void trackFunctionCall() {
+      String methodName = Thread.currentThread().getStackTrace()[2].getMethodName();
+      FUNCTION_CALLS.put(methodName, FUNCTION_CALLS.getOrDefault(methodName, 0) + 1);
+    }
+
+    public static Map<String, Integer> getFunctionCalls() {
+      return FUNCTION_CALLS;
+    }
   }
 
   public static class TestCatalogConversionSourceImpl implements CatalogConversionSource {
