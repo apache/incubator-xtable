@@ -16,20 +16,13 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.spi.extractor;
-
-import org.apache.xtable.conversion.SourceTable;
-import org.apache.xtable.model.catalog.CatalogTableIdentifier;
+package org.apache.xtable.model.storage;
 
 /**
- * A client for converting the table with tableIdentifier {@link CatalogTableIdentifier} in source
- * catalog to SourceTable object {@link SourceTable}, can be used by downstream consumers for
- * syncing it to multiple {@link org.apache.xtable.conversion.TargetTable}
+ * Default constants for supported catalog types.
+ *
+ * @since 0.1
  */
-public interface CatalogConversionSource {
-  /** Returns the source table object present in the catalog. */
-  SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier);
-
-  /** Returns the {@link org.apache.xtable.model.storage.CatalogType} for the catalog conversion */
-  String getCatalogType();
+public class CatalogType {
+  public static final String STORAGE = "STORAGE";
 }

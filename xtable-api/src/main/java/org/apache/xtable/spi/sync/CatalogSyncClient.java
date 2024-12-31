@@ -34,6 +34,9 @@ public interface CatalogSyncClient<TABLE> extends AutoCloseable {
    */
   String getCatalogId();
 
+  /** Returns the {@link org.apache.xtable.model.storage.CatalogType} the client syncs to */
+  String getCatalogType();
+
   /** Returns the storage location of the table synced to the catalog. */
   String getStorageLocation(TABLE table);
 
