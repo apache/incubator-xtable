@@ -18,6 +18,9 @@
  
 package org.apache.xtable.catalog;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.xtable.conversion.ExternalCatalogConfig;
@@ -25,6 +28,7 @@ import org.apache.xtable.reflection.ReflectionUtils;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class CatalogConversionFactory {
   private static final CatalogConversionFactory INSTANCE = new CatalogConversionFactory();
 
@@ -52,7 +56,7 @@ public class CatalogConversionFactory {
    * @param targetCatalogConfig configuration for the target catalog
    * @param configuration hadoop configuration
    */
-  public CatalogSyncClient createCatalogSyncClient(
+  public <TABLE> CatalogSyncClient<TABLE> createCatalogSyncClient(
       ExternalCatalogConfig targetCatalogConfig, String tableFormat, Configuration configuration) {
     return ReflectionUtils.createInstanceOfClass(
         targetCatalogConfig.getCatalogSyncClientImpl(),

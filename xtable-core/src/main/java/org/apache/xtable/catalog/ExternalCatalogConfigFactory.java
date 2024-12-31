@@ -37,7 +37,6 @@ public class ExternalCatalogConfigFactory {
     String catalogConversionSourceImpl =
         findImplClassName(
             CatalogConversionSource.class, catalogType, CatalogConversionSource::getCatalogType);
-    ;
     return ExternalCatalogConfig.builder()
         .catalogType(catalogType)
         .catalogSyncClientImpl(catalogSyncClientImpl)
