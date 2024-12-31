@@ -29,4 +29,7 @@ import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 public interface CatalogConversionSource {
   /** Returns the source table object present in the catalog. */
   SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier);
+
+  /** Returns the {@link org.apache.xtable.model.storage.CatalogType} for the catalog conversion */
+  String getCatalogType();
 }

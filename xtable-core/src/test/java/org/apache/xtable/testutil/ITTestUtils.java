@@ -36,6 +36,7 @@ import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 public class ITTestUtils {
+  public static final String TEST_CATALOG_TYPE = "test";
 
   public static void validateTable(
       InternalTable internalTable,
@@ -59,10 +60,17 @@ public class ITTestUtils {
     public TestCatalogSyncImpl(
         ExternalCatalogConfig catalogConfig, String tableFormat, Configuration hadoopConf) {}
 
+    public TestCatalogSyncImpl() {}
+
     @Override
     public String getCatalogId() {
       trackFunctionCall();
       return null;
+    }
+
+    @Override
+    public String getCatalogType() {
+      return TEST_CATALOG_TYPE;
     }
 
     @Override
@@ -128,6 +136,8 @@ public class ITTestUtils {
     public TestCatalogConversionSourceImpl(
         ExternalCatalogConfig sourceCatalogConfig, Configuration configuration) {}
 
+    public TestCatalogConversionSourceImpl() {}
+
     @Override
     public SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier) {
       return SourceTable.builder()
@@ -136,5 +146,10 @@ public class ITTestUtils {
           .formatName("ICEBERG")
           .build();
     }
+
+    @Override
+    public String getCatalogType() {
+      return TEST_CATALOG_TYPE;
+    }g
   }
 }

@@ -450,7 +450,9 @@ public class TestConversionController {
     when(mockConversionSource.getCurrentTable()).thenReturn(getInternalTable());
     // Mocks for tableFormatSync.
     Instant instantBeforeHour = Instant.now().minus(Duration.ofHours(1));
-    SyncResult syncResult = buildSyncResult(syncMode, instantBeforeHour, Duration.ofSeconds(1));
+    Instant syncStartTime = Instant.now();
+    SyncResult syncResult =
+        buildSyncResult(syncMode, instantBeforeHour, syncStartTime, Duration.ofSeconds(1));
     Map<String, SyncResult> tableFormatSyncResults =
         buildPerTableResult(Arrays.asList(ICEBERG, DELTA), syncResult);
     when(tableFormatSync.syncSnapshot(
@@ -470,7 +472,8 @@ public class TestConversionController {
                     targetCatalogs.get(0).getCatalogTableIdentifier(), mockCatalogSyncClient1,
                     targetCatalogs.get(1).getCatalogTableIdentifier(), mockCatalogSyncClient2)),
             any()))
-        .thenReturn(buildSyncResult(syncMode, Instant.now(), Duration.ofSeconds(3)));
+        .thenReturn(
+            buildSyncResult(syncMode, syncStartTime, instantBeforeHour, Duration.ofSeconds(3)));
     ConversionController conversionController =
         new ConversionController(
             mockConf,
@@ -523,11 +526,11 @@ public class TestConversionController {
   }
 
   private SyncResult buildSyncResult(
-      SyncMode syncMode, Instant lastSyncedInstant, Duration duration) {
+      SyncMode syncMode, Instant syncStartTime, Instant lastSyncedInstant, Duration duration) {
     return SyncResult.builder()
         .mode(syncMode)
         .lastInstantSynced(lastSyncedInstant)
-        .syncStartTime(Instant.now().minusSeconds(duration.getSeconds()))
+        .syncStartTime(syncStartTime)
         .syncDuration(duration)
         .tableFormatSyncStatus(SyncResult.SyncStatus.SUCCESS)
         .build();

@@ -26,7 +26,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +33,7 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.Builder;
 import lombok.Value;
@@ -182,16 +182,17 @@ public class RunCatalogSync {
               .syncMode(SyncMode.INCREMENTAL)
               .build();
       List<String> tableFormats =
-          new ArrayList<>(Collections.singleton(sourceTable.getFormatName()));
-      tableFormats.addAll(
-          targetTables.stream().map(TargetTable::getFormatName).collect(Collectors.toList()));
-      tableFormats = tableFormats.stream().distinct().collect(Collectors.toList());
+          Stream.concat(
+                  Stream.of(sourceTable.getFormatName()),
+                  targetTables.stream().map(TargetTable::getFormatName))
+              .distinct()
+              .collect(Collectors.toList());
       try {
         conversionController.syncTableAcrossCatalogs(
             conversionConfig,
             getConversionSourceProviders(tableFormats, tableFormatConverters, hadoopConf));
       } catch (Exception e) {
-        log.error(String.format("Error running sync for %s", sourceTable.getBasePath()), e);
+        log.error("Error running sync for {}", sourceTable.getBasePath(), e);
       }
     }
   }

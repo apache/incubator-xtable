@@ -19,17 +19,25 @@
 package org.apache.xtable.catalog;
 
 import java.util.Map;
+import java.util.ServiceLoader;
+import java.util.function.Function;
 
 import org.apache.xtable.conversion.ExternalCatalogConfig;
+import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.spi.extractor.CatalogConversionSource;
+import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 /** A factory class which returns {@link ExternalCatalogConfig} based on catalogType. */
 public class ExternalCatalogConfigFactory {
 
   public static ExternalCatalogConfig fromCatalogType(
       String catalogType, String catalogId, Map<String, String> properties) {
-    // TODO: Choose existing implementation based on catalogType.
-    String catalogSyncClientImpl = "";
-    String catalogConversionSourceImpl = "";
+    String catalogSyncClientImpl =
+        findImplClassName(CatalogSyncClient.class, catalogType, CatalogSyncClient::getCatalogType);
+    String catalogConversionSourceImpl =
+        findImplClassName(
+            CatalogConversionSource.class, catalogType, CatalogConversionSource::getCatalogType);
+    ;
     return ExternalCatalogConfig.builder()
         .catalogType(catalogType)
         .catalogSyncClientImpl(catalogSyncClientImpl)
@@ -37,5 +45,17 @@ public class ExternalCatalogConfigFactory {
         .catalogId(catalogId)
         .catalogProperties(properties)
         .build();
+  }
+
+  private static <T> String findImplClassName(
+      Class<T> serviceClass, String catalogType, Function<T, String> catalogTypeExtractor) {
+    ServiceLoader<T> loader = ServiceLoader.load(serviceClass);
+    for (T instance : loader) {
+      String instanceCatalogType = catalogTypeExtractor.apply(instance);
+      if (catalogType.equals(instanceCatalogType)) {
+        return instance.getClass().getName();
+      }
+    }
+    throw new NotSupportedException("catalogType is not yet supported: " + catalogType);
   }
 }

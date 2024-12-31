@@ -190,7 +190,7 @@ public class RunSync {
       try {
         conversionController.sync(conversionConfig, conversionSourceProvider);
       } catch (Exception e) {
-        log.error(String.format("Error running sync for %s", table.getTableBasePath()), e);
+        log.error("Error running sync for {}", table.getTableBasePath(), e);
       }
     }
   }
