@@ -66,11 +66,11 @@ public class ITIcebergConversionTargetSource {
   private static final Configuration hadoopConf = new Configuration();
 
   @TempDir public static Path tempDir;
-  private IcebergConversionSourceProvider sourceProvider;
+  private IcebergTableStateProvider sourceProvider;
 
   @BeforeEach
   void setup() {
-    sourceProvider = new IcebergConversionSourceProvider();
+    sourceProvider = new IcebergTableStateProvider();
     sourceProvider.init(hadoopConf);
   }
 

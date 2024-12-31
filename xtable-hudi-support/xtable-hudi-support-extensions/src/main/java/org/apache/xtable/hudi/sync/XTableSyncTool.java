@@ -41,7 +41,7 @@ import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
-import org.apache.xtable.hudi.HudiConversionSourceProvider;
+import org.apache.xtable.hudi.HudiTableStateProvider;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
@@ -52,12 +52,12 @@ import org.apache.xtable.model.sync.SyncResult;
  */
 public class XTableSyncTool extends HoodieSyncTool {
   private final XTableSyncConfig config;
-  private final HudiConversionSourceProvider hudiConversionSourceProvider;
+  private final HudiTableStateProvider hudiConversionSourceProvider;
 
   public XTableSyncTool(Properties props, Configuration hadoopConf) {
     super(props, hadoopConf);
     this.config = new XTableSyncConfig(props);
-    this.hudiConversionSourceProvider = new HudiConversionSourceProvider();
+    this.hudiConversionSourceProvider = new HudiTableStateProvider();
     hudiConversionSourceProvider.init(hadoopConf);
   }
 

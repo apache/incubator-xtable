@@ -88,19 +88,19 @@ public class ConversionController {
    *
    * @param config A per table level config containing tableBasePath, partitionFieldSpecConfig,
    *     targetTableFormats and syncMode
-   * @param conversionSourceProvider A provider for the {@link ConversionSource} instance, {@link
-   *     ConversionSourceProvider#init(Configuration)} must be called before calling this method.
+   * @param tableStateProvider A provider for the {@link ConversionSource} instance, {@link
+   *     TableStateProvider#init(Configuration)} must be called before calling this method.
    * @return Returns a map containing the table format, and it's sync result. Run sync for a table
    *     with the provided per table level configuration.
    */
   public <COMMIT> Map<String, SyncResult> sync(
-      ConversionConfig config, ConversionSourceProvider<COMMIT> conversionSourceProvider) {
+      ConversionConfig config, TableStateProvider<COMMIT> tableStateProvider) {
     if (config.getTargetTables() == null || config.getTargetTables().isEmpty()) {
       throw new IllegalArgumentException("Please provide at-least one format to sync");
     }
 
     try (ConversionSource<COMMIT> conversionSource =
-        conversionSourceProvider.getConversionSourceInstance(config.getSourceTable())) {
+        tableStateProvider.getConversionSourceInstance(config.getSourceTable())) {
       ExtractFromSource<COMMIT> source = ExtractFromSource.of(conversionSource);
       return syncTableFormats(config, source, config.getSyncMode());
     } catch (IOException ioException) {
@@ -115,19 +115,19 @@ public class ConversionController {
    *
    * @param config A per table level config containing source table, target tables, target catalogs
    *     and syncMode.
-   * @param conversionSourceProvider A provider for the {@link ConversionSource} instance for each
-   *     tableFormat, {@link ConversionSourceProvider#init(Configuration)} must be called before
-   *     calling this method.
+   * @param tableStateProviders A provider for the {@link ConversionSource} instance for each
+   *     tableFormat, {@link TableStateProvider#init(Configuration)} must be called before calling
+   *     this method.
    * @return Returns a map containing the table format, and it's sync result. Run sync for a table *
    *     with the provided per table level configuration.
    */
   public Map<String, SyncResult> syncTableAcrossCatalogs(
-      ConversionConfig config, Map<String, ConversionSourceProvider> conversionSourceProvider) {
+      ConversionConfig config, Map<String, TableStateProvider> tableStateProviders) {
     if (config.getTargetTables() == null || config.getTargetTables().isEmpty()) {
       throw new IllegalArgumentException("Please provide at-least one format to sync");
     }
     try (ConversionSource conversionSource =
-        conversionSourceProvider
+        tableStateProviders
             .get(config.getSourceTable().getFormatName())
             .getConversionSourceInstance(config.getSourceTable())) {
       ExtractFromSource source = ExtractFromSource.of(conversionSource);
@@ -150,7 +150,7 @@ public class ConversionController {
             syncCatalogsForTargetTable(
                 targetTable,
                 catalogSyncClients,
-                conversionSourceProvider.get(targetTable.getFormatName())));
+                tableStateProviders.get(targetTable.getFormatName())));
       }
       mergeSyncResults(tableFormatSyncResults, catalogSyncResults);
       return tableFormatSyncResults;
@@ -226,18 +226,18 @@ public class ConversionController {
    * @param targetTable target table that needs to synced.
    * @param catalogSyncClients Collection of catalog sync clients along with their table identifiers
    *     for each target catalog.
-   * @param conversionSourceProvider A provider for the {@link ConversionSource} instance for the
-   *     table format of targetTable.
+   * @param tableStateProvider A provider for the {@link ConversionSource} instance for the table
+   *     format of targetTable.
    */
   private SyncResult syncCatalogsForTargetTable(
       TargetTable targetTable,
       Map<CatalogTableIdentifier, CatalogSyncClient> catalogSyncClients,
-      ConversionSourceProvider conversionSourceProvider) {
+      TableStateProvider tableStateProvider) {
     return catalogSync.syncTable(
         catalogSyncClients,
         // We get the latest state of InternalTable for TargetTable
         // and then synchronize it to catalogSyncClients.
-        conversionSourceProvider
+        tableStateProvider
             .getConversionSourceInstance(convertToSourceTable(targetTable))
             .getCurrentTable());
   }

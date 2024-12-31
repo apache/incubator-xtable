@@ -48,8 +48,8 @@ import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
-import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.conversion.TableStateProvider;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
@@ -139,9 +139,9 @@ public class RunSync {
               sourceFormat, tableFormatConverters.getTableFormatConverters().keySet()));
     }
     String sourceProviderClass = sourceConversionConfig.conversionSourceProviderClass;
-    ConversionSourceProvider<?> conversionSourceProvider =
+    TableStateProvider<?> tableStateProvider =
         ReflectionUtils.createInstanceOfClass(sourceProviderClass);
-    conversionSourceProvider.init(hadoopConf);
+    tableStateProvider.init(hadoopConf);
 
     List<String> tableFormatList = datasetConfig.getTargetFormats();
     ConversionController conversionController = new ConversionController(hadoopConf);
@@ -188,7 +188,7 @@ public class RunSync {
               .syncMode(SyncMode.INCREMENTAL)
               .build();
       try {
-        conversionController.sync(conversionConfig, conversionSourceProvider);
+        conversionController.sync(conversionConfig, tableStateProvider);
       } catch (Exception e) {
         log.error("Error running sync for {}", table.getTableBasePath(), e);
       }
@@ -284,7 +284,7 @@ public class RunSync {
     @Data
     public static class ConversionConfig {
       /**
-       * The class name of the {@link ConversionSourceProvider} that will generate the {@link
+       * The class name of the {@link TableStateProvider} that will generate the {@link
        * org.apache.xtable.spi.extractor.ConversionSource}.
        */
       String conversionSourceProviderClass;

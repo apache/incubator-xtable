@@ -16,20 +16,27 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.iceberg;
+package org.apache.xtable.delta;
 
-import org.apache.iceberg.Snapshot;
+import org.apache.spark.sql.SparkSession;
 
-import org.apache.xtable.conversion.ConversionSourceProvider;
+import io.delta.tables.DeltaTable;
+
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.conversion.TableStateProvider;
 
-/** A concrete implementation of {@link ConversionSourceProvider} for Hudi table format. */
-public class IcebergConversionSourceProvider extends ConversionSourceProvider<Snapshot> {
+/** A concrete implementation of {@link TableStateProvider} for Delta Lake table format. */
+public class DeltaTableStateProvider extends TableStateProvider<Long> {
   @Override
-  public IcebergConversionSource getConversionSourceInstance(SourceTable sourceTableConfig) {
-    return IcebergConversionSource.builder()
-        .sourceTableConfig(sourceTableConfig)
-        .hadoopConf(hadoopConf)
+  public DeltaConversionSource getConversionSourceInstance(SourceTable sourceTable) {
+    SparkSession sparkSession = DeltaConversionUtils.buildSparkSession(hadoopConf);
+    DeltaTable deltaTable = DeltaTable.forPath(sparkSession, sourceTable.getBasePath());
+    return DeltaConversionSource.builder()
+        .sparkSession(sparkSession)
+        .tableName(sourceTable.getName())
+        .basePath(sourceTable.getBasePath())
+        .deltaTable(deltaTable)
+        .deltaLog(deltaTable.deltaLog())
         .build();
   }
 }

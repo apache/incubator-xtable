@@ -56,9 +56,9 @@ import org.apache.xtable.catalog.CatalogConversionFactory;
 import org.apache.xtable.catalog.ExternalCatalogConfigFactory;
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
-import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.conversion.TableStateProvider;
 import org.apache.xtable.conversion.TargetCatalogConfig;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.hudi.HudiSourceConfig;
@@ -86,7 +86,7 @@ public class RunCatalogSync {
   private static final String HADOOP_CONFIG_PATH = "hadoopConfig";
   private static final String CONVERTERS_CONFIG_PATH = "convertersConfig";
   private static final String HELP_OPTION = "h";
-  private static final Map<String, ConversionSourceProvider> CONVERSION_SOURCE_PROVIDERS =
+  private static final Map<String, TableStateProvider> CONVERSION_SOURCE_PROVIDERS =
       new HashMap<>();
 
   private static final Options OPTIONS =
@@ -190,7 +190,7 @@ public class RunCatalogSync {
       try {
         conversionController.syncTableAcrossCatalogs(
             conversionConfig,
-            getConversionSourceProviders(tableFormats, tableFormatConverters, hadoopConf));
+            getTableStateProviders(tableFormats, tableFormatConverters, hadoopConf));
       } catch (Exception e) {
         log.error("Error running sync for {}", sourceTable.getBasePath(), e);
       }
@@ -239,7 +239,7 @@ public class RunCatalogSync {
     return sourceTable;
   }
 
-  static Map<String, ConversionSourceProvider> getConversionSourceProviders(
+  static Map<String, TableStateProvider> getTableStateProviders(
       List<String> tableFormats,
       TableFormatConverters tableFormatConverters,
       Configuration hadoopConf) {
@@ -256,10 +256,10 @@ public class RunCatalogSync {
                 tableFormat, tableFormatConverters.getTableFormatConverters().keySet()));
       }
       String sourceProviderClass = sourceConversionConfig.conversionSourceProviderClass;
-      ConversionSourceProvider<?> conversionSourceProvider =
+      TableStateProvider<?> tableStateProvider =
           ReflectionUtils.createInstanceOfClass(sourceProviderClass);
-      conversionSourceProvider.init(hadoopConf);
-      CONVERSION_SOURCE_PROVIDERS.put(tableFormat, conversionSourceProvider);
+      tableStateProvider.init(hadoopConf);
+      CONVERSION_SOURCE_PROVIDERS.put(tableFormat, tableStateProvider);
     }
     return CONVERSION_SOURCE_PROVIDERS;
   }

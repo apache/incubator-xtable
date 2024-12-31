@@ -41,10 +41,10 @@ import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestJavaHudiTable;
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
-import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.conversion.TableStateProvider;
 import org.apache.xtable.conversion.TargetTable;
-import org.apache.xtable.hudi.HudiConversionSourceProvider;
+import org.apache.xtable.hudi.HudiTableStateProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 
@@ -56,12 +56,12 @@ import org.apache.xtable.model.sync.SyncMode;
 public class LoadTest {
   @TempDir public static Path tempDir;
   private static final Configuration CONFIGURATION = new Configuration();
-  private ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider;
+  private TableStateProvider<HoodieInstant> hudiTableStateProvider;
 
   @BeforeEach
   public void setup() {
-    hudiConversionSourceProvider = new HudiConversionSourceProvider();
-    hudiConversionSourceProvider.init(CONFIGURATION);
+    hudiTableStateProvider = new HudiTableStateProvider();
+    hudiTableStateProvider.init(CONFIGURATION);
   }
 
   @Test
@@ -88,7 +88,7 @@ public class LoadTest {
               Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA));
       ConversionController conversionController = new ConversionController(CONFIGURATION);
       long start = System.currentTimeMillis();
-      conversionController.sync(conversionConfig, hudiConversionSourceProvider);
+      conversionController.sync(conversionConfig, hudiTableStateProvider);
       long end = System.currentTimeMillis();
       System.out.println("Full sync took " + (end - start) + "ms");
     }
@@ -116,7 +116,7 @@ public class LoadTest {
               Arrays.asList(TableFormat.ICEBERG, TableFormat.DELTA));
       // sync once to establish first commit
       ConversionController conversionController = new ConversionController(CONFIGURATION);
-      conversionController.sync(conversionConfig, hudiConversionSourceProvider);
+      conversionController.sync(conversionConfig, hudiTableStateProvider);
       for (int i = 0; i < numCommits; i++) {
         table.insertRecords(
             1,
@@ -127,7 +127,7 @@ public class LoadTest {
       }
 
       long start = System.currentTimeMillis();
-      conversionController.sync(conversionConfig, hudiConversionSourceProvider);
+      conversionController.sync(conversionConfig, hudiTableStateProvider);
       long end = System.currentTimeMillis();
       System.out.println("Incremental sync took " + (end - start) + "ms");
     }

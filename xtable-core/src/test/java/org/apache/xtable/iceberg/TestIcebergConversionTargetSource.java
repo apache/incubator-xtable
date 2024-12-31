@@ -66,7 +66,7 @@ class TestIcebergConversionTargetSource {
   private IcebergTableManager tableManager;
   private Schema csSchema;
   private PartitionSpec csPartitionSpec;
-  private IcebergConversionSourceProvider sourceProvider;
+  private IcebergTableStateProvider sourceProvider;
   private Configuration hadoopConf;
 
   @BeforeEach
@@ -74,7 +74,7 @@ class TestIcebergConversionTargetSource {
     hadoopConf = new Configuration();
     hadoopConf.set("fs.defaultFS", "file:///");
 
-    sourceProvider = new IcebergConversionSourceProvider();
+    sourceProvider = new IcebergTableStateProvider();
     sourceProvider.init(hadoopConf);
 
     tableManager = IcebergTableManager.of(hadoopConf);

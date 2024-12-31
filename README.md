@@ -99,7 +99,7 @@ datasets:
 # configuration: A map of configuration values specific to this converter.
 tableFormatConverters:
     HUDI:
-      conversionSourceProviderClass: org.apache.xtable.hudi.HudiConversionSourceProvider
+      conversionSourceProviderClass: org.apache.xtable.hudi.HudiTableStateProvider
     DELTA:
       conversionTargetProviderClass: org.apache.xtable.delta.DeltaConversionTarget
       configuration:
