@@ -51,6 +51,7 @@
         <module>xtable-hudi-support</module>
         <module>xtable-core</module>
         <module>xtable-utilities</module>
+        <module>xtable-aws</module>
     </modules>
 
     <properties>

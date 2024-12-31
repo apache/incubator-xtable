@@ -83,6 +83,11 @@ public class CatalogSync {
       CatalogSyncClient<TABLE> catalogSyncClient,
       CatalogTableIdentifier tableIdentifier,
       InternalTable table) {
+    log.info(
+        "Running catalog sync for table {} with format {} using catalogSync {}",
+        table.getBasePath(),
+        table.getTableFormat(),
+        catalogSyncClient.getClass().getName());
     if (!catalogSyncClient.hasDatabase(tableIdentifier)) {
       catalogSyncClient.createDatabase(tableIdentifier);
     }

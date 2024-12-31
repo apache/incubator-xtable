@@ -19,6 +19,8 @@
 package org.apache.xtable.reflection;
 
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 
 import org.apache.xtable.exception.ConfigurationException;
@@ -49,8 +51,36 @@ public class ReflectionUtils {
         | IllegalAccessException
         | NoSuchMethodException
         | InvocationTargetException e) {
-      throw new ConfigurationException("Unable to load class: " + className);
+      throw new ConfigurationException("Unable to load class: " + className, e);
     }
+  }
+
+  public static <T> T createInstanceOfClassFromStaticMethod(
+      String className, String methodName, Class<?>[] argClasses, Object[] args) {
+    try {
+      // try loading the class; throw error if not found
+      Class<T> clazz = (Class<T>) ReflectionUtils.class.getClassLoader().loadClass(className);
+
+      // Retrieve and make the specified method accessible
+      Method method = clazz.getDeclaredMethod(methodName, argClasses);
+      method.setAccessible(true);
+
+      // Invoke the method if it's static; throw an error otherwise
+      if (Modifier.isStatic(method.getModifiers())) {
+        return (T) method.invoke(null, args);
+      } else {
+        throw new IllegalArgumentException("The specified method is not static: " + methodName);
+      }
+    } catch (ClassNotFoundException ex) {
+      throw new ConfigurationException("Unable to load class: " + className, ex);
+    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException ex) {
+      throw new ConfigurationException(
+          String.format("Failed to invoke method '%s' in class '%s'", methodName, className), ex);
+    }
+  }
+
+  public static <T> T createInstanceOfClassFromStaticMethod(String className, String methodName) {
+    return createInstanceOfClassFromStaticMethod(className, methodName, new Class<?>[] {}, null);
   }
 
   private static boolean hasConstructor(Class<?> clazz, Class<?>... constructorArgTypes) {
