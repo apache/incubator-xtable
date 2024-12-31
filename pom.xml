@@ -387,6 +387,11 @@
                 <version>${aws.version}</version>
                 <scope>runtime</scope>
             </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>glue</artifactId>
+                <version>${aws.version}</version>
+            </dependency>
 
             <!-- Protobuf -->
             <dependency>

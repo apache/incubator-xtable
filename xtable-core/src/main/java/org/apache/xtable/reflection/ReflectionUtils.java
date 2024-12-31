@@ -23,9 +23,13 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 import org.apache.xtable.exception.ConfigurationException;
 
 /** Creates a instance of class from the class name and provided constructor arguments. */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ReflectionUtils {
 
   public static <T> T createInstanceOfClass(String className, Object... constructorArgs) {
@@ -73,7 +77,10 @@ public class ReflectionUtils {
       }
     } catch (ClassNotFoundException ex) {
       throw new ConfigurationException("Unable to load class: " + className, ex);
-    } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException ex) {
+    } catch (NoSuchMethodException
+        | IllegalAccessException
+        | InvocationTargetException
+        | IllegalArgumentException ex) {
       throw new ConfigurationException(
           String.format("Failed to invoke method '%s' in class '%s'", methodName, className), ex);
     }

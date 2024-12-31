@@ -28,7 +28,6 @@ import lombok.Setter;
 import lombok.ToString;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -68,13 +67,12 @@ public class GlueCatalogConfig {
   public static GlueCatalogConfig of(Map<String, String> properties) {
     try {
       GlueCatalogConfig glueCatalogConfig =
-          OBJECT_MAPPER.readValue(
-              OBJECT_MAPPER.writeValueAsString(properties), GlueCatalogConfig.class);
+          OBJECT_MAPPER.convertValue(properties, GlueCatalogConfig.class);
       Map<String, String> clientCredentialProperties =
           propertiesWithPrefix(properties, CLIENT_CREDENTIAL_PROVIDER_PREFIX);
       glueCatalogConfig.setClientCredentialConfigs(clientCredentialProperties);
       return glueCatalogConfig;
-    } catch (JsonProcessingException e) {
+    } catch (IllegalArgumentException e) {
       throw new RuntimeException(e);
     }
   }

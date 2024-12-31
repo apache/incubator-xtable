@@ -56,7 +56,6 @@
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>glue</artifactId>
-            <version>${aws.version}</version>
         </dependency>
 
         <!-- Junit -->

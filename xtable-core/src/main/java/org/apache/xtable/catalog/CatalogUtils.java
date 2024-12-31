@@ -18,9 +18,13 @@
  
 package org.apache.xtable.catalog;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class CatalogUtils {
 
   public static HierarchicalTableIdentifier castToHierarchicalTableIdentifier(
@@ -28,6 +32,7 @@ public class CatalogUtils {
     if (tableIdentifier instanceof HierarchicalTableIdentifier) {
       return (HierarchicalTableIdentifier) tableIdentifier;
     }
-    throw new IllegalArgumentException("Invalid tableIdentifier implementation");
+    throw new IllegalArgumentException(
+        "Invalid tableIdentifier implementation: " + tableIdentifier.getClass().getName());
   }
 }

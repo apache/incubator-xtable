@@ -23,6 +23,9 @@ import static org.apache.xtable.catalog.Constants.PROP_SPARK_SQL_SOURCES_PROVIDE
 
 import java.util.Map;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 import org.apache.iceberg.TableProperties;
 
 import com.google.common.base.Strings;
@@ -30,6 +33,7 @@ import com.google.common.base.Strings;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.storage.TableFormat;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class TableFormatUtils {
 
   public static String getTableDataLocation(
@@ -61,12 +65,17 @@ public class TableFormatUtils {
     return dataLocation;
   }
 
-  // Get table format name from table properties
+  /**
+   * Get table format from given table properties
+   *
+   * @param properties catalog table properties
+   * @return table format name
+   *     <li>In case of ICEBERG, table_type param will give the table format
+   *     <li>In case of DELTA, table_type or spark.sql.sources.provider param will give the table
+   *         format
+   *     <li>In case of HUDI, spark.sql.sources.provider param will give the table format
+   */
   public static String getTableFormat(Map<String, String> properties) {
-    //  - In case of ICEBERG, table_type param will give the table format
-    //  - In case of DELTA, table_type or spark.sql.sources.provider param will give the table
-    // format
-    //  - In case of HUDI, spark.sql.sources.provider param will give the table format
     String tableFormat = properties.get(TABLE_TYPE_PROP);
     if (Strings.isNullOrEmpty(tableFormat)) {
       tableFormat = properties.get(PROP_SPARK_SQL_SOURCES_PROVIDER);

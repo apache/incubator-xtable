@@ -18,6 +18,10 @@
  
 package org.apache.xtable.catalog;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class Constants {
 
   public static final String PROP_SPARK_SQL_SOURCES_PROVIDER = "spark.sql.sources.provider";

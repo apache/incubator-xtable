@@ -22,6 +22,7 @@ import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 
+import org.apache.xtable.exception.ConfigurationException;
 import org.apache.xtable.reflection.ReflectionUtils;
 
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
@@ -61,7 +62,11 @@ public class DefaultGlueClientFactory extends GlueClientFactory {
                 "create",
                 new Class<?>[] {Map.class},
                 new Object[] {glueConfig.getClientCredentialConfigs()});
-      } catch (Exception e) {
+      } catch (ConfigurationException e) {
+        // retry credentialsProvider creation without arguments if not a ClassNotFoundException
+        if (e.getCause() instanceof ClassNotFoundException) {
+          throw e;
+        }
         credentialsProvider =
             ReflectionUtils.createInstanceOfClassFromStaticMethod(className, "create");
       }
