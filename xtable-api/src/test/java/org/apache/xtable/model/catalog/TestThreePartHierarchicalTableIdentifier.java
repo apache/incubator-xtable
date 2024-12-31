@@ -23,11 +23,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class TestThreePartHierarchicalTableIdentifier {
+class TestHierarchicalTableIdentifier {
 
   @Test
-  void testGetId() {
-    ThreePartHierarchicalTableIdentifier catalogTableIdentifier =
+  void testToString() {
+    HierarchicalTableIdentifier catalogTableIdentifier =
         ThreePartHierarchicalTableIdentifier.fromDotSeparatedIdentifier(
             "catalogName.databaseName.tableName");
     assertEquals("catalogName.databaseName.tableName", catalogTableIdentifier.getId());

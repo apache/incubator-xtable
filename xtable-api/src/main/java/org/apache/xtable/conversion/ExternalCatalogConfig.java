@@ -61,5 +61,5 @@ public class ExternalCatalogConfig {
   /**
    * The properties for this catalog, used for providing any custom behaviour during catalog sync
    */
-  @NonNull @Builder.Default Map<String, String> catalogProperties = Collections.emptyMap();
+  @Builder.Default Map<String, String> catalogProperties = Collections.emptyMap();
 }
