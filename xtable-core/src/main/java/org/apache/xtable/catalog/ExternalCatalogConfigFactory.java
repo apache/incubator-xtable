@@ -33,10 +33,14 @@ public class ExternalCatalogConfigFactory {
   public static ExternalCatalogConfig fromCatalogType(
       String catalogType, String catalogId, Map<String, String> properties) {
     String catalogSyncClientImpl =
-        findImplClassName(CatalogSyncClient.class, catalogType, CatalogSyncClient::getCatalogType);
+        findInstance(CatalogSyncClient.class, catalogType, CatalogSyncClient::getCatalogType)
+            .getClass()
+            .getName();
     String catalogConversionSourceImpl =
-        findImplClassName(
-            CatalogConversionSource.class, catalogType, CatalogConversionSource::getCatalogType);
+        findInstance(
+                CatalogConversionSource.class, catalogType, CatalogConversionSource::getCatalogType)
+            .getClass()
+            .getName();
     return ExternalCatalogConfig.builder()
         .catalogType(catalogType)
         .catalogSyncClientImpl(catalogSyncClientImpl)
@@ -46,13 +50,13 @@ public class ExternalCatalogConfigFactory {
         .build();
   }
 
-  private static <T> String findImplClassName(
+  private static <T> T findInstance(
       Class<T> serviceClass, String catalogType, Function<T, String> catalogTypeExtractor) {
     ServiceLoader<T> loader = ServiceLoader.load(serviceClass);
     for (T instance : loader) {
       String instanceCatalogType = catalogTypeExtractor.apply(instance);
       if (catalogType.equals(instanceCatalogType)) {
-        return instance.getClass().getName();
+        return instance;
       }
     }
     throw new NotSupportedException("catalogType is not yet supported: " + catalogType);
