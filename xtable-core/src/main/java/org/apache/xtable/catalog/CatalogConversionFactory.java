@@ -18,12 +18,17 @@
  
 package org.apache.xtable.catalog;
 
+import java.util.ServiceLoader;
+import java.util.function.Function;
+
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.xtable.conversion.ExternalCatalogConfig;
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.reflection.ReflectionUtils;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
@@ -45,6 +50,12 @@ public class CatalogConversionFactory {
    */
   public static CatalogConversionSource createCatalogConversionSource(
       ExternalCatalogConfig sourceCatalogConfig, Configuration configuration) {
+    if (!StringUtils.isEmpty(sourceCatalogConfig.getCatalogType())) {
+      return findInstance(
+          CatalogConversionSource.class,
+          sourceCatalogConfig.getCatalogType(),
+          CatalogConversionSource::getCatalogType);
+    }
     return ReflectionUtils.createInstanceOfClass(
         sourceCatalogConfig.getCatalogConversionSourceImpl(), sourceCatalogConfig, configuration);
   }
@@ -58,10 +69,28 @@ public class CatalogConversionFactory {
    */
   public <TABLE> CatalogSyncClient<TABLE> createCatalogSyncClient(
       ExternalCatalogConfig targetCatalogConfig, String tableFormat, Configuration configuration) {
+    if (!StringUtils.isEmpty(targetCatalogConfig.getCatalogType())) {
+      return findInstance(
+          CatalogSyncClient.class,
+          targetCatalogConfig.getCatalogType(),
+          CatalogSyncClient::getCatalogType);
+    }
     return ReflectionUtils.createInstanceOfClass(
         targetCatalogConfig.getCatalogSyncClientImpl(),
         targetCatalogConfig,
         tableFormat,
         configuration);
+  }
+
+  private static <T> T findInstance(
+      Class<T> serviceClass, String catalogType, Function<T, String> catalogTypeExtractor) {
+    ServiceLoader<T> loader = ServiceLoader.load(serviceClass);
+    for (T instance : loader) {
+      String instanceCatalogType = catalogTypeExtractor.apply(instance);
+      if (catalogType.equals(instanceCatalogType)) {
+        return instance;
+      }
+    }
+    throw new NotSupportedException("catalogType is not yet supported: " + catalogType);
   }
 }

@@ -30,13 +30,14 @@ import org.apache.xtable.conversion.TargetCatalogConfig;
 import org.apache.xtable.model.catalog.ThreePartHierarchicalTableIdentifier;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
+import org.apache.xtable.testutil.ITTestUtils;
 import org.apache.xtable.testutil.ITTestUtils.TestCatalogConversionSourceImpl;
 import org.apache.xtable.testutil.ITTestUtils.TestCatalogSyncImpl;
 
 class TestCatalogConversionFactory {
 
   @Test
-  void createSourceForConfig() {
+  void createCatalogConversionSource() {
     ExternalCatalogConfig sourceCatalog =
         ExternalCatalogConfig.builder()
             .catalogId("catalogId")
@@ -51,13 +52,48 @@ class TestCatalogConversionFactory {
   }
 
   @Test
-  void createForCatalog() {
+  void createCatalogConversionSourceForCatalogType() {
+    ExternalCatalogConfig sourceCatalog =
+        ExternalCatalogConfig.builder()
+            .catalogId("catalogId")
+            .catalogType(ITTestUtils.TEST_CATALOG_TYPE)
+            .catalogProperties(Collections.emptyMap())
+            .build();
+    CatalogConversionSource catalogConversionSource =
+        CatalogConversionFactory.createCatalogConversionSource(sourceCatalog, new Configuration());
+    assertEquals(
+        catalogConversionSource.getClass().getName(),
+        TestCatalogConversionSourceImpl.class.getName());
+  }
+
+  @Test
+  void createCatalogSyncClient() {
     TargetCatalogConfig targetCatalogConfig =
         TargetCatalogConfig.builder()
             .catalogConfig(
                 ExternalCatalogConfig.builder()
                     .catalogId("catalogId")
                     .catalogSyncClientImpl(TestCatalogSyncImpl.class.getName())
+                    .catalogProperties(Collections.emptyMap())
+                    .build())
+            .catalogTableIdentifier(
+                new ThreePartHierarchicalTableIdentifier("target-database", "target-tableName"))
+            .build();
+    CatalogSyncClient catalogSyncClient =
+        CatalogConversionFactory.getInstance()
+            .createCatalogSyncClient(
+                targetCatalogConfig.getCatalogConfig(), "TABLE_FORMAT", new Configuration());
+    assertEquals(catalogSyncClient.getClass().getName(), TestCatalogSyncImpl.class.getName());
+  }
+
+  @Test
+  void createCatalogSyncClientForCatalogType() {
+    TargetCatalogConfig targetCatalogConfig =
+        TargetCatalogConfig.builder()
+            .catalogConfig(
+                ExternalCatalogConfig.builder()
+                    .catalogId("catalogId")
+                    .catalogType(ITTestUtils.TEST_CATALOG_TYPE)
                     .catalogProperties(Collections.emptyMap())
                     .build())
             .catalogTableIdentifier(
