@@ -107,8 +107,8 @@
             <artifactId>hadoop-aws</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-bundle</artifactId>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>bundle</artifactId>
         </dependency>
 
         <!-- Azure Dependencies -->
