@@ -61,8 +61,9 @@
         <junit.version>5.9.0</junit.version>
         <lombok.version>1.18.30</lombok.version>
         <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
-        <hadoop.version>3.4.0</hadoop.version>
+        <hadoop.version>3.4.1</hadoop.version>
         <hudi.version>0.14.0</hudi.version>
+        <aws.version>2.29.40</aws.version>
         <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.8.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
@@ -372,15 +373,17 @@
                 <scope>runtime</scope>
             </dependency>
             <dependency>
-                <groupId>com.amazonaws</groupId>
-                <artifactId>aws-java-sdk-bundle</artifactId>
-                <version>1.12.328</version>
-                <scope>runtime</scope>
-            </dependency>
-            <dependency>
                 <groupId>com.google.cloud.bigdataoss</groupId>
                 <artifactId>gcs-connector</artifactId>
                 <version>hadoop3-2.2.22</version>
+                <scope>runtime</scope>
+            </dependency>
+
+            <!-- AWS -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bundle</artifactId>
+                <version>${aws.version}</version>
                 <scope>runtime</scope>
             </dependency>
 
