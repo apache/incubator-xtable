@@ -150,6 +150,6 @@ public class ITTestUtils {
     @Override
     public String getCatalogType() {
       return TEST_CATALOG_TYPE;
-    }g
+    }
   }
 }
