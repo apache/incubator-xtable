@@ -93,13 +93,13 @@ import com.google.common.collect.ImmutableList;
 
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
-import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.conversion.TableStateProvider;
 import org.apache.xtable.conversion.TargetTable;
-import org.apache.xtable.delta.DeltaConversionSourceProvider;
-import org.apache.xtable.hudi.HudiConversionSourceProvider;
+import org.apache.xtable.delta.DeltaTableStateProvider;
+import org.apache.xtable.hudi.HudiTableStateProvider;
 import org.apache.xtable.hudi.HudiTestUtil;
-import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
+import org.apache.xtable.iceberg.IcebergTableStateProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 
@@ -167,22 +167,19 @@ public class ITConversionController {
     return Stream.of(Arguments.of(SyncMode.INCREMENTAL), Arguments.of(SyncMode.FULL));
   }
 
-  private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
+  private TableStateProvider<?> getConversionSourceProvider(String sourceTableFormat) {
     if (sourceTableFormat.equalsIgnoreCase(HUDI)) {
-      ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
-          new HudiConversionSourceProvider();
-      hudiConversionSourceProvider.init(jsc.hadoopConfiguration());
-      return hudiConversionSourceProvider;
+      TableStateProvider<HoodieInstant> hudiTableStateProvider = new HudiTableStateProvider();
+      hudiTableStateProvider.init(jsc.hadoopConfiguration());
+      return hudiTableStateProvider;
     } else if (sourceTableFormat.equalsIgnoreCase(DELTA)) {
-      ConversionSourceProvider<Long> deltaConversionSourceProvider =
-          new DeltaConversionSourceProvider();
-      deltaConversionSourceProvider.init(jsc.hadoopConfiguration());
-      return deltaConversionSourceProvider;
+      TableStateProvider<Long> deltaTableStateProvider = new DeltaTableStateProvider();
+      deltaTableStateProvider.init(jsc.hadoopConfiguration());
+      return deltaTableStateProvider;
     } else if (sourceTableFormat.equalsIgnoreCase(ICEBERG)) {
-      ConversionSourceProvider<Snapshot> icebergConversionSourceProvider =
-          new IcebergConversionSourceProvider();
-      icebergConversionSourceProvider.init(jsc.hadoopConfiguration());
-      return icebergConversionSourceProvider;
+      TableStateProvider<Snapshot> icebergTableStateProvider = new IcebergTableStateProvider();
+      icebergTableStateProvider.init(jsc.hadoopConfiguration());
+      return icebergTableStateProvider;
     } else {
       throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
     }
@@ -209,8 +206,7 @@ public class ITConversionController {
     if (isPartitioned) {
       partitionConfig = "level:VALUE";
     }
-    ConversionSourceProvider<?> conversionSourceProvider =
-        getConversionSourceProvider(sourceTableFormat);
+    TableStateProvider<?> tableStateProvider = getConversionSourceProvider(sourceTableFormat);
     List<?> insertRecords;
     try (GenericTable table =
         GenericTable.getInstance(
@@ -226,17 +222,17 @@ public class ITConversionController {
               targetTableFormats,
               partitionConfig,
               null);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 100);
 
       // make multiple commits and then sync
       table.insertRows(100);
       table.upsertRows(insertRecords.subList(0, 20));
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 200);
 
       table.deleteRows(insertRecords.subList(30, 50));
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 180);
       checkDatasetEquivalenceWithFilter(
           sourceTableFormat, table, targetTableFormats, table.getFilterQuery());
@@ -256,27 +252,27 @@ public class ITConversionController {
               null);
       List<Row> insertsAfterSchemaUpdate = tableWithUpdatedSchema.insertRows(100);
       tableWithUpdatedSchema.reload();
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 280);
 
       tableWithUpdatedSchema.deleteRows(insertsAfterSchemaUpdate.subList(60, 90));
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 250);
 
       if (isPartitioned) {
         // Adds new partition.
         tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
-        conversionController.sync(conversionConfig, conversionSourceProvider);
+        conversionController.sync(conversionConfig, tableStateProvider);
         checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 300);
 
         // Drops partition.
         tableWithUpdatedSchema.deleteSpecialPartition();
-        conversionController.sync(conversionConfig, conversionSourceProvider);
+        conversionController.sync(conversionConfig, tableStateProvider);
         checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 250);
 
         // Insert records to the dropped partition again.
         tableWithUpdatedSchema.insertRecordsForSpecialPartition(50);
-        conversionController.sync(conversionConfig, conversionSourceProvider);
+        conversionController.sync(conversionConfig, tableStateProvider);
         checkDatasetEquivalence(sourceTableFormat, tableWithUpdatedSchema, targetTableFormats, 300);
       }
     }
@@ -297,8 +293,7 @@ public class ITConversionController {
     if (isPartitioned) {
       partitionConfig = "level:VALUE";
     }
-    ConversionSourceProvider<?> conversionSourceProvider =
-        getConversionSourceProvider(sourceTableFormat);
+    TableStateProvider<?> tableStateProvider = getConversionSourceProvider(sourceTableFormat);
     List<?> insertRecords;
     try (GenericTable table =
         GenericTable.getInstanceWithUUIDColumns(
@@ -314,16 +309,16 @@ public class ITConversionController {
               targetTableFormats,
               partitionConfig,
               null);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 100);
 
       // Upsert some records and sync again
       table.upsertRows(insertRecords.subList(0, 20));
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 100);
 
       table.deleteRows(insertRecords.subList(30, 50));
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 80);
       checkDatasetEquivalenceWithFilter(
           sourceTableFormat, table, targetTableFormats, table.getFilterQuery());
@@ -335,7 +330,7 @@ public class ITConversionController {
   public void testConcurrentInsertWritesInSource(
       SyncMode syncMode, PartitionConfig partitionConfig) {
     String tableName = getTableName();
-    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    TableStateProvider<?> tableStateProvider = getConversionSourceProvider(HUDI);
     List<String> targetTableFormats = getOtherFormats(HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
@@ -360,11 +355,11 @@ public class ITConversionController {
               null);
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
 
       checkDatasetEquivalence(HUDI, table, targetTableFormats, 50);
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       checkDatasetEquivalence(HUDI, table, targetTableFormats, 100);
     }
   }
@@ -374,7 +369,7 @@ public class ITConversionController {
   public void testConcurrentInsertsAndTableServiceWrites(
       SyncMode syncMode, PartitionConfig partitionConfig) {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
-    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    TableStateProvider<?> tableStateProvider = getConversionSourceProvider(HUDI);
     List<String> targetTableFormats = getOtherFormats(HUDI);
     String tableName = getTableName();
     try (TestSparkHudiTable table =
@@ -393,7 +388,7 @@ public class ITConversionController {
               null);
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       checkDatasetEquivalence(HUDI, table, targetTableFormats, 50);
 
       table.deleteRecords(insertedRecords1.subList(0, 20), true);
@@ -401,7 +396,7 @@ public class ITConversionController {
       String scheduledCompactionInstant = table.onlyScheduleCompaction();
 
       table.insertRecords(50, true);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       Map<String, String> sourceHudiOptions =
           Collections.singletonMap("hoodie.datasource.query.type", "read_optimized");
       // Because compaction is not completed yet and read optimized query, there are 100 records.
@@ -409,13 +404,13 @@ public class ITConversionController {
           HUDI, table, sourceHudiOptions, targetTableFormats, Collections.emptyMap(), 100);
 
       table.insertRecords(50, true);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       // Because compaction is not completed yet and read optimized query, there are 150 records.
       checkDatasetEquivalence(
           HUDI, table, sourceHudiOptions, targetTableFormats, Collections.emptyMap(), 150);
 
       table.completeScheduledCompaction(scheduledCompactionInstant);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       checkDatasetEquivalence(HUDI, table, targetTableFormats, 130);
     }
   }
@@ -437,23 +432,22 @@ public class ITConversionController {
               targetTableFormats,
               null,
               null);
-      ConversionSourceProvider<?> conversionSourceProvider =
-          getConversionSourceProvider(sourceTableFormat);
+      TableStateProvider<?> tableStateProvider = getConversionSourceProvider(sourceTableFormat);
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       Instant instantAfterFirstSync = Instant.now();
       // sleep before starting the next commit to avoid any rounding issues
       Thread.sleep(1000);
 
       table.insertRows(50);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       Instant instantAfterSecondSync = Instant.now();
       // sleep before starting the next commit to avoid any rounding issues
       Thread.sleep(1000);
 
       table.insertRows(50);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
 
       checkDatasetEquivalence(
           sourceTableFormat,
@@ -540,8 +534,7 @@ public class ITConversionController {
     Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
     String xTablePartitionConfig = tableFormatPartitionDataHolder.getXTablePartitionConfig();
     String filter = tableFormatPartitionDataHolder.getFilter();
-    ConversionSourceProvider<?> conversionSourceProvider =
-        getConversionSourceProvider(sourceTableFormat);
+    TableStateProvider<?> tableStateProvider = getConversionSourceProvider(sourceTableFormat);
     GenericTable table;
     if (hudiPartitionConfig.isPresent()) {
       table =
@@ -564,10 +557,10 @@ public class ITConversionController {
       tableToClose.insertRows(100);
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       // Do a second sync to force the test to read back the metadata it wrote earlier
       tableToClose.insertRows(100);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
 
       checkDatasetEquivalenceWithFilter(
           sourceTableFormat, tableToClose, targetTableFormats, filter);
@@ -578,7 +571,7 @@ public class ITConversionController {
   @EnumSource(value = SyncMode.class)
   public void testSyncWithSingleFormat(SyncMode syncMode) {
     String tableName = getTableName();
-    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    TableStateProvider<?> tableStateProvider = getConversionSourceProvider(HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
@@ -592,15 +585,15 @@ public class ITConversionController {
 
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
-      conversionController.sync(conversionConfigIceberg, conversionSourceProvider);
+      conversionController.sync(conversionConfigIceberg, tableStateProvider);
       checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 100);
-      conversionController.sync(conversionConfigDelta, conversionSourceProvider);
+      conversionController.sync(conversionConfigDelta, tableStateProvider);
       checkDatasetEquivalence(HUDI, table, Collections.singletonList(DELTA), 100);
 
       table.insertRecords(100, true);
-      conversionController.sync(conversionConfigIceberg, conversionSourceProvider);
+      conversionController.sync(conversionConfigIceberg, tableStateProvider);
       checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 200);
-      conversionController.sync(conversionConfigDelta, conversionSourceProvider);
+      conversionController.sync(conversionConfigDelta, tableStateProvider);
       checkDatasetEquivalence(HUDI, table, Collections.singletonList(DELTA), 200);
     }
   }
@@ -608,7 +601,7 @@ public class ITConversionController {
   @Test
   public void testOutOfSyncIncrementalSyncs() {
     String tableName = getTableName();
-    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    TableStateProvider<?> tableStateProvider = getConversionSourceProvider(HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
@@ -629,12 +622,12 @@ public class ITConversionController {
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
       // sync iceberg only
-      conversionController.sync(singleTableConfig, conversionSourceProvider);
+      conversionController.sync(singleTableConfig, tableStateProvider);
       checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 50);
       // insert more records
       table.insertRecords(50, true);
       // iceberg will be an incremental sync and delta will need to bootstrap with snapshot sync
-      conversionController.sync(dualTableConfig, conversionSourceProvider);
+      conversionController.sync(dualTableConfig, tableStateProvider);
       checkDatasetEquivalence(HUDI, table, Arrays.asList(ICEBERG, DELTA), 100);
 
       // insert more records
@@ -642,13 +635,13 @@ public class ITConversionController {
       // insert more records
       table.insertRecords(50, true);
       // incremental sync for two commits for iceberg only
-      conversionController.sync(singleTableConfig, conversionSourceProvider);
+      conversionController.sync(singleTableConfig, tableStateProvider);
       checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 200);
 
       // insert more records
       table.insertRecords(50, true);
       // incremental sync for one commit for iceberg and three commits for delta
-      conversionController.sync(dualTableConfig, conversionSourceProvider);
+      conversionController.sync(dualTableConfig, tableStateProvider);
       checkDatasetEquivalence(HUDI, table, Arrays.asList(ICEBERG, DELTA), 250);
     }
   }
@@ -656,7 +649,7 @@ public class ITConversionController {
   @Test
   public void testIcebergCorruptedSnapshotRecovery() throws Exception {
     String tableName = getTableName();
-    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    TableStateProvider<?> tableStateProvider = getConversionSourceProvider(HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
@@ -672,11 +665,11 @@ public class ITConversionController {
               Collections.singletonList(ICEBERG),
               null,
               null);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       table.insertRows(10);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       table.insertRows(10);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       // corrupt last two snapshots
       Table icebergTable = new HadoopTables(jsc.hadoopConfiguration()).load(table.getBasePath());
       long currentSnapshotId = icebergTable.currentSnapshot().snapshotId();
@@ -686,7 +679,7 @@ public class ITConversionController {
       Files.delete(
           Paths.get(URI.create(icebergTable.snapshot(previousSnapshotId).manifestListLocation())));
       table.insertRows(10);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       checkDatasetEquivalence(HUDI, table, Collections.singletonList(ICEBERG), 50);
     }
   }
@@ -694,7 +687,7 @@ public class ITConversionController {
   @Test
   public void testMetadataRetention() throws Exception {
     String tableName = getTableName();
-    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    TableStateProvider<?> tableStateProvider = getConversionSourceProvider(HUDI);
     try (TestJavaHudiTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
@@ -710,7 +703,7 @@ public class ITConversionController {
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
       table.insertRecords(10, true);
-      conversionController.sync(conversionConfig, conversionSourceProvider);
+      conversionController.sync(conversionConfig, tableStateProvider);
       // later we will ensure we can still read the source table at this instant to ensure that
       // neither target cleaned up the underlying parquet files in the table
       Instant instantAfterFirstCommit = Instant.now();
@@ -721,7 +714,7 @@ public class ITConversionController {
           .forEach(
               unused -> {
                 table.insertRecords(10, true);
-                conversionController.sync(conversionConfig, conversionSourceProvider);
+                conversionController.sync(conversionConfig, tableStateProvider);
               });
       // ensure that hudi rows can still be read and underlying files were not removed
       List<Row> rows =

@@ -24,12 +24,12 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 
-import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.conversion.TableStateProvider;
 
-/** A concrete implementation of {@link ConversionSourceProvider} for Hudi table format. */
+/** A concrete implementation of {@link TableStateProvider} for Hudi table format. */
 @Log4j2
-public class HudiConversionSourceProvider extends ConversionSourceProvider<HoodieInstant> {
+public class HudiTableStateProvider extends TableStateProvider<HoodieInstant> {
 
   @Override
   public HudiConversionSource getConversionSourceInstance(SourceTable sourceTable) {

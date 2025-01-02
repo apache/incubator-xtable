@@ -23,11 +23,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.xtable.spi.extractor.ConversionSource;
 
 /**
- * Provides the functionality to provide an instance of the {@link ConversionSource} for a given
- * table format. The provider can create a new instance of the conversion source for each table
- * format or reuse the same instance.
+ * An abstract class that provides table state for a specific table format. The provider can create
+ * a new instance of the conversion source for each table format or reuse the same instance.
  */
-public abstract class ConversionSourceProvider<COMMIT> {
+public abstract class TableStateProvider<COMMIT> {
   /** The Hadoop configuration to use when reading from the source table. */
   protected Configuration hadoopConf;
 

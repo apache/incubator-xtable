@@ -55,7 +55,7 @@ public class ITDeltaDeleteVectorConvert {
   @TempDir private static Path tempDir;
   private static SparkSession sparkSession;
 
-  private DeltaConversionSourceProvider conversionSourceProvider;
+  private DeltaTableStateProvider conversionSourceProvider;
 
   @BeforeAll
   public static void setupOnce() {
@@ -87,7 +87,7 @@ public class ITDeltaDeleteVectorConvert {
     Configuration hadoopConf = new Configuration();
     hadoopConf.set("fs.defaultFS", "file:///");
 
-    conversionSourceProvider = new DeltaConversionSourceProvider();
+    conversionSourceProvider = new DeltaTableStateProvider();
     conversionSourceProvider.init(hadoopConf);
   }
 
