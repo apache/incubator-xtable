@@ -21,7 +21,7 @@ package org.apache.xtable.hms;
 import static org.apache.xtable.catalog.CatalogUtils.castToHierarchicalTableIdentifier;
 
 import java.io.IOException;
-import java.time.ZonedDateTime;
+import java.time.Instant;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
@@ -59,7 +59,7 @@ public class HMSCatalogTableBuilderFactory {
       newTb.setDbName(tableIdentifier.getDatabaseName());
       newTb.setTableName(tableIdentifier.getTableName());
       newTb.setOwner(UserGroupInformation.getCurrentUser().getShortUserName());
-      newTb.setCreateTime((int) ZonedDateTime.now().toEpochSecond());
+      newTb.setCreateTime((int) Instant.now().getEpochSecond());
       newTb.setSd(storageDescriptor);
       newTb.setTableType(TableType.EXTERNAL_TABLE.toString());
       newTb.setParameters(params);

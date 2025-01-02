@@ -29,8 +29,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -93,18 +91,17 @@ public class TestIcebergHMSCatalogTableBuilder extends HMSCatalogSyncClientTestB
     when(mockHmsSchemaExtractor.toColumns(
             TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema()))
         .thenReturn(Collections.emptyList());
-    ZonedDateTime zonedDateTime =
-        Instant.ofEpochMilli(System.currentTimeMillis()).atZone(ZoneId.systemDefault());
-    try (MockedStatic<ZonedDateTime> mockZonedDateTime = mockStatic(ZonedDateTime.class)) {
-      mockZonedDateTime.when(ZonedDateTime::now).thenReturn(zonedDateTime);
+    Instant createdTime = Instant.now();
+    try (MockedStatic<Instant> mockZonedDateTime = mockStatic(Instant.class)) {
+      mockZonedDateTime.when(Instant::now).thenReturn(createdTime);
       Table expected = new Table();
       expected.setDbName(TEST_HMS_DATABASE);
       expected.setTableName(TEST_HMS_TABLE);
       expected.setOwner(UserGroupInformation.getCurrentUser().getShortUserName());
-      expected.setCreateTime((int) zonedDateTime.toEpochSecond());
-      expected.setSd(getTestStorageDescriptor());
+      expected.setCreateTime((int) createdTime.getEpochSecond());
+      expected.setSd(getTestHmsTableStorageDescriptor());
       expected.setTableType("EXTERNAL_TABLE");
-      expected.setParameters(getTestParameters());
+      expected.setParameters(getTestHmsTableParameters());
 
       assertEquals(
           expected,
@@ -129,7 +126,8 @@ public class TestIcebergHMSCatalogTableBuilder extends HMSCatalogSyncClientTestB
     Map<String, String> tableParams = new HashMap<>();
     tableParams.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION);
     Table hmsTable =
-        newTable(TEST_HMS_DATABASE, TEST_HMS_TABLE, tableParams, getTestStorageDescriptor());
+        newTable(
+            TEST_HMS_DATABASE, TEST_HMS_TABLE, tableParams, getTestHmsTableStorageDescriptor());
 
     when(mockIcebergTableMetadata.metadataFileLocation())
         .thenReturn(ICEBERG_METADATA_FILE_LOCATION_V2);
@@ -140,7 +138,8 @@ public class TestIcebergHMSCatalogTableBuilder extends HMSCatalogSyncClientTestB
     tableParams.put(PREVIOUS_METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION);
     tableParams.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION_V2);
     Table expected =
-        newTable(TEST_HMS_DATABASE, TEST_HMS_TABLE, tableParams, getTestStorageDescriptor());
+        newTable(
+            TEST_HMS_DATABASE, TEST_HMS_TABLE, tableParams, getTestHmsTableStorageDescriptor());
     assertEquals(expected, output);
     assertEquals(tableParams, hmsTable.getParameters());
     verify(mockHmsSchemaExtractor, times(1))
@@ -153,7 +152,7 @@ public class TestIcebergHMSCatalogTableBuilder extends HMSCatalogSyncClientTestB
     when(mockHmsSchemaExtractor.toColumns(
             TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema()))
         .thenReturn(Collections.emptyList());
-    StorageDescriptor expected = getTestStorageDescriptor();
+    StorageDescriptor expected = getTestHmsTableStorageDescriptor();
     assertEquals(
         expected,
         mockIcebergHmsCatalogSyncRequestProvider.getStorageDescriptor(TEST_ICEBERG_INTERNAL_TABLE));
@@ -166,7 +165,7 @@ public class TestIcebergHMSCatalogTableBuilder extends HMSCatalogSyncClientTestB
     mockIcebergHmsCatalogSyncRequestProvider = createIcebergHMSHelper();
     mockMetadataFileLocation();
     when(mockIcebergBaseTable.properties()).thenReturn(Collections.emptyMap());
-    Map<String, String> expected = getTestParameters();
+    Map<String, String> expected = getTestHmsTableParameters();
     assertEquals(
         expected,
         mockIcebergHmsCatalogSyncRequestProvider.getTableParameters(mockIcebergBaseTable));
@@ -174,7 +173,7 @@ public class TestIcebergHMSCatalogTableBuilder extends HMSCatalogSyncClientTestB
     verify(mockIcebergHadoopTables, never()).load(any());
   }
 
-  private StorageDescriptor getTestStorageDescriptor() {
+  public static StorageDescriptor getTestHmsTableStorageDescriptor() {
     StorageDescriptor storageDescriptor = new StorageDescriptor();
     SerDeInfo serDeInfo = new SerDeInfo();
     storageDescriptor.setCols(Collections.emptyList());
@@ -186,7 +185,7 @@ public class TestIcebergHMSCatalogTableBuilder extends HMSCatalogSyncClientTestB
     return storageDescriptor;
   }
 
-  private Map<String, String> getTestParameters() {
+  public static Map<String, String> getTestHmsTableParameters() {
     Map<String, String> parameters = new HashMap<>();
     parameters.put("EXTERNAL", "TRUE");
     parameters.put("table_type", "ICEBERG");

@@ -59,27 +59,31 @@ public class TestHMSSchemaExtractor extends TestSchemaExtractorBase {
             .name("record")
             .fields(
                 Arrays.asList(
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "requiredBoolean", "boolean", InternalType.BOOLEAN, false, 1),
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "optionalBoolean", "boolean", InternalType.BOOLEAN, true, 2),
-                    getPrimitiveOneField("requiredInt", "integer", InternalType.INT, false, 3),
-                    getPrimitiveOneField("requiredLong", "long", InternalType.LONG, false, 4),
-                    getPrimitiveOneField("requiredDouble", "double", InternalType.DOUBLE, false, 5),
-                    getPrimitiveOneField("requiredFloat", "float", InternalType.FLOAT, false, 6),
-                    getPrimitiveOneField("requiredString", "string", InternalType.STRING, false, 7),
-                    getPrimitiveOneField("requiredBytes", "binary", InternalType.BYTES, false, 8),
-                    getPrimitiveOneField("requiredDate", "date", InternalType.DATE, false, 9),
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField("requiredInt", "integer", InternalType.INT, false, 3),
+                    getPrimitiveInternalField("requiredLong", "long", InternalType.LONG, false, 4),
+                    getPrimitiveInternalField(
+                        "requiredDouble", "double", InternalType.DOUBLE, false, 5),
+                    getPrimitiveInternalField(
+                        "requiredFloat", "float", InternalType.FLOAT, false, 6),
+                    getPrimitiveInternalField(
+                        "requiredString", "string", InternalType.STRING, false, 7),
+                    getPrimitiveInternalField(
+                        "requiredBytes", "binary", InternalType.BYTES, false, 8),
+                    getPrimitiveInternalField("requiredDate", "date", InternalType.DATE, false, 9),
+                    getPrimitiveInternalField(
                         "requiredDecimal",
                         "decimal",
                         InternalType.DECIMAL,
                         false,
                         10,
                         doubleMetadata),
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "requiredTimestamp", "timestamp", InternalType.TIMESTAMP, false, 11),
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "requiredTimestampNTZ",
                         "timestamp_ntz",
                         InternalType.TIMESTAMP_NTZ,
@@ -123,28 +127,28 @@ public class TestHMSSchemaExtractor extends TestSchemaExtractorBase {
             .name("record")
             .fields(
                 Arrays.asList(
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "requiredTimestampMillis",
                         "timestamp",
                         InternalType.TIMESTAMP,
                         false,
                         1,
                         millisTimestamp),
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "requiredTimestampMicros",
                         "timestamp",
                         InternalType.TIMESTAMP,
                         false,
                         2,
                         microsTimestamp),
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "requiredTimestampNTZMillis",
                         "timestamp_ntz",
                         InternalType.TIMESTAMP_NTZ,
                         false,
                         3,
                         millisTimestamp),
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "requiredTimestampNTZMicros",
                         "timestamp_ntz",
                         InternalType.TIMESTAMP_NTZ,
@@ -172,14 +176,14 @@ public class TestHMSSchemaExtractor extends TestSchemaExtractorBase {
             .isNullable(true)
             .fields(
                 Arrays.asList(
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "requiredDouble",
                         "double",
                         InternalType.DOUBLE,
                         false,
                         1,
                         "recordMap._one_field_value"),
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "optionalString",
                         "string",
                         InternalType.STRING,
@@ -206,14 +210,14 @@ public class TestHMSSchemaExtractor extends TestSchemaExtractorBase {
                                 .dataType(InternalType.MAP)
                                 .fields(
                                     Arrays.asList(
-                                        getPrimitiveOneField(
+                                        getPrimitiveInternalField(
                                             InternalField.Constants.MAP_KEY_FIELD_NAME,
                                             "string",
                                             InternalType.STRING,
                                             false,
                                             3,
                                             "intMap"),
-                                        getPrimitiveOneField(
+                                        getPrimitiveInternalField(
                                             InternalField.Constants.MAP_VALUE_FIELD_NAME,
                                             "integer",
                                             InternalType.INT,
@@ -232,7 +236,7 @@ public class TestHMSSchemaExtractor extends TestSchemaExtractorBase {
                                 .dataType(InternalType.MAP)
                                 .fields(
                                     Arrays.asList(
-                                        getPrimitiveOneField(
+                                        getPrimitiveInternalField(
                                             InternalField.Constants.MAP_KEY_FIELD_NAME,
                                             "integer",
                                             InternalType.INT,
@@ -268,14 +272,14 @@ public class TestHMSSchemaExtractor extends TestSchemaExtractorBase {
             .isNullable(true)
             .fields(
                 Arrays.asList(
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "requiredDouble",
                         "double",
                         InternalType.DOUBLE,
                         false,
                         11,
                         "recordMap._one_field_value"),
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "optionalString",
                         "string",
                         InternalType.STRING,
@@ -302,7 +306,7 @@ public class TestHMSSchemaExtractor extends TestSchemaExtractorBase {
                                 .dataType(InternalType.LIST)
                                 .fields(
                                     Collections.singletonList(
-                                        getPrimitiveOneField(
+                                        getPrimitiveInternalField(
                                             InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME,
                                             "integer",
                                             InternalType.INT,
@@ -362,14 +366,14 @@ public class TestHMSSchemaExtractor extends TestSchemaExtractorBase {
                                 .isNullable(true)
                                 .fields(
                                     Arrays.asList(
-                                        getPrimitiveOneField(
+                                        getPrimitiveInternalField(
                                             "nestedOptionalInt",
                                             "integer",
                                             InternalType.INT,
                                             true,
                                             11,
                                             "nestedOne"),
-                                        getPrimitiveOneField(
+                                        getPrimitiveInternalField(
                                             "nestedRequiredDouble",
                                             "double",
                                             InternalType.DOUBLE,
@@ -387,7 +391,7 @@ public class TestHMSSchemaExtractor extends TestSchemaExtractorBase {
                                                     .isNullable(false)
                                                     .fields(
                                                         Collections.singletonList(
-                                                            getPrimitiveOneField(
+                                                            getPrimitiveInternalField(
                                                                 "doublyNestedString",
                                                                 "string",
                                                                 InternalType.STRING,
@@ -419,7 +423,7 @@ public class TestHMSSchemaExtractor extends TestSchemaExtractorBase {
             .name("record")
             .fields(
                 Arrays.asList(
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "optionalBoolean", "boolean", InternalType.BOOLEAN, true, 2),
                     InternalField.builder()
                         .name("unionField")
@@ -447,9 +451,9 @@ public class TestHMSSchemaExtractor extends TestSchemaExtractorBase {
             .name("record")
             .fields(
                 Arrays.asList(
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "optionalBoolean", "boolean", InternalType.BOOLEAN, true, 1),
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "optionalDecimal", "decimal", InternalType.DECIMAL, true, 2)))
             .build();
 
@@ -469,9 +473,9 @@ public class TestHMSSchemaExtractor extends TestSchemaExtractorBase {
             .name("record")
             .fields(
                 Arrays.asList(
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "optionalBoolean", "boolean", InternalType.BOOLEAN, true, 1),
-                    getPrimitiveOneField(
+                    getPrimitiveInternalField(
                         "optionalDecimal",
                         "decimal",
                         InternalType.DECIMAL,

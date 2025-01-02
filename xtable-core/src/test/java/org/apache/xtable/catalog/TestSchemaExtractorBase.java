@@ -26,35 +26,35 @@ import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 
 public class TestSchemaExtractorBase {
-  protected static InternalField getPrimitiveOneField(
+  protected static InternalField getPrimitiveInternalField(
       String fieldName, String schemaName, InternalType dataType, boolean isNullable, int fieldId) {
-    return getPrimitiveOneField(
+    return getPrimitiveInternalField(
         fieldName, schemaName, dataType, isNullable, fieldId, Collections.emptyMap());
   }
 
-  protected static InternalField getPrimitiveOneField(
+  protected static InternalField getPrimitiveInternalField(
       String fieldName,
       String schemaName,
       InternalType dataType,
       boolean isNullable,
       int fieldId,
       String parentPath) {
-    return getPrimitiveOneField(
+    return getPrimitiveInternalField(
         fieldName, schemaName, dataType, isNullable, fieldId, parentPath, Collections.emptyMap());
   }
 
-  protected static InternalField getPrimitiveOneField(
+  protected static InternalField getPrimitiveInternalField(
       String fieldName,
       String schemaName,
       InternalType dataType,
       boolean isNullable,
       int fieldId,
       Map<InternalSchema.MetadataKey, Object> metadata) {
-    return getPrimitiveOneField(
+    return getPrimitiveInternalField(
         fieldName, schemaName, dataType, isNullable, fieldId, null, metadata);
   }
 
-  protected static InternalField getPrimitiveOneField(
+  protected static InternalField getPrimitiveInternalField(
       String fieldName,
       String schemaName,
       InternalType dataType,
