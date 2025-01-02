@@ -16,27 +16,18 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.exception;
+package org.apache.xtable.catalog;
 
-import lombok.Getter;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
-@Getter
-public enum ErrorCode {
-  INVALID_CONFIGURATION(10001),
-  INVALID_PARTITION_SPEC(10002),
-  INVALID_PARTITION_VALUE(10003),
-  READ_EXCEPTION(10004),
-  UPDATE_EXCEPTION(10005),
-  INVALID_SCHEMA(10006),
-  UNSUPPORTED_SCHEMA_TYPE(10007),
-  UNSUPPORTED_FEATURE(10008),
-  PARSE_EXCEPTION(10009),
-  CATALOG_REFRESH_EXCEPTION(10010),
-  CATALOG_SYNC_GENERIC_EXCEPTION(10011);
+/**
+ * The interface for creating/updating catalog table object, each catalog can have its own
+ * implementation that can be plugged in.
+ */
+public interface CatalogTableBuilder<REQUEST, TABLE> {
+  public REQUEST getCreateTableRequest(InternalTable table, CatalogTableIdentifier tableIdentifier);
 
-  private final int errorCode;
-
-  ErrorCode(int errorCode) {
-    this.errorCode = errorCode;
-  }
+  public REQUEST getUpdateTableRequest(
+      InternalTable table, TABLE catalogTable, CatalogTableIdentifier tableIdentifier);
 }

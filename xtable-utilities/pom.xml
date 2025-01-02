@@ -44,6 +44,12 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.xtable</groupId>
+            <artifactId>xtable-aws</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- command line arg parsing -->
         <dependency>
             <groupId>commons-cli</groupId>
@@ -107,8 +113,8 @@
             <artifactId>hadoop-aws</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-bundle</artifactId>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>bundle</artifactId>
         </dependency>
 
         <!-- Azure Dependencies -->
