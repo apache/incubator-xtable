@@ -156,6 +156,7 @@ public class RunCatalogSync {
                 .basePath(sourceTable.getBasePath())
                 .namespace(sourceTable.getNamespace())
                 .formatName(targetCatalogTableIdentifier.getTableFormat())
+                .additionalProperties(sourceTable.getAdditionalProperties())
                 .build();
         targetTables.add(targetTable);
         if (!targetCatalogs.containsKey(targetTable)) {

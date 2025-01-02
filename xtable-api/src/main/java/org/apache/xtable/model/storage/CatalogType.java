@@ -25,4 +25,5 @@ package org.apache.xtable.model.storage;
  */
 public class CatalogType {
   public static final String STORAGE = "STORAGE";
+  public static final String HMS = "HMS";
 }
