@@ -79,8 +79,15 @@ public class TestGlueCatalogConversionSource {
     // error getting table from glue
     when(mockGlueClient.getTable(getTableRequest))
         .thenThrow(GlueException.builder().message("something went wrong").build());
-    assertThrows(
-        CatalogSyncException.class, () -> catalogConversionSource.getSourceTable(tableIdentifier));
+    CatalogSyncException exception =
+        assertThrows(
+            CatalogSyncException.class,
+            () -> catalogConversionSource.getSourceTable(tableIdentifier));
+    assertEquals(
+        String.format(
+            "Failed to get table: %s.%s",
+            tableIdentifier.getDatabaseName(), tableIdentifier.getTableName()),
+        exception.getMessage());
 
     verify(mockGlueClient, times(1)).getTable(getTableRequest);
   }
@@ -90,23 +97,15 @@ public class TestGlueCatalogConversionSource {
     // table not found in glue
     when(mockGlueClient.getTable(getTableRequest))
         .thenThrow(EntityNotFoundException.builder().message("table not found").build());
-    assertThrows(
-        CatalogSyncException.class, () -> catalogConversionSource.getSourceTable(tableIdentifier));
-
-    verify(mockGlueClient, times(1)).getTable(getTableRequest);
-  }
-
-  @Test
-  void testGetSourceTable_tableFormatNotPresent() {
-    // table format not present in table properties
-    when(mockGlueClient.getTable(getTableRequest))
-        .thenReturn(GetTableResponse.builder().table(Table.builder().build()).build());
-    IllegalStateException exception =
+    CatalogSyncException exception =
         assertThrows(
-            IllegalStateException.class,
+            CatalogSyncException.class,
             () -> catalogConversionSource.getSourceTable(tableIdentifier));
     assertEquals(
-        "TableFormat is null or empty for table: glue_db.glue_tbl", exception.getMessage());
+        String.format(
+            "Failed to get table: %s.%s",
+            tableIdentifier.getDatabaseName(), tableIdentifier.getTableName()),
+        exception.getMessage());
 
     verify(mockGlueClient, times(1)).getTable(getTableRequest);
   }

@@ -21,6 +21,7 @@ package org.apache.xtable.catalog;
 import static org.apache.iceberg.BaseMetastoreTableOperations.TABLE_TYPE_PROP;
 import static org.apache.xtable.catalog.Constants.PROP_SPARK_SQL_SOURCES_PROVIDER;
 
+import java.util.Locale;
 import java.util.Map;
 
 import lombok.AccessLevel;
@@ -80,6 +81,9 @@ public class TableFormatUtils {
     if (Strings.isNullOrEmpty(tableFormat)) {
       tableFormat = properties.get(PROP_SPARK_SQL_SOURCES_PROVIDER);
     }
-    return tableFormat;
+    if (Strings.isNullOrEmpty(tableFormat)) {
+      throw new IllegalArgumentException("Invalid TableFormat: null or empty");
+    }
+    return tableFormat.toUpperCase(Locale.ENGLISH);
   }
 }

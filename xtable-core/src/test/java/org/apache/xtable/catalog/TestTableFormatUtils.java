@@ -20,7 +20,7 @@ package org.apache.xtable.catalog;
 
 import static org.apache.xtable.catalog.Constants.PROP_SPARK_SQL_SOURCES_PROVIDER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -85,8 +85,10 @@ class TestTableFormatUtils {
   void testGetTableFormat() {
     Map<String, String> params = new HashMap<>();
 
-    // table format is null when table type param in not present
-    assertNull(TableFormatUtils.getTableFormat(params));
+    // exception thrown when table format is not present
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> TableFormatUtils.getTableFormat(params));
+    assertEquals("Invalid TableFormat: null or empty", exception.getMessage());
 
     // "table_type" is set
     params.put("table_type", TableFormat.ICEBERG);
