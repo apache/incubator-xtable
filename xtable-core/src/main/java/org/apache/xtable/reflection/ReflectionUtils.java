@@ -37,8 +37,7 @@ public class ReflectionUtils {
     try {
       clazz = (Class<T>) ReflectionUtils.class.getClassLoader().loadClass(className);
     } catch (ClassNotFoundException ex) {
-      throw new ConfigurationException(
-          "SourcePartitionSpecExtractor class not found: " + className);
+      throw new ConfigurationException("Class not found: " + className, ex);
     }
     try {
       if (constructorArgs.length == 0) {
