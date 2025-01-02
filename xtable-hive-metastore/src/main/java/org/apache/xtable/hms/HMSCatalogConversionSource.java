@@ -20,7 +20,6 @@ package org.apache.xtable.hms;
 
 import static org.apache.xtable.catalog.CatalogUtils.castToHierarchicalTableIdentifier;
 
-import java.util.Locale;
 import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
@@ -31,7 +30,6 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.thrift.TException;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 
 import org.apache.xtable.catalog.TableFormatUtils;
 import org.apache.xtable.conversion.ExternalCatalogConfig;
@@ -71,7 +69,8 @@ public class HMSCatalogConversionSource implements CatalogConversionSource {
           metaStoreClient.getTable(
               tableIdentifier.getDatabaseName(), tableIdentifier.getTableName());
       if (table == null) {
-        throw new IllegalStateException(String.format("table: %s is null", tableIdentifier.getId()));
+        throw new IllegalStateException(
+            String.format("table: %s is null", tableIdentifier.getId()));
       }
 
       String tableFormat = TableFormatUtils.getTableFormat(table.getParameters());

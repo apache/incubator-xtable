@@ -24,7 +24,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -74,8 +73,10 @@ class TestHMSCatalogConversionSource {
     // error getting table from hms
     when(mockMetaStoreClient.getTable(HMS_DB, HMS_TABLE))
         .thenThrow(new TException("something went wrong"));
-    CatalogSyncException exception = assertThrows(
-        CatalogSyncException.class, () -> catalogConversionSource.getSourceTable(tableIdentifier));
+    CatalogSyncException exception =
+        assertThrows(
+            CatalogSyncException.class,
+            () -> catalogConversionSource.getSourceTable(tableIdentifier));
     assertEquals(
         String.format(
             "Failed to get table: %s.%s",
@@ -91,8 +92,10 @@ class TestHMSCatalogConversionSource {
     // table not found in hms
     when(mockMetaStoreClient.getTable(HMS_DB, HMS_TABLE))
         .thenThrow(new NoSuchObjectException("table not found"));
-    CatalogSyncException exception = assertThrows(
-        CatalogSyncException.class, () -> catalogConversionSource.getSourceTable(tableIdentifier));
+    CatalogSyncException exception =
+        assertThrows(
+            CatalogSyncException.class,
+            () -> catalogConversionSource.getSourceTable(tableIdentifier));
     assertEquals(
         String.format(
             "Failed to get table: %s.%s",
