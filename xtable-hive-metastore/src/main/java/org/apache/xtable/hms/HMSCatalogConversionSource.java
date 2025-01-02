@@ -71,16 +71,10 @@ public class HMSCatalogConversionSource implements CatalogConversionSource {
           metaStoreClient.getTable(
               tableIdentifier.getDatabaseName(), tableIdentifier.getTableName());
       if (table == null) {
-        throw new IllegalStateException(String.format("table: %s is null", tableIdentifier));
+        throw new IllegalStateException(String.format("table: %s is null", tableIdentifier.getId()));
       }
 
       String tableFormat = TableFormatUtils.getTableFormat(table.getParameters());
-      if (Strings.isNullOrEmpty(tableFormat)) {
-        throw new IllegalStateException(
-            String.format("TableFormat is null or empty for table: %s", tableIdentifier.getId()));
-      }
-      tableFormat = tableFormat.toUpperCase(Locale.ENGLISH);
-
       String tableLocation = table.getSd().getLocation();
       String dataPath =
           TableFormatUtils.getTableDataLocation(tableFormat, tableLocation, table.getParameters());

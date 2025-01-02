@@ -74,8 +74,13 @@ class TestHMSCatalogConversionSource {
     // error getting table from hms
     when(mockMetaStoreClient.getTable(HMS_DB, HMS_TABLE))
         .thenThrow(new TException("something went wrong"));
-    assertThrows(
+    CatalogSyncException exception = assertThrows(
         CatalogSyncException.class, () -> catalogConversionSource.getSourceTable(tableIdentifier));
+    assertEquals(
+        String.format(
+            "Failed to get table: %s.%s",
+            tableIdentifier.getDatabaseName(), tableIdentifier.getTableName()),
+        exception.getMessage());
 
     verify(mockMetaStoreClient, times(1)).getTable(HMS_DB, HMS_TABLE);
   }
@@ -86,23 +91,13 @@ class TestHMSCatalogConversionSource {
     // table not found in hms
     when(mockMetaStoreClient.getTable(HMS_DB, HMS_TABLE))
         .thenThrow(new NoSuchObjectException("table not found"));
-    assertThrows(
+    CatalogSyncException exception = assertThrows(
         CatalogSyncException.class, () -> catalogConversionSource.getSourceTable(tableIdentifier));
-
-    verify(mockMetaStoreClient, times(1)).getTable(HMS_DB, HMS_TABLE);
-  }
-
-  @SneakyThrows
-  @Test
-  void testGetSourceTable_tableFormatNotPresent() {
-    // table format not present in table properties
-    when(mockMetaStoreClient.getTable(HMS_DB, HMS_TABLE))
-        .thenReturn(newHmsTable(HMS_DB, HMS_TABLE, Collections.emptyMap(), null));
-    IllegalStateException exception =
-        assertThrows(
-            IllegalStateException.class,
-            () -> catalogConversionSource.getSourceTable(tableIdentifier));
-    assertEquals("TableFormat is null or empty for table: hms_db.hms_tbl", exception.getMessage());
+    assertEquals(
+        String.format(
+            "Failed to get table: %s.%s",
+            tableIdentifier.getDatabaseName(), tableIdentifier.getTableName()),
+        exception.getMessage());
 
     verify(mockMetaStoreClient, times(1)).getTable(HMS_DB, HMS_TABLE);
   }
