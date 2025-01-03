@@ -145,7 +145,8 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
     Snapshot currentSnapshot = iceTable.currentSnapshot();
     InternalTable irTable = getTable(currentSnapshot);
 
-    TableScan scan = iceTable.newScan().useSnapshot(currentSnapshot.snapshotId());
+    TableScan scan =
+        iceTable.newScan().useSnapshot(currentSnapshot.snapshotId()).includeColumnStats();
     PartitionSpec partitionSpec = iceTable.spec();
     List<PartitionFileGroup> partitionedDataFiles;
     try (CloseableIterable<FileScanTask> files = scan.planFiles()) {
