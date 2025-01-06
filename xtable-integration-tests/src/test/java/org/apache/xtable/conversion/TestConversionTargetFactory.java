@@ -32,7 +32,9 @@ import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.ConversionTarget;
 
-@Disabled("TODO - figure out what to do with these cases")
+/**
+ * This test is not in xtable-core because we want to test that the service loader can detect the implementations from the other modules.
+ */
 public class TestConversionTargetFactory {
 
   @Test

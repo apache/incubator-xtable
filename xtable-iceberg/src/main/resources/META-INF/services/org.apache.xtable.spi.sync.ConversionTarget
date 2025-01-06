@@ -16,5 +16,4 @@
 # limitations under the License.
 ##########################################################################
 
-org.apache.xtable.hudi.HudiConversionTarget
 org.apache.xtable.iceberg.IcebergConversionTarget
