@@ -126,7 +126,7 @@ public class TestIcebergDataHelper {
   String recordKeyField;
   List<String> partitionFieldNames;
 
-  public static enum SchemaType {
+  public enum SchemaType {
     BASIC,
     COMMON,
     COMMON_WITH_ADDITIONAL_COLUMNS,
