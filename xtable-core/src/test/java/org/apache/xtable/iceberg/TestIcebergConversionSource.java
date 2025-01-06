@@ -61,7 +61,7 @@ import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 
-class TestIcebergConversionTargetSource {
+class TestIcebergConversionSource {
 
   private IcebergTableManager tableManager;
   private Schema csSchema;

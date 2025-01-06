@@ -58,8 +58,8 @@
         <maven.compiler.target>8</maven.compiler.target>
         <avro.version>1.11.4</avro.version>
         <log4j.version>2.22.0</log4j.version>
-        <junit.version>5.9.0</junit.version>
-        <lombok.version>1.18.30</lombok.version>
+        <junit.version>5.11.4</junit.version>
+        <lombok.version>1.18.36</lombok.version>
         <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
         <hadoop.version>3.4.1</hadoop.version>
         <hudi.version>0.14.0</hudi.version>
@@ -69,18 +69,18 @@
         <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
         <maven-deploy-plugin.version>3.1.1</maven-deploy-plugin.version>
         <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
-        <mockito.version>5.2.0</mockito.version>
-        <parquet.version>1.12.2</parquet.version>
+        <mockito.version>5.15.2</mockito.version>
+        <parquet.version>1.12.3</parquet.version>
         <protobuf.version>3.25.5</protobuf.version>
         <scala12.version>2.12.20</scala12.version>
-        <scala13.version>2.13.14</scala13.version>
+        <scala13.version>2.13.15</scala13.version>
         <scala.version>${scala12.version}</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
         <spark.version>3.4.2</spark.version>
         <spark.version.prefix>3.4</spark.version.prefix>
         <iceberg.version>1.4.2</iceberg.version>
         <delta.version>2.4.0</delta.version>
-        <jackson.version>2.17.1</jackson.version>
+        <jackson.version>2.18.2</jackson.version>
         <spotless.version>2.43.0</spotless.version>
         <apache.rat.version>0.16.1</apache.rat.version>
         <google.java.format.version>1.8</google.java.format.version>
@@ -90,7 +90,7 @@
         <delombok.output.dir>${project.build.directory}/delombok</delombok.output.dir>
         <apache-jar-resource-bundle.version>1.7</apache-jar-resource-bundle.version>
         <apache-incubator-disclaimer-resource-bundle.version>1.7</apache-incubator-disclaimer-resource-bundle.version>
-        <scala-collection-compat.version>2.8.1</scala-collection-compat.version>
+        <scala-collection-compat.version>2.12.0</scala-collection-compat.version>
         
         <!-- Test properties -->
         <skipTests>false</skipTests>
@@ -436,7 +436,7 @@
             <dependency>
                 <groupId>org.junit.platform</groupId>
                 <artifactId>junit-platform-runner</artifactId>
-                <version>1.8.2</version>
+                <version>1.11.4</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
@@ -650,6 +650,13 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                    </execution>
+                </executions>
                 <configuration>
                     <skip>${skipUTs}</skip>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
