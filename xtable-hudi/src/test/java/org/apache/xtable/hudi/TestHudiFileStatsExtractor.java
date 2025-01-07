@@ -285,12 +285,8 @@ public class TestHudiFileStatsExtractor {
     assertEquals(1, decimalColumnStat.getNumNulls());
     assertEquals(2, decimalColumnStat.getNumValues());
     assertTrue(decimalColumnStat.getTotalSize() > 0);
-    assertEquals(
-        new BigDecimal("1234.56"),
-        ((BigDecimal) decimalColumnStat.getRange().getMinValue()).setScale(2));
-    assertEquals(
-        new BigDecimal("1234.56"),
-        ((BigDecimal) decimalColumnStat.getRange().getMaxValue()).setScale(2));
+    assertEquals(new BigDecimal("1234.56"), decimalColumnStat.getRange().getMinValue());
+    assertEquals(new BigDecimal("1234.56"), decimalColumnStat.getRange().getMaxValue());
   }
 
   private HoodieRecord<HoodieAvroPayload> buildRecord(GenericRecord record) {

@@ -26,6 +26,8 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import com.google.common.collect.ImmutableMap;
+
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
@@ -174,7 +176,16 @@ public class ColumnStatMapUtil {
   private static final InternalField DECIMAL_FIELD =
       InternalField.builder()
           .name("decimal_field")
-          .schema(InternalSchema.builder().name("decimal").dataType(InternalType.DECIMAL).build())
+          .schema(
+              InternalSchema.builder()
+                  .name("decimal")
+                  .dataType(InternalType.DECIMAL)
+                  .metadata(
+                      ImmutableMap.<InternalSchema.MetadataKey, Object>builder()
+                          .put(InternalSchema.MetadataKey.DECIMAL_SCALE, 2)
+                          .put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 5)
+                          .build())
+                  .build())
           .build();
 
   private static final InternalField FLOAT_FIELD =
@@ -312,7 +323,7 @@ public class ColumnStatMapUtil {
         ColumnStat.builder()
             .field(DECIMAL_FIELD)
             .numNulls(1)
-            .range(Range.vector(new BigDecimal("1.0"), new BigDecimal("2.0")))
+            .range(Range.vector(new BigDecimal("1.00"), new BigDecimal("2.00")))
             .numValues(50)
             .totalSize(123)
             .build();

@@ -20,6 +20,7 @@ package org.apache.xtable.hudi;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.util.ArrayList;
@@ -200,14 +201,16 @@ public class HudiFileStatsExtractor {
     Comparable<?> minValue = HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMinValue());
     Comparable<?> maxValue = HoodieAvroUtils.unwrapAvroValueWrapper(columnStats.getMaxValue());
     if (field.getSchema().getDataType() == InternalType.DECIMAL) {
+      int scale =
+          (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
       minValue =
           minValue instanceof ByteBuffer
-              ? convertBytesToBigDecimal((ByteBuffer) minValue, DECIMAL_WRAPPER_SCALE)
-              : minValue;
+              ? convertBytesToBigDecimal((ByteBuffer) minValue, scale)
+              : ((BigDecimal) minValue).setScale(scale, RoundingMode.UNNECESSARY);
       maxValue =
           maxValue instanceof ByteBuffer
-              ? convertBytesToBigDecimal((ByteBuffer) maxValue, DECIMAL_WRAPPER_SCALE)
-              : maxValue;
+              ? convertBytesToBigDecimal((ByteBuffer) maxValue, scale)
+              : ((BigDecimal) maxValue).setScale(scale, RoundingMode.UNNECESSARY);
     }
     return getColumnStatFromValues(
         minValue,
@@ -221,7 +224,9 @@ public class HudiFileStatsExtractor {
   private static BigDecimal convertBytesToBigDecimal(ByteBuffer value, int scale) {
     byte[] bytes = new byte[value.remaining()];
     value.duplicate().get(bytes);
-    return new BigDecimal(new BigInteger(bytes), scale);
+    BigDecimal serializedValue = new BigDecimal(new BigInteger(bytes), DECIMAL_WRAPPER_SCALE);
+    // set the scale to match the schema
+    return serializedValue.setScale(scale, RoundingMode.UNNECESSARY);
   }
 
   private static ColumnStat getColumnStatFromColRange(

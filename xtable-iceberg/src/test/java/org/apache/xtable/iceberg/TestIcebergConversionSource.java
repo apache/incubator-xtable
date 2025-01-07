@@ -160,8 +160,7 @@ class TestIcebergConversionSource {
       PartitionValue partitionEntry = partitionValues.iterator().next();
       assertEquals(
           "cs_sold_date_sk", partitionEntry.getPartitionField().getSourceField().getName());
-      // TODO generate test with column stats
-      assertEquals(0, internalDataFile.getColumnStats().size());
+      assertEquals(7, internalDataFile.getColumnStats().size());
     }
   }
 
@@ -202,12 +201,12 @@ class TestIcebergConversionSource {
     Snapshot snapshot5 = catalogSales.currentSnapshot();
     Snapshot snapshot4 = catalogSales.snapshot(snapshot5.parentId());
 
-    validateTableChangeDiffSize(catalogSales, snapshot1, 5, 0);
-    validateTableChangeDiffSize(catalogSales, snapshot2, 0, 3);
-    validateTableChangeDiffSize(catalogSales, snapshot3, 5, 0);
+    validateTableChangeDiffSize(catalogSales, snapshot1, 5, 0, 7);
+    validateTableChangeDiffSize(catalogSales, snapshot2, 0, 3, 7);
+    validateTableChangeDiffSize(catalogSales, snapshot3, 5, 0, 7);
     // transaction related snapshot verification
-    validateTableChangeDiffSize(catalogSales, snapshot4, 0, 1);
-    validateTableChangeDiffSize(catalogSales, snapshot5, 1, 0);
+    validateTableChangeDiffSize(catalogSales, snapshot4, 0, 1, 7);
+    validateTableChangeDiffSize(catalogSales, snapshot5, 1, 0, 7);
 
     assertEquals(4, catalogSales.history().size());
     catalogSales.expireSnapshots().expireSnapshotId(snapshot1.snapshotId()).commit();
@@ -242,7 +241,7 @@ class TestIcebergConversionSource {
     catalogSales.updateSpec().removeField("cs_sold_date_sk").commit();
     Snapshot snapshot8 = catalogSales.currentSnapshot();
 
-    validateTableChangeDiffSize(catalogSales, snapshot7, 1, 2);
+    validateTableChangeDiffSize(catalogSales, snapshot7, 1, 2, 7);
     assertEquals(snapshot7, snapshot8);
   }
 
@@ -311,10 +310,13 @@ class TestIcebergConversionSource {
   }
 
   private void validateTableChangeDiffSize(
-      Table table, Snapshot snapshot, int addedFiles, int removedFiles) {
+      Table table, Snapshot snapshot, int addedFiles, int removedFiles, int numberOfColumns) {
     IcebergConversionSource conversionSource = getIcebergConversionSource(table);
     TableChange tableChange = conversionSource.getTableChangeForCommit(snapshot);
     assertEquals(addedFiles, tableChange.getFilesDiff().getFilesAdded().size());
+    assertTrue(
+        tableChange.getFilesDiff().getFilesAdded().stream()
+            .allMatch(file -> file.getColumnStats().size() == numberOfColumns));
     assertEquals(removedFiles, tableChange.getFilesDiff().getFilesRemoved().size());
   }
 
