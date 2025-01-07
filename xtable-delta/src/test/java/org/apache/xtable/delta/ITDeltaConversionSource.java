@@ -70,7 +70,7 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.InternalDataFile;
 
-public class ITDeltaConversionTargetSource {
+public class ITDeltaConversionSource {
 
   private static final InternalField COL1_INT_FIELD =
       InternalField.builder()

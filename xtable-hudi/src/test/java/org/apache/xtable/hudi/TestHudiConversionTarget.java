@@ -54,9 +54,9 @@ import org.apache.xtable.model.storage.PartitionFileGroup;
 
 /**
  * Unit tests that focus on the basic control flow of the HudiConversionTarget. Functional tests are
- * in {@link ITHudiConversionSourceTarget}.
+ * in {@link ITHudiConversionTarget}.
  */
-public class TestHudiConversionSourceTarget {
+public class TestHudiConversionTarget {
   private static final int RETENTION_IN_HOURS = 1;
   private static final int MAX_DELTA_COMMITS = 2;
   private static final Instant COMMIT_TIME = Instant.ofEpochMilli(1598644800000L);

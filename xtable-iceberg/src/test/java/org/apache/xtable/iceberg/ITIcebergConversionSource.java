@@ -61,7 +61,7 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
 
-public class ITIcebergConversionTargetSource {
+public class ITIcebergConversionSource {
   private static final Configuration hadoopConf = new Configuration();
 
   @TempDir public static Path tempDir;

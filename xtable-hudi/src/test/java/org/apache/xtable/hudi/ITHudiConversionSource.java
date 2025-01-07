@@ -77,7 +77,7 @@ import org.apache.xtable.model.storage.TableFormat;
 /**
  * A suite of functional tests that the extraction from Hudi to Intermediate representation works.
  */
-public class ITHudiConversionSourceSource {
+public class ITHudiConversionSource {
   @TempDir public static Path tempDir;
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;

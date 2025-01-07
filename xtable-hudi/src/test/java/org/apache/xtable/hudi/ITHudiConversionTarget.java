@@ -92,7 +92,7 @@ import org.apache.xtable.spi.sync.ConversionTarget;
  * A suite of functional tests that assert that the metadata for the hudi table is properly written
  * to disk.
  */
-public class ITHudiConversionSourceTarget {
+public class ITHudiConversionTarget {
   @TempDir public static Path tempDir;
   private static final Configuration CONFIGURATION = new Configuration();
   private static final HoodieEngineContext CONTEXT = new HoodieJavaEngineContext(CONFIGURATION);
