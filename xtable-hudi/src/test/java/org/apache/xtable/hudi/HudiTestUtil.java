@@ -67,7 +67,8 @@ public class HudiTestUtil {
     return getHoodieWriteConfig(metaClient, null);
   }
 
-  synchronized static HoodieWriteConfig getHoodieWriteConfig(HoodieTableMetaClient metaClient, Schema schema) {
+  static synchronized HoodieWriteConfig getHoodieWriteConfig(
+      HoodieTableMetaClient metaClient, Schema schema) {
     Properties properties = new Properties();
     properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
     return HoodieWriteConfig.newBuilder()
