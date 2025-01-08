@@ -35,6 +35,12 @@
             <version>${project.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.xtable</groupId>
+            <artifactId>xtable-iceberg</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- command line arg parsing -->
         <dependency>
             <groupId>commons-cli</groupId>
