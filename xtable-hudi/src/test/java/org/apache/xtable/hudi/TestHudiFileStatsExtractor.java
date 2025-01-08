@@ -49,7 +49,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.util.HadoopOutputFile;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -447,7 +446,6 @@ public class TestHudiFileStatsExtractor {
     return record;
   }
 
-  @NotNull
   private GenericData.Record getNestedRecord(Integer nestedIntValue) {
     GenericData.Record nested = new GenericData.Record(NESTED_SCHEMA);
     nested.put("nested_int", nestedIntValue);
