@@ -30,6 +30,7 @@ import lombok.Getter;
 @EqualsAndHashCode(callSuper = true)
 public class TargetTable extends ExternalTable {
   private final Duration metadataRetention;
+  private final boolean useInternalMetadataCleaner;
 
   @Builder(toBuilder = true)
   public TargetTable(
@@ -39,9 +40,11 @@ public class TargetTable extends ExternalTable {
       String[] namespace,
       CatalogConfig catalogConfig,
       Duration metadataRetention,
+      boolean useInternalMetadataCleaner,
       Properties additionalProperties) {
     super(name, formatName, basePath, namespace, catalogConfig, additionalProperties);
     this.metadataRetention =
         metadataRetention == null ? Duration.of(7, ChronoUnit.DAYS) : metadataRetention;
+    this.useInternalMetadataCleaner = useInternalMetadataCleaner;
   }
 }
