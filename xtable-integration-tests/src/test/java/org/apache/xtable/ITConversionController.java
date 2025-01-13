@@ -70,9 +70,7 @@ import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
-import org.apache.hudi.common.table.timeline.HoodieInstant;
 
-import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.hadoop.HadoopTables;
 
@@ -98,6 +96,8 @@ import org.apache.xtable.hudi.TestSparkHudiTable;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
+import org.apache.xtable.shade.org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.xtable.shade.org.apache.iceberg.Snapshot;
 
 public class ITConversionController {
   @TempDir public static Path tempDir;

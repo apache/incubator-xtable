@@ -63,6 +63,14 @@
             <groupId>org.apache.parquet</groupId>
             <artifactId>parquet-column</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.apache.parquet</groupId>
+            <artifactId>parquet-avro</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.parquet</groupId>
+            <artifactId>parquet-hadoop</artifactId>
+        </dependency>
 
         <!-- Hudi dependencies -->
         <dependency>
@@ -73,12 +81,6 @@
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-java-client</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.hbase</groupId>
-                    <artifactId>hbase-server</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <!-- Hadoop dependencies -->
@@ -181,6 +183,7 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
+                            <createSourcesJar>true</createSourcesJar>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"> </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
@@ -205,14 +208,30 @@
                                     <include>com.fasterxml.jackson.core:jackson-databind</include>
                                     <include>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</include>
                                     <include>com.fasterxml.jackson.core:jackson-core</include>
+                                    <include>com.fasterxml.jackson.core:jackson-annotations</include>
                                     <include>org.apache.parquet:parquet-column</include>
+                                    <include>org.apache.parquet:parquet-avro</include>
                                     <include>org.apache.parquet:parquet-common</include>
                                     <include>org.apache.parquet:parquet-encoding</include>
+                                    <include>org.apache.parquet:parquet-hadoop</include>
+                                    <include>org.apache.parquet:parquet-format-structures</include>
                                     <include>org.apache.hudi:hudi-java-client</include>
                                     <include>org.apache.hudi:hudi-client-common</include>
                                     <include>org.apache.hudi:hudi-common</include>
                                     <include>org.apache.avro:avro</include>
                                     <include>com.google.guava:guava</include>
+                                    <!-- hbase -->
+                                    <include>org.apache.hbase:hbase-client</include>
+                                    <include>org.apache.hbase:hbase-common</include>
+                                    <include>org.apache.hbase:hbase-hadoop-compat</include>
+                                    <include>org.apache.hbase:hbase-metrics</include>
+                                    <include>org.apache.hbase:hbase-metrics-api</include>
+                                    <include>org.apache.hbase:hbase-protocol</include>
+                                    <include>org.apache.hbase:hbase-protocol-shaded</include>
+                                    <include>org.apache.hbase:hbase-server</include>
+                                    <include>org.apache.hbase.thirdparty:hbase-shaded-miscellaneous</include>
+                                    <include>org.apache.hbase.thirdparty:hbase-shaded-netty</include>
+                                    <include>org.apache.hbase.thirdparty:hbase-shaded-protobuf</include>
                                 </includes>
                             </artifactSet>
                             <relocations combine.children="append">
@@ -223,6 +242,17 @@
                                 <relocation>
                                     <pattern>org.apache.hudi.</pattern>
                                     <shadedPattern>org.apache.xtable.shade.org.apache.hudi.</shadedPattern>
+                                    <excludes>
+                                        <exclude>org.apache.hudi.io.storage.HoodieHBaseKVComparator</exclude>
+                                    </excludes>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.hadoop.hbase.</pattern>
+                                    <shadedPattern>org.apache.xtable.shade.org.apache.hadoop.hbase.</shadedPattern>
+                                    <excludes>
+                                        <exclude>org.apache.hadoop.hbase.CellComparator</exclude>
+                                        <exclude>org.apache.hadoop.hbase.CellComparatorImpl</exclude>
+                                    </excludes>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.avro.</pattern>
