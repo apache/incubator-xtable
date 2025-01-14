@@ -53,6 +53,10 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.module</groupId>
+            <artifactId>jackson-module-scala_${scala.binary.version}</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>com.google.guava</groupId>
@@ -204,6 +208,7 @@
                                     <include>com.fasterxml.jackson.core:jackson-core</include>
                                     <include>com.fasterxml.jackson.core:jackson-databind</include>
                                     <include>com.fasterxml.jackson.core:jackson-annotations</include>
+                                    <include>com.fasterxml.jackson.module:jackson-module-scala_${scala.binary.version}</include>
                                     <include>org.scala-lang:scala-library</include>
                                     <include>io.delta:delta-core_${scala.binary.version}</include>
                                     <include>io.delta:delta-storage</include>
@@ -219,10 +224,6 @@
                                 <relocation>
                                     <pattern>io.delta.</pattern>
                                     <shadedPattern>org.apache.xtable.shade.io.delta.</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>org.apache.spark.sql.delta.</pattern>
-                                    <shadedPattern>org.apache.xtable.shade.org.apache.spark.sql.delta.</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.commons.</pattern>

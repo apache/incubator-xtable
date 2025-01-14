@@ -232,6 +232,7 @@
                                     <include>org.apache.hbase.thirdparty:hbase-shaded-miscellaneous</include>
                                     <include>org.apache.hbase.thirdparty:hbase-shaded-netty</include>
                                     <include>org.apache.hbase.thirdparty:hbase-shaded-protobuf</include>
+                                    <include>org.apache.htrace:htrace-core4</include>
                                 </includes>
                             </artifactSet>
                             <relocations combine.children="append">
@@ -240,23 +241,23 @@
                                     <shadedPattern>org.apache.xtable.shade.org.apache.parquet.</shadedPattern>
                                 </relocation>
                                 <relocation>
-                                    <pattern>org.apache.hudi.</pattern>
-                                    <shadedPattern>org.apache.xtable.shade.org.apache.hudi.</shadedPattern>
-                                    <excludes>
-                                        <exclude>org.apache.hudi.io.storage.HoodieHBaseKVComparator</exclude>
-                                    </excludes>
-                                </relocation>
-                                <relocation>
                                     <pattern>org.apache.hadoop.hbase.</pattern>
                                     <shadedPattern>org.apache.xtable.shade.org.apache.hadoop.hbase.</shadedPattern>
                                     <excludes>
+                                        <exclude>org.apache.hadoop.hbase.KeyValue$KeyComparator</exclude>
                                         <exclude>org.apache.hadoop.hbase.CellComparator</exclude>
                                         <exclude>org.apache.hadoop.hbase.CellComparatorImpl</exclude>
                                     </excludes>
                                 </relocation>
+                                <!-- Try relocating comparator related classes to always match Hudi to avoid (de)serialization issues -->
                                 <relocation>
-                                    <pattern>org.apache.avro.</pattern>
-                                    <shadedPattern>org.apache.xtable.shade.org.apache.avro.</shadedPattern>
+                                    <pattern>org.apache.hadoop.hbase.</pattern>
+                                    <shadedPattern>org.apache.hudi.org.apache.hadoop.hbase.</shadedPattern>
+                                    <includes>
+                                        <include>org.apache.hadoop.hbase.KeyValue$KeyComparator</include>
+                                        <include>org.apache.hadoop.hbase.CellComparator</include>
+                                        <include>org.apache.hadoop.hbase.CellComparatorImpl</include>
+                                    </includes>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.google.guava.</pattern>
