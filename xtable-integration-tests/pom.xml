@@ -91,10 +91,12 @@
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-api</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-1.2-api</artifactId>
+            <scope>test</scope>
         </dependency>
 
         <!-- Spark/Iceberg/Hudi dependencies for reading/writing tables -->
@@ -106,17 +108,17 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_${scala.binary.version}</artifactId>
-            <scope>test</scope>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_${scala.binary.version}</artifactId>
-            <scope>test</scope>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
-            <scope>test</scope>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>
@@ -135,21 +137,18 @@
             <groupId>org.apache.xtable</groupId>
             <artifactId>xtable-delta_${scala.binary.version}</artifactId>
             <version>${project.version}</version>
-            <classifier>bundled</classifier>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.xtable</groupId>
             <artifactId>xtable-iceberg</artifactId>
             <version>${project.version}</version>
-            <classifier>bundled</classifier>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.xtable</groupId>
             <artifactId>xtable-hudi</artifactId>
             <version>${project.version}</version>
-            <classifier>bundled</classifier>
             <scope>test</scope>
         </dependency>
 
@@ -217,6 +216,14 @@
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
+
+        <!-- Ensure that utilities bundle is built for validation by adding dependency -->
+        <dependency>
+            <groupId>org.apache.xtable</groupId>
+            <artifactId>xtable-utilities_${scala.binary.version}</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -229,6 +236,19 @@
                     <!-- Do not publish the testing module -->
                     <skip>true</skip>
                 </configuration>
+            </plugin>
+            <!-- Generate a bundled spark jar to use in our ITBundleValidation suite -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>bundle-spark-test-jar</id>
+                        <configuration>
+                            <finalName>spark-testing-bundle_${scala.binary.version}</finalName>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -82,6 +82,12 @@
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-java-client</artifactId>
         </dependency>
+        <!-- Hudi requires kryo at runtime -->
+        <dependency>
+            <groupId>com.esotericsoftware</groupId>
+            <artifactId>kryo</artifactId>
+            <scope>runtime</scope>
+        </dependency>
 
         <!-- Hadoop dependencies -->
         <dependency>
@@ -224,18 +230,23 @@
                                     <include>org.apache.hbase:hbase-client</include>
                                     <include>org.apache.hbase:hbase-common</include>
                                     <include>org.apache.hbase:hbase-hadoop-compat</include>
-                                    <include>org.apache.hbase:hbase-metrics</include>
                                     <include>org.apache.hbase:hbase-metrics-api</include>
-                                    <include>org.apache.hbase:hbase-protocol</include>
                                     <include>org.apache.hbase:hbase-protocol-shaded</include>
                                     <include>org.apache.hbase:hbase-server</include>
                                     <include>org.apache.hbase.thirdparty:hbase-shaded-miscellaneous</include>
                                     <include>org.apache.hbase.thirdparty:hbase-shaded-netty</include>
                                     <include>org.apache.hbase.thirdparty:hbase-shaded-protobuf</include>
                                     <include>org.apache.htrace:htrace-core4</include>
+                                    <include>com.esotericsoftware:kryo</include>
+                                    <include>org.openjdk.jol:jol-core</include>
+                                    <include>org.lz4:lz4-java</include>
                                 </includes>
                             </artifactSet>
                             <relocations combine.children="append">
+                                <relocation>
+                                    <pattern>com.esotericsoftware</pattern>
+                                    <shadedPattern>org.apache.xtable.shade.com.esotericsoftware</shadedPattern>
+                                </relocation>
                                 <relocation>
                                     <pattern>org.apache.parquet.</pattern>
                                     <shadedPattern>org.apache.xtable.shade.org.apache.parquet.</shadedPattern>
@@ -266,6 +277,10 @@
                                 <relocation>
                                     <pattern>com.fasterxml.jackson.</pattern>
                                     <shadedPattern>org.apache.xtable.shade.com.fasterxml.jackson.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>net.jpountz.</pattern>
+                                    <shadedPattern>org.apache.xtable.shade.net.jpountz.</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>

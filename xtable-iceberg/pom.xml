@@ -183,9 +183,11 @@
                                     <include>org.apache.iceberg:iceberg-common</include>
                                     <include>org.apache.iceberg:iceberg-bundled-guava</include>
                                     <include>org.apache.avro:avro</include>
+                                    <include>com.github.ben-manes.caffeine:caffeine</include>
                                 </includes>
                             </artifactSet>
                             <relocations combine.children="append">
+                                <!-- TODO: Validate whether relocation will cause issues if using an Iceberg catalog -->
                                 <relocation>
                                     <pattern>org.apache.iceberg.</pattern>
                                     <shadedPattern>org.apache.xtable.shade.org.apache.iceberg.</shadedPattern>
@@ -193,6 +195,10 @@
                                 <relocation>
                                     <pattern>org.apache.avro.</pattern>
                                     <shadedPattern>org.apache.xtable.shade.org.apache.avro.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.github.ben-manes.</pattern>
+                                    <shadedPattern>org.apache.xtable.shade.com.github.ben-manes.</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>

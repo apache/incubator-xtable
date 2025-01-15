@@ -703,6 +703,11 @@
                     <trimStackTrace>false</trimStackTrace>
                     <argLine>-Xmx1024m</argLine>
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
+                    <environmentVariables>
+                        <ROOT_DIR>${maven.multiModuleProjectDirectory}</ROOT_DIR>
+                        <PROJECT_VERSION>${project.version}</PROJECT_VERSION>
+                        <SCALA_VERSION>${scala.binary.version}</SCALA_VERSION>
+                    </environmentVariables>
                 </configuration>
             </plugin>
             <plugin>
