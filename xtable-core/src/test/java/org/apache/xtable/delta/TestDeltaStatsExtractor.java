@@ -42,6 +42,7 @@ import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.stat.FileStats;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.testutil.ColumnStatMapUtil;
 
@@ -120,11 +121,15 @@ public class TestDeltaStatsExtractor {
     List<InternalField> fields = schema.getAllFields();
     List<ColumnStat> columnStats = getColumnStats();
 
+    long numRecords = 50L;
     String stats =
-        DeltaStatsExtractor.getInstance().convertStatsToDeltaFormat(schema, 50L, columnStats);
+        DeltaStatsExtractor.getInstance()
+            .convertStatsToDeltaFormat(schema, numRecords, columnStats);
     AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
     DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
-    List<ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
+    FileStats actual = extractor.getColumnStatsForFile(addFile, fields);
+    List<ColumnStat> actualColumStats = actual.getColumnStats();
+    long actualNumRecords = actual.getNumRecords();
 
     Set<ColumnStat> expected = new HashSet<>();
     columnStats.forEach(
@@ -137,7 +142,8 @@ public class TestDeltaStatsExtractor {
             expected.add(columnStatWithoutSize);
           }
         });
-    assertEquals(expected, new HashSet<>(actual));
+    assertEquals(expected, new HashSet<>(actualColumStats));
+    assertEquals(numRecords, actualNumRecords);
   }
 
   @Test
@@ -147,20 +153,24 @@ public class TestDeltaStatsExtractor {
     Map<String, Object> maxValues = generateMap("b", 2, 2.0, 20);
     Map<String, Object> nullValues = generateMap(1L, 2L, 3L, 4L);
     Map<String, Object> deltaStats = new HashMap<>();
+    long numRecords = 100;
     deltaStats.put("minValues", minValues);
     deltaStats.put("maxValues", maxValues);
     deltaStats.put("nullCount", nullValues);
-    deltaStats.put("numRecords", 100);
+    deltaStats.put("numRecords", numRecords);
     deltaStats.put("tightBounds", Boolean.TRUE);
     deltaStats.put("nonExisting", minValues);
     String stats = MAPPER.writeValueAsString(deltaStats);
     AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
     DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
-    List<ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
+    FileStats actual = extractor.getColumnStatsForFile(addFile, fields);
+    List<ColumnStat> actualColumStats = actual.getColumnStats();
+    long actualNumRecords = actual.getNumRecords();
     Set<String> unsupportedStats = extractor.getUnsupportedStats();
     assertEquals(2, unsupportedStats.size());
     assertTrue(unsupportedStats.contains("tightBounds"));
     assertTrue(unsupportedStats.contains("nonExisting"));
+    assertEquals(numRecords, actualNumRecords);
 
     List<ColumnStat> expected =
         Arrays.asList(
@@ -188,7 +198,7 @@ public class TestDeltaStatsExtractor {
                 .numNulls(4)
                 .range(Range.vector(10, 20))
                 .build());
-    assertEquals(expected, actual);
+    assertEquals(expected, actualColumStats);
   }
 
   @Test
@@ -196,8 +206,11 @@ public class TestDeltaStatsExtractor {
     List<InternalField> fields = getSchemaFields();
     AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, null, null, null);
     DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
-    List<ColumnStat> actual = extractor.getColumnStatsForFile(addFile, fields);
-    assertEquals(Collections.emptyList(), actual);
+    FileStats actual = extractor.getColumnStatsForFile(addFile, fields);
+    List<ColumnStat> actualColumStats = actual.getColumnStats();
+    long actualNumRecords = actual.getNumRecords();
+    assertEquals(Collections.emptyList(), actualColumStats);
+    assertEquals(0, actualNumRecords);
   }
 
   private List<InternalField> getSchemaFields() {
