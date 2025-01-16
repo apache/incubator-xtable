@@ -35,6 +35,7 @@ import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.stat.FileStats;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 
@@ -56,13 +57,10 @@ public class DeltaActionsConverter {
       boolean includeColumnStats,
       DeltaPartitionExtractor partitionExtractor,
       DeltaStatsExtractor fileStatsExtractor) {
+    FileStats fileStats = fileStatsExtractor.getColumnStatsForFile(addFile, fields);
     List<ColumnStat> columnStats =
-        includeColumnStats
-            ? fileStatsExtractor.getColumnStatsForFile(addFile, fields)
-            : Collections.emptyList();
-    long recordCount =
-        columnStats.stream().map(ColumnStat::getNumValues).max(Long::compareTo).orElse(0L);
-    // TODO(https://github.com/apache/incubator-xtable/issues/102): removed record count.
+        includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
+    long recordCount = fileStats.getNumRecords();
     return InternalDataFile.builder()
         .physicalPath(getFullPathToFile(deltaSnapshot, addFile.path()))
         .fileFormat(fileFormat)

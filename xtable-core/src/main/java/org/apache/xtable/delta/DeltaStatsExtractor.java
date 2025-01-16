@@ -55,6 +55,7 @@ import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.stat.FileStats;
 import org.apache.xtable.model.stat.Range;
 
 /**
@@ -185,9 +186,9 @@ public class DeltaStatsExtractor {
     }
   }
 
-  public List<ColumnStat> getColumnStatsForFile(AddFile addFile, List<InternalField> fields) {
+  public FileStats getColumnStatsForFile(AddFile addFile, List<InternalField> fields) {
     if (StringUtils.isEmpty(addFile.stats())) {
-      return Collections.emptyList();
+      return FileStats.builder().columnStats(Collections.emptyList()).numRecords(0).build();
     }
     // TODO: Additional work needed to track maps & arrays.
     try {
@@ -197,27 +198,32 @@ public class DeltaStatsExtractor {
       Map<String, Object> fieldPathToMaxValue = flattenStatMap(deltaStats.getMaxValues());
       Map<String, Object> fieldPathToMinValue = flattenStatMap(deltaStats.getMinValues());
       Map<String, Object> fieldPathToNullCount = flattenStatMap(deltaStats.getNullCount());
-      return fields.stream()
-          .filter(field -> fieldPathToMaxValue.containsKey(field.getPath()))
-          .map(
-              field -> {
-                String fieldPath = field.getPath();
-                Object minValue =
-                    DeltaValueConverter.convertFromDeltaColumnStatValue(
-                        fieldPathToMinValue.get(fieldPath), field.getSchema());
-                Object maxValue =
-                    DeltaValueConverter.convertFromDeltaColumnStatValue(
-                        fieldPathToMaxValue.get(fieldPath), field.getSchema());
-                Number nullCount = (Number) fieldPathToNullCount.get(fieldPath);
-                Range range = Range.vector(minValue, maxValue);
-                return ColumnStat.builder()
-                    .field(field)
-                    .numValues(deltaStats.getNumRecords())
-                    .numNulls(nullCount.longValue())
-                    .range(range)
-                    .build();
-              })
-          .collect(CustomCollectors.toList(fields.size()));
+      List<ColumnStat> columnStats =
+          fields.stream()
+              .filter(field -> fieldPathToMaxValue.containsKey(field.getPath()))
+              .map(
+                  field -> {
+                    String fieldPath = field.getPath();
+                    Object minValue =
+                        DeltaValueConverter.convertFromDeltaColumnStatValue(
+                            fieldPathToMinValue.get(fieldPath), field.getSchema());
+                    Object maxValue =
+                        DeltaValueConverter.convertFromDeltaColumnStatValue(
+                            fieldPathToMaxValue.get(fieldPath), field.getSchema());
+                    Number nullCount = (Number) fieldPathToNullCount.get(fieldPath);
+                    Range range = Range.vector(minValue, maxValue);
+                    return ColumnStat.builder()
+                        .field(field)
+                        .numValues(deltaStats.getNumRecords())
+                        .numNulls(nullCount.longValue())
+                        .range(range)
+                        .build();
+                  })
+              .collect(CustomCollectors.toList(fields.size()));
+      return FileStats.builder()
+          .columnStats(columnStats)
+          .numRecords(deltaStats.getNumRecords())
+          .build();
     } catch (IOException ex) {
       throw new ParseException("Unable to parse stats json", ex);
     }
