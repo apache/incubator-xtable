@@ -109,5 +109,8 @@ npm run serve
 1. The homepage is a `.html` file located at `website/static/index.html`
 2. If you're making changes to the page, test it locally using `python 3 -m http.server` and visiting http://localhost:8000/ before pushing the changes.
 
+## Add community sync page 
+1. Add community page for XTable.
+
 ## Maintainers
 [Apache XTable™ (Incubating) Community](https://incubator.apache.org/projects/xtable.html)

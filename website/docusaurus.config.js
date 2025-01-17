@@ -33,6 +33,14 @@ const config = {
           routeBasePath: 'releases',
         },
       ],
+      [
+        '@docusaurus/plugin-content-docs',
+        {
+          id: 'community',
+          path: 'community',
+          routeBasePath: 'community',
+        },
+      ]
     ],
 
   presets: [
@@ -78,6 +86,7 @@ const config = {
           },
           {to: 'blog', label: 'Blogs', position: 'left'},
           {to: 'releases/downloads', label: 'Downloads', position: 'left'},
+          {to: 'community', label: 'Community', position: 'left'}
         ],
       },
       prism: {
