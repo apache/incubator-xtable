@@ -221,6 +221,7 @@
                                     <include>org.apache.parquet:parquet-encoding</include>
                                     <include>org.apache.parquet:parquet-hadoop</include>
                                     <include>org.apache.parquet:parquet-format-structures</include>
+                                    <include>org.apache.parquet:parquet-jackson</include>
                                     <include>org.apache.hudi:hudi-java-client</include>
                                     <include>org.apache.hudi:hudi-client-common</include>
                                     <include>org.apache.hudi:hudi-common</include>

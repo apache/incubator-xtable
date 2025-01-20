@@ -81,7 +81,7 @@ class ITBundleValidation extends ConversionTestingBase {
    * 1. Insert few records.
    * 2. Upsert few records.
    * 3. Delete few records.
-   * After each step the RunSync command is run.
+   * After each step the RunSync command is run as a separate process to validate proper dependencies are included in the bundles.
    */
   @ParameterizedTest
   @MethodSource("generateTestParametersForFormats")
@@ -151,7 +151,7 @@ class ITBundleValidation extends ConversionTestingBase {
         new BufferedReader(new InputStreamReader(process.getInputStream()))) {
       String line;
       while ((line = reader.readLine()) != null) {
-        log.info("System log {}", line);
+        log.info("Process log {}", line);
       }
     }
     assertEquals(0, process.waitFor());
