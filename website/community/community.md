@@ -13,7 +13,7 @@ We have a [Slack channel](https://join.slack.com/t/apachextablei-yoi8504/shared_
 
 ## Recordings of the Community Calls
 Find date-wise recordings here.
-- 15th Jan 2025: https://drive.google.com/file/d/1eVRIWvf-Kn2UoYYctIyO-Iaetha8U_nH/view?usp=sharing
+- [15th Jan 2025](https://drive.google.com/file/d/1eVRIWvf-Kn2UoYYctIyO-Iaetha8U_nH/view?usp=sharing)
 
 
 ## Typical agenda
