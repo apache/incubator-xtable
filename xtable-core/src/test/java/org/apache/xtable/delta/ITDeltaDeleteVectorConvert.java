@@ -19,11 +19,16 @@
 package org.apache.xtable.delta;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
@@ -38,6 +43,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.actions.AddFile;
+import org.apache.spark.sql.delta.actions.DeletionVectorDescriptor;
 
 import scala.Option;
 
@@ -49,6 +55,7 @@ import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.storage.InternalDeletionVector;
 import org.apache.xtable.model.storage.TableFormat;
 
 public class ITDeltaDeleteVectorConvert {
@@ -56,6 +63,7 @@ public class ITDeltaDeleteVectorConvert {
   private static SparkSession sparkSession;
 
   private DeltaConversionSourceProvider conversionSourceProvider;
+  private TestSparkDeltaTable testSparkDeltaTable;
 
   @BeforeAll
   public static void setupOnce() {
@@ -91,11 +99,24 @@ public class ITDeltaDeleteVectorConvert {
     conversionSourceProvider.init(hadoopConf);
   }
 
+  private static class TableState {
+    Map<String, AddFile> activeFiles;
+    List<Row> rowsToDelete;
+
+    TableState(Map<String, AddFile> activeFiles) {
+      this(activeFiles, Collections.emptyList());
+    }
+
+    TableState(Map<String, AddFile> activeFiles, List<Row> rowsToDelete) {
+      this.activeFiles = activeFiles;
+      this.rowsToDelete = rowsToDelete;
+    }
+  }
+
   @Test
   public void testInsertsUpsertsAndDeletes() {
     String tableName = GenericTable.getTableName();
-    TestSparkDeltaTable testSparkDeltaTable =
-        new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
+    testSparkDeltaTable = new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
 
     // enable deletion vectors for the test table
     testSparkDeltaTable
@@ -105,25 +126,30 @@ public class ITDeltaDeleteVectorConvert {
                 + tableName
                 + " SET TBLPROPERTIES ('delta.enableDeletionVectors' = true)");
 
-    List<List<String>> allActiveFiles = new ArrayList<>();
+    List<TableState> testTableStates = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
     Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
-    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    Map<String, AddFile> tableFiles = collectActiveFilesAfterCommit(testSparkDeltaTable);
+    testTableStates.add(new TableState(tableFiles, Collections.emptyList()));
 
     List<Row> rows1 = testSparkDeltaTable.insertRows(50);
-    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    tableFiles = collectActiveFilesAfterCommit(testSparkDeltaTable);
+    testTableStates.add(new TableState(tableFiles));
+    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), 0, 0);
     assertEquals(100L, testSparkDeltaTable.getNumRows());
-    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), allActiveFiles.size() + 1, 0, 0);
 
     // upsert does not create delete vectors
     testSparkDeltaTable.upsertRows(rows.subList(0, 20));
-    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    tableFiles = collectActiveFilesAfterCommit(testSparkDeltaTable);
+    testTableStates.add(new TableState(tableFiles));
+    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), 0, 0);
     assertEquals(100L, testSparkDeltaTable.getNumRows());
-    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), allActiveFiles.size() + 1, 0, 0);
 
     testSparkDeltaTable.insertRows(50);
-    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    tableFiles = collectActiveFilesAfterCommit(testSparkDeltaTable);
+    testTableStates.add(new TableState(tableFiles));
+    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), 0, 0);
     assertEquals(150L, testSparkDeltaTable.getNumRows());
 
     // delete a few rows with gaps in ids
@@ -133,12 +159,15 @@ public class ITDeltaDeleteVectorConvert {
             .collect(Collectors.toList());
     rowsToDelete.addAll(rows.subList(35, 45));
     testSparkDeltaTable.deleteRows(rowsToDelete);
-    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    tableFiles = collectActiveFilesAfterCommit(testSparkDeltaTable);
+    testTableStates.add(new TableState(tableFiles, rowsToDelete));
+    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), 2, 15);
     assertEquals(135L, testSparkDeltaTable.getNumRows());
-    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), allActiveFiles.size() + 1, 2, 15);
 
     testSparkDeltaTable.insertRows(50);
-    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    tableFiles = collectActiveFilesAfterCommit(testSparkDeltaTable);
+    testTableStates.add(new TableState(tableFiles));
+    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), 2, 15);
     assertEquals(185L, testSparkDeltaTable.getNumRows());
 
     // delete a few rows from a file which already has a deletion vector, this should generate a
@@ -146,18 +175,22 @@ public class ITDeltaDeleteVectorConvert {
     // This deletion step intentionally deletes the same rows again to test the merge.
     rowsToDelete = rows1.subList(5, 15);
     testSparkDeltaTable.deleteRows(rowsToDelete);
-    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    tableFiles = collectActiveFilesAfterCommit(testSparkDeltaTable);
+    testTableStates.add(new TableState(tableFiles, rowsToDelete));
+    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), 2, 22);
     assertEquals(178L, testSparkDeltaTable.getNumRows());
-    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), allActiveFiles.size() + 1, 2, 22);
 
     testSparkDeltaTable.insertRows(50);
-    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    tableFiles = collectActiveFilesAfterCommit(testSparkDeltaTable);
+    testTableStates.add(new TableState(tableFiles));
+    validateDeletedRecordCount(testSparkDeltaTable.getDeltaLog(), 2, 22);
     assertEquals(228L, testSparkDeltaTable.getNumRows());
 
+    String tableBasePath = testSparkDeltaTable.getBasePath();
     SourceTable tableConfig =
         SourceTable.builder()
             .name(testSparkDeltaTable.getTableName())
-            .basePath(testSparkDeltaTable.getBasePath())
+            .basePath(tableBasePath)
             .formatName(TableFormat.DELTA)
             .build();
     DeltaConversionSource conversionSource =
@@ -165,8 +198,9 @@ public class ITDeltaDeleteVectorConvert {
     InternalSnapshot internalSnapshot = conversionSource.getCurrentSnapshot();
 
     //    validateDeltaPartitioning(internalSnapshot);
-    ValidationTestHelper.validateSnapshot(
-        internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+    List<String> activeDataFilePaths =
+        new ArrayList<>(testTableStates.get(testTableStates.size() - 1).activeFiles.keySet());
+    ValidationTestHelper.validateSnapshot(internalSnapshot, activeDataFilePaths);
 
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
@@ -179,13 +213,124 @@ public class ITDeltaDeleteVectorConvert {
       TableChange tableChange = conversionSource.getTableChangeForCommit(version);
       allTableChanges.add(tableChange);
     }
-    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
+
+    List<List<String>> allActiveDataFilePaths =
+        testTableStates.stream()
+            .map(s -> s.activeFiles)
+            .map(Map::keySet)
+            .map(ArrayList::new)
+            .collect(Collectors.toList());
+    ValidationTestHelper.validateTableChanges(allActiveDataFilePaths, allTableChanges);
+
+    validateDeletionInfo(testTableStates, allTableChanges);
+  }
+
+  // collects active files in the current snapshot as a map and adds it to the list
+  private Map<String, AddFile> collectActiveFilesAfterCommit(
+      TestSparkDeltaTable testSparkDeltaTable) {
+    Map<String, AddFile> allFiles =
+        testSparkDeltaTable.getAllActiveFilesInfo().stream()
+            .collect(
+                Collectors.toMap(
+                    file -> getAddFileAbsolutePath(file, testSparkDeltaTable.getBasePath()),
+                    file -> file));
+    return allFiles;
+  }
+
+  private void validateDeletionInfo(
+      List<TableState> testTableStates, List<TableChange> allTableChanges) {
+    if (allTableChanges.isEmpty() && testTableStates.size() <= 1) {
+      return;
+    }
+
+    assertEquals(
+        allTableChanges.size(),
+        testTableStates.size() - 1,
+        "Number of table changes should be equal to number of commits - 1");
+
+    for (int i = 0; i < allTableChanges.size() - 1; i++) {
+      Map<String, AddFile> activeFileAfterCommit = testTableStates.get(i + 1).activeFiles;
+      Map<String, AddFile> activeFileBeforeCommit = testTableStates.get(i).activeFiles;
+
+      Map<String, AddFile> activeFilesWithUpdatedDeleteInfo =
+          activeFileAfterCommit.entrySet().stream()
+              .filter(e -> e.getValue().deletionVector() != null)
+              .filter(
+                  entry -> {
+                    if (activeFileBeforeCommit.get(entry.getKey()) == null) {
+                      return true;
+                    }
+                    if (activeFileBeforeCommit.get(entry.getKey()).deletionVector() == null) {
+                      return true;
+                    }
+                    DeletionVectorDescriptor deletionVectorDescriptor =
+                        activeFileBeforeCommit.get(entry.getKey()).deletionVector();
+                    return !deletionVectorDescriptor.equals(entry.getValue().deletionVector());
+                  })
+              .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+      if (activeFilesWithUpdatedDeleteInfo.isEmpty()) {
+        continue;
+      }
+
+      // validate all new delete vectors are correctly detected
+      validateDeletionInfoForCommit(
+          testTableStates.get(i + 1), activeFilesWithUpdatedDeleteInfo, allTableChanges.get(i));
+    }
+  }
+
+  private void validateDeletionInfoForCommit(
+      TableState tableState,
+      Map<String, AddFile> activeFilesAfterCommit,
+      TableChange changeDetectedForCommit) {
+    Map<String, InternalDeletionVector> detectedDeleteInfos =
+        changeDetectedForCommit.getDeletionVectorsAdded().stream()
+            .collect(Collectors.toMap(InternalDeletionVector::dataFilePath, file -> file));
+
+    Map<String, AddFile> filesWithDeleteVectors =
+        activeFilesAfterCommit.entrySet().stream()
+            .filter(file -> file.getValue().deletionVector() != null)
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+    assertEquals(filesWithDeleteVectors.size(), detectedDeleteInfos.size());
+
+    for (Map.Entry<String, AddFile> fileWithDeleteVector : filesWithDeleteVectors.entrySet()) {
+      InternalDeletionVector deleteInfo = detectedDeleteInfos.get(fileWithDeleteVector.getKey());
+      assertNotNull(deleteInfo);
+      DeletionVectorDescriptor deletionVectorDescriptor =
+          fileWithDeleteVector.getValue().deletionVector();
+      assertEquals(deletionVectorDescriptor.cardinality(), deleteInfo.countRecordsDeleted());
+      assertEquals(deletionVectorDescriptor.sizeInBytes(), deleteInfo.length());
+      assertEquals(deletionVectorDescriptor.offset().get(), deleteInfo.offset());
+
+      String deletionFilePath =
+          deletionVectorDescriptor
+              .absolutePath(new org.apache.hadoop.fs.Path(testSparkDeltaTable.getBasePath()))
+              .toString();
+      assertEquals(deletionFilePath, deleteInfo.deletionVectorFilePath());
+
+      Iterator<Long> iterator = deleteInfo.deleteRecordIterator();
+      List<Long> deletes = new ArrayList<>();
+      iterator.forEachRemaining(deletes::add);
+      assertEquals(deletes.size(), deleteInfo.countRecordsDeleted());
+    }
+  }
+
+  private static String getAddFileAbsolutePath(AddFile file, String tableBasePath) {
+    String filePath = file.path();
+    if (filePath.startsWith(tableBasePath)) {
+      return filePath;
+    }
+    return Paths.get(tableBasePath, file.path()).toString();
   }
 
   private void validateDeletedRecordCount(
-      DeltaLog deltaLog, int version, int deleteVectorFileCount, int deletionRecordCount) {
+      DeltaLog deltaLog, int deleteVectorFileCount, int deletionRecordCount) {
     List<AddFile> allFiles =
-        deltaLog.getSnapshotAt(version, Option.empty()).allFiles().collectAsList();
+        deltaLog
+            .getSnapshotAt(deltaLog.snapshot().version(), Option.empty())
+            .allFiles()
+            .collectAsList();
     List<AddFile> filesWithDeletionVectors =
         allFiles.stream().filter(f -> f.deletionVector() != null).collect(Collectors.toList());
 

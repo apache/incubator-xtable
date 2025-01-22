@@ -18,10 +18,14 @@
  
 package org.apache.xtable.delta;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.when;
+
 import java.net.URISyntaxException;
 
 import org.apache.hadoop.fs.Path;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -31,6 +35,8 @@ import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.DeletionVectorDescriptor;
 
 import scala.Option;
+
+import org.apache.xtable.model.storage.InternalDeletionVector;
 
 class TestDeltaActionsConverter {
 
@@ -49,7 +55,9 @@ class TestDeltaActionsConverter {
     DeletionVectorDescriptor deletionVector = null;
     AddFile addFileAction =
         new AddFile(filePath, null, size, time, dataChange, stats, null, deletionVector);
-    Assertions.assertNull(actionsConverter.extractDeletionVectorFile(snapshot, addFileAction));
+    InternalDeletionVector internaldeletionVector =
+        actionsConverter.extractDeletionVector(snapshot, addFileAction);
+    assertNull(internaldeletionVector);
 
     deletionVector =
         DeletionVectorDescriptor.onDiskWithAbsolutePath(
@@ -58,10 +66,13 @@ class TestDeltaActionsConverter {
     addFileAction =
         new AddFile(filePath, null, size, time, dataChange, stats, null, deletionVector);
 
-    Mockito.when(snapshot.deltaLog()).thenReturn(deltaLog);
-    Mockito.when(deltaLog.dataPath())
+    when(snapshot.deltaLog()).thenReturn(deltaLog);
+    when(deltaLog.dataPath())
         .thenReturn(new Path("https://container.blob.core.windows.net/tablepath"));
-    Assertions.assertEquals(
-        filePath, actionsConverter.extractDeletionVectorFile(snapshot, addFileAction));
+    internaldeletionVector = actionsConverter.extractDeletionVector(snapshot, addFileAction);
+    assertNotNull(internaldeletionVector);
+    assertEquals(filePath, internaldeletionVector.dataFilePath());
+    assertEquals(42, internaldeletionVector.countRecordsDeleted());
+    assertEquals(size, internaldeletionVector.length());
   }
 }

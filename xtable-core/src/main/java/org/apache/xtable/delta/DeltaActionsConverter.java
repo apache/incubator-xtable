@@ -18,7 +18,9 @@
  
 package org.apache.xtable.delta;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 import lombok.AccessLevel;
@@ -30,6 +32,9 @@ import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.DeletionVectorDescriptor;
 import org.apache.spark.sql.delta.actions.RemoveFile;
+import org.apache.spark.sql.delta.deletionvectors.RoaringBitmapArray;
+import org.apache.spark.sql.delta.storage.dv.DeletionVectorStore;
+import org.apache.spark.sql.delta.storage.dv.HadoopFileSystemDVStore;
 
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
@@ -37,6 +42,7 @@ import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalDeletionVector;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaActionsConverter {
@@ -115,16 +121,41 @@ public class DeltaActionsConverter {
    *
    * @param snapshot the commit snapshot
    * @param addFile the add file action
-   * @return the deletion vector representation (path of data file), or null if no deletion vector
-   *     is present
+   * @return the deletion vector representation, or null if no deletion vector is present
    */
-  public String extractDeletionVectorFile(Snapshot snapshot, AddFile addFile) {
+  public InternalDeletionVector extractDeletionVector(Snapshot snapshot, AddFile addFile) {
     DeletionVectorDescriptor deletionVector = addFile.deletionVector();
     if (deletionVector == null) {
       return null;
     }
 
     String dataFilePath = addFile.path();
-    return getFullPathToFile(snapshot, dataFilePath);
+    dataFilePath = getFullPathToFile(snapshot, dataFilePath);
+    Path deletionVectorFilePath = deletionVector.absolutePath(snapshot.deltaLog().dataPath());
+
+    // TODO assumes deletion vector file. Need to handle inlined deletion vectors
+    InternalDeletionVector deleteVector =
+        InternalDeletionVector.builder()
+            .dataFilePath(dataFilePath)
+            .deletionVectorFilePath(deletionVectorFilePath.toString())
+            .countRecordsDeleted(deletionVector.cardinality())
+            .offset((Integer) deletionVector.offset().get())
+            .length(deletionVector.sizeInBytes())
+            .deleteRecordSupplier(() -> deletedRecordsIterator(snapshot, deletionVector))
+            .build();
+
+    return deleteVector;
+  }
+
+  private Iterator<Long> deletedRecordsIterator(
+      Snapshot snapshot, DeletionVectorDescriptor deleteVector) {
+    DeletionVectorStore dvStore =
+        new HadoopFileSystemDVStore(snapshot.deltaLog().newDeltaHadoopConf());
+
+    Path deletionVectorFilePath = deleteVector.absolutePath(snapshot.deltaLog().dataPath());
+    int size = deleteVector.sizeInBytes();
+    int offset = deleteVector.offset().isDefined() ? (int) deleteVector.offset().get() : 1;
+    RoaringBitmapArray rbm = dvStore.read(deletionVectorFilePath, offset, size);
+    return Arrays.stream(rbm.values()).iterator();
   }
 }

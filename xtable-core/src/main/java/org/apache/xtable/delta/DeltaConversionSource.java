@@ -22,11 +22,9 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import lombok.Builder;
 import lombok.extern.log4j.Log4j2;
@@ -54,6 +52,7 @@ import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalDeletionVector;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.spi.extractor.ConversionSource;
 import org.apache.xtable.spi.extractor.DataFileIterator;
@@ -112,8 +111,8 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     // All 3 of the following data structures use data file's absolute path as the key
     Map<String, InternalDataFile> addedFiles = new HashMap<>();
     Map<String, InternalDataFile> removedFiles = new HashMap<>();
-    // Set of data file paths for which deletion vectors exists.
-    Set<String> deletionVectors = new HashSet<>();
+    // Map of data file paths for which deletion vectors exists.
+    Map<String, InternalDeletionVector> deletionVectors = new HashMap<>();
 
     for (Action action : actionsForVersion) {
       if (action instanceof AddFile) {
@@ -128,10 +127,10 @@ public class DeltaConversionSource implements ConversionSource<Long> {
                 DeltaPartitionExtractor.getInstance(),
                 DeltaStatsExtractor.getInstance());
         addedFiles.put(dataFile.getPhysicalPath(), dataFile);
-        String deleteVectorPath =
-            actionsConverter.extractDeletionVectorFile(snapshotAtVersion, (AddFile) action);
-        if (deleteVectorPath != null) {
-          deletionVectors.add(deleteVectorPath);
+        InternalDeletionVector deletionVector =
+            actionsConverter.extractDeletionVector(snapshotAtVersion, (AddFile) action);
+        if (deletionVector != null) {
+          deletionVectors.put(deletionVector.dataFilePath(), deletionVector);
         }
       } else if (action instanceof RemoveFile) {
         InternalDataFile dataFile =
@@ -150,7 +149,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
     // entry which is replaced by a new entry, AddFile with delete vector information. Since the
     // same data file is removed and added, we need to remove it from the added and removed file
     // maps which are used to track actual added and removed data files.
-    for (String deletionVector : deletionVectors) {
+    for (String deletionVector : deletionVectors.keySet()) {
       // validate that a Remove action is also added for the data file
       if (removedFiles.containsKey(deletionVector)) {
         addedFiles.remove(deletionVector);
@@ -167,7 +166,11 @@ public class DeltaConversionSource implements ConversionSource<Long> {
             .filesAdded(addedFiles.values())
             .filesRemoved(removedFiles.values())
             .build();
-    return TableChange.builder().tableAsOfChange(tableAtVersion).filesDiff(dataFilesDiff).build();
+    return TableChange.builder()
+        .tableAsOfChange(tableAtVersion)
+        .deletionVectorsAdded(deletionVectors.values())
+        .filesDiff(dataFilesDiff)
+        .build();
   }
 
   @Override

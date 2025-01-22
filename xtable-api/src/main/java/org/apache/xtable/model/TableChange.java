@@ -18,10 +18,15 @@
  
 package org.apache.xtable.model;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
 import lombok.Builder;
 import lombok.Value;
 
 import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.storage.InternalDeletionVector;
 
 /**
  * Captures the changes in a single commit/instant from the source table.
@@ -29,11 +34,23 @@ import org.apache.xtable.model.storage.DataFilesDiff;
  * @since 0.1
  */
 @Value
-@Builder(toBuilder = true)
+@Builder(toBuilder = true, builderClassName = "Builder")
 public class TableChange {
   // Change in files at the specified instant
   DataFilesDiff filesDiff;
 
+  // A commit can add deletion vectors when some records are deleted. New deletion vectors can be
+  // added even if no new data files are added. However, as deletion vectors are always associated
+  // with a data file, they are implicitly removed when a corresponding data file is removed.
+  List<InternalDeletionVector> deletionVectorsAdded;
+
   /** The {@link InternalTable} at the commit time to which this table change belongs. */
   InternalTable tableAsOfChange;
+
+  public static class Builder {
+    public Builder deletionVectorsAdded(Collection<InternalDeletionVector> deletionVectorsAdded) {
+      this.deletionVectorsAdded = new ArrayList<>(deletionVectorsAdded);
+      return this;
+    }
+  }
 }
