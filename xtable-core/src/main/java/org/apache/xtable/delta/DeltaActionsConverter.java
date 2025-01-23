@@ -139,7 +139,7 @@ public class DeltaActionsConverter {
             .dataFilePath(dataFilePath)
             .deletionVectorFilePath(deletionVectorFilePath.toString())
             .countRecordsDeleted(deletionVector.cardinality())
-            .offset((Integer) deletionVector.offset().get())
+            .offset(getOffset(deletionVector))
             .length(deletionVector.sizeInBytes())
             .deleteRecordSupplier(() -> deletedRecordsIterator(snapshot, deletionVector))
             .build();
@@ -154,8 +154,12 @@ public class DeltaActionsConverter {
 
     Path deletionVectorFilePath = deleteVector.absolutePath(snapshot.deltaLog().dataPath());
     int size = deleteVector.sizeInBytes();
-    int offset = deleteVector.offset().isDefined() ? (int) deleteVector.offset().get() : 1;
+    int offset = getOffset(deleteVector);
     RoaringBitmapArray rbm = dvStore.read(deletionVectorFilePath, offset, size);
     return Arrays.stream(rbm.values()).iterator();
+  }
+
+  private static int getOffset(DeletionVectorDescriptor deleteVector) {
+    return deleteVector.offset().isDefined() ? (int) deleteVector.offset().get() : 1;
   }
 }

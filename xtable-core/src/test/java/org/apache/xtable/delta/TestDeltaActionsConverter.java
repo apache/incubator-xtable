@@ -41,7 +41,7 @@ import org.apache.xtable.model.storage.InternalDeletionVector;
 class TestDeltaActionsConverter {
 
   @Test
-  void extractDeletionVector() throws URISyntaxException {
+  void extractDeletionVector() {
     DeltaActionsConverter actionsConverter = DeltaActionsConverter.getInstance();
 
     int size = 123;
