@@ -23,8 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.when;
 
-import java.net.URISyntaxException;
-
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
