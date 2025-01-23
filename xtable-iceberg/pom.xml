@@ -19,54 +19,26 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
     <parent>
         <groupId>org.apache.xtable</groupId>
-        <artifactId>xtable-hudi-support</artifactId>
+        <artifactId>xtable</artifactId>
         <version>0.2.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>xtable-hudi-support-extensions_${scala.binary.version}</artifactId>
-    <name>XTable Project Hudi Support Extensions</name>
+    <artifactId>xtable-iceberg</artifactId>
+    <name>XTable Project Iceberg</name>
 
     <dependencies>
         <dependency>
             <groupId>org.apache.xtable</groupId>
-            <artifactId>xtable-hudi-support-utils</artifactId>
+            <artifactId>xtable-api</artifactId>
             <version>${project.version}</version>
+            <scope>provided</scope>
         </dependency>
-
         <dependency>
             <groupId>org.apache.xtable</groupId>
             <artifactId>xtable-core_${scala.binary.version}</artifactId>
             <version>${project.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.xtable</groupId>
-            <artifactId>xtable-hudi</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <!-- Logging API -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-client-common</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-sync-common</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
             <scope>provided</scope>
         </dependency>
 
@@ -74,81 +46,53 @@
         <dependency>
             <groupId>org.apache.avro</groupId>
             <artifactId>avro</artifactId>
-            <scope>provided</scope>
         </dependency>
 
-        <!-- Jackson -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-            <version>${jackson.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>${jackson.version}</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- parquet -->
-        <dependency>
-            <groupId>org.apache.parquet</groupId>
-            <artifactId>parquet-avro</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- iceberg -->
+        <!-- Iceberg dependencies -->
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-core</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>io.airlift</groupId>
-                    <artifactId>aircompressor</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.httpcomponents.client5</groupId>
-                    <artifactId>httpclient5</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-parquet</artifactId>
+            <artifactId>iceberg-api</artifactId>
         </dependency>
 
-        <!-- hudi -->
+        <!-- Logging API -->
         <dependency>
-            <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-common</artifactId>
-            <scope>provided</scope>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
         </dependency>
 
         <!-- Test Dependencies -->
         <dependency>
-            <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.binary.version}</artifactId>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Spark-Iceberg dependencies for reading/writing test tables -->
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-spark-runtime-${spark.version.prefix}_${scala.binary.version}</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-java-client</artifactId>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-client-runtime</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Mockito -->
         <dependency>
-            <groupId>com.esotericsoftware</groupId>
-            <artifactId>kryo</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.binary.version}</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-sql_${scala.binary.version}</artifactId>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -169,12 +113,6 @@
             <scope>test</scope>
         </dependency>
 
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-
         <!-- Test logging -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
@@ -189,21 +127,27 @@
 
         <dependency>
             <groupId>org.apache.xtable</groupId>
-            <artifactId>xtable-delta_${scala.binary.version}</artifactId>
+            <artifactId>xtable-core_${scala.binary.version}</artifactId>
             <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.xtable</groupId>
-            <artifactId>xtable-iceberg</artifactId>
-            <version>${project.version}</version>
+            <classifier>tests</classifier>
+            <type>test-jar</type>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -232,6 +176,31 @@
                                     <file>target/classes/META-INF/NOTICE</file>
                                 </transformer>
                             </transformers>
+                            <artifactSet>
+                                <includes combine.children="append">
+                                    <include>org.apache.iceberg:iceberg-core</include>
+                                    <include>org.apache.iceberg:iceberg-api</include>
+                                    <include>org.apache.iceberg:iceberg-common</include>
+                                    <include>org.apache.iceberg:iceberg-bundled-guava</include>
+                                    <include>org.apache.avro:avro</include>
+                                    <include>com.github.ben-manes.caffeine:caffeine</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations combine.children="append">
+                                <!-- TODO: Validate whether relocation will cause issues if using an Iceberg catalog -->
+                                <relocation>
+                                    <pattern>org.apache.iceberg.</pattern>
+                                    <shadedPattern>org.apache.xtable.shade.org.apache.iceberg.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.avro.</pattern>
+                                    <shadedPattern>org.apache.xtable.shade.org.apache.avro.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.github.ben-manes.</pattern>
+                                    <shadedPattern>org.apache.xtable.shade.com.github.ben-manes.</shadedPattern>
+                                </relocation>
+                            </relocations>
                         </configuration>
                     </execution>
                 </executions>

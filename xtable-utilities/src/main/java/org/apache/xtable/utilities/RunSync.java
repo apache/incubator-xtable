@@ -29,6 +29,8 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 
 import lombok.Data;
+import lombok.Value;
+import lombok.extern.jackson.Jacksonized;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.commons.cli.CommandLine;
@@ -42,7 +44,6 @@ import org.apache.hadoop.conf.Configuration;
 import com.fasterxml.jackson.annotation.JsonMerge;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.annotations.VisibleForTesting;
 
@@ -51,7 +52,6 @@ import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
-import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
@@ -115,11 +115,10 @@ public class RunSync {
       return;
     }
 
-    DatasetConfig datasetConfig = new DatasetConfig();
+    DatasetConfig datasetConfig;
     try (InputStream inputStream =
         Files.newInputStream(Paths.get(cmd.getOptionValue(DATASET_CONFIG_OPTION)))) {
-      ObjectReader objectReader = YAML_MAPPER.readerForUpdating(datasetConfig);
-      objectReader.readValue(inputStream);
+      datasetConfig = YAML_MAPPER.readValue(inputStream, DatasetConfig.class);
     }
 
     byte[] customConfig = getCustomConfigurations(cmd, HADOOP_CONFIG_PATH);
@@ -153,7 +152,7 @@ public class RunSync {
       Properties sourceProperties = new Properties();
       if (table.getPartitionSpec() != null) {
         sourceProperties.put(
-            HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec());
+            "xtable.hudi.source.partition_field_spec_config", table.getPartitionSpec());
       }
       SourceTable sourceTable =
           SourceTable.builder()
@@ -171,7 +170,7 @@ public class RunSync {
                   tableFormat ->
                       TargetTable.builder()
                           .name(table.getTableName())
-                          .basePath(table.getTableBasePath())
+                          .basePath(table.getTableDataPath())
                           .namespace(
                               table.getNamespace() == null
                                   ? null
@@ -242,7 +241,8 @@ public class RunSync {
         : YAML_MAPPER.readValue(customConfigs, IcebergCatalogConfig.class);
   }
 
-  @Data
+  @Jacksonized
+  @Value
   public static class DatasetConfig {
 
     /**
@@ -258,7 +258,8 @@ public class RunSync {
     /** Configuration of the dataset to sync, path, table name, etc. */
     List<Table> datasets;
 
-    @Data
+    @Jacksonized
+    @Value
     public static class Table {
       /**
        * The base path of the table to sync. Any authentication configuration needed by HDFS client
