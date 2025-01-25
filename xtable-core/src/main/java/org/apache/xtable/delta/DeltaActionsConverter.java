@@ -26,6 +26,7 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
 import org.apache.spark.sql.delta.Snapshot;
@@ -35,6 +36,8 @@ import org.apache.spark.sql.delta.actions.RemoveFile;
 import org.apache.spark.sql.delta.deletionvectors.RoaringBitmapArray;
 import org.apache.spark.sql.delta.storage.dv.DeletionVectorStore;
 import org.apache.spark.sql.delta.storage.dv.HadoopFileSystemDVStore;
+
+import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
@@ -131,35 +134,55 @@ public class DeltaActionsConverter {
 
     String dataFilePath = addFile.path();
     dataFilePath = getFullPathToFile(snapshot, dataFilePath);
-    Path deletionVectorFilePath = deletionVector.absolutePath(snapshot.deltaLog().dataPath());
 
-    // TODO assumes deletion vector file. Need to handle inlined deletion vectors
-    InternalDeletionVector deleteVector =
+    InternalDeletionVector.Builder deleteVectorBuilder =
         InternalDeletionVector.builder()
-            .dataFilePath(dataFilePath)
-            .deletionVectorFilePath(deletionVectorFilePath.toString())
             .countRecordsDeleted(deletionVector.cardinality())
-            .offset(getOffset(deletionVector))
-            .length(deletionVector.sizeInBytes())
-            .deleteRecordSupplier(() -> deletedRecordsIterator(snapshot, deletionVector))
-            .build();
+            .size(deletionVector.sizeInBytes())
+            .dataFilePath(dataFilePath);
 
-    return deleteVector;
+    if (deletionVector.isInline()) {
+      deleteVectorBuilder
+          .binaryRepresentation(deletionVector.inlineData())
+          .deleteRecordSupplier(() -> deletedRecordsIterator(deletionVector.inlineData()));
+    } else {
+      Path deletionVectorFilePath = deletionVector.absolutePath(snapshot.deltaLog().dataPath());
+      deleteVectorBuilder
+          .offset(getOffset(deletionVector))
+          .deletionVectorFilePath(deletionVectorFilePath.toString())
+          .deleteRecordSupplier(() -> deletedRecordsIterator(snapshot, deletionVector));
+    }
+
+    return deleteVectorBuilder.build();
+  }
+
+  private Iterator<Long> deletedRecordsIterator(byte[] bytes) {
+    RoaringBitmapArray rbm = RoaringBitmapArray.readFrom(bytes);
+    long[] ordinals = rbm.values();
+    return Arrays.stream(ordinals).iterator();
   }
 
   private Iterator<Long> deletedRecordsIterator(
       Snapshot snapshot, DeletionVectorDescriptor deleteVector) {
-    DeletionVectorStore dvStore =
-        new HadoopFileSystemDVStore(snapshot.deltaLog().newDeltaHadoopConf());
-
     Path deletionVectorFilePath = deleteVector.absolutePath(snapshot.deltaLog().dataPath());
-    int size = deleteVector.sizeInBytes();
     int offset = getOffset(deleteVector);
-    RoaringBitmapArray rbm = dvStore.read(deletionVectorFilePath, offset, size);
-    return Arrays.stream(rbm.values()).iterator();
+    long[] ordinals =
+        parseOrdinalFile(
+            snapshot.deltaLog().newDeltaHadoopConf(),
+            deletionVectorFilePath,
+            deleteVector.sizeInBytes(),
+            offset);
+    return Arrays.stream(ordinals).iterator();
   }
 
   private static int getOffset(DeletionVectorDescriptor deleteVector) {
     return deleteVector.offset().isDefined() ? (int) deleteVector.offset().get() : 1;
+  }
+
+  @VisibleForTesting
+  long[] parseOrdinalFile(Configuration conf, Path filePath, int size, int offset) {
+    DeletionVectorStore dvStore = new HadoopFileSystemDVStore(conf);
+    RoaringBitmapArray rbm = dvStore.read(filePath, offset, size);
+    return rbm.values();
   }
 }

@@ -35,29 +35,41 @@ public class InternalDeletionVector {
   // path (absolute with scheme) of data file to which this deletion vector belongs
   @NonNull String dataFilePath;
 
-  // physical path of the deletion vector file (absolute with scheme)
-  String deletionVectorFilePath;
-
-  // offset of deletion vector start in the deletion vector file
-  int offset;
-
-  // length of the deletion vector in the deletion vector file
-  int length;
+  // size of the deletion vector
+  int size;
 
   // count of records deleted by this deletion vector
   long countRecordsDeleted;
 
+  // physical path of the deletion vector file (absolute with scheme)
+  String deletionVectorFilePath;
+
+  // offset of deletion vector start in a deletion vector file
+  int offset;
+
+  /**
+   * binary representation of the deletion vector. The consumer can use the {@link
+   * #deleteRecordIterator()} to extract the positional ordinals represented in the binary format.
+   */
+  byte[] binaryRepresentation;
+
+  /**
+   * Supplier for an iterator that returns the ordinal position of a record deleted by this deletion
+   * vector in the data file, identified by {@link #dataFilePath}.
+   *
+   * <p>The {@link InternalDeletionVector} instance does not guarantee that a new or distinct result
+   * will be returned each time the supplier is invoked. However, the supplier is expected to return
+   * a new iterator for each call.
+   */
   @Getter(AccessLevel.NONE)
   Supplier<Iterator<Long>> deleteRecordSupplier;
 
+  /**
+   * @return An iterator that returns the ordinal position of a record deleted by this deletion.
+   *     There is no guarantee that a new or distinct iterator will be returned each time the
+   *     iterator is invoked.
+   */
   public Iterator<Long> deleteRecordIterator() {
     return deleteRecordSupplier.get();
-  }
-
-  public static class Builder {
-    public Builder deleteRecordSupplier(Supplier<Iterator<Long>> recordsSupplier) {
-      this.deleteRecordSupplier = recordsSupplier;
-      return this;
-    }
   }
 }

@@ -300,7 +300,7 @@ public class ITDeltaDeleteVectorConvert {
       DeletionVectorDescriptor deletionVectorDescriptor =
           fileWithDeleteVector.getValue().deletionVector();
       assertEquals(deletionVectorDescriptor.cardinality(), deleteInfo.countRecordsDeleted());
-      assertEquals(deletionVectorDescriptor.sizeInBytes(), deleteInfo.length());
+      assertEquals(deletionVectorDescriptor.sizeInBytes(), deleteInfo.size());
       assertEquals(deletionVectorDescriptor.offset().get(), deleteInfo.offset());
 
       String deletionFilePath =
