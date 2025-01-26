@@ -18,6 +18,7 @@
  
 package org.apache.xtable.iceberg;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -26,6 +27,7 @@ import lombok.AllArgsConstructor;
 
 import org.apache.iceberg.*;
 import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.io.FileIO;
 
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
@@ -33,6 +35,7 @@ import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalDeletionVector;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 @AllArgsConstructor(staticName = "of")
@@ -46,7 +49,8 @@ public class IcebergDataFileUpdatesSync {
       Transaction transaction,
       List<PartitionFileGroup> partitionedDataFiles,
       Schema schema,
-      PartitionSpec partitionSpec) {
+      PartitionSpec partitionSpec)
+      throws IOException {
 
     Map<String, DataFile> previousFiles = new HashMap<>();
     try (CloseableIterable<FileScanTask> iterator = table.newScan().planFiles()) {
@@ -67,7 +71,8 @@ public class IcebergDataFileUpdatesSync {
       Transaction transaction,
       DataFilesDiff dataFilesDiff,
       Schema schema,
-      PartitionSpec partitionSpec) {
+      PartitionSpec partitionSpec)
+      throws IOException {
 
     Collection<DataFile> filesRemoved =
         dataFilesDiff.getFilesRemoved().stream()
@@ -82,11 +87,45 @@ public class IcebergDataFileUpdatesSync {
       Collection<InternalDataFile> filesAdded,
       Collection<DataFile> filesRemoved,
       Schema schema,
-      PartitionSpec partitionSpec) {
-    OverwriteFiles overwriteFiles = transaction.newOverwrite();
-    filesAdded.forEach(f -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, f)));
-    filesRemoved.forEach(overwriteFiles::deleteFile);
-    overwriteFiles.commit();
+      PartitionSpec partitionSpec)
+      throws IOException {
+
+    List<InternalDeletionVector> deletionVectors =
+        filesAdded.stream()
+            .filter(dataFile -> dataFile instanceof InternalDeletionVector)
+            .map(dataFile -> (InternalDeletionVector) dataFile)
+            .collect(Collectors.toList());
+
+    if (!filesRemoved.isEmpty() || filesAdded.size() > deletionVectors.size()) {
+      OverwriteFiles overwriteFiles = transaction.newOverwrite();
+      filesAdded.stream()
+          .filter(dataFile -> !(dataFile instanceof InternalDeletionVector))
+          .forEach(
+              dataFile -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, dataFile)));
+      filesRemoved.forEach(overwriteFiles::deleteFile);
+      overwriteFiles.commit();
+    }
+
+    if (deletionVectors.isEmpty()) {
+      return;
+    }
+    RowDelta rowDeletes = transaction.newRowDelta();
+    String basePath = transaction.table().location();
+    IcebergDeleteVectorConverter converter =
+        IcebergDeleteVectorConverter.builder().directoryPath(basePath).build();
+    for (InternalDeletionVector dataFile : deletionVectors) {
+      rowDeletes.addDeletes(getDeleteFile(transaction, dataFile, converter));
+    }
+    rowDeletes.commit();
+  }
+
+  private DeleteFile getDeleteFile(
+      Transaction transaction,
+      InternalDeletionVector deletionVector,
+      IcebergDeleteVectorConverter converter)
+      throws IOException {
+    FileIO io = transaction.table().io();
+    return converter.toIceberg(io, deletionVector);
   }
 
   private DataFile getDataFile(

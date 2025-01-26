@@ -18,6 +18,7 @@
  
 package org.apache.xtable.iceberg;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -194,19 +195,27 @@ public class IcebergConversionTarget implements ConversionTarget {
 
   @Override
   public void syncFilesForSnapshot(List<PartitionFileGroup> partitionedDataFiles) {
-    dataFileUpdatesExtractor.applySnapshot(
-        table,
-        internalTableState,
-        transaction,
-        partitionedDataFiles,
-        transaction.table().schema(),
-        transaction.table().spec());
+    try {
+      dataFileUpdatesExtractor.applySnapshot(
+          table,
+          internalTableState,
+          transaction,
+          partitionedDataFiles,
+          transaction.table().schema(),
+          transaction.table().spec());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
   public void syncFilesForDiff(DataFilesDiff dataFilesDiff) {
-    dataFileUpdatesExtractor.applyDiff(
-        transaction, dataFilesDiff, transaction.table().schema(), transaction.table().spec());
+    try {
+      dataFileUpdatesExtractor.applyDiff(
+          transaction, dataFilesDiff, transaction.table().schema(), transaction.table().spec());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override

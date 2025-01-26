@@ -36,7 +36,6 @@ import lombok.AllArgsConstructor;
 import lombok.NonNull;
 
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.io.api.Binary;
 
 import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
@@ -258,10 +257,10 @@ public class HudiFileStatsExtractor {
         && (minValue instanceof ByteBuffer || maxValue instanceof ByteBuffer)) {
       minValue = minValue == null ? null : new String(((ByteBuffer) minValue).array());
       maxValue = maxValue == null ? null : new String(((ByteBuffer) maxValue).array());
-    } else if (field.getSchema().getDataType() == InternalType.FIXED
-        && (minValue instanceof Binary || maxValue instanceof Binary)) {
-      minValue = minValue == null ? null : ByteBuffer.wrap(((Binary) minValue).getBytes());
-      maxValue = maxValue == null ? null : ByteBuffer.wrap(((Binary) maxValue).getBytes());
+      //    } else if (field.getSchema().getDataType() == InternalType.FIXED
+      //        && (minValue instanceof Binary || maxValue instanceof Binary)) {
+      //      minValue = minValue == null ? null : ByteBuffer.wrap(((Binary) minValue).getBytes());
+      //      maxValue = maxValue == null ? null : ByteBuffer.wrap(((Binary) maxValue).getBytes());
     }
     boolean isScalar = minValue == null || minValue.compareTo(maxValue) == 0;
     Range range = isScalar ? Range.scalar(minValue) : Range.vector(minValue, maxValue);
