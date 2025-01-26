@@ -144,25 +144,25 @@ public class DeltaActionsConverter {
     if (deletionVector.isInline()) {
       deleteVectorBuilder
           .binaryRepresentation(deletionVector.inlineData())
-          .deleteRecordSupplier(() -> deletedRecordsIterator(deletionVector.inlineData()));
+          .ordinalsSupplier(() -> ordinalsIterator(deletionVector.inlineData()));
     } else {
       Path deletionVectorFilePath = deletionVector.absolutePath(snapshot.deltaLog().dataPath());
       deleteVectorBuilder
           .offset(getOffset(deletionVector))
-          .deletionVectorFilePath(deletionVectorFilePath.toString())
-          .deleteRecordSupplier(() -> deletedRecordsIterator(snapshot, deletionVector));
+          .sourceDeletionVectorFilePath(deletionVectorFilePath.toString())
+          .ordinalsSupplier(() -> ordinalsIterator(snapshot, deletionVector));
     }
 
     return deleteVectorBuilder.build();
   }
 
-  private Iterator<Long> deletedRecordsIterator(byte[] bytes) {
+  private Iterator<Long> ordinalsIterator(byte[] bytes) {
     RoaringBitmapArray rbm = RoaringBitmapArray.readFrom(bytes);
     long[] ordinals = rbm.values();
     return Arrays.stream(ordinals).iterator();
   }
 
-  private Iterator<Long> deletedRecordsIterator(
+  private Iterator<Long> ordinalsIterator(
       Snapshot snapshot, DeletionVectorDescriptor deleteVector) {
     Path deletionVectorFilePath = deleteVector.absolutePath(snapshot.deltaLog().dataPath());
     int offset = getOffset(deleteVector);

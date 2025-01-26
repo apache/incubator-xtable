@@ -307,9 +307,9 @@ public class ITDeltaDeleteVectorConvert {
           deletionVectorDescriptor
               .absolutePath(new org.apache.hadoop.fs.Path(testSparkDeltaTable.getBasePath()))
               .toString();
-      assertEquals(deletionFilePath, deleteInfo.deletionVectorFilePath());
+      assertEquals(deletionFilePath, deleteInfo.sourceDeletionVectorFilePath());
 
-      Iterator<Long> iterator = deleteInfo.deleteRecordIterator();
+      Iterator<Long> iterator = deleteInfo.ordinalsIterator();
       List<Long> deletes = new ArrayList<>();
       iterator.forEachRemaining(deletes::add);
       assertEquals(deletes.size(), deleteInfo.countRecordsDeleted());

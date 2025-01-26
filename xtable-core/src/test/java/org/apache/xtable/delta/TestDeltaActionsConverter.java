@@ -101,13 +101,13 @@ class TestDeltaActionsConverter {
         actionsConverter.extractDeletionVector(snapshot, addFileAction);
     assertNotNull(internaldeletionVector);
     assertEquals(basePath + dataFilePath, internaldeletionVector.dataFilePath());
-    assertEquals(deleteFilePath, internaldeletionVector.deletionVectorFilePath());
+    assertEquals(deleteFilePath, internaldeletionVector.sourceDeletionVectorFilePath());
     assertEquals(offset, internaldeletionVector.offset());
     assertEquals(cardinality, internaldeletionVector.countRecordsDeleted());
     assertEquals(size, internaldeletionVector.size());
     assertNull(internaldeletionVector.binaryRepresentation());
 
-    Iterator<Long> iterator = internaldeletionVector.deleteRecordIterator();
+    Iterator<Long> iterator = internaldeletionVector.ordinalsIterator();
     Arrays.stream(ordinals).forEach(o -> assertEquals(o, iterator.next()));
     assertFalse(iterator.hasNext());
   }
@@ -143,13 +143,13 @@ class TestDeltaActionsConverter {
         actionsConverter.extractDeletionVector(snapshot, addFileAction);
     assertNotNull(internaldeletionVector);
     assertEquals(basePath + dataFilePath, internaldeletionVector.dataFilePath());
-    assertEquals(deleteFilePath, internaldeletionVector.deletionVectorFilePath());
+    assertEquals(deleteFilePath, internaldeletionVector.sourceDeletionVectorFilePath());
     assertEquals(offset, internaldeletionVector.offset());
     assertEquals(cardinality, internaldeletionVector.countRecordsDeleted());
     assertEquals(size, internaldeletionVector.size());
     assertNull(internaldeletionVector.binaryRepresentation());
 
-    Iterator<Long> iterator = internaldeletionVector.deleteRecordIterator();
+    Iterator<Long> iterator = internaldeletionVector.ordinalsIterator();
     Arrays.stream(ordinals).forEach(o -> assertEquals(o, iterator.next()));
     assertFalse(iterator.hasNext());
   }
@@ -183,10 +183,10 @@ class TestDeltaActionsConverter {
     assertArrayEquals(bytes, internaldeletionVector.binaryRepresentation());
     assertEquals(cardinality, internaldeletionVector.countRecordsDeleted());
     assertEquals(bytes.length, internaldeletionVector.size());
-    assertNull(internaldeletionVector.deletionVectorFilePath());
+    assertNull(internaldeletionVector.sourceDeletionVectorFilePath());
     assertEquals(0, internaldeletionVector.offset());
 
-    Iterator<Long> iterator = internaldeletionVector.deleteRecordIterator();
+    Iterator<Long> iterator = internaldeletionVector.ordinalsIterator();
     Arrays.stream(ordinals).forEach(o -> assertEquals(o, iterator.next()));
     assertFalse(iterator.hasNext());
   }
