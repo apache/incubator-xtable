@@ -190,12 +190,12 @@ public class RunSync {
       try {
         conversionController.sync(conversionConfig, conversionSourceProvider);
       } catch (Exception e) {
-        log.error(String.format("Error running sync for %s", table.getTableBasePath()), e);
+        log.error("Error running sync for {}", table.getTableBasePath(), e);
       }
     }
   }
 
-  private static byte[] getCustomConfigurations(CommandLine cmd, String option) throws IOException {
+  static byte[] getCustomConfigurations(CommandLine cmd, String option) throws IOException {
     byte[] customConfig = null;
     if (cmd.hasOption(option)) {
       customConfig = Files.readAllBytes(Paths.get(cmd.getOptionValue(option)));

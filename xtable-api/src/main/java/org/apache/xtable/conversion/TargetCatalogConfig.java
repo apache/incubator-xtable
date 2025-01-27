@@ -16,20 +16,24 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.spi.extractor;
+package org.apache.xtable.conversion;
 
-import org.apache.xtable.conversion.SourceTable;
+import lombok.Builder;
+import lombok.NonNull;
+import lombok.Value;
+
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
 /**
- * A client for converting the table with tableIdentifier {@link CatalogTableIdentifier} in source
- * catalog to SourceTable object {@link SourceTable}, can be used by downstream consumers for
- * syncing it to multiple {@link org.apache.xtable.conversion.TargetTable}
+ * TargetCatalogConfig contains the parameters that are required when syncing {@link TargetTable} to
+ * a catalog.
  */
-public interface CatalogConversionSource {
-  /** Returns the source table object present in the catalog. */
-  SourceTable getSourceTable(CatalogTableIdentifier tableIdentifier);
+@Value
+@Builder
+public class TargetCatalogConfig {
+  /** The tableIdentifier that will be used when syncing {@link TargetTable} to the catalog. */
+  @NonNull CatalogTableIdentifier catalogTableIdentifier;
 
-  /** Returns the {@link org.apache.xtable.model.storage.CatalogType} for the catalog conversion */
-  String getCatalogType();
+  /** Configuration for the catalog. */
+  @NonNull ExternalCatalogConfig catalogConfig;
 }
