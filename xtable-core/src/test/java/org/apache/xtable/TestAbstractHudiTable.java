@@ -148,6 +148,7 @@ public abstract class TestAbstractHudiTable
       // Add key generator
       this.typedProperties = new TypedProperties();
       typedProperties.put(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key(), RECORD_KEY_FIELD_NAME);
+      typedProperties.put("hoodie.datasource.write.hive_style_partitioning", "true");
       if (partitionConfig == null) {
         this.keyGenerator = new NonpartitionedKeyGenerator(typedProperties);
         this.partitionFieldNames = Collections.emptyList();
@@ -155,7 +156,7 @@ public abstract class TestAbstractHudiTable
         if (partitionConfig.contains("timestamp")) {
           typedProperties.put("hoodie.keygen.timebased.timestamp.type", "SCALAR");
           typedProperties.put("hoodie.keygen.timebased.timestamp.scalar.time.unit", "MICROSECONDS");
-          typedProperties.put("hoodie.keygen.timebased.output.dateformat", "yyyy/MM/dd");
+          typedProperties.put("hoodie.keygen.timebased.output.dateformat", "yyyy-MM-dd");
           typedProperties.put("hoodie.keygen.timebased.input.timezone", "UTC");
           typedProperties.put("hoodie.keygen.timebased.output.timezone", "UTC");
         }
