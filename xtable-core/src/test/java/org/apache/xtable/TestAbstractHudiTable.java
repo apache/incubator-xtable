@@ -57,6 +57,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
 
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
@@ -101,6 +102,7 @@ import org.apache.hudi.keygen.SimpleKeyGenerator;
 import org.apache.hudi.keygen.TimestampBasedKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
+import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
 
 import com.google.common.base.Preconditions;
 
@@ -586,14 +588,14 @@ public abstract class TestAbstractHudiTable
   @SneakyThrows
   protected HoodieTableMetaClient getMetaClient(
       TypedProperties keyGenProperties, HoodieTableType hoodieTableType, Configuration conf) {
-    LocalFileSystem fs = (LocalFileSystem) FSUtils.getFs(basePath, conf);
+    LocalFileSystem fs = FileSystem.getLocal(conf);
     // Enforce checksum such that fs.open() is consistent to DFS
     fs.setVerifyChecksum(true);
     fs.mkdirs(new org.apache.hadoop.fs.Path(basePath));
 
     if (fs.exists(new org.apache.hadoop.fs.Path(basePath + "/.hoodie"))) {
       return HoodieTableMetaClient.builder()
-          .setConf(conf)
+          .setConf(new HadoopStorageConfiguration(conf))
           .setBasePath(basePath)
           .setLoadActiveTimelineOnLoad(true)
           .build();
@@ -610,7 +612,8 @@ public abstract class TestAbstractHudiTable
             .setCommitTimezone(HoodieTimelineTimeZone.UTC)
             .setBaseFileFormat(HoodieFileFormat.PARQUET.toString())
             .build();
-    return HoodieTableMetaClient.initTableAndGetMetaClient(conf, this.basePath, properties);
+    return HoodieTableMetaClient.initTableAndGetMetaClient(
+        new HadoopStorageConfiguration(conf), this.basePath, properties);
   }
 
   private static Schema.Field copyField(Schema.Field input) {

@@ -70,8 +70,10 @@ import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieCleanConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
-import org.apache.hudi.hadoop.CachingPath;
 import org.apache.hudi.metadata.HoodieTableMetadataWriter;
+import org.apache.hudi.storage.StorageConfiguration;
+import org.apache.hudi.storage.StoragePath;
+import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
 import org.apache.hudi.table.HoodieJavaTable;
 import org.apache.hudi.table.action.clean.CleanPlanner;
 
@@ -109,14 +111,14 @@ public class HudiConversionTarget implements ConversionTarget {
   @VisibleForTesting
   HudiConversionTarget(
       TargetTable targetTable,
-      Configuration configuration,
+      StorageConfiguration<?> configuration,
       int maxNumDeltaCommitsBeforeCompaction) {
     this(
         targetTable.getBasePath(),
         (int) targetTable.getMetadataRetention().toHours(),
         maxNumDeltaCommitsBeforeCompaction,
         BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(configuration), new CachingPath(targetTable.getBasePath())),
+            new HoodieJavaEngineContext(configuration), new StoragePath(targetTable.getBasePath())),
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);
@@ -168,9 +170,10 @@ public class HudiConversionTarget implements ConversionTarget {
         (int) targetTable.getMetadataRetention().toHours(),
         HoodieMetadataConfig.COMPACT_NUM_DELTA_COMMITS.defaultValue(),
         BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(configuration), new CachingPath(targetTable.getBasePath())),
+            new HoodieJavaEngineContext(new HadoopStorageConfiguration(configuration)),
+            new StoragePath(targetTable.getBasePath())),
         AvroSchemaConverter.getInstance(),
-        HudiTableManager.of(configuration),
+        HudiTableManager.of(new HadoopStorageConfiguration(configuration)),
         CommitState::new);
   }
 
@@ -369,7 +372,7 @@ public class HudiConversionTarget implements ConversionTarget {
               getNumInstantsToRetain(),
               maxNumDeltaCommitsBeforeCompaction,
               timelineRetentionInHours);
-      HoodieEngineContext engineContext = new HoodieJavaEngineContext(metaClient.getHadoopConf());
+      HoodieEngineContext engineContext = new HoodieJavaEngineContext(metaClient.getStorageConf());
       try (HoodieJavaWriteClient<?> writeClient =
           new HoodieJavaWriteClient<>(engineContext, writeConfig)) {
         writeClient.startCommitWithTime(instantTime, HoodieTimeline.REPLACE_COMMIT_ACTION);
@@ -494,7 +497,8 @@ public class HudiConversionTarget implements ConversionTarget {
                 Collections.emptyMap(),
                 CleanPlanner.LATEST_CLEAN_PLAN_VERSION,
                 cleanInfoPerPartition,
-                Collections.emptyList());
+                Collections.emptyList(),
+                Collections.emptyMap());
         // create a clean instant and mark it as requested with the clean plan
         HoodieInstant requestedCleanInstant =
             new HoodieInstant(
@@ -524,7 +528,8 @@ public class HudiConversionTarget implements ConversionTarget {
                     })
                 .collect(Collectors.toList());
         HoodieCleanMetadata cleanMetadata =
-            CleanerUtils.convertCleanMetadata(cleanTime, Option.empty(), cleanStats);
+            CleanerUtils.convertCleanMetadata(
+                cleanTime, Option.empty(), cleanStats, Collections.emptyMap());
         // update the metadata table with the clean metadata so the files' metadata are marked for
         // deletion
         hoodieTableMetadataWriter.performTableServices(Option.empty());

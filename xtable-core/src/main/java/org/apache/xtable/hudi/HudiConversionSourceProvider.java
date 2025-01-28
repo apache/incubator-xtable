@@ -23,6 +23,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
 
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
@@ -35,7 +36,7 @@ public class HudiConversionSourceProvider extends ConversionSourceProvider<Hoodi
   public HudiConversionSource getConversionSourceInstance(SourceTable sourceTable) {
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder()
-            .setConf(hadoopConf)
+            .setConf(new HadoopStorageConfiguration(hadoopConf))
             .setBasePath(sourceTable.getBasePath())
             .setLoadActiveTimelineOnLoad(true)
             .build();

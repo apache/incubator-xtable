@@ -26,14 +26,13 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
-import org.apache.hadoop.conf.Configuration;
-
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.exception.TableNotFoundException;
+import org.apache.hudi.storage.StorageConfiguration;
 
 import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.model.InternalTable;
@@ -53,7 +52,7 @@ class HudiTableManager {
   private static final String COMPLEX_KEY_GENERATOR = "org.apache.hudi.keygen.ComplexKeyGenerator";
   private static final String SIMPLE_KEY_GENERATOR = "org.apache.hudi.keygen.SimpleKeyGenerator";
 
-  private final Configuration configuration;
+  private final StorageConfiguration<?> configuration;
 
   /**
    * Loads the meta client for the table at the base path if it exists

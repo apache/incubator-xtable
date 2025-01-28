@@ -31,7 +31,6 @@ import lombok.SneakyThrows;
 import lombok.Value;
 
 import org.apache.avro.Schema;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.SparkConf;
 import org.apache.spark.serializer.KryoSerializer;
 
@@ -47,6 +46,7 @@ import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class HudiTestUtil {
@@ -60,7 +60,7 @@ public class HudiTestUtil {
         .setTableName("test_table")
         .setPayloadClass(HoodieAvroPayload.class)
         .setPartitionFields(partitionFields)
-        .initTable(new Configuration(), tableBasePath);
+        .initTable(new HadoopStorageConfiguration(false), tableBasePath);
   }
 
   public static HoodieWriteConfig getHoodieWriteConfig(HoodieTableMetaClient metaClient) {

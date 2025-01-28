@@ -37,6 +37,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.storage.StorageConfiguration;
+import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
 
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
@@ -48,7 +50,8 @@ import org.apache.xtable.model.storage.TableFormat;
 
 public class TestHudiTableManager {
 
-  private static final Configuration CONFIGURATION = new Configuration();
+  private static final StorageConfiguration<?> CONFIGURATION =
+      new HadoopStorageConfiguration(new Configuration(false));
   @TempDir public static Path tempDir;
   private final String tableBasePath = tempDir.resolve(UUID.randomUUID().toString()).toString();
 

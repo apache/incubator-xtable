@@ -36,8 +36,6 @@ import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.Value;
 
-import org.apache.hadoop.fs.Path;
-
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
@@ -48,8 +46,8 @@ import org.apache.hudi.common.model.HoodieDeltaWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
-import org.apache.hudi.hadoop.CachingPath;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
+import org.apache.hudi.storage.StoragePath;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.schema.InternalType;
@@ -64,7 +62,7 @@ public class BaseFileUpdatesExtractor {
       Pattern.compile(
           "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9]_[0-9a-fA-F-]+_[0-9]+\\.");
   private final HoodieEngineContext engineContext;
-  private final Path tableBasePath;
+  private final StoragePath tableBasePath;
 
   /**
    * Extracts the changes between the snapshot files and the base files in the Hudi table currently.
@@ -91,7 +89,10 @@ public class BaseFileUpdatesExtractor {
     Set<String> partitionPathsToDrop =
         new HashSet<>(
             FSUtils.getAllPartitionPaths(
-                engineContext, metadataConfig, metaClient.getBasePathV2().toString()));
+                engineContext,
+                metaClient.getStorage(),
+                metadataConfig,
+                metaClient.getBasePathV2().toString()));
     ReplaceMetadata replaceMetadata =
         partitionedDataFiles.stream()
             .map(
@@ -173,7 +174,7 @@ public class BaseFileUpdatesExtractor {
     // For all removed files, group by partition and extract the file id
     Map<String, List<String>> partitionToReplacedFileIds =
         dataFilesDiff.getFilesRemoved().stream()
-            .map(file -> new CachingPath(file.getPhysicalPath()))
+            .map(file -> new StoragePath(file.getPhysicalPath()))
             .collect(
                 Collectors.groupingBy(
                     path -> HudiPathUtils.getPartitionPath(tableBasePath, path),
@@ -186,7 +187,7 @@ public class BaseFileUpdatesExtractor {
     return ReplaceMetadata.of(partitionToReplacedFileIds, writeStatuses);
   }
 
-  private String getFileId(Path filePath) {
+  private String getFileId(StoragePath filePath) {
     String fileName = filePath.getName();
     // if file was created by Hudi use original fileId, otherwise use the file name as IDs
     if (isFileCreatedByHudiWriter(fileName)) {
@@ -207,12 +208,12 @@ public class BaseFileUpdatesExtractor {
   }
 
   private WriteStatus toWriteStatus(
-      Path tableBasePath,
+      StoragePath tableBasePath,
       String commitTime,
       InternalDataFile file,
       Optional<String> partitionPathOptional) {
     WriteStatus writeStatus = new WriteStatus();
-    Path path = new CachingPath(file.getPhysicalPath());
+    StoragePath path = new StoragePath(file.getPhysicalPath());
     String partitionPath =
         partitionPathOptional.orElseGet(() -> HudiPathUtils.getPartitionPath(tableBasePath, path));
     String fileId = getFileId(path);
@@ -273,8 +274,8 @@ public class BaseFileUpdatesExtractor {
     }
   }
 
-  private String getPartitionPath(Path tableBasePath, List<InternalDataFile> files) {
+  private String getPartitionPath(StoragePath tableBasePath, List<InternalDataFile> files) {
     return HudiPathUtils.getPartitionPath(
-        tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
+        tableBasePath, new StoragePath(files.get(0).getPhysicalPath()));
   }
 }
