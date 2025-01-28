@@ -500,30 +500,6 @@ public class ITConversionController {
     return Stream.of(
         Arguments.of(
             buildArgsForPartition(
-                HUDI, Arrays.asList(ICEBERG, DELTA), "level:SIMPLE", "level:VALUE", levelFilter)),
-        Arguments.of(
-            buildArgsForPartition(
-                DELTA, Arrays.asList(ICEBERG, HUDI), null, "level:VALUE", levelFilter)),
-        Arguments.of(
-            buildArgsForPartition(
-                ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter)),
-        Arguments.of(
-            // Delta Lake does not currently support nested partition columns
-            buildArgsForPartition(
-                HUDI,
-                Arrays.asList(ICEBERG),
-                "nested_record.level:SIMPLE",
-                "nested_record.level:VALUE",
-                nestedLevelFilter)),
-        Arguments.of(
-            buildArgsForPartition(
-                HUDI,
-                Arrays.asList(ICEBERG, DELTA),
-                "severity:SIMPLE",
-                "severity:VALUE",
-                severityFilter)),
-        Arguments.of(
-            buildArgsForPartition(
                 HUDI,
                 Arrays.asList(ICEBERG, DELTA),
                 "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",

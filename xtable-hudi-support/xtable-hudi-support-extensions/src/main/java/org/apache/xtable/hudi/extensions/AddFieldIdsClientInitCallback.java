@@ -29,6 +29,7 @@ import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieException;
+import org.apache.hudi.storage.HoodieStorage;
 import org.apache.hudi.storage.StorageConfiguration;
 import org.apache.hudi.storage.StoragePath;
 import org.apache.hudi.storage.hadoop.HoodieHadoopStorage;
@@ -64,7 +65,8 @@ public class AddFieldIdsClientInitCallback implements HoodieClientInitCallback {
         Option<Schema> currentSchema = Option.empty();
         StoragePath basePath = new StoragePath(config.getBasePath());
         StorageConfiguration<?> storageConf = hoodieClient.getEngineContext().getStorageConf();
-        try (HoodieHadoopStorage storage = new HoodieHadoopStorage(basePath, storageConf)) {
+        try {
+          HoodieStorage storage = new HoodieHadoopStorage(basePath, storageConf);
           if (storage.exists(basePath)) {
             HoodieTableMetaClient metaClient =
                 HoodieTableMetaClient.builder()
