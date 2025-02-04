@@ -284,7 +284,9 @@ public class ITDeltaDeleteVectorConvert {
       Map<String, AddFile> activeFilesAfterCommit,
       TableChange changeDetectedForCommit) {
     Map<String, InternalDeletionVector> detectedDeleteInfos =
-        changeDetectedForCommit.getDeletionVectorsAdded().stream()
+        changeDetectedForCommit.getFilesDiff().getFilesAdded().stream()
+            .filter(file -> file instanceof InternalDeletionVector)
+            .map(file -> (InternalDeletionVector) file)
             .collect(Collectors.toMap(InternalDeletionVector::dataFilePath, file -> file));
 
     Map<String, AddFile> filesWithDeleteVectors =
@@ -299,20 +301,20 @@ public class ITDeltaDeleteVectorConvert {
       assertNotNull(deleteInfo);
       DeletionVectorDescriptor deletionVectorDescriptor =
           fileWithDeleteVector.getValue().deletionVector();
-      assertEquals(deletionVectorDescriptor.cardinality(), deleteInfo.countRecordsDeleted());
-      assertEquals(deletionVectorDescriptor.sizeInBytes(), deleteInfo.size());
+      assertEquals(deletionVectorDescriptor.cardinality(), deleteInfo.getRecordCount());
+      assertEquals(deletionVectorDescriptor.sizeInBytes(), deleteInfo.getFileSizeBytes());
       assertEquals(deletionVectorDescriptor.offset().get(), deleteInfo.offset());
 
       String deletionFilePath =
           deletionVectorDescriptor
               .absolutePath(new org.apache.hadoop.fs.Path(testSparkDeltaTable.getBasePath()))
               .toString();
-      assertEquals(deletionFilePath, deleteInfo.sourceDeletionVectorFilePath());
+      assertEquals(deletionFilePath, deleteInfo.getPhysicalPath());
 
       Iterator<Long> iterator = deleteInfo.ordinalsIterator();
       List<Long> deletes = new ArrayList<>();
       iterator.forEachRemaining(deletes::add);
-      assertEquals(deletes.size(), deleteInfo.countRecordsDeleted());
+      assertEquals(deletes.size(), deleteInfo.getRecordCount());
     }
   }
 

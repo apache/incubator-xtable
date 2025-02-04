@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.Builder;
 import lombok.extern.log4j.Log4j2;
@@ -161,16 +163,15 @@ public class DeltaConversionSource implements ConversionSource<Long> {
       }
     }
 
+    List<InternalDataFile> allAddedFiles =
+        Stream.concat(addedFiles.values().stream(), deletionVectors.values().stream())
+            .collect(Collectors.toList());
     DataFilesDiff dataFilesDiff =
         DataFilesDiff.builder()
-            .filesAdded(addedFiles.values())
+            .filesAdded(allAddedFiles)
             .filesRemoved(removedFiles.values())
             .build();
-    return TableChange.builder()
-        .tableAsOfChange(tableAtVersion)
-        .deletionVectorsAdded(deletionVectors.values())
-        .filesDiff(dataFilesDiff)
-        .build();
+    return TableChange.builder().tableAsOfChange(tableAtVersion).filesDiff(dataFilesDiff).build();
   }
 
   @Override

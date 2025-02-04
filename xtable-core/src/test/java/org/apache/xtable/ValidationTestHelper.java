@@ -30,6 +30,7 @@ import java.util.stream.IntStream;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalDeletionVector;
 
 public class ValidationTestHelper {
 
@@ -96,7 +97,10 @@ public class ValidationTestHelper {
   }
 
   private static Set<String> extractPathsFromDataFile(Set<InternalDataFile> dataFiles) {
-    return dataFiles.stream().map(InternalDataFile::getPhysicalPath).collect(Collectors.toSet());
+    return dataFiles.stream()
+        .filter(file -> !(file instanceof InternalDeletionVector))
+        .map(InternalDataFile::getPhysicalPath)
+        .collect(Collectors.toSet());
   }
 
   private static void replaceFileScheme(List<String> filePaths) {

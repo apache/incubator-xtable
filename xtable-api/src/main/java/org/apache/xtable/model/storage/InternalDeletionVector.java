@@ -22,27 +22,27 @@ import java.util.Iterator;
 import java.util.function.Supplier;
 
 import lombok.AccessLevel;
-import lombok.Builder;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
-import lombok.Value;
+import lombok.ToString;
 import lombok.experimental.Accessors;
+import lombok.experimental.FieldDefaults;
+import lombok.experimental.SuperBuilder;
 
-@Builder(toBuilder = true, builderClassName = "Builder")
 @Accessors(fluent = true)
-@Value
-public class InternalDeletionVector {
+@SuperBuilder(toBuilder = true)
+@FieldDefaults(makeFinal = true, level = lombok.AccessLevel.PRIVATE)
+@Getter
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
+public class InternalDeletionVector extends InternalDataFile {
   // path (absolute with scheme) of data file to which this deletion vector belongs
   @NonNull String dataFilePath;
 
-  // size of the deletion vector
-  int size;
-
-  // count of records deleted by this deletion vector
-  long countRecordsDeleted;
-
-  // physical path of the deletion vector file (absolute with scheme)
-  String sourceDeletionVectorFilePath;
+  // super.getFileSizeBytes() is the size of the deletion vector file
+  // super.getPhysicalPath() is the absolute path (with scheme) of the deletion vector file
+  // super.getRecordCount() is the count of records in the deletion vector file
 
   // offset of deletion vector start in a deletion vector file
   int offset;

@@ -135,21 +135,22 @@ public class DeltaActionsConverter {
     String dataFilePath = addFile.path();
     dataFilePath = getFullPathToFile(snapshot, dataFilePath);
 
-    InternalDeletionVector.Builder deleteVectorBuilder =
+    InternalDeletionVector.InternalDeletionVectorBuilder<?, ?> deleteVectorBuilder =
         InternalDeletionVector.builder()
-            .countRecordsDeleted(deletionVector.cardinality())
-            .size(deletionVector.sizeInBytes())
+            .recordCount(deletionVector.cardinality())
+            .fileSizeBytes(deletionVector.sizeInBytes())
             .dataFilePath(dataFilePath);
 
     if (deletionVector.isInline()) {
       deleteVectorBuilder
           .binaryRepresentation(deletionVector.inlineData())
+          .physicalPath("")
           .ordinalsSupplier(() -> ordinalsIterator(deletionVector.inlineData()));
     } else {
       Path deletionVectorFilePath = deletionVector.absolutePath(snapshot.deltaLog().dataPath());
       deleteVectorBuilder
           .offset(getOffset(deletionVector))
-          .sourceDeletionVectorFilePath(deletionVectorFilePath.toString())
+          .physicalPath(deletionVectorFilePath.toString())
           .ordinalsSupplier(() -> ordinalsIterator(snapshot, deletionVector));
     }
 
