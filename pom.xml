@@ -52,6 +52,7 @@
         <module>xtable-core</module>
         <module>xtable-utilities</module>
         <module>xtable-aws</module>
+        <module>xtable-hive-metastore</module>
     </modules>
 
     <properties>
@@ -65,6 +66,7 @@
         <hadoop.version>3.4.1</hadoop.version>
         <hudi.version>0.14.0</hudi.version>
         <aws.version>2.29.40</aws.version>
+        <hive.version>2.3.9</hive.version>
         <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.8.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
