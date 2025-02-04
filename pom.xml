@@ -51,6 +51,7 @@
         <module>xtable-hudi-support</module>
         <module>xtable-core</module>
         <module>xtable-utilities</module>
+        <module>xtable-aws</module>
     </modules>
 
     <properties>
@@ -385,6 +386,11 @@
                 <artifactId>bundle</artifactId>
                 <version>${aws.version}</version>
                 <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>glue</artifactId>
+                <version>${aws.version}</version>
             </dependency>
 
             <!-- Protobuf -->

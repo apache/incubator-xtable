@@ -18,6 +18,9 @@
  
 package org.apache.xtable.spi.sync;
 
+import org.apache.hadoop.conf.Configuration;
+
+import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
@@ -71,4 +74,7 @@ public interface CatalogSyncClient<TABLE> extends AutoCloseable {
 
   /** Drops a table from the catalog. */
   void dropTable(InternalTable table, CatalogTableIdentifier tableIdentifier);
+
+  /** Initializes the client with provided configuration */
+  void init(ExternalCatalogConfig catalogConfig, String tableFormat, Configuration configuration);
 }

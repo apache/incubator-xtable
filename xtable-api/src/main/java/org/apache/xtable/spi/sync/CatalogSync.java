@@ -56,13 +56,15 @@ public class CatalogSync {
           try {
             results.add(syncCatalog(catalogSyncClient, tableIdentifier, table));
             log.info(
-                "Catalog sync is successful for table {} with format {} using catalogSync {}",
+                "Catalog sync is successful for table {} with base path {} and format {} using catalogSync {}",
+                tableIdentifier.getId(),
                 table.getBasePath(),
                 table.getTableFormat(),
                 catalogSyncClient.getClass().getName());
           } catch (Exception e) {
             log.error(
-                "Catalog sync failed for table {} with format {} using catalogSync {}",
+                "Catalog sync failed for table {} with base path {} and format {} using catalogSync {}",
+                tableIdentifier.getId(),
                 table.getBasePath(),
                 table.getTableFormat(),
                 catalogSyncClient.getClass().getName());
@@ -83,6 +85,12 @@ public class CatalogSync {
       CatalogSyncClient<TABLE> catalogSyncClient,
       CatalogTableIdentifier tableIdentifier,
       InternalTable table) {
+    log.info(
+        "Running catalog sync for table {} with base path {} and format {} using catalogSync {}",
+        tableIdentifier.getId(),
+        table.getBasePath(),
+        table.getTableFormat(),
+        catalogSyncClient.getClass().getName());
     if (!catalogSyncClient.hasDatabase(tableIdentifier)) {
       catalogSyncClient.createDatabase(tableIdentifier);
     }
