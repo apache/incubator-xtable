@@ -51,10 +51,13 @@ public class CatalogConversionFactory {
   public static CatalogConversionSource createCatalogConversionSource(
       ExternalCatalogConfig sourceCatalogConfig, Configuration configuration) {
     if (!StringUtils.isEmpty(sourceCatalogConfig.getCatalogType())) {
-      return findInstance(
-          CatalogConversionSource.class,
-          sourceCatalogConfig.getCatalogType(),
-          CatalogConversionSource::getCatalogType);
+      CatalogConversionSource catalogConversionSource =
+          findInstanceByCatalogType(
+              CatalogConversionSource.class,
+              sourceCatalogConfig.getCatalogType(),
+              CatalogConversionSource::getCatalogType);
+      catalogConversionSource.init(sourceCatalogConfig, configuration);
+      return catalogConversionSource;
     }
     return ReflectionUtils.createInstanceOfClass(
         sourceCatalogConfig.getCatalogConversionSourceImpl(), sourceCatalogConfig, configuration);
@@ -70,10 +73,13 @@ public class CatalogConversionFactory {
   public <TABLE> CatalogSyncClient<TABLE> createCatalogSyncClient(
       ExternalCatalogConfig targetCatalogConfig, String tableFormat, Configuration configuration) {
     if (!StringUtils.isEmpty(targetCatalogConfig.getCatalogType())) {
-      return findInstance(
-          CatalogSyncClient.class,
-          targetCatalogConfig.getCatalogType(),
-          CatalogSyncClient::getCatalogType);
+      CatalogSyncClient catalogSyncClient =
+          findInstanceByCatalogType(
+              CatalogSyncClient.class,
+              targetCatalogConfig.getCatalogType(),
+              CatalogSyncClient::getCatalogType);
+      catalogSyncClient.init(targetCatalogConfig, tableFormat, configuration);
+      return catalogSyncClient;
     }
     return ReflectionUtils.createInstanceOfClass(
         targetCatalogConfig.getCatalogSyncClientImpl(),
@@ -82,7 +88,7 @@ public class CatalogConversionFactory {
         configuration);
   }
 
-  private static <T> T findInstance(
+  private static <T> T findInstanceByCatalogType(
       Class<T> serviceClass, String catalogType, Function<T, String> catalogTypeExtractor) {
     ServiceLoader<T> loader = ServiceLoader.load(serviceClass);
     for (T instance : loader) {

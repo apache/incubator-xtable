@@ -18,6 +18,9 @@
  
 package org.apache.xtable.spi.extractor;
 
+import org.apache.hadoop.conf.Configuration;
+
+import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 
@@ -32,4 +35,7 @@ public interface CatalogConversionSource {
 
   /** Returns the {@link org.apache.xtable.model.storage.CatalogType} for the catalog conversion */
   String getCatalogType();
+
+  /** Initializes the ConversionSource with provided configuration */
+  void init(ExternalCatalogConfig catalogConfig, Configuration configuration);
 }

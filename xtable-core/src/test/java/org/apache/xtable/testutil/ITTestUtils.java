@@ -118,6 +118,10 @@ public class ITTestUtils {
     }
 
     @Override
+    public void init(
+        ExternalCatalogConfig catalogConfig, String tableFormat, Configuration configuration) {}
+
+    @Override
     public void close() throws Exception {
       trackFunctionCall();
     }
@@ -151,5 +155,8 @@ public class ITTestUtils {
     public String getCatalogType() {
       return TEST_CATALOG_TYPE;
     }
+
+    @Override
+    public void init(ExternalCatalogConfig catalogConfig, Configuration configuration) {}
   }
 }
