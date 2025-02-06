@@ -18,13 +18,16 @@
  
 package org.apache.xtable.hms;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.mockito.Mock;
@@ -32,7 +35,11 @@ import org.mockito.Mock;
 import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.ThreePartHierarchicalTableIdentifier;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.CatalogType;
 import org.apache.xtable.model.storage.TableFormat;
 
@@ -57,17 +64,80 @@ public class HMSCatalogSyncClientTestBase {
 
   protected static final String ICEBERG_METADATA_FILE_LOCATION = "base-path/metadata";
   protected static final String ICEBERG_METADATA_FILE_LOCATION_V2 = "base-path/v2-metadata";
+  protected static final InternalPartitionField PARTITION_FIELD =
+      InternalPartitionField.builder()
+          .sourceField(
+              InternalField.builder()
+                  .name("partitionField")
+                  .schema(
+                      InternalSchema.builder().name("string").dataType(InternalType.STRING).build())
+                  .build())
+          .transformType(PartitionTransformType.VALUE)
+          .build();
+  protected static final InternalSchema INTERNAL_SCHEMA =
+      InternalSchema.builder()
+          .dataType(InternalType.RECORD)
+          .fields(
+              Arrays.asList(
+                  getInternalField("intField", "int", InternalType.INT),
+                  getInternalField("stringField", "string", InternalType.STRING),
+                  getInternalField("partitionField", "string", InternalType.STRING)))
+          .build();
+  protected static final InternalSchema UPDATED_INTERNAL_SCHEMA =
+      InternalSchema.builder()
+          .dataType(InternalType.RECORD)
+          .fields(
+              Arrays.asList(
+                  getInternalField("intField", "int", InternalType.INT),
+                  getInternalField("stringField", "string", InternalType.STRING),
+                  getInternalField("partitionField", "string", InternalType.STRING),
+                  getInternalField("booleanField", "boolean", InternalType.BOOLEAN)))
+          .build();
+  protected static final List<FieldSchema> FIELD_SCHEMA =
+      Arrays.asList(
+          getFieldSchema("intField", "int"),
+          getFieldSchema("stringField", "string"),
+          getFieldSchema("partitionField", "string"));
+  protected static final List<FieldSchema> UPDATED_FIELD_SCHEMA =
+      Arrays.asList(
+          getFieldSchema("intField", "int"),
+          getFieldSchema("stringField", "string"),
+          getFieldSchema("partitionField", "string"),
+          getFieldSchema("booleanField", "boolean"));
   protected static final InternalTable TEST_ICEBERG_INTERNAL_TABLE =
       InternalTable.builder()
           .basePath(TEST_BASE_PATH)
           .tableFormat(TableFormat.ICEBERG)
-          .readSchema(InternalSchema.builder().fields(Collections.emptyList()).build())
+          .readSchema(INTERNAL_SCHEMA)
+          .partitioningFields(Collections.singletonList(PARTITION_FIELD))
+          .build();
+  protected static final InternalTable TEST_UPDATED_ICEBERG_INTERNAL_TABLE =
+      InternalTable.builder()
+          .basePath(TEST_BASE_PATH)
+          .tableFormat(TableFormat.ICEBERG)
+          .readSchema(UPDATED_INTERNAL_SCHEMA)
+          .partitioningFields(Collections.singletonList(PARTITION_FIELD))
+          .build();
+  protected static final InternalTable TEST_DELTA_INTERNAL_TABLE =
+      InternalTable.builder()
+          .basePath(TEST_BASE_PATH)
+          .tableFormat(TableFormat.DELTA)
+          .readSchema(INTERNAL_SCHEMA)
+          .partitioningFields(Collections.singletonList(PARTITION_FIELD))
+          .build();
+  protected static final InternalTable TEST_UPDATED_DELTA_INTERNAL_TABLE =
+      InternalTable.builder()
+          .basePath(TEST_BASE_PATH)
+          .tableFormat(TableFormat.DELTA)
+          .readSchema(UPDATED_INTERNAL_SCHEMA)
+          .partitioningFields(Collections.singletonList(PARTITION_FIELD))
           .build();
   protected static final InternalTable TEST_HUDI_INTERNAL_TABLE =
       InternalTable.builder()
           .basePath(TEST_BASE_PATH)
           .tableFormat(TableFormat.HUDI)
-          .readSchema(InternalSchema.builder().fields(Collections.emptyList()).build())
+          .readSchema(INTERNAL_SCHEMA)
+          .partitioningFields(Collections.singletonList(PARTITION_FIELD))
           .build();
   protected static final ThreePartHierarchicalTableIdentifier TEST_CATALOG_TABLE_IDENTIFIER =
       new ThreePartHierarchicalTableIdentifier(TEST_HMS_DATABASE, TEST_HMS_TABLE);
@@ -94,5 +164,17 @@ public class HMSCatalogSyncClientTestBase {
   protected Database newDatabase(String dbName) {
     return new Database(
         dbName, "Created by " + HMSCatalogSyncClient.class.getName(), null, Collections.emptyMap());
+  }
+
+  protected static FieldSchema getFieldSchema(String name, String type) {
+    return new FieldSchema(name, type, null);
+  }
+
+  protected static InternalField getInternalField(
+      String fieldName, String schemaName, InternalType dataType) {
+    return InternalField.builder()
+        .name(fieldName)
+        .schema(InternalSchema.builder().name(schemaName).dataType(dataType).build())
+        .build();
   }
 }
