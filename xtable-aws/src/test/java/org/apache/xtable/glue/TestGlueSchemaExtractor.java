@@ -25,19 +25,28 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import org.apache.xtable.catalog.TestSchemaExtractorBase;
 import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.TableFormat;
 
 import software.amazon.awssdk.services.glue.model.Column;
@@ -46,13 +55,58 @@ import software.amazon.awssdk.services.glue.model.Table;
 
 public class TestGlueSchemaExtractor extends TestSchemaExtractorBase {
 
-  private Column getCurrentGlueTableColumn(
+  private static final List<Column> testColumns =
+      Arrays.asList(
+          getColumn("id", "string"),
+          getColumn("firstName", "string"),
+          getColumn("gender", "string"),
+          getColumn("birthTs", "timestamp"),
+          getColumn("dateOfBirth", "int"));
+
+  private static final Map<String, Column> testColumnMap =
+      testColumns.stream().collect(Collectors.toMap(Column::name, c -> c));
+
+  private static final InternalPartitionField simplePartitionField =
+      InternalPartitionField.builder()
+          .sourceField(
+              InternalField.builder()
+                  .name("gender")
+                  .schema(
+                      InternalSchema.builder().name("string").dataType(InternalType.STRING).build())
+                  .build())
+          .transformType(PartitionTransformType.VALUE)
+          .build();
+
+  private static final InternalPartitionField complexPartitionField =
+      InternalPartitionField.builder()
+          .sourceField(
+              InternalField.builder()
+                  .name("birthTimestamp")
+                  .schema(
+                      InternalSchema.builder()
+                          .name("timestamp")
+                          .dataType(InternalType.TIMESTAMP)
+                          .build())
+                  .build())
+          .transformType(PartitionTransformType.DAY)
+          .partitionFieldNames(Collections.singletonList("dateOfBirth"))
+          .build();
+
+  private static Column getColumn(String name, String type) {
+    return Column.builder().name(name).type(type).build();
+  }
+
+  public static Column getColumn(String tableFormat, String name, String type) {
+    return getCurrentGlueTableColumn(tableFormat, name, type, null, false);
+  }
+
+  private static Column getCurrentGlueTableColumn(
       String tableFormat, String colName, String colType, Integer fieldId, boolean isNullable) {
     fieldId = fieldId != null ? fieldId : -1;
     return getCurrentGlueTableColumn(tableFormat, colName, colType, null, fieldId, isNullable);
   }
 
-  private Column getCurrentGlueTableColumn(
+  private static Column getCurrentGlueTableColumn(
       String tableFormat,
       String colName,
       String colType,
@@ -72,12 +126,17 @@ public class TestGlueSchemaExtractor extends TestSchemaExtractorBase {
         .build();
   }
 
-  private Column getPreviousGlueTableColumn(String tableFormat, String colName, String colType) {
+  private static Column getPreviousGlueTableColumn(
+      String tableFormat, String colName, String colType) {
     return Column.builder()
         .name(colName)
         .type(colType)
         .parameters(ImmutableMap.of(getColumnProperty(tableFormat, "field.current"), "false"))
         .build();
+  }
+
+  private static InternalTable getInternalTable(List<InternalPartitionField> partitionFields) {
+    return InternalTable.builder().partitioningFields(partitionFields).build();
   }
 
   @Test
@@ -682,5 +741,59 @@ public class TestGlueSchemaExtractor extends TestSchemaExtractorBase {
             Collections.emptyMap());
     column = getCurrentGlueTableColumn(tableFormat, "booleanField", "boolean", comment, 1, false);
     assertEquals(column, GlueSchemaExtractor.getInstance().toColumn(field, tableFormat));
+  }
+
+  static Stream<Arguments> getNonPartitionColumnsTestArgs() {
+    return Stream.of(
+        // table with no partition fields
+        Arguments.of(getInternalTable(Collections.emptyList()), testColumns),
+        // table with simple partition field
+        Arguments.of(
+            getInternalTable(Collections.singletonList(simplePartitionField)),
+            Arrays.asList(
+                testColumns.get(0), testColumns.get(1), testColumns.get(3), testColumns.get(4))),
+        // table with complex partition field
+        Arguments.of(
+            getInternalTable(Collections.singletonList(complexPartitionField)),
+            Arrays.asList(
+                testColumns.get(0), testColumns.get(1), testColumns.get(2), testColumns.get(3))),
+        // table with multiple partition field
+        Arguments.of(
+            getInternalTable(Arrays.asList(simplePartitionField, complexPartitionField)),
+            Arrays.asList(testColumns.get(0), testColumns.get(1), testColumns.get(3))));
+  }
+
+  @ParameterizedTest
+  @MethodSource("getNonPartitionColumnsTestArgs")
+  void testGetNonPartitionColumns(InternalTable table, List<Column> expected) {
+    List<Column> output =
+        GlueSchemaExtractor.getInstance().getNonPartitionColumns(table, testColumnMap);
+    assertEquals(new HashSet<>(expected), new HashSet<>(output));
+  }
+
+  static Stream<Arguments> getPartitionColumnsTestArgs() {
+    return Stream.of(
+        // table with no partition fields
+        Arguments.of(getInternalTable(Collections.emptyList()), Collections.emptyList()),
+        // table with simple partition field
+        Arguments.of(
+            getInternalTable(Collections.singletonList(simplePartitionField)),
+            Collections.singletonList(testColumns.get(2))),
+        // table with complex partition field
+        Arguments.of(
+            getInternalTable(Collections.singletonList(complexPartitionField)),
+            Collections.singletonList(testColumns.get(4))),
+        // table with multiple partition field
+        Arguments.of(
+            getInternalTable(Arrays.asList(simplePartitionField, complexPartitionField)),
+            Arrays.asList(testColumns.get(2), testColumns.get(4))));
+  }
+
+  @ParameterizedTest
+  @MethodSource("getPartitionColumnsTestArgs")
+  void testGetPartitionColumns(InternalTable table, List<Column> expected) {
+    List<Column> output =
+        GlueSchemaExtractor.getInstance().getPartitionColumns(table, testColumnMap);
+    assertEquals(new HashSet<>(expected), new HashSet<>(output));
   }
 }

@@ -18,10 +18,11 @@
  
 package org.apache.xtable.glue;
 
-import static org.apache.xtable.glue.GlueCatalogSyncClient.GLUE_EXTERNAL_TABLE_TYPE;
+import static org.apache.xtable.glue.TestGlueSchemaExtractor.getColumn;
 
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.Map;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.mockito.Mock;
@@ -29,11 +30,16 @@ import org.mockito.Mock;
 import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.ThreePartHierarchicalTableIdentifier;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.CatalogType;
 import org.apache.xtable.model.storage.TableFormat;
 
 import software.amazon.awssdk.services.glue.GlueClient;
+import software.amazon.awssdk.services.glue.model.Column;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.CreateTableRequest;
 import software.amazon.awssdk.services.glue.model.DatabaseInput;
@@ -60,17 +66,91 @@ public class GlueCatalogSyncTestBase {
   protected static final String TEST_CATALOG_NAME = "aws-glue-1";
   protected static final String ICEBERG_METADATA_FILE_LOCATION = "base-path/metadata";
   protected static final String ICEBERG_METADATA_FILE_LOCATION_v2 = "base-path/v2-metadata";
+  protected static final InternalPartitionField PARTITION_FIELD =
+      InternalPartitionField.builder()
+          .sourceField(
+              InternalField.builder()
+                  .name("partitionField")
+                  .schema(
+                      InternalSchema.builder().name("string").dataType(InternalType.STRING).build())
+                  .build())
+          .transformType(PartitionTransformType.VALUE)
+          .build();
+  protected static final InternalSchema INTERNAL_SCHEMA =
+      InternalSchema.builder()
+          .dataType(InternalType.RECORD)
+          .fields(
+              Arrays.asList(
+                  getInternalField("intField", "int", InternalType.INT),
+                  getInternalField("stringField", "string", InternalType.STRING),
+                  getInternalField("partitionField", "string", InternalType.STRING)))
+          .build();
+  protected static final InternalSchema UPDATED_INTERNAL_SCHEMA =
+      InternalSchema.builder()
+          .dataType(InternalType.RECORD)
+          .fields(
+              Arrays.asList(
+                  getInternalField("intField", "int", InternalType.INT),
+                  getInternalField("stringField", "string", InternalType.STRING),
+                  getInternalField("partitionField", "string", InternalType.STRING),
+                  getInternalField("booleanField", "boolean", InternalType.BOOLEAN)))
+          .build();
+  protected static final List<Column> PARTITION_KEYS =
+      Collections.singletonList(getColumn(TableFormat.DELTA, "partitionField", "string"));
+  protected static final List<Column> DELTA_GLUE_SCHEMA =
+      Arrays.asList(
+          getColumn(TableFormat.DELTA, "intField", "int"),
+          getColumn(TableFormat.DELTA, "stringField", "string"));
+  protected static final List<Column> UPDATED_DELTA_GLUE_SCHEMA =
+      Arrays.asList(
+          getColumn(TableFormat.DELTA, "booleanField", "boolean"),
+          getColumn(TableFormat.DELTA, "intField", "int"),
+          getColumn(TableFormat.DELTA, "stringField", "string"));
+  protected static final List<Column> ICEBERG_GLUE_SCHEMA =
+      Arrays.asList(
+          getColumn(TableFormat.ICEBERG, "intField", "int"),
+          getColumn(TableFormat.ICEBERG, "stringField", "string"),
+          getColumn(TableFormat.ICEBERG, "partitionField", "string"));
+  protected static final List<Column> UPDATED_ICEBERG_GLUE_SCHEMA =
+      Arrays.asList(
+          getColumn(TableFormat.ICEBERG, "intField", "int"),
+          getColumn(TableFormat.ICEBERG, "stringField", "string"),
+          getColumn(TableFormat.ICEBERG, "partitionField", "string"),
+          getColumn(TableFormat.ICEBERG, "booleanField", "boolean"));
   protected static final InternalTable TEST_ICEBERG_INTERNAL_TABLE =
       InternalTable.builder()
           .basePath(TEST_BASE_PATH)
           .tableFormat(TableFormat.ICEBERG)
-          .readSchema(InternalSchema.builder().fields(Collections.emptyList()).build())
+          .readSchema(INTERNAL_SCHEMA)
+          .partitioningFields(Collections.singletonList(PARTITION_FIELD))
+          .build();
+  protected static final InternalTable TEST_UPDATED_ICEBERG_INTERNAL_TABLE =
+      InternalTable.builder()
+          .basePath(TEST_BASE_PATH)
+          .tableFormat(TableFormat.ICEBERG)
+          .readSchema(UPDATED_INTERNAL_SCHEMA)
+          .partitioningFields(Collections.singletonList(PARTITION_FIELD))
           .build();
   protected static final InternalTable TEST_HUDI_INTERNAL_TABLE =
       InternalTable.builder()
           .basePath(TEST_BASE_PATH)
           .tableFormat(TableFormat.HUDI)
-          .readSchema(InternalSchema.builder().fields(Collections.emptyList()).build())
+          .readSchema(INTERNAL_SCHEMA)
+          .partitioningFields(Collections.singletonList(PARTITION_FIELD))
+          .build();
+  protected static final InternalTable TEST_DELTA_INTERNAL_TABLE =
+      InternalTable.builder()
+          .basePath(TEST_BASE_PATH)
+          .tableFormat(TableFormat.DELTA)
+          .readSchema(INTERNAL_SCHEMA)
+          .partitioningFields(Collections.singletonList(PARTITION_FIELD))
+          .build();
+  protected static final InternalTable TEST_UPDATED_DELTA_INTERNAL_TABLE =
+      InternalTable.builder()
+          .basePath(TEST_BASE_PATH)
+          .tableFormat(TableFormat.DELTA)
+          .readSchema(UPDATED_INTERNAL_SCHEMA)
+          .partitioningFields(Collections.singletonList(PARTITION_FIELD))
           .build();
   protected static final ThreePartHierarchicalTableIdentifier TEST_CATALOG_TABLE_IDENTIFIER =
       new ThreePartHierarchicalTableIdentifier(TEST_GLUE_DATABASE, TEST_GLUE_TABLE);
@@ -108,20 +188,6 @@ public class GlueCatalogSyncTestBase {
         .build();
   }
 
-  protected TableInput getCreateOrUpdateTableInput(
-      String tableName, Map<String, String> params, InternalTable internalTable) {
-    return TableInput.builder()
-        .name(tableName)
-        .tableType(GLUE_EXTERNAL_TABLE_TYPE)
-        .parameters(params)
-        .storageDescriptor(
-            StorageDescriptor.builder()
-                .location(internalTable.getBasePath())
-                .columns(Collections.emptyList())
-                .build())
-        .build();
-  }
-
   protected CreateTableRequest createTableRequest(String dbName, TableInput tableInput) {
     return CreateTableRequest.builder()
         .catalogId(TEST_GLUE_CATALOG_ID)
@@ -152,6 +218,14 @@ public class GlueCatalogSyncTestBase {
         .databaseName(dbName)
         .name(tableName)
         .storageDescriptor(StorageDescriptor.builder().location(location).build())
+        .build();
+  }
+
+  private static InternalField getInternalField(
+      String fieldName, String schemaName, InternalType dataType) {
+    return InternalField.builder()
+        .name(fieldName)
+        .schema(InternalSchema.builder().name(schemaName).dataType(dataType).build())
         .build();
   }
 }

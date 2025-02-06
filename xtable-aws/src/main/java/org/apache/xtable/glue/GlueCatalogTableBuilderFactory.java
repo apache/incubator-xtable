@@ -22,6 +22,7 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.apache.xtable.catalog.CatalogTableBuilder;
 import org.apache.xtable.exception.NotSupportedException;
+import org.apache.xtable.glue.table.DeltaGlueCatalogTableBuilder;
 import org.apache.xtable.glue.table.IcebergGlueCatalogTableBuilder;
 import org.apache.xtable.model.storage.TableFormat;
 
@@ -35,6 +36,8 @@ class GlueCatalogTableBuilderFactory {
     switch (tableFormat) {
       case TableFormat.ICEBERG:
         return new IcebergGlueCatalogTableBuilder(configuration);
+      case TableFormat.DELTA:
+        return new DeltaGlueCatalogTableBuilder();
       default:
         throw new NotSupportedException("Unsupported table format: " + tableFormat);
     }

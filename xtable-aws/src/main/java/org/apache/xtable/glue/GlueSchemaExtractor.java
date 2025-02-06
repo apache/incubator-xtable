@@ -18,6 +18,7 @@
  
 package org.apache.xtable.glue;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -39,6 +40,7 @@ import com.google.common.collect.Sets;
 
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.SchemaExtractorException;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 
@@ -230,5 +232,41 @@ public class GlueSchemaExtractor {
   @VisibleForTesting
   protected static String getColumnProperty(String tableFormat, String property) {
     return String.format("%s.%s", tableFormat.toLowerCase(Locale.ENGLISH), property);
+  }
+
+  public List<Column> getNonPartitionColumns(InternalTable table, Map<String, Column> columnsMap) {
+    List<String> partitionKeys = getPartitionKeys(table);
+    return columnsMap.values().stream()
+        .filter(c -> !partitionKeys.contains(c.name()))
+        .collect(Collectors.toList());
+  }
+
+  public List<Column> getPartitionColumns(InternalTable table, Map<String, Column> columnsMap) {
+    /**
+     * When converting delta schema to InternalSchema, generated columns are excluded: {@link
+     * org.apache.xtable.delta.DeltaSchemaExtractor#toInternalSchema}. In case of partition field
+     * being a generated column, it won't be present in columnsMap, so defaulting to string type
+     * until support is there
+     */
+    return getPartitionKeys(table).stream()
+        .map(
+            pKey ->
+                columnsMap.getOrDefault(pKey, Column.builder().name(pKey).type("string").build()))
+        .collect(Collectors.toList());
+  }
+
+  private List<String> getPartitionKeys(InternalTable table) {
+    List<String> partitionKeys = new ArrayList<>();
+    table
+        .getPartitioningFields()
+        .forEach(
+            field -> {
+              if (!field.getPartitionFieldNames().isEmpty()) {
+                partitionKeys.addAll(field.getPartitionFieldNames());
+              } else {
+                partitionKeys.add(field.getSourceField().getName());
+              }
+            });
+    return partitionKeys;
   }
 }
