@@ -194,8 +194,7 @@ public class HMSCatalogSyncClient implements CatalogSyncClient<Table> {
     } catch (MetaException | HiveException e) {
       throw new CatalogSyncException("HiveMetastoreClient could not be created", e);
     }
-    this.tableBuilder =
-        HMSCatalogTableBuilderFactory.getTableBuilder(tableFormat, this.configuration);
+    this.tableBuilder = HMSCatalogTableBuilderFactory.getInstance(tableFormat, this.configuration);
   }
 
   /**

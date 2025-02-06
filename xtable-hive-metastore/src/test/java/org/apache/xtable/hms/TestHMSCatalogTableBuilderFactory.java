@@ -18,6 +18,7 @@
  
 package org.apache.xtable.hms;
 
+import static org.apache.xtable.hms.HMSCatalogSyncClientTestBase.FIELD_SCHEMA;
 import static org.apache.xtable.hms.HMSCatalogSyncClientTestBase.TEST_CATALOG_TABLE_IDENTIFIER;
 import static org.apache.xtable.hms.HMSCatalogSyncClientTestBase.TEST_HMS_DATABASE;
 import static org.apache.xtable.hms.HMSCatalogSyncClientTestBase.TEST_HMS_TABLE;
@@ -48,7 +49,7 @@ public class TestHMSCatalogTableBuilderFactory {
       expected.setTableName(TEST_HMS_TABLE);
       expected.setOwner(UserGroupInformation.getCurrentUser().getShortUserName());
       expected.setCreateTime((int) createdTime.getEpochSecond());
-      expected.setSd(getTestHmsTableStorageDescriptor());
+      expected.setSd(getTestHmsTableStorageDescriptor(FIELD_SCHEMA));
       expected.setTableType("EXTERNAL_TABLE");
       expected.setParameters(getTestHmsTableParameters());
 
@@ -56,7 +57,7 @@ public class TestHMSCatalogTableBuilderFactory {
           expected,
           HMSCatalogTableBuilderFactory.newHmsTable(
               TEST_CATALOG_TABLE_IDENTIFIER,
-              getTestHmsTableStorageDescriptor(),
+              getTestHmsTableStorageDescriptor(FIELD_SCHEMA),
               getTestHmsTableParameters()));
     }
   }
