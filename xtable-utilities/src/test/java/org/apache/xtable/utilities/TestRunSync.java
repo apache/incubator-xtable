@@ -32,8 +32,21 @@ import org.junit.jupiter.api.Test;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
-
+import java.io.UncheckedIOException;
 class TestRunSync {
+
+  @Test
+  public void testMethod() {
+    int result = 2 + 2;
+    System.out.println("This is a print statement inside a JUnit test case.");
+    String[] args = new String[] {"--datasetConfig", "/Users/vaibhakumar/Desktop/opensource/incubator-xtable/my_config.yaml"};
+    try{RunSync.main(args);}
+    catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+
+    Assertions.assertEquals(4, result);
+  }
 
   /** Tests that the default hadoop configs are loaded. */
   @Test

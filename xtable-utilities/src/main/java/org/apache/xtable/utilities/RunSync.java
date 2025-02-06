@@ -98,6 +98,80 @@ public class RunSync {
                   + "used for any Iceberg source or target.")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
+  public static SourceTable sourceTableBuilder(
+      DatasetConfig.Table table,
+      IcebergCatalogConfig icebergCatalogConfig,
+      DatasetConfig datasetConfig,
+      Properties sourceProperties) {
+    SourceTable sourceTable =
+        SourceTable.builder()
+            .name(table.getTableName())
+            .basePath(table.getTableBasePath())
+            .namespace(table.getNamespace() == null ? null : table.getNamespace().split("\\."))
+            .dataPath(table.getTableDataPath())
+            .catalogConfig(icebergCatalogConfig)
+            .additionalProperties(sourceProperties)
+            .formatName(datasetConfig.sourceFormat)
+            .build();
+    return sourceTable;
+  }
+
+  public static List<TargetTable> targetTableBuilder(
+      DatasetConfig.Table table,
+      IcebergCatalogConfig icebergCatalogConfig,
+      List<String> tableFormatList) {
+    List<TargetTable> targetTables =
+        tableFormatList.stream()
+            .map(
+                tableFormat ->
+                    TargetTable.builder()
+                        .name(table.getTableName())
+                        .basePath(table.getTableBasePath())
+                        .namespace(
+                            table.getNamespace() == null ? null : table.getNamespace().split("\\."))
+                        .catalogConfig(icebergCatalogConfig)
+                        .formatName(tableFormat)
+                        .build())
+            .collect(Collectors.toList());
+    return targetTables;
+  }
+
+  public static void formatConvertor(
+      DatasetConfig datasetConfig,
+      List<String> tableFormatList,
+      IcebergCatalogConfig icebergCatalogConfig,
+      Configuration hadoopConf,
+      ConversionSourceProvider conversionSourceProvider) {
+    for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
+      log.info(
+          "Running sync for basePath {} for following table formats {}",
+          table.getTableBasePath(),
+          tableFormatList);
+      Properties sourceProperties = new Properties();
+      if (table.getPartitionSpec() != null) {
+        sourceProperties.put(
+            HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec());
+      }
+
+      ConversionController conversionController = new ConversionController(hadoopConf);
+      SourceTable sourceTable =
+          sourceTableBuilder(table, icebergCatalogConfig, datasetConfig, sourceProperties);
+      List<TargetTable> targetTables =
+          targetTableBuilder(table, icebergCatalogConfig, tableFormatList);
+      ConversionConfig conversionConfig =
+          ConversionConfig.builder()
+              .sourceTable(sourceTable)
+              .targetTables(targetTables)
+              .syncMode(SyncMode.INCREMENTAL)
+              .build();
+      try {
+        conversionController.sync(conversionConfig, conversionSourceProvider);
+      } catch (Exception e) {
+        log.error(String.format("Error running sync for %s", table.getTableBasePath()), e);
+      }
+    }
+  }
+
   public static void main(String[] args) throws IOException {
     CommandLineParser parser = new DefaultParser();
 
@@ -144,55 +218,8 @@ public class RunSync {
     conversionSourceProvider.init(hadoopConf);
 
     List<String> tableFormatList = datasetConfig.getTargetFormats();
-    ConversionController conversionController = new ConversionController(hadoopConf);
-    for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
-      log.info(
-          "Running sync for basePath {} for following table formats {}",
-          table.getTableBasePath(),
-          tableFormatList);
-      Properties sourceProperties = new Properties();
-      if (table.getPartitionSpec() != null) {
-        sourceProperties.put(
-            HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec());
-      }
-      SourceTable sourceTable =
-          SourceTable.builder()
-              .name(table.getTableName())
-              .basePath(table.getTableBasePath())
-              .namespace(table.getNamespace() == null ? null : table.getNamespace().split("\\."))
-              .dataPath(table.getTableDataPath())
-              .catalogConfig(icebergCatalogConfig)
-              .additionalProperties(sourceProperties)
-              .formatName(sourceFormat)
-              .build();
-      List<TargetTable> targetTables =
-          tableFormatList.stream()
-              .map(
-                  tableFormat ->
-                      TargetTable.builder()
-                          .name(table.getTableName())
-                          .basePath(table.getTableBasePath())
-                          .namespace(
-                              table.getNamespace() == null
-                                  ? null
-                                  : table.getNamespace().split("\\."))
-                          .catalogConfig(icebergCatalogConfig)
-                          .formatName(tableFormat)
-                          .build())
-              .collect(Collectors.toList());
-
-      ConversionConfig conversionConfig =
-          ConversionConfig.builder()
-              .sourceTable(sourceTable)
-              .targetTables(targetTables)
-              .syncMode(SyncMode.INCREMENTAL)
-              .build();
-      try {
-        conversionController.sync(conversionConfig, conversionSourceProvider);
-      } catch (Exception e) {
-        log.error("Error running sync for {}", table.getTableBasePath(), e);
-      }
-    }
+    formatConvertor(
+        datasetConfig, tableFormatList, icebergCatalogConfig, hadoopConf, conversionSourceProvider);
   }
 
   static byte[] getCustomConfigurations(CommandLine cmd, String option) throws IOException {
