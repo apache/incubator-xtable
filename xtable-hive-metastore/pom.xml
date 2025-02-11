@@ -42,6 +42,14 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Hudi dependencies -->
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-hive-sync</artifactId>
+            <version>${hudi.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Iceberg dependencies  -->
         <dependency>
             <groupId>org.apache.iceberg</groupId>

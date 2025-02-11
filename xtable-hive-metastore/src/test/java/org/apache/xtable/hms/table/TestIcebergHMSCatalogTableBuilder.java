@@ -52,11 +52,11 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.hadoop.HadoopTables;
 
-import org.apache.xtable.hms.HMSCatalogSyncClientTestBase;
+import org.apache.xtable.hms.HMSCatalogSyncTestBase;
 import org.apache.xtable.hms.HMSSchemaExtractor;
 
 @ExtendWith(MockitoExtension.class)
-public class TestIcebergHMSCatalogTableBuilder extends HMSCatalogSyncClientTestBase {
+public class TestIcebergHMSCatalogTableBuilder extends HMSCatalogSyncTestBase {
 
   @Mock private HadoopTables mockIcebergHadoopTables;
   @Mock private BaseTable mockIcebergBaseTable;

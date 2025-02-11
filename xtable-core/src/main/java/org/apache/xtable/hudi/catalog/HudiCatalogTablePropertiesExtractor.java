@@ -23,6 +23,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 import org.apache.spark.sql.types.StructType;
 
 import org.apache.hudi.common.util.StringUtils;
@@ -33,15 +36,22 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.schema.SparkSchemaExtractor;
 
 /** Util class to fetch details about Hudi table */
-public class HudiCatalogTableUtils {
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public class HudiCatalogTablePropertiesExtractor {
 
+  private static final HudiCatalogTablePropertiesExtractor INSTANCE =
+      new HudiCatalogTablePropertiesExtractor();
+
+  public static HudiCatalogTablePropertiesExtractor getInstance() {
+    return INSTANCE;
+  }
   /**
    * Get Spark Sql related table properties. This is used for spark datasource table.
    *
    * @param schema The schema to write to the table.
    * @return A new parameters added the spark's table properties.
    */
-  public static Map<String, String> getSparkTableProperties(
+  public Map<String, String> getSparkTableProperties(
       List<String> partitionNames,
       String sparkVersion,
       int schemaLengthThreshold,

@@ -38,11 +38,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import org.apache.xtable.hms.HMSCatalogSyncClientTestBase;
+import org.apache.xtable.hms.HMSCatalogSyncTestBase;
 import org.apache.xtable.model.storage.TableFormat;
 
 @ExtendWith(MockitoExtension.class)
-public class TestDeltaHMSCatalogTableBuilder extends HMSCatalogSyncClientTestBase {
+public class TestDeltaHMSCatalogTableBuilder extends HMSCatalogSyncTestBase {
 
   private DeltaHMSCatalogTableBuilder mockDeltaHmsCatalogSyncRequestProvider;
 

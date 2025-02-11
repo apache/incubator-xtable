@@ -18,10 +18,10 @@
  
 package org.apache.xtable.hms;
 
-import static org.apache.xtable.hms.HMSCatalogSyncClientTestBase.FIELD_SCHEMA;
-import static org.apache.xtable.hms.HMSCatalogSyncClientTestBase.TEST_CATALOG_TABLE_IDENTIFIER;
-import static org.apache.xtable.hms.HMSCatalogSyncClientTestBase.TEST_HMS_DATABASE;
-import static org.apache.xtable.hms.HMSCatalogSyncClientTestBase.TEST_HMS_TABLE;
+import static org.apache.xtable.hms.HMSCatalogSyncTestBase.FIELD_SCHEMA;
+import static org.apache.xtable.hms.HMSCatalogSyncTestBase.TEST_CATALOG_TABLE_IDENTIFIER;
+import static org.apache.xtable.hms.HMSCatalogSyncTestBase.TEST_HMS_DATABASE;
+import static org.apache.xtable.hms.HMSCatalogSyncTestBase.TEST_HMS_TABLE;
 import static org.apache.xtable.hms.table.TestIcebergHMSCatalogTableBuilder.getTestHmsTableParameters;
 import static org.apache.xtable.hms.table.TestIcebergHMSCatalogTableBuilder.getTestHmsTableStorageDescriptor;
 import static org.junit.jupiter.api.Assertions.assertEquals;

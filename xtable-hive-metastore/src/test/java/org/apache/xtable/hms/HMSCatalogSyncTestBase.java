@@ -43,7 +43,7 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.CatalogType;
 import org.apache.xtable.model.storage.TableFormat;
 
-public class HMSCatalogSyncClientTestBase {
+public class HMSCatalogSyncTestBase {
 
   @Mock protected IMetaStoreClient mockMetaStoreClient;
   @Mock protected HMSCatalogConfig mockHMSCatalogConfig;
@@ -139,6 +139,14 @@ public class HMSCatalogSyncClientTestBase {
           .readSchema(INTERNAL_SCHEMA)
           .partitioningFields(Collections.singletonList(PARTITION_FIELD))
           .build();
+  protected static final InternalTable TEST_EVOLVED_HUDI_INTERNAL_TABLE =
+      InternalTable.builder()
+          .basePath(TEST_BASE_PATH)
+          .tableFormat(TableFormat.HUDI)
+          .readSchema(UPDATED_INTERNAL_SCHEMA)
+          .partitioningFields(Collections.singletonList(PARTITION_FIELD))
+          .build();
+
   protected static final ThreePartHierarchicalTableIdentifier TEST_CATALOG_TABLE_IDENTIFIER =
       new ThreePartHierarchicalTableIdentifier(TEST_HMS_DATABASE, TEST_HMS_TABLE);
 

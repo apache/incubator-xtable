@@ -32,7 +32,7 @@ import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 
-public class TestHudiCatalogTableUtils {
+public class TestHudiCatalogTablePropertiesExtractor {
 
   @Test
   void testGetSparkTableProperties() {
@@ -81,8 +81,8 @@ public class TestHudiCatalogTableUtils {
             .build();
 
     Map<String, String> result =
-        HudiCatalogTableUtils.getSparkTableProperties(
-            partitionNames, sparkVersion, schemaLengthThreshold, schema);
+        HudiCatalogTablePropertiesExtractor.getInstance()
+            .getSparkTableProperties(partitionNames, sparkVersion, schemaLengthThreshold, schema);
 
     // Validate results
     assertEquals("hudi", result.get("spark.sql.sources.provider"));
@@ -127,8 +127,8 @@ public class TestHudiCatalogTableUtils {
 
     // Call the method
     Map<String, String> result =
-        HudiCatalogTableUtils.getSparkTableProperties(
-            partitionNames, "", schemaLengthThreshold, schema);
+        HudiCatalogTablePropertiesExtractor.getInstance()
+            .getSparkTableProperties(partitionNames, "", schemaLengthThreshold, schema);
 
     assertEquals("hudi", result.get("spark.sql.sources.provider"));
     assertNull(result.get("spark.sql.create.version"));
