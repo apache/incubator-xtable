@@ -26,6 +26,8 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 
+import org.apache.hudi.hive.MultiPartKeysValueExtractor;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -42,6 +44,15 @@ public class HMSCatalogConfig {
 
   @JsonProperty("externalCatalog.hms.serverUrl")
   private final String serverUrl;
+
+  @JsonProperty("externalCatalog.hms.schema_string_length_thresh")
+  private final int schemaLengthThreshold = 4000;
+
+  @JsonProperty("externalCatalog.hms.partition_extractor_class")
+  private final String partitionExtractorClass = MultiPartKeysValueExtractor.class.getName();
+
+  @JsonProperty("externalCatalog.hms.max_partitions_per_request")
+  private final int maxPartitionsPerRequest = 1000;
 
   protected static HMSCatalogConfig of(Map<String, String> properties) {
     try {

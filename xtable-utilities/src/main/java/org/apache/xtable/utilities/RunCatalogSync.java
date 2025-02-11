@@ -64,6 +64,7 @@ import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
 import org.apache.xtable.model.catalog.ThreePartHierarchicalTableIdentifier;
 import org.apache.xtable.model.storage.CatalogType;
+import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.reflection.ReflectionUtils;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
@@ -153,7 +154,9 @@ public class RunCatalogSync {
         TargetTable targetTable =
             TargetTable.builder()
                 .name(sourceTable.getName())
-                .basePath(sourceTable.getBasePath())
+                .basePath(
+                    getSourceTableLocation(
+                        targetCatalogTableIdentifier.getTableFormat(), sourceTable))
                 .namespace(sourceTable.getNamespace())
                 .formatName(targetCatalogTableIdentifier.getTableFormat())
                 .additionalProperties(sourceTable.getAdditionalProperties())
@@ -228,13 +231,23 @@ public class RunCatalogSync {
               .additionalProperties(sourceProperties)
               .build();
     } else if (catalogConversionSource.isPresent()) {
+      TableIdentifier tableIdentifier = sourceTableIdentifier.getTableIdentifier();
       sourceTable =
-          catalogConversionSource
-              .get()
-              .getSourceTable(
-                  getCatalogTableIdentifier(sourceTableIdentifier.getTableIdentifier()));
+          catalogConversionSource.get().getSourceTable(getCatalogTableIdentifier(tableIdentifier));
+      if (tableIdentifier.getPartitionSpec() != null) {
+        sourceTable
+            .getAdditionalProperties()
+            .put(HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, tableIdentifier.getPartitionSpec());
+      }
     }
     return sourceTable;
+  }
+
+  static String getSourceTableLocation(String targetTableFormat, SourceTable sourceTable) {
+    return sourceTable.getFormatName().equals(TableFormat.ICEBERG)
+            && targetTableFormat.equals(TableFormat.HUDI)
+        ? sourceTable.getDataPath()
+        : sourceTable.getBasePath();
   }
 
   static Map<String, ConversionSourceProvider> getConversionSourceProviders(
@@ -345,6 +358,8 @@ public class RunCatalogSync {
        * HierarchicalTableIdentifier}
        */
       String hierarchicalId;
+      /** Specifies the partition spec of the table */
+      String partitionSpec;
     }
 
     /**

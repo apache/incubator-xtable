@@ -33,6 +33,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.xtable.catalog.CatalogTableBuilder;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.hms.table.DeltaHMSCatalogTableBuilder;
+import org.apache.xtable.hms.table.HudiHMSCatalogTableBuilder;
 import org.apache.xtable.hms.table.IcebergHMSCatalogTableBuilder;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
@@ -40,13 +41,15 @@ import org.apache.xtable.model.storage.TableFormat;
 
 public class HMSCatalogTableBuilderFactory {
 
-  static CatalogTableBuilder<Table, Table> getInstance(
-      String tableFormat, Configuration configuration) {
+  public static CatalogTableBuilder<Table, Table> getTableBuilder(
+      String tableFormat, HMSCatalogConfig hmsCatalogConfig, Configuration configuration) {
     switch (tableFormat) {
       case TableFormat.ICEBERG:
         return new IcebergHMSCatalogTableBuilder(configuration);
       case TableFormat.DELTA:
         return new DeltaHMSCatalogTableBuilder();
+      case TableFormat.HUDI:
+        return new HudiHMSCatalogTableBuilder(hmsCatalogConfig, configuration);
       default:
         throw new NotSupportedException("Unsupported table format: " + tableFormat);
     }

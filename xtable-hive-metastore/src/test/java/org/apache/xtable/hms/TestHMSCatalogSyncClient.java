@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -37,6 +38,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.ServiceLoader;
 
 import lombok.SneakyThrows;
@@ -54,6 +56,7 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.apache.xtable.catalog.CatalogPartitionSyncTool;
 import org.apache.xtable.catalog.CatalogTableBuilder;
 import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.model.catalog.ThreePartHierarchicalTableIdentifier;
@@ -61,29 +64,29 @@ import org.apache.xtable.model.storage.CatalogType;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 @ExtendWith(MockitoExtension.class)
-public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
+public class TestHMSCatalogSyncClient extends HMSCatalogSyncTestBase {
 
   @Mock private CatalogTableBuilder<Table, Table> mockTableBuilder;
+  @Mock private CatalogPartitionSyncTool mockPartitionSyncTool;
   private HMSCatalogSyncClient hmsCatalogSyncClient;
 
-  private HMSCatalogSyncClient createHMSCatalogSyncClient() {
+  private HMSCatalogSyncClient createHMSCatalogSyncClient(boolean includePartitionSyncTool) {
+    Optional<CatalogPartitionSyncTool> partitionSyncToolOpt =
+        includePartitionSyncTool ? Optional.of(mockPartitionSyncTool) : Optional.empty();
     return new HMSCatalogSyncClient(
         TEST_CATALOG_CONFIG,
         mockHMSCatalogConfig,
         testConfiguration,
         mockMetaStoreClient,
-        mockTableBuilder);
-  }
-
-  void setupCommonMocks() {
-    hmsCatalogSyncClient = createHMSCatalogSyncClient();
+        mockTableBuilder,
+        partitionSyncToolOpt);
   }
 
   @SneakyThrows
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testHasDatabase(boolean isDbPresent) {
-    setupCommonMocks();
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(false);
     Database db = new Database(TEST_HMS_DATABASE, null, null, Collections.emptyMap());
     if (isDbPresent) {
       when(mockMetaStoreClient.getDatabase(TEST_HMS_DATABASE)).thenReturn(db);
@@ -103,7 +106,7 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
   @SneakyThrows
   @Test
   void testHasDatabaseFailure() {
-    setupCommonMocks();
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(false);
     when(mockMetaStoreClient.getDatabase(TEST_HMS_DATABASE))
         .thenThrow(new TException("something went wrong"));
     CatalogSyncException exception =
@@ -119,7 +122,7 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testGetTable(boolean isTablePresent) {
-    setupCommonMocks();
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(false);
     Table table = newTable(TEST_HMS_DATABASE, TEST_HMS_TABLE);
     if (isTablePresent) {
       when(mockMetaStoreClient.getTable(TEST_HMS_DATABASE, TEST_HMS_TABLE)).thenReturn(table);
@@ -139,7 +142,7 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
   @SneakyThrows
   @Test
   void testGetTableFailure() {
-    setupCommonMocks();
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(false);
     when(mockMetaStoreClient.getTable(TEST_HMS_DATABASE, TEST_HMS_TABLE))
         .thenThrow(new TException("something went wrong"));
     CatalogSyncException exception =
@@ -156,7 +159,7 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testCreateDatabase(boolean shouldFail) {
-    setupCommonMocks();
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(false);
     Database database = newDatabase(TEST_HMS_DATABASE);
     if (shouldFail) {
       Mockito.doThrow(new TException("something went wrong"))
@@ -179,7 +182,7 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testDropTable(boolean shouldFail) {
-    setupCommonMocks();
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(false);
     if (shouldFail) {
       Mockito.doThrow(new TException("something went wrong"))
           .when(mockMetaStoreClient)
@@ -200,9 +203,10 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
   }
 
   @SneakyThrows
-  @Test
-  void testCreateTable_Success() {
-    setupCommonMocks();
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testCreateTable_Success(boolean syncPartitions) {
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(syncPartitions);
     Table testTable = new Table();
     when(mockTableBuilder.getCreateTableRequest(
             TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER))
@@ -211,12 +215,20 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
     verify(mockMetaStoreClient, times(1)).createTable(testTable);
     verify(mockTableBuilder, times(1))
         .getCreateTableRequest(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+    if (syncPartitions) {
+      verify(mockPartitionSyncTool, times(1))
+          .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
+    } else {
+      verify(mockPartitionSyncTool, never())
+          .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
+    }
   }
 
   @SneakyThrows
-  @Test
-  void testCreateTable_ErrorGettingTableInput() {
-    setupCommonMocks();
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testCreateTable_ErrorGettingTableInput(boolean syncPartitions) {
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(syncPartitions);
 
     // error when getting iceberg table input
     doThrow(new RuntimeException("something went wrong"))
@@ -230,12 +242,15 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
     verify(mockTableBuilder, times(1))
         .getCreateTableRequest(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
     verify(mockMetaStoreClient, never()).createTable(any());
+    verify(mockPartitionSyncTool, never())
+        .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
   }
 
   @SneakyThrows
-  @Test
-  void testCreateTable_ErrorCreatingTable() {
-    setupCommonMocks();
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testCreateTable_ErrorCreatingTable(boolean syncPartitions) {
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(syncPartitions);
 
     // error when creating table
     Table testTable = new Table();
@@ -257,12 +272,15 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
     verify(mockTableBuilder, times(1))
         .getCreateTableRequest(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
     verify(mockMetaStoreClient, times(1)).createTable(testTable);
+    verify(mockPartitionSyncTool, never())
+        .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
   }
 
   @SneakyThrows
-  @Test
-  void testRefreshTable_Success() {
-    setupCommonMocks();
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testRefreshTable_Success(boolean syncPartitions) {
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(syncPartitions);
     Table origTable = new Table();
     Table updatedTable = new Table(origTable);
     updatedTable.putToParameters(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION_V2);
@@ -276,12 +294,20 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
     verify(mockTableBuilder, times(1))
         .getUpdateTableRequest(
             TEST_ICEBERG_INTERNAL_TABLE, origTable, TEST_CATALOG_TABLE_IDENTIFIER);
+    if (syncPartitions) {
+      verify(mockPartitionSyncTool, times(1))
+          .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
+    } else {
+      verify(mockPartitionSyncTool, never())
+          .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
+    }
   }
 
   @SneakyThrows
-  @Test
-  void testRefreshTable_ErrorGettingUpdatedTable() {
-    setupCommonMocks();
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testRefreshTable_ErrorGettingUpdatedTable(boolean syncPartitions) {
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(syncPartitions);
 
     // error when getting iceberg table input
     Table testTable = new Table();
@@ -298,12 +324,15 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
         .getUpdateTableRequest(
             TEST_ICEBERG_INTERNAL_TABLE, testTable, TEST_CATALOG_TABLE_IDENTIFIER);
     verify(mockMetaStoreClient, never()).alter_table(any(), any(), any());
+    verify(mockPartitionSyncTool, never())
+        .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
   }
 
   @SneakyThrows
-  @Test
-  void testRefreshTable_ErrorRefreshingTable() {
-    setupCommonMocks();
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testRefreshTable_ErrorRefreshingTable(boolean syncPartitions) {
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(syncPartitions);
 
     // error when creating table
     Table origTable = new Table();
@@ -329,12 +358,14 @@ public class TestHMSCatalogSyncClient extends HMSCatalogSyncClientTestBase {
             TEST_ICEBERG_INTERNAL_TABLE, origTable, TEST_CATALOG_TABLE_IDENTIFIER);
     verify(mockMetaStoreClient, times(1))
         .alter_table(TEST_HMS_DATABASE, TEST_HMS_TABLE, updatedTable);
+    verify(mockPartitionSyncTool, never())
+        .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
   }
 
   @SneakyThrows
   @Test
   void testCreateOrReplaceTable() {
-    setupCommonMocks();
+    hmsCatalogSyncClient = createHMSCatalogSyncClient(false);
 
     ZonedDateTime zonedDateTime =
         Instant.ofEpochMilli(System.currentTimeMillis()).atZone(ZoneId.systemDefault());
