@@ -63,6 +63,7 @@ import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.schema.SparkSchemaExtractor;
 import org.apache.xtable.spi.sync.ConversionTarget;
 
 public class DeltaConversionTarget implements ConversionTarget {
@@ -247,7 +248,7 @@ public class DeltaConversionTarget implements ConversionTarget {
 
     private void setLatestSchema(InternalSchema schema) {
       this.latestSchemaInternal = schema;
-      this.latestSchema = schemaExtractor.fromInternalSchema(schema);
+      this.latestSchema = SparkSchemaExtractor.getInstance().fromInternalSchema(schema);
     }
 
     private void commitTransaction() {

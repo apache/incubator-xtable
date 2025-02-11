@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.delta;
+package org.apache.xtable.schema;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -24,8 +24,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.Metadata;
-import org.apache.spark.sql.types.MetadataBuilder;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -34,15 +32,14 @@ import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 
-public class TestDeltaSchemaExtractor {
-
+public class TestSparkSchemaExtractor {
   @Test
   public void testPrimitiveTypes() {
     Map<InternalSchema.MetadataKey, Object> decimalMetadata = new HashMap<>();
     decimalMetadata.put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 10);
     decimalMetadata.put(InternalSchema.MetadataKey.DECIMAL_SCALE, 2);
 
-    InternalSchema internalSchema =
+    InternalSchema InternalSchemaRepresentation =
         InternalSchema.builder()
             .name("struct")
             .dataType(InternalType.RECORD)
@@ -56,7 +53,6 @@ public class TestDeltaSchemaExtractor {
                                 .name("boolean")
                                 .dataType(InternalType.BOOLEAN)
                                 .isNullable(false)
-                                .comment("requiredBooleanComment")
                                 .build())
                         .build(),
                     InternalField.builder()
@@ -227,7 +223,7 @@ public class TestDeltaSchemaExtractor {
 
     StructType structRepresentation =
         new StructType()
-            .add("requiredBoolean", DataTypes.BooleanType, false, "requiredBooleanComment")
+            .add("requiredBoolean", DataTypes.BooleanType, false)
             .add("optionalBoolean", DataTypes.BooleanType, true)
             .add("requiredInt", DataTypes.IntegerType, false)
             .add("optionalInt", DataTypes.IntegerType, true)
@@ -247,12 +243,41 @@ public class TestDeltaSchemaExtractor {
             .add("optionalDecimal", DataTypes.createDecimalType(10, 2), true);
 
     Assertions.assertEquals(
-        internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+        structRepresentation,
+        SparkSchemaExtractor.getInstance().fromInternalSchema(InternalSchemaRepresentation));
   }
 
   @Test
   public void testFixedBytes() {
-    InternalSchema internalSchemaAfterRoundTrip =
+    InternalSchema InternalSchemaRepresentationOriginal =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("requiredFixed")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("fixed")
+                                .dataType(InternalType.FIXED)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("optionalFixed")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("fixed")
+                                .dataType(InternalType.FIXED)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    InternalSchema InternalSchemaRepresentationAfterRoundTrip =
         InternalSchema.builder()
             .name("struct")
             .dataType(InternalType.RECORD)
@@ -266,7 +291,6 @@ public class TestDeltaSchemaExtractor {
                                 .name("binary")
                                 .dataType(InternalType.BYTES)
                                 .isNullable(false)
-                                .comment("comment")
                                 .build())
                         .build(),
                     InternalField.builder()
@@ -282,12 +306,13 @@ public class TestDeltaSchemaExtractor {
             .build();
     StructType structRepresentation =
         new StructType()
-            .add("requiredFixed", DataTypes.BinaryType, false, "comment")
+            .add("requiredFixed", DataTypes.BinaryType, false)
             .add("optionalFixed", DataTypes.BinaryType, true);
 
     Assertions.assertEquals(
-        internalSchemaAfterRoundTrip,
-        DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+        structRepresentation,
+        SparkSchemaExtractor.getInstance()
+            .fromInternalSchema(InternalSchemaRepresentationOriginal));
   }
 
   @Test
@@ -295,7 +320,7 @@ public class TestDeltaSchemaExtractor {
     Map<InternalSchema.MetadataKey, Object> metadata =
         Collections.singletonMap(
             InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
-    InternalSchema internalSchemaTimestamp =
+    InternalSchema InternalSchemaRepresentationTimestamp =
         InternalSchema.builder()
             .name("struct")
             .dataType(InternalType.RECORD)
@@ -325,14 +350,100 @@ public class TestDeltaSchemaExtractor {
                         .build()))
             .build();
 
+    InternalSchema InternalSchemaRepresentationTimestampNtz =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("requiredTimestampNtz")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("timestampNtz")
+                                .dataType(InternalType.TIMESTAMP_NTZ)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("optionalTimestampNtz")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("timestampNtz")
+                                .dataType(InternalType.TIMESTAMP_NTZ)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
     StructType structRepresentationTimestamp =
         new StructType()
             .add("requiredTimestamp", DataTypes.TimestampType, false)
             .add("optionalTimestamp", DataTypes.TimestampType, true);
 
+    StructType structRepresentationTimestampNtz =
+        new StructType()
+            .add("requiredTimestampNtz", DataTypes.LongType, false)
+            .add("optionalTimestampNtz", DataTypes.LongType, true);
+
     Assertions.assertEquals(
-        internalSchemaTimestamp,
-        DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentationTimestamp));
+        structRepresentationTimestamp,
+        SparkSchemaExtractor.getInstance()
+            .fromInternalSchema(InternalSchemaRepresentationTimestamp));
+    Assertions.assertEquals(
+        structRepresentationTimestampNtz,
+        SparkSchemaExtractor.getInstance()
+            .fromInternalSchema(InternalSchemaRepresentationTimestampNtz));
+  }
+
+  @Test
+  public void testEnums() {
+    Map<InternalSchema.MetadataKey, Object> requiredEnumMetadata = new HashMap<>();
+    requiredEnumMetadata.put(InternalSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
+    Map<InternalSchema.MetadataKey, Object> optionalEnumMetadata = new HashMap<>();
+    optionalEnumMetadata.put(
+        InternalSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));
+
+    InternalSchema InternalSchemaRepresentation =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("requiredEnum")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("REQUIRED_ENUM")
+                                .dataType(InternalType.ENUM)
+                                .isNullable(false)
+                                .metadata(requiredEnumMetadata)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("optionalEnum")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("OPTIONAL_ENUM")
+                                .dataType(InternalType.ENUM)
+                                .isNullable(true)
+                                .metadata(optionalEnumMetadata)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    StructType structRepresentation =
+        new StructType()
+            .add("requiredEnum", DataTypes.StringType, false)
+            .add("optionalEnum", DataTypes.StringType, true);
+
+    Assertions.assertEquals(
+        structRepresentation,
+        SparkSchemaExtractor.getInstance().fromInternalSchema(InternalSchemaRepresentation));
   }
 
   @Test
@@ -366,7 +477,7 @@ public class TestDeltaSchemaExtractor {
                         .build()))
             .dataType(InternalType.RECORD)
             .build();
-    InternalSchema internalSchema =
+    InternalSchema InternalSchemaRepresentation =
         InternalSchema.builder()
             .name("struct")
             .dataType(InternalType.RECORD)
@@ -446,7 +557,8 @@ public class TestDeltaSchemaExtractor {
             .add("recordMap", DataTypes.createMapType(DataTypes.IntegerType, mapElement, true));
 
     Assertions.assertEquals(
-        internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+        structRepresentation,
+        SparkSchemaExtractor.getInstance().fromInternalSchema(InternalSchemaRepresentation));
   }
 
   @Test
@@ -480,7 +592,7 @@ public class TestDeltaSchemaExtractor {
                         .build()))
             .dataType(InternalType.RECORD)
             .build();
-    InternalSchema internalSchema =
+    InternalSchema InternalSchemaRepresentation =
         InternalSchema.builder()
             .name("struct")
             .dataType(InternalType.RECORD)
@@ -536,12 +648,13 @@ public class TestDeltaSchemaExtractor {
             .add("recordList", DataTypes.createArrayType(elementSchema, true), true);
 
     Assertions.assertEquals(
-        internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+        structRepresentation,
+        SparkSchemaExtractor.getInstance().fromInternalSchema(InternalSchemaRepresentation));
   }
 
   @Test
   public void testNestedRecords() {
-    InternalSchema internalSchema =
+    InternalSchema InternalSchemaRepresentation =
         InternalSchema.builder()
             .name("struct")
             .dataType(InternalType.RECORD)
@@ -556,7 +669,6 @@ public class TestDeltaSchemaExtractor {
                                 .name("struct")
                                 .dataType(InternalType.RECORD)
                                 .isNullable(true)
-                                .comment("comment")
                                 .fields(
                                     Arrays.asList(
                                         InternalField.builder()
@@ -567,7 +679,6 @@ public class TestDeltaSchemaExtractor {
                                                     .name("integer")
                                                     .dataType(InternalType.INT)
                                                     .isNullable(true)
-                                                    .comment("nestedOptionalIntComment")
                                                     .build())
                                             .defaultValue(
                                                 InternalField.Constants.NULL_DEFAULT_VALUE)
@@ -617,198 +728,15 @@ public class TestDeltaSchemaExtractor {
             .add(
                 "nestedOne",
                 new StructType()
-                    .add(
-                        "nestedOptionalInt",
-                        DataTypes.IntegerType,
-                        true,
-                        "nestedOptionalIntComment")
+                    .add("nestedOptionalInt", DataTypes.IntegerType, true)
                     .add("nestedRequiredDouble", DataTypes.DoubleType, false)
                     .add(
                         "nestedTwo",
                         new StructType().add("doublyNestedString", DataTypes.StringType, true),
                         false),
-                true,
-                "comment");
+                true);
     Assertions.assertEquals(
-        internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
-  }
-
-  @Test
-  public void testFieldIdsInDeltaSchema() {
-    StructType structRepresentation =
-        new StructType()
-            .add(
-                "nestedOne",
-                new StructType()
-                    .add(
-                        "nestedOptionalInt",
-                        DataTypes.IntegerType,
-                        true,
-                        Metadata.fromJson("{\"delta.columnMapping.id\": 3}"))
-                    .add(
-                        "nestedRequiredDouble",
-                        DataTypes.DoubleType,
-                        false,
-                        Metadata.fromJson("{\"delta.columnMapping.id\": 5}"))
-                    .add(
-                        "nestedTwo",
-                        new StructType()
-                            .add(
-                                "doublyNestedString",
-                                DataTypes.StringType,
-                                true,
-                                Metadata.fromJson("{\"delta.columnMapping.id\": 12}")),
-                        false,
-                        Metadata.fromJson("{\"delta.columnMapping.id\": 10}")),
-                true,
-                Metadata.fromJson("{\"delta.columnMapping.id\": 2}"));
-
-    InternalSchema internalSchema =
-        InternalSchema.builder()
-            .name("struct")
-            .dataType(InternalType.RECORD)
-            .isNullable(false)
-            .fields(
-                Collections.singletonList(
-                    InternalField.builder()
-                        .name("nestedOne")
-                        .fieldId(2)
-                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                        .schema(
-                            InternalSchema.builder()
-                                .name("struct")
-                                .dataType(InternalType.RECORD)
-                                .isNullable(true)
-                                .fields(
-                                    Arrays.asList(
-                                        InternalField.builder()
-                                            .name("nestedOptionalInt")
-                                            .fieldId(3)
-                                            .parentPath("nestedOne")
-                                            .schema(
-                                                InternalSchema.builder()
-                                                    .name("integer")
-                                                    .dataType(InternalType.INT)
-                                                    .isNullable(true)
-                                                    .build())
-                                            .defaultValue(
-                                                InternalField.Constants.NULL_DEFAULT_VALUE)
-                                            .build(),
-                                        InternalField.builder()
-                                            .name("nestedRequiredDouble")
-                                            .fieldId(5)
-                                            .parentPath("nestedOne")
-                                            .schema(
-                                                InternalSchema.builder()
-                                                    .name("double")
-                                                    .dataType(InternalType.DOUBLE)
-                                                    .isNullable(false)
-                                                    .build())
-                                            .build(),
-                                        InternalField.builder()
-                                            .name("nestedTwo")
-                                            .fieldId(10)
-                                            .parentPath("nestedOne")
-                                            .schema(
-                                                InternalSchema.builder()
-                                                    .name("struct")
-                                                    .dataType(InternalType.RECORD)
-                                                    .isNullable(false)
-                                                    .fields(
-                                                        Collections.singletonList(
-                                                            InternalField.builder()
-                                                                .name("doublyNestedString")
-                                                                .fieldId(12)
-                                                                .parentPath("nestedOne.nestedTwo")
-                                                                .schema(
-                                                                    InternalSchema.builder()
-                                                                        .name("string")
-                                                                        .dataType(
-                                                                            InternalType.STRING)
-                                                                        .isNullable(true)
-                                                                        .build())
-                                                                .defaultValue(
-                                                                    InternalField.Constants
-                                                                        .NULL_DEFAULT_VALUE)
-                                                                .build()))
-                                                    .build())
-                                            .build()))
-                                .build())
-                        .build()))
-            .build();
-    Assertions.assertEquals(
-        internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
-  }
-
-  @Test
-  void generateColumnsAreNotTranslatedToInternalSchema() {
-    StructType structRepresentation =
-        new StructType()
-            .add("birthDate", DataTypes.TimestampType, false)
-            .add(
-                "birthYear",
-                DataTypes.TimestampType,
-                true,
-                Metadata.fromJson("{\"delta.generationExpression\":\"YEAR(birthDate)\"}"));
-    InternalSchema internalSchema =
-        InternalSchema.builder()
-            .dataType(InternalType.RECORD)
-            .name("struct")
-            .fields(
-                Collections.singletonList(
-                    InternalField.builder()
-                        .schema(
-                            InternalSchema.builder()
-                                .name("timestamp")
-                                .dataType(InternalType.TIMESTAMP)
-                                .metadata(
-                                    Collections.singletonMap(
-                                        InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
-                                        InternalSchema.MetadataValue.MICROS))
-                                .build())
-                        .name("birthDate")
-                        .build()))
-            .build();
-    Assertions.assertEquals(
-        internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
-  }
-
-  @Test
-  public void testIcebergToDeltaUUIDSupport() {
-    Metadata metadata =
-        new MetadataBuilder().putString(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid").build();
-    StructType structRepresentation =
-        new StructType()
-            .add("requiredUUID", DataTypes.BinaryType, false, metadata)
-            .add("optionalUUID", DataTypes.BinaryType, true, metadata);
-    InternalSchema internalSchema =
-        InternalSchema.builder()
-            .name("struct")
-            .dataType(InternalType.RECORD)
-            .isNullable(false)
-            .fields(
-                Arrays.asList(
-                    InternalField.builder()
-                        .name("requiredUUID")
-                        .schema(
-                            InternalSchema.builder()
-                                .name("binary")
-                                .dataType(InternalType.UUID)
-                                .isNullable(false)
-                                .build())
-                        .build(),
-                    InternalField.builder()
-                        .name("optionalUUID")
-                        .schema(
-                            InternalSchema.builder()
-                                .name("binary")
-                                .dataType(InternalType.UUID)
-                                .isNullable(true)
-                                .build())
-                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                        .build()))
-            .build();
-    Assertions.assertEquals(
-        internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+        structRepresentation,
+        SparkSchemaExtractor.getInstance().fromInternalSchema(InternalSchemaRepresentation));
   }
 }
