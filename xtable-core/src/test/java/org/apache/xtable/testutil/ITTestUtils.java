@@ -21,6 +21,7 @@ package org.apache.xtable.testutil;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
@@ -148,6 +149,7 @@ public class ITTestUtils {
           .name("source_table_name")
           .basePath("file://base_path/v1/")
           .formatName("ICEBERG")
+          .additionalProperties(new Properties())
           .build();
     }
 
