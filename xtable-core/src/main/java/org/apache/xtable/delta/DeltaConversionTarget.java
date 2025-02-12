@@ -66,9 +66,9 @@ import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.ConversionTarget;
 
 public class DeltaConversionTarget implements ConversionTarget {
-  private static final String MIN_READER_VERSION = String.valueOf(1);
+  private static final String MIN_READER_VERSION = String.valueOf(3);
   // gets access to generated columns.
-  private static final String MIN_WRITER_VERSION = String.valueOf(4);
+  private static final String MIN_WRITER_VERSION = String.valueOf(7);
 
   private DeltaLog deltaLog;
   private DeltaSchemaExtractor schemaExtractor;

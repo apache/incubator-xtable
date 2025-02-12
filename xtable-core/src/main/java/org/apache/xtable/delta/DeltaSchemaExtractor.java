@@ -61,6 +61,11 @@ public class DeltaSchemaExtractor {
   private static final String DELTA_COLUMN_MAPPING_ID = "delta.columnMapping.id";
   private static final String COMMENT = "comment";
   private static final DeltaSchemaExtractor INSTANCE = new DeltaSchemaExtractor();
+  // Timestamps in Delta are microsecond precision by default
+  private static final Map<InternalSchema.MetadataKey, Object>
+      DEFAULT_TIMESTAMP_PRECISION_METADATA =
+          Collections.singletonMap(
+              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
 
   public static DeltaSchemaExtractor getInstance() {
     return INSTANCE;
@@ -88,7 +93,6 @@ public class DeltaSchemaExtractor {
       case INT:
         return DataTypes.IntegerType;
       case LONG:
-      case TIMESTAMP_NTZ:
         return DataTypes.LongType;
       case BYTES:
       case FIXED:
@@ -102,6 +106,8 @@ public class DeltaSchemaExtractor {
         return DataTypes.DateType;
       case TIMESTAMP:
         return DataTypes.TimestampType;
+      case TIMESTAMP_NTZ:
+        return DataTypes.TimestampNTZType;
       case DOUBLE:
         return DataTypes.DoubleType;
       case DECIMAL:
@@ -206,11 +212,11 @@ public class DeltaSchemaExtractor {
         break;
       case "timestamp":
         type = InternalType.TIMESTAMP;
-        // Timestamps in Delta are microsecond precision by default
-        metadata =
-            Collections.singletonMap(
-                InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
-                InternalSchema.MetadataValue.MICROS);
+        metadata = DEFAULT_TIMESTAMP_PRECISION_METADATA;
+        break;
+      case "timestamp_ntz":
+        type = InternalType.TIMESTAMP_NTZ;
+        metadata = DEFAULT_TIMESTAMP_PRECISION_METADATA;
         break;
       case "struct":
         StructType structType = (StructType) dataType;
