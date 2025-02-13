@@ -126,7 +126,7 @@ public class ITIcebergConversionSource {
               .build();
       validateTable(
           internalTable,
-          testIcebergTable.getBasePath(),
+          testIcebergTable.getTableName(),
           TableFormat.ICEBERG,
           internalSchema,
           DataLayoutStrategy.FLAT,
