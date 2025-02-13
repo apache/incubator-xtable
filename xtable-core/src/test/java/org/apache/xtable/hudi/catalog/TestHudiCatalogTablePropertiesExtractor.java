@@ -18,27 +18,39 @@
  
 package org.apache.xtable.hudi.catalog;
 
+import static org.apache.xtable.hudi.catalog.HudiCatalogTablePropertiesExtractor.HUDI_METADATA_CONFIG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import org.apache.hudi.common.util.ConfigUtils;
+
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.storage.TableFormat;
 
 public class TestHudiCatalogTablePropertiesExtractor {
 
   @Test
   void testGetSparkTableProperties() {
 
-    List<String> partitionNames = Arrays.asList("region", "category");
-    String sparkVersion = "3.2.1";
+    InternalPartitionField p1 =
+        InternalPartitionField.builder()
+            .sourceField(InternalField.builder().name("region").build())
+            .build();
+    InternalPartitionField p2 =
+        InternalPartitionField.builder()
+            .sourceField(InternalField.builder().name("category").build())
+            .build();
     int schemaLengthThreshold = 1000;
     InternalSchema schema =
         InternalSchema.builder()
@@ -80,13 +92,20 @@ public class TestHudiCatalogTablePropertiesExtractor {
             .name("testSchema")
             .build();
 
+    InternalTable table =
+        InternalTable.builder()
+            .name("test-table")
+            .tableFormat(TableFormat.HUDI)
+            .readSchema(schema)
+            .partitioningFields(Arrays.asList(p1, p2))
+            .build();
+
     Map<String, String> result =
         HudiCatalogTablePropertiesExtractor.getInstance()
-            .getSparkTableProperties(partitionNames, sparkVersion, schemaLengthThreshold, schema);
+            .getTableProperties(table, schemaLengthThreshold);
 
     // Validate results
     assertEquals("hudi", result.get("spark.sql.sources.provider"));
-    assertEquals("3.2.1", result.get("spark.sql.create.version"));
     assertEquals("1", result.get("spark.sql.sources.schema.numParts"));
     assertEquals(
         "{\"type\":\"struct\",\"fields\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false,\"metadata\":{}},{\"name\":\"name\",\"type\":\"string\",\"nullable\":false,\"metadata\":{}},{\"name\":\"region\",\"type\":\"string\",\"nullable\":false,\"metadata\":{}},{\"name\":\"category\",\"type\":\"string\",\"nullable\":false,\"metadata\":{}}]}",
@@ -94,12 +113,12 @@ public class TestHudiCatalogTablePropertiesExtractor {
     assertEquals("2", result.get("spark.sql.sources.schema.numPartCols"));
     assertEquals("region", result.get("spark.sql.sources.schema.partCol.0"));
     assertEquals("category", result.get("spark.sql.sources.schema.partCol.1"));
+    assertEquals("true", result.get(HUDI_METADATA_CONFIG));
   }
 
   @Test
   void testGetSparkTablePropertiesEmptyPartitions() {
     // Setup input data with no partitions
-    List<String> partitionNames = Collections.emptyList();
     int schemaLengthThreshold = 50;
     InternalSchema schema =
         InternalSchema.builder()
@@ -125,10 +144,17 @@ public class TestHudiCatalogTablePropertiesExtractor {
             .name("testSchema")
             .build();
 
+    InternalTable table =
+        InternalTable.builder()
+            .name("test-table")
+            .tableFormat(TableFormat.HUDI)
+            .readSchema(schema)
+            .partitioningFields(Collections.emptyList())
+            .build();
     // Call the method
     Map<String, String> result =
         HudiCatalogTablePropertiesExtractor.getInstance()
-            .getSparkTableProperties(partitionNames, "", schemaLengthThreshold, schema);
+            .getTableProperties(table, schemaLengthThreshold);
 
     assertEquals("hudi", result.get("spark.sql.sources.provider"));
     assertNull(result.get("spark.sql.create.version"));
@@ -140,5 +166,17 @@ public class TestHudiCatalogTablePropertiesExtractor {
             + result.get("spark.sql.sources.schema.part.2")
             + result.get("spark.sql.sources.schema.part.3"));
     assertNull(result.get("spark.sql.sources.schema.numPartCols"));
+    assertEquals("true", result.get(HUDI_METADATA_CONFIG));
+  }
+
+  @Test
+  void testGetSerdeProperties() {
+    String basePath = "/test/base/path";
+    Map<String, String> serdeProperties =
+        HudiCatalogTablePropertiesExtractor.getInstance().getSerdeProperties(basePath);
+
+    assertNotNull(serdeProperties);
+    assertEquals(basePath, serdeProperties.get(ConfigUtils.TABLE_SERDE_PATH));
+    assertEquals("false", serdeProperties.get(ConfigUtils.IS_QUERY_AS_RO_TABLE));
   }
 }

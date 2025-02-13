@@ -143,7 +143,7 @@ public class GlueSchemaExtractor {
    * @param fieldSchema InternalTable field schema
    * @return glue column type
    */
-  protected String toTypeString(InternalSchema fieldSchema, String tableFormat) {
+  public String toTypeString(InternalSchema fieldSchema, String tableFormat) {
     switch (fieldSchema.getDataType()) {
       case BOOLEAN:
         return "boolean";
