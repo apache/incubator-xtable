@@ -22,7 +22,6 @@ import static org.apache.xtable.catalog.CatalogUtils.toHierarchicalTableIdentifi
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,7 +38,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import org.apache.hudi.common.model.HoodieFileFormat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.common.util.ConfigUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -54,7 +52,6 @@ import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
 import org.apache.xtable.model.schema.InternalPartitionField;
-import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.TableFormat;
 
 @Log4j2
@@ -122,7 +119,9 @@ public class HudiHMSCatalogTableBuilder implements CatalogTableBuilder<Table, Ta
     }
 
     newTb.setCreateTime((int) Instant.now().toEpochMilli());
-    Map<String, String> tableProperties = getTableProperties(table, table.getReadSchema());
+    Map<String, String> tableProperties =
+        tablePropertiesExtractor.getTableProperties(
+            table, hmsCatalogConfig.getSchemaLengthThreshold());
     newTb.setParameters(tableProperties);
     newTb.setSd(getStorageDescriptor(table));
     newTb.setPartitionKeys(getSchemaPartitionKeys(table));
@@ -134,27 +133,15 @@ public class HudiHMSCatalogTableBuilder implements CatalogTableBuilder<Table, Ta
       InternalTable table, Table hmsTable, CatalogTableIdentifier tableIdentifier) {
     Map<String, String> parameters = hmsTable.getParameters();
     Map<String, String> tableParameters = hmsTable.getParameters();
-    tableParameters.putAll(getTableProperties(table, table.getReadSchema()));
+    tableParameters.putAll(
+        tablePropertiesExtractor.getTableProperties(
+            table, hmsCatalogConfig.getSchemaLengthThreshold()));
     hmsTable.setParameters(tableParameters);
     hmsTable.setSd(getStorageDescriptor(table));
 
     hmsTable.setParameters(parameters);
     hmsTable.getSd().setCols(schemaExtractor.toColumns(TableFormat.HUDI, table.getReadSchema()));
     return hmsTable;
-  }
-
-  private Map<String, String> getTableProperties(InternalTable table, InternalSchema schema) {
-    List<String> partitionFields =
-        table.getPartitioningFields().stream()
-            .map(field -> field.getSourceField().getName())
-            .collect(Collectors.toList());
-    Map<String, String> tableProperties = new HashMap<>();
-    tableProperties.put(HUDI_METADATA_CONFIG, "true");
-    Map<String, String> sparkTableProperties =
-        tablePropertiesExtractor.getSparkTableProperties(
-            partitionFields, "", hmsCatalogConfig.getSchemaLengthThreshold(), schema);
-    tableProperties.putAll(sparkTableProperties);
-    return tableProperties;
   }
 
   private StorageDescriptor getStorageDescriptor(InternalTable table) {
@@ -168,19 +155,13 @@ public class HudiHMSCatalogTableBuilder implements CatalogTableBuilder<Table, Ta
     String serdeClassName = HudiInputFormatUtils.getSerDeClassName(fileFormat);
     storageDescriptor.setInputFormat(inputFormatClassName);
     storageDescriptor.setOutputFormat(outputFormatClassName);
-    Map<String, String> serdeProperties = getSerdeProperties(table.getBasePath());
+    Map<String, String> serdeProperties =
+        tablePropertiesExtractor.getSerdeProperties(table.getBasePath());
     SerDeInfo serDeInfo = new SerDeInfo();
     serDeInfo.setSerializationLib(serdeClassName);
     serDeInfo.setParameters(serdeProperties);
     storageDescriptor.setSerdeInfo(serDeInfo);
     return storageDescriptor;
-  }
-
-  private static Map<String, String> getSerdeProperties(String basePath) {
-    Map<String, String> serdeProperties = new HashMap<>();
-    serdeProperties.put(ConfigUtils.TABLE_SERDE_PATH, basePath);
-    serdeProperties.put(ConfigUtils.IS_QUERY_AS_RO_TABLE, String.valueOf(false));
-    return serdeProperties;
   }
 
   private List<FieldSchema> getSchemaPartitionKeys(InternalTable table) {

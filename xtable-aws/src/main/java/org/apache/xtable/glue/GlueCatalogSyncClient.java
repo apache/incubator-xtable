@@ -21,6 +21,7 @@ package org.apache.xtable.glue;
 import static org.apache.xtable.catalog.CatalogUtils.toHierarchicalTableIdentifier;
 
 import java.time.ZonedDateTime;
+import java.util.Optional;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -28,7 +29,9 @@ import org.apache.hadoop.conf.Configuration;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import org.apache.xtable.catalog.CatalogPartitionSyncTool;
 import org.apache.xtable.catalog.CatalogTableBuilder;
+import org.apache.xtable.catalog.CatalogUtils;
 import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.model.InternalTable;
@@ -45,8 +48,6 @@ import software.amazon.awssdk.services.glue.model.DatabaseInput;
 import software.amazon.awssdk.services.glue.model.DeleteTableRequest;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
 import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
-import software.amazon.awssdk.services.glue.model.GetTableRequest;
-import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.TableInput;
 import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
@@ -63,6 +64,7 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
   private GlueCatalogConfig glueCatalogConfig;
   private Configuration configuration;
   private CatalogTableBuilder<TableInput, Table> tableBuilder;
+  private Optional<CatalogPartitionSyncTool> partitionSyncTool;
 
   // For loading the instance using ServiceLoader
   public GlueCatalogSyncClient() {}
@@ -78,12 +80,14 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
       Configuration configuration,
       GlueCatalogConfig glueCatalogConfig,
       GlueClient glueClient,
-      CatalogTableBuilder tableBuilder) {
+      CatalogTableBuilder tableBuilder,
+      Optional<CatalogPartitionSyncTool> partitionSyncTool) {
     this.catalogConfig = catalogConfig;
     this.configuration = new Configuration(configuration);
     this.glueCatalogConfig = glueCatalogConfig;
     this.glueClient = glueClient;
     this.tableBuilder = tableBuilder;
+    this.partitionSyncTool = partitionSyncTool;
   }
 
   @Override
@@ -143,20 +147,13 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
 
   @Override
   public Table getTable(CatalogTableIdentifier tableIdentifier) {
-    HierarchicalTableIdentifier tblIdentifier = toHierarchicalTableIdentifier(tableIdentifier);
     try {
-      GetTableResponse response =
-          glueClient.getTable(
-              GetTableRequest.builder()
-                  .catalogId(glueCatalogConfig.getCatalogId())
-                  .databaseName(tblIdentifier.getDatabaseName())
-                  .name(tblIdentifier.getTableName())
-                  .build());
-      return response.table();
+      return GlueCatalogTableUtils.getTable(
+          glueClient, glueCatalogConfig.getCatalogId(), tableIdentifier);
     } catch (EntityNotFoundException e) {
       return null;
     } catch (Exception e) {
-      throw new CatalogSyncException("Failed to get table: " + tblIdentifier.getId(), e);
+      throw new CatalogSyncException("Failed to get table: " + tableIdentifier.getId(), e);
     }
   }
 
@@ -174,6 +171,8 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
     } catch (Exception e) {
       throw new CatalogSyncException("Failed to create table: " + tblIdentifier.getId(), e);
     }
+
+    partitionSyncTool.ifPresent(tool -> tool.syncPartitions(table, tableIdentifier));
   }
 
   @Override
@@ -193,6 +192,8 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
     } catch (Exception e) {
       throw new CatalogSyncException("Failed to refresh table: " + tblIdentifier.getId(), e);
     }
+
+    partitionSyncTool.ifPresent(tool -> tool.syncPartitions(table, tableIdentifier));
   }
 
   @Override
@@ -230,7 +231,16 @@ public class GlueCatalogSyncClient implements CatalogSyncClient<Table> {
     this.glueCatalogConfig = GlueCatalogConfig.of(catalogConfig.getCatalogProperties());
     this.glueClient = new DefaultGlueClientFactory(glueCatalogConfig).getGlueClient();
     this.configuration = new Configuration(configuration);
-    this.tableBuilder = GlueCatalogTableBuilderFactory.getInstance(tableFormat, this.configuration);
+    this.tableBuilder =
+        GlueCatalogTableBuilderFactory.getInstance(
+            tableFormat, glueCatalogConfig, this.configuration);
+    this.partitionSyncTool =
+        CatalogUtils.getPartitionSyncTool(
+            tableFormat,
+            glueCatalogConfig.getPartitionExtractorClass(),
+            new GlueCatalogPartitionSyncOperations(glueClient, glueCatalogConfig),
+            configuration);
+    ;
   }
 
   @Override

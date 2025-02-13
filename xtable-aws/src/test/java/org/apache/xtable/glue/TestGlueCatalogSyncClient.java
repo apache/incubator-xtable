@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -34,6 +35,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.ZonedDateTime;
 import java.util.Collections;
+import java.util.Optional;
 import java.util.ServiceLoader;
 
 import org.junit.jupiter.api.Test;
@@ -44,8 +46,10 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.apache.xtable.catalog.CatalogPartitionSyncTool;
 import org.apache.xtable.catalog.CatalogTableBuilder;
 import org.apache.xtable.exception.CatalogSyncException;
+import org.apache.xtable.hudi.catalog.HudiCatalogPartitionSyncTool;
 import org.apache.xtable.model.catalog.ThreePartHierarchicalTableIdentifier;
 import org.apache.xtable.model.storage.CatalogType;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
@@ -71,15 +75,22 @@ import software.amazon.awssdk.services.glue.model.UpdateTableResponse;
 public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
 
   @Mock private CatalogTableBuilder<TableInput, Table> mockTableBuilder;
+  @Mock private HudiCatalogPartitionSyncTool mockPartitionSyncTool;
   private GlueCatalogSyncClient glueCatalogSyncClient;
 
-  private GlueCatalogSyncClient createGlueCatalogSyncClient() {
+  private GlueCatalogSyncClient createGlueCatalogSyncClient(boolean includePartitionSyncTool) {
+    Optional<CatalogPartitionSyncTool> partitionSyncToolOpt =
+        includePartitionSyncTool ? Optional.of(mockPartitionSyncTool) : Optional.empty();
     return new GlueCatalogSyncClient(
-        catalogConfig, testConfiguration, mockGlueCatalogConfig, mockGlueClient, mockTableBuilder);
+        catalogConfig,
+        testConfiguration,
+        mockGlueCatalogConfig,
+        mockGlueClient,
+        mockTableBuilder,
+        partitionSyncToolOpt);
   }
 
   void setupCommonMocks() {
-    glueCatalogSyncClient = createGlueCatalogSyncClient();
     when(mockGlueCatalogConfig.getCatalogId()).thenReturn(TEST_GLUE_CATALOG_ID);
   }
 
@@ -87,6 +98,7 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
   @ValueSource(booleans = {true, false})
   void testHasDatabase(boolean isDbPresent) {
     setupCommonMocks();
+    glueCatalogSyncClient = createGlueCatalogSyncClient(false);
     GetDatabaseRequest dbRequest = getDbRequest(TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName());
     GetDatabaseResponse dbResponse =
         GetDatabaseResponse.builder()
@@ -111,6 +123,7 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
   @Test
   void testHasDatabaseFailure() {
     setupCommonMocks();
+    glueCatalogSyncClient = createGlueCatalogSyncClient(false);
     GetDatabaseRequest dbRequest = getDbRequest(TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName());
     when(mockGlueClient.getDatabase(dbRequest)).thenThrow(TEST_GLUE_EXCEPTION);
     CatalogSyncException exception =
@@ -126,6 +139,7 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
   @ValueSource(booleans = {true, false})
   void testGetTable(boolean isTablePresent) {
     setupCommonMocks();
+    glueCatalogSyncClient = createGlueCatalogSyncClient(false);
     GetTableRequest tableRequest =
         getTableRequest(
             TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(),
@@ -158,6 +172,7 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
   @Test
   void testGetTableFailure() {
     setupCommonMocks();
+    glueCatalogSyncClient = createGlueCatalogSyncClient(false);
     GetTableRequest tableRequest =
         getTableRequest(
             TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(),
@@ -177,6 +192,7 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
   @ValueSource(booleans = {false, true})
   void testCreateDatabase(boolean shouldFail) {
     setupCommonMocks();
+    glueCatalogSyncClient = createGlueCatalogSyncClient(false);
     CreateDatabaseRequest dbRequest =
         createDbRequest(TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName());
     if (shouldFail) {
@@ -200,6 +216,7 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
   @ValueSource(booleans = {false, true})
   void testDropTable(boolean shouldFail) {
     setupCommonMocks();
+    glueCatalogSyncClient = createGlueCatalogSyncClient(false);
     DeleteTableRequest deleteRequest =
         deleteTableRequest(
             TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(),
@@ -223,9 +240,11 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
     verify(mockGlueClient, times(1)).deleteTable(deleteRequest);
   }
 
-  @Test
-  void testCreateTable_Success() {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testCreateTable_Success(boolean syncPartitions) {
     setupCommonMocks();
+    glueCatalogSyncClient = createGlueCatalogSyncClient(syncPartitions);
     CreateTableRequest createTableRequest =
         createTableRequest(TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(), TEST_TABLE_INPUT);
     when(mockTableBuilder.getCreateTableRequest(
@@ -237,12 +256,19 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
     verify(mockGlueClient, times(1)).createTable(createTableRequest);
     verify(mockTableBuilder, times(1))
         .getCreateTableRequest(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
+    if (syncPartitions) {
+      verify(mockPartitionSyncTool, times(1))
+          .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
+    } else {
+      verify(mockPartitionSyncTool, never())
+          .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
+    }
   }
 
-  @Test
-  void testCreateTable_ErrorGettingTableInput() {
-    glueCatalogSyncClient = createGlueCatalogSyncClient();
-
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testCreateTable_ErrorGettingTableInput(boolean syncPartitions) {
+    glueCatalogSyncClient = createGlueCatalogSyncClient(syncPartitions);
     // error when getting iceberg table input
     doThrow(new RuntimeException("something went wrong"))
         .when(mockTableBuilder)
@@ -255,12 +281,15 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
     verify(mockTableBuilder, times(1))
         .getCreateTableRequest(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
     verify(mockGlueClient, never()).createTable(any(CreateTableRequest.class));
+    verify(mockPartitionSyncTool, never())
+        .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
   }
 
-  @Test
-  void testCreateTable_ErrorCreatingTable() {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testCreateTable_ErrorCreatingTable(boolean syncPartitions) {
     setupCommonMocks();
-
+    glueCatalogSyncClient = createGlueCatalogSyncClient(syncPartitions);
     // error when creating table
     CreateTableRequest createTableRequest =
         createTableRequest(TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(), TEST_TABLE_INPUT);
@@ -280,11 +309,15 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
     verify(mockTableBuilder, times(1))
         .getCreateTableRequest(TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
     verify(mockGlueClient, times(1)).createTable(createTableRequest);
+    verify(mockPartitionSyncTool, never())
+        .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
   }
 
-  @Test
-  void testRefreshTable_Success() {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testRefreshTable_Success(boolean syncPartitions) {
     setupCommonMocks();
+    glueCatalogSyncClient = createGlueCatalogSyncClient(syncPartitions);
     UpdateTableRequest updateTableRequest =
         updateTableRequest(TEST_CATALOG_TABLE_IDENTIFIER.getDatabaseName(), TEST_TABLE_INPUT);
     Table glueTable = Table.builder().parameters(Collections.emptyMap()).build();
@@ -299,11 +332,19 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
     verify(mockTableBuilder, times(1))
         .getUpdateTableRequest(
             TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
+    if (syncPartitions) {
+      verify(mockPartitionSyncTool, times(1))
+          .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
+    } else {
+      verify(mockPartitionSyncTool, never())
+          .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
+    }
   }
 
-  @Test
-  void testRefreshTable_ErrorCreatingTableInput() {
-    glueCatalogSyncClient = createGlueCatalogSyncClient();
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testRefreshTable_ErrorCreatingTableInput(boolean syncPartitions) {
+    glueCatalogSyncClient = createGlueCatalogSyncClient(syncPartitions);
     Table glueTable = Table.builder().parameters(Collections.emptyMap()).build();
 
     // error while refreshing table
@@ -320,11 +361,15 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
         .getUpdateTableRequest(
             TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
     verify(mockGlueClient, never()).updateTable(any(UpdateTableRequest.class));
+    verify(mockPartitionSyncTool, never())
+        .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
   }
 
-  @Test
-  void testRefreshTable_ErrorRefreshingTable() {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testRefreshTable_ErrorRefreshingTable(boolean syncPartitions) {
     setupCommonMocks();
+    glueCatalogSyncClient = createGlueCatalogSyncClient(syncPartitions);
     Table glueTable = Table.builder().parameters(Collections.emptyMap()).build();
 
     UpdateTableRequest updateTableRequest =
@@ -348,12 +393,14 @@ public class TestGlueCatalogSyncClient extends GlueCatalogSyncTestBase {
         .getUpdateTableRequest(
             TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
     verify(mockGlueClient, times(1)).updateTable(updateTableRequest);
+    verify(mockPartitionSyncTool, never())
+        .syncPartitions(eq(TEST_ICEBERG_INTERNAL_TABLE), eq(TEST_CATALOG_TABLE_IDENTIFIER));
   }
 
   @Test
   void testCreateOrReplaceTable() {
     setupCommonMocks();
-
+    glueCatalogSyncClient = createGlueCatalogSyncClient(false);
     ZonedDateTime fixedDateTime = ZonedDateTime.parse("2024-10-25T10:15:30.00Z");
     try (MockedStatic<ZonedDateTime> mockZonedDateTime = mockStatic(ZonedDateTime.class)) {
       mockZonedDateTime.when(ZonedDateTime::now).thenReturn(fixedDateTime);
