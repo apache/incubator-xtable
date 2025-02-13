@@ -15,19 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 package org.apache.xtable.iceberg;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
+import com.google.common.util.concurrent.MoreExecutors;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
+import org.apache.iceberg.ExpireSnapshots;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
@@ -39,6 +42,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NotFoundException;
 
+import org.apache.iceberg.util.ThreadPools;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
@@ -51,6 +55,10 @@ import org.apache.xtable.spi.sync.ConversionTarget;
 
 @Log4j2
 public class IcebergConversionTarget implements ConversionTarget {
+
+  private static final ExecutorService DEFAULT_DELETE_EXECUTOR_SERVICE =
+      MoreExecutors.newDirectExecutorService();
+
   private static final String METADATA_DIR_PATH = "/metadata/";
   private IcebergSchemaExtractor schemaExtractor;
   private IcebergSchemaSync schemaSync;
@@ -66,8 +74,10 @@ public class IcebergConversionTarget implements ConversionTarget {
   private Transaction transaction;
   private Table table;
   private InternalTable internalTableState;
+  private boolean useInternalMetadataCleaner;
 
-  public IcebergConversionTarget() {}
+  private final ExecutorService deleteExecutorService = DEFAULT_DELETE_EXECUTOR_SERVICE;
+  private final ExecutorService planExecutorService = ThreadPools.getWorkerPool();
 
   IcebergConversionTarget(
       TargetTable targetTable,
@@ -107,6 +117,7 @@ public class IcebergConversionTarget implements ConversionTarget {
     this.basePath = targetTable.getBasePath();
     this.configuration = configuration;
     this.snapshotRetentionInHours = (int) targetTable.getMetadataRetention().toHours();
+    this.useInternalMetadataCleaner = targetTable.isUseInternalMetadataCleaner();
     String[] namespace = targetTable.getNamespace();
     this.tableIdentifier =
         namespace == null
@@ -211,17 +222,33 @@ public class IcebergConversionTarget implements ConversionTarget {
 
   @Override
   public void completeSync() {
-    transaction
-        .expireSnapshots()
-        .expireOlderThan(
-            Instant.now().minus(snapshotRetentionInHours, ChronoUnit.HOURS).toEpochMilli())
-        .deleteWith(this::safeDelete) // ensures that only metadata files are deleted
-        .cleanExpiredFiles(true)
-        .commit();
+    boolean useInternalIcebergCleaner = useInternalCleaner();
+    ExpireSnapshots expireSnapshots =
+        transaction
+            .expireSnapshots()
+            .expireOlderThan(
+                Instant.now().minus(snapshotRetentionInHours, ChronoUnit.HOURS).toEpochMilli())
+            .cleanExpiredFiles(!useInternalIcebergCleaner); // is internal cleaner is enabled, disable iceberg cleaner
+    List<Snapshot> removedSnapshots = expireSnapshots.apply();
+    expireSnapshots.commit();
     transaction.commitTransaction();
+    // after commit is complete, clean up the manifest files
+    if (useInternalIcebergCleaner) {
+      cleanExpiredSnapshots(removedSnapshots);
+    }
     transaction = null;
     internalTableState = null;
   }
+
+  private boolean useInternalCleaner() {
+    return useInternalMetadataCleaner && table.refs().size() == 1;
+  }
+
+  private void cleanExpiredSnapshots(List<Snapshot> removedSnapshots) {
+    IcebergMetadataCleanupStrategy cleanupStrategy = new IcebergMetadataFileCleaner(transaction.table().io(), deleteExecutorService, planExecutorService, this::safeDelete);
+    cleanupStrategy.cleanFiles(table, removedSnapshots);
+  }
+
 
   private void safeDelete(String file) {
     if (file.startsWith(new Path(basePath) + METADATA_DIR_PATH)) {
