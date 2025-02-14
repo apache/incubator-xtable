@@ -63,6 +63,10 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.storage.HoodieStorage;
+import org.apache.hudi.storage.StorageConfiguration;
+import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
+import org.apache.hudi.storage.hadoop.HoodieHadoopStorage;
 
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestJavaHudiTable;
@@ -81,7 +85,7 @@ public class TestHudiFileStatsExtractor {
   private static final Schema NESTED_SCHEMA =
       AVRO_SCHEMA.getField("nested_record").schema().getTypes().get(1);
 
-  private final Configuration configuration = new Configuration();
+  private final StorageConfiguration<?> configuration = new HadoopStorageConfiguration(false);
   private final InternalField nestedIntBase = getNestedIntBase();
   private final InternalSchema nestedSchema = getNestedSchema(nestedIntBase, "nested_record");
   private final InternalField longField = getLongField();
@@ -132,9 +136,12 @@ public class TestHudiFileStatsExtractor {
       table.insertRecords(true, records);
       basePath = table.getBasePath();
     }
+    HoodieStorage hoodieStorage =
+        new HoodieHadoopStorage(basePath, new HadoopStorageConfiguration(false));
     HoodieTableMetadata tableMetadata =
         HoodieTableMetadata.create(
             new HoodieJavaEngineContext(configuration),
+            hoodieStorage,
             HoodieMetadataConfig.newBuilder().enable(true).build(),
             basePath,
             true);
@@ -170,7 +177,7 @@ public class TestHudiFileStatsExtractor {
     try (ParquetWriter<GenericRecord> writer =
         AvroParquetWriter.<GenericRecord>builder(
                 HadoopOutputFile.fromPath(
-                    new org.apache.hadoop.fs.Path(file.toUri()), configuration))
+                    new org.apache.hadoop.fs.Path(file.toUri()), new Configuration(false)))
             .withSchema(AVRO_SCHEMA)
             .withDataModel(genericData)
             .build()) {
@@ -190,7 +197,9 @@ public class TestHudiFileStatsExtractor {
             .build();
 
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
-    when(mockMetaClient.getHadoopConf()).thenReturn(configuration);
+    HoodieStorage hoodieStorage =
+        new HoodieHadoopStorage(file.toString(), new HadoopStorageConfiguration(false));
+    when(mockMetaClient.getStorage()).thenReturn(hoodieStorage);
     HudiFileStatsExtractor fileStatsExtractor = new HudiFileStatsExtractor(mockMetaClient);
     List<InternalDataFile> output =
         fileStatsExtractor

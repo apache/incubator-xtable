@@ -57,6 +57,7 @@ import org.apache.hudi.common.table.view.FileSystemViewStorageType;
 import org.apache.hudi.common.table.view.SyncableFileSystemView;
 import org.apache.hudi.common.table.view.TableFileSystemView;
 import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.storage.StoragePath;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.NotSupportedException;
@@ -79,26 +80,26 @@ public class HudiDataFileExtractor implements AutoCloseable {
   private final HudiFileStatsExtractor fileStatsExtractor;
   private final HoodieMetadataConfig metadataConfig;
   private final FileSystemViewManager fileSystemViewManager;
-  private final Path basePath;
+  private final StoragePath basePath;
 
   public HudiDataFileExtractor(
       HoodieTableMetaClient metaClient,
       HudiPartitionValuesExtractor hudiPartitionValuesExtractor,
       HudiFileStatsExtractor hudiFileStatsExtractor) {
-    this.engineContext = new HoodieLocalEngineContext(metaClient.getHadoopConf());
+    this.engineContext = new HoodieLocalEngineContext(metaClient.getStorageConf());
     metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(metaClient.getTableConfig().isMetadataTableAvailable())
             .build();
     this.basePath = metaClient.getBasePathV2();
     this.tableMetadata =
-        metadataConfig.enabled()
-            ? HoodieTableMetadata.create(engineContext, metadataConfig, basePath.toString(), true)
+        metadataConfig.isEnabled()
+            ? HoodieTableMetadata.create(
+                engineContext, metaClient.getStorage(), metadataConfig, basePath.toString(), true)
             : null;
     this.fileSystemViewManager =
         FileSystemViewManager.createViewManager(
             engineContext,
-            metadataConfig,
             FileSystemViewStorageConfig.newBuilder()
                 .withStorageType(FileSystemViewStorageType.MEMORY)
                 .build(),
@@ -114,7 +115,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
       List<String> allPartitionPaths =
           tableMetadata != null
               ? tableMetadata.getAllPartitionPaths()
-              : FSUtils.getAllPartitionPaths(engineContext, metadataConfig, basePath.toString());
+              : FSUtils.getAllPartitionPaths(
+                  engineContext, metaClient.getStorage(), metadataConfig, basePath.toString());
       return getInternalDataFilesForPartitions(allPartitionPaths, table);
     } catch (IOException ex) {
       throw new ReadException(
@@ -402,9 +404,9 @@ public class HudiDataFileExtractor implements AutoCloseable {
         .recordCount(rowCount)
         .columnStats(Collections.emptyList())
         .lastModified(
-            hoodieBaseFile.getFileStatus() == null
+            hoodieBaseFile.getPathInfo() == null
                 ? 0L
-                : hoodieBaseFile.getFileStatus().getModificationTime())
+                : hoodieBaseFile.getPathInfo().getModificationTime())
         .build();
   }
 

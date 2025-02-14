@@ -527,7 +527,7 @@ public class ITConversionController {
                 HUDI,
                 Arrays.asList(ICEBERG, DELTA),
                 "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
+                "timestamp_micros_nullable_field:DAY:yyyy-MM-dd,level:VALUE",
                 timestampAndLevelFilter)));
   }
 

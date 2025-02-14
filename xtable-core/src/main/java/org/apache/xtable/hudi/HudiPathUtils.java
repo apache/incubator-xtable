@@ -18,10 +18,10 @@
  
 package org.apache.xtable.hudi;
 
-import org.apache.hadoop.fs.Path;
+import org.apache.hudi.storage.StoragePath;
 
 public class HudiPathUtils {
-  public static String getPartitionPath(Path tableBasePath, Path filePath) {
+  public static String getPartitionPath(StoragePath tableBasePath, StoragePath filePath) {
     String fileName = filePath.getName();
     String pathStr = filePath.toUri().getPath();
     int startIndex = tableBasePath.toUri().getPath().length() + 1;

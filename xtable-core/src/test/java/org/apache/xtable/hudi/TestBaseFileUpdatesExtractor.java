@@ -49,7 +49,8 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
-import org.apache.hudi.hadoop.CachingPath;
+import org.apache.hudi.storage.StoragePath;
+import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
 
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -72,7 +73,7 @@ public class TestBaseFileUpdatesExtractor {
   private static final long RECORD_COUNT = 200L;
   private static final long LAST_MODIFIED = System.currentTimeMillis();
   private static final HoodieEngineContext CONTEXT =
-      new HoodieJavaEngineContext(new Configuration());
+      new HoodieJavaEngineContext(new HadoopStorageConfiguration(new Configuration(false)));
   private static final InternalPartitionField PARTITION_FIELD =
       InternalPartitionField.builder()
           .sourceField(
@@ -126,7 +127,7 @@ public class TestBaseFileUpdatesExtractor {
             .build();
 
     BaseFileUpdatesExtractor extractor =
-        BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
+        BaseFileUpdatesExtractor.of(CONTEXT, new StoragePath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         extractor.convertDiff(diff, COMMIT_TIME);
 
@@ -155,7 +156,7 @@ public class TestBaseFileUpdatesExtractor {
             .setTableName("test_table")
             .setPayloadClass(HoodieAvroPayload.class)
             .setPartitionFields("partition_field")
-            .initTable(new Configuration(), tableBasePath);
+            .initTable(CONTEXT.getStorageConf(), tableBasePath);
 
     String partitionPath1 = "partition1";
     String fileName1 = "file1.parquet";
@@ -177,7 +178,7 @@ public class TestBaseFileUpdatesExtractor {
             String.format("%s/%s/%s", tableBasePath, partitionPath2, fileName3), getColumnStats());
 
     BaseFileUpdatesExtractor extractor =
-        BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
+        BaseFileUpdatesExtractor.of(CONTEXT, new StoragePath(tableBasePath));
 
     List<PartitionFileGroup> partitionedDataFiles =
         Arrays.asList(
@@ -291,7 +292,7 @@ public class TestBaseFileUpdatesExtractor {
                             .build()))
                 .build());
     BaseFileUpdatesExtractor extractor =
-        BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
+        BaseFileUpdatesExtractor.of(CONTEXT, new StoragePath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         extractor.extractSnapshotChanges(partitionedDataFiles, metaClient, COMMIT_TIME);
 
@@ -362,7 +363,7 @@ public class TestBaseFileUpdatesExtractor {
                 .partitionValues(Collections.emptyList())
                 .build());
     BaseFileUpdatesExtractor extractor =
-        BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
+        BaseFileUpdatesExtractor.of(CONTEXT, new StoragePath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
         extractor.extractSnapshotChanges(partitionedDataFiles, metaClient, COMMIT_TIME);
 

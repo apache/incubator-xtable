@@ -57,6 +57,8 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.index.HoodieIndex;
+import org.apache.hudi.storage.StorageConfiguration;
+import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
 
 import org.apache.xtable.hudi.idtracking.IdTracker;
 
@@ -66,6 +68,8 @@ public class TestAddFieldIdsClientInitCallback {
   private final IdTracker mockIdTracker = mock(IdTracker.class);
   private final AddFieldIdsClientInitCallback callback =
       new AddFieldIdsClientInitCallback(mockIdTracker);
+  private final StorageConfiguration<?> storageConfiguration =
+      new HadoopStorageConfiguration(new Configuration(false));
 
   @Test
   void nullSchemasIsNoOp() {
@@ -81,7 +85,7 @@ public class TestAddFieldIdsClientInitCallback {
     Schema inputSchema = getSchemaStub(1);
     Schema updatedSchema = getSchemaStub(3);
 
-    HoodieEngineContext localEngineContext = new HoodieLocalEngineContext(new Configuration());
+    HoodieEngineContext localEngineContext = new HoodieLocalEngineContext(storageConfiguration);
     HoodieWriteConfig config =
         HoodieWriteConfig.newBuilder()
             .withSchema(inputSchema.toString())
@@ -105,7 +109,7 @@ public class TestAddFieldIdsClientInitCallback {
     Schema inputSchema = getSchemaStub(2);
     Schema updatedSchema = getSchemaStub(3);
 
-    HoodieEngineContext localEngineContext = new HoodieJavaEngineContext(new Configuration());
+    HoodieEngineContext localEngineContext = new HoodieJavaEngineContext(storageConfiguration);
     String basePath = getTableBasePath();
     HoodieWriteConfig tableConfig =
         HoodieWriteConfig.newBuilder()
@@ -126,7 +130,7 @@ public class TestAddFieldIdsClientInitCallback {
       properties.setProperty(
           VERSION.key(), Integer.toString(HoodieTableVersion.current().versionCode()));
       HoodieTableMetaClient.initTableAndGetMetaClient(
-          localEngineContext.getHadoopConf().get(), basePath, properties);
+          localEngineContext.getStorageConf(), basePath, properties);
       String commit = hoodieJavaWriteClient.startCommit();
       GenericRecord genericRecord =
           new GenericRecordBuilder(existingSchema).set("id", "1").set("field", "value").build();
@@ -166,7 +170,7 @@ public class TestAddFieldIdsClientInitCallback {
     properties.setProperty(
         HoodieWriteConfig.WRITE_SCHEMA_OVERRIDE.key(), inputWriteSchema.toString());
 
-    HoodieEngineContext localEngineContext = new HoodieLocalEngineContext(new Configuration());
+    HoodieEngineContext localEngineContext = new HoodieLocalEngineContext(storageConfiguration);
     HoodieWriteConfig config =
         HoodieWriteConfig.newBuilder()
             .withSchema(inputSchema.toString())

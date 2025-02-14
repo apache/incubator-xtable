@@ -57,6 +57,7 @@ import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
+import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
 
 import com.google.common.base.Preconditions;
 
@@ -320,7 +321,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
               .withArchivalConfig(archivalConfig)
               .build();
     }
-    HoodieEngineContext context = new HoodieJavaEngineContext(conf);
+    HoodieEngineContext context = new HoodieJavaEngineContext(new HadoopStorageConfiguration(conf));
     return new HoodieJavaWriteClient<>(context, writeConfig);
   }
 }
