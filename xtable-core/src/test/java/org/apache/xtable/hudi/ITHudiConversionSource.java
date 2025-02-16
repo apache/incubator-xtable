@@ -705,10 +705,10 @@ public class ITHudiConversionSource {
         tableChange.getFilesDiff().getFilesAdded().stream()
             .collect(
                 Collectors.groupingBy(
-                    oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).getFileId(),
+                    oneDf -> getFileGroupInfo(oneDf.physicalPath()).getFileId(),
                     Collectors.collectingAndThen(
                         Collectors.mapping(
-                            oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).getCommitTime(),
+                            oneDf -> getFileGroupInfo(oneDf.physicalPath()).getCommitTime(),
                             Collectors.toList()),
                         list -> {
                           if (list.size() > 1) {
@@ -733,10 +733,10 @@ public class ITHudiConversionSource {
         tableChange.getFilesDiff().getFilesRemoved().stream()
             .collect(
                 Collectors.groupingBy(
-                    oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).getFileId(),
+                    oneDf -> getFileGroupInfo(oneDf.physicalPath()).getFileId(),
                     Collectors.collectingAndThen(
                         Collectors.mapping(
-                            oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).getCommitTime(),
+                            oneDf -> getFileGroupInfo(oneDf.physicalPath()).getCommitTime(),
                             Collectors.toList()),
                         list -> {
                           if (list.size() > 1) {

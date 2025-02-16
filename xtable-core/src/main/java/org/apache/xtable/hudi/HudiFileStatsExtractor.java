@@ -107,7 +107,7 @@ public class HudiFileStatsExtractor {
     return files.map(
         file -> {
           HudiFileStats fileStats =
-              computeColumnStatsForFile(new Path(file.getPhysicalPath()), nameFieldMap);
+              computeColumnStatsForFile(new Path(file.physicalPath()), nameFieldMap);
           return file.toBuilder()
               .columnStats(fileStats.getColumnStats())
               .recordCount(fileStats.getRowCount())
@@ -128,7 +128,7 @@ public class HudiFileStatsExtractor {
     Map<Pair<String, String>, InternalDataFile> filePathsToDataFile =
         files.collect(
             Collectors.toMap(
-                file -> getPartitionAndFileName(file.getPhysicalPath()), Function.identity()));
+                file -> getPartitionAndFileName(file.physicalPath()), Function.identity()));
     if (filePathsToDataFile.isEmpty()) {
       return Stream.empty();
     }

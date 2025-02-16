@@ -721,25 +721,25 @@ public class ITDeltaConversionSource {
   private void validatePropertiesDataFile(InternalDataFile expected, InternalDataFile actual)
       throws URISyntaxException {
     Assertions.assertTrue(
-        Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
-        () -> "path == " + actual.getPhysicalPath() + " is not absolute");
-    Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
-    Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
-    Assertions.assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
-    Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
+        Paths.get(new URI(actual.physicalPath()).getPath()).isAbsolute(),
+        () -> "path == " + actual.physicalPath() + " is not absolute");
+    Assertions.assertEquals(expected.fileFormat(), actual.fileFormat());
+    Assertions.assertEquals(expected.partitionValues(), actual.partitionValues());
+    Assertions.assertEquals(expected.fileSizeBytes(), actual.fileSizeBytes());
+    Assertions.assertEquals(expected.recordCount(), actual.recordCount());
     Instant now = Instant.now();
     long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
     long maxRange = now.toEpochMilli();
     Assertions.assertTrue(
-        actual.getLastModified() > minRange && actual.getLastModified() <= maxRange,
+        actual.lastModified() > minRange && actual.lastModified() <= maxRange,
         () ->
             "last modified == "
-                + actual.getLastModified()
+                + actual.lastModified()
                 + " is expected between "
                 + minRange
                 + " and "
                 + maxRange);
-    Assertions.assertEquals(expected.getColumnStats(), actual.getColumnStats());
+    Assertions.assertEquals(expected.columnStats(), actual.columnStats());
   }
 
   private static Stream<Arguments> testWithPartitionToggle() {
@@ -749,7 +749,7 @@ public class ITDeltaConversionSource {
   private boolean checkIfFileIsRemoved(String activePath, TableChange tableChange) {
     Set<String> filePathsRemoved =
         tableChange.getFilesDiff().getFilesRemoved().stream()
-            .map(oneDf -> oneDf.getPhysicalPath())
+            .map(oneDf -> oneDf.physicalPath())
             .collect(Collectors.toSet());
     return filePathsRemoved.contains(activePath);
   }

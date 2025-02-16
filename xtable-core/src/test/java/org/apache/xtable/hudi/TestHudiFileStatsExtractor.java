@@ -202,8 +202,8 @@ public class TestHudiFileStatsExtractor {
   private void validateOutput(List<InternalDataFile> output) {
     assertEquals(1, output.size());
     InternalDataFile fileWithStats = output.get(0);
-    assertEquals(2, fileWithStats.getRecordCount());
-    List<ColumnStat> columnStats = fileWithStats.getColumnStats();
+    assertEquals(2, fileWithStats.recordCount());
+    List<ColumnStat> columnStats = fileWithStats.columnStats();
 
     assertEquals(9, columnStats.size());
 

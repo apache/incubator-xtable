@@ -253,11 +253,11 @@ public class DeltaPartitionExtractor {
 
   public Map<String, String> partitionValueSerialization(InternalDataFile internalDataFile) {
     Map<String, String> partitionValuesSerialized = new HashMap<>();
-    if (internalDataFile.getPartitionValues() == null
-        || internalDataFile.getPartitionValues().isEmpty()) {
+    if (internalDataFile.partitionValues() == null
+        || internalDataFile.partitionValues().isEmpty()) {
       return partitionValuesSerialized;
     }
-    for (PartitionValue partitionValue : internalDataFile.getPartitionValues()) {
+    for (PartitionValue partitionValue : internalDataFile.partitionValues()) {
       InternalPartitionField partitionField = partitionValue.getPartitionField();
       PartitionTransformType transformType = partitionField.getTransformType();
       String partitionValueSerialized;

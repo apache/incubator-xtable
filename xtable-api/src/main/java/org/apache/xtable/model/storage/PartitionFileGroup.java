@@ -28,12 +28,12 @@ import lombok.Value;
 
 import org.apache.xtable.model.stat.PartitionValue;
 
-/** Represents a grouping of {@link InternalDataFile} with the same partition values. */
+/** Represents a grouping of {@link InternalBaseFile} with the same partition values. */
 @Value
 @Builder
 public class PartitionFileGroup {
   List<PartitionValue> partitionValues;
-  List<InternalDataFile> files;
+  List<? extends InternalBaseFile> files;
 
   public static List<PartitionFileGroup> fromFiles(List<InternalDataFile> files) {
     return fromFiles(files.stream());
@@ -41,7 +41,7 @@ public class PartitionFileGroup {
 
   public static List<PartitionFileGroup> fromFiles(Stream<InternalDataFile> files) {
     Map<List<PartitionValue>, List<InternalDataFile>> filesGrouped =
-        files.collect(Collectors.groupingBy(InternalDataFile::getPartitionValues));
+        files.collect(Collectors.groupingBy(InternalDataFile::partitionValues));
     return filesGrouped.entrySet().stream()
         .map(
             entry ->

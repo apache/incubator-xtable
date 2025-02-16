@@ -16,28 +16,30 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model;
-
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
-
-import org.apache.xtable.model.storage.InternalFilesDiff;
+package org.apache.xtable.model.storage;
 
 /**
- * Captures the changes in a single commit/instant from the source table.
+ * Known types of storage files. For e.g. data file of a table, a position deletion, statistics
+ * file.
  *
  * @since 0.1
  */
-@Value
-@Builder(toBuilder = true)
-public class TableChange {
-  // Change in files at the specified instant
-  InternalFilesDiff filesDiff;
+public enum FileType {
+  /** Files of type data contain the actual data records of the table. */
+  DATA_FILE,
 
-  /** The {@link InternalTable} at the commit time to which this table change belongs. */
-  InternalTable tableAsOfChange;
+  /**
+   * Files of type deletion contain information of soft deleted records of the table, typically
+   * containing ordinal references
+   */
+  DELETION_FILE,
 
-  // Commit identifier in source table
-  @NonNull String sourceIdentifier;
+  /**
+   * Files of type statistics typically contain supplemental statistics information related to a
+   * table, its partitions, or data files
+   */
+  STATISTICS_FILE,
+
+  /** Files of type index contain information related to the indexes of a table */
+  INDEX_FILE
 }

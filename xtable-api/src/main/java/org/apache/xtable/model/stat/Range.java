@@ -25,14 +25,13 @@ import lombok.Value;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
-import org.apache.xtable.model.storage.InternalDataFile;
 
 /**
  * Represents a range of values in the specified data type. Can represent a scalar value when the
  * {@link #minValue} and {@link #maxValue} are the same.
  *
- * <p>For the ranges stored in {@link InternalDataFile#getPartitionValues()}, the values will be
- * based off the {@link PartitionTransformType}. {@link PartitionTransformType#HOUR}, {@link
+ * <p>For the ranges stored in {@link InternalDataFile#partitionValues()}, the values will be based
+ * off the {@link PartitionTransformType}. {@link PartitionTransformType#HOUR}, {@link
  * PartitionTransformType#DAY}, {@link PartitionTransformType#MONTH}, {@link
  * PartitionTransformType#YEAR} are all stored as a long representing a point in time as
  * milliseconds since epoch. {@link PartitionTransformType#VALUE} will match the rules below.

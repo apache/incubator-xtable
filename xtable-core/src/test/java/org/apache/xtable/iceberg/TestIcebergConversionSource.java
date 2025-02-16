@@ -151,16 +151,16 @@ class TestIcebergConversionSource {
       List<InternalDataFile> internalDataFiles = dataFilesChunk.getFiles();
       assertEquals(1, internalDataFiles.size());
       InternalDataFile internalDataFile = internalDataFiles.get(0);
-      assertEquals(FileFormat.APACHE_PARQUET, internalDataFile.getFileFormat());
-      assertEquals(1, internalDataFile.getRecordCount());
-      Assertions.assertTrue(internalDataFile.getPhysicalPath().startsWith("file:" + workingDir));
+      assertEquals(FileFormat.APACHE_PARQUET, internalDataFile.fileFormat());
+      assertEquals(1, internalDataFile.recordCount());
+      Assertions.assertTrue(internalDataFile.physicalPath().startsWith("file:" + workingDir));
 
-      List<PartitionValue> partitionValues = internalDataFile.getPartitionValues();
+      List<PartitionValue> partitionValues = internalDataFile.partitionValues();
       assertEquals(1, partitionValues.size());
       PartitionValue partitionEntry = partitionValues.iterator().next();
       assertEquals(
           "cs_sold_date_sk", partitionEntry.getPartitionField().getSourceField().getName());
-      assertEquals(7, internalDataFile.getColumnStats().size());
+      assertEquals(7, internalDataFile.columnStats().size());
     }
   }
 
@@ -315,8 +315,8 @@ class TestIcebergConversionSource {
     TableChange tableChange = conversionSource.getTableChangeForCommit(snapshot);
     assertEquals(addedFiles, tableChange.getFilesDiff().getFilesAdded().size());
     assertTrue(
-        tableChange.getFilesDiff().getFilesAdded().stream()
-            .allMatch(file -> file.getColumnStats().size() == numberOfColumns));
+        tableChange.getFilesDiff().dataFilesAdded().stream()
+            .allMatch(file -> file.columnStats().size() == numberOfColumns));
     assertEquals(removedFiles, tableChange.getFilesDiff().getFilesRemoved().size());
   }
 

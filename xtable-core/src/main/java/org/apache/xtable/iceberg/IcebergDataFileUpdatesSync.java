@@ -31,9 +31,9 @@ import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
-import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 @AllArgsConstructor(staticName = "of")
@@ -60,7 +60,7 @@ public class IcebergDataFileUpdatesSync {
     }
 
     FilesDiff<InternalDataFile, DataFile> diff =
-        DataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
+        InternalFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
     applyDiff(
         transaction, diff.getFilesAdded(), diff.getFilesRemoved(), schema, partitionSpec, metadata);
@@ -68,18 +68,23 @@ public class IcebergDataFileUpdatesSync {
 
   public void applyDiff(
       Transaction transaction,
-      DataFilesDiff dataFilesDiff,
+      InternalFilesDiff internalFilesDiff,
       Schema schema,
       PartitionSpec partitionSpec,
       TableSyncMetadata metadata) {
 
     Collection<DataFile> filesRemoved =
-        dataFilesDiff.getFilesRemoved().stream()
+        internalFilesDiff.dataFilesRemoved().stream()
             .map(file -> getDataFile(partitionSpec, schema, file))
             .collect(Collectors.toList());
 
     applyDiff(
-        transaction, dataFilesDiff.getFilesAdded(), filesRemoved, schema, partitionSpec, metadata);
+        transaction,
+        internalFilesDiff.dataFilesAdded(),
+        filesRemoved,
+        schema,
+        partitionSpec,
+        metadata);
   }
 
   private void applyDiff(
@@ -100,15 +105,15 @@ public class IcebergDataFileUpdatesSync {
       PartitionSpec partitionSpec, Schema schema, InternalDataFile dataFile) {
     DataFiles.Builder builder =
         DataFiles.builder(partitionSpec)
-            .withPath(dataFile.getPhysicalPath())
-            .withFileSizeInBytes(dataFile.getFileSizeBytes())
+            .withPath(dataFile.physicalPath())
+            .withFileSizeInBytes(dataFile.fileSizeBytes())
             .withMetrics(
                 columnStatsConverter.toIceberg(
-                    schema, dataFile.getRecordCount(), dataFile.getColumnStats()))
-            .withFormat(convertFileFormat(dataFile.getFileFormat()));
+                    schema, dataFile.recordCount(), dataFile.columnStats()))
+            .withFormat(convertFileFormat(dataFile.fileFormat()));
     if (partitionSpec.isPartitioned()) {
       builder.withPartition(
-          partitionValueConverter.toIceberg(partitionSpec, schema, dataFile.getPartitionValues()));
+          partitionValueConverter.toIceberg(partitionSpec, schema, dataFile.partitionValues()));
     }
     return builder.build();
   }

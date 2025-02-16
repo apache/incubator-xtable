@@ -97,7 +97,7 @@ public class FilesDiff<L, P> {
     Map<String, InternalDataFile> latestFiles =
         latestFileGroups.stream()
             .flatMap(group -> group.getFiles().stream())
-            .collect(Collectors.toMap(InternalDataFile::getPhysicalPath, Function.identity()));
+            .collect(Collectors.toMap(InternalDataFile::physicalPath, Function.identity()));
     return findNewAndRemovedFiles(latestFiles, previousFiles);
   }
 }

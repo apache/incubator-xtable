@@ -40,7 +40,7 @@ public class ValidationTestHelper {
     List<String> filePaths =
         internalSnapshot.getPartitionedDataFiles().stream()
             .flatMap(group -> group.getFiles().stream())
-            .map(InternalDataFile::getPhysicalPath)
+            .map(InternalDataFile::physicalPath)
             .collect(Collectors.toList());
     replaceFileScheme(allActivePaths);
     replaceFileScheme(filePaths);
@@ -83,20 +83,20 @@ public class ValidationTestHelper {
         filesForCommitBefore.stream()
             .filter(file -> !filesForCommitAfter.contains(file))
             .collect(Collectors.toSet());
-    assertEquals(filesAdded, extractPathsFromDataFile(tableChange.getFilesDiff().getFilesAdded()));
+    assertEquals(filesAdded, extractPathsFromDataFile(tableChange.getFilesDiff().dataFilesAdded()));
     assertEquals(
-        filesRemoved, extractPathsFromDataFile(tableChange.getFilesDiff().getFilesRemoved()));
+        filesRemoved, extractPathsFromDataFile(tableChange.getFilesDiff().dataFilesAdded()));
   }
 
   public static List<String> getAllFilePaths(InternalSnapshot internalSnapshot) {
     return internalSnapshot.getPartitionedDataFiles().stream()
         .flatMap(fileGroup -> fileGroup.getFiles().stream())
-        .map(InternalDataFile::getPhysicalPath)
+        .map(InternalDataFile::physicalPath)
         .collect(Collectors.toList());
   }
 
   private static Set<String> extractPathsFromDataFile(Set<InternalDataFile> dataFiles) {
-    return dataFiles.stream().map(InternalDataFile::getPhysicalPath).collect(Collectors.toSet());
+    return dataFiles.stream().map(InternalDataFile::physicalPath).collect(Collectors.toSet());
   }
 
   private static void replaceFileScheme(List<String> filePaths) {
