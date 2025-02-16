@@ -28,7 +28,7 @@ import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 /** A client that provides the major functionality for syncing changes to a target system. */
@@ -68,9 +68,9 @@ public interface ConversionTarget {
    * Syncs the changes in files to the target system. This method is required to both add and remove
    * files.
    *
-   * @param dataFilesDiff the diff that needs to be synced
+   * @param internalFilesDiff the diff that needs to be synced
    */
-  void syncFilesForDiff(DataFilesDiff dataFilesDiff);
+  void syncFilesForDiff(InternalFilesDiff internalFilesDiff);
 
   /**
    * Starts the sync and performs any initialization required

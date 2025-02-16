@@ -58,9 +58,9 @@ import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.PartitionValue;
-import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.extractor.ConversionSource;
@@ -193,8 +193,11 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
             .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable))
             .collect(Collectors.toSet());
 
-    DataFilesDiff filesDiff =
-        DataFilesDiff.builder().filesAdded(dataFilesAdded).filesRemoved(dataFilesRemoved).build();
+    InternalFilesDiff filesDiff =
+        InternalFilesDiff.builder()
+            .filesAdded(dataFilesAdded)
+            .filesRemoved(dataFilesRemoved)
+            .build();
 
     InternalTable table = getTable(snapshot);
     return TableChange.builder()

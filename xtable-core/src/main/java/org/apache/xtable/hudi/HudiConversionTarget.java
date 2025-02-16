@@ -87,7 +87,7 @@ import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.ConversionTarget;
@@ -251,9 +251,9 @@ public class HudiConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void syncFilesForDiff(DataFilesDiff dataFilesDiff) {
+  public void syncFilesForDiff(InternalFilesDiff internalFilesDiff) {
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
-        baseFileUpdatesExtractor.convertDiff(dataFilesDiff, commitState.getInstantTime());
+        baseFileUpdatesExtractor.convertDiff(internalFilesDiff, commitState.getInstantTime());
     commitState.setReplaceMetadata(replaceMetadata);
   }
 

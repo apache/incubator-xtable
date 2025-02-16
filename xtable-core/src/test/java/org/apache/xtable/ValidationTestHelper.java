@@ -39,7 +39,7 @@ public class ValidationTestHelper {
     assertNotNull(internalSnapshot.getTable());
     List<String> filePaths =
         internalSnapshot.getPartitionedDataFiles().stream()
-            .flatMap(group -> group.getFiles().stream())
+            .flatMap(group -> group.getDataFiles().stream())
             .map(InternalDataFile::getPhysicalPath)
             .collect(Collectors.toList());
     replaceFileScheme(allActivePaths);
@@ -83,14 +83,14 @@ public class ValidationTestHelper {
         filesForCommitBefore.stream()
             .filter(file -> !filesForCommitAfter.contains(file))
             .collect(Collectors.toSet());
-    assertEquals(filesAdded, extractPathsFromDataFile(tableChange.getFilesDiff().getFilesAdded()));
+    assertEquals(filesAdded, extractPathsFromDataFile(tableChange.getFilesDiff().dataFilesAdded()));
     assertEquals(
-        filesRemoved, extractPathsFromDataFile(tableChange.getFilesDiff().getFilesRemoved()));
+        filesRemoved, extractPathsFromDataFile(tableChange.getFilesDiff().dataFilesRemoved()));
   }
 
   public static List<String> getAllFilePaths(InternalSnapshot internalSnapshot) {
     return internalSnapshot.getPartitionedDataFiles().stream()
-        .flatMap(fileGroup -> fileGroup.getFiles().stream())
+        .flatMap(fileGroup -> fileGroup.getDataFiles().stream())
         .map(InternalDataFile::getPhysicalPath)
         .collect(Collectors.toList());
   }

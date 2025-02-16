@@ -148,7 +148,7 @@ class TestIcebergConversionSource {
     List<PartitionFileGroup> dataFileChunks = internalSnapshot.getPartitionedDataFiles();
     assertEquals(5, dataFileChunks.size());
     for (PartitionFileGroup dataFilesChunk : dataFileChunks) {
-      List<InternalDataFile> internalDataFiles = dataFilesChunk.getFiles();
+      List<InternalDataFile> internalDataFiles = dataFilesChunk.getDataFiles();
       assertEquals(1, internalDataFiles.size());
       InternalDataFile internalDataFile = internalDataFiles.get(0);
       assertEquals(FileFormat.APACHE_PARQUET, internalDataFile.getFileFormat());
@@ -315,7 +315,7 @@ class TestIcebergConversionSource {
     TableChange tableChange = conversionSource.getTableChangeForCommit(snapshot);
     assertEquals(addedFiles, tableChange.getFilesDiff().getFilesAdded().size());
     assertTrue(
-        tableChange.getFilesDiff().getFilesAdded().stream()
+        tableChange.getFilesDiff().dataFilesAdded().stream()
             .allMatch(file -> file.getColumnStats().size() == numberOfColumns));
     assertEquals(removedFiles, tableChange.getFilesDiff().getFilesRemoved().size());
   }

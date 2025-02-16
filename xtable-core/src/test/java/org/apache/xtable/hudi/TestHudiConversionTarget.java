@@ -49,7 +49,7 @@ import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
-import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 /**
@@ -212,7 +212,7 @@ public class TestHudiConversionTarget {
     HudiConversionTarget.CommitState mockCommitState =
         initMocksForBeginSync(targetClient).getLeft();
     String instant = "commit";
-    DataFilesDiff input = DataFilesDiff.builder().build();
+    InternalFilesDiff input = InternalFilesDiff.builder().build();
     BaseFileUpdatesExtractor.ReplaceMetadata output =
         BaseFileUpdatesExtractor.ReplaceMetadata.of(
             Collections.emptyMap(), Collections.emptyList());
