@@ -50,7 +50,7 @@ public class TestFilesDiff {
     previousFiles.put("file2NoGroup", file2);
     previousFiles.put("file2Group2", file3);
 
-    FilesDiff<InternalDataFile, File> diff =
+    FilesDiff<InternalFile, File> diff =
         FilesDiff.findNewAndRemovedFiles(latestFileGroups, previousFiles);
     assertEquals(2, diff.getFilesAdded().size());
     assertTrue(diff.getFilesAdded().contains(file1Group2));

@@ -37,13 +37,13 @@ public class TestDataFilesDiff {
         InternalDataFile.builder().physicalPath("file://already_in_target2.parquet").build();
     InternalDataFile sourceFileInTargetAlready =
         InternalDataFile.builder().physicalPath("file://already_in_target3.parquet").build();
-    DataFilesDiff actual =
-        DataFilesDiff.from(
+    InternalFilesDiff actual =
+        InternalFilesDiff.from(
             Arrays.asList(sourceFile1, sourceFile2, sourceFileInTargetAlready),
             Arrays.asList(targetFile1, targetFile2, sourceFileInTargetAlready));
 
-    DataFilesDiff expected =
-        DataFilesDiff.builder()
+    InternalFilesDiff expected =
+        InternalFilesDiff.builder()
             .filesAdded(Arrays.asList(sourceFile1, sourceFile2))
             .filesRemoved(Arrays.asList(targetFile1, targetFile2))
             .build();

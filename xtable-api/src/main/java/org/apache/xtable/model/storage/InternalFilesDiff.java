@@ -20,6 +20,7 @@ package org.apache.xtable.model.storage;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -31,17 +32,18 @@ import lombok.experimental.SuperBuilder;
 @Value
 @EqualsAndHashCode(callSuper = true)
 @SuperBuilder
-public class DataFilesDiff extends FilesDiff<InternalDataFile, InternalDataFile> {
+public class InternalFilesDiff extends FilesDiff<InternalFile, InternalFile> {
 
   /**
-   * Creates a DataFilesDiff from the list of files in the target table and the list of files in the
-   * source table.
+   * Creates a InternalFilesDiff from the list of files in the target table and the list of files in
+   * the source table.
    *
    * @param source list of files currently in the source table
    * @param target list of files currently in the target table
    * @return files that need to be added and removed for the target table match the source table
    */
-  public static DataFilesDiff from(List<InternalDataFile> source, List<InternalDataFile> target) {
+  public static InternalFilesDiff from(
+      List<InternalDataFile> source, List<InternalDataFile> target) {
     Map<String, InternalDataFile> targetPaths =
         target.stream()
             .collect(Collectors.toMap(InternalDataFile::getPhysicalPath, Function.identity()));
@@ -51,9 +53,35 @@ public class DataFilesDiff extends FilesDiff<InternalDataFile, InternalDataFile>
 
     FilesDiff<InternalDataFile, InternalDataFile> diff =
         findNewAndRemovedFiles(sourcePaths, targetPaths);
-    return DataFilesDiff.builder()
+    return InternalFilesDiff.builder()
         .filesAdded(diff.getFilesAdded())
         .filesRemoved(diff.getFilesRemoved())
         .build();
+  }
+
+  /**
+   * Filters files of type {@link InternalDataFile} from the list of files added to the source table
+   * and returns the list.
+   */
+  public Set<InternalDataFile> dataFilesAdded() {
+    Set<InternalDataFile> result =
+        getFilesAdded().stream()
+            .filter(InternalDataFile.class::isInstance)
+            .map(file -> (InternalDataFile) file)
+            .collect(Collectors.toSet());
+    return result;
+  }
+
+  /**
+   * Filters files of type {@link InternalDataFile} from the list of files removed to the source
+   * table and returns the list.
+   */
+  public Set<InternalDataFile> dataFilesRemoved() {
+    Set<InternalDataFile> result =
+        getFilesRemoved().stream()
+            .filter(InternalDataFile.class::isInstance)
+            .map(file -> (InternalDataFile) file)
+            .collect(Collectors.toSet());
+    return result;
   }
 }
