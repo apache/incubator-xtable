@@ -59,9 +59,9 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.testutil.ColumnStatMapUtil;
 
@@ -119,8 +119,8 @@ public class TestBaseFileUpdatesExtractor {
             String.format("%s/%s/%s", tableBasePath, partitionPath2, fileName5),
             Collections.emptyList());
 
-    DataFilesDiff diff =
-        DataFilesDiff.builder()
+    InternalFilesDiff diff =
+        InternalFilesDiff.builder()
             .filesAdded(Arrays.asList(addedFile1, addedFile2))
             .filesRemoved(Arrays.asList(removedFile1, removedFile2, removedFile3))
             .build();

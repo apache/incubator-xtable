@@ -51,9 +51,9 @@ import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.spi.extractor.ConversionSource;
 import org.apache.xtable.spi.extractor.DataFileIterator;
@@ -163,14 +163,14 @@ public class DeltaConversionSource implements ConversionSource<Long> {
       }
     }
 
-    DataFilesDiff dataFilesDiff =
-        DataFilesDiff.builder()
+    InternalFilesDiff internalFilesDiff =
+        InternalFilesDiff.builder()
             .filesAdded(addedFiles.values())
             .filesRemoved(removedFiles.values())
             .build();
     return TableChange.builder()
         .tableAsOfChange(tableAtVersion)
-        .filesDiff(dataFilesDiff)
+        .filesDiff(internalFilesDiff)
         .sourceIdentifier(getCommitIdentifier(versionNumber))
         .build();
   }
