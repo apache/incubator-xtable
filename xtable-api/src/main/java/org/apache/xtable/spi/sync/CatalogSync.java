@@ -34,6 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
+import org.apache.xtable.model.catalog.policy.InternalAccessControlPolicySnapshot;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.model.sync.SyncResult.CatalogSyncStatus;
 
@@ -119,6 +120,51 @@ public class CatalogSync {
     return CatalogSyncStatus.builder()
         .catalogId(catalogSyncClient.getCatalogId())
         .statusCode(SyncResult.SyncStatusCode.SUCCESS)
+        .build();
+  }
+
+  // TODO: Improve this.
+  public SyncResult syncPolicies(
+      Map<String, CatalogAccessControlPolicySyncClient> policySyncClients,
+      InternalAccessControlPolicySnapshot policySnapshot) {
+    List<CatalogSyncStatus> results = new ArrayList<>();
+    Instant startTime = Instant.now();
+    policySyncClients.forEach(
+        ((catalogId, policySyncClient) -> {
+          try {
+            policySyncClient.pushPolicies(policySnapshot);
+            log.error(
+                "Catalog policy sync is successful for catalog {} using policySync {}",
+                catalogId,
+                policySyncClient.getClass().getName());
+            results.add(
+                CatalogSyncStatus.builder()
+                    .catalogId(catalogId)
+                    .statusCode(SyncResult.SyncStatusCode.SUCCESS)
+                    .build());
+          } catch (Exception e) {
+            log.error(
+                "Catalog policy sync failed for catalog {} using policySync {}",
+                catalogId,
+                policySyncClient.getClass().getName());
+            results.add(
+                CatalogSyncStatus.builder()
+                    .catalogId(catalogId)
+                    .statusCode(SyncResult.SyncStatusCode.ERROR)
+                    .errorDetails(
+                        SyncResult.ErrorDetails.builder()
+                            .errorMessage(e.getMessage())
+                            .errorDescription(
+                                "catalogSync failed for " + policySyncClient.getClass().getName())
+                            .build())
+                    .build());
+          }
+        }));
+    return SyncResult.builder()
+        .lastInstantSynced(policySnapshot.getTimestamp())
+        .syncStartTime(startTime)
+        .syncDuration(Duration.between(startTime, Instant.now()))
+        .catalogSyncStatusList(results)
         .build();
   }
 
