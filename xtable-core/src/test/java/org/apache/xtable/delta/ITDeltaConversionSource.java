@@ -704,7 +704,7 @@ public class ITDeltaConversionSource {
       throws URISyntaxException {
     assertEquals(
         expectedPartitionFiles.getPartitionValues(), actualPartitionFiles.getPartitionValues());
-    validateDataFiles(expectedPartitionFiles.getFiles(), actualPartitionFiles.getFiles());
+    validateDataFiles(expectedPartitionFiles.dataFiles(), actualPartitionFiles.dataFiles());
   }
 
   private void validateDataFiles(

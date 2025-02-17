@@ -148,7 +148,7 @@ class TestIcebergConversionSource {
     List<PartitionFileGroup> dataFileChunks = internalSnapshot.getPartitionedDataFiles();
     assertEquals(5, dataFileChunks.size());
     for (PartitionFileGroup dataFilesChunk : dataFileChunks) {
-      List<InternalDataFile> internalDataFiles = dataFilesChunk.getFiles();
+      List<InternalDataFile> internalDataFiles = dataFilesChunk.dataFiles();
       assertEquals(1, internalDataFiles.size());
       InternalDataFile internalDataFile = internalDataFiles.get(0);
       assertEquals(FileFormat.APACHE_PARQUET, internalDataFile.fileFormat());

@@ -59,7 +59,7 @@ public class IcebergDataFileUpdatesSync {
       throw new ReadException("Failed to iterate through Iceberg data files", e);
     }
 
-    FilesDiff<InternalDataFile, DataFile> diff =
+    FilesDiff<? extends InternalBaseFile, DataFile> diff =
         InternalFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
     applyDiff(
@@ -89,13 +89,16 @@ public class IcebergDataFileUpdatesSync {
 
   private void applyDiff(
       Transaction transaction,
-      Collection<InternalDataFile> filesAdded,
+      Collection<? extends InternalBaseFile> filesAdded,
       Collection<DataFile> filesRemoved,
       Schema schema,
       PartitionSpec partitionSpec,
       TableSyncMetadata metadata) {
     OverwriteFiles overwriteFiles = transaction.newOverwrite();
-    filesAdded.forEach(f -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, f)));
+    filesAdded.stream()
+        .filter(InternalBaseFile::isDataFile)
+        .map(file -> (InternalDataFile) file)
+        .forEach(f -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, f)));
     filesRemoved.forEach(overwriteFiles::deleteFile);
     overwriteFiles.set(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
     overwriteFiles.commit();

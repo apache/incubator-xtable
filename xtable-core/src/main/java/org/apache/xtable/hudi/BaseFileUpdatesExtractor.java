@@ -96,7 +96,7 @@ public class BaseFileUpdatesExtractor {
         partitionedDataFiles.stream()
             .map(
                 partitionFileGroup -> {
-                  List<InternalDataFile> dataFiles = partitionFileGroup.getFiles();
+                  List<InternalDataFile> dataFiles = partitionFileGroup.dataFiles();
                   String partitionPath = getPartitionPath(tableBasePath, dataFiles);
                   // remove the partition from the set of partitions to drop since it is present in
                   // the snapshot

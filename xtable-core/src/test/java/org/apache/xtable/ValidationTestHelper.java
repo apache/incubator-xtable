@@ -39,7 +39,7 @@ public class ValidationTestHelper {
     assertNotNull(internalSnapshot.getTable());
     List<String> filePaths =
         internalSnapshot.getPartitionedDataFiles().stream()
-            .flatMap(group -> group.getFiles().stream())
+            .flatMap(group -> group.dataFiles().stream())
             .map(InternalDataFile::physicalPath)
             .collect(Collectors.toList());
     replaceFileScheme(allActivePaths);
@@ -90,7 +90,7 @@ public class ValidationTestHelper {
 
   public static List<String> getAllFilePaths(InternalSnapshot internalSnapshot) {
     return internalSnapshot.getPartitionedDataFiles().stream()
-        .flatMap(fileGroup -> fileGroup.getFiles().stream())
+        .flatMap(fileGroup -> fileGroup.dataFiles().stream())
         .map(InternalDataFile::physicalPath)
         .collect(Collectors.toList());
   }

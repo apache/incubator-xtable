@@ -51,4 +51,12 @@ public class PartitionFileGroup {
                     .build())
         .collect(Collectors.toList());
   }
+
+  /** Filters storage files of type {@link FileType#DATA_FILE} and returns them. */
+  public List<InternalDataFile> dataFiles() {
+    return files.stream()
+        .filter(InternalBaseFile::isDataFile)
+        .map(file -> (InternalDataFile) file)
+        .collect(Collectors.toList());
+  }
 }
