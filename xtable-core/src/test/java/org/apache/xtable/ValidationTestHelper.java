@@ -85,7 +85,7 @@ public class ValidationTestHelper {
             .collect(Collectors.toSet());
     assertEquals(filesAdded, extractPathsFromDataFile(tableChange.getFilesDiff().dataFilesAdded()));
     assertEquals(
-        filesRemoved, extractPathsFromDataFile(tableChange.getFilesDiff().dataFilesAdded()));
+        filesRemoved, extractPathsFromDataFile(tableChange.getFilesDiff().dataFilesRemoved()));
   }
 
   public static List<String> getAllFilePaths(InternalSnapshot internalSnapshot) {
