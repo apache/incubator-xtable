@@ -66,6 +66,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
   private HoodieJavaWriteClient<HoodieAvroPayload> writeClient;
 
   private final Configuration conf;
+
   /**
    * Create a test table instance for general testing. The table is created with the schema defined
    * in basic_schema.avsc which contains many data types to ensure they are handled correctly.

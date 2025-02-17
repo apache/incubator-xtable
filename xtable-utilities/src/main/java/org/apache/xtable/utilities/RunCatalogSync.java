@@ -283,11 +283,13 @@ public class RunCatalogSync {
      * necessary connection and access details for describing and listing tables
      */
     ExternalCatalogConfig sourceCatalog;
+
     /**
      * Defines configuration one or more target catalogs, to which XTable will write or update
      * tables. Unlike the source, these catalogs must be writable
      */
     List<ExternalCatalogConfig> targetCatalogs;
+
     /** A list of datasets that specify how a source table maps to one or more target tables. */
     List<Dataset> datasets;
 
@@ -300,6 +302,7 @@ public class RunCatalogSync {
     public static class Dataset {
       /** Identifies the source table in sourceCatalog. */
       SourceTableIdentifier sourceCatalogTableIdentifier;
+
       /** A list of one or more targets that this source table should be written to. */
       List<TargetTableIdentifier> targetCatalogTableIdentifiers;
     }
@@ -310,6 +313,7 @@ public class RunCatalogSync {
     public static class SourceTableIdentifier {
       /** Specifies the table identifier in the source catalog. */
       TableIdentifier tableIdentifier;
+
       /**
        * (Optional) Provides direct storage details such as a table’s base path (like an S3
        * location) and the partition specification. This allows reading from a source even if it is
@@ -327,11 +331,13 @@ public class RunCatalogSync {
        * updated
        */
       String catalogId;
+
       /**
        * The target table format (e.g., DELTA, HUDI, ICEBERG), specifying how the data will be
        * stored at the target.
        */
       String tableFormat;
+
       /** Specifies the table identifier in the target catalog. */
       TableIdentifier tableIdentifier;
     }
