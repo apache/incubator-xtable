@@ -214,7 +214,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
             RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(basePath), true);
             return remoteIteratorToStream(iterator)
                     .filter(file -> file.getPath().getName().endsWith("parquet"));
-        } catch (IOException e) {
+        } catch (IOException|FileNotFoundException e) {
             throw new RuntimeException(e);
         }
     }
