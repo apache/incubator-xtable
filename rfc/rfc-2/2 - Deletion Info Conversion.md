@@ -16,7 +16,7 @@
 -->
 # RFC-2: Support for conversion of Deletion Vectors from Delta Lake to Iceberg format
 
-## Proposers**
+## Proposers
 
 - @ashvin
 
@@ -207,7 +207,7 @@ Finally, existing classes that handle Iceberg data files and sync operations wil
 Most changes are straightforward and inline with existing logic. However, as described earlier, new deletion vectors
 are added to a separate manifest file in Iceberg. This requires invoking a separate transaction operation specific 
 to row level operations. The row level operation is initiated only if there are new deletion vectors in the 
-`FilesaAdded`.
+`FilesAdded`.
 
 ## Rollout/Adoption Plan
 
