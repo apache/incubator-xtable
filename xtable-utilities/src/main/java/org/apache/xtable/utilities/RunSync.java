@@ -172,37 +172,36 @@ public class RunSync {
     }
   }
 
-  public static void main(String[] args) throws IOException {
-    CommandLineParser parser = new DefaultParser();
-
-    CommandLine cmd;
-    try {
-      cmd = parser.parse(OPTIONS, args);
-    } catch (ParseException e) {
-      new HelpFormatter().printHelp("xtable.jar", OPTIONS, true);
-      return;
-    }
-
-    if (cmd.hasOption(HELP_OPTION)) {
-      HelpFormatter formatter = new HelpFormatter();
-      formatter.printHelp("RunSync", OPTIONS);
-      return;
-    }
-
+  public static DatasetConfig getDatasetConfig(CommandLine cmd) throws IOException {
+    // Initialize DatasetConfig
     DatasetConfig datasetConfig = new DatasetConfig();
     try (InputStream inputStream =
         Files.newInputStream(Paths.get(cmd.getOptionValue(DATASET_CONFIG_OPTION)))) {
       ObjectReader objectReader = YAML_MAPPER.readerForUpdating(datasetConfig);
       objectReader.readValue(inputStream);
     }
+    return datasetConfig;
+  }
 
+  public static Configuration gethadoopConf(CommandLine cmd) throws IOException {
+    // Load configurations
     byte[] customConfig = getCustomConfigurations(cmd, HADOOP_CONFIG_PATH);
     Configuration hadoopConf = loadHadoopConf(customConfig);
+    return hadoopConf;
+  }
+
+  public static IcebergCatalogConfig getIcebergCatalogConfig(CommandLine cmd) throws IOException {
+    // Load configurations
     byte[] icebergCatalogConfigInput = getCustomConfigurations(cmd, ICEBERG_CATALOG_CONFIG_PATH);
     IcebergCatalogConfig icebergCatalogConfig = loadIcebergCatalogConfig(icebergCatalogConfigInput);
+    return icebergCatalogConfig;
+  }
 
+  public static ConversionSourceProvider<?> getConversionSourceProvider(
+      CommandLine cmd, DatasetConfig datasetConfig, Configuration hadoopConf) throws IOException {
+    // Process source format
     String sourceFormat = datasetConfig.sourceFormat;
-    customConfig = getCustomConfigurations(cmd, CONVERTERS_CONFIG_PATH);
+    byte[] customConfig = getCustomConfigurations(cmd, CONVERTERS_CONFIG_PATH);
     TableFormatConverters tableFormatConverters = loadTableFormatConversionConfigs(customConfig);
     TableFormatConverters.ConversionConfig sourceConversionConfig =
         tableFormatConverters.getTableFormatConverters().get(sourceFormat);
@@ -216,8 +215,42 @@ public class RunSync {
     ConversionSourceProvider<?> conversionSourceProvider =
         ReflectionUtils.createInstanceOfClass(sourceProviderClass);
     conversionSourceProvider.init(hadoopConf);
+    return conversionSourceProvider;
+  }
 
+  public static List<String> getTableFormatList(DatasetConfig datasetConfig) throws IOException {
+    // Retrieve table format list
     List<String> tableFormatList = datasetConfig.getTargetFormats();
+    return tableFormatList;
+  }
+
+  public static CommandLine CommandParser(String[] args) {
+    CommandLineParser parser = new DefaultParser();
+
+    CommandLine cmd;
+    try {
+      cmd = parser.parse(OPTIONS, args);
+    } catch (ParseException e) {
+      new HelpFormatter().printHelp("xtable.jar", OPTIONS, true);
+      return null;
+    }
+
+    if (cmd.hasOption(HELP_OPTION)) {
+      HelpFormatter formatter = new HelpFormatter();
+      formatter.printHelp("RunSync", OPTIONS);
+      return null;
+    }
+    return cmd;
+  }
+
+  public static void main(String[] args) throws IOException {
+    CommandLine cmd = CommandParser(args);
+    DatasetConfig datasetConfig = getDatasetConfig(cmd);
+    IcebergCatalogConfig icebergCatalogConfig = getIcebergCatalogConfig(cmd);
+    Configuration hadoopConf = gethadoopConf(cmd);
+    ConversionSourceProvider conversionSourceProvider =
+        getConversionSourceProvider(cmd, datasetConfig, hadoopConf);
+    List<String> tableFormatList = getTableFormatList(datasetConfig);
     formatConvertor(
         datasetConfig, tableFormatList, icebergCatalogConfig, hadoopConf, conversionSourceProvider);
   }
