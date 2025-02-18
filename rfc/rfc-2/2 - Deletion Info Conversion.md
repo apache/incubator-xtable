@@ -107,6 +107,13 @@ RemoveFile file_a.parquet file_a_dv_2.bin
 AddFile    file_d.parquet NULL
 ```
 
+> Note: XTable would generate deletion vectors in the target table format corresponding to the source table format. 
+> While compaction in the source table will result in the removal of deletion vectors, XTable currently does not remove 
+> the generated deletion files in the target table. Over time, if the deletion vectors are not removed in the target 
+> table, they could significantly increase the number of files and storage size of target table. This is a known issue 
+> and a mitigation strategy is currently being discussed and tracked by this 
+> [task](https://github.com/apache/incubator-xtable/issues/655).
+
 #### Row level deletes in Iceberg
 Iceberg (v2), on the other hand, supports equality deletes and simple table representations for position based row level
 deletes. This proposal focuses on positional deletes. Similar to Delta Lake, Iceberg also maintains a separate file for
@@ -163,7 +170,6 @@ The following metadata is relevant for deletion vectors:
 > The fields above are inherited from InternalDataFile. The fields below are new fields specific to deletion vectors. 
 - `dataFilePath`: Path of the data file associated with the deletion vector.
 - `offset`: Offset of the deletion vector within the file (optional as inline deletion vectors do not have an offset).
-- `binaryRepresentation`: Binary representation of the inline deletion vector (optional).
 - `ordinalStream`: Stream of ordinals of the records deleted.
 
 **Modifications in `DataFilesDiff`**
