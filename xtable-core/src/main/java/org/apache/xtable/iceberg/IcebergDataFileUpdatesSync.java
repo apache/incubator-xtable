@@ -33,9 +33,9 @@ import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.storage.FilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.InternalStorageFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.StorageFilesDiff;
 
 @AllArgsConstructor(staticName = "of")
 public class IcebergDataFileUpdatesSync {
@@ -61,7 +61,7 @@ public class IcebergDataFileUpdatesSync {
     }
 
     FilesDiff<InternalStorageFile, DataFile> diff =
-        InternalFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
+        StorageFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
     applyDiff(
         transaction, diff.getFilesAdded(), diff.getFilesRemoved(), schema, partitionSpec, metadata);
@@ -69,19 +69,19 @@ public class IcebergDataFileUpdatesSync {
 
   public void applyDiff(
       Transaction transaction,
-      InternalFilesDiff internalFilesDiff,
+      StorageFilesDiff storageFilesDiff,
       Schema schema,
       PartitionSpec partitionSpec,
       TableSyncMetadata metadata) {
 
     Collection<DataFile> filesRemoved =
-        internalFilesDiff.dataFilesRemoved().stream()
+        storageFilesDiff.dataFilesRemoved().stream()
             .map(file -> getDataFile(partitionSpec, schema, file))
             .collect(Collectors.toList());
 
     applyDiff(
         transaction,
-        internalFilesDiff.dataFilesAdded(),
+        storageFilesDiff.dataFilesAdded(),
         filesRemoved,
         schema,
         partitionSpec,

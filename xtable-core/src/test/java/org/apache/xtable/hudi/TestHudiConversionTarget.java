@@ -49,8 +49,8 @@ import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
-import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.StorageFilesDiff;
 
 /**
  * Unit tests that focus on the basic control flow of the HudiConversionTarget. Functional tests are
@@ -212,7 +212,7 @@ public class TestHudiConversionTarget {
     HudiConversionTarget.CommitState mockCommitState =
         initMocksForBeginSync(targetClient).getLeft();
     String instant = "commit";
-    InternalFilesDiff input = InternalFilesDiff.builder().build();
+    StorageFilesDiff input = StorageFilesDiff.builder().build();
     BaseFileUpdatesExtractor.ReplaceMetadata output =
         BaseFileUpdatesExtractor.ReplaceMetadata.of(
             Collections.emptyMap(), Collections.emptyList());

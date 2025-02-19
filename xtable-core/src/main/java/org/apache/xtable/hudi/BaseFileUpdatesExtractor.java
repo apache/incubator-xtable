@@ -55,8 +55,8 @@ import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.StorageFilesDiff;
 
 @AllArgsConstructor(staticName = "of")
 public class BaseFileUpdatesExtractor {
@@ -163,17 +163,16 @@ public class BaseFileUpdatesExtractor {
   }
 
   /**
-   * Converts the provided {@link InternalFilesDiff}.
+   * Converts the provided {@link StorageFilesDiff}.
    *
-   * @param internalFilesDiff the diff to apply to the Hudi table
+   * @param storageFilesDiff the diff to apply to the Hudi table
    * @param commit The current commit started by the Hudi client
    * @return The information needed to create a "replace" commit for the Hudi table
    */
-  ReplaceMetadata convertDiff(
-      @NonNull InternalFilesDiff internalFilesDiff, @NonNull String commit) {
+  ReplaceMetadata convertDiff(@NonNull StorageFilesDiff storageFilesDiff, @NonNull String commit) {
     // For all removed files, group by partition and extract the file id
     Map<String, List<String>> partitionToReplacedFileIds =
-        internalFilesDiff.dataFilesRemoved().stream()
+        storageFilesDiff.dataFilesRemoved().stream()
             .map(file -> new CachingPath(file.getPhysicalPath()))
             .collect(
                 Collectors.groupingBy(
@@ -181,9 +180,9 @@ public class BaseFileUpdatesExtractor {
                     Collectors.mapping(this::getFileId, Collectors.toList())));
     // For all added files, group by partition and extract the file id
     List<WriteStatus> writeStatuses =
-        internalFilesDiff.dataFilesAdded().stream()
+        storageFilesDiff.dataFilesAdded().stream()
             .map(file -> toWriteStatus(tableBasePath, commit, file, Optional.empty()))
-            .collect(CustomCollectors.toList(internalFilesDiff.dataFilesAdded().size()));
+            .collect(CustomCollectors.toList(storageFilesDiff.dataFilesAdded().size()));
     return ReplaceMetadata.of(partitionToReplacedFileIds, writeStatuses);
   }
 

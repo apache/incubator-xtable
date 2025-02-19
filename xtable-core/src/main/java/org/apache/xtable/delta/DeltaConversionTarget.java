@@ -65,8 +65,8 @@ import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.StorageFilesDiff;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.schema.SparkSchemaExtractor;
 import org.apache.xtable.spi.sync.ConversionTarget;
@@ -193,10 +193,10 @@ public class DeltaConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void syncFilesForDiff(InternalFilesDiff internalFilesDiff) {
+  public void syncFilesForDiff(StorageFilesDiff storageFilesDiff) {
     transactionState.setActions(
         dataFileUpdatesExtractor.applyDiff(
-            internalFilesDiff,
+            storageFilesDiff,
             transactionState.getLatestSchemaInternal(),
             deltaLog.dataPath().toString()));
   }

@@ -32,17 +32,17 @@ import lombok.experimental.SuperBuilder;
 @Value
 @EqualsAndHashCode(callSuper = true)
 @SuperBuilder
-public class InternalFilesDiff extends FilesDiff<InternalStorageFile, InternalStorageFile> {
+public class StorageFilesDiff extends FilesDiff<InternalStorageFile, InternalStorageFile> {
 
   /**
-   * Creates a InternalFilesDiff from the list of files in the target table and the list of files in
+   * Creates a StorageFilesDiff from the list of files in the target table and the list of files in
    * the source table.
    *
    * @param source list of files currently in the source table
    * @param target list of files currently in the target table
    * @return files that need to be added and removed for the target table match the source table
    */
-  public static InternalFilesDiff from(
+  public static StorageFilesDiff from(
       List<InternalDataFile> source, List<InternalDataFile> target) {
     Map<String, InternalDataFile> targetPaths =
         target.stream()
@@ -53,7 +53,7 @@ public class InternalFilesDiff extends FilesDiff<InternalStorageFile, InternalSt
 
     FilesDiff<InternalDataFile, InternalDataFile> diff =
         findNewAndRemovedFiles(sourcePaths, targetPaths);
-    return InternalFilesDiff.builder()
+    return StorageFilesDiff.builder()
         .filesAdded(diff.getFilesAdded())
         .filesRemoved(diff.getFilesRemoved())
         .build();

@@ -87,8 +87,8 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.StorageFilesDiff;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.ConversionTarget;
 
@@ -195,8 +195,8 @@ public class ITHudiConversionTarget {
     String fileName = "file_1.parquet";
     String filePath = getFilePath(partitionPath, fileName);
 
-    InternalFilesDiff internalFilesDiff =
-        InternalFilesDiff.builder()
+    StorageFilesDiff storageFilesDiff =
+        StorageFilesDiff.builder()
             .fileAdded(getTestFile(partitionPath, fileName))
             .fileRemoved(fileToRemove)
             .build();
@@ -204,7 +204,7 @@ public class ITHudiConversionTarget {
     HudiConversionTarget targetClient = getTargetClient();
     InternalTable initialState = getState(Instant.now());
     targetClient.beginSync(initialState);
-    targetClient.syncFilesForDiff(internalFilesDiff);
+    targetClient.syncFilesForDiff(storageFilesDiff);
     targetClient.syncSchema(SCHEMA);
     TableSyncMetadata latestState =
         TableSyncMetadata.of(
@@ -518,11 +518,11 @@ public class ITHudiConversionTarget {
       List<InternalDataFile> filesToRemove,
       Instant commitStart,
       String sourceIdentifier) {
-    InternalFilesDiff internalFilesDiff2 =
-        InternalFilesDiff.builder().filesAdded(filesToAdd).filesRemoved(filesToRemove).build();
+    StorageFilesDiff storageFilesDiff2 =
+        StorageFilesDiff.builder().filesAdded(filesToAdd).filesRemoved(filesToRemove).build();
     InternalTable state3 = getState(commitStart);
     conversionTarget.beginSync(state3);
-    conversionTarget.syncFilesForDiff(internalFilesDiff2);
+    conversionTarget.syncFilesForDiff(storageFilesDiff2);
     TableSyncMetadata latestState =
         TableSyncMetadata.of(
             state3.getLatestCommitTime(), Collections.emptyList(), "TEST", sourceIdentifier);

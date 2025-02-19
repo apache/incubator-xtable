@@ -67,8 +67,8 @@ import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.StorageFilesDiff;
 
 /** Extracts all the files for Hudi table represented by {@link InternalTable}. */
 public class HudiDataFileExtractor implements AutoCloseable {
@@ -122,7 +122,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
     }
   }
 
-  public InternalFilesDiff getDiffForCommit(
+  public StorageFilesDiff getDiffForCommit(
       HoodieInstant hoodieInstantForDiff,
       InternalTable table,
       HoodieInstant instant,
@@ -139,7 +139,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
             .collect(Collectors.toList());
     List<InternalDataFile> filesRemoved = allInfo.getRemoved();
 
-    return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
+    return StorageFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
   }
 
   private AddedAndRemovedFiles getAddedAndRemovedPartitionInfo(

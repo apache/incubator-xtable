@@ -41,9 +41,9 @@ import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.FilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.InternalStorageFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.StorageFilesDiff;
 import org.apache.xtable.paths.PathUtils;
 
 @Builder
@@ -76,20 +76,20 @@ public class DeltaDataFileUpdatesExtractor {
                     file -> file));
 
     FilesDiff<InternalStorageFile, Action> diff =
-        InternalFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
+        StorageFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
     return applyDiff(
         diff.getFilesAdded(), diff.getFilesRemoved(), tableSchema, deltaLog.dataPath().toString());
   }
 
   public Seq<Action> applyDiff(
-      InternalFilesDiff internalFilesDiff, InternalSchema tableSchema, String tableBasePath) {
+      StorageFilesDiff storageFilesDiff, InternalSchema tableSchema, String tableBasePath) {
     List<Action> removeActions =
-        internalFilesDiff.dataFilesRemoved().stream()
+        storageFilesDiff.dataFilesRemoved().stream()
             .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath))
             .map(AddFile::remove)
-            .collect(CustomCollectors.toList(internalFilesDiff.dataFilesRemoved().size()));
-    return applyDiff(internalFilesDiff.dataFilesAdded(), removeActions, tableSchema, tableBasePath);
+            .collect(CustomCollectors.toList(storageFilesDiff.dataFilesRemoved().size()));
+    return applyDiff(storageFilesDiff.dataFilesAdded(), removeActions, tableSchema, tableBasePath);
   }
 
   private Seq<Action> applyDiff(
