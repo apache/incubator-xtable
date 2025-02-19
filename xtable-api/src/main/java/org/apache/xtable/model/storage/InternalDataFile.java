@@ -26,7 +26,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.ToString;
-import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.SuperBuilder;
 
@@ -42,15 +41,13 @@ import org.apache.xtable.model.stat.PartitionValue;
 @FieldDefaults(makeFinal = true, level = lombok.AccessLevel.PRIVATE)
 @ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true)
-@Accessors(fluent = true)
 @Getter
-public class InternalDataFile extends InternalBaseFile {
+public class InternalDataFile extends InternalStorageFile {
   // file format
   @Builder.Default @NonNull FileFormat fileFormat = FileFormat.APACHE_PARQUET;
   // partition ranges for the data file
   @Builder.Default @NonNull List<PartitionValue> partitionValues = Collections.emptyList();
 
-  long recordCount;
   // column stats for each column in the data file
   @Builder.Default @NonNull List<ColumnStat> columnStats = Collections.emptyList();
   // last modified time in millis since epoch

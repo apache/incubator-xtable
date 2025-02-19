@@ -19,12 +19,10 @@
 package org.apache.xtable.model.storage;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.ToString;
-import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.SuperBuilder;
 
@@ -43,25 +41,16 @@ import lombok.experimental.SuperBuilder;
 @ToString(callSuper = true)
 @EqualsAndHashCode
 @AllArgsConstructor
-@Accessors(fluent = true)
 @Getter
-public abstract class InternalBaseFile {
+public abstract class InternalStorageFile {
   // Absolute path of the storage file, with the scheme, that contains this logical file. Typically,
   // one physical storage file contains only one base file, for e.g. a parquet data file. However,
   // in some cases, one storage file can contain multiple logical storage files for optimizations.
   @NonNull String physicalPath;
 
-  // The offset of the logical file in the physical storage file.
-  @Builder.Default long offset = 0;
-
   // The size of the logical file in the physical storage file.
   long fileSizeBytes;
 
-  // File Type represents the type of the storage file. For example, a data file, a delete file, a
-  // stat file
-  @Builder.Default @NonNull FileType fileType = FileType.DATA_FILE;
-
-  public boolean isDataFile() {
-    return fileType.equals(FileType.DATA_FILE);
-  }
+  // The number of records in the storage file.
+  long recordCount;
 }

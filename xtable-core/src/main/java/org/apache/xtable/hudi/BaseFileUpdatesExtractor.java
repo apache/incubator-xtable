@@ -96,7 +96,7 @@ public class BaseFileUpdatesExtractor {
         partitionedDataFiles.stream()
             .map(
                 partitionFileGroup -> {
-                  List<InternalDataFile> dataFiles = partitionFileGroup.dataFiles();
+                  List<InternalDataFile> dataFiles = partitionFileGroup.getDataFiles();
                   String partitionPath = getPartitionPath(tableBasePath, dataFiles);
                   // remove the partition from the set of partitions to drop since it is present in
                   // the snapshot
@@ -107,7 +107,7 @@ public class BaseFileUpdatesExtractor {
                       dataFiles.stream()
                           .collect(
                               Collectors.toMap(
-                                  InternalDataFile::physicalPath, Function.identity()));
+                                  InternalDataFile::getPhysicalPath, Function.identity()));
                   List<HoodieBaseFile> baseFiles =
                       isTableInitialized
                           ? fsView.getLatestBaseFiles(partitionPath).collect(Collectors.toList())
@@ -174,7 +174,7 @@ public class BaseFileUpdatesExtractor {
     // For all removed files, group by partition and extract the file id
     Map<String, List<String>> partitionToReplacedFileIds =
         internalFilesDiff.dataFilesRemoved().stream()
-            .map(file -> new CachingPath(file.physicalPath()))
+            .map(file -> new CachingPath(file.getPhysicalPath()))
             .collect(
                 Collectors.groupingBy(
                     path -> HudiPathUtils.getPartitionPath(tableBasePath, path),
@@ -213,7 +213,7 @@ public class BaseFileUpdatesExtractor {
       InternalDataFile file,
       Optional<String> partitionPathOptional) {
     WriteStatus writeStatus = new WriteStatus();
-    Path path = new CachingPath(file.physicalPath());
+    Path path = new CachingPath(file.getPhysicalPath());
     String partitionPath =
         partitionPathOptional.orElseGet(() -> HudiPathUtils.getPartitionPath(tableBasePath, path));
     String fileId = getFileId(path);
@@ -227,10 +227,10 @@ public class BaseFileUpdatesExtractor {
     writeStat.setPath(
         ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(filePath, commitTime));
     writeStat.setPartitionPath(partitionPath);
-    writeStat.setNumWrites(file.recordCount());
-    writeStat.setTotalWriteBytes(file.fileSizeBytes());
-    writeStat.setFileSizeInBytes(file.fileSizeBytes());
-    writeStat.putRecordsStats(convertColStats(fileName, file.columnStats()));
+    writeStat.setNumWrites(file.getRecordCount());
+    writeStat.setTotalWriteBytes(file.getFileSizeBytes());
+    writeStat.setFileSizeInBytes(file.getFileSizeBytes());
+    writeStat.putRecordsStats(convertColStats(fileName, file.getColumnStats()));
     writeStatus.setStat(writeStat);
     return writeStatus;
   }
@@ -276,6 +276,6 @@ public class BaseFileUpdatesExtractor {
 
   private String getPartitionPath(Path tableBasePath, List<InternalDataFile> files) {
     return HudiPathUtils.getPartitionPath(
-        tableBasePath, new CachingPath(files.get(0).physicalPath()));
+        tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
   }
 }

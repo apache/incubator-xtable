@@ -128,7 +128,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
                 true,
                 DeltaPartitionExtractor.getInstance(),
                 DeltaStatsExtractor.getInstance());
-        addedFiles.put(dataFile.physicalPath(), dataFile);
+        addedFiles.put(dataFile.getPhysicalPath(), dataFile);
         String deleteVectorPath =
             actionsConverter.extractDeletionVectorFile(snapshotAtVersion, (AddFile) action);
         if (deleteVectorPath != null) {
@@ -142,7 +142,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
                 fileFormat,
                 tableAtVersion.getPartitioningFields(),
                 DeltaPartitionExtractor.getInstance());
-        removedFiles.put(dataFile.physicalPath(), dataFile);
+        removedFiles.put(dataFile.getPhysicalPath(), dataFile);
       }
     }
 

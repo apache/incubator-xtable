@@ -32,7 +32,7 @@ import lombok.experimental.SuperBuilder;
 @Value
 @EqualsAndHashCode(callSuper = true)
 @SuperBuilder
-public class InternalFilesDiff extends FilesDiff<InternalBaseFile, InternalBaseFile> {
+public class InternalFilesDiff extends FilesDiff<InternalStorageFile, InternalStorageFile> {
 
   /**
    * Creates a InternalFilesDiff from the list of files in the target table and the list of files in
@@ -46,10 +46,10 @@ public class InternalFilesDiff extends FilesDiff<InternalBaseFile, InternalBaseF
       List<InternalDataFile> source, List<InternalDataFile> target) {
     Map<String, InternalDataFile> targetPaths =
         target.stream()
-            .collect(Collectors.toMap(InternalDataFile::physicalPath, Function.identity()));
+            .collect(Collectors.toMap(InternalDataFile::getPhysicalPath, Function.identity()));
     Map<String, InternalDataFile> sourcePaths =
         source.stream()
-            .collect(Collectors.toMap(InternalDataFile::physicalPath, Function.identity()));
+            .collect(Collectors.toMap(InternalDataFile::getPhysicalPath, Function.identity()));
 
     FilesDiff<InternalDataFile, InternalDataFile> diff =
         findNewAndRemovedFiles(sourcePaths, targetPaths);
@@ -60,26 +60,26 @@ public class InternalFilesDiff extends FilesDiff<InternalBaseFile, InternalBaseF
   }
 
   /**
-   * Filters files of type {@link FileType#DATA_FILE} from the list of files added to the source
-   * table and returns the list.
+   * Filters files of type {@link InternalDataFile} from the list of files added to the source table
+   * and returns the list.
    */
   public Set<InternalDataFile> dataFilesAdded() {
     Set<InternalDataFile> result =
         getFilesAdded().stream()
-            .filter(InternalBaseFile::isDataFile)
+            .filter(InternalDataFile.class::isInstance)
             .map(file -> (InternalDataFile) file)
             .collect(Collectors.toSet());
     return result;
   }
 
   /**
-   * Filters files of type {@link FileType#DATA_FILE} from the list of files removed to the source
+   * Filters files of type {@link InternalDataFile} from the list of files removed to the source
    * table and returns the list.
    */
   public Set<InternalDataFile> dataFilesRemoved() {
     Set<InternalDataFile> result =
         getFilesRemoved().stream()
-            .filter(InternalBaseFile::isDataFile)
+            .filter(InternalDataFile.class::isInstance)
             .map(file -> (InternalDataFile) file)
             .collect(Collectors.toSet());
     return result;

@@ -40,9 +40,9 @@ import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.FilesDiff;
-import org.apache.xtable.model.storage.InternalBaseFile;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.InternalFilesDiff;
+import org.apache.xtable.model.storage.InternalStorageFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.paths.PathUtils;
 
@@ -75,7 +75,7 @@ public class DeltaDataFileUpdatesExtractor {
                     file -> DeltaActionsConverter.getFullPathToFile(snapshot, file.path()),
                     file -> file));
 
-    FilesDiff<? extends InternalBaseFile, Action> diff =
+    FilesDiff<InternalStorageFile, Action> diff =
         InternalFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
     return applyDiff(
@@ -93,13 +93,13 @@ public class DeltaDataFileUpdatesExtractor {
   }
 
   private Seq<Action> applyDiff(
-      Set<? extends InternalBaseFile> filesAdded,
+      Set<? extends InternalStorageFile> filesAdded,
       Collection<Action> removeFileActions,
       InternalSchema tableSchema,
       String tableBasePath) {
     Stream<Action> addActions =
         filesAdded.stream()
-            .filter(InternalBaseFile::isDataFile)
+            .filter(InternalDataFile.class::isInstance)
             .map(file -> (InternalDataFile) file)
             .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath));
     int totalActions = filesAdded.size() + removeFileActions.size();
@@ -115,12 +115,12 @@ public class DeltaDataFileUpdatesExtractor {
         new AddFile(
             // Delta Lake supports relative and absolute paths in theory but relative paths seem
             // more commonly supported by query engines in our testing
-            PathUtils.getRelativePath(dataFile.physicalPath(), tableBasePath),
+            PathUtils.getRelativePath(dataFile.getPhysicalPath(), tableBasePath),
             convertJavaMapToScala(deltaPartitionExtractor.partitionValueSerialization(dataFile)),
-            dataFile.fileSizeBytes(),
-            dataFile.lastModified(),
+            dataFile.getFileSizeBytes(),
+            dataFile.getLastModified(),
             true,
-            getColumnStats(schema, dataFile.recordCount(), dataFile.columnStats()),
+            getColumnStats(schema, dataFile.getRecordCount(), dataFile.getColumnStats()),
             null,
             null));
   }

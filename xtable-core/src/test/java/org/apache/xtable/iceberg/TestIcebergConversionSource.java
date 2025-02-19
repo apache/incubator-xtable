@@ -148,19 +148,19 @@ class TestIcebergConversionSource {
     List<PartitionFileGroup> dataFileChunks = internalSnapshot.getPartitionedDataFiles();
     assertEquals(5, dataFileChunks.size());
     for (PartitionFileGroup dataFilesChunk : dataFileChunks) {
-      List<InternalDataFile> internalDataFiles = dataFilesChunk.dataFiles();
+      List<InternalDataFile> internalDataFiles = dataFilesChunk.getDataFiles();
       assertEquals(1, internalDataFiles.size());
       InternalDataFile internalDataFile = internalDataFiles.get(0);
-      assertEquals(FileFormat.APACHE_PARQUET, internalDataFile.fileFormat());
-      assertEquals(1, internalDataFile.recordCount());
-      Assertions.assertTrue(internalDataFile.physicalPath().startsWith("file:" + workingDir));
+      assertEquals(FileFormat.APACHE_PARQUET, internalDataFile.getFileFormat());
+      assertEquals(1, internalDataFile.getRecordCount());
+      Assertions.assertTrue(internalDataFile.getPhysicalPath().startsWith("file:" + workingDir));
 
-      List<PartitionValue> partitionValues = internalDataFile.partitionValues();
+      List<PartitionValue> partitionValues = internalDataFile.getPartitionValues();
       assertEquals(1, partitionValues.size());
       PartitionValue partitionEntry = partitionValues.iterator().next();
       assertEquals(
           "cs_sold_date_sk", partitionEntry.getPartitionField().getSourceField().getName());
-      assertEquals(7, internalDataFile.columnStats().size());
+      assertEquals(7, internalDataFile.getColumnStats().size());
     }
   }
 
@@ -316,7 +316,7 @@ class TestIcebergConversionSource {
     assertEquals(addedFiles, tableChange.getFilesDiff().getFilesAdded().size());
     assertTrue(
         tableChange.getFilesDiff().dataFilesAdded().stream()
-            .allMatch(file -> file.columnStats().size() == numberOfColumns));
+            .allMatch(file -> file.getColumnStats().size() == numberOfColumns));
     assertEquals(removedFiles, tableChange.getFilesDiff().getFilesRemoved().size());
   }
 

@@ -838,13 +838,14 @@ public class TestIcebergSync {
           assertEquals(expectedFiles.size(), combinedScanTask.files().size());
           Map<String, InternalDataFile> pathToFile =
               expectedFiles.stream()
-                  .collect(Collectors.toMap(InternalDataFile::physicalPath, Function.identity()));
+                  .collect(
+                      Collectors.toMap(InternalDataFile::getPhysicalPath, Function.identity()));
           for (FileScanTask fileScanTask : combinedScanTask.files()) {
             // check that path and other stats match
             InternalDataFile expected = pathToFile.get(fileScanTask.file().path());
             assertNotNull(expected);
-            assertEquals(expected.fileSizeBytes(), fileScanTask.file().fileSizeInBytes());
-            assertEquals(expected.recordCount(), fileScanTask.file().recordCount());
+            assertEquals(expected.getFileSizeBytes(), fileScanTask.file().fileSizeInBytes());
+            assertEquals(expected.getRecordCount(), fileScanTask.file().recordCount());
           }
         }
       }
@@ -862,11 +863,11 @@ public class TestIcebergSync {
   }
 
   private void mockColStatsForFile(InternalDataFile dataFile, int times) {
-    Metrics response = new Metrics(dataFile.recordCount(), null, null, null, null);
+    Metrics response = new Metrics(dataFile.getRecordCount(), null, null, null, null);
     Metrics[] responses =
         IntStream.of(times - 1).mapToObj(unused -> response).toArray(Metrics[]::new);
     when(mockColumnStatsConverter.toIceberg(
-            any(Schema.class), eq(dataFile.recordCount()), eq(Collections.emptyList())))
+            any(Schema.class), eq(dataFile.getRecordCount()), eq(Collections.emptyList())))
         .thenReturn(response, responses);
   }
 }

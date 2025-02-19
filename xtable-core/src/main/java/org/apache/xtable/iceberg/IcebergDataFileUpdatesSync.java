@@ -34,6 +34,7 @@ import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.storage.FilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.InternalFilesDiff;
+import org.apache.xtable.model.storage.InternalStorageFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 @AllArgsConstructor(staticName = "of")
@@ -59,7 +60,7 @@ public class IcebergDataFileUpdatesSync {
       throw new ReadException("Failed to iterate through Iceberg data files", e);
     }
 
-    FilesDiff<? extends InternalBaseFile, DataFile> diff =
+    FilesDiff<InternalStorageFile, DataFile> diff =
         InternalFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
     applyDiff(
@@ -89,14 +90,14 @@ public class IcebergDataFileUpdatesSync {
 
   private void applyDiff(
       Transaction transaction,
-      Collection<? extends InternalBaseFile> filesAdded,
+      Collection<? extends InternalStorageFile> filesAdded,
       Collection<DataFile> filesRemoved,
       Schema schema,
       PartitionSpec partitionSpec,
       TableSyncMetadata metadata) {
     OverwriteFiles overwriteFiles = transaction.newOverwrite();
     filesAdded.stream()
-        .filter(InternalBaseFile::isDataFile)
+        .filter(InternalDataFile.class::isInstance)
         .map(file -> (InternalDataFile) file)
         .forEach(f -> overwriteFiles.addFile(getDataFile(partitionSpec, schema, f)));
     filesRemoved.forEach(overwriteFiles::deleteFile);
@@ -108,15 +109,15 @@ public class IcebergDataFileUpdatesSync {
       PartitionSpec partitionSpec, Schema schema, InternalDataFile dataFile) {
     DataFiles.Builder builder =
         DataFiles.builder(partitionSpec)
-            .withPath(dataFile.physicalPath())
-            .withFileSizeInBytes(dataFile.fileSizeBytes())
+            .withPath(dataFile.getPhysicalPath())
+            .withFileSizeInBytes(dataFile.getFileSizeBytes())
             .withMetrics(
                 columnStatsConverter.toIceberg(
-                    schema, dataFile.recordCount(), dataFile.columnStats()))
-            .withFormat(convertFileFormat(dataFile.fileFormat()));
+                    schema, dataFile.getRecordCount(), dataFile.getColumnStats()))
+            .withFormat(convertFileFormat(dataFile.getFileFormat()));
     if (partitionSpec.isPartitioned()) {
       builder.withPartition(
-          partitionValueConverter.toIceberg(partitionSpec, schema, dataFile.partitionValues()));
+          partitionValueConverter.toIceberg(partitionSpec, schema, dataFile.getPartitionValues()));
     }
     return builder.build();
   }
