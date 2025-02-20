@@ -262,7 +262,6 @@ public class GlueCatalogPartitionSyncOperations implements CatalogPartitionSyncO
       Table table =
           GlueCatalogTableUtils.getTable(
               glueClient, glueCatalogConfig.getCatalogId(), tableIdentifier);
-      ;
       Map<String, String> tableParameters = table.parameters();
 
       return keysToRetrieve.stream()
@@ -286,7 +285,6 @@ public class GlueCatalogPartitionSyncOperations implements CatalogPartitionSyncO
       Table table =
           GlueCatalogTableUtils.getTable(
               glueClient, glueCatalogConfig.getCatalogId(), catalogTableIdentifier);
-      ;
 
       final Map<String, String> newParams = new HashMap<>();
       newParams.putAll(table.parameters());
