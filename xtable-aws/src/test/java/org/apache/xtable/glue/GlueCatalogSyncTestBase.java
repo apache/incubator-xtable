@@ -138,6 +138,13 @@ public class GlueCatalogSyncTestBase {
           .readSchema(INTERNAL_SCHEMA)
           .partitioningFields(Collections.singletonList(PARTITION_FIELD))
           .build();
+  protected static final InternalTable TEST_EVOLVED_HUDI_INTERNAL_TABLE =
+      InternalTable.builder()
+          .basePath(TEST_BASE_PATH)
+          .tableFormat(TableFormat.HUDI)
+          .readSchema(UPDATED_INTERNAL_SCHEMA)
+          .partitioningFields(Collections.singletonList(PARTITION_FIELD))
+          .build();
   protected static final InternalTable TEST_DELTA_INTERNAL_TABLE =
       InternalTable.builder()
           .basePath(TEST_BASE_PATH)

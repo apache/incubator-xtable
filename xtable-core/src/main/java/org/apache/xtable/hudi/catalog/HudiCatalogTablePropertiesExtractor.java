@@ -22,14 +22,17 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 import org.apache.spark.sql.types.StructType;
 
+import org.apache.hudi.common.util.ConfigUtils;
 import org.apache.hudi.common.util.StringUtils;
 
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
@@ -41,17 +44,28 @@ public class HudiCatalogTablePropertiesExtractor {
 
   private static final HudiCatalogTablePropertiesExtractor INSTANCE =
       new HudiCatalogTablePropertiesExtractor();
+  protected static final String HUDI_METADATA_CONFIG = "hudi.metadata-listing-enabled";
 
   public static HudiCatalogTablePropertiesExtractor getInstance() {
     return INSTANCE;
   }
-  /**
-   * Get Spark Sql related table properties. This is used for spark datasource table.
-   *
-   * @param schema The schema to write to the table.
-   * @return A new parameters added the spark's table properties.
-   */
-  public Map<String, String> getSparkTableProperties(
+
+  /** Get Hudi table properties that needs to be synced with catalog table */
+  public Map<String, String> getTableProperties(InternalTable table, int schemaLengthThreshold) {
+    Map<String, String> tableProperties = new HashMap<>();
+    List<String> partitionFields =
+        table.getPartitioningFields().stream()
+            .map(field -> field.getSourceField().getName())
+            .collect(Collectors.toList());
+    tableProperties.put(HUDI_METADATA_CONFIG, "true");
+    Map<String, String> sparkTableProperties =
+        getSparkTableProperties(partitionFields, "", schemaLengthThreshold, table.getReadSchema());
+    tableProperties.putAll(sparkTableProperties);
+    return tableProperties;
+  }
+
+  /** Get Spark Sql related table properties. This is used for spark datasource table. */
+  private Map<String, String> getSparkTableProperties(
       List<String> partitionNames,
       String sparkVersion,
       int schemaLengthThreshold,
@@ -122,5 +136,13 @@ public class HudiCatalogTablePropertiesExtractor {
       }
     }
     return sparkProperties;
+  }
+
+  /** Get Hudi serde properties that needs to be synced with catalog table */
+  public Map<String, String> getSerdeProperties(String basePath) {
+    Map<String, String> serdeProperties = new HashMap<>();
+    serdeProperties.put(ConfigUtils.TABLE_SERDE_PATH, basePath);
+    serdeProperties.put(ConfigUtils.IS_QUERY_AS_RO_TABLE, String.valueOf(false));
+    return serdeProperties;
   }
 }
