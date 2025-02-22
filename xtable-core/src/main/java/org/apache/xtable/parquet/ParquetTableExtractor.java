@@ -38,11 +38,14 @@ import org.apache.xtable.model.storage.TableFormat;
 public class ParquetTableExtractor {
   @Builder.Default
   private static final ParquetSchemaExtractor schemaExtractor = ParquetTableExtractor.getInstance();
+  @Builder.Default
+  private static final ParquetMetadataExtractor parquetMetadataExtractor =
+          ParquetMetadataExtractor.getInstance();
 
   public InternalTable table(String tableName, Long version) {
-    ParquetMetadata readFooter =
-        ParquetFileReader.readFooter(conf, path, ParquetMetadataConverter.NO_FILTER);
-    MessageType schema = readFooter.getFileMetaData().getSchema();
+    ParquetMetadata footer =
+            parquetMetadataExtractor.readParquetMetadata(conf, path, ParquetMetadataConverter.NO_FILTER);
+    MessageType schema = parquetMetadataExtractor.getSchema(footer);
     InternalSchema schema = schemaExtractor.toInternalSchema(schema);
     // TODO check partitionSchema of Parquet File
     List<InternalPartitionField> partitionFields =

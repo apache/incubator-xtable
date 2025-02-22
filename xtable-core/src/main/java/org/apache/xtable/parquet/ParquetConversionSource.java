@@ -46,8 +46,8 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   @NonNull private final Configuration hadoopConf;
 
   @Builder.Default
-  private static final ParquetSchemaConverter schemaExtractor =
-      ParquetSchemaConverter.getInstance();
+  private static final ParquetSchemaExtractor schemaExtractor =
+      ParquetSchemaExtractor.getInstance();
 
   @Builder.Default
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
@@ -78,7 +78,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.get().getPath());
     Schema tableSchema =
         new org.apache.parquet.parquet.ParquetSchemaConverter()
-            .convert(parquetMetadata.getFileMetaData().getSchema());
+            .convert(parquetMetadataExtractor.getSchema(parquetMetadata));
 
     Set<String> partitionKeys = initPartitionInfo().keySet();
 
@@ -127,6 +127,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                         .physicalPath(file.getPath().toString())
                         .fileFormat(FileFormat.APACHE_PARQUET)
                         .fileSizeBytes(file.getLen())
+                            //TODO create parquetPartitionHelper Class
                         .partitionValues(
                             parquetPartitionHelper.getPartitionValue(
                                 basePath,
@@ -134,6 +135,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                                 table.getReadSchema(),
                                 partitionInfo))
                         .lastModified(file.getModificationTime())
+                            //TODO create getColumnStatsForaFile method in parquetMetadataExtractor class
                         .columnStats(
                             parquetMetadataExtractor.getColumnStatsForaFile(
                                 hadoopConf, file, table))

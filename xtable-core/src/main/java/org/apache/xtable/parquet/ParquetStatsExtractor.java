@@ -8,13 +8,43 @@ import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.util.HiddenFileFilter;
 import org.apache.parquet.io.ParquetDecodingException;
 import org.apache.parquet.schema.MessageType;
-
+import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.column.Encoding;
+import org.apache.parquet.column.statistics.Statistics;
+import java.util.stream.Collectors;
+import org.apache.hadoop.fs.*;
 // TODO add other methods of stats (row group vs columns)
-public class ParquetTableExtractor {
+public class ParquetStatsExtractor {
+    @Builder.Default
+    private static final ParquetMetadataExtractor parquetMetadataExtractor =
+            ParquetMetadataExtractor.getInstance();
+
+    private static Map<ColumnDescriptor, ColStats> stats = new LinkedHashMap<ColumnDescriptor, ColStats>();
+    private InternalDataFile toInternalDataFile(Configuration hadoopConf,
+            String parentPath, Map<ColumnDescriptor, ColStats> stats) {
+        FileSystem fs = FileSystem.get(hadoopConf);
+        FileStatus file = fs.getFileStatus(new Path(parentPath));
+
+        return InternalDataFile.builder()
+                .physicalPath(parentPath)
+                .fileFormat(FileFormat.APACHE_PARQUET)
+                //TODO create parquetPartitionHelper Class getPartitionValue(
+                //                                basePath,
+                //                                file.getPath().toString(),
+                //                                table.getReadSchema(),
+                //                                partitionInfo))
+                .partitionValues(schema.getDoc())
+                .fileSizeBytes(file.getLen())
+                // TODO check record count of Parquet
+                .recordCount()
+                .columnStats(stats.values().stream().collect(Collectors.toList()))
+                .lastModified(file.getModificationTime())
+                .build();
+    }
     private static void add(ParquetMetadata footer) {
         for (BlockMetaData blockMetaData : footer.getBlocks()) {
 
-            MessageType schema = footer.getFileMetaData().getSchema();
+            MessageType schema = parquetMetadataExtractor.getSchema(footer)
             recordCount += blockMetaData.getRowCount();
             List<ColumnChunkMetaData> columns = blockMetaData.getColumns();
             for (ColumnChunkMetaData columnMetaData : columns) {
@@ -28,6 +58,36 @@ public class ParquetTableExtractor {
                         columnMetaData.getEncodings(),
                         columnMetaData.getStatistics());
             }
+        }
+    }
+    private static class Stats {
+        long min = Long.MAX_VALUE;
+        long max = Long.MIN_VALUE;
+        long total = 0;
+
+        public void add(long length) {
+            min = Math.min(length, min);
+            max = Math.max(length, max);
+            total += length;
+        }
+    }
+    private static class ColStats {
+
+        Stats valueCountStats = new Stats();
+        Stats allStats = new Stats();
+        Stats uncStats = new Stats();
+        Set<Encoding> encodings = new TreeSet<Encoding>();
+        Statistics colValuesStats = null;
+        int blocks = 0;
+
+        public void add(
+                long valueCount, long size, long uncSize, Collection<Encoding> encodings, Statistics colValuesStats) {
+            ++blocks;
+            valueCountStats.add(valueCount);
+            allStats.add(size);
+            uncStats.add(uncSize);
+            this.encodings.addAll(encodings);
+            this.colValuesStats = colValuesStats;
         }
     }
 }
