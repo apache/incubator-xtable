@@ -47,7 +47,7 @@ public class ParquetTableExtractor {
             parquetMetadataExtractor.readParquetMetadata(conf, path, ParquetMetadataConverter.NO_FILTER);
     MessageType schema = parquetMetadataExtractor.getSchema(footer);
     InternalSchema schema = schemaExtractor.toInternalSchema(schema);
-    // TODO check ParquetPartitionExtractor,partitionSchema of Parquet File
+    // TODO check ParquetPartitionExtractor, how to get partitionSchema of Parquet File
     List<InternalPartitionField> partitionFields =
         ParquetPartitionExtractor.getInstance()
             .convertFromParquetPartitionFormat(schema, fileMetaData.metadata().partitionSchema());

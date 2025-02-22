@@ -53,9 +53,9 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
- /* @Builder.Default
+  @Builder.Default
   private static final ParquetPartitionHelper parquetPartitionHelper =
-      ParquetPartitionHelper.getInstance();*/
+      ParquetPartitionHelper.getInstance();
 
   @Builder.Default
   private static final ParquetStatsExtractor parquetStatsExtractor =
