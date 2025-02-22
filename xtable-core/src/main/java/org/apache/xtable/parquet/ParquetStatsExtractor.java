@@ -20,6 +20,7 @@ public class ParquetStatsExtractor {
             ParquetMetadataExtractor.getInstance();
 
     private static Map<ColumnDescriptor, ColStats> stats = new LinkedHashMap<ColumnDescriptor, ColStats>();
+    private static long recordCount = 0;
     private InternalDataFile toInternalDataFile(Configuration hadoopConf,
             String parentPath, Map<ColumnDescriptor, ColStats> stats) {
         FileSystem fs = FileSystem.get(hadoopConf);
@@ -33,15 +34,14 @@ public class ParquetStatsExtractor {
                 //                                file.getPath().toString(),
                 //                                table.getReadSchema(),
                 //                                partitionInfo))
-                .partitionValues(schema.getDoc())
+                .partitionValues(/*schema.getDoc()*/)
                 .fileSizeBytes(file.getLen())
-                // TODO check record count of Parquet
-                .recordCount()
+                .recordCount(recordCount)
                 .columnStats(stats.values().stream().collect(Collectors.toList()))
                 .lastModified(file.getModificationTime())
                 .build();
     }
-    private static void add(ParquetMetadata footer) {
+    private static void getColumnStatsForaFile(ParquetMetadata footer) {
         for (BlockMetaData blockMetaData : footer.getBlocks()) {
 
             MessageType schema = parquetMetadataExtractor.getSchema(footer)
@@ -50,7 +50,7 @@ public class ParquetStatsExtractor {
             for (ColumnChunkMetaData columnMetaData : columns) {
                 ColumnDescriptor desc =
                         schema.getColumnDescription(columnMetaData.getPath().toArray());
-                add(
+                ColStats.add(
                         desc,
                         columnMetaData.getValueCount(),
                         columnMetaData.getTotalSize(),
@@ -88,6 +88,20 @@ public class ParquetStatsExtractor {
             uncStats.add(uncSize);
             this.encodings.addAll(encodings);
             this.colValuesStats = colValuesStats;
+        }
+        private static void add(
+                ColumnDescriptor desc,
+                long valueCount,
+                long size,
+                long uncSize,
+                Collection<Encoding> encodings,
+                Statistics colValuesStats) {
+            ColStats colStats = stats.get(desc);
+            if (colStats == null) {
+                colStats = new ColStats();
+                stats.put(desc, colStats);
+            }
+            colStats.add(valueCount, size, uncSize, encodings, colValuesStats);
         }
     }
 }

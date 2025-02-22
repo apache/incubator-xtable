@@ -53,9 +53,13 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
-  @Builder.Default
+ /* @Builder.Default
   private static final ParquetPartitionHelper parquetPartitionHelper =
-      ParquetPartitionHelper.getInstance();
+      ParquetPartitionHelper.getInstance();*/
+
+  @Builder.Default
+  private static final ParquetStatsExtractor parquetStatsExtractor =
+          ParquetStatsExtractor.getInstance();
 
   private Map<String, List<String>> initPartitionInfo() {
     return getPartitionFromDirectoryStructure(hadoopConf, basePath, Collections.emptyMap());
@@ -135,10 +139,9 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                                 table.getReadSchema(),
                                 partitionInfo))
                         .lastModified(file.getModificationTime())
-                            //TODO create getColumnStatsForaFile method in parquetMetadataExtractor class
                         .columnStats(
-                            parquetMetadataExtractor.getColumnStatsForaFile(
-                                hadoopConf, file, table))
+                                parquetStatsExtractor.getColumnStatsForaFile(parquetMetadataExtractor.readParquetMetadata(
+                                hadoopConf, file.getPath().toString()))
                         .build())
             .collect(Collectors.toList());
 
