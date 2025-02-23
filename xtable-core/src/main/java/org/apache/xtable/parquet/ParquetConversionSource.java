@@ -54,8 +54,8 @@ public class ParquetConversionSource implements ConversionSource<Long> {
       ParquetMetadataExtractor.getInstance();
 
   @Builder.Default
-  private static final ParquetPartitionHelper parquetPartitionHelper =
-      ParquetPartitionHelper.getInstance();
+  private static final ParquetPartitionExtractor parquetPartitionExtractor =
+      ParquetPartitionExtractor.getInstance();
 
   @Builder.Default
   private static final ParquetStatsExtractor parquetStatsExtractor =
@@ -95,7 +95,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     List<InternalPartitionField> partitionFields =
         partitionKeys.isEmpty()
             ? Collections.emptyList()
-            : parquetPartitionHelper.getInternalPartitionField(partitionKeys, schema);
+            : parquetPartitionExtractor.getInternalPartitionField(partitionKeys, schema);
     DataLayoutStrategy dataLayoutStrategy =
         partitionFields.isEmpty()
             ? DataLayoutStrategy.FLAT
@@ -131,9 +131,8 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                         .physicalPath(file.getPath().toString())
                         .fileFormat(FileFormat.APACHE_PARQUET)
                         .fileSizeBytes(file.getLen())
-                            //TODO create parquetPartitionHelper Class
                         .partitionValues(
-                            parquetPartitionHelper.getPartitionValue(
+                                parquetPartitionExtractor.getPartitionValue(
                                 basePath,
                                 file.getPath().toString(),
                                 table.getReadSchema(),
@@ -174,7 +173,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
           InternalDataFile.builder()
               .physicalPath(tableStatus.getPath().toString())
               .partitionValues(
-                  parquetPartitionHelper.getPartitionValue(
+                      parquetPartitionExtractor.getPartitionValue(
                       basePath,
                       tableStatus.getPath().toString(),
                       internalTable.getReadSchema(),

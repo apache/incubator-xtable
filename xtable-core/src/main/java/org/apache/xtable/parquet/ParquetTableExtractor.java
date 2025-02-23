@@ -41,16 +41,19 @@ public class ParquetTableExtractor {
   @Builder.Default
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
           ParquetMetadataExtractor.getInstance();
+  private Map<String, List<String>> initPartitionInfo() {
+    return getPartitionFromDirectoryStructure(hadoopConf, basePath, Collections.emptyMap());
+  }
 
   public InternalTable table(String tableName, Long version) {
     ParquetMetadata footer =
             parquetMetadataExtractor.readParquetMetadata(conf, path, ParquetMetadataConverter.NO_FILTER);
     MessageType schema = parquetMetadataExtractor.getSchema(footer);
     InternalSchema schema = schemaExtractor.toInternalSchema(schema);
-    // TODO check ParquetPartitionExtractor, how to get partitionSchema of Parquet File
+    Set<String> partitionKeys = initPartitionInfo().keySet();
     List<InternalPartitionField> partitionFields =
         ParquetPartitionExtractor.getInstance()
-            .convertFromParquetPartitionFormat(schema, fileMetaData.metadata().partitionSchema());
+            .convertFromParquetPartitionFormat(partitionKeys,schema);
     DataLayoutStrategy dataLayoutStrategy =
         !partitionFields.isEmpty()
             ? DataLayoutStrategy.HIVE_STYLE_PARTITION
