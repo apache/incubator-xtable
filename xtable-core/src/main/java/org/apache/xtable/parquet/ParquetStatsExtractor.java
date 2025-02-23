@@ -13,28 +13,36 @@ import org.apache.parquet.column.Encoding;
 import org.apache.parquet.column.statistics.Statistics;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.*;
-// TODO add other methods of stats (row group vs columns)
+
 public class ParquetStatsExtractor {
     @Builder.Default
     private static final ParquetMetadataExtractor parquetMetadataExtractor =
             ParquetMetadataExtractor.getInstance();
+    @Builder.Default
+    private static final ParquetPartitionExtractor partitionExtractor = ParquetPartitionExtractor.getInstance();
 
     private static Map<ColumnDescriptor, ColStats> stats = new LinkedHashMap<ColumnDescriptor, ColStats>();
     private static long recordCount = 0;
+    private Map<String, List<String>> initPartitionInfo() {
+        return getPartitionFromDirectoryStructure(hadoopConf, basePath, Collections.emptyMap());
+    }
     private InternalDataFile toInternalDataFile(Configuration hadoopConf,
             String parentPath, Map<ColumnDescriptor, ColStats> stats) {
         FileSystem fs = FileSystem.get(hadoopConf);
         FileStatus file = fs.getFileStatus(new Path(parentPath));
+        Map<String, List<String>> partitionInfo = initPartitionInfo();
 
+        ParquetMetadata footer =
+                parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
+        MessageType schema = parquetMetadataExtractor.getSchema(footer);
+        InternalSchema schema = schemaExtractor.toInternalSchema(schema);
+        List<PartitionValue> partitionValues =
+                partitionExtractor
+                        .getPartitionValue(parentPath,file.getPath().toString(),schema,partitionInfo);
         return InternalDataFile.builder()
                 .physicalPath(parentPath)
                 .fileFormat(FileFormat.APACHE_PARQUET)
-                //TODO create parquetPartitionHelper Class getPartitionValue(
-                //                                basePath,
-                //                                file.getPath().toString(),
-                //                                table.getReadSchema(),
-                //                                partitionInfo))
-                .partitionValues(/*schema.getDoc()*/)
+                .partitionValues(partitionValues)
                 .fileSizeBytes(file.getLen())
                 .recordCount(recordCount)
                 .columnStats(stats.values().stream().collect(Collectors.toList()))

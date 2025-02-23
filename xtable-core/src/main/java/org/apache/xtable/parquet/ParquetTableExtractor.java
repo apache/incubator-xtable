@@ -39,6 +39,8 @@ public class ParquetTableExtractor {
   @Builder.Default
   private static final ParquetSchemaExtractor schemaExtractor = ParquetTableExtractor.getInstance();
   @Builder.Default
+  private static final ParquetPartitionExtractor partitionExtractor = ParquetPartitionExtractor.getInstance();
+  @Builder.Default
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
           ParquetMetadataExtractor.getInstance();
   private Map<String, List<String>> initPartitionInfo() {
@@ -47,13 +49,13 @@ public class ParquetTableExtractor {
 
   public InternalTable table(String tableName, Long version) {
     ParquetMetadata footer =
-            parquetMetadataExtractor.readParquetMetadata(conf, path, ParquetMetadataConverter.NO_FILTER);
+            parquetMetadataExtractor.readParquetMetadata(conf, path);
     MessageType schema = parquetMetadataExtractor.getSchema(footer);
     InternalSchema schema = schemaExtractor.toInternalSchema(schema);
     Set<String> partitionKeys = initPartitionInfo().keySet();
     List<InternalPartitionField> partitionFields =
-        ParquetPartitionExtractor.getInstance()
-            .convertFromParquetPartitionFormat(partitionKeys,schema);
+            partitionExtractor
+            .getInternalPartitionField(partitionKeys,schema);
     DataLayoutStrategy dataLayoutStrategy =
         !partitionFields.isEmpty()
             ? DataLayoutStrategy.HIVE_STYLE_PARTITION
