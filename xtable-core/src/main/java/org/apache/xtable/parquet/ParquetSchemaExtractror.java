@@ -118,19 +118,15 @@ public class ParquetSchemaConverter {
       case BYTE_ARRAY:
         logicalType = schema.getLogicalType();
         // TODO: any metadata to add ?
-        if (logicalType== LogicalTypes.JSON) {
+        if (logicalType == LogicalTypes.JSON) {
           newDataType = InternalType.JSON;
-        }
-        else if (logicalType instanceof LogicalTypes.BSON) {
+        } else if (logicalType instanceof LogicalTypes.BSON) {
           newDataType = InternalType.BSON;
-        }
-        else if (logicalType instanceof LogicalTypes.VARIANT) {
+        } else if (logicalType instanceof LogicalTypes.VARIANT) {
           newDataType = InternalType.VARIANT;
-        }
-        else if (logicalType instanceof LogicalTypes.GEOMETRY) {
+        } else if (logicalType instanceof LogicalTypes.GEOMETRY) {
           newDataType = InternalType.GEOMETRY;
-        }
-        else if (logicalType instanceof LogicalTypes.GEOGRAPHY) {
+        } else if (logicalType instanceof LogicalTypes.GEOGRAPHY) {
           newDataType = InternalType.GEOGRAPHY;
         }
         break;

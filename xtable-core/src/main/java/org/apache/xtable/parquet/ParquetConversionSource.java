@@ -59,7 +59,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   @Builder.Default
   private static final ParquetStatsExtractor parquetStatsExtractor =
-          ParquetStatsExtractor.getInstance();
+      ParquetStatsExtractor.getInstance();
 
   private Map<String, List<String>> initPartitionInfo() {
     return getPartitionFromDirectoryStructure(hadoopConf, basePath, Collections.emptyMap());
@@ -132,17 +132,19 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                         .fileFormat(FileFormat.APACHE_PARQUET)
                         .fileSizeBytes(file.getLen())
                         .partitionValues(
-                                parquetPartitionExtractor.getPartitionValue(
+                            parquetPartitionExtractor.getPartitionValue(
                                 basePath,
                                 file.getPath().toString(),
                                 table.getReadSchema(),
                                 partitionInfo))
                         .lastModified(file.getModificationTime())
                         .columnStats(
-                                parquetStatsExtractor.getColumnStatsForaFile(parquetMetadataExtractor.readParquetMetadata(
-                                hadoopConf, file.getPath().toString()))
-                        .build())
-            .collect(Collectors.toList());
+                            parquetStatsExtractor
+                                .getColumnStatsForaFile(
+                                    parquetMetadataExtractor.readParquetMetadata(
+                                        hadoopConf, file.getPath().toString()))
+                                .build())
+                        .collect(Collectors.toList()));
 
     return InternalSnapshot.builder()
         .table(table)
@@ -173,7 +175,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
           InternalDataFile.builder()
               .physicalPath(tableStatus.getPath().toString())
               .partitionValues(
-                      parquetPartitionExtractor.getPartitionValue(
+                  parquetPartitionExtractor.getPartitionValue(
                       basePath,
                       tableStatus.getPath().toString(),
                       internalTable.getReadSchema(),

@@ -23,8 +23,6 @@ import java.util.List;
 
 import lombok.Builder;
 
-import org.apache.parquet.hadoop.ParquetFileReader;
-
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -38,24 +36,26 @@ import org.apache.xtable.model.storage.TableFormat;
 public class ParquetTableExtractor {
   @Builder.Default
   private static final ParquetSchemaExtractor schemaExtractor = ParquetTableExtractor.getInstance();
+
   @Builder.Default
-  private static final ParquetPartitionExtractor partitionExtractor = ParquetPartitionExtractor.getInstance();
+  private static final ParquetPartitionExtractor partitionExtractor =
+      ParquetPartitionExtractor.getInstance();
+
   @Builder.Default
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
-          ParquetMetadataExtractor.getInstance();
+      ParquetMetadataExtractor.getInstance();
+
   private Map<String, List<String>> initPartitionInfo() {
     return getPartitionFromDirectoryStructure(hadoopConf, basePath, Collections.emptyMap());
   }
 
   public InternalTable table(String tableName, Long version) {
-    ParquetMetadata footer =
-            parquetMetadataExtractor.readParquetMetadata(conf, path);
+    ParquetMetadata footer = parquetMetadataExtractor.readParquetMetadata(conf, path);
     MessageType schema = parquetMetadataExtractor.getSchema(footer);
     InternalSchema schema = schemaExtractor.toInternalSchema(schema);
     Set<String> partitionKeys = initPartitionInfo().keySet();
     List<InternalPartitionField> partitionFields =
-            partitionExtractor
-            .getInternalPartitionField(partitionKeys,schema);
+        partitionExtractor.getInternalPartitionField(partitionKeys, schema);
     DataLayoutStrategy dataLayoutStrategy =
         !partitionFields.isEmpty()
             ? DataLayoutStrategy.HIVE_STYLE_PARTITION
