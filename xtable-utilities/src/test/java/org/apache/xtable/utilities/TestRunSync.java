@@ -44,11 +44,6 @@ class TestRunSync {
 
     @Test
     public void testMain() {
-//      String[] args =
-//          new String[] {
-//            "--datasetConfig",
-//   "/Users/vaibhakumar/Desktop/opensource/incubator-xtable/my_config.yaml"
-//          };
       String projectRoot = System.getProperty("user.dir");
       // Construct the path to the file in the root directory
       int lastSlashIndex = projectRoot.lastIndexOf('/');
@@ -62,6 +57,19 @@ class TestRunSync {
         throw new UncheckedIOException(ex);
       }
     }
+
+  @Test
+  public void testNonExistentFile() {
+    String projectRoot = System.getProperty("user.dir");
+    // Construct the path to the file in the root directory
+    int lastSlashIndex = projectRoot.lastIndexOf('/');
+    String result = projectRoot.substring(0, lastSlashIndex);
+    File file = new File(result, "/my_config1.yaml");
+    String filePath = file.getPath();
+    Assertions.assertThrows(IOException.class, () -> {
+      RunSync.getDatasetConfig(filePath);
+    });
+  }
 
   @Test
   public void testGetDatasetConfigWithValidYAML() throws IOException {
