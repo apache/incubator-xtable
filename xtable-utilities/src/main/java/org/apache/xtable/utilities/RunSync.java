@@ -26,6 +26,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import lombok.Data;
@@ -71,6 +72,7 @@ public class RunSync {
   private static final String ICEBERG_CATALOG_CONFIG_PATH = "i";
   private static final String HELP_OPTION = "h";
 
+  private static final Logger LOGGER = Logger.getLogger(RunSync.class.getName());
   private static final Options OPTIONS =
       new Options()
           .addRequiredOption(
@@ -172,36 +174,36 @@ public class RunSync {
     }
   }
 
-  public static DatasetConfig getDatasetConfig(CommandLine cmd) throws IOException {
+  public static DatasetConfig getDatasetConfig(String d) throws IOException {
     // Initialize DatasetConfig
     DatasetConfig datasetConfig = new DatasetConfig();
-    try (InputStream inputStream =
-        Files.newInputStream(Paths.get(cmd.getOptionValue(DATASET_CONFIG_OPTION)))) {
+
+    try (InputStream inputStream = Files.newInputStream(Paths.get(d))) {
       ObjectReader objectReader = YAML_MAPPER.readerForUpdating(datasetConfig);
       objectReader.readValue(inputStream);
     }
     return datasetConfig;
   }
 
-  public static Configuration gethadoopConf(CommandLine cmd) throws IOException {
+  public static Configuration gethadoopConf(String cmd) throws IOException {
     // Load configurations
-    byte[] customConfig = getCustomConfigurations(cmd, HADOOP_CONFIG_PATH);
+    byte[] customConfig = getCustomConfigurations(cmd);
     Configuration hadoopConf = loadHadoopConf(customConfig);
     return hadoopConf;
   }
 
-  public static IcebergCatalogConfig getIcebergCatalogConfig(CommandLine cmd) throws IOException {
+  public static IcebergCatalogConfig getIcebergCatalogConfig(String cmd) throws IOException {
     // Load configurations
-    byte[] icebergCatalogConfigInput = getCustomConfigurations(cmd, ICEBERG_CATALOG_CONFIG_PATH);
+    byte[] icebergCatalogConfigInput = getCustomConfigurations(cmd);
     IcebergCatalogConfig icebergCatalogConfig = loadIcebergCatalogConfig(icebergCatalogConfigInput);
     return icebergCatalogConfig;
   }
 
   public static ConversionSourceProvider<?> getConversionSourceProvider(
-      CommandLine cmd, DatasetConfig datasetConfig, Configuration hadoopConf) throws IOException {
+      String cmd, DatasetConfig datasetConfig, Configuration hadoopConf) throws IOException {
     // Process source format
     String sourceFormat = datasetConfig.sourceFormat;
-    byte[] customConfig = getCustomConfigurations(cmd, CONVERTERS_CONFIG_PATH);
+    byte[] customConfig = getCustomConfigurations(cmd);
     TableFormatConverters tableFormatConverters = loadTableFormatConversionConfigs(customConfig);
     TableFormatConverters.ConversionConfig sourceConversionConfig =
         tableFormatConverters.getTableFormatConverters().get(sourceFormat);
@@ -243,22 +245,37 @@ public class RunSync {
     return cmd;
   }
 
+  public static String getValueFromConfig(CommandLine cmd, String configFlag) {
+    return cmd.getOptionValue(configFlag);
+  }
+
   public static void main(String[] args) throws IOException {
     CommandLine cmd = CommandParser(args);
-    DatasetConfig datasetConfig = getDatasetConfig(cmd);
-    IcebergCatalogConfig icebergCatalogConfig = getIcebergCatalogConfig(cmd);
-    Configuration hadoopConf = gethadoopConf(cmd);
+    String datasetConfigpath = getValueFromConfig(cmd, DATASET_CONFIG_OPTION);
+    LOGGER.info("datasetConfigpath" + datasetConfigpath);
+    String icebergCatalogConfigpath = getValueFromConfig(cmd, ICEBERG_CATALOG_CONFIG_PATH);
+    LOGGER.info("icebergCatalogConfigpath" + icebergCatalogConfigpath);
+    String hadoopConfigpath = getValueFromConfig(cmd, HADOOP_CONFIG_PATH);
+    LOGGER.info("hadoopConfigpath" + hadoopConfigpath);
+    String conversionProviderConfigpath = getValueFromConfig(cmd, CONVERTERS_CONFIG_PATH);
+    LOGGER.info("conversionProviderConfigpath" + conversionProviderConfigpath);
+    DatasetConfig datasetConfig = getDatasetConfig(datasetConfigpath);
+    LOGGER.info("datasetConfig" + datasetConfig);
+    IcebergCatalogConfig icebergCatalogConfig = getIcebergCatalogConfig(icebergCatalogConfigpath);
+    LOGGER.info("icebergCatalogConfig" + icebergCatalogConfig);
+    Configuration hadoopConf = gethadoopConf(hadoopConfigpath);
+    LOGGER.info("hadoopConf" + hadoopConf);
     ConversionSourceProvider conversionSourceProvider =
-        getConversionSourceProvider(cmd, datasetConfig, hadoopConf);
+        getConversionSourceProvider(conversionProviderConfigpath, datasetConfig, hadoopConf);
     List<String> tableFormatList = getTableFormatList(datasetConfig);
     formatConvertor(
         datasetConfig, tableFormatList, icebergCatalogConfig, hadoopConf, conversionSourceProvider);
   }
 
-  static byte[] getCustomConfigurations(CommandLine cmd, String option) throws IOException {
+  static byte[] getCustomConfigurations(String cmd) throws IOException {
     byte[] customConfig = null;
-    if (cmd.hasOption(option)) {
-      customConfig = Files.readAllBytes(Paths.get(cmd.getOptionValue(option)));
+    if (cmd != null) {
+      customConfig = Files.readAllBytes(Paths.get(cmd));
     }
     return customConfig;
   }

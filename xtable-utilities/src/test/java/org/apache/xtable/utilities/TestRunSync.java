@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -43,34 +42,43 @@ import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfi
 class TestRunSync {
   private static final Logger LOGGER = Logger.getLogger(TestRunSync.class.getName());
 
+    @Test
+    public void testMain() {
+//      String[] args =
+//          new String[] {
+//            "--datasetConfig",
+//   "/Users/vaibhakumar/Desktop/opensource/incubator-xtable/my_config.yaml"
+//          };
+      String projectRoot = System.getProperty("user.dir");
+      // Construct the path to the file in the root directory
+      int lastSlashIndex = projectRoot.lastIndexOf('/');
+      String result = projectRoot.substring(0, lastSlashIndex);
+      File file = new File(result, "/my_config.yaml");
+      String filePath = file.getPath();
+      String[] args = new String[] {"--datasetConfig", filePath};
+      try {
+        RunSync.main(args);
+      } catch (IOException ex) {
+        throw new UncheckedIOException(ex);
+      }
+    }
+
   @Test
-  public void testFormatConvertor() {
+  public void testGetDatasetConfigWithValidYAML() throws IOException {
+    // Arrange
+    // Act
     String projectRoot = System.getProperty("user.dir");
     // Construct the path to the file in the root directory
     int lastSlashIndex = projectRoot.lastIndexOf('/');
     String result = projectRoot.substring(0, lastSlashIndex);
     File file = new File(result, "/my_config.yaml");
     String filePath = file.getPath();
-    String[] args = new String[] {"--datasetConfig", filePath};
-    CommandLine cmd = RunSync.CommandParser(args);
-    try {
-      DatasetConfig datasetConfig = RunSync.getDatasetConfig(cmd);
-      IcebergCatalogConfig icebergCatalogConfig = RunSync.getIcebergCatalogConfig(cmd);
-      Configuration hadoopConf = RunSync.gethadoopConf(cmd);
-      ConversionSourceProvider conversionSourceProvider =
-          RunSync.getConversionSourceProvider(cmd, datasetConfig, hadoopConf);
-      List<String> tableFormatList = RunSync.getTableFormatList(datasetConfig);
-      RunSync.formatConvertor(
-          datasetConfig,
-          tableFormatList,
-          icebergCatalogConfig,
-          hadoopConf,
-          conversionSourceProvider);
-    } catch (IOException ex) {
-      throw new UncheckedIOException(ex);
-    }
+    DatasetConfig config = RunSync.getDatasetConfig(filePath);
+    // Assert
+    Assertions.assertNotNull(config);
+    Assertions.assertEquals("ICEBERG", config.sourceFormat);
+    Assertions.assertNotEquals("DELTA1", config.targetFormats);
   }
-
   /** Tests that the default hadoop configs are loaded. */
   @Test
   public void testLoadDefaultHadoopConfig() {
