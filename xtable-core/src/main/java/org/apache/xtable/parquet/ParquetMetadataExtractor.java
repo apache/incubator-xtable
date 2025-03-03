@@ -16,25 +16,20 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.catalog;
+import org.apache.hadoop.fs.*;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.schema.MessageType;
 
-/**
- * Represents a hierarchical table identifier, often including catalog, database (or schema), and
- * table names. Some catalogs may omit the catalog name.
- */
-public interface HierarchicalTableIdentifier extends CatalogTableIdentifier {
-  /**
-   * @return the catalog name if present, otherwise null
-   */
-  String getCatalogName();
+public class ParquetMetadataExtractor {
 
-  /**
-   * @return the database (or schema) name; required
-   */
-  String getDatabaseName();
+  private static MessageType getSchema(ParquetMetadata footer) {
+    MessageType schema = footer.getFileMetaData().getSchema();
+    return schema;
+  }
 
-  /**
-   * @return the table name; required
-   */
-  String getTableName();
+  private static ParquetMetadata readParquetMetadata(HadoopConf conf, BasePath path) {
+    ParquetMetadata footer =
+        ParquetFileReader.readFooter(conf, path, ParquetMetadataConverter.NO_FILTER);
+    return footer;
+  }
 }
