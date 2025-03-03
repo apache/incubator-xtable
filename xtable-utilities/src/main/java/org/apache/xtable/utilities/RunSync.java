@@ -25,6 +25,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.stream.Collectors;
 
@@ -103,6 +104,8 @@ public class RunSync {
       IcebergCatalogConfig icebergCatalogConfig,
       DatasetConfig datasetConfig,
       Properties sourceProperties) {
+    Objects.requireNonNull(table, "Table cannot be null");
+    Objects.requireNonNull(datasetConfig, "datasetConfig cannot be null");
     SourceTable sourceTable =
         SourceTable.builder()
             .name(table.getTableName())
@@ -120,6 +123,8 @@ public class RunSync {
       DatasetConfig.Table table,
       IcebergCatalogConfig icebergCatalogConfig,
       List<String> tableFormatList) {
+    Objects.requireNonNull(table, "Table cannot be null");
+    Objects.requireNonNull(tableFormatList, "tableFormatList cannot be null");
     List<TargetTable> targetTables =
         tableFormatList.stream()
             .map(
@@ -142,6 +147,7 @@ public class RunSync {
       IcebergCatalogConfig icebergCatalogConfig,
       Configuration hadoopConf,
       ConversionSourceProvider conversionSourceProvider) {
+    ConversionController conversionController = new ConversionController(hadoopConf);
     for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
       log.info(
           "Running sync for basePath {} for following table formats {}",
@@ -153,7 +159,6 @@ public class RunSync {
             HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec());
       }
 
-      ConversionController conversionController = new ConversionController(hadoopConf);
       SourceTable sourceTable =
           sourceTableBuilder(table, icebergCatalogConfig, datasetConfig, sourceProperties);
       List<TargetTable> targetTables =
@@ -172,27 +177,28 @@ public class RunSync {
     }
   }
 
-  public static DatasetConfig getDatasetConfig(String d) throws IOException {
+  public static DatasetConfig getDatasetConfig(String datasetConfigPath) throws IOException {
     // Initialize DatasetConfig
     DatasetConfig datasetConfig = new DatasetConfig();
 
-    try (InputStream inputStream = Files.newInputStream(Paths.get(d))) {
+    try (InputStream inputStream = Files.newInputStream(Paths.get(datasetConfigPath))) {
       ObjectReader objectReader = YAML_MAPPER.readerForUpdating(datasetConfig);
       objectReader.readValue(inputStream);
     }
     return datasetConfig;
   }
 
-  public static Configuration gethadoopConf(String cmd) throws IOException {
+  public static Configuration gethadoopConf(String hadoopConfigPath) throws IOException {
     // Load configurations
-    byte[] customConfig = getCustomConfigurations(cmd);
+    byte[] customConfig = getCustomConfigurations(hadoopConfigPath);
     Configuration hadoopConf = loadHadoopConf(customConfig);
     return hadoopConf;
   }
 
-  public static IcebergCatalogConfig getIcebergCatalogConfig(String cmd) throws IOException {
+  public static IcebergCatalogConfig getIcebergCatalogConfig(String icebergCatalogConfigPath)
+      throws IOException {
     // Load configurations
-    byte[] icebergCatalogConfigInput = getCustomConfigurations(cmd);
+    byte[] icebergCatalogConfigInput = getCustomConfigurations(icebergCatalogConfigPath);
     IcebergCatalogConfig icebergCatalogConfig = loadIcebergCatalogConfig(icebergCatalogConfigInput);
     return icebergCatalogConfig;
   }

@@ -72,7 +72,6 @@ import org.apache.xtable.utilities.RunCatalogSync.DatasetConfig.StorageIdentifie
 import org.apache.xtable.utilities.RunCatalogSync.DatasetConfig.TableIdentifier;
 import org.apache.xtable.utilities.RunCatalogSync.DatasetConfig.TargetTableIdentifier;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters;
-// import org.apache.xtable.utilities.RunSync.ConfigOption;
 
 /**
  * Provides standalone process for reading tables from a source catalog and synchronizing their
