@@ -25,38 +25,34 @@ import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.utilities.RunSync.DatasetConfig;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
 
 class TestRunSync {
-  private static final Logger LOGGER = Logger.getLogger(TestRunSync.class.getName());
 
-    @Test
-    public void testMain() {
-      String projectRoot = System.getProperty("user.dir");
-      // Construct the path to the file in the root directory
-      int lastSlashIndex = projectRoot.lastIndexOf('/');
-      String result = projectRoot.substring(0, lastSlashIndex);
-      File file = new File(result, "/my_config.yaml");
-      String filePath = file.getPath();
-      String[] args = new String[] {"--datasetConfig", filePath};
-      try {
-        RunSync.main(args);
-      } catch (IOException ex) {
-        throw new UncheckedIOException(ex);
-      }
+  @Test
+  public void testMain() {
+    String projectRoot = System.getProperty("user.dir");
+    // Construct the path to the file in the root directory
+    int lastSlashIndex = projectRoot.lastIndexOf('/');
+    String result = projectRoot.substring(0, lastSlashIndex);
+    File file = new File(result, "/my_config.yaml");
+    String filePath = file.getPath();
+    String[] args = new String[] {"--datasetConfig", filePath};
+    try {
+      RunSync.main(args);
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
     }
+  }
 
   @Test
   public void testNonExistentFile() {
@@ -66,15 +62,15 @@ class TestRunSync {
     String result = projectRoot.substring(0, lastSlashIndex);
     File file = new File(result, "/my_config1.yaml");
     String filePath = file.getPath();
-    Assertions.assertThrows(IOException.class, () -> {
-      RunSync.getDatasetConfig(filePath);
-    });
+    Assertions.assertThrows(
+        IOException.class,
+        () -> {
+          RunSync.getDatasetConfig(filePath);
+        });
   }
 
   @Test
   public void testGetDatasetConfigWithValidYAML() throws IOException {
-    // Arrange
-    // Act
     String projectRoot = System.getProperty("user.dir");
     // Construct the path to the file in the root directory
     int lastSlashIndex = projectRoot.lastIndexOf('/');

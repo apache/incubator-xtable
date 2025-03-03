@@ -26,7 +26,6 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import lombok.Data;
@@ -72,7 +71,6 @@ public class RunSync {
   private static final String ICEBERG_CATALOG_CONFIG_PATH = "i";
   private static final String HELP_OPTION = "h";
 
-  private static final Logger LOGGER = Logger.getLogger(RunSync.class.getName());
   private static final Options OPTIONS =
       new Options()
           .addRequiredOption(
@@ -252,19 +250,12 @@ public class RunSync {
   public static void main(String[] args) throws IOException {
     CommandLine cmd = CommandParser(args);
     String datasetConfigpath = getValueFromConfig(cmd, DATASET_CONFIG_OPTION);
-    LOGGER.info("datasetConfigpath" + datasetConfigpath);
     String icebergCatalogConfigpath = getValueFromConfig(cmd, ICEBERG_CATALOG_CONFIG_PATH);
-    LOGGER.info("icebergCatalogConfigpath" + icebergCatalogConfigpath);
     String hadoopConfigpath = getValueFromConfig(cmd, HADOOP_CONFIG_PATH);
-    LOGGER.info("hadoopConfigpath" + hadoopConfigpath);
     String conversionProviderConfigpath = getValueFromConfig(cmd, CONVERTERS_CONFIG_PATH);
-    LOGGER.info("conversionProviderConfigpath" + conversionProviderConfigpath);
     DatasetConfig datasetConfig = getDatasetConfig(datasetConfigpath);
-    LOGGER.info("datasetConfig" + datasetConfig);
     IcebergCatalogConfig icebergCatalogConfig = getIcebergCatalogConfig(icebergCatalogConfigpath);
-    LOGGER.info("icebergCatalogConfig" + icebergCatalogConfig);
     Configuration hadoopConf = gethadoopConf(hadoopConfigpath);
-    LOGGER.info("hadoopConf" + hadoopConf);
     ConversionSourceProvider conversionSourceProvider =
         getConversionSourceProvider(conversionProviderConfigpath, datasetConfig, hadoopConf);
     List<String> tableFormatList = getTableFormatList(datasetConfig);
