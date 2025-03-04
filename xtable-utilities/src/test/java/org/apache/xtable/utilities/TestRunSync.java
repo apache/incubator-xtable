@@ -22,7 +22,9 @@ import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
@@ -30,11 +32,57 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
+import org.apache.xtable.utilities.RunSync.DatasetConfig;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
 
 class TestRunSync {
 
+  @Test
+  public void testMain() {
+    String projectRoot = System.getProperty("user.dir");
+    // Construct the path to the file in the root directory
+    int lastSlashIndex = projectRoot.lastIndexOf('/');
+    String result = projectRoot.substring(0, lastSlashIndex);
+    File file = new File(result, "/my_config.yaml");
+    String filePath = file.getPath();
+    String[] args = new String[] {"--datasetConfig", filePath};
+    try {
+      RunSync.main(args);
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  @Test
+  public void testNonExistentFile() {
+    String projectRoot = System.getProperty("user.dir");
+    // Construct the path to the file in the root directory
+    int lastSlashIndex = projectRoot.lastIndexOf('/');
+    String result = projectRoot.substring(0, lastSlashIndex);
+    File file = new File(result, "/my_config1.yaml");
+    String filePath = file.getPath();
+    Assertions.assertThrows(
+        IOException.class,
+        () -> {
+          RunSync.getDatasetConfig(filePath);
+        });
+  }
+
+  @Test
+  public void testGetDatasetConfigWithValidYAML() throws IOException {
+    String projectRoot = System.getProperty("user.dir");
+    // Construct the path to the file in the root directory
+    int lastSlashIndex = projectRoot.lastIndexOf('/');
+    String result = projectRoot.substring(0, lastSlashIndex);
+    File file = new File(result, "/my_config.yaml");
+    String filePath = file.getPath();
+    DatasetConfig config = RunSync.getDatasetConfig(filePath);
+    // Assert
+    Assertions.assertNotNull(config);
+    Assertions.assertEquals("ICEBERG", config.sourceFormat);
+    Assertions.assertNotEquals("DELTA1", config.targetFormats);
+  }
   /** Tests that the default hadoop configs are loaded. */
   @Test
   public void testLoadDefaultHadoopConfig() {
