@@ -91,6 +91,15 @@ public class ParquetSchemaConverter {
         return targetSchema;
     }
 
+    private static boolean groupTypeContainsNull(Type schema) {
+        for (Type field in schema.getFields()){
+            if (field == null) {
+                return True;
+            }
+        }
+        return False;
+    }
+
   /*   public InternalSchema toInternalSchema(Schema schema) {
        Map<String, IdMapping> fieldNameToIdMapping =
                 IdTracker.getInstance()
@@ -101,7 +110,7 @@ public class ParquetSchemaConverter {
                                                 .collect(Collectors.toMap(IdMapping::getName, Function.identity())))
                         .orElse(Collections.emptyMap());
         return toInternalSchema(schema, null, fieldNameToIdMapping);*/
-    }
+}
 
     /**
      * Converts the parquet {@link Schema} to {@link InternalSchema}.
@@ -120,11 +129,12 @@ public class ParquetSchemaConverter {
         LogicalTypeAnnotation logicalType;
         Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
         switch (schema.getName()) {
+            //PrimitiveTypes
             case "INT64":
                 logicalType = schema.getLogicalTypeAnnotation();
                 if (logicalType instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) {
                     newDataType = InternalType.TIMESTAMP;
-                } else if (logicalType instanceof  LogicalTypeAnnotation.IntLogicalTypeAnnotation){
+                } else if (logicalType instanceof LogicalTypeAnnotation.IntLogicalTypeAnnotation) {
                     newDataType = InternalType.INT;
                 }
                 break;
@@ -145,10 +155,10 @@ public class ParquetSchemaConverter {
                 } else if (logicalType instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
                     metadata.put(
                             InternalSchema.MetadataKey.DECIMAL_PRECISION,
-                             logicalType.getPrecision());
+                            logicalType.getPrecision());
                     metadata.put(
                             InternalSchema.MetadataKey.DECIMAL_SCALE,
-                             logicalType.getScale());
+                            logicalType.getScale());
                     newDataType = InternalType.DECIMAL;
                 }
                 break;
@@ -255,11 +265,12 @@ public class ParquetSchemaConverter {
                         .fields(subFields)
                         .isNullable(schema.isNullable())
                         .build();*/
-            case ARRAY:
+            //GroupTypes
+            case "LIST":
                 IdMapping elementMapping = fieldNameToIdMapping.get(ELEMENT);
                 InternalSchema elementSchema =
                         toInternalSchema(
-                                schema.getElementType(),
+                                schema.getName(),
                                 SchemaUtils.getFullyQualifiedPath(
                                         parentPath, InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME),
                                 getChildIdMap(elementMapping));
@@ -273,16 +284,17 @@ public class ParquetSchemaConverter {
                 return InternalSchema.builder()
                         .name(schema.getName())
                         .dataType(InternalType.LIST)
-                        .comment(schema.getDoc())
-                        .isNullable(schema.isNullable())
+                        .comment(schema.toString())
+                        .isNullable(groupTypeContainsNull(schema))
                         .fields(Collections.singletonList(elementField))
                         .build();
-            case MAP:
+
+            case "MAP":
                 IdMapping keyMapping = fieldNameToIdMapping.get(KEY);
                 IdMapping valueMapping = fieldNameToIdMapping.get(VALUE);
                 InternalSchema valueSchema =
                         toInternalSchema(
-                                schema.getValueType(),
+                                schema.getName(),
                                 SchemaUtils.getFullyQualifiedPath(
                                         parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
                                 getChildIdMap(valueMapping));
@@ -296,8 +308,8 @@ public class ParquetSchemaConverter {
                 return InternalSchema.builder()
                         .name(schema.getName())
                         .dataType(InternalType.MAP)
-                        .comment(schema.getDoc())
-                        .isNullable(schema.isNullable())
+                        .comment(schema.toString())
+                        .isNullable(groupTypeContainsNull(schema))
                         .fields(
                                 Arrays.asList(
                                         MAP_KEY_FIELD.toBuilder()
