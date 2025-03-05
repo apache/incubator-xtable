@@ -51,8 +51,7 @@ public enum InternalType {
   DATE,
   DECIMAL,
   TIMESTAMP,
-  TIMESTAMP_NTZ,
-  JSON;
+  TIMESTAMP_NTZ;
   private final String name;
 
   InternalType() {
