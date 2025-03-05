@@ -134,6 +134,7 @@ public class ParquetSchemaConverter {
         if (logicalType instanceof LogicalTypeAnnotation.UUIDLogicalTypeAnnotation) {
           newDataType = InternalType.UUID;
         }
+        break;
        //TODO how to add  INTERVAL ?
       case BYTE_ARRAY:
         // includes string json,BSON, Variant,GEOMETRY, geography,
@@ -482,8 +483,7 @@ public class ParquetSchemaConverter {
 
   private static Type finalizeSchema(Type targetSchema, InternalSchema inputSchema) {
     if (inputSchema.isNullable()) {
-      return targetSchema.union(Type("NULL","optional"))
-      return Schema.createUnion(Schema.create(Schema.Type.NULL), targetSchema);
+      return targetSchema.union(Type(null,"optional"))
     }
     return targetSchema;
   }
