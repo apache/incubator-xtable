@@ -78,11 +78,11 @@ public class ParquetSchemaConverter {
         return INSTANCE;
     }
 
-    private static Object getDefaultValue(Schema.Field parquetField) {
+  /*  private static Object getDefaultValue(Schema.Field parquetField) {
         return Schema.Field.NULL_VALUE.equals(parquetField.defaultVal())
                 ? InternalField.Constants.NULL_DEFAULT_VALUE
                 : parquetField.defaultVal();
-    }
+    }*/
 
     private static Type finalizeSchema(Type targetSchema, InternalSchema inputSchema) {
         if (inputSchema.isNullable()) {
@@ -91,8 +91,8 @@ public class ParquetSchemaConverter {
         return targetSchema;
     }
 
-    public InternalSchema toInternalSchema(Schema schema) {
-        Map<String, IdMapping> fieldNameToIdMapping =
+  /*   public InternalSchema toInternalSchema(Schema schema) {
+       Map<String, IdMapping> fieldNameToIdMapping =
                 IdTracker.getInstance()
                         .getIdTracking(schema)
                         .map(
@@ -100,7 +100,7 @@ public class ParquetSchemaConverter {
                                         idTracking.getIdMappings().stream()
                                                 .collect(Collectors.toMap(IdMapping::getName, Function.identity())))
                         .orElse(Collections.emptyMap());
-        return toInternalSchema(schema, null, fieldNameToIdMapping);
+        return toInternalSchema(schema, null, fieldNameToIdMapping);*/
     }
 
     /**
@@ -117,40 +117,43 @@ public class ParquetSchemaConverter {
             Type schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
         // TODO - Does not handle recursion in parquet schema
         InternalType newDataType;
+        LogicalTypeAnnotation logicalType;
         Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
         switch (schema.getName()) {
-            case INT64:
-                LogicalType logicalType = schema.getLogicalTypeAnnotation();
+            case "INT64":
+                logicalType = schema.getLogicalTypeAnnotation();
                 if (logicalType instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) {
                     newDataType = InternalType.TIMESTAMP;
+                } else if (logicalType instanceof  LogicalTypeAnnotation.IntLogicalTypeAnnotation){
+                    newDataType = InternalType.INT;
                 }
                 break;
-            case INT32:
-                LogicalType logicalType = schema.getLogicalTypeAnnotation();
+            case "INT32":
+                logicalType = schema.getLogicalTypeAnnotation();
                 if (logicalType instanceof LogicalTypeAnnotation.DateLogicalTypeAnnotation) {
                     newDataType = InternalType.DATE;
                 }
                 // is also a TIME
                 break;
-            case FLOAT:
-                LogicalType logicalType = schema.getLogicalTypeAnnotation();
+            case "INT96":
+                newDataType = InternalType.INT;
+                break;
+            case "FLOAT":
+                logicalType = schema.getLogicalTypeAnnotation();
                 if (logicalType instanceof LogicalTypeAnnotation.Float16LogicalTypeAnnotation) {
                     newDataType = InternalType.FLOAT;
                 } else if (logicalType instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
                     metadata.put(
                             InternalSchema.MetadataKey.DECIMAL_PRECISION,
-                            ((LogicalTypes.Decimal) logicalType).getPrecision());
+                             logicalType.getPrecision());
                     metadata.put(
                             InternalSchema.MetadataKey.DECIMAL_SCALE,
-                            ((LogicalTypes.Decimal) logicalType).getScale());
-                    if (schema.getType() == Schema.Type.FIXED) {
-                        metadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, schema.getFixedSize());
-                    }
+                             logicalType.getScale());
                     newDataType = InternalType.DECIMAL;
                 }
                 break;
-            case BYTES:
-                logicalType = schema.getLogicalType();
+            case "BYTES":
+                newDataType = InternalType.BYTES;
                 break;
             case FIXED_LEN_BYTE_ARRAY:
                 logicalType = schema.getLogicalTypeAnnotation()
@@ -159,7 +162,7 @@ public class ParquetSchemaConverter {
                 }
                 break;
             //TODO add other logicalTypes ?
-            case BYTE_ARRAY:
+            case "BYTE_ARRAY":
                 // includes metadata (?) for json,BSON, Variant,GEOMETRY, geography,
                 logicalType = schema.getLogicalTypeAnnotation()
                 if (logicalType instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
@@ -170,14 +173,14 @@ public class ParquetSchemaConverter {
                     newDataType = InternalType.BYTES;
                 }
                 break;
-            case BOOLEAN:
+            case "BOOLEAN":
                 newDataType = InternalType.BOOLEAN;
                 break;
-            case UNKNOWN:
+            case "UNKNOWN":
                 newDataType = InternalType.NULL;
                 break;
-            // TODO check the rest of the types starting from here
-            case FIXED:
+            // TODO: check the rest of the types starting from here
+            /*case FIXED:
                 logicalType = schema.getLogicalTypeAnnotation();
                 if (logicalType instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
                     metadata.put(
@@ -203,8 +206,8 @@ public class ParquetSchemaConverter {
                 } else {
                     newDataType = InternalType.BYTES;
                 }
-                break;
-            case LONG:
+                break;*/
+    /*        case LONG:
                 logicalType = schema.getLogicalType();
                 if (logicalType instanceof LogicalTypes.TimestampMillis) {
                     newDataType = InternalType.TIMESTAMP;
@@ -225,8 +228,8 @@ public class ParquetSchemaConverter {
                 } else {
                     newDataType = InternalType.LONG;
                 }
-                break;
-            case RECORD:
+                break;*/
+            /*case RECORD:
                 List<InternalField> subFields = new ArrayList<>(schema.getFields().size());
                 for (Schema.Field parquetField : schema.getFields()) {
                     IdMapping idMapping = fieldNameToIdMapping.get(parquetField.name());
@@ -251,7 +254,7 @@ public class ParquetSchemaConverter {
                         .dataType(InternalType.RECORD)
                         .fields(subFields)
                         .isNullable(schema.isNullable())
-                        .build();
+                        .build();*/
             case ARRAY:
                 IdMapping elementMapping = fieldNameToIdMapping.get(ELEMENT);
                 InternalSchema elementSchema =
@@ -303,7 +306,7 @@ public class ParquetSchemaConverter {
                                                 .build(),
                                         valueField))
                         .build();
-            case UNION:
+        /*    case UNION:
                 boolean containsUnionWithNull =
                         schema.getTypes().stream().anyMatch(t -> t.getType() == Schema.Type.NULL);
                 if (containsUnionWithNull) {
@@ -324,7 +327,7 @@ public class ParquetSchemaConverter {
                 } else {
                     throw new UnsupportedSchemaTypeException(
                             String.format("Unsupported complex union type %s", schema));
-                }
+                }*/
             default:
                 throw new UnsupportedSchemaTypeException(
                         String.format("Unsupported schema type %s", schema));
@@ -367,7 +370,8 @@ public class ParquetSchemaConverter {
      */
     private Schema fromInternalSchema(InternalSchema internalSchema, String currentPath) {
         switch (internalSchema.getDataType()) {
-            case RECORD:
+            // TODO consider RECORD Type?
+  /*          case RECORD:
                 List<Schema.Field> fields =
                         internalSchema.getFields().stream()
                                 .map(
@@ -385,7 +389,7 @@ public class ParquetSchemaConverter {
                 return finalizeSchema(
                         Schema.createRecord(
                                 internalSchema.getName(), internalSchema.getComment(), currentPath, false, fields),
-                        internalSchema);
+                        internalSchema);*/
             case BYTES:
                 return finalizeSchema(Schema.create(Schema.Type.BYTES), internalSchema);
             case BOOLEAN:
