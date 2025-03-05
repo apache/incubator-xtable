@@ -34,6 +34,12 @@ import lombok.NoArgsConstructor;
 import org.apache.parquet.LogicalType;
 import org.apache.parquet.LogicalTypes;
 import org.apache.parquet.Schema;
+import org.apache.parquet.Schema.Type;
+import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.format.NullType;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
+
+
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.SchemaExtractorException;
@@ -96,38 +102,49 @@ public class ParquetSchemaConverter {
    * @return a converted schema
    */
   private InternalSchema toInternalSchema(
-      Schema schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
+      Type schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
     // TODO - Does not handle recursion in parquet schema
     InternalType newDataType;
     Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
-    switch (schema.getType()) {
-      case INT:
-        LogicalType logicalType = schema.getLogicalType();
-        if (logicalType instanceof LogicalTypes.Date) {
-          newDataType = InternalType.DATE;
-        } else {
-          newDataType = InternalType.INT;
+    switch (schema.getName()) {
+      case INT64:
+        LogicalType logicalType = schema.getLogicalTypeAnnotation();
+        if (logicalType instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) {
+          newDataType = InternalType.TIMESTAMP;
         }
         break;
-      case STRING:
-        newDataType = InternalType.STRING;
+      case INT32:
+        LogicalType logicalType = schema.getLogicalTypeAnnotation();
+        if (logicalType instanceof LogicalTypeAnnotation.DateLogicalTypeAnnotation) {
+          newDataType = InternalType.DATE;
+        }
+        // is also a TIME
         break;
-      case BOOLEAN:
-        newDataType = InternalType.BOOLEAN;
+      case FLOAT:
+        LogicalType logicalType = schema.getLogicalTypeAnnotation();
+        if (logicalType instanceof LogicalTypeAnnotation.Float16LogicalTypeAnnotation) {
+          newDataType = InternalType.FLOAT;
+        }
         break;
-      case BYTE_ARRAY:
+      case BYTES:
         logicalType = schema.getLogicalType();
-        // TODO: any metadata to add ?
+        break;
+      case FIXED_LEN_BYTE_ARRAY:
+        logicalType=schema.getLogicalTypeAnnotation()
+        if (logicalType instanceof LogicalTypeAnnotation.UUIDLogicalTypeAnnotation) {
+          newDataType = InternalType.UUID;
+        }
+       //TODO how to add  INTERVAL ?
+      case BYTE_ARRAY:
+        // includes string json,BSON, Variant,GEOMETRY, geography,
+        logicalType=schema.getLogicalTypeAnnotation()
+        if (logicalType instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
+          newDataType = InternalType.ENUM;
+        }
         if (logicalType == LogicalTypes.JSON) {
-          newDataType = InternalType.JSON;
-        } else if (logicalType instanceof LogicalTypes.BSON) {
-          newDataType = InternalType.BSON;
-        } else if (logicalType instanceof LogicalTypes.VARIANT) {
-          newDataType = InternalType.VARIANT;
-        } else if (logicalType instanceof LogicalTypes.GEOMETRY) {
-          newDataType = InternalType.GEOMETRY;
-        } else if (logicalType instanceof LogicalTypes.GEOGRAPHY) {
-          newDataType = InternalType.GEOGRAPHY;
+          newDataType = InternalType.BYTES;
+        } else if (logicalType instanceof LogicalTypeAnnotation.BsonLogicalTypeAnnotation) {
+          newDataType = InternalType.BYTES;
         }
         break;
       case FIXED:
@@ -157,12 +174,6 @@ public class ParquetSchemaConverter {
           newDataType = InternalType.BYTES;
         }
         break;
-      case DOUBLE:
-        newDataType = InternalType.DOUBLE;
-        break;
-      case FLOAT:
-        newDataType = InternalType.FLOAT;
-        break;
       case LONG:
         logicalType = schema.getLogicalType();
         if (logicalType instanceof LogicalTypes.TimestampMillis) {
@@ -184,10 +195,6 @@ public class ParquetSchemaConverter {
         } else {
           newDataType = InternalType.LONG;
         }
-        break;
-      case ENUM:
-        metadata.put(InternalSchema.MetadataKey.ENUM_VALUES, schema.getEnumSymbols());
-        newDataType = InternalType.ENUM;
         break;
       case NULL:
         newDataType = InternalType.NULL;
@@ -473,8 +480,9 @@ public class ParquetSchemaConverter {
         .orElse(field.getName());
   }
 
-  private static Schema finalizeSchema(Schema targetSchema, InternalSchema inputSchema) {
+  private static Type finalizeSchema(Type targetSchema, InternalSchema inputSchema) {
     if (inputSchema.isNullable()) {
+      return targetSchema.union(Type("NULL","optional"))
       return Schema.createUnion(Schema.create(Schema.Type.NULL), targetSchema);
     }
     return targetSchema;

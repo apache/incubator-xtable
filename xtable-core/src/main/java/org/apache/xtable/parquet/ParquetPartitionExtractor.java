@@ -31,12 +31,35 @@ import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.schema.SchemaFieldFinder;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 public class ParquetPartitionExtractor {
   private static final ParquetPartitionExtractor INSTANCE = new ParquetPartitionExtractor();
 
   public static ParquetPartitionExtractor getInstance() {
     return INSTANCE;
   }
+  public static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
+
+
+  public PartitionConfiguration getPartitionsFromUserConfiguration(String configPath) throws IOException {
+    PartitionConfiguration partitionConfiguration = new PartitionConfiguration();
+    try (InputStream inputStream = Files.newInputStream(Paths.get(configPath))) {
+      ObjectReader objectReader = YAML_MAPPER.readerForUpdating(partitionConfiguration);
+      objectReader.readValue(inputStream);
+      return partitionConfiguration;
+    }
+  }
+
 
   public List<InternalPartitionField> getInternalPartitionField(
       Set<String> partitionList, InternalSchema schema) {

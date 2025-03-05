@@ -54,6 +54,7 @@ public class ParquetTableExtractor {
     MessageType schema = parquetMetadataExtractor.getSchema(footer);
     InternalSchema schema = schemaExtractor.toInternalSchema(schema);
     Set<String> partitionKeys = initPartitionInfo().keySet();
+    // TODO getInternalPartitionField() to be replaced with the new YAML based partition fields
     List<InternalPartitionField> partitionFields =
         partitionExtractor.getInternalPartitionField(partitionKeys, schema);
     DataLayoutStrategy dataLayoutStrategy =

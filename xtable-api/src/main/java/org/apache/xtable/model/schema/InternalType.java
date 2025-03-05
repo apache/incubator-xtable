@@ -52,11 +52,7 @@ public enum InternalType {
   DECIMAL,
   TIMESTAMP,
   TIMESTAMP_NTZ,
-  JSON,
-  BSON,
-  VARIANT,
-  GEOMETRY,
-  GEOGRAPHY;
+  JSON;
   private final String name;
 
   InternalType() {
