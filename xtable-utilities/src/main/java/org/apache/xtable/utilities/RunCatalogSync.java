@@ -19,6 +19,7 @@
 package org.apache.xtable.utilities;
 
 import static org.apache.xtable.utilities.RunSync.getCustomConfigurations;
+import static org.apache.xtable.utilities.RunSync.getValueFromConfig;
 import static org.apache.xtable.utilities.RunSync.loadHadoopConf;
 import static org.apache.xtable.utilities.RunSync.loadTableFormatConversionConfigs;
 
@@ -131,11 +132,11 @@ public class RunCatalogSync {
             Paths.get(cmd.getOptionValue(CATALOG_SOURCE_AND_TARGET_CONFIG_PATH)))) {
       datasetConfig = YAML_MAPPER.readValue(inputStream, DatasetConfig.class);
     }
-
-    byte[] customConfig = getCustomConfigurations(cmd, HADOOP_CONFIG_PATH);
+    String hadoopConfigpath = getValueFromConfig(cmd, HADOOP_CONFIG_PATH);
+    byte[] customConfig = getCustomConfigurations(hadoopConfigpath);
     Configuration hadoopConf = loadHadoopConf(customConfig);
-
-    customConfig = getCustomConfigurations(cmd, CONVERTERS_CONFIG_PATH);
+    String conversionProviderConfigpath = getValueFromConfig(cmd, CONVERTERS_CONFIG_PATH);
+    customConfig = getCustomConfigurations(conversionProviderConfigpath);
     TableFormatConverters tableFormatConverters = loadTableFormatConversionConfigs(customConfig);
 
     Map<String, ExternalCatalogConfig> catalogsById =
