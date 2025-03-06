@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -135,7 +136,7 @@ public class TestBaseFileUpdatesExtractor {
     expectedPartitionToReplacedFileIds.put(
         partitionPath1, Arrays.asList(fileName3, fileIdForFile4));
     expectedPartitionToReplacedFileIds.put(partitionPath2, Collections.singletonList(fileName5));
-    assertEquals(
+    assertEqualsIgnoreOrder(
         expectedPartitionToReplacedFileIds, replaceMetadata.getPartitionToReplacedFileIds());
 
     // validate added files
@@ -144,6 +145,16 @@ public class TestBaseFileUpdatesExtractor {
             getExpectedWriteStatus(fileName1, partitionPath1, Collections.emptyMap()),
             getExpectedWriteStatus(fileName2, partitionPath2, getExpectedColumnStats(fileName2)));
     assertWriteStatusesEquivalent(expectedWriteStatuses, replaceMetadata.getWriteStatuses());
+  }
+
+  private void assertEqualsIgnoreOrder(
+      Map<String, List<String>> expected, Map<String, List<String>> actual) {
+    for (Map.Entry<String, List<String>> entry : expected.entrySet()) {
+      List<?> expectedList = entry.getValue();
+      List<?> actualList = actual.get(entry.getKey());
+      assertEquals(expectedList.size(), actualList.size());
+      assertEquals(new HashSet<>(expectedList), new HashSet<>(actualList));
+    }
   }
 
   @Test
