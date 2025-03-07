@@ -246,31 +246,24 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
     long timeInMillis = instant.toEpochMilli();
     Table iceTable = getSourceTable();
-    boolean doesInstantOfAgeExists = false;
-    Long targetSnapshotId = null;
-    for (Snapshot snapshot : iceTable.snapshots()) {
-      if (snapshot.timestampMillis() <= timeInMillis) {
-        doesInstantOfAgeExists = true;
-        targetSnapshotId = snapshot.snapshotId();
-      } else {
-        break;
-      }
-    }
-    if (!doesInstantOfAgeExists) {
-      return false;
-    }
-    // Go from latest snapshot until targetSnapshotId through parent reference.
-    // nothing has to be null in this chain to guarantee safety of incremental sync.
-    Long currentSnapshotId = iceTable.currentSnapshot().snapshotId();
-    while (currentSnapshotId != null && currentSnapshotId != targetSnapshotId) {
-      Snapshot currentSnapshot = iceTable.snapshot(currentSnapshotId);
-      if (currentSnapshot == null) {
-        // The snapshot is expired.
+    Snapshot currentSnapshot = iceTable.currentSnapshot();
+
+    while (currentSnapshot != null && currentSnapshot.timestampMillis() > timeInMillis) {
+      Long parentSnapshotId = currentSnapshot.parentId();
+      if (parentSnapshotId == null) {
+        // no more snapshots in the chain and did not find targetSnapshot
         return false;
       }
-      currentSnapshotId = currentSnapshot.parentId();
+
+      Snapshot parentSnapshot = iceTable.snapshot(parentSnapshotId);
+      if (parentSnapshot == null) {
+        // chain is broken due to expired snapshot
+        log.info("Expired snapshot id: {}", parentSnapshotId);
+        return false;
+      }
+      currentSnapshot = parentSnapshot;
     }
-    return true;
+    return currentSnapshot != null;
   }
 
   @Override
