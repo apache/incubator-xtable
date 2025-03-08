@@ -56,7 +56,7 @@ import org.apache.xtable.schema.SchemaUtils;
  * parquet data types and canonical data types.
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class ParquetSchemaConverter {
+public class ParquetSchemaExtractor {
     // parquet only supports string keys in maps
     private static final InternalField MAP_KEY_FIELD =
             InternalField.builder()
@@ -69,12 +69,12 @@ public class ParquetSchemaConverter {
                                     .build())
                     .defaultValue("")
                     .build();
-    private static final ParquetSchemaConverter INSTANCE = new ParquetSchemaConverter();
+    private static final ParquetSchemaExtractor INSTANCE = new ParquetSchemaExtractor();
     private static final String ELEMENT = "element";
     private static final String KEY = "key";
     private static final String VALUE = "value";
 
-    public static parquetSchemaConverter getInstance() {
+    public static ParquetSchemaExtractor getInstance() {
         return INSTANCE;
     }
 
