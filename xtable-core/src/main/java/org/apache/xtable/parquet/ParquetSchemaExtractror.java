@@ -78,12 +78,6 @@ public class ParquetSchemaExtractor {
         return INSTANCE;
     }
 
-  /*  private static Object getDefaultValue(Schema.Field parquetField) {
-        return Schema.Field.NULL_VALUE.equals(parquetField.defaultVal())
-                ? InternalField.Constants.NULL_DEFAULT_VALUE
-                : parquetField.defaultVal();
-    }*/
-
     private static Type finalizeSchema(Type targetSchema, InternalSchema inputSchema) {
         if (inputSchema.isNullable()) {
             return targetSchema.union(LogicalTypeAnnotation.unknownType())
@@ -99,17 +93,6 @@ public class ParquetSchemaExtractor {
         }
         return False;
     }
-
-  /*   public InternalSchema toInternalSchema(Schema schema) {
-       Map<String, IdMapping> fieldNameToIdMapping =
-                IdTracker.getInstance()
-                        .getIdTracking(schema)
-                        .map(
-                                idTracking ->
-                                        idTracking.getIdMappings().stream()
-                                                .collect(Collectors.toMap(IdMapping::getName, Function.identity())))
-                        .orElse(Collections.emptyMap());
-        return toInternalSchema(schema, null, fieldNameToIdMapping);*/
 }
 
     /**
@@ -189,82 +172,6 @@ public class ParquetSchemaExtractor {
             case "UNKNOWN":
                 newDataType = InternalType.NULL;
                 break;
-            // TODO: check the rest of the types starting from here
-            /*case FIXED:
-                logicalType = schema.getLogicalTypeAnnotation();
-                if (logicalType instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
-                    metadata.put(
-                            InternalSchema.MetadataKey.DECIMAL_PRECISION,
-                            ((LogicalTypes.Decimal) logicalType).getPrecision());
-                    metadata.put(
-                            InternalSchema.MetadataKey.DECIMAL_SCALE,
-                            ((LogicalTypes.Decimal) logicalType).getScale());
-                    if (schema.getType() == Schema.Type.FIXED) {
-                        metadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, schema.getFixedSize());
-                    }
-                    newDataType = InternalType.DECIMAL;
-                    break;
-                }
-                if (schema.getType() == Schema.Type.FIXED) {
-                    String xtableLogicalType = schema.getProp(InternalSchema.XTABLE_LOGICAL_TYPE);
-                    if ("uuid".equals(xtableLogicalType)) {
-                        newDataType = InternalType.UUID;
-                    } else {
-                        metadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, schema.getFixedSize());
-                        newDataType = InternalType.FIXED;
-                    }
-                } else {
-                    newDataType = InternalType.BYTES;
-                }
-                break;*/
-    /*        case LONG:
-                logicalType = schema.getLogicalType();
-                if (logicalType instanceof LogicalTypes.TimestampMillis) {
-                    newDataType = InternalType.TIMESTAMP;
-                    metadata.put(
-                            InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
-                } else if (logicalType instanceof LogicalTypes.TimestampMicros) {
-                    newDataType = InternalType.TIMESTAMP;
-                    metadata.put(
-                            InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
-                } else if (logicalType instanceof LogicalTypes.LocalTimestampMillis) {
-                    newDataType = InternalType.TIMESTAMP_NTZ;
-                    metadata.put(
-                            InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
-                } else if (logicalType instanceof LogicalTypes.LocalTimestampMicros) {
-                    newDataType = InternalType.TIMESTAMP_NTZ;
-                    metadata.put(
-                            InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
-                } else {
-                    newDataType = InternalType.LONG;
-                }
-                break;*/
-            /*case RECORD:
-                List<InternalField> subFields = new ArrayList<>(schema.getFields().size());
-                for (Schema.Field parquetField : schema.getFields()) {
-                    IdMapping idMapping = fieldNameToIdMapping.get(parquetField.name());
-                    InternalSchema subFieldSchema =
-                            toInternalSchema(
-                                    parquetField.schema(),
-                                    SchemaUtils.getFullyQualifiedPath(parentPath, parquetField.name()),
-                                    getChildIdMap(idMapping));
-                    Object defaultValue = getDefaultValue(parquetField);
-                    subFields.add(
-                            InternalField.builder()
-                                    .parentPath(parentPath)
-                                    .name(parquetField.name())
-                                    .schema(subFieldSchema)
-                                    .defaultValue(defaultValue)
-                                    .fieldId(idMapping == null ? null : idMapping.getId())
-                                    .build());
-                }
-                return InternalSchema.builder()
-                        .name(schema.getName())
-                        .comment(schema.getDoc())
-                        .dataType(InternalType.RECORD)
-                        .fields(subFields)
-                        .isNullable(schema.isNullable())
-                        .build();*/
             //GroupTypes
             case "LIST":
                 IdMapping elementMapping = fieldNameToIdMapping.get(ELEMENT);
@@ -318,28 +225,6 @@ public class ParquetSchemaExtractor {
                                                 .build(),
                                         valueField))
                         .build();
-        /*    case UNION:
-                boolean containsUnionWithNull =
-                        schema.getTypes().stream().anyMatch(t -> t.getType() == Schema.Type.NULL);
-                if (containsUnionWithNull) {
-                    List<Schema> remainingSchemas =
-                            schema.getTypes().stream()
-                                    .filter(t -> t.getType() != Schema.Type.NULL)
-                                    .collect(Collectors.toList());
-                    if (remainingSchemas.size() == 1) {
-                        InternalSchema restSchema =
-                                toInternalSchema(remainingSchemas.get(0), parentPath, fieldNameToIdMapping);
-                        return InternalSchema.builderFrom(restSchema).isNullable(true).build();
-                    } else {
-                        return InternalSchema.builderFrom(
-                                toInternalSchema(Schema.createUnion(remainingSchemas)))
-                                .isNullable(true)
-                                .build();
-                    }
-                } else {
-                    throw new UnsupportedSchemaTypeException(
-                            String.format("Unsupported complex union type %s", schema));
-                }*/
             default:
                 throw new UnsupportedSchemaTypeException(
                         String.format("Unsupported schema type %s", schema));
@@ -382,26 +267,6 @@ public class ParquetSchemaExtractor {
      */
     private Schema fromInternalSchema(InternalSchema internalSchema, String currentPath) {
         switch (internalSchema.getDataType()) {
-            // TODO consider RECORD Type?
-  /*          case RECORD:
-                List<Schema.Field> fields =
-                        internalSchema.getFields().stream()
-                                .map(
-                                        field ->
-                                                new Schema.Field(
-                                                        field.getName(),
-                                                        fromInternalSchema(
-                                                                field.getSchema(),
-                                                                SchemaUtils.getFullyQualifiedPath(currentPath, field.getName())),
-                                                        field.getSchema().getComment(),
-                                                        InternalField.Constants.NULL_DEFAULT_VALUE == field.getDefaultValue()
-                                                                ? Schema.Field.NULL_VALUE
-                                                                : field.getDefaultValue()))
-                                .collect(CustomCollectors.toList(internalSchema.getFields().size()));
-                return finalizeSchema(
-                        Schema.createRecord(
-                                internalSchema.getName(), internalSchema.getComment(), currentPath, false, fields),
-                        internalSchema);*/
             case BYTES:
                 return finalizeSchema(Schema.create(Schema.Type.BYTES), internalSchema);
             case BOOLEAN:
