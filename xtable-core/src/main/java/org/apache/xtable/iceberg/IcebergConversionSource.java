@@ -247,7 +247,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
     long timeInMillis = instant.toEpochMilli();
     Table iceTable = getSourceTable();
     boolean doesInstantOfAgeExists = false;
-    Long targetSnapshotId = null;
+    long targetSnapshotId = -1L;
     for (Snapshot snapshot : iceTable.snapshots()) {
       if (snapshot.timestampMillis() <= timeInMillis) {
         doesInstantOfAgeExists = true;
@@ -261,8 +261,8 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
     }
     // Go from latest snapshot until targetSnapshotId through parent reference.
     // nothing has to be null in this chain to guarantee safety of incremental sync.
-    Long currentSnapshotId = iceTable.currentSnapshot().snapshotId();
-    while (currentSnapshotId != null && currentSnapshotId != targetSnapshotId) {
+    long currentSnapshotId = iceTable.currentSnapshot().snapshotId();
+    while (currentSnapshotId != targetSnapshotId) {
       Snapshot currentSnapshot = iceTable.snapshot(currentSnapshotId);
       if (currentSnapshot == null) {
         // The snapshot is expired.
