@@ -18,12 +18,12 @@
  
 package org.apache.xtable.model.schema;
 
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 
 import lombok.Getter;
 import lombok.ToString;
+
+import com.google.common.collect.ImmutableSet;
 
 /**
  * Collection of supported types
@@ -59,13 +59,5 @@ public enum InternalType {
   }
 
   public static final Set<InternalType> NON_SCALAR_TYPES =
-      Collections.unmodifiableSet(
-          new HashSet<InternalType>() {
-            {
-              add(RECORD);
-              add(LIST);
-              add(MAP);
-              add(UNION);
-            }
-          });
+      ImmutableSet.<InternalType>builder().add(RECORD, LIST, MAP, UNION).build();
 }

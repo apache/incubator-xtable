@@ -352,11 +352,14 @@ public class ConversionController {
 
   private InstantsForIncrementalSync getMostOutOfSyncCommitAndPendingCommits(
       Map<ConversionTarget, TableSyncMetadata> lastSyncMetadataByFormat) {
-    Optional<Instant> mostOutOfSyncCommit =
+    Instant mostOutOfSyncCommit =
         lastSyncMetadataByFormat.values().stream()
             .map(TableSyncMetadata::getLastInstantSynced)
             .sorted()
-            .findFirst();
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new IllegalArgumentException("No existing commits found for incremental sync"));
     List<Instant> allPendingInstants =
         lastSyncMetadataByFormat.values().stream()
             .map(TableSyncMetadata::getInstantsToConsiderForNextSync)
@@ -365,7 +368,7 @@ public class ConversionController {
             .sorted()
             .collect(Collectors.toList());
     return InstantsForIncrementalSync.builder()
-        .lastSyncInstant(mostOutOfSyncCommit.get())
+        .lastSyncInstant(mostOutOfSyncCommit)
         .pendingCommits(allPendingInstants)
         .build();
   }

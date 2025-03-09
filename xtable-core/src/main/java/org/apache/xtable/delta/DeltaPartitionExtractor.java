@@ -423,6 +423,8 @@ public class DeltaPartitionExtractor {
     private static final Pattern DAY_PATTERN = Pattern.compile("DAY\\(([^)]+)\\)");
     private static final Pattern HOUR_PATTERN = Pattern.compile("HOUR\\(([^)]+)\\)");
     private static final Pattern CAST_PATTERN = Pattern.compile("CAST\\(([^ ]+) AS DATE\\)");
+    private static final Pattern DATE_FORMAT_PATTERN =
+        Pattern.compile("DATE_FORMAT\\(([^,]+),[^']+'([^']+)'\\)");
 
     enum GeneratedExprType {
       YEAR,
@@ -475,19 +477,17 @@ public class DeltaPartitionExtractor {
             .internalPartitionTransformType(PartitionTransformType.DAY)
             .build();
       } else if (expr.contains("DATE_FORMAT")) {
-        if (expr.startsWith("DATE_FORMAT(") && expr.endsWith(")")) {
-          int firstParenthesisPos = expr.indexOf("(");
-          int commaPos = expr.indexOf(",");
-          int lastParenthesisPos = expr.lastIndexOf(")");
+        Matcher matcher = DATE_FORMAT_PATTERN.matcher(expr);
+        if (matcher.find()) {
           /*
            * from DATE_FORMAT(source_col, 'yyyy-MM-dd-HH') the code below extracts yyyy-MM-dd-HH.
            */
-          String dateFormatExpr =
-              expr.substring(commaPos + 1, lastParenthesisPos).trim().replaceAll("^'|'$", "");
+          String fieldName = matcher.group(1);
+          String dateFormatExpr = matcher.group(2);
           return ParsedGeneratedExpr.builder()
               .generatedExprType(GeneratedExprType.DATE_FORMAT)
               .partitionColumnName(partitionColumnName)
-              .sourceColumn(expr.substring(firstParenthesisPos + 1, commaPos).trim())
+              .sourceColumn(fieldName)
               .internalPartitionTransformType(computeInternalPartitionTransform(dateFormatExpr))
               .build();
         } else {
