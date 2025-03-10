@@ -1,0 +1,40 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+## This file contains the default configuration of known InternalTable tableFormatConverters for both source and target
+## table formats. The config maps a table format name to a converter class, and contains the default configuration
+## values needed by the converter.
+
+## conversionSourceProviderClass: The class name of a table format's converter factory, where the converter is
+##     used for reading from a table of this format. All user configurations, including hadoop config
+##     and converter specific configuration, will be available to the factory for instantiation of the
+##     converter.
+## conversionTargetProviderClass: The class name of a table format's converter factory, where the converter is
+##     used for writing to a table of this format.
+## configuration: A map of configuration values specific to this converter.
+
+tableFormatConverters:
+    HUDI:
+      conversionSourceProviderClass: org.apache.xtable.hudi.HudiConversionSourceProvider
+    DELTA:
+      conversionSourceProviderClass: org.apache.xtable.delta.DeltaConversionSourceProvider
+      conversionTargetProviderClass: org.apache.xtable.delta.DeltaConversionTarget
+      configuration:
+        spark.master: local[2]
+        spark.app.name: xtable
+    ICEBERG:
+      conversionSourceProviderClass: org.apache.xtable.iceberg.IcebergConversionSourceProvider
+      conversionTargetProviderClass: org.apache.xtable.iceberg.IcebergConversionTarget
