@@ -89,11 +89,20 @@ class TestRunSync {
         "org.apache.xtable.hudi.HudiConversionSourceProvider",
         tfConverters.get(HUDI).getConversionSourceProviderClass());
     Assertions.assertEquals(
+        "org.apache.xtable.hudi.HudiConversionTarget",
+        tfConverters.get(HUDI).getConversionTargetProviderClass());
+    Assertions.assertEquals(
         "org.apache.xtable.iceberg.IcebergConversionTarget",
         tfConverters.get(ICEBERG).getConversionTargetProviderClass());
     Assertions.assertEquals(
         "org.apache.xtable.iceberg.IcebergConversionSourceProvider",
         tfConverters.get(ICEBERG).getConversionSourceProviderClass());
+    Assertions.assertEquals(
+        "org.apache.xtable.delta.DeltaConversionTarget",
+        tfConverters.get(DELTA).getConversionTargetProviderClass());
+    Assertions.assertEquals(
+        "org.apache.xtable.delta.DeltaConversionSourceProvider",
+        tfConverters.get(DELTA).getConversionSourceProviderClass());
   }
 
   @Test
