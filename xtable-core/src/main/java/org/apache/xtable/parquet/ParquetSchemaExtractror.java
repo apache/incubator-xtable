@@ -131,9 +131,14 @@ public class ParquetSchemaExtractor {
                         metadata.put(
                                 InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.NANOS);
                     }
-                    //newDataType = InternalType.TIMESTAMP;
                 } else if (logicalType instanceof LogicalTypeAnnotation.IntLogicalTypeAnnotation) {
                     newDataType = InternalType.INT;
+                } else if (logicalType instanceof LogicalTypeAnnotation.TimeLogicalTypeAnnotation) {
+                    LogicalTypeAnnotation.TimeUnit timeUnit = logicalType.getUnit();
+                    if (timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS || timeUnit == LogicalTypeAnnotation.TimeUnit.NANOS) {
+                        // check if INT is the InternalType needed here
+                        newDataType = InternalType.INT;
+                    }
                 } else {
                     newDataType = InternalType.INT;
                 }
@@ -142,6 +147,12 @@ public class ParquetSchemaExtractor {
                 logicalType = schema.getLogicalTypeAnnotation();
                 if (logicalType instanceof LogicalTypeAnnotation.DateLogicalTypeAnnotation) {
                     newDataType = InternalType.DATE;
+                } else if (logicalType instanceof TimeLogicalTypeAnnotation) {
+                    LogicalTypeAnnotation.TimeUnit timeUnit = logicalType.getUnit();
+                    if (timeUnit == LogicalTypeAnnotation.TimeUnit.MILLIS) {
+                        // check if INT is the InternalType needed here
+                        newDataType = InternalType.INT;
+                    }
                 } else {
                     newDataType = InternalType.INT;
                 }
@@ -187,10 +198,9 @@ public class ParquetSchemaExtractor {
                     newDataType = InternalType.BYTES;
                 } else if (logicalType instanceof LogicalTypeAnnotation.BsonLogicalTypeAnnotation) {
                     newDataType = InternalType.BYTES;
-                } else if (logicalType instanceof LogicalTypeAnnotation.StringLogicalTypeAnnotation){
+                } else if (logicalType instanceof LogicalTypeAnnotation.StringLogicalTypeAnnotation) {
                     newDataType = InternalType.STRING;
-                }
-                else {
+                } else {
                     newDataType = InternalType.BYTES;
                 }
                 break;
