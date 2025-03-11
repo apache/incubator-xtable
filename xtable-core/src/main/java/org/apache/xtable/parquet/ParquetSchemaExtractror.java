@@ -117,16 +117,16 @@ public class ParquetSchemaExtractor {
             case "INT64":
                 logicalType = schema.getLogicalTypeAnnotation();
                 if (logicalType instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) {
-                    LogicalTypeAnnotation.TimeUnit time_unit = logicalType.getUnit();
-                    if (time_unit == LogicalTypeAnnotation.TimeUnit.MICROS) {
+                    LogicalTypeAnnotation.TimeUnit timeUnit = logicalType.getUnit();
+                    if (timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS) {
                         newDataType = InternalType.TIMESTAMP;
                         metadata.put(
                                 InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
-                    } else if (time_unit == LogicalTypeAnnotation.TimeUnit.MILLIS) {
+                    } else if (timeUnit == LogicalTypeAnnotation.TimeUnit.MILLIS) {
                         newDataType = InternalType.TIMESTAMP_NTZ;
                         metadata.put(
                                 InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
-                    } else if (time_unit == LogicalTypeAnnotation.TimeUnit.NANOS) {
+                    } else if (timeUnit == LogicalTypeAnnotation.TimeUnit.NANOS) {
                         newDataType = InternalType.TIMESTAMP_NTZ;
                         metadata.put(
                                 InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.NANOS);
@@ -134,12 +134,16 @@ public class ParquetSchemaExtractor {
                     //newDataType = InternalType.TIMESTAMP;
                 } else if (logicalType instanceof LogicalTypeAnnotation.IntLogicalTypeAnnotation) {
                     newDataType = InternalType.INT;
+                } else {
+                    newDataType = InternalType.INT;
                 }
                 break;
             case "INT32":
                 logicalType = schema.getLogicalTypeAnnotation();
                 if (logicalType instanceof LogicalTypeAnnotation.DateLogicalTypeAnnotation) {
                     newDataType = InternalType.DATE;
+                } else {
+                    newDataType = InternalType.INT;
                 }
                 // is also a TIME
                 break;
@@ -158,6 +162,8 @@ public class ParquetSchemaExtractor {
                             InternalSchema.MetadataKey.DECIMAL_SCALE,
                             logicalType.getScale());
                     newDataType = InternalType.DECIMAL;
+                } else {
+                    newDataType = InternalType.FLOAT;
                 }
                 break;
             case "BYTES":
@@ -167,6 +173,8 @@ public class ParquetSchemaExtractor {
                 logicalType = schema.getLogicalTypeAnnotation()
                 if (logicalType instanceof LogicalTypeAnnotation.UUIDLogicalTypeAnnotation) {
                     newDataType = InternalType.UUID;
+                } else {
+                    newDataType = InternalType.BYTES;
                 }
                 break;
             //TODO add other logicalTypes ?
@@ -178,6 +186,8 @@ public class ParquetSchemaExtractor {
                 } else if (logicalType instanceof LogicalTypeAnnotation.JsonLogicalTypeAnnotation) {
                     newDataType = InternalType.BYTES;
                 } else if (logicalType instanceof LogicalTypeAnnotation.BsonLogicalTypeAnnotation) {
+                    newDataType = InternalType.BYTES;
+                } else {
                     newDataType = InternalType.BYTES;
                 }
                 break;
