@@ -204,10 +204,11 @@ public class RunSync {
   }
 
   public static ConversionSourceProvider<?> getConversionSourceProvider(
-      String cmd, DatasetConfig datasetConfig, Configuration hadoopConf) throws IOException {
+      String conversionProviderConfigpath, DatasetConfig datasetConfig, Configuration hadoopConf)
+      throws IOException {
     // Process source format
     String sourceFormat = datasetConfig.sourceFormat;
-    byte[] customConfig = getCustomConfigurations(cmd);
+    byte[] customConfig = getCustomConfigurations(conversionProviderConfigpath);
     TableFormatConverters tableFormatConverters = loadTableFormatConversionConfigs(customConfig);
     TableFormatConverters.ConversionConfig sourceConversionConfig =
         tableFormatConverters.getTableFormatConverters().get(sourceFormat);
@@ -224,13 +225,7 @@ public class RunSync {
     return conversionSourceProvider;
   }
 
-  public static List<String> getTableFormatList(DatasetConfig datasetConfig) throws IOException {
-    // Retrieve table format list
-    List<String> tableFormatList = datasetConfig.getTargetFormats();
-    return tableFormatList;
-  }
-
-  public static CommandLine CommandParser(String[] args) {
+  public static CommandLine commandParser(String[] args) {
     CommandLineParser parser = new DefaultParser();
 
     CommandLine cmd;
@@ -254,7 +249,7 @@ public class RunSync {
   }
 
   public static void main(String[] args) throws IOException {
-    CommandLine cmd = CommandParser(args);
+    CommandLine cmd = commandParser(args);
     String datasetConfigpath = getValueFromConfig(cmd, DATASET_CONFIG_OPTION);
     String icebergCatalogConfigpath = getValueFromConfig(cmd, ICEBERG_CATALOG_CONFIG_PATH);
     String hadoopConfigpath = getValueFromConfig(cmd, HADOOP_CONFIG_PATH);
@@ -264,15 +259,15 @@ public class RunSync {
     Configuration hadoopConf = gethadoopConf(hadoopConfigpath);
     ConversionSourceProvider conversionSourceProvider =
         getConversionSourceProvider(conversionProviderConfigpath, datasetConfig, hadoopConf);
-    List<String> tableFormatList = getTableFormatList(datasetConfig);
+    List<String> tableFormatList = datasetConfig.getTargetFormats();
     formatConvertor(
         datasetConfig, tableFormatList, icebergCatalogConfig, hadoopConf, conversionSourceProvider);
   }
 
-  static byte[] getCustomConfigurations(String cmd) throws IOException {
+  static byte[] getCustomConfigurations(String Configpath) throws IOException {
     byte[] customConfig = null;
-    if (cmd != null) {
-      customConfig = Files.readAllBytes(Paths.get(cmd));
+    if (Configpath != null) {
+      customConfig = Files.readAllBytes(Paths.get(Configpath));
     }
     return customConfig;
   }

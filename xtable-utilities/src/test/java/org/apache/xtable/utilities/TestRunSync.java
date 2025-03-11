@@ -24,7 +24,6 @@ import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
@@ -47,15 +46,13 @@ class TestRunSync {
     File file = new File(result, "/my_config.yaml");
     String filePath = file.getPath();
     String[] args = new String[] {"--datasetConfig", filePath};
-    try {
-      RunSync.main(args);
-    } catch (IOException ex) {
-      throw new UncheckedIOException(ex);
-    }
+    //      RunSync.main(args);
+    Assertions.assertDoesNotThrow(
+        () -> RunSync.main(args), "RunSync.main() threw an unexpected exception.");
   }
 
   @Test
-  public void testNonExistentFile() {
+  public void testGetDatasetConfigWithNonExistentFile() {
     String projectRoot = System.getProperty("user.dir");
     // Construct the path to the file in the root directory
     int lastSlashIndex = projectRoot.lastIndexOf('/');
