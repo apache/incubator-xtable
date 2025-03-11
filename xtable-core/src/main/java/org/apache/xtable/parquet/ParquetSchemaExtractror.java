@@ -184,15 +184,17 @@ public class ParquetSchemaExtractor {
                 logicalType = schema.getLogicalTypeAnnotation()
                 if (logicalType instanceof LogicalTypeAnnotation.UUIDLogicalTypeAnnotation) {
                     newDataType = InternalType.UUID;
-                } else {
-                    newDataType = InternalType.BYTES;
+                } else if (logicalType instanceof LogicalTypeAnnotation.IntervalLogicalTypeAnnotation) {
+                    metadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 12);
+                    newDataType = InternalType.FIXED;
                 }
                 break;
             //TODO add other logicalTypes ?
             case "BYTE_ARRAY":
-                // includes metadata (?) for json,BSON, Variant,GEOMETRY, geography,
+                //? Variant,GEOMETRY, GEOGRAPHY,
                 logicalType = schema.getLogicalTypeAnnotation()
                 if (logicalType instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
+                    metadata.put(InternalSchema.MetadataKey.ENUM_VALUES, schema.toOriginalType().values());
                     newDataType = InternalType.ENUM;
                 } else if (logicalType instanceof LogicalTypeAnnotation.JsonLogicalTypeAnnotation) {
                     newDataType = InternalType.BYTES;
