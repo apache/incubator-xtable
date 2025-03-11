@@ -93,6 +93,7 @@ public class ParquetSchemaExtractor {
         }
         return False;
     }
+
 }
 
     /**
@@ -116,7 +117,21 @@ public class ParquetSchemaExtractor {
             case "INT64":
                 logicalType = schema.getLogicalTypeAnnotation();
                 if (logicalType instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) {
-                    newDataType = InternalType.TIMESTAMP;
+                    LogicalTypeAnnotation.TimeUnit time_unit = logicalType.getUnit();
+                    if (time_unit == LogicalTypeAnnotation.TimeUnit.MICROS) {
+                        newDataType = InternalType.TIMESTAMP;
+                        metadata.put(
+                                InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
+                    } else if (time_unit == LogicalTypeAnnotation.TimeUnit.MILLIS) {
+                        newDataType = InternalType.TIMESTAMP_NTZ;
+                        metadata.put(
+                                InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
+                    } else if (time_unit == LogicalTypeAnnotation.TimeUnit.NANOS) {
+                        newDataType = InternalType.TIMESTAMP_NTZ;
+                        metadata.put(
+                                InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.NANOS);
+                    }
+                    //newDataType = InternalType.TIMESTAMP;
                 } else if (logicalType instanceof LogicalTypeAnnotation.IntLogicalTypeAnnotation) {
                     newDataType = InternalType.INT;
                 }
