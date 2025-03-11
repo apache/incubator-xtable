@@ -187,7 +187,10 @@ public class ParquetSchemaExtractor {
                     newDataType = InternalType.BYTES;
                 } else if (logicalType instanceof LogicalTypeAnnotation.BsonLogicalTypeAnnotation) {
                     newDataType = InternalType.BYTES;
-                } else {
+                } else if (logicalType instanceof LogicalTypeAnnotation.StringLogicalTypeAnnotation){
+                    newDataType = InternalType.STRING;
+                }
+                else {
                     newDataType = InternalType.BYTES;
                 }
                 break;
