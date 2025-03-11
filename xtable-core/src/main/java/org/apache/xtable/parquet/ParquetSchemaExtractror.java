@@ -215,7 +215,7 @@ public class ParquetSchemaExtractor {
                     throw new UnsupportedSchemaTypeException(
                             String.format("Unsupported schema type %s", schema));
             }
-        }else {
+        } else {
             //GroupTypes
             typeName = schema.asGroupType();
             switch (typeName.getOriginalType()) {
@@ -314,20 +314,25 @@ public class ParquetSchemaExtractor {
      */
     private Schema fromInternalSchema(InternalSchema internalSchema, String currentPath) {
         switch (internalSchema.getDataType()) {
-            case BYTES:
+            /*case BYTES:
                 return finalizeSchema(Schema.create(Schema.Type.BYTES), internalSchema);
             case BOOLEAN:
-                return finalizeSchema(Schema.create(Schema.Type.BOOLEAN), internalSchema);
+                return finalizeSchema(Schema.create(Schema.Type.BOOLEAN), internalSchema);*/
             case INT:
-                return finalizeSchema(Schema.create(Schema.Type.INT), internalSchema);
+                return finalizeSchema(LogicalTypeAnnotation.intType(32), internalSchema);
             case LONG:
-                return finalizeSchema(Schema.create(Schema.Type.LONG), internalSchema);
+                return finalizeSchema(LogicalTypeAnnotation.intType(64), internalSchema);
             case STRING:
-                return finalizeSchema(Schema.create(Schema.Type.STRING), internalSchema);
+                return finalizeSchema(LogicalTypeAnnotation.stringType(), internalSchema);
             case FLOAT:
-                return finalizeSchema(Schema.create(Schema.Type.FLOAT), internalSchema);
+                return finalizeSchema(LogicalTypeAnnotation.float16Type(), internalSchema);
             case DOUBLE:
-                return finalizeSchema(Schema.create(Schema.Type.DOUBLE), internalSchema);
+                int precision =
+                        (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+                int scale =
+                        (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
+                return finalizeSchema(LogicalTypeAnnotation.decimalType(scale, precision), internalSchema);
+                // TODO check how to create ENUM
             case ENUM:
                 return finalizeSchema(
                         Schema.createEnum(
@@ -340,29 +345,36 @@ public class ParquetSchemaExtractor {
                         internalSchema);
             case DATE:
                 return finalizeSchema(
-                        LogicalTypes.date().addToSchema(Schema.create(Schema.Type.INT)), internalSchema);
+                        LogicalTypeAnnotation.dateType(), internalSchema);
             case TIMESTAMP:
                 if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
                         == InternalSchema.MetadataValue.MICROS) {
                     return finalizeSchema(
-                            LogicalTypes.timestampMicros().addToSchema(Schema.create(Schema.Type.LONG)),
+                            , LogicalTypeAnnotation.timestampType(True, MICROS)
                             internalSchema);
-                } else {
-                    return finalizeSchema(
-                            LogicalTypes.timestampMillis().addToSchema(Schema.create(Schema.Type.LONG)),
-                            internalSchema);
-                }
+                } if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+                    == InternalSchema.MetadataValue.MILLIS) {
+                return finalizeSchema(
+                        , LogicalTypeAnnotation.timestampType(True, MILLIS)
+                        internalSchema);
+            } else if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+                    == InternalSchema.MetadataValue.NANOS) {
+                return finalizeSchema(
+                        LogicalTypeAnnotation.timestampType(True, NANOS),
+                        internalSchema);
+            }
             case TIMESTAMP_NTZ:
                 if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
                         == InternalSchema.MetadataValue.MICROS) {
                     return finalizeSchema(
-                            LogicalTypes.localTimestampMicros().addToSchema(Schema.create(Schema.Type.LONG)),
+                            LogicalTypeAnnotation.timestampType(True, MICROS),
                             internalSchema);
                 } else {
                     return finalizeSchema(
-                            LogicalTypes.localTimestampMillis().addToSchema(Schema.create(Schema.Type.LONG)),
+                            LogicalTypeAnnotation.timestampType(True, MILLIS),
                             internalSchema);
                 }
+                // TODO check from here FIXED, LIST and MAP types (still to todo)
             case LIST:
                 InternalField elementField =
                         internalSchema.getFields().stream()
@@ -390,20 +402,20 @@ public class ParquetSchemaExtractor {
                         (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
                 int scale =
                         (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
-                Integer size =
-                        (Integer) internalSchema.getMetadata().get(InternalSchema.MetadataKey.FIXED_BYTES_SIZE);
-                if (size == null) {
-                    return finalizeSchema(
-                            LogicalTypes.decimal(precision, scale).addToSchema(Schema.create(Schema.Type.BYTES)),
-                            internalSchema);
-                } else {
-                    return finalizeSchema(
-                            LogicalTypes.decimal(precision, scale)
-                                    .addToSchema(
-                                            Schema.createFixed(
-                                                    internalSchema.getName(), internalSchema.getComment(), null, size)),
-                            internalSchema);
-                }
+//                Integer size =
+//                        (Integer) internalSchema.getMetadata().get(InternalSchema.MetadataKey.FIXED_BYTES_SIZE);
+//                if (size == null) {
+                return finalizeSchema(
+                        LogicalTypeAnnotation.decimalType(scale, precision),
+                        internalSchema);
+//                } else {
+//                    return finalizeSchema(
+//                            LogicalTypes.decimal(precision, scale)
+//                                    .addToSchema(
+//                                            Schema.createFixed(
+//                                                    internalSchema.getName(), internalSchema.getComment(), null, size)),
+//                            internalSchema);
+//                }
             case FIXED:
                 Integer fixedSize =
                         (Integer) internalSchema.getMetadata().get(InternalSchema.MetadataKey.FIXED_BYTES_SIZE);
@@ -412,10 +424,10 @@ public class ParquetSchemaExtractor {
                                 internalSchema.getName(), internalSchema.getComment(), null, fixedSize),
                         internalSchema);
             case UUID:
-                Schema uuidSchema =
+                /*Schema uuidSchema =
                         Schema.createFixed(internalSchema.getName(), internalSchema.getComment(), null, 16);
-                uuidSchema.addProp(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid");
-                return finalizeSchema(uuidSchema, internalSchema);
+                uuidSchema.addProp(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid");*/
+                return finalizeSchema(LogicalTypeAnnotation.uuidType(), internalSchema);
             default:
                 throw new UnsupportedSchemaTypeException(
                         "Encountered unhandled type during InternalSchema to parquet conversion: "
