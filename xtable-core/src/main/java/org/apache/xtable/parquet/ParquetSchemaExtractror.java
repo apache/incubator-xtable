@@ -110,164 +110,171 @@ public class ParquetSchemaExtractor {
             Type schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
         // TODO - Does not handle recursion in parquet schema
         InternalType newDataType;
+        PrimitiveType typeName;
         LogicalTypeAnnotation logicalType;
         Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
-        switch (schema.getName()) {
-            //PrimitiveTypes
-            case "INT64":
-                logicalType = schema.getLogicalTypeAnnotation();
-                if (logicalType instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) {
-                    LogicalTypeAnnotation.TimeUnit timeUnit = logicalType.getUnit();
-                    if (timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS) {
-                        newDataType = InternalType.TIMESTAMP;
-                        metadata.put(
-                                InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
-                    } else if (timeUnit == LogicalTypeAnnotation.TimeUnit.MILLIS) {
-                        newDataType = InternalType.TIMESTAMP_NTZ;
-                        metadata.put(
-                                InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
-                    } else if (timeUnit == LogicalTypeAnnotation.TimeUnit.NANOS) {
-                        newDataType = InternalType.TIMESTAMP_NTZ;
-                        metadata.put(
-                                InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.NANOS);
-                    }
-                } else if (logicalType instanceof LogicalTypeAnnotation.IntLogicalTypeAnnotation) {
-                    newDataType = InternalType.INT;
-                } else if (logicalType instanceof LogicalTypeAnnotation.TimeLogicalTypeAnnotation) {
-                    LogicalTypeAnnotation.TimeUnit timeUnit = logicalType.getUnit();
-                    if (timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS || timeUnit == LogicalTypeAnnotation.TimeUnit.NANOS) {
-                        // check if INT is the InternalType needed here
+        if (schema.isPrimitive()) {
+            typeName = schema.asPrimitiveType();
+            switch (typeName.getPrimitiveTypeName()) {
+                //PrimitiveTypes
+                case INT64:
+                    logicalType = schema.getLogicalTypeAnnotation();
+                    if (logicalType instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) {
+                        LogicalTypeAnnotation.TimeUnit timeUnit = logicalType.getUnit();
+                        if (timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS) {
+                            newDataType = InternalType.TIMESTAMP;
+                            metadata.put(
+                                    InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
+                        } else if (timeUnit == LogicalTypeAnnotation.TimeUnit.MILLIS) {
+                            newDataType = InternalType.TIMESTAMP_NTZ;
+                            metadata.put(
+                                    InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
+                        } else if (timeUnit == LogicalTypeAnnotation.TimeUnit.NANOS) {
+                            newDataType = InternalType.TIMESTAMP_NTZ;
+                            metadata.put(
+                                    InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.NANOS);
+                        }
+                    } else if (logicalType instanceof LogicalTypeAnnotation.IntLogicalTypeAnnotation) {
+                        newDataType = InternalType.INT;
+                    } else if (logicalType instanceof LogicalTypeAnnotation.TimeLogicalTypeAnnotation) {
+                        LogicalTypeAnnotation.TimeUnit timeUnit = logicalType.getUnit();
+                        if (timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS || timeUnit == LogicalTypeAnnotation.TimeUnit.NANOS) {
+                            // check if INT is the InternalType needed here
+                            newDataType = InternalType.INT;
+                        }
+                    } else {
                         newDataType = InternalType.INT;
                     }
-                } else {
-                    newDataType = InternalType.INT;
-                }
-                break;
-            case "INT32":
-                logicalType = schema.getLogicalTypeAnnotation();
-                if (logicalType instanceof LogicalTypeAnnotation.DateLogicalTypeAnnotation) {
-                    newDataType = InternalType.DATE;
-                } else if (logicalType instanceof TimeLogicalTypeAnnotation) {
-                    LogicalTypeAnnotation.TimeUnit timeUnit = logicalType.getUnit();
-                    if (timeUnit == LogicalTypeAnnotation.TimeUnit.MILLIS) {
-                        // check if INT is the InternalType needed here
+                    break;
+                case INT32:
+                    logicalType = schema.getLogicalTypeAnnotation();
+                    if (logicalType instanceof LogicalTypeAnnotation.DateLogicalTypeAnnotation) {
+                        newDataType = InternalType.DATE;
+                    } else if (logicalType instanceof TimeLogicalTypeAnnotation) {
+                        LogicalTypeAnnotation.TimeUnit timeUnit = logicalType.getUnit();
+                        if (timeUnit == LogicalTypeAnnotation.TimeUnit.MILLIS) {
+                            // check if INT is the InternalType needed here
+                            newDataType = InternalType.INT;
+                        }
+                    } else {
                         newDataType = InternalType.INT;
                     }
-                } else {
+                    break;
+                case INT96:
                     newDataType = InternalType.INT;
-                }
-                // is also a TIME
-                break;
-            case "INT96":
-                newDataType = InternalType.INT;
-                break;
-            case "FLOAT":
-                logicalType = schema.getLogicalTypeAnnotation();
-                if (logicalType instanceof LogicalTypeAnnotation.Float16LogicalTypeAnnotation) {
-                    newDataType = InternalType.FLOAT;
-                } else if (logicalType instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
-                    metadata.put(
-                            InternalSchema.MetadataKey.DECIMAL_PRECISION,
-                            logicalType.getPrecision());
-                    metadata.put(
-                            InternalSchema.MetadataKey.DECIMAL_SCALE,
-                            logicalType.getScale());
-                    newDataType = InternalType.DECIMAL;
-                } else {
-                    newDataType = InternalType.FLOAT;
-                }
-                break;
-            case "BYTES":
-                newDataType = InternalType.BYTES;
-                break;
-            case FIXED_LEN_BYTE_ARRAY:
-                logicalType = schema.getLogicalTypeAnnotation()
-                if (logicalType instanceof LogicalTypeAnnotation.UUIDLogicalTypeAnnotation) {
-                    newDataType = InternalType.UUID;
-                } else if (logicalType instanceof LogicalTypeAnnotation.IntervalLogicalTypeAnnotation) {
-                    metadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 12);
-                    newDataType = InternalType.FIXED;
-                }
-                break;
-            //TODO add other logicalTypes ?
-            case "BYTE_ARRAY":
-                //? Variant,GEOMETRY, GEOGRAPHY,
-                logicalType = schema.getLogicalTypeAnnotation()
-                if (logicalType instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
-                    metadata.put(InternalSchema.MetadataKey.ENUM_VALUES, schema.toOriginalType().values());
-                    newDataType = InternalType.ENUM;
-                } else if (logicalType instanceof LogicalTypeAnnotation.JsonLogicalTypeAnnotation) {
-                    newDataType = InternalType.BYTES;
-                } else if (logicalType instanceof LogicalTypeAnnotation.BsonLogicalTypeAnnotation) {
-                    newDataType = InternalType.BYTES;
-                } else if (logicalType instanceof LogicalTypeAnnotation.StringLogicalTypeAnnotation) {
-                    newDataType = InternalType.STRING;
-                } else {
-                    newDataType = InternalType.BYTES;
-                }
-                break;
-            case "BOOLEAN":
-                newDataType = InternalType.BOOLEAN;
-                break;
-            case "UNKNOWN":
-                newDataType = InternalType.NULL;
-                break;
+                    break;
+                case FLOAT:
+                    logicalType = schema.getLogicalTypeAnnotation();
+                    if (logicalType instanceof LogicalTypeAnnotation.Float16LogicalTypeAnnotation) {
+                        newDataType = InternalType.FLOAT;
+                    } else if (logicalType instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+                        metadata.put(
+                                InternalSchema.MetadataKey.DECIMAL_PRECISION,
+                                logicalType.getPrecision());
+                        metadata.put(
+                                InternalSchema.MetadataKey.DECIMAL_SCALE,
+                                logicalType.getScale());
+                        newDataType = InternalType.DECIMAL;
+                    } else {
+                        newDataType = InternalType.FLOAT;
+                    }
+                    break;
+                case FIXED_LEN_BYTE_ARRAY:
+                    logicalType = schema.getLogicalTypeAnnotation()
+                    if (logicalType instanceof LogicalTypeAnnotation.UUIDLogicalTypeAnnotation) {
+                        newDataType = InternalType.UUID;
+                    } else if (logicalType instanceof LogicalTypeAnnotation.IntervalLogicalTypeAnnotation) {
+                        metadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 12);
+                        newDataType = InternalType.FIXED;
+                    }
+                    break;
+                //TODO add other logicalTypes?
+                case BINARY:
+                    //? Variant,GEOMETRY, GEOGRAPHY,
+                    logicalType = schema.getLogicalTypeAnnotation()
+                    if (logicalType instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
+                        metadata.put(InternalSchema.MetadataKey.ENUM_VALUES, schema.toOriginalType().values());
+                        newDataType = InternalType.ENUM;
+                    } else if (logicalType instanceof LogicalTypeAnnotation.JsonLogicalTypeAnnotation) {
+                        newDataType = InternalType.BYTES;
+                    } else if (logicalType instanceof LogicalTypeAnnotation.BsonLogicalTypeAnnotation) {
+                        newDataType = InternalType.BYTES;
+                    } else if (logicalType instanceof LogicalTypeAnnotation.StringLogicalTypeAnnotation) {
+                        newDataType = InternalType.STRING;
+                    } else {
+                        newDataType = InternalType.BYTES;
+                    }
+                    break;
+                case BOOLEAN:
+                    newDataType = InternalType.BOOLEAN;
+                    break;
+                case UNKNOWN:
+                    newDataType = InternalType.NULL;
+                    break;
+                default:
+                    throw new UnsupportedSchemaTypeException(
+                            String.format("Unsupported schema type %s", schema));
+            }
+        }else {
             //GroupTypes
-            case "LIST":
-                IdMapping elementMapping = fieldNameToIdMapping.get(ELEMENT);
-                InternalSchema elementSchema =
-                        toInternalSchema(
-                                schema.getName(),
-                                SchemaUtils.getFullyQualifiedPath(
-                                        parentPath, InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME),
-                                getChildIdMap(elementMapping));
-                InternalField elementField =
-                        InternalField.builder()
-                                .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                .parentPath(parentPath)
-                                .schema(elementSchema)
-                                .fieldId(elementMapping == null ? null : elementMapping.getId())
-                                .build();
-                return InternalSchema.builder()
-                        .name(schema.getName())
-                        .dataType(InternalType.LIST)
-                        .comment(schema.toString())
-                        .isNullable(groupTypeContainsNull(schema))
-                        .fields(Collections.singletonList(elementField))
-                        .build();
+            typeName = schema.asGroupType();
+            switch (typeName.getOriginalType()) {
+                case LIST:
+                    IdMapping elementMapping = fieldNameToIdMapping.get(ELEMENT);
+                    InternalSchema elementSchema =
+                            toInternalSchema(
+                                    schema.getName(),
+                                    SchemaUtils.getFullyQualifiedPath(
+                                            parentPath, InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME),
+                                    getChildIdMap(elementMapping));
+                    InternalField elementField =
+                            InternalField.builder()
+                                    .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                    .parentPath(parentPath)
+                                    .schema(elementSchema)
+                                    .fieldId(elementMapping == null ? null : elementMapping.getId())
+                                    .build();
+                    return InternalSchema.builder()
+                            .name(schema.getName())
+                            .dataType(InternalType.LIST)
+                            .comment(schema.toString())
+                            .isNullable(groupTypeContainsNull(schema))
+                            .fields(Collections.singletonList(elementField))
+                            .build();
 
-            case "MAP":
-                IdMapping keyMapping = fieldNameToIdMapping.get(KEY);
-                IdMapping valueMapping = fieldNameToIdMapping.get(VALUE);
-                InternalSchema valueSchema =
-                        toInternalSchema(
-                                schema.getName(),
-                                SchemaUtils.getFullyQualifiedPath(
-                                        parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
-                                getChildIdMap(valueMapping));
-                InternalField valueField =
-                        InternalField.builder()
-                                .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
-                                .parentPath(parentPath)
-                                .schema(valueSchema)
-                                .fieldId(valueMapping == null ? null : valueMapping.getId())
-                                .build();
-                return InternalSchema.builder()
-                        .name(schema.getName())
-                        .dataType(InternalType.MAP)
-                        .comment(schema.toString())
-                        .isNullable(groupTypeContainsNull(schema))
-                        .fields(
-                                Arrays.asList(
-                                        MAP_KEY_FIELD.toBuilder()
-                                                .parentPath(parentPath)
-                                                .fieldId(keyMapping == null ? null : keyMapping.getId())
-                                                .build(),
-                                        valueField))
-                        .build();
-            default:
-                throw new UnsupportedSchemaTypeException(
-                        String.format("Unsupported schema type %s", schema));
+                case MAP:
+                    IdMapping keyMapping = fieldNameToIdMapping.get(KEY);
+                    IdMapping valueMapping = fieldNameToIdMapping.get(VALUE);
+                    InternalSchema valueSchema =
+                            toInternalSchema(
+                                    schema.getName(),
+                                    SchemaUtils.getFullyQualifiedPath(
+                                            parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
+                                    getChildIdMap(valueMapping));
+                    InternalField valueField =
+                            InternalField.builder()
+                                    .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                                    .parentPath(parentPath)
+                                    .schema(valueSchema)
+                                    .fieldId(valueMapping == null ? null : valueMapping.getId())
+                                    .build();
+                    return InternalSchema.builder()
+                            .name(schema.getName())
+                            .dataType(InternalType.MAP)
+                            .comment(schema.toString())
+                            .isNullable(groupTypeContainsNull(schema))
+                            .fields(
+                                    Arrays.asList(
+                                            MAP_KEY_FIELD.toBuilder()
+                                                    .parentPath(parentPath)
+                                                    .fieldId(keyMapping == null ? null : keyMapping.getId())
+                                                    .build(),
+                                            valueField))
+                            .build();
+                default:
+                    throw new UnsupportedSchemaTypeException(
+                            String.format("Unsupported schema type %s", schema));
+            }
         }
         return InternalSchema.builder()
                 .name(schema.getName())
