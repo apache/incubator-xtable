@@ -99,7 +99,7 @@ public class RunSync {
                   + "used for any Iceberg source or target.")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
-  public static SourceTable sourceTableBuilder(
+  static SourceTable sourceTableBuilder(
       DatasetConfig.Table table,
       IcebergCatalogConfig icebergCatalogConfig,
       DatasetConfig datasetConfig,
@@ -119,7 +119,7 @@ public class RunSync {
     return sourceTable;
   }
 
-  public static List<TargetTable> targetTableBuilder(
+  static List<TargetTable> targetTableBuilder(
       DatasetConfig.Table table,
       IcebergCatalogConfig icebergCatalogConfig,
       List<String> tableFormatList) {
@@ -141,7 +141,7 @@ public class RunSync {
     return targetTables;
   }
 
-  public static void formatConvertor(
+  static void formatConvertor(
       DatasetConfig datasetConfig,
       List<String> tableFormatList,
       IcebergCatalogConfig icebergCatalogConfig,
@@ -177,7 +177,7 @@ public class RunSync {
     }
   }
 
-  public static DatasetConfig getDatasetConfig(String datasetConfigPath) throws IOException {
+  static DatasetConfig getDatasetConfig(String datasetConfigPath) throws IOException {
     // Initialize DatasetConfig
     DatasetConfig datasetConfig = new DatasetConfig();
 
@@ -188,14 +188,14 @@ public class RunSync {
     return datasetConfig;
   }
 
-  public static Configuration gethadoopConf(String hadoopConfigPath) throws IOException {
+  static Configuration gethadoopConf(String hadoopConfigPath) throws IOException {
     // Load configurations
     byte[] customConfig = getCustomConfigurations(hadoopConfigPath);
     Configuration hadoopConf = loadHadoopConf(customConfig);
     return hadoopConf;
   }
 
-  public static IcebergCatalogConfig getIcebergCatalogConfig(String icebergCatalogConfigPath)
+  static IcebergCatalogConfig getIcebergCatalogConfig(String icebergCatalogConfigPath)
       throws IOException {
     // Load configurations
     byte[] icebergCatalogConfigInput = getCustomConfigurations(icebergCatalogConfigPath);
@@ -203,7 +203,7 @@ public class RunSync {
     return icebergCatalogConfig;
   }
 
-  public static ConversionSourceProvider<?> getConversionSourceProvider(
+  static ConversionSourceProvider<?> getConversionSourceProvider(
       String conversionProviderConfigpath, DatasetConfig datasetConfig, Configuration hadoopConf)
       throws IOException {
     // Process source format
@@ -225,7 +225,7 @@ public class RunSync {
     return conversionSourceProvider;
   }
 
-  public static CommandLine commandParser(String[] args) {
+  static CommandLine commandParser(String[] args) {
     CommandLineParser parser = new DefaultParser();
 
     CommandLine cmd;
@@ -244,7 +244,7 @@ public class RunSync {
     return cmd;
   }
 
-  public static String getValueFromConfig(CommandLine cmd, String configFlag) {
+  static String getValueFromConfig(CommandLine cmd, String configFlag) {
     return cmd.getOptionValue(configFlag);
   }
 
