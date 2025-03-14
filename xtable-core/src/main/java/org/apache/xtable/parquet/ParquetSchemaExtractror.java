@@ -50,6 +50,10 @@ import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.schema.SchemaUtils;
 
+import org.apache.xtable.avro.AvroSchemaConverter;
+import org.apache.avro.Schema;
+//import org.apache.parquet.avro.AvroSchemaConverter;
+
 /**
  * Class that converts parquet Schema {@link Schema} to Canonical Schema {@link InternalSchema} and
  * vice-versa. This conversion is fully reversible and there is a strict 1 to 1 mapping between
@@ -95,6 +99,13 @@ public class ParquetSchemaExtractor {
     }
 
 }
+    // check which methods is best for the conversion
+    private InternalSchema toInternalSchema_bis(
+            MessageType schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
+        org.apache.parquet.avro.AvroSchemaConverter avroParquetSchemaConverter = new org.apache.parquet.avro.AvroSchemaConverter();
+        Schema avroSchema = avroParquetSchemaConverter.convert(schema);
+        return AvroSchemaConverter(avroSchema,parentPath,fieldNameToIdMapping);
+    }
 
     /**
      * Converts the parquet {@link Schema} to {@link InternalSchema}.
@@ -303,6 +314,14 @@ public class ParquetSchemaExtractor {
         return fromInternalSchema(internalSchema, null);
     }
 
+    // check which methods is best for the conversion
+    private MessageType fromInternalSchema_bis(
+            InternalSchema internalSchema, String currentPath) {
+        org.apache.parquet.avro.AvroSchemaConverter avroParquetSchemaConverter = new org.apache.parquet.avro.AvroSchemaConverter();
+        Schema avroSchema = fromInternalSchema(internalSchema,currentPath);
+        MessageType parquetSchema = avroParquetSchemaConverter.convert(avroSchema);
+        return parquetSchema;
+    }
     /**
      * Internal method for converting the {@link InternalSchema} to parquet {@link Schema}.
      *
@@ -312,7 +331,7 @@ public class ParquetSchemaExtractor {
      *                       records.
      * @return an parquet schema
      */
-    private Schema fromInternalSchema(InternalSchema internalSchema, String currentPath) {
+    private Type fromInternalSchema(InternalSchema internalSchema, String currentPath) {
         switch (internalSchema.getDataType()) {
             /*case BYTES:
                 return finalizeSchema(Schema.create(Schema.Type.BYTES), internalSchema);
