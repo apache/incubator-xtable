@@ -60,23 +60,6 @@ public class ParquetPartitionExtractor {
     }
   }
 
-
-  public List<InternalPartitionField> getInternalPartitionField(
-      Set<String> partitionList, InternalSchema schema) {
-    List<InternalPartitionField> partitionFields = new ArrayList<>();
-
-    for (String partitionKey : partitionList) {
-
-      partitionFields.add(
-          InternalPartitionField.builder()
-              .sourceField(SchemaFieldFinder.getInstance().findFieldByPath(schema, partitionKey))
-              .transformType(PartitionTransformType.VALUE)
-              .build());
-    }
-
-    return partitionFields;
-  }
-
   // TODO logic is too complicated can be simplified
   public List<PartitionValue> getPartitionValue(
       String basePath,

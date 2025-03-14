@@ -42,33 +42,46 @@ public class ParquetTableExtractor {
       ParquetPartitionExtractor.getInstance();
 
   @Builder.Default
+  private static final ParquetPartitionValueExtractor partitionValueExtractor =
+          ParquetPartitionValueExtractor.getInstance();
+
+  @Builder.Default
+  private static final ParquetConversionSource parquetConversionSource =
+          ParquetConversionSource.getInstance();
+
+  @Builder.Default
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
   private Map<String, List<String>> initPartitionInfo() {
     return getPartitionFromDirectoryStructure(hadoopConf, basePath, Collections.emptyMap());
   }
+  public String getBasePathFromLastModifiedTable(){
+    InternalTable table = parquetConversionSource.getTable(-1L);
+    return table.getBasePath();
+  }
 
-  public InternalTable table(String tableName, Long version) {
+  public InternalTable table(String tableName, Set<String> partitionKeys) {
     ParquetMetadata footer = parquetMetadataExtractor.readParquetMetadata(conf, path);
     MessageType schema = parquetMetadataExtractor.getSchema(footer);
-    InternalSchema schema = schemaExtractor.toInternalSchema(schema);
-    Set<String> partitionKeys = initPartitionInfo().keySet();
-    // TODO getInternalPartitionField() to be replaced with the new YAML based partition fields
+    InternalSchema internalSchema = schemaExtractor.toInternalSchema(schema);
     List<InternalPartitionField> partitionFields =
-        partitionExtractor.getInternalPartitionField(partitionKeys, schema);
+            partitionValueExtractor.getInternalPartitionField(partitionKeys, internalSchema);
+    InternalTable snapshot = parquetConversionSource.getTable(-1L);
+    // Assuming InternalTable.java has its getters
+    Instant lastCommit = snapshot.latestCommitTime();
     DataLayoutStrategy dataLayoutStrategy =
         !partitionFields.isEmpty()
             ? DataLayoutStrategy.HIVE_STYLE_PARTITION
             : DataLayoutStrategy.FLAT;
     return InternalTable.builder()
         .tableFormat(TableFormat.APACHE_PARQUET)
-        .basePath(snapshot.deltaLog().dataPath().toString())
+        .basePath(getBasePathFromLastModifiedTable())
         .name(tableName)
         .layoutStrategy(dataLayoutStrategy)
         .partitioningFields(partitionFields)
-        .readSchema(schema)
-        .latestCommitTime(Instant.ofEpochMilli(snapshot.timestamp()))
+        .readSchema(internalSchema)
+        .latestCommitTime(Instant.ofEpochMilli(lastCommit))
         .build();
   }
 }
