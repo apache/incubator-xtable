@@ -368,13 +368,13 @@ public class ParquetSchemaExtractor {
                 // TODO check how to create ENUM
             case ENUM:
                 return finalizeSchema(
-                        Schema.createEnum(
+                        new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createEnum(
                                 internalSchema.getName(),
                                 internalSchema.getComment(),
                                 null,
                                 (List<String>)
                                         internalSchema.getMetadata().get(InternalSchema.MetadataKey.ENUM_VALUES),
-                                null),
+                                null)),
                         internalSchema);
             case DATE:
                 return finalizeSchema(
@@ -417,8 +417,8 @@ public class ParquetSchemaExtractor {
                                 .findFirst()
                                 .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
                 return finalizeSchema(
-                        Schema.createArray(
-                                fromInternalSchema(elementField.getSchema(), elementField.getPath())),
+                        new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createArray(
+                                fromInternalSchema(elementField.getSchema(), elementField.getPath()))),
                         internalSchema);
             case MAP:
                 InternalField valueField =
@@ -428,7 +428,7 @@ public class ParquetSchemaExtractor {
                                 .findFirst()
                                 .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
                 return finalizeSchema(
-                        Schema.createMap(fromInternalSchema(valueField.getSchema(), valueField.getPath())),
+                        new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createMap(fromInternalSchema(valueField.getSchema(), valueField.getPath()))),
                         internalSchema);
             case DECIMAL:
                 int precision =
