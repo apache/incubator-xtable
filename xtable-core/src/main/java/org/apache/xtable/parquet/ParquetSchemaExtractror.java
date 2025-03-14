@@ -82,7 +82,7 @@ public class ParquetSchemaExtractor {
         return INSTANCE;
     }
 
-    private static Type finalizeSchema(Type targetSchema, InternalSchema inputSchema) {
+    private static Type finalizeSchema(MessageType targetSchema, InternalSchema inputSchema) {
         if (inputSchema.isNullable()) {
             return targetSchema.union(LogicalTypeAnnotation.unknownType())
         }
@@ -98,7 +98,7 @@ public class ParquetSchemaExtractor {
         return False;
     }
 
-    public InternalSchema toInternalSchema(Schema schema) {
+    public InternalSchema _toInternalSchema(Schema schema) {
         AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance()
         Map<String, IdMapping> fieldNameToIdMapping =
                 IdTracker.getInstance()
@@ -112,7 +112,7 @@ public class ParquetSchemaExtractor {
     }
 
     // check which methods is best for the conversion
-    private InternalSchema toInternalSchema(
+    private InternalSchema _toInternalSchema(
             MessageType schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
         org.apache.parquet.avro.AvroSchemaConverter avroParquetSchemaConverter = new org.apache.parquet.avro.AvroSchemaConverter();
         Schema avroSchema = avroParquetSchemaConverter.convert(schema);
@@ -130,8 +130,8 @@ public class ParquetSchemaExtractor {
      *                             source schema. If source schema does not contain IdMappings, map will be empty.
      * @return a converted schema
      */
-    private InternalSchema toInternalSchema_bis(
-            Type schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
+    private InternalSchema toInternalSchema(
+            MessageType schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
         // TODO - Does not handle recursion in parquet schema
         InternalType newDataType;
         PrimitiveType typeName;
@@ -323,7 +323,7 @@ public class ParquetSchemaExtractor {
      * @param internalSchema internal schema representation
      * @return an parquet schema
      */
-    public Schema fromInternalSchema(InternalSchema internalSchema) {
+    public Schema _fromInternalSchema(InternalSchema internalSchema) {
         return fromInternalSchema(internalSchema, null);
     }
 
@@ -345,7 +345,7 @@ public class ParquetSchemaExtractor {
      *                       records.
      * @return an parquet schema
      */
-    private Type fromInternalSchema_bis(InternalSchema internalSchema, String currentPath) {
+    private Type fromInternalSchema(InternalSchema internalSchema, String currentPath) {
         switch (internalSchema.getDataType()) {
             /*case BYTES:
                 return finalizeSchema(Schema.create(Schema.Type.BYTES), internalSchema);

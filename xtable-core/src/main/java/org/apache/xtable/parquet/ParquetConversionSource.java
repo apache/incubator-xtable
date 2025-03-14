@@ -46,8 +46,8 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     @Builder.Default
     private static final ParquetSchemaExtractor schemaExtractor =
             ParquetSchemaExtractor.getInstance();
-    //    private static final ParquetSchemaConverter parquetSchemaConverter =
-//            ParquetSchemaConverter.getInstance();
+/*    private static final ParquetSchemaConverter parquetSchemaConverter =
+            ParquetSchemaConverter.getInstance();*/
     @Builder.Default
     private static final ParquetMetadataExtractor parquetMetadataExtractor =
             ParquetMetadataExtractor.getInstance();
@@ -99,16 +99,18 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
         ParquetMetadata parquetMetadata =
                 parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.get().getPath());
-        Schema tableSchema =
-                new org.apache.parquet.avro.AvroSchemaConverter().convert(parquetMetadataExtractor.getSchema(parquetMetadata));
-
+        //Schema tableSchema =
+        //        new org.apache.parquet.avro.AvroSchemaConverter().convert(parquetMetadataExtractor.getSchema(parquetMetadata));
+//        Type tableSchema =
+//                parquetSchemaConverter.convert(parquetMetadataExtractor.getSchema(parquetMetadata));
+        MessageType tableSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
 
         Set<String> partitionKeys = initPartitionInfo().keySet();
 
         // merge schema of partition into original as partition is not part of parquet fie
         if (!partitionKeys.isEmpty()) {
-            //tableSchema = mergeParquetSchema(tableSchema, partitionKeys);
-            tableSchema = mergeAvroSchema(tableSchema, partitionKeys);
+            tableSchema = mergeParquetSchema(tableSchema, partitionKeys);
+            //tableSchema = mergeAvroSchema(tableSchema, partitionKeys);
         }
         InternalSchema schema = schemaExtractor.toInternalSchema(tableSchema);
 
@@ -185,7 +187,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         return fieldAssembler.endRecord();
     }
 
-    private Type mergeParquetSchema(Type internalSchema, List<String> parititonFields) {
+    private Type mergeParquetSchema(MessageType internalSchema, List<String> parititonFields) {
 
         List<Type> listOfAllFields = internalSchema.getFields();
         Type fieldsToMerge = listOfAllFields.get(0);
