@@ -104,7 +104,8 @@ public class ParquetSchemaExtractor {
             MessageType schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
         org.apache.parquet.avro.AvroSchemaConverter avroParquetSchemaConverter = new org.apache.parquet.avro.AvroSchemaConverter();
         Schema avroSchema = avroParquetSchemaConverter.convert(schema);
-        return AvroSchemaConverter(avroSchema,parentPath,fieldNameToIdMapping);
+        AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance()
+        return avroSchemaConverter.toInternalSchema(avroSchema,parentPath,fieldNameToIdMapping);
     }
 
     /**
@@ -318,7 +319,8 @@ public class ParquetSchemaExtractor {
     private MessageType fromInternalSchema_bis(
             InternalSchema internalSchema, String currentPath) {
         org.apache.parquet.avro.AvroSchemaConverter avroParquetSchemaConverter = new org.apache.parquet.avro.AvroSchemaConverter();
-        Schema avroSchema = fromInternalSchema(internalSchema,currentPath);
+        AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance()
+        Schema avroSchema = avroSchemaConverter.fromInternalSchema(internalSchema,currentPath);
         MessageType parquetSchema = avroParquetSchemaConverter.convert(avroSchema);
         return parquetSchema;
     }
