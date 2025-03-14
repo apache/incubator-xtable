@@ -48,47 +48,57 @@ public class ParquetPartitionValueExtractor {
     }
 
     public List<InternalPartitionField> getInternalPartitionField(
-            Set<String> partitionList, InternalSchema schema) {
+            InputPartitionFields partitions) {
         List<InternalPartitionField> partitionFields = new ArrayList<>();
-
-        for (String partitionKey : partitionList) {
+        String sourceField = partitions.getSourceField()
+        for (InputPartitionField partition : partitions) {
             partitionFields.add(
                     InternalPartitionField.builder()
-                            //TODO check if this still is true for parquet (get sourceField from shcema and partitionKey?)
-                            .sourceField(SchemaFieldFinder.getInstance().findFieldByPath(schema, partitionKey))
-                            .transformType(PartitionTransformType.VALUE)
+                            .sourceField(sourceField)
+                            .transformType(partition.getTransformType())
                             .build());
         }
 
         return partitionFields;
     }
 
-    /*public Map<InternalPartitionField, Range> extractPartitionValues(
-            List<InternalPartitionField> partitionFields, Type schema) {
+    public List<PartitionValue> createPartitionValues(Map<InternalPartitionField, Range> extractedPartitions) {
+        return extractedPartitions.entrySet()
+                .stream()
+                .map(internalPartitionField ->
+                        PartitionValue.builder()
+                                .InternalPartitionField(internalPartitionField.getKey())
+                                .Range(internalPartitionField.getValue())
+                                .collect(Collectors.toList());
+    }
+
+    public Map<InternalPartitionField, Range> extractPartitionValues(
+            InternalPartitionFields partitionsConf) {
         Map<InternalPartitionField, Range> partitionValues = new HashMap<>();
-        for (int i = 0; i < partitionFields.size(); i++) {
-            InternalPartitionField partitionField = partitionFields.get(i);
+        List<InternalPartitionField> partitions = partitionsConf.getPartitions();
+        for (int i = 0; i < partitions.size(); i++) {
+            InternalPartitionField partitionField = partitions.get(i);
             Object value;
             // Convert date based partitions into millis since epoch
             switch (partitionField.getTransformType()) {
                 case YEAR:
-                    value = EPOCH.plusYears(structLike.get(i, Integer.class)).toInstant().toEpochMilli();
+                    value = EPOCH.plusYears(partitionField.get().PartitionValue()).toInstant().toEpochMilli();
                     break;
                 case MONTH:
-                    value = EPOCH.plusMonths(structLike.get(i, Integer.class)).toInstant().toEpochMilli();
+                    value = EPOCH.plusMonths(partitionField.get().PartitionValue()).toInstant().toEpochMilli();
                     break;
                 case DAY:
-                    value = EPOCH.plusDays(structLike.get(i, Integer.class)).toInstant().toEpochMilli();
+                    value = EPOCH.plusDays(partitionField.get().PartitionValue()).toInstant().toEpochMilli();
                     break;
                 case HOUR:
-                    value = EPOCH.plusHours(structLike.get(i, Integer.class)).toInstant().toEpochMilli();
+                    value = EPOCH.plusHours(partitionField.get().PartitionValue()).toInstant().toEpochMilli();
                     break;
                 default:
-                    value = structLike.get(i, Object.class);
+                    value = ((Object) partitionField.get().PartitionValue());
             }
 
-            partitionValues.put(partitionFields.get(i), Range.scalar(value));
+            partitionValues.put(partitionField, Range.scalar(value));
         }
         return partitionValues;
-    }*/
+    }
 }

@@ -46,7 +46,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     @Builder.Default
     private static final ParquetSchemaExtractor schemaExtractor =
             ParquetSchemaExtractor.getInstance();
-//    private static final ParquetSchemaConverter parquetSchemaConverter =
+    //    private static final ParquetSchemaConverter parquetSchemaConverter =
 //            ParquetSchemaConverter.getInstance();
     @Builder.Default
     private static final ParquetMetadataExtractor parquetMetadataExtractor =
@@ -54,6 +54,11 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     @Builder.Default
     private static final ParquetPartitionExtractor parquetPartitionExtractor =
             ParquetPartitionExtractor.getInstance();
+
+    @Builder.Default
+    private static final ParquetPartitionValueExtractor parquetPartitionValueExtractor =
+            ParquetPartitionValueExtractor.getInstance();
+
     @Builder.Default
     private static final ParquetStatsExtractor parquetStatsExtractor =
             ParquetStatsExtractor.getInstance();
@@ -64,12 +69,12 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     @NonNull
     private final Configuration hadoopConf;
 
-    private Map<String, List<String>> initPartitionInfo() {
-        return getPartitionFromConfiguration();
+    private InputPartitionFields initPartitionInfo() {
+        return parquetPartitionExtractor.getPartitionsFromUserConfiguration(configPath);
     }
 
     public Map<String, List<String>> getPartitionFromConfiguration() {
-        List<InputPartitionField> partitionFields = parquetPartitionExtractor.getPartitionsFromUserConfiguration(configPath);
+        List<InputPartitionField> partitionFields = initPartitionInfo().getPartitions();
         Map<String, List<String>> partitionsMap = new HashMap<>();
         for (InputPartitionField partition : partitionFields) {
             partitionsMap
@@ -126,11 +131,11 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                 .build();
     }
 
-    public List<InternalDataFile> getInternalDataFiles(){
+    public List<InternalDataFile> getInternalDataFiles() {
         List<LocatedFileStatus> parquetFiles =
                 getParquetFiles(hadoopConf, basePath).collect(Collectors.toList());
-        Map<String, List<String>> partitionInfo = initPartitionInfo();
-        InternalTable table = getTable(-1L);
+        List<PartitionValue> partitionValuesFromConfig = parquetPartitionValueExtractor.createPartitionValues(parquetPartitionValueExtractor.extractPartitionValues(initPartitionInfo())
+                InternalTable table = getTable(-1L);
         List<InternalDataFile> internalDataFiles =
                 parquetFiles.stream()
                         .map(
@@ -139,12 +144,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                                                 .physicalPath(file.getPath().toString())
                                                 .fileFormat(FileFormat.APACHE_PARQUET)
                                                 .fileSizeBytes(file.getLen())
-                                                .partitionValues(
-                                                        parquetPartitionExtractor.getPartitionValue(
-                                                                basePath,
-                                                                file.getPath().toString(),
-                                                                table.getReadSchema(),
-                                                                partitionInfo))
+                                                .partitionValues(partitionValuesFromConfig)
                                                 .lastModified(file.getModificationTime())
                                                 .columnStats(
                                                         parquetStatsExtractor

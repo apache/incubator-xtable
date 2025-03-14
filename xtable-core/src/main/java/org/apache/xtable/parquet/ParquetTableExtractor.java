@@ -53,9 +53,9 @@ public class ParquetTableExtractor {
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
-  private Map<String, List<String>> initPartitionInfo() {
+ /* private Map<String, List<String>> initPartitionInfo() {
     return getPartitionFromDirectoryStructure(hadoopConf, basePath, Collections.emptyMap());
-  }
+  }*/
   public String getBasePathFromLastModifiedTable(){
     InternalTable table = parquetConversionSource.getTable(-1L);
     return table.getBasePath();
@@ -66,7 +66,7 @@ public class ParquetTableExtractor {
     MessageType schema = parquetMetadataExtractor.getSchema(footer);
     InternalSchema internalSchema = schemaExtractor.toInternalSchema(schema);
     List<InternalPartitionField> partitionFields =
-            partitionValueExtractor.getInternalPartitionField(partitionKeys, internalSchema);
+            parquetConversionSource.initPartitionInfo().getPartitions();
     InternalTable snapshot = parquetConversionSource.getTable(-1L);
     // Assuming InternalTable.java has its getters
     Instant lastCommit = snapshot.latestCommitTime();

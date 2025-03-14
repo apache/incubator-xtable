@@ -51,7 +51,7 @@ public class ParquetPartitionExtractor {
   public static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
 
 
-  public List<InputPartitionField> getPartitionsFromUserConfiguration(String configPath) throws IOException {
+  public InputPartitionFields getPartitionsFromUserConfiguration(String configPath) throws IOException {
     InputPartitionFields partitionConfiguration = new InputPartitionFields();
     try (InputStream inputStream = Files.newInputStream(Paths.get(configPath))) {
       ObjectReader objectReader = YAML_MAPPER.readerForUpdating(partitionConfiguration);
@@ -61,7 +61,7 @@ public class ParquetPartitionExtractor {
   }
 
   // TODO logic is too complicated can be simplified
-  public List<PartitionValue> getPartitionValue(
+/*  public List<PartitionValue> getPartitionValue(
       String basePath,
       String filePath,
       InternalSchema schema,
@@ -90,5 +90,5 @@ public class ParquetPartitionExtractor {
       }
     }
     return partitionValues;
-  }
+  }*/
 }
