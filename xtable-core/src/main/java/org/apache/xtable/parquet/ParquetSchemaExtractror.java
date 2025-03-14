@@ -33,7 +33,7 @@ import lombok.NoArgsConstructor;
 
 import org.apache.parquet.LogicalType;
 import org.apache.parquet.LogicalTypes;
-import org.apache.parquet.Schema;
+//import org.apache.parquet.Schema;
 import org.apache.parquet.Schema.Type;
 import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.format.NullType;
@@ -98,13 +98,25 @@ public class ParquetSchemaExtractor {
         return False;
     }
 
-}
+    public InternalSchema toInternalSchema(Schema schema) {
+        AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance()
+        Map<String, IdMapping> fieldNameToIdMapping =
+                IdTracker.getInstance()
+                        .getIdTracking(schema)
+                        .map(
+                                idTracking ->
+                                        idTracking.getIdMappings().stream()
+                                                .collect(Collectors.toMap(IdMapping::getName, Function.identity())))
+                        .orElse(Collections.emptyMap());
+        return avroSchemaConverter.toInternalSchema(schema,null,fieldNameToIdMapping);
+    }
+
     // check which methods is best for the conversion
-    private InternalSchema toInternalSchema_bis(
+    private InternalSchema toInternalSchema(
             MessageType schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
         org.apache.parquet.avro.AvroSchemaConverter avroParquetSchemaConverter = new org.apache.parquet.avro.AvroSchemaConverter();
         Schema avroSchema = avroParquetSchemaConverter.convert(schema);
-        AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance()
+        AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance();
         return avroSchemaConverter.toInternalSchema(avroSchema,parentPath,fieldNameToIdMapping);
     }
 
@@ -118,7 +130,7 @@ public class ParquetSchemaExtractor {
      *                             source schema. If source schema does not contain IdMappings, map will be empty.
      * @return a converted schema
      */
-    private InternalSchema toInternalSchema(
+    private InternalSchema toInternalSchema_bis(
             Type schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
         // TODO - Does not handle recursion in parquet schema
         InternalType newDataType;
@@ -316,7 +328,7 @@ public class ParquetSchemaExtractor {
     }
 
     // check which methods is best for the conversion
-    private MessageType fromInternalSchema_bis(
+    private MessageType fromInternalSchema(
             InternalSchema internalSchema, String currentPath) {
         org.apache.parquet.avro.AvroSchemaConverter avroParquetSchemaConverter = new org.apache.parquet.avro.AvroSchemaConverter();
         AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance()
@@ -333,7 +345,7 @@ public class ParquetSchemaExtractor {
      *                       records.
      * @return an parquet schema
      */
-    private Type fromInternalSchema(InternalSchema internalSchema, String currentPath) {
+    private Type fromInternalSchema_bis(InternalSchema internalSchema, String currentPath) {
         switch (internalSchema.getDataType()) {
             /*case BYTES:
                 return finalizeSchema(Schema.create(Schema.Type.BYTES), internalSchema);

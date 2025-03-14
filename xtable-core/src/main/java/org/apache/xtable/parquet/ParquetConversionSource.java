@@ -31,7 +31,7 @@ import org.apache.hadoop.fs.*;
 import org.apache.parquet.Type;
 import org.apache.parquet.SchemaBuilder;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-
+import org.apache.avro.Schema;
 import org.apache.xtable.model.*;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -46,8 +46,8 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     @Builder.Default
     private static final ParquetSchemaExtractor schemaExtractor =
             ParquetSchemaExtractor.getInstance();
-    private static final ParquetSchemaConverter parquetSchemaConverter =
-            ParquetSchemaConverter.getInstance();
+//    private static final ParquetSchemaConverter parquetSchemaConverter =
+//            ParquetSchemaConverter.getInstance();
     @Builder.Default
     private static final ParquetMetadataExtractor parquetMetadataExtractor =
             ParquetMetadataExtractor.getInstance();
@@ -94,15 +94,16 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
         ParquetMetadata parquetMetadata =
                 parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.get().getPath());
-        Type tableSchema =
-                parquetSchemaConverter.convert(parquetMetadataExtractor.getSchema(parquetMetadata));
+        Schema tableSchema =
+                new org.apache.parquet.avro.AvroSchemaConverter().convert(parquetMetadataExtractor.getSchema(parquetMetadata));
 
 
         Set<String> partitionKeys = initPartitionInfo().keySet();
 
         // merge schema of partition into original as partition is not part of parquet fie
         if (!partitionKeys.isEmpty()) {
-            tableSchema = mergeParquetSchema(tableSchema, partitionKeys);
+            //tableSchema = mergeParquetSchema(tableSchema, partitionKeys);
+            tableSchema = mergeAvroSchema(tableSchema, partitionKeys);
         }
         InternalSchema schema = schemaExtractor.toInternalSchema(tableSchema);
 
@@ -167,6 +168,21 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                 .table(table)
                 .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
                 .build();
+    }
+
+    private Schema mergeAvroSchema(Schema internalSchema, Set<String> parititonFields) {
+
+        SchemaBuilder.FieldAssembler<Schema> fieldAssembler =
+                SchemaBuilder.record(internalSchema.getName()).fields();
+        for (Schema.Field field : internalSchema.getFields()) {
+            fieldAssembler = fieldAssembler.name(field.name()).type(field.schema()).noDefault();
+        }
+
+        for (String paritionKey : parititonFields) {
+            fieldAssembler = fieldAssembler.name(paritionKey).type().stringType().noDefault();
+        }
+
+        return fieldAssembler.endRecord();
     }
 
     private Type mergeParquetSchema(Type internalSchema, List<String> parititonFields) {
