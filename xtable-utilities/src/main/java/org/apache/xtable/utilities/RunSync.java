@@ -272,10 +272,16 @@ public class RunSync {
       String partitionSpec;
       String namespace;
 
+      @Data
       public class InputPartitionField {
         String partitionFieldName;
         List<String> partitionFieldValues;
         PartitionTransformType transformType;
+      }
+
+      @Data
+      class InputPartitionFields {
+        private List<InputPartitionField> partitions;
       }
     }
   }
