@@ -105,7 +105,9 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 //                parquetSchemaConverter.convert(parquetMetadataExtractor.getSchema(parquetMetadata));
         MessageType tableSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
 
-        Set<String> partitionKeys = initPartitionInfo().keySet();
+        List<String> partitionKeys = initPartitionInfo().getPartitions().stream()
+                .map(InputPartitionField::getPartitionFieldName)
+                .collect(Collectors.toList());
 
         // merge schema of partition into original as partition is not part of parquet fie
         if (!partitionKeys.isEmpty()) {
