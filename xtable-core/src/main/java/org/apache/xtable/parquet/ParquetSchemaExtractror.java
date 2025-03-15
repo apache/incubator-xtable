@@ -453,8 +453,8 @@ public class ParquetSchemaExtractor {
                 Integer fixedSize =
                         (Integer) internalSchema.getMetadata().get(InternalSchema.MetadataKey.FIXED_BYTES_SIZE);
                 return finalizeSchema(
-                        Schema.createFixed(
-                                internalSchema.getName(), internalSchema.getComment(), null, fixedSize),
+                        new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createFixed(
+                                internalSchema.getName(), internalSchema.getComment(), null, fixedSize)),
                         internalSchema);
             case UUID:
                 /*Schema uuidSchema =

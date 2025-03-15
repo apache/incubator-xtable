@@ -50,7 +50,7 @@ public class ParquetPartitionExtractor {
   }
   public static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
 
-
+// todo this is to be put inside RunSync.java
   public InputPartitionFields getPartitionsFromUserConfiguration(String configPath) throws IOException {
     InputPartitionFields partitionConfiguration = new InputPartitionFields();
     try (InputStream inputStream = Files.newInputStream(Paths.get(configPath))) {
