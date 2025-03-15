@@ -321,6 +321,19 @@ public class RunSync {
       String tableName;
       String partitionSpec;
       String namespace;
+
+      @Data
+      public class InputPartitionField {
+        String partitionFieldName;
+        String partitionValue;
+        PartitionTransformType transformType;
+      }
+
+      @Data
+      class InputPartitionFields {
+        String sourceField;
+        List<InputPartitionField> partitions;
+      }
     }
   }
 

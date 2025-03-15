@@ -34,12 +34,16 @@ import com.google.common.base.Preconditions;
 class ExternalTable {
   /** The name of the table. */
   protected final @NonNull String name;
+
   /** The format of the table (e.g. DELTA, ICEBERG, HUDI) */
   protected final @NonNull String formatName;
+
   /** The path to the root of the table or the metadata directory depending on the format */
   protected final @NonNull String basePath;
+
   /** Optional namespace for the table */
   protected final String[] namespace;
+
   /** The configuration for interacting with the catalog that manages this table */
   protected final CatalogConfig catalogConfig;
 

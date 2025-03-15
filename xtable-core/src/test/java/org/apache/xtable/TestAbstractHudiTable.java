@@ -127,6 +127,7 @@ public abstract class TestAbstractHudiTable
       throw new UncheckedIOException(ex);
     }
   }
+
   // Name of the table
   protected String tableName;
   // Base path for the table
