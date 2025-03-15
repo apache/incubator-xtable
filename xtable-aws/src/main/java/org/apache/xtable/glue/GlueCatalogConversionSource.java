@@ -18,8 +18,6 @@
  
 package org.apache.xtable.glue;
 
-import static org.apache.xtable.catalog.CatalogUtils.toHierarchicalTableIdentifier;
-
 import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
@@ -31,13 +29,10 @@ import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
-import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
 import org.apache.xtable.model.storage.CatalogType;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
 
 import software.amazon.awssdk.services.glue.GlueClient;
-import software.amazon.awssdk.services.glue.model.GetTableRequest;
-import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.GlueException;
 import software.amazon.awssdk.services.glue.model.Table;
 
@@ -61,19 +56,12 @@ public class GlueCatalogConversionSource implements CatalogConversionSource {
 
   @Override
   public SourceTable getSourceTable(CatalogTableIdentifier tblIdentifier) {
-    HierarchicalTableIdentifier tableIdentifier = toHierarchicalTableIdentifier(tblIdentifier);
     try {
-      GetTableResponse response =
-          glueClient.getTable(
-              GetTableRequest.builder()
-                  .catalogId(glueCatalogConfig.getCatalogId())
-                  .databaseName(tableIdentifier.getDatabaseName())
-                  .name(tableIdentifier.getTableName())
-                  .build());
-      Table table = response.table();
+      Table table =
+          GlueCatalogTableUtils.getTable(
+              glueClient, glueCatalogConfig.getCatalogId(), tblIdentifier);
       if (table == null) {
-        throw new IllegalStateException(
-            String.format("table: %s is null", tableIdentifier.getId()));
+        throw new IllegalStateException(String.format("table: %s is null", tblIdentifier.getId()));
       }
 
       String tableFormat = TableFormatUtils.getTableFormat(table.parameters());
@@ -91,7 +79,7 @@ public class GlueCatalogConversionSource implements CatalogConversionSource {
           .additionalProperties(tableProperties)
           .build();
     } catch (GlueException e) {
-      throw new CatalogSyncException("Failed to get table: " + tableIdentifier.getId(), e);
+      throw new CatalogSyncException("Failed to get table: " + tblIdentifier.getId(), e);
     }
   }
 

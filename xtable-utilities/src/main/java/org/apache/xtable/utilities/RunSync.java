@@ -27,9 +27,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import lombok.Builder;
 import lombok.Data;
+import lombok.Value;
+import lombok.extern.jackson.Jacksonized;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.commons.cli.CommandLine;
@@ -43,7 +49,6 @@ import org.apache.hadoop.conf.Configuration;
 import com.fasterxml.jackson.annotation.JsonMerge;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.annotations.VisibleForTesting;
 
@@ -70,6 +75,8 @@ public class RunSync {
   private static final String HADOOP_CONFIG_PATH = "p";
   private static final String CONVERTERS_CONFIG_PATH = "c";
   private static final String ICEBERG_CATALOG_CONFIG_PATH = "i";
+  private static final String CONTINUOUS_MODE = "m";
+  private static final String CONTINUOUS_MODE_INTERVAL = "t";
   private static final String HELP_OPTION = "h";
 
   private static final Options OPTIONS =
@@ -97,6 +104,16 @@ public class RunSync {
               true,
               "The path to a yaml file containing Iceberg catalog configuration. The configuration will be "
                   + "used for any Iceberg source or target.")
+          .addOption(
+              CONTINUOUS_MODE,
+              "continuousMode",
+              false,
+              "Runs the tool on a scheduled loop. On each iteration, the process will reload the configurations from the provided file path allowing the user to update the tables managed by the job without restarting the job.")
+          .addOption(
+              CONTINUOUS_MODE_INTERVAL,
+              "continuousModeInterval",
+              true,
+              "The interval in seconds to schedule the loop. Requires --continuousMode to be set. Defaults to 5 seconds.")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   static SourceTable sourceTableBuilder(
@@ -176,7 +193,7 @@ public class RunSync {
       }
     }
   }
-
+  
   static DatasetConfig getDatasetConfig(String datasetConfigPath) throws IOException {
     // Initialize DatasetConfig
     DatasetConfig datasetConfig = new DatasetConfig();
@@ -311,7 +328,9 @@ public class RunSync {
         : YAML_MAPPER.readValue(customConfigs, IcebergCatalogConfig.class);
   }
 
-  @Data
+  @Value
+  @Builder
+  @Jacksonized
   public static class DatasetConfig {
 
     /**
@@ -327,7 +346,9 @@ public class RunSync {
     /** Configuration of the dataset to sync, path, table name, etc. */
     List<Table> datasets;
 
-    @Data
+    @Value
+    @Builder
+    @Jacksonized
     public static class Table {
       /**
        * The base path of the table to sync. Any authentication configuration needed by HDFS client

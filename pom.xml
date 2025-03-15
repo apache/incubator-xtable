@@ -52,6 +52,7 @@
         <module>xtable-core</module>
         <module>xtable-utilities</module>
         <module>xtable-aws</module>
+        <module>xtable-hive-metastore</module>
     </modules>
 
     <properties>
@@ -65,6 +66,7 @@
         <hadoop.version>3.4.1</hadoop.version>
         <hudi.version>0.14.0</hudi.version>
         <aws.version>2.29.40</aws.version>
+        <hive.version>2.3.9</hive.version>
         <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.8.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
@@ -86,6 +88,7 @@
         <apache.rat.version>0.16.1</apache.rat.version>
         <google.java.format.version>1.8</google.java.format.version>
         <delta.standalone.version>0.5.0</delta.standalone.version>
+        <delta.hive.version>3.0.0</delta.hive.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <target.dir.pattern>**/target/**</target.dir.pattern>
         <delombok.output.dir>${project.build.directory}/delombok</delombok.output.dir>
@@ -278,6 +281,11 @@
                 <version>${iceberg.version}</version>
                 <scope>test</scope>
             </dependency>
+            <dependency>
+                <groupId>org.apache.iceberg</groupId>
+                <artifactId>iceberg-hive-runtime</artifactId>
+                <version>${iceberg.version}</version>
+            </dependency>
 
             <!-- Delta -->
             <dependency>
@@ -289,7 +297,11 @@
                 <groupId>io.delta</groupId>
                 <artifactId>delta-standalone_${scala.binary.version}</artifactId>
                 <version>${delta.standalone.version}</version>
-                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.delta</groupId>
+                <artifactId>delta-hive_${scala.binary.version}</artifactId>
+                <version>${delta.hive.version}</version>
             </dependency>
 
             <!-- Spark -->
@@ -687,7 +699,7 @@
                     <reuseForks>false</reuseForks>
                     <forkCount>6</forkCount>
                     <trimStackTrace>false</trimStackTrace>
-                    <argLine>-Xmx1024m</argLine>
+                    <argLine>-Xmx1500m</argLine>
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
                 </configuration>
             </plugin>

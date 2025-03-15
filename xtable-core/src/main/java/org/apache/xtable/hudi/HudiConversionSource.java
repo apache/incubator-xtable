@@ -114,6 +114,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
                     hoodieInstant ->
                         HudiInstantUtils.parseFromInstantTime(hoodieInstant.getTimestamp()))
                 .collect(CustomCollectors.toList(pendingInstants.size())))
+        .sourceIdentifier(getCommitIdentifier(latestCommit))
         .build();
   }
 
@@ -130,6 +131,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
         .filesDiff(
             dataFileExtractor.getDiffForCommit(
                 hoodieInstantForDiff, table, hoodieInstantForDiff, visibleTimeline))
+        .sourceIdentifier(getCommitIdentifier(hoodieInstantForDiff))
         .build();
   }
 
@@ -159,6 +161,11 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
     return doesCommitExistsAsOfInstant(instant) && !isAffectedByCleanupProcess(instant);
+  }
+
+  @Override
+  public String getCommitIdentifier(HoodieInstant commit) {
+    return commit.getTimestamp();
   }
 
   private boolean doesCommitExistsAsOfInstant(Instant instant) {

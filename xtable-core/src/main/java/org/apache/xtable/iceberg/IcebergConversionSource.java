@@ -58,9 +58,9 @@ import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.PartitionValue;
-import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.extractor.ConversionSource;
@@ -165,6 +165,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         .version(String.valueOf(currentSnapshot.snapshotId()))
         .table(irTable)
         .partitionedDataFiles(partitionedDataFiles)
+        .sourceIdentifier(getCommitIdentifier(currentSnapshot))
         .build();
   }
 
@@ -192,11 +193,18 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
             .map(dataFile -> fromIceberg(dataFile, partitionSpec, irTable))
             .collect(Collectors.toSet());
 
-    DataFilesDiff filesDiff =
-        DataFilesDiff.builder().filesAdded(dataFilesAdded).filesRemoved(dataFilesRemoved).build();
+    InternalFilesDiff filesDiff =
+        InternalFilesDiff.builder()
+            .filesAdded(dataFilesAdded)
+            .filesRemoved(dataFilesRemoved)
+            .build();
 
     InternalTable table = getTable(snapshot);
-    return TableChange.builder().tableAsOfChange(table).filesDiff(filesDiff).build();
+    return TableChange.builder()
+        .tableAsOfChange(table)
+        .filesDiff(filesDiff)
+        .sourceIdentifier(getCommitIdentifier(snapshot))
+        .build();
   }
 
   @Override
@@ -238,31 +246,29 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
     long timeInMillis = instant.toEpochMilli();
     Table iceTable = getSourceTable();
-    boolean doesInstantOfAgeExists = false;
-    Long targetSnapshotId = null;
-    for (Snapshot snapshot : iceTable.snapshots()) {
-      if (snapshot.timestampMillis() <= timeInMillis) {
-        doesInstantOfAgeExists = true;
-        targetSnapshotId = snapshot.snapshotId();
-      } else {
-        break;
-      }
-    }
-    if (!doesInstantOfAgeExists) {
-      return false;
-    }
-    // Go from latest snapshot until targetSnapshotId through parent reference.
-    // nothing has to be null in this chain to guarantee safety of incremental sync.
-    Long currentSnapshotId = iceTable.currentSnapshot().snapshotId();
-    while (currentSnapshotId != null && currentSnapshotId != targetSnapshotId) {
-      Snapshot currentSnapshot = iceTable.snapshot(currentSnapshotId);
-      if (currentSnapshot == null) {
-        // The snapshot is expired.
+    Snapshot currentSnapshot = iceTable.currentSnapshot();
+
+    while (currentSnapshot != null && currentSnapshot.timestampMillis() > timeInMillis) {
+      Long parentSnapshotId = currentSnapshot.parentId();
+      if (parentSnapshotId == null) {
+        // no more snapshots in the chain and did not find targetSnapshot
         return false;
       }
-      currentSnapshotId = currentSnapshot.parentId();
+
+      Snapshot parentSnapshot = iceTable.snapshot(parentSnapshotId);
+      if (parentSnapshot == null) {
+        // chain is broken due to expired snapshot
+        log.info("Expired snapshot id: {}", parentSnapshotId);
+        return false;
+      }
+      currentSnapshot = parentSnapshot;
     }
-    return true;
+    return currentSnapshot != null;
+  }
+
+  @Override
+  public String getCommitIdentifier(Snapshot commit) {
+    return String.valueOf(commit.snapshotId());
   }
 
   @Override

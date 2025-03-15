@@ -39,9 +39,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
-import org.apache.xtable.model.storage.DataFilesDiff;
 import org.apache.xtable.model.storage.FilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.paths.PathUtils;
 
@@ -74,30 +75,32 @@ public class DeltaDataFileUpdatesExtractor {
                     file -> DeltaActionsConverter.getFullPathToFile(snapshot, file.path()),
                     file -> file));
 
-    FilesDiff<InternalDataFile, Action> diff =
-        DataFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
+    FilesDiff<InternalFile, Action> diff =
+        InternalFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
     return applyDiff(
         diff.getFilesAdded(), diff.getFilesRemoved(), tableSchema, deltaLog.dataPath().toString());
   }
 
   public Seq<Action> applyDiff(
-      DataFilesDiff dataFilesDiff, InternalSchema tableSchema, String tableBasePath) {
+      InternalFilesDiff internalFilesDiff, InternalSchema tableSchema, String tableBasePath) {
     List<Action> removeActions =
-        dataFilesDiff.getFilesRemoved().stream()
+        internalFilesDiff.dataFilesRemoved().stream()
             .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath))
             .map(AddFile::remove)
-            .collect(CustomCollectors.toList(dataFilesDiff.getFilesRemoved().size()));
-    return applyDiff(dataFilesDiff.getFilesAdded(), removeActions, tableSchema, tableBasePath);
+            .collect(CustomCollectors.toList(internalFilesDiff.dataFilesRemoved().size()));
+    return applyDiff(internalFilesDiff.dataFilesAdded(), removeActions, tableSchema, tableBasePath);
   }
 
   private Seq<Action> applyDiff(
-      Set<InternalDataFile> filesAdded,
+      Set<? extends InternalFile> filesAdded,
       Collection<Action> removeFileActions,
       InternalSchema tableSchema,
       String tableBasePath) {
     Stream<Action> addActions =
         filesAdded.stream()
+            .filter(InternalDataFile.class::isInstance)
+            .map(file -> (InternalDataFile) file)
             .flatMap(dFile -> createAddFileAction(dFile, tableSchema, tableBasePath));
     int totalActions = filesAdded.size() + removeFileActions.size();
     List<Action> allActions =

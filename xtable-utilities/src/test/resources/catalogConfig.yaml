@@ -45,6 +45,7 @@ datasets:
   - sourceCatalogTableIdentifier:
       tableIdentifier:
         hierarchicalId: "source-database-1.source-1"
+        partitionSpec: "cs_sold_date_sk:VALUE"
     targetCatalogTableIdentifiers:
       - catalogId: "target-1"
         tableFormat: "DELTA"

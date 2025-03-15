@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,6 +31,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.SparkSession;
@@ -41,14 +43,17 @@ import org.apache.spark.sql.delta.DeltaConfigs;
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.DeltaOperations;
 import org.apache.spark.sql.delta.OptimisticTransaction;
+import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.Action;
 import org.apache.spark.sql.delta.actions.AddFile;
+import org.apache.spark.sql.delta.actions.CommitInfo;
 import org.apache.spark.sql.delta.actions.Format;
 import org.apache.spark.sql.delta.actions.Metadata;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import scala.Option;
 import scala.Some;
+import scala.Tuple2;
 import scala.collection.JavaConverters;
 import scala.collection.Seq;
 
@@ -60,11 +65,13 @@ import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.schema.SparkSchemaExtractor;
 import org.apache.xtable.spi.sync.ConversionTarget;
 
+@Log4j2
 public class DeltaConversionTarget implements ConversionTarget {
   private static final String MIN_READER_VERSION = String.valueOf(1);
   // gets access to generated columns.
@@ -186,10 +193,10 @@ public class DeltaConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void syncFilesForDiff(DataFilesDiff dataFilesDiff) {
+  public void syncFilesForDiff(InternalFilesDiff internalFilesDiff) {
     transactionState.setActions(
         dataFileUpdatesExtractor.applyDiff(
-            dataFilesDiff,
+            internalFilesDiff,
             transactionState.getLatestSchemaInternal(),
             deltaLog.dataPath().toString()));
   }
@@ -213,6 +220,58 @@ public class DeltaConversionTarget implements ConversionTarget {
   @Override
   public String getTableFormat() {
     return TableFormat.DELTA;
+  }
+
+  @Override
+  public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
+    Snapshot currentSnapshot = deltaLog.currentSnapshot().snapshot();
+
+    Iterator<Tuple2<Object, Seq<Action>>> versionIterator =
+        JavaConverters.asJavaIteratorConverter(
+                deltaLog.getChanges(currentSnapshot.version(), false))
+            .asJava();
+    while (versionIterator.hasNext()) {
+      Tuple2<Object, Seq<Action>> currentChange = versionIterator.next();
+      Long targetVersion = currentSnapshot.version();
+      List<Action> actions = JavaConverters.seqAsJavaListConverter(currentChange._2()).asJava();
+
+      // Find the CommitInfo in the changes belongs to certain version
+      Optional<CommitInfo> commitInfo =
+          actions.stream()
+              .filter(action -> action instanceof CommitInfo)
+              .map(action -> (CommitInfo) action)
+              .findFirst();
+      if (!commitInfo.isPresent()) {
+        continue;
+      }
+
+      Option<scala.collection.immutable.Map<String, String>> tags = commitInfo.get().tags();
+      if (tags.isEmpty()) {
+        continue;
+      }
+
+      Option<String> sourceMetadataJson = tags.get().get(TableSyncMetadata.XTABLE_METADATA);
+      if (sourceMetadataJson.isEmpty()) {
+        continue;
+      }
+
+      try {
+        Optional<TableSyncMetadata> optionalMetadata =
+            TableSyncMetadata.fromJson(sourceMetadataJson.get());
+        if (!optionalMetadata.isPresent()) {
+          continue;
+        }
+
+        TableSyncMetadata metadata = optionalMetadata.get();
+        if (sourceIdentifier.equals(metadata.getSourceIdentifier())) {
+          return Optional.of(String.valueOf(targetVersion));
+        }
+      } catch (Exception e) {
+        log.warn("Failed to parse commit metadata for commit: {}", targetVersion, e);
+      }
+    }
+
+    return Optional.empty();
   }
 
   @EqualsAndHashCode
@@ -247,7 +306,7 @@ public class DeltaConversionTarget implements ConversionTarget {
 
     private void setLatestSchema(InternalSchema schema) {
       this.latestSchemaInternal = schema;
-      this.latestSchema = schemaExtractor.fromInternalSchema(schema);
+      this.latestSchema = SparkSchemaExtractor.getInstance().fromInternalSchema(schema);
     }
 
     private void commitTransaction() {
@@ -264,7 +323,8 @@ public class DeltaConversionTarget implements ConversionTarget {
       transaction.updateMetadata(metadata, false);
       transaction.commit(
           actions,
-          new DeltaOperations.Update(Option.apply(Literal.fromObject("xtable-delta-sync"))));
+          new DeltaOperations.Update(Option.apply(Literal.fromObject("xtable-delta-sync"))),
+          ScalaUtils.convertJavaMapToScala(getCommitTags()));
     }
 
     private Map<String, String> getConfigurationsForDeltaSync() {
@@ -299,6 +359,10 @@ public class DeltaConversionTarget implements ConversionTarget {
       }
       // fallback to existing deltalog value
       return deltaLog.snapshot().metadata().format();
+    }
+
+    private Map<String, String> getCommitTags() {
+      return Collections.singletonMap(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
     }
   }
 }

@@ -44,7 +44,7 @@ import org.apache.xtable.model.storage.DataLayoutStrategy;
 /** A class used to initialize new Hudi tables and load the metadata of existing tables. */
 @Log4j2
 @RequiredArgsConstructor(staticName = "of")
-class HudiTableManager {
+public class HudiTableManager {
   private static final String NONPARTITIONED_KEY_GENERATOR =
       "org.apache.hudi.keygen.NonpartitionedKeyGenerator";
   private static final String CUSTOM_KEY_GENERATOR = "org.apache.hudi.keygen.CustomKeyGenerator";
@@ -61,7 +61,7 @@ class HudiTableManager {
    * @param tableDataPath the path for the table
    * @return {@link HoodieTableMetaClient} if table exists, otherwise null
    */
-  Optional<HoodieTableMetaClient> loadTableMetaClientIfExists(String tableDataPath) {
+  public Optional<HoodieTableMetaClient> loadTableMetaClientIfExists(String tableDataPath) {
     try {
       return Optional.of(
           HoodieTableMetaClient.builder()

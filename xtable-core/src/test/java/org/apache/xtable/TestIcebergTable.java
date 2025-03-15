@@ -307,7 +307,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return String.format("%s > 'aaa'", icebergDataHelper.getRecordKeyField());
   }
 
-  public Long getLastCommitTimestamp() {
+  public long getLastCommitTimestamp() {
     return getLatestSnapshot().timestampMillis();
   }
 

@@ -19,9 +19,10 @@
 package org.apache.xtable.model;
 
 import lombok.Builder;
+import lombok.NonNull;
 import lombok.Value;
 
-import org.apache.xtable.model.storage.DataFilesDiff;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 
 /**
  * Captures the changes in a single commit/instant from the source table.
@@ -32,8 +33,11 @@ import org.apache.xtable.model.storage.DataFilesDiff;
 @Builder(toBuilder = true)
 public class TableChange {
   // Change in files at the specified instant
-  DataFilesDiff filesDiff;
+  InternalFilesDiff filesDiff;
 
   /** The {@link InternalTable} at the commit time to which this table change belongs. */
   InternalTable tableAsOfChange;
+
+  // Commit identifier in source table
+  @NonNull String sourceIdentifier;
 }

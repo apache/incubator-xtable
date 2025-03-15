@@ -146,7 +146,7 @@ public class ITIcebergConversionSource {
       List<TableChange> allTableChanges = new ArrayList<>();
 
       testIcebergTable.insertRows(50);
-      Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
+      long timestamp1 = testIcebergTable.getLastCommitTimestamp();
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
       List<Record> records1 = testIcebergTable.insertRows(50);
@@ -204,7 +204,7 @@ public class ITIcebergConversionSource {
       List<TableChange> allTableChanges = new ArrayList<>();
 
       List<Record> records1 = testIcebergTable.insertRows(50);
-      Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
+      long timestamp1 = testIcebergTable.getLastCommitTimestamp();
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
       List<Record> records2 = testIcebergTable.insertRows(50);
@@ -264,7 +264,7 @@ public class ITIcebergConversionSource {
       List<TableChange> allTableChanges = new ArrayList<>();
 
       List<Record> records1 = testIcebergTable.insertRows(50);
-      Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
+      long timestamp1 = testIcebergTable.getLastCommitTimestamp();
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
 
       List<Record> records2 = testIcebergTable.insertRows(50);
@@ -325,7 +325,7 @@ public class ITIcebergConversionSource {
       List<TableChange> allTableChanges = new ArrayList<>();
 
       List<Record> records1 = testIcebergTable.insertRows(50);
-      Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
+      long timestamp1 = testIcebergTable.getLastCommitTimestamp();
 
       testIcebergTable.upsertRows(records1.subList(0, 20));
       allActiveFiles.add(testIcebergTable.getAllActiveFiles());
@@ -383,8 +383,8 @@ public class ITIcebergConversionSource {
         TestIcebergTable.forStandardSchemaAndPartitioning(
             tableName, "level", tempDir, hadoopConf)) {
       // Insert 50 rows to INFO partition.
-      List<Record> commit1Rows = testIcebergTable.insertRecordsForPartition(50, "INFO");
-      Long timestamp1 = testIcebergTable.getLastCommitTimestamp();
+      List<Record> firstCommitRows = testIcebergTable.insertRecordsForPartition(50, "INFO");
+      long timestampAfterFirstCommit = testIcebergTable.getLastCommitTimestamp();
       SourceTable tableConfig =
           SourceTable.builder()
               .name(testIcebergTable.getTableName())
@@ -393,23 +393,42 @@ public class ITIcebergConversionSource {
               .build();
 
       // Upsert all rows inserted before, so all files are replaced.
-      testIcebergTable.upsertRows(commit1Rows.subList(0, 50));
-      long snapshotIdAfterCommit2 = testIcebergTable.getLatestSnapshot().snapshotId();
+      testIcebergTable.upsertRows(firstCommitRows.subList(0, 50));
+      long timestampAfterSecondCommit = testIcebergTable.getLastCommitTimestamp();
+      long snapshotIdAfterSecondCommit = testIcebergTable.getLatestSnapshot().snapshotId();
 
       // Insert 50 rows to different (ERROR) partition.
       testIcebergTable.insertRecordsForPartition(50, "ERROR");
+      long timestampAfterThirdCommit = testIcebergTable.getLastCommitTimestamp();
 
       if (shouldExpireSnapshots) {
         // Expire snapshotAfterCommit2.
-        testIcebergTable.expireSnapshot(snapshotIdAfterCommit2);
+        testIcebergTable.expireSnapshot(snapshotIdAfterSecondCommit);
       }
       IcebergConversionSource conversionSource =
           sourceProvider.getConversionSourceInstance(tableConfig);
       if (shouldExpireSnapshots) {
-        assertFalse(conversionSource.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));
+        // Since the second snapshot is expired, we cannot safely perform incremental sync from the
+        // first two commits
+        assertFalse(
+            conversionSource.isIncrementalSyncSafeFrom(
+                Instant.ofEpochMilli(timestampAfterFirstCommit)));
+        assertFalse(
+            conversionSource.isIncrementalSyncSafeFrom(
+                Instant.ofEpochMilli(timestampAfterSecondCommit)));
       } else {
-        assertTrue(conversionSource.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));
+        // The full history is still present so incremental sync is safe from any of these commits
+        assertTrue(
+            conversionSource.isIncrementalSyncSafeFrom(
+                Instant.ofEpochMilli(timestampAfterFirstCommit)));
+        assertTrue(
+            conversionSource.isIncrementalSyncSafeFrom(
+                Instant.ofEpochMilli(timestampAfterSecondCommit)));
       }
+      // Table always has the last commit so incremental sync is safe
+      assertTrue(
+          conversionSource.isIncrementalSyncSafeFrom(
+              Instant.ofEpochMilli(timestampAfterThirdCommit)));
       // Table doesn't have instant of this older commit, hence it is not safe.
       Instant instantAsOfHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
       assertFalse(conversionSource.isIncrementalSyncSafeFrom(instantAsOfHourAgo));

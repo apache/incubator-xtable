@@ -21,13 +21,12 @@ package org.apache.xtable.glue.table;
 import static org.apache.iceberg.BaseMetastoreTableOperations.METADATA_LOCATION_PROP;
 import static org.apache.iceberg.BaseMetastoreTableOperations.PREVIOUS_METADATA_LOCATION_PROP;
 import static org.apache.iceberg.BaseMetastoreTableOperations.TABLE_TYPE_PROP;
+import static org.apache.xtable.glue.GlueCatalogSyncClient.GLUE_EXTERNAL_TABLE_TYPE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -41,8 +40,11 @@ import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.hadoop.HadoopTables;
 
 import org.apache.xtable.glue.GlueCatalogSyncTestBase;
+import org.apache.xtable.glue.GlueSchemaExtractor;
 import org.apache.xtable.model.storage.TableFormat;
 
+import software.amazon.awssdk.services.glue.model.Column;
+import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.TableInput;
 
@@ -56,7 +58,8 @@ public class TestIcebergGlueCatalogTableBuilder extends GlueCatalogSyncTestBase 
   private IcebergGlueCatalogTableBuilder icebergGlueCatalogTableBuilder;
 
   private IcebergGlueCatalogTableBuilder createIcebergGlueCatalogSyncHelper() {
-    return new IcebergGlueCatalogTableBuilder(mockGlueSchemaExtractor, mockIcebergHadoopTables);
+    return new IcebergGlueCatalogTableBuilder(
+        GlueSchemaExtractor.getInstance(), mockIcebergHadoopTables);
   }
 
   void setupCommonMocks() {
@@ -79,21 +82,16 @@ public class TestIcebergGlueCatalogTableBuilder extends GlueCatalogSyncTestBase 
   void testGetCreateTableRequest() {
     setupCommonMocks();
     mockIcebergHadoopTables();
-    when(mockGlueSchemaExtractor.toColumns(
-            TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema()))
-        .thenReturn(Collections.emptyList());
 
     TableInput expected =
         getCreateOrUpdateTableInput(
-            TEST_CATALOG_TABLE_IDENTIFIER.getTableName(),
+            TEST_GLUE_TABLE,
             icebergGlueCatalogTableBuilder.getTableParameters(mockIcebergBaseTable),
-            TEST_ICEBERG_INTERNAL_TABLE);
+            getTestStorageDescriptor(ICEBERG_GLUE_SCHEMA));
     TableInput output =
         icebergGlueCatalogTableBuilder.getCreateTableRequest(
             TEST_ICEBERG_INTERNAL_TABLE, TEST_CATALOG_TABLE_IDENTIFIER);
     assertEquals(expected, output);
-    verify(mockGlueSchemaExtractor, times(1))
-        .toColumns(TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema());
   }
 
   @Test
@@ -103,7 +101,11 @@ public class TestIcebergGlueCatalogTableBuilder extends GlueCatalogSyncTestBase 
 
     Map<String, String> glueTableParams = new HashMap<>();
     glueTableParams.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION);
-    Table glueTable = Table.builder().parameters(glueTableParams).build();
+    Table glueTable =
+        Table.builder()
+            .parameters(glueTableParams)
+            .storageDescriptor(getTestStorageDescriptor(ICEBERG_GLUE_SCHEMA))
+            .build();
 
     Map<String, String> parameters = new HashMap<>();
     parameters.put(PREVIOUS_METADATA_LOCATION_PROP, glueTableParams.get(METADATA_LOCATION_PROP));
@@ -111,19 +113,13 @@ public class TestIcebergGlueCatalogTableBuilder extends GlueCatalogSyncTestBase 
         .thenReturn(ICEBERG_METADATA_FILE_LOCATION_v2);
     parameters.put(METADATA_LOCATION_PROP, ICEBERG_METADATA_FILE_LOCATION_v2);
 
-    when(mockGlueSchemaExtractor.toColumns(
-            TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema(), glueTable))
-        .thenReturn(Collections.emptyList());
-
     TableInput expected =
         getCreateOrUpdateTableInput(
-            TEST_CATALOG_TABLE_IDENTIFIER.getTableName(), parameters, TEST_ICEBERG_INTERNAL_TABLE);
+            TEST_GLUE_TABLE, parameters, getTestStorageDescriptor(UPDATED_ICEBERG_GLUE_SCHEMA));
     TableInput output =
         icebergGlueCatalogTableBuilder.getUpdateTableRequest(
-            TEST_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
+            TEST_UPDATED_ICEBERG_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
     assertEquals(expected, output);
-    verify(mockGlueSchemaExtractor, times(1))
-        .toColumns(TableFormat.ICEBERG, TEST_ICEBERG_INTERNAL_TABLE.getReadSchema(), glueTable);
   }
 
   @Test
@@ -136,5 +132,19 @@ public class TestIcebergGlueCatalogTableBuilder extends GlueCatalogSyncTestBase 
     Map<String, String> tableParameters =
         icebergGlueCatalogTableBuilder.getTableParameters(mockIcebergBaseTable);
     assertEquals(expected, tableParameters);
+  }
+
+  private TableInput getCreateOrUpdateTableInput(
+      String tableName, Map<String, String> params, StorageDescriptor sd) {
+    return TableInput.builder()
+        .name(tableName)
+        .tableType(GLUE_EXTERNAL_TABLE_TYPE)
+        .parameters(params)
+        .storageDescriptor(sd)
+        .build();
+  }
+
+  private StorageDescriptor getTestStorageDescriptor(List<Column> columns) {
+    return StorageDescriptor.builder().columns(columns).location(TEST_BASE_PATH).build();
   }
 }

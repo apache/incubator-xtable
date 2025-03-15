@@ -654,6 +654,35 @@ public class ITConversionController {
   }
 
   @Test
+  public void testIncrementalSyncsWithNoChangesDoesNotThrowError() {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
+      ConversionConfig dualTableConfig =
+          getTableSyncConfig(
+              HUDI,
+              SyncMode.INCREMENTAL,
+              tableName,
+              table,
+              Arrays.asList(ICEBERG, DELTA),
+              null,
+              null);
+
+      table.insertRecords(50, true);
+      ConversionController conversionController =
+          new ConversionController(jsc.hadoopConfiguration());
+      // sync once
+      conversionController.sync(dualTableConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, Arrays.asList(DELTA, ICEBERG), 50);
+      // sync again
+      conversionController.sync(dualTableConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, Arrays.asList(DELTA, ICEBERG), 50);
+    }
+  }
+
+  @Test
   public void testIcebergCorruptedSnapshotRecovery() throws Exception {
     String tableName = getTableName();
     ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);

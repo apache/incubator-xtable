@@ -18,11 +18,20 @@
  
 package org.apache.xtable.catalog;
 
+import java.util.Optional;
+
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import org.apache.hadoop.conf.Configuration;
+
+import org.apache.hudi.sync.common.model.PartitionValueExtractor;
+
+import org.apache.xtable.hudi.catalog.HudiCatalogPartitionSyncTool;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
+import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.reflection.ReflectionUtils;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class CatalogUtils {
@@ -34,5 +43,27 @@ public class CatalogUtils {
     }
     throw new IllegalArgumentException(
         "Invalid tableIdentifier implementation: " + tableIdentifier.getClass().getName());
+  }
+
+  public static Optional<CatalogPartitionSyncTool> getPartitionSyncTool(
+      String tableFormat,
+      String partitionValueExtractorClass,
+      CatalogPartitionSyncOperations catalogPartitionSyncOperations,
+      Configuration configuration) {
+
+    if (partitionValueExtractorClass.isEmpty()) {
+      return Optional.empty();
+    }
+
+    // In Iceberg and Delta, partitions are automatically synchronized with catalogs when
+    // table metadata is updated. However, for Hudi, we need to sync them manually
+    if (tableFormat.equals(TableFormat.HUDI)) {
+      PartitionValueExtractor partitionValueExtractor =
+          ReflectionUtils.createInstanceOfClass(partitionValueExtractorClass);
+      return Optional.of(
+          new HudiCatalogPartitionSyncTool(
+              catalogPartitionSyncOperations, partitionValueExtractor, configuration));
+    }
+    return Optional.empty();
   }
 }

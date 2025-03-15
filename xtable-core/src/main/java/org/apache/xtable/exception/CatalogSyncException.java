@@ -34,4 +34,8 @@ public class CatalogSyncException extends InternalException {
   public CatalogSyncException(String message, Throwable e) {
     super(ErrorCode.CATALOG_SYNC_GENERIC_EXCEPTION, message, e);
   }
+
+  public CatalogSyncException(String message) {
+    super(ErrorCode.CATALOG_SYNC_GENERIC_EXCEPTION, message);
+  }
 }

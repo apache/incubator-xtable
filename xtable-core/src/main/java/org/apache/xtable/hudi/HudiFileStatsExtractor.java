@@ -250,21 +250,14 @@ public class HudiFileStatsExtractor {
       long nullCount,
       long valueCount,
       long totalSize) {
-    // Special type handling
-    if (minValue instanceof Date || maxValue instanceof Date) {
-      minValue = minValue == null ? null : dateToDaysSinceEpoch(minValue);
-      maxValue = maxValue == null ? null : dateToDaysSinceEpoch(maxValue);
-    } else if (field.getSchema().getDataType() == InternalType.ENUM
-        && (minValue instanceof ByteBuffer || maxValue instanceof ByteBuffer)) {
-      minValue = minValue == null ? null : new String(((ByteBuffer) minValue).array());
-      maxValue = maxValue == null ? null : new String(((ByteBuffer) maxValue).array());
-    } else if (field.getSchema().getDataType() == InternalType.FIXED
-        && (minValue instanceof Binary || maxValue instanceof Binary)) {
-      minValue = minValue == null ? null : ByteBuffer.wrap(((Binary) minValue).getBytes());
-      maxValue = maxValue == null ? null : ByteBuffer.wrap(((Binary) maxValue).getBytes());
-    }
-    boolean isScalar = minValue == null || minValue.compareTo(maxValue) == 0;
-    Range range = isScalar ? Range.scalar(minValue) : Range.vector(minValue, maxValue);
+    Comparable convertedMinValue = convertValue(minValue, field.getSchema().getDataType());
+    Comparable convertedMaxValue = convertValue(maxValue, field.getSchema().getDataType());
+    boolean isScalar =
+        convertedMinValue == null || convertedMinValue.compareTo(convertedMaxValue) == 0;
+    Range range =
+        isScalar
+            ? Range.scalar(convertedMinValue)
+            : Range.vector(convertedMinValue, convertedMaxValue);
     return ColumnStat.builder()
         .field(field)
         .range(range)
@@ -272,6 +265,22 @@ public class HudiFileStatsExtractor {
         .numValues(valueCount)
         .totalSize(totalSize)
         .build();
+  }
+
+  private static Comparable convertValue(Comparable value, InternalType type) {
+    // Special type handling
+    if (value == null) {
+      return value;
+    }
+    Comparable result = value;
+    if (value instanceof Date) {
+      result = dateToDaysSinceEpoch(value);
+    } else if (type == InternalType.ENUM && (value instanceof ByteBuffer)) {
+      result = new String(((ByteBuffer) value).array());
+    } else if (type == InternalType.FIXED && (value instanceof Binary)) {
+      result = ByteBuffer.wrap(((Binary) value).getBytes());
+    }
+    return result;
   }
 
   private static int dateToDaysSinceEpoch(Object date) {
