@@ -28,8 +28,8 @@ import lombok.NonNull;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
-import org.apache.parquet.Type;
-import org.apache.parquet.SchemaBuilder;
+import org.apache.parquet.schema.Type;
+//import org.apache.parquet.SchemaBuilder;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.avro.Schema;
 import org.apache.xtable.model.*;
@@ -39,7 +39,8 @@ import org.apache.xtable.model.storage.*;
 import org.apache.xtable.spi.extractor.ConversionSource;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.Type.Repetition;
-
+import org.apache.xtable.utilities.RunSync.DatasetConfig.Table.InputPartitionFields;
+import org.apache.parquet.schema.MessageType;
 @Builder
 public class ParquetConversionSource implements ConversionSource<Long> {
 
@@ -138,7 +139,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     public List<InternalDataFile> getInternalDataFiles() {
         List<LocatedFileStatus> parquetFiles =
                 getParquetFiles(hadoopConf, basePath).collect(Collectors.toList());
-        List<PartitionValue> partitionValuesFromConfig = parquetPartitionValueExtractor.createPartitionValues(parquetPartitionValueExtractor.extractPartitionValues(initPartitionInfo())
+        List<PartitionValue> partitionValuesFromConfig = parquetPartitionValueExtractor.createPartitionValues(parquetPartitionValueExtractor.extractPartitionValues(initPartitionInfo()));
                 InternalTable table = getTable(-1L);
         List<InternalDataFile> internalDataFiles =
                 parquetFiles.stream()
@@ -200,7 +201,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         }
         for (String parition : parititonFields) {
             //create Type from partiton, TODO: check further...
-            fieldsToMerge = fieldsToMerge.union(Type(partition, Repetition.REQUIRED))
+            fieldsToMerge = fieldsToMerge.union(Type(partition, Repetition.REQUIRED));
         }
 
         return fieldsToMerge;

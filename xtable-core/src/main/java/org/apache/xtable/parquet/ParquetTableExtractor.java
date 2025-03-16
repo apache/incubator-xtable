@@ -16,13 +16,13 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.delta;
+package org.apache.xtable.parquet;
 
 import java.time.Instant;
 import java.util.List;
 
 import lombok.Builder;
-
+import java.util.Set;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;

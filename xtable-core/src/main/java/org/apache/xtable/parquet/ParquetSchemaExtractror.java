@@ -31,13 +31,16 @@ import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import org.apache.parquet.LogicalType;
-import org.apache.parquet.LogicalTypes;
+import org.apache.parquet.schema.LogicalType;
+//import org.apache.parquet.LogicalTypes;
 //import org.apache.parquet.Schema;
-import org.apache.parquet.Schema.Type;
+import org.apache.parquet.schema.Type;
+import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.format.NullType;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
+import org.apache.parquet.schema.Type.Repetition;
+
 
 
 import org.apache.xtable.collectors.CustomCollectors;
@@ -84,13 +87,13 @@ public class ParquetSchemaExtractor {
 
     private static Type finalizeSchema(MessageType targetSchema, InternalSchema inputSchema) {
         if (inputSchema.isNullable()) {
-            return targetSchema.union(LogicalTypeAnnotation.unknownType())
+            return targetSchema.union(LogicalTypeAnnotation.unknownType());
         }
         return targetSchema;
     }
 
     private static boolean groupTypeContainsNull(Type schema) {
-        for (Type field in schema.getFields()){
+        for (Type field : schema.getFields()){
             if (field == null) {
                 return True;
             }
@@ -99,7 +102,7 @@ public class ParquetSchemaExtractor {
     }
 
     public InternalSchema _toInternalSchema(Schema schema) {
-        AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance()
+        AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance();
         Map<String, IdMapping> fieldNameToIdMapping =
                 IdTracker.getInstance()
                         .getIdTracking(schema)
@@ -204,7 +207,7 @@ public class ParquetSchemaExtractor {
                     }
                     break;
                 case FIXED_LEN_BYTE_ARRAY:
-                    logicalType = schema.getLogicalTypeAnnotation()
+                    logicalType = schema.getLogicalTypeAnnotation();
                     if (logicalType instanceof LogicalTypeAnnotation.UUIDLogicalTypeAnnotation) {
                         newDataType = InternalType.UUID;
                     } else if (logicalType instanceof LogicalTypeAnnotation.IntervalLogicalTypeAnnotation) {
@@ -215,7 +218,7 @@ public class ParquetSchemaExtractor {
                 //TODO add other logicalTypes?
                 case BINARY:
                     //? Variant,GEOMETRY, GEOGRAPHY,
-                    logicalType = schema.getLogicalTypeAnnotation()
+                    logicalType = schema.getLogicalTypeAnnotation();
                     if (logicalType instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
                         metadata.put(InternalSchema.MetadataKey.ENUM_VALUES, schema.toOriginalType().values());
                         newDataType = InternalType.ENUM;
@@ -331,7 +334,7 @@ public class ParquetSchemaExtractor {
     private MessageType fromInternalSchema(
             InternalSchema internalSchema, String currentPath) {
         org.apache.parquet.avro.AvroSchemaConverter avroParquetSchemaConverter = new org.apache.parquet.avro.AvroSchemaConverter();
-        AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance()
+        AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance();
         Schema avroSchema = avroSchemaConverter.fromInternalSchema(internalSchema,currentPath);
         MessageType parquetSchema = avroParquetSchemaConverter.convert(avroSchema);
         return parquetSchema;
@@ -383,17 +386,17 @@ public class ParquetSchemaExtractor {
                 if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
                         == InternalSchema.MetadataValue.MICROS) {
                     return finalizeSchema(
-                            , LogicalTypeAnnotation.timestampType(True, MICROS)
+                             LogicalTypeAnnotation.timestampType(True, Repetition.MICROS),
                             internalSchema);
                 } if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
                     == InternalSchema.MetadataValue.MILLIS) {
                 return finalizeSchema(
-                        , LogicalTypeAnnotation.timestampType(True, MILLIS)
+                         LogicalTypeAnnotation.timestampType(True, Repetition.MILLIS),
                         internalSchema);
             } else if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
                     == InternalSchema.MetadataValue.NANOS) {
                 return finalizeSchema(
-                        LogicalTypeAnnotation.timestampType(True, NANOS),
+                        LogicalTypeAnnotation.timestampType(True, Repetition.NANOS),
                         internalSchema);
             }
             case TIMESTAMP_NTZ:

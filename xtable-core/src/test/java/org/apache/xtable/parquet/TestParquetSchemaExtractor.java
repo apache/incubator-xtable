@@ -8,7 +8,8 @@ import org.apache.parquet.hadoop.example.ExampleParquetWriter;
 import org.apache.parquet.schema.*;
 import org.apache.parquet.schema.Type.Repetition;
 
-
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,49 +26,10 @@ public class TestParquetSchemaExtractor {
     static final MessageType messageType = new MessageType("schema", groupType2);
     private static final ParquetSchemaExtractor SCHEMA_EXTRACTOR =
             ParquetSchemaExtractor.getInstance();
+
     public static void main(String[] args) {
-        generateParquetFileFor();
-    }
-
-    @Test
-    public void testPrimitiveTypes() {
-       /* Map<InternalSchema.MetadataKey, Object> requiredEnumMetadata =
-                Collections.singletonMap(
-                        InternalSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
-        Map<InternalSchema.MetadataKey, Object> optionalEnumMetadata =
-                Collections.singletonMap(
-                        InternalSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));*/
-
-        InternalSchema schemaWithPrimitiveTypes =
-                InternalSchema.builder()
-                        .dataType(InternalType.RECORD)
-                        .fields(
-                                Arrays.asList(
-                                        InternalField.builder()
-                                                .name("int")
-                                                .schema(
-                                                        InternalSchema.builder()
-                                                                .name("REQUIRED_int")
-                                                                .dataType(InternalType.INT)
-                                                                .isNullable(false)
-                                                                .metadata(null)
-                                                                .build())
-                                                .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                                                .build(),
-                                        InternalField.builder()
-                                                .name("float")
-                                                .schema(
-                                                        InternalSchema.builder()
-                                                                .name("REQUIRED_double")
-                                                                .dataType(InternalType.FLOAT)
-                                                                .isNullable(true)
-                                                                .metadata(null)
-                                                                .build())
-                                                .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                                                .build()))
-                        .build();
-        //Type expectedSchema = mapGroupType;
-        assertTrue(TestParquetSchemaExtractor.mapGroupType.equals(SCHEMA_EXTRACTOR.toInternalSchema(schemaWithPrimitiveTypes)));
+        //generateParquetFileFor();
+        testPrimitiveTypes();
     }
 
     private static void generateParquetFileFor() {
@@ -96,10 +58,10 @@ public class TestParquetSchemaExtractor {
 
         List<Group> recordList = new ArrayList<>();
 
-        for(int i = 1; i <= 4; i++) {
+        for (int i = 1; i <= 4; i++) {
             Group mapGroup = new SimpleGroup(mapGroupType);
-            mapGroup.add("fakekey", i*i);
-            mapGroup.add("fakevalue", i*i*i);
+            mapGroup.add("fakekey", i * i);
+            mapGroup.add("fakevalue", i * i * i);
             Group group = new SimpleGroup(groupType);
             group.add("key_value", mapGroup);
             Group mapGroup2 = new SimpleGroup(mapGroupType2);
@@ -113,5 +75,57 @@ public class TestParquetSchemaExtractor {
         }
 
         return recordList;
+    }
+
+    @Test
+    public void testPrimitiveTypes() {
+       /* Map<InternalSchema.MetadataKey, Object> requiredEnumMetadata =
+                Collections.singletonMap(
+                        InternalSchema.MetadataKey.ENUM_VALUES, Arrays.asList("ONE", "TWO"));
+        Map<InternalSchema.MetadataKey, Object> optionalEnumMetadata =
+                Collections.singletonMap(
+                        InternalSchema.MetadataKey.ENUM_VALUES, Arrays.asList("THREE", "FOUR"));*/
+        InternalSchema primitive1 = InternalSchema.builder()
+                .name("integer");
+                .dataType(InternalType.INT);
+        InternalSchema primitive2 = InternalSchema.builder()
+                .name("string");
+                .dataType(InternalType.STRING);
+
+
+/*        InternalSchema schemaWithPrimitiveTypes =
+                InternalSchema.builder()
+                        .dataType(InternalType.RECORD)
+                        .fields(
+                                Arrays.asList(
+                                        InternalField.builder()
+                                                .name("int")
+                                                .schema(
+                                                        InternalSchema.builder()
+                                                                .name("REQUIRED_int")
+                                                                .dataType(InternalType.INT)
+                                                                .isNullable(false)
+                                                                .metadata(null)
+                                                                .build())
+                                                .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                                                .build(),
+                                        InternalField.builder()
+                                                .name("float")
+                                                .schema(
+                                                        InternalSchema.builder()
+                                                                .name("REQUIRED_double")
+                                                                .dataType(InternalType.FLOAT)
+                                                                .isNullable(true)
+                                                                .metadata(null)
+                                                                .build())
+                                                .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                                                .build()
+                                ))
+                        .build();*/
+        //Type expectedSchema = mapGroupType;
+        MessageType integerPrimitiveType = MessageType(REQUIRED,PrimitiveType(Type.Repetition repetition, INT32, "integer") );
+        Assertions.assertEquals(
+                primitive1, SCHEMA_EXTRACTOR.toInternalSchema(integerPrimitiveType, null, null));
+        //assertTrue(TestParquetSchemaExtractor.mapGroupType.equals(SCHEMA_EXTRACTOR.toInternalSchema(schemaWithPrimitiveTypes)));
     }
 }

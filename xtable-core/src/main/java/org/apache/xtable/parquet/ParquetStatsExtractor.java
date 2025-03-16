@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+package org.apache.xtable.parquet;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.fs.*;
@@ -26,7 +26,18 @@ import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
+import org.apache.xtable.model.storage.InternalDataFile;
 
+import java.util.Map;
+import java.util.Collection;
+import java.util.Set;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
+
+@Value
+@Builder
 public class ParquetStatsExtractor {
   @Builder.Default
   private static final ParquetMetadataExtractor parquetMetadataExtractor =

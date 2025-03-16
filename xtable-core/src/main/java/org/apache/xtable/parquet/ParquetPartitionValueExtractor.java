@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.xtable.iceberg;
+package org.apache.xtable.parquet;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -33,7 +33,8 @@ import lombok.NoArgsConstructor;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.schema.SchemaFieldFinder;
-
+import org.apache.xtable.model.stat.PartitionValue;
+import org.apache.xtable.utilities.RunSync.DatasetConfig.Table.InputPartitionFields;
 /**
  * Partition value extractor for Parquet.
  */
@@ -50,7 +51,7 @@ public class ParquetPartitionValueExtractor {
     public List<InternalPartitionField> getInternalPartitionField(
             InputPartitionFields partitions) {
         List<InternalPartitionField> partitionFields = new ArrayList<>();
-        String sourceField = partitions.getSourceField()
+        String sourceField = partitions.getSourceField();
         for (InputPartitionField partition : partitions) {
             partitionFields.add(
                     InternalPartitionField.builder()
@@ -68,7 +69,7 @@ public class ParquetPartitionValueExtractor {
                 .map(internalPartitionField ->
                         PartitionValue.builder()
                                 .InternalPartitionField(internalPartitionField.getKey())
-                                .Range(internalPartitionField.getValue())
+                                .Range(internalPartitionField.getValue()))
                                 .collect(Collectors.toList());
     }
 

@@ -15,11 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
+package org.apache.xtable.parquet;
 import org.apache.hadoop.fs.*;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
-
+import org.apache.hadoop.conf.Configuration;
 public class ParquetMetadataExtractor {
 
   private static MessageType getSchema(ParquetMetadata footer) {
@@ -27,7 +28,7 @@ public class ParquetMetadataExtractor {
     return schema;
   }
 
-  private static ParquetMetadata readParquetMetadata(HadoopConf conf, BasePath path) {
+  private static ParquetMetadata readParquetMetadata(Configuration conf, String path) {
     ParquetMetadata footer =
         ParquetFileReader.readFooter(conf, path, ParquetMetadataConverter.NO_FILTER);
     return footer;
