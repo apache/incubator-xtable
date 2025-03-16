@@ -18,6 +18,7 @@
 package org.apache.xtable.parquet;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.Encoding;
@@ -27,7 +28,9 @@ import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 import org.apache.xtable.model.storage.InternalDataFile;
-
+import lombok.Builder;
+import lombok.NonNull;
+import lombok.Value;
 import java.util.Map;
 import java.util.Collection;
 import java.util.Set;
