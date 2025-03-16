@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import org.apache.parquet.schema.LogicalType;
+//import org.apache.parquet.schema.LogicalType;
 //import org.apache.parquet.LogicalTypes;
 //import org.apache.parquet.Schema;
 import org.apache.parquet.schema.Type;
@@ -101,7 +101,7 @@ public class ParquetSchemaExtractor {
         return False;
     }
 
-    public InternalSchema _toInternalSchema(Schema schema) {
+   /* public InternalSchema _toInternalSchema(Schema schema) {
         AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance();
         Map<String, IdMapping> fieldNameToIdMapping =
                 IdTracker.getInstance()
@@ -121,7 +121,7 @@ public class ParquetSchemaExtractor {
         Schema avroSchema = avroParquetSchemaConverter.convert(schema);
         AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance();
         return avroSchemaConverter.toInternalSchema(avroSchema,parentPath,fieldNameToIdMapping);
-    }
+    }*/
 
     /**
      * Converts the parquet {@link Schema} to {@link InternalSchema}.
@@ -331,14 +331,14 @@ public class ParquetSchemaExtractor {
     }
 
     // check which methods is best for the conversion
-    private MessageType fromInternalSchema(
+    /*private MessageType fromInternalSchema(
             InternalSchema internalSchema, String currentPath) {
         org.apache.parquet.avro.AvroSchemaConverter avroParquetSchemaConverter = new org.apache.parquet.avro.AvroSchemaConverter();
         AvroSchemaConverter avroSchemaConverter =  AvroSchemaConverter.getInstance();
         Schema avroSchema = avroSchemaConverter.fromInternalSchema(internalSchema,currentPath);
         MessageType parquetSchema = avroParquetSchemaConverter.convert(avroSchema);
         return parquetSchema;
-    }
+    }*/
     /**
      * Internal method for converting the {@link InternalSchema} to parquet {@link Schema}.
      *
