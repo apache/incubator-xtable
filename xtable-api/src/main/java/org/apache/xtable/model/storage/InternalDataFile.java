@@ -52,4 +52,8 @@ public class InternalDataFile extends InternalFile {
   @Builder.Default @NonNull List<ColumnStat> columnStats = Collections.emptyList();
   // last modified time in millis since epoch
   long lastModified;
+
+  public static InternalDataFileBuilder builderFrom(InternalDataFile dataFile) {
+    return dataFile.toBuilder();
+  }
 }

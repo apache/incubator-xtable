@@ -16,25 +16,22 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.catalog;
+package org.apache.xtable.parquet;
 
-/**
- * Represents a hierarchical table identifier, often including catalog, database (or schema), and
- * table names. Some catalogs may omit the catalog name.
- */
-public interface HierarchicalTableIdentifier extends CatalogTableIdentifier {
-  /**
-   * @return the catalog name if present, otherwise null
-   */
-  String getCatalogName();
+import org.apache.hadoop.conf.Configuration;
 
-  /**
-   * @return the database (or schema) name; required
-   */
-  String getDatabaseName();
+import org.apache.xtable.conversion.ConversionSourceProvider;
+import org.apache.xtable.conversion.SourceTable;
 
-  /**
-   * @return the table name; required
-   */
-  String getTableName();
+/** A concrete implementation of {@link ConversionSourceProvider} for Delta Lake table format. */
+public class ParquetConversionSourceProvider extends ConversionSourceProvider<Long> {
+  @Override
+  public ParquetConversionSource getConversionSourceInstance(SourceTable sourceTable) {
+
+    return ParquetConversionSource.builder()
+        .tableName(sourceTable.getName())
+        .basePath(sourceTable.getBasePath())
+        .hadoopConf(new Configuration())
+        .build();
+  }
 }
