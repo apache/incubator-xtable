@@ -15,23 +15,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
-package org.apache.xtable.parquet;
 
-import org.apache.hadoop.conf.Configuration;
-
-import org.apache.xtable.conversion.ConversionSourceProvider;
-import org.apache.xtable.conversion.SourceTable;
-
-/** A concrete implementation of {@link ConversionSourceProvider} for Delta Lake table format. */
-public class ParquetConversionSourceProvider {//extends ConversionSourceProvider<Long> {
-  //@Override
-  public ParquetConversionSource getConversionSourceInstance(SourceTable sourceTable) {
-
-    return ParquetConversionSource.builder()
-        .tableName(sourceTable.getName())
-        .basePath(sourceTable.getBasePath())
-        .hadoopConf(new Configuration())
-        .build();
-  }
+package org.apache.xtable.model.config;
+import lombok.Data;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Value;
+import org.apache.xtable.model.schema.PartitionTransformType;
+@Data
+@Value
+@Builder(toBuilder = true)
+public class InputPartitionField {
+    String partitionFieldName;
+    String partitionValue;
+    PartitionTransformType transformType;
 }

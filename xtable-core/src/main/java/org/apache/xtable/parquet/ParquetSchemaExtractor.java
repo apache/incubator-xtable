@@ -37,9 +37,11 @@ import lombok.NoArgsConstructor;
 import org.apache.parquet.schema.Type;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.GroupType;
 import org.apache.parquet.format.NullType;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.Type.Repetition;
+import org.apache.parquet.schema.LogicalTypeAnnotation.TimeUnit;
 
 
 
@@ -54,6 +56,7 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.schema.SchemaUtils;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
+//import org.apache.parquet.avro.AvroSchemaConverter;
 import org.apache.avro.Schema;
 //import org.apache.parquet.avro.AvroSchemaConverter;
 
@@ -77,28 +80,29 @@ public class ParquetSchemaExtractor {
                     .defaultValue("")
                     .build();
     private static final ParquetSchemaExtractor INSTANCE = new ParquetSchemaExtractor();
+    public static ParquetSchemaExtractor getInstance() {
+        return INSTANCE;
+    }
     private static final String ELEMENT = "element";
     private static final String KEY = "key";
     private static final String VALUE = "value";
 
-    public static ParquetSchemaExtractor getInstance() {
-        return INSTANCE;
-    }
+
 
     private static Type finalizeSchema(MessageType targetSchema, InternalSchema inputSchema) {
         if (inputSchema.isNullable()) {
-            return targetSchema.union(LogicalTypeAnnotation.unknownType());
+            return targetSchema.union(null);//LogicalTypeAnnotation.unknownType()
         }
         return targetSchema;
     }
 
-    private static boolean groupTypeContainsNull(Type schema) {
+    private static boolean groupTypeContainsNull(GroupType schema) {
         for (Type field : schema.getFields()){
             if (field == null) {
-                return True;
+                return true;
             }
         }
-        return False;
+        return false;
     }
 
    /* public InternalSchema _toInternalSchema(Schema schema) {
@@ -133,7 +137,7 @@ public class ParquetSchemaExtractor {
      *                             source schema. If source schema does not contain IdMappings, map will be empty.
      * @return a converted schema
      */
-    private InternalSchema toInternalSchema(
+    public InternalSchema toInternalSchema(
             MessageType schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
         // TODO - Does not handle recursion in parquet schema
         InternalType newDataType;
@@ -147,7 +151,7 @@ public class ParquetSchemaExtractor {
                 case INT64:
                     logicalType = schema.getLogicalTypeAnnotation();
                     if (logicalType instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) {
-                        LogicalTypeAnnotation.TimeUnit timeUnit = logicalType.getUnit();
+                        LogicalTypeAnnotation.TimeUnit timeUnit = ((LogicalTypeAnnotation.TimestampLogicalTypeAnnotation)logicalType).getUnit();
                         if (timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS) {
                             newDataType = InternalType.TIMESTAMP;
                             metadata.put(
@@ -163,13 +167,13 @@ public class ParquetSchemaExtractor {
                         }
                     } else if (logicalType instanceof LogicalTypeAnnotation.IntLogicalTypeAnnotation) {
                         newDataType = InternalType.INT;
-                    } else if (logicalType instanceof LogicalTypeAnnotation.TimeLogicalTypeAnnotation) {
-                        LogicalTypeAnnotation.TimeUnit timeUnit = logicalType.getUnit();
+                    }/* else if (logicalType instanceof LogicalTypeAnnotation.TimeLogicalTypeAnnotation) {
+                        LogicalTypeAnnotation.TimeUnit timeUnit = ((LogicalTypeAnnotation.TimestampLogicalTypeAnnotation)logicalType).getUnit();
                         if (timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS || timeUnit == LogicalTypeAnnotation.TimeUnit.NANOS) {
                             // check if INT is the InternalType needed here
                             newDataType = InternalType.INT;
                         }
-                    } else {
+                    }*/ else {
                         newDataType = InternalType.INT;
                     }
                     break;
@@ -177,13 +181,13 @@ public class ParquetSchemaExtractor {
                     logicalType = schema.getLogicalTypeAnnotation();
                     if (logicalType instanceof LogicalTypeAnnotation.DateLogicalTypeAnnotation) {
                         newDataType = InternalType.DATE;
-                    } else if (logicalType instanceof TimeLogicalTypeAnnotation) {
-                        LogicalTypeAnnotation.TimeUnit timeUnit = logicalType.getUnit();
+                    } /*else if (logicalType instanceof TimeLogicalTypeAnnotation) {
+                        LogicalTypeAnnotation.TimeUnit timeUnit = ((LogicalTypeAnnotation.TimeLogicalTypeAnnotation)logicalType).getUnit();
                         if (timeUnit == LogicalTypeAnnotation.TimeUnit.MILLIS) {
                             // check if INT is the InternalType needed here
                             newDataType = InternalType.INT;
                         }
-                    } else {
+                    }*/ else {
                         newDataType = InternalType.INT;
                     }
                     break;
@@ -192,15 +196,15 @@ public class ParquetSchemaExtractor {
                     break;
                 case FLOAT:
                     logicalType = schema.getLogicalTypeAnnotation();
-                    if (logicalType instanceof LogicalTypeAnnotation.Float16LogicalTypeAnnotation) {
+                  /*  if (logicalType instanceof LogicalTypeAnnotation.Float16LogicalTypeAnnotation) {
                         newDataType = InternalType.FLOAT;
-                    } else if (logicalType instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+                    } else*/ if (logicalType instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
                         metadata.put(
                                 InternalSchema.MetadataKey.DECIMAL_PRECISION,
-                                logicalType.getPrecision());
+                                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation)logicalType).getPrecision());
                         metadata.put(
                                 InternalSchema.MetadataKey.DECIMAL_SCALE,
-                                logicalType.getScale());
+                                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation)logicalType).getScale());
                         newDataType = InternalType.DECIMAL;
                     } else {
                         newDataType = InternalType.FLOAT;
@@ -220,7 +224,7 @@ public class ParquetSchemaExtractor {
                     //? Variant,GEOMETRY, GEOGRAPHY,
                     logicalType = schema.getLogicalTypeAnnotation();
                     if (logicalType instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
-                        metadata.put(InternalSchema.MetadataKey.ENUM_VALUES, schema.toOriginalType().values());
+                        metadata.put(InternalSchema.MetadataKey.ENUM_VALUES, logicalType.toOriginalType().values());
                         newDataType = InternalType.ENUM;
                     } else if (logicalType instanceof LogicalTypeAnnotation.JsonLogicalTypeAnnotation) {
                         newDataType = InternalType.BYTES;
@@ -235,14 +239,14 @@ public class ParquetSchemaExtractor {
                 case BOOLEAN:
                     newDataType = InternalType.BOOLEAN;
                     break;
-                case UNKNOWN:
+               /* case UNKNOWN:
                     newDataType = InternalType.NULL;
-                    break;
+                    break;*/
                 default:
                     throw new UnsupportedSchemaTypeException(
                             String.format("Unsupported schema type %s", schema));
             }
-        } else {
+        } /*else {
             //GroupTypes
             typeName = schema.asGroupType();
             switch (typeName.getOriginalType()) {
@@ -302,33 +306,25 @@ public class ParquetSchemaExtractor {
                     throw new UnsupportedSchemaTypeException(
                             String.format("Unsupported schema type %s", schema));
             }
-        }
+        }*/
+         newDataType = null;
         return InternalSchema.builder()
                 .name(schema.getName())
                 .dataType(newDataType)
-                .comment(schema.getDoc())
-                .isNullable(schema.isNullable())
+                .comment(null)
+                .isNullable(false)// to check
                 .metadata(metadata.isEmpty() ? null : metadata)
                 .build();
     }
 
-    private Map<String, IdMapping> getChildIdMap(IdMapping idMapping) {
+  /*  private Map<String, IdMapping> getChildIdMap(IdMapping idMapping) {
         if (idMapping == null) {
             return Collections.emptyMap();
         }
         return idMapping.getFields().stream()
                 .collect(Collectors.toMap(IdMapping::getName, Function.identity()));
-    }
+    }*/
 
-    /**
-     * Converts the {@link InternalSchema} to parquet {@link Schema}.
-     *
-     * @param internalSchema internal schema representation
-     * @return an parquet schema
-     */
-    public Schema _fromInternalSchema(InternalSchema internalSchema) {
-        return fromInternalSchema(internalSchema, null);
-    }
 
     // check which methods is best for the conversion
     /*private MessageType fromInternalSchema(
@@ -348,128 +344,128 @@ public class ParquetSchemaExtractor {
      *                       records.
      * @return an parquet schema
      */
-    private Type fromInternalSchema(InternalSchema internalSchema, String currentPath) {
-        switch (internalSchema.getDataType()) {
-            /*case BYTES:
-                return finalizeSchema(Schema.create(Schema.Type.BYTES), internalSchema);
-            case BOOLEAN:
-                return finalizeSchema(Schema.create(Schema.Type.BOOLEAN), internalSchema);*/
-            case INT:
-                return finalizeSchema(LogicalTypeAnnotation.intType(32), internalSchema);
-            case LONG:
-                return finalizeSchema(LogicalTypeAnnotation.intType(64), internalSchema);
-            case STRING:
-                return finalizeSchema(LogicalTypeAnnotation.stringType(), internalSchema);
-            case FLOAT:
-                return finalizeSchema(LogicalTypeAnnotation.float16Type(), internalSchema);
-            case DOUBLE:
-                int precision =
-                        (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
-                int scale =
-                        (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
-                return finalizeSchema(LogicalTypeAnnotation.decimalType(scale, precision), internalSchema);
-                // TODO check how to create ENUM
-            case ENUM:
-                return finalizeSchema(
-                        new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createEnum(
-                                internalSchema.getName(),
-                                internalSchema.getComment(),
-                                null,
-                                (List<String>)
-                                        internalSchema.getMetadata().get(InternalSchema.MetadataKey.ENUM_VALUES),
-                                null)),
-                        internalSchema);
-            case DATE:
-                return finalizeSchema(
-                        LogicalTypeAnnotation.dateType(), internalSchema);
-            case TIMESTAMP:
-                if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
-                        == InternalSchema.MetadataValue.MICROS) {
-                    return finalizeSchema(
-                             LogicalTypeAnnotation.timestampType(True, Repetition.MICROS),
-                            internalSchema);
-                } if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
-                    == InternalSchema.MetadataValue.MILLIS) {
-                return finalizeSchema(
-                         LogicalTypeAnnotation.timestampType(True, Repetition.MILLIS),
-                        internalSchema);
-            } else if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
-                    == InternalSchema.MetadataValue.NANOS) {
-                return finalizeSchema(
-                        LogicalTypeAnnotation.timestampType(True, Repetition.NANOS),
-                        internalSchema);
-            }
-            case TIMESTAMP_NTZ:
-                if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
-                        == InternalSchema.MetadataValue.MICROS) {
-                    return finalizeSchema(
-                            LogicalTypeAnnotation.timestampType(True, MICROS),
-                            internalSchema);
-                } else {
-                    return finalizeSchema(
-                            LogicalTypeAnnotation.timestampType(True, MILLIS),
-                            internalSchema);
-                }
-                // TODO check from here FIXED, LIST and MAP types (still to todo)
-            case LIST:
-                InternalField elementField =
-                        internalSchema.getFields().stream()
-                                .filter(
-                                        field ->
-                                                InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(field.getName()))
-                                .findFirst()
-                                .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
-                return finalizeSchema(
-                        new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createArray(
-                                fromInternalSchema(elementField.getSchema(), elementField.getPath()))),
-                        internalSchema);
-            case MAP:
-                InternalField valueField =
-                        internalSchema.getFields().stream()
-                                .filter(
-                                        field -> InternalField.Constants.MAP_VALUE_FIELD_NAME.equals(field.getName()))
-                                .findFirst()
-                                .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
-                return finalizeSchema(
-                        new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createMap(fromInternalSchema(valueField.getSchema(), valueField.getPath()))),
-                        internalSchema);
-            case DECIMAL:
-                int precision =
-                        (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
-                int scale =
-                        (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
-//                Integer size =
-//                        (Integer) internalSchema.getMetadata().get(InternalSchema.MetadataKey.FIXED_BYTES_SIZE);
-//                if (size == null) {
-                return finalizeSchema(
-                        LogicalTypeAnnotation.decimalType(scale, precision),
-                        internalSchema);
+//    private Type fromInternalSchema(InternalSchema internalSchema, String currentPath) {
+//        switch (internalSchema.getDataType()) {
+//            /*case BYTES:
+//                return finalizeSchema(Schema.create(Schema.Type.BYTES), internalSchema);
+//            case BOOLEAN:
+//                return finalizeSchema(Schema.create(Schema.Type.BOOLEAN), internalSchema);*/
+//            case INT:
+//                return finalizeSchema(LogicalTypeAnnotation.intType(32,false), internalSchema);
+//            case LONG:
+//                return finalizeSchema(LogicalTypeAnnotation.intType(64,false), internalSchema);
+//            case STRING:
+//                return finalizeSchema(LogicalTypeAnnotation.stringType(), internalSchema);
+//            //case FLOAT:
+//                //return finalizeSchema(LogicalTypeAnnotation.float16Type(), internalSchema);
+//            /*case DOUBLE:
+//                int precision =
+//                        (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+//                int scale =
+//                        (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
+//                return finalizeSchema(LogicalTypeAnnotation.decimalType(scale, precision), internalSchema);
+//                // TODO check how to create ENUM
+//            case ENUM:
+//                return finalizeSchema(
+//                        new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createEnum(
+//                                internalSchema.getName(),
+//                                internalSchema.getComment(),
+//                                null,
+//                                (List<String>)
+//                                        internalSchema.getMetadata().get(InternalSchema.MetadataKey.ENUM_VALUES),
+//                                null)),
+//                        internalSchema);*/
+//            case DATE:
+//                return finalizeSchema(
+//                        LogicalTypeAnnotation.dateType(), internalSchema);
+//            /*case TIMESTAMP:
+//                if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+//                        == InternalSchema.MetadataValue.MICROS) {
+//                    return finalizeSchema(
+//                             LogicalTypeAnnotation.timestampType(true, TimeUnit.MICROS),
+//                            internalSchema);
+//                } if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+//                    == InternalSchema.MetadataValue.MILLIS) {
+//                return finalizeSchema(
+//                         LogicalTypeAnnotation.timestampType(true, TimeUnit.MILLIS),
+//                        internalSchema);
+//            } else if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+//                    == InternalSchema.MetadataValue.NANOS) {
+//                return finalizeSchema(
+//                        LogicalTypeAnnotation.timestampType(true, TimeUnit.NANOS),
+//                        internalSchema);
+//            }
+//            case TIMESTAMP_NTZ:
+//                if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+//                        == InternalSchema.MetadataValue.MICROS) {
+//                    return finalizeSchema(
+//                            LogicalTypeAnnotation.timestampType(true, TimeUnit.MICROS),
+//                            internalSchema);
 //                } else {
 //                    return finalizeSchema(
-//                            LogicalTypes.decimal(precision, scale)
-//                                    .addToSchema(
-//                                            Schema.createFixed(
-//                                                    internalSchema.getName(), internalSchema.getComment(), null, size)),
+//                            LogicalTypeAnnotation.timestampType(true, TimeUnit.MILLIS),
 //                            internalSchema);
-//                }
-            case FIXED:
-                Integer fixedSize =
-                        (Integer) internalSchema.getMetadata().get(InternalSchema.MetadataKey.FIXED_BYTES_SIZE);
-                return finalizeSchema(
-                        new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createFixed(
-                                internalSchema.getName(), internalSchema.getComment(), null, fixedSize)),
-                        internalSchema);
-            case UUID:
-                /*Schema uuidSchema =
-                        Schema.createFixed(internalSchema.getName(), internalSchema.getComment(), null, 16);
-                uuidSchema.addProp(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid");*/
-                return finalizeSchema(LogicalTypeAnnotation.uuidType(), internalSchema);
-            default:
-                throw new UnsupportedSchemaTypeException(
-                        "Encountered unhandled type during InternalSchema to parquet conversion: "
-                                + internalSchema.getDataType());
-        }
-    }
+//                }*/
+//                // TODO check from here FIXED, LIST and MAP types (still to todo)
+//            /*case LIST:
+//                InternalField elementField =
+//                        internalSchema.getFields().stream()
+//                                .filter(
+//                                        field ->
+//                                                InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(field.getName()))
+//                                .findFirst()
+//                                .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
+//                return finalizeSchema(
+//                        new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createArray(
+//                                fromInternalSchema(elementField.getSchema(), elementField.getPath()))),
+//                        internalSchema);
+//            case MAP:
+//                InternalField valueField =
+//                        internalSchema.getFields().stream()
+//                                .filter(
+//                                        field -> InternalField.Constants.MAP_VALUE_FIELD_NAME.equals(field.getName()))
+//                                .findFirst()
+//                                .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
+//                return finalizeSchema(
+//                        new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createMap(fromInternalSchema(valueField.getSchema(), valueField.getPath()))),
+//                        internalSchema);*/
+////            case DECIMAL:
+////                int precision =
+////                        (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+////                int scale =
+////                        (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
+//////                Integer size =
+//////                        (Integer) internalSchema.getMetadata().get(InternalSchema.MetadataKey.FIXED_BYTES_SIZE);
+//////                if (size == null) {
+////                return finalizeSchema(
+////                        LogicalTypeAnnotation.decimalType(scale, precision),
+////                        internalSchema);
+////                } else {
+////                    return finalizeSchema(
+////                            LogicalTypes.decimal(precision, scale)
+////                                    .addToSchema(
+////                                            Schema.createFixed(
+////                                                    internalSchema.getName(), internalSchema.getComment(), null, size)),
+////                            internalSchema);
+////                }
+//            /*case FIXED:
+//                Integer fixedSize =
+//                        (Integer) internalSchema.getMetadata().get(InternalSchema.MetadataKey.FIXED_BYTES_SIZE);
+//                return finalizeSchema(
+//                        new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createFixed(
+//                                internalSchema.getName(), internalSchema.getComment(), null, fixedSize)),
+//                        internalSchema);
+//            case UUID:
+//                *//*Schema uuidSchema =
+//                        Schema.createFixed(internalSchema.getName(), internalSchema.getComment(), null, 16);
+//                uuidSchema.addProp(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid");*//*
+//                return finalizeSchema(LogicalTypeAnnotation.uuidType(), internalSchema);*/
+//            default:
+//                throw new UnsupportedSchemaTypeException(
+//                        "Encountered unhandled type during InternalSchema to parquet conversion: "
+//                                + internalSchema.getDataType());
+//        }
+//    }
 
     private String buildCurrentPath(InternalField field, String parentPath) {
         return Optional.ofNullable(parentPath)

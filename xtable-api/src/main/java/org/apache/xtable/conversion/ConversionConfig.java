@@ -29,7 +29,7 @@ import lombok.Value;
 import com.google.common.base.Preconditions;
 
 import org.apache.xtable.model.sync.SyncMode;
-
+import org.apache.xtable.model.config.InputPartitionFields;
 @Value
 @Builder
 public class ConversionConfig {
@@ -42,13 +42,15 @@ public class ConversionConfig {
   Map<TargetTable, List<TargetCatalogConfig>> targetCatalogs;
   // The mode, incremental or snapshot
   SyncMode syncMode;
+  // Input partition config for parquet
+  InputPartitionFields partitions;
 
   @Builder
   ConversionConfig(
       @NonNull SourceTable sourceTable,
       List<TargetTable> targetTables,
       Map<TargetTable, List<TargetCatalogConfig>> targetCatalogs,
-      SyncMode syncMode) {
+      SyncMode syncMode, InputPartitionFields partitions) {
     this.sourceTable = sourceTable;
     this.targetTables = targetTables;
     Preconditions.checkArgument(
@@ -56,5 +58,6 @@ public class ConversionConfig {
         "Please provide at-least one format to sync");
     this.targetCatalogs = targetCatalogs == null ? Collections.emptyMap() : targetCatalogs;
     this.syncMode = syncMode == null ? SyncMode.INCREMENTAL : syncMode;
+    this.partitions = partitions;
   }
 }

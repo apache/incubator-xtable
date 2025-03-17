@@ -21,16 +21,24 @@ import org.apache.hadoop.fs.*;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.parquet.hadoop.ParquetFileReader;
+import org.apache.parquet.format.converter.ParquetMetadataConverter;
+import org.apache.hadoop.fs.Path;
 public class ParquetMetadataExtractor {
 
-  private static MessageType getSchema(ParquetMetadata footer) {
+  private static final ParquetMetadataExtractor INSTANCE = new ParquetMetadataExtractor();
+  public static ParquetMetadataExtractor getInstance() {
+    return INSTANCE;
+  }
+
+  public static MessageType getSchema(ParquetMetadata footer) {
     MessageType schema = footer.getFileMetaData().getSchema();
     return schema;
   }
 
-  private static ParquetMetadata readParquetMetadata(Configuration conf, String path) {
-    ParquetMetadata footer =
-        ParquetFileReader.readFooter(conf, path, ParquetMetadataConverter.NO_FILTER);
+  public static ParquetMetadata readParquetMetadata(Configuration conf, Path path) {
+    ParquetMetadata footer =null;
+        //ParquetFileReader.readFooter(conf, path, ParquetMetadataConverter.NO_FILTER);
     return footer;
   }
 }

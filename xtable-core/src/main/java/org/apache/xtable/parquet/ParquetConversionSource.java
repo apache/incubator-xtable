@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.Builder;
 import lombok.NonNull;
@@ -39,25 +40,34 @@ import org.apache.xtable.model.storage.*;
 import org.apache.xtable.spi.extractor.ConversionSource;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.Type.Repetition;
-import org.apache.xtable.utilities.RunSync.DatasetConfig.Table.InputPartitionFields;
+import org.apache.xtable.model.config.InputPartitionFields;
+import org.apache.xtable.model.config.InputPartitionField;
 import org.apache.parquet.schema.MessageType;
+import org.apache.xtable.model.stat.PartitionValue;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 @Builder
-public class ParquetConversionSource implements ConversionSource<Long> {
+//@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public class ParquetConversionSource {// implements ConversionSource<Long> {
+
+    private final InputPartitionFields partitions;
 
     @Builder.Default
     private static final ParquetSchemaExtractor schemaExtractor =
             ParquetSchemaExtractor.getInstance();
+
+    /*private static final ParquetConversionSource INSTANCE = new ParquetConversionSource();
+    public static ParquetConversionSource getInstance() {
+        return INSTANCE;
+    }*/
 /*    private static final ParquetSchemaConverter parquetSchemaConverter =
             ParquetSchemaConverter.getInstance();*/
     @Builder.Default
     private static final ParquetMetadataExtractor parquetMetadataExtractor =
             ParquetMetadataExtractor.getInstance();
-    @Builder.Default
-    private static final ParquetPartitionExtractor parquetPartitionExtractor =
-            ParquetPartitionExtractor.getInstance();
 
     @Builder.Default
-    private static final ParquetPartitionValueExtractor parquetPartitionValueExtractor =
+    private static final ParquetPartitionValueExtractor partitionValueExtractor =
             ParquetPartitionValueExtractor.getInstance();
 
     @Builder.Default
@@ -71,19 +81,20 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     private final Configuration hadoopConf;
 
     private InputPartitionFields initPartitionInfo() {
-        return parquetPartitionExtractor.getPartitionsFromUserConfiguration(configPath);
+        //return parquetPartitionExtractor.getPartitionsFromUserConfiguration(configPath);
+        return partitions;
     }
 
-    public Map<String, List<String>> getPartitionFromConfiguration() {
-        List<InputPartitionField> partitionFields = initPartitionInfo().getPartitions();
-        Map<String, List<String>> partitionsMap = new HashMap<>();
-        for (InputPartitionField partition : partitionFields) {
-            partitionsMap
-                    .computeIfAbsent(partition.getPartitionFieldName(), k -> new ArrayList<>())
-                    .addAll(partition.partitionFieldValues());
-        }
-        return partitionsMap;
-    }
+//    public Map<String, List<String>> getPartitionFromConfiguration() {
+//        List<InputPartitionField> partitionFields = initPartitionInfo().getPartitions();
+//        Map<String, List<String>> partitionsMap = new HashMap<>();
+//        for (InputPartitionField partition : partitionFields) {
+//            partitionsMap
+//                    .computeIfAbsent(partition.getPartitionFieldName(), k -> new ArrayList<>())
+//                    .addAll(partition.partitionFieldValues());
+//        }
+//        return partitionsMap;
+//    }
 
     /**
      * To infer schema getting the latest file assumption is that latest file will have new fields
@@ -91,7 +102,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
      * @param modificationTime the commit to consider for reading the table state
      * @return
      */
-    @Override
+    //@Override
     public InternalTable getTable(Long modificationTime) {
 
         Optional<LocatedFileStatus> latestFile =
@@ -110,17 +121,17 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                 .map(InputPartitionField::getPartitionFieldName)
                 .collect(Collectors.toList());
 
-        // merge schema of partition into original as partition is not part of parquet fie
+        // merge schema of partition into original as partition is not part of parquet file
         if (!partitionKeys.isEmpty()) {
-            tableSchema = mergeParquetSchema(tableSchema, partitionKeys);
-            //tableSchema = mergeAvroSchema(tableSchema, partitionKeys);
+            //TODO compilation error
+         //   tableSchema = mergeParquetSchema(tableSchema, partitionKeys);
         }
-        InternalSchema schema = schemaExtractor.toInternalSchema(tableSchema);
+        InternalSchema schema = schemaExtractor.toInternalSchema(tableSchema,null,null);
 
         List<InternalPartitionField> partitionFields =
                 partitionKeys.isEmpty()
                         ? Collections.emptyList()
-                        : parquetPartitionExtractor.getPartitionsFromUserConfiguration(configPath);
+                        : partitionValueExtractor.getInternalPartitionFields(partitions);
         DataLayoutStrategy dataLayoutStrategy =
                 partitionFields.isEmpty()
                         ? DataLayoutStrategy.FLAT
@@ -137,9 +148,10 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     }
 
     public List<InternalDataFile> getInternalDataFiles() {
-        List<LocatedFileStatus> parquetFiles =
+        List<InternalDataFile> internalDataFiles = null;
+       /* List<LocatedFileStatus> parquetFiles =
                 getParquetFiles(hadoopConf, basePath).collect(Collectors.toList());
-        List<PartitionValue> partitionValuesFromConfig = parquetPartitionValueExtractor.createPartitionValues(parquetPartitionValueExtractor.extractPartitionValues(initPartitionInfo()));
+        List<PartitionValue> partitionValuesFromConfig = partitionValueExtractor.createPartitionValues(partitionValueExtractor.extractPartitionValues(partitions));
                 InternalTable table = getTable(-1L);
         List<InternalDataFile> internalDataFiles =
                 parquetFiles.stream()
@@ -155,27 +167,35 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                                                         parquetStatsExtractor
                                                                 .getColumnStatsForaFile(
                                                                         parquetMetadataExtractor.readParquetMetadata(
-                                                                                hadoopConf, file.getPath().toString()))
+                                                                                hadoopConf, file.getPath()))
                                                                 .build())
-                                                .collect(Collectors.toList()));
+                                                .collect(Collectors.toList()));*/
         return internalDataFiles;
     }
+
+/*
+    @Override
+    public CommitsBacklog<long> getCommitsBacklog(){
+
+    }
+*/
 
     /**
      * Here to get current snapshot listing all files hence the -1 is being passed
      *
      * @return
      */
-    @Override
+    //@Override
     public InternalSnapshot getCurrentSnapshot() {
-        List<InternalDataFiles> internalDataFiles = getInternalDataFiles();
+        /*List<InternalDataFile> internalDataFiles = getInternalDataFiles();
         return InternalSnapshot.builder()
                 .table(table)
                 .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
-                .build();
+                .build();*/
+        return null;
     }
 
-    private Schema mergeAvroSchema(Schema internalSchema, Set<String> parititonFields) {
+   /* private Schema mergeAvroSchema(Schema internalSchema, Set<String> parititonFields) {
 
         SchemaBuilder.FieldAssembler<Schema> fieldAssembler =
                 SchemaBuilder.record(internalSchema.getName()).fields();
@@ -188,32 +208,33 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         }
 
         return fieldAssembler.endRecord();
-    }
+    }*/
 
-    private Type mergeParquetSchema(MessageType internalSchema, List<String> parititonFields) {
+   /* private Type mergeParquetSchema(MessageType internalSchema, List<String> parititonFields) {
 
         List<Type> listOfAllFields = internalSchema.getFields();
         Type fieldsToMerge = listOfAllFields.get(0);
         listOfAllFields.remove(0);
         // start the merge
         for (Type field : internalSchema.getFields()) {
-            fieldsToMerge = fieldsToMerge.union(field);
+            fieldsToMerge = fieldsToMerge.union(field,false);
         }
-        for (String parition : parititonFields) {
+      *//*  for (String partition : parititonFields) {
             //create Type from partiton, TODO: check further...
-            fieldsToMerge = fieldsToMerge.union(Type(partition, Repetition.REQUIRED));
-        }
+            fieldsToMerge = fieldsToMerge.union(new Type(partition, Repetition.REQUIRED),false);
+        }*//*
 
         return fieldsToMerge;
-    }
+    }*/
 
     public Stream<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
         try {
             FileSystem fs = FileSystem.get(hadoopConf);
             RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(basePath), true);
-            return remoteIteratorToStream(iterator)
-                    .filter(file -> file.getPath().getName().endsWith("parquet"));
-        } catch (IOException | FileNotFoundException e) {
+            return null;
+            //remoteIteratorToStream(iterator)
+              //      .filter(file -> file.getPath().getName().endsWith("parquet"));
+        } catch (IOException e) {//| FileNotFoundException e
             throw new RuntimeException(e);
         }
     }
@@ -244,5 +265,9 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+    //@Override
+    public boolean isIncrementalSyncSafeFrom(Instant instant) {
+        return false;
     }
 }
