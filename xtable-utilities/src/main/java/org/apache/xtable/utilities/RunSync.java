@@ -196,13 +196,10 @@ public class RunSync {
   
   static DatasetConfig getDatasetConfig(String datasetConfigPath) throws IOException {
     // Initialize DatasetConfig
-    DatasetConfig datasetConfig = new DatasetConfig();
-
-    try (InputStream inputStream = Files.newInputStream(Paths.get(datasetConfigPath))) {
-      ObjectReader objectReader = YAML_MAPPER.readerForUpdating(datasetConfig);
-      objectReader.readValue(inputStream);
+    try (InputStream inputStream =
+        Files.newInputStream(Paths.get(cmd.getOptionValue(DATASET_CONFIG_OPTION)))) {
+      return YAML_MAPPER.readValue(inputStream, DatasetConfig.class);
     }
-    return datasetConfig;
   }
 
   static Configuration gethadoopConf(String hadoopConfigPath) throws IOException {
