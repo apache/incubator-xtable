@@ -32,6 +32,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import lombok.NonNull;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Value;
@@ -117,12 +118,10 @@ public class RunSync {
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   static SourceTable sourceTableBuilder(
-      DatasetConfig.Table table,
+          @NonNull DatasetConfig.Table table,
       IcebergCatalogConfig icebergCatalogConfig,
-      DatasetConfig datasetConfig,
+          @NonNull DatasetConfig datasetConfig,
       Properties sourceProperties) {
-    Objects.requireNonNull(table, "Table cannot be null");
-    Objects.requireNonNull(datasetConfig, "datasetConfig cannot be null");
     SourceTable sourceTable =
         SourceTable.builder()
             .name(table.getTableName())
@@ -137,11 +136,9 @@ public class RunSync {
   }
 
   static List<TargetTable> targetTableBuilder(
-      DatasetConfig.Table table,
-      IcebergCatalogConfig icebergCatalogConfig,
-      List<String> tableFormatList) {
-    Objects.requireNonNull(table, "Table cannot be null");
-    Objects.requireNonNull(tableFormatList, "tableFormatList cannot be null");
+          @NonNull DatasetConfig.Table table,
+          IcebergCatalogConfig icebergCatalogConfig,
+          @NonNull List<String> tableFormatList) {
     List<TargetTable> targetTables =
         tableFormatList.stream()
             .map(
