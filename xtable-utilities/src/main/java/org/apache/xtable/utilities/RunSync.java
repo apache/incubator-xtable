@@ -158,7 +158,7 @@ public class RunSync {
     return targetTables;
   }
 
-  static void formatConvertor(
+  static void syncTableMetdata(
       DatasetConfig datasetConfig,
       List<String> tableFormatList,
       IcebergCatalogConfig icebergCatalogConfig,
@@ -189,19 +189,18 @@ public class RunSync {
       try {
         conversionController.sync(conversionConfig, conversionSourceProvider);
       } catch (Exception e) {
-        log.error(String.format("Error running sync for %s", table.getTableBasePath()), e);
+        log.error("Error running sync for {}", table.getTableBasePath(), e);
       }
     }
   }
-  
+
   static DatasetConfig getDatasetConfig(String datasetConfigPath) throws IOException {
     // Initialize DatasetConfig
     try (InputStream inputStream =
-        Files.newInputStream(Paths.get(cmd.getOptionValue(DATASET_CONFIG_OPTION)))) {
+                 Files.newInputStream(Paths.get(datasetConfigPath))) {
       return YAML_MAPPER.readValue(inputStream, DatasetConfig.class);
     }
-  }
-
+}
   static Configuration gethadoopConf(String hadoopConfigPath) throws IOException {
     // Load configurations
     byte[] customConfig = getCustomConfigurations(hadoopConfigPath);
@@ -274,7 +273,7 @@ public class RunSync {
     ConversionSourceProvider conversionSourceProvider =
         getConversionSourceProvider(conversionProviderConfigpath, datasetConfig, hadoopConf);
     List<String> tableFormatList = datasetConfig.getTargetFormats();
-    formatConvertor(
+    syncTableMetdata(
         datasetConfig, tableFormatList, icebergCatalogConfig, hadoopConf, conversionSourceProvider);
   }
 

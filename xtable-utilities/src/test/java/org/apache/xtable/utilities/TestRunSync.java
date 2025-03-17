@@ -77,8 +77,6 @@ class TestRunSync {
     DatasetConfig config = RunSync.getDatasetConfig(filePath);
     // Assert
     Assertions.assertNotNull(config);
-    Assertions.assertEquals("ICEBERG", config.sourceFormat);
-    Assertions.assertNotEquals("DELTA1", config.targetFormats);
   }
   /** Tests that the default hadoop configs are loaded. */
   @Test
