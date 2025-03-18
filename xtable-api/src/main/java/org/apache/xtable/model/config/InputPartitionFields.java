@@ -15,16 +15,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+ 
 package org.apache.xtable.model.config;
+
 import java.util.List;
-import lombok.Data;
+
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
 import lombok.Value;
+
 @Data
 @Value
 @Builder(toBuilder = true)
 public class InputPartitionFields {
-    String sourceField;
-    List<InputPartitionField> partitions;
+  String sourceField;
+  List<InputPartitionField> partitions;
 }

@@ -15,18 +15,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.model.config;
-import lombok.Data;
+
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
 import lombok.Value;
+
 import org.apache.xtable.model.schema.PartitionTransformType;
+
 @Data
 @Value
 @Builder(toBuilder = true)
 public class InputPartitionField {
-    String partitionFieldName;
-    String partitionValue;
-    PartitionTransformType transformType;
+  String partitionFieldName;
+  String partitionValue;
+  PartitionTransformType transformType;
 }

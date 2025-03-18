@@ -15,18 +15,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.parquet;
+
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
+import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.parquet.hadoop.ParquetFileReader;
-import org.apache.parquet.format.converter.ParquetMetadataConverter;
-import org.apache.hadoop.fs.Path;
+
 public class ParquetMetadataExtractor {
 
   private static final ParquetMetadataExtractor INSTANCE = new ParquetMetadataExtractor();
+
   public static ParquetMetadataExtractor getInstance() {
     return INSTANCE;
   }
@@ -37,8 +38,8 @@ public class ParquetMetadataExtractor {
   }
 
   public static ParquetMetadata readParquetMetadata(Configuration conf, Path path) {
-    ParquetMetadata footer =null;
-        //ParquetFileReader.readFooter(conf, path, ParquetMetadataConverter.NO_FILTER);
+    ParquetMetadata footer = null;
+    // ParquetFileReader.readFooter(conf, path, ParquetMetadataConverter.NO_FILTER);
     return footer;
   }
 }

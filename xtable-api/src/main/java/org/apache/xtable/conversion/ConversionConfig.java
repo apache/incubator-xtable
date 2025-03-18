@@ -28,8 +28,9 @@ import lombok.Value;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.config.InputPartitionFields;
+import org.apache.xtable.model.sync.SyncMode;
+
 @Value
 @Builder
 public class ConversionConfig {
@@ -50,7 +51,8 @@ public class ConversionConfig {
       @NonNull SourceTable sourceTable,
       List<TargetTable> targetTables,
       Map<TargetTable, List<TargetCatalogConfig>> targetCatalogs,
-      SyncMode syncMode, InputPartitionFields partitions) {
+      SyncMode syncMode,
+      InputPartitionFields partitions) {
     this.sourceTable = sourceTable;
     this.targetTables = targetTables;
     Preconditions.checkArgument(

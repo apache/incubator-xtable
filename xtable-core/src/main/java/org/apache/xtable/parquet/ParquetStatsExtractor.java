@@ -15,11 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.xtable.parquet;
 
+import org.apache.xtable.model.schema.InternalSchema;
+
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.xtable.model.storage.FileFormat;
-import org.apache.hadoop.conf.Configuration;
+import java.util.TreeSet;
+
+import org.apache.xtable.model.stat.PartitionValue;
+import org.apache.xtable.model.stat.ColumnStat;
+import lombok.Builder;
+import lombok.Value;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.hadoop.fs.*;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.Encoding;
@@ -28,38 +41,21 @@ import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
-import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.stat.PartitionValue;
-import lombok.Builder;
-import lombok.NonNull;
-import lombok.Value;
-
-import java.util.Map;
-import java.util.TreeSet;
-import java.util.Collection;
-import java.util.Set;
-import java.util.LinkedHashMap;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Stream;
-
-import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.config.InputPartitionFields;
-import org.apache.xtable.model.config.InputPartitionField;
+import org.apache.hadoop.conf.Configuration;
 
 @Value
 @Builder
 public class ParquetStatsExtractor {
 
-    private static final ParquetStatsExtractor INSTANCE = null;//new ParquetStatsExtractor();
-    public static ParquetStatsExtractor getInstance() {
-        return INSTANCE;
-    }
+    private static final ParquetStatsExtractor INSTANCE = null; // new ParquetStatsExtractor();
     @Builder.Default
-    private static final ParquetPartitionValueExtractor partitionExtractor = ParquetPartitionValueExtractor.getInstance();
+    private static final ParquetPartitionValueExtractor partitionExtractor =
+            ParquetPartitionValueExtractor.getInstance();
     @Builder.Default
-    private static final ParquetSchemaExtractor schemaExtractor = ParquetSchemaExtractor.getInstance();
+    private static final ParquetSchemaExtractor schemaExtractor =
+            ParquetSchemaExtractor.getInstance();
     @Builder.Default
     private static final ParquetMetadataExtractor parquetMetadataExtractor =
             ParquetMetadataExtractor.getInstance();
@@ -67,6 +63,10 @@ public class ParquetStatsExtractor {
             new LinkedHashMap<ColumnDescriptor, ColStats>();
     private static long recordCount = 0;
     private final InputPartitionFields partitions;
+
+    public static ParquetStatsExtractor getInstance() {
+        return INSTANCE;
+    }
 
     public static void getColumnStatsForaFile(ParquetMetadata footer) {
         for (BlockMetaData blockMetaData : footer.getBlocks()) {
@@ -91,18 +91,24 @@ public class ParquetStatsExtractor {
         return partitions;
     }
 
-/*    private InternalDataFile toInternalDataFile(
-            Configuration hadoopConf, Path parentPath, Map<ColumnDescriptor, ColStats> stats) {
-        FileSystem fs = FileSystem.get(hadoopConf);
-        FileStatus file = fs.getFileStatus(new Path(parentPath));
-        InputPartitionFields partitionInfo = initPartitionInfo();
+    private InternalDataFile toInternalDataFile(
+            Configuration hadoopConf, Path parentPath, Map<ColumnDescriptor, ColumnStat> stats) throws java.io.IOException {
+        FileStatus file = null;
+        List<PartitionValue> partitionValues =null;
+        try {
+            FileSystem fs = FileSystem.get(hadoopConf);
+             file = fs.getFileStatus(parentPath);
+            InputPartitionFields partitionInfo = initPartitionInfo();
 
-        ParquetMetadata footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
-        MessageType schema = parquetMetadataExtractor.getSchema(footer);
-        InternalSchema internalSchema = schemaExtractor.toInternalSchema(schema);
-        List<PartitionValue> partitionValues = partitionExtractor.createPartitionValues(
-                partitionExtractor.extractPartitionValues(
-                        partitionInfo));
+            ParquetMetadata footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
+            MessageType schema = parquetMetadataExtractor.getSchema(footer);
+            InternalSchema internalSchema = schemaExtractor.toInternalSchema(schema, null, null);
+             partitionValues = partitionExtractor.createPartitionValues(
+                    partitionExtractor.extractPartitionValues(
+                            partitionInfo));
+        } catch (java.io.IOException e) {
+
+        }
         return InternalDataFile.builder()
                 .physicalPath(parentPath.toString())
                 .fileFormat(FileFormat.APACHE_PARQUET)
@@ -112,7 +118,7 @@ public class ParquetStatsExtractor {
                 .columnStats(stats.values().stream().collect(Collectors.toList()))
                 .lastModified(file.getModificationTime())
                 .build();
-    }*/
+    }
 
     private static class Stats {
         long min = Long.MAX_VALUE;
@@ -130,7 +136,7 @@ public class ParquetStatsExtractor {
 
         Stats valueCountStats = new Stats();
         Stats allStats = new Stats();
-        Stats uncStats = new Stats();
+        Stats uncompressedStats = new Stats();
         Set<Encoding> encodings = new TreeSet<Encoding>();
         Statistics colValuesStats = null;
         int blocks = 0;
@@ -139,7 +145,7 @@ public class ParquetStatsExtractor {
                 ColumnDescriptor desc,
                 long valueCount,
                 long size,
-                long uncSize,
+                long uncompressedSize,
                 Collection<Encoding> encodings,
                 Statistics colValuesStats) {
             ColStats colStats = stats.get(desc);
@@ -147,19 +153,19 @@ public class ParquetStatsExtractor {
                 colStats = new ColStats();
                 stats.put(desc, colStats);
             }
-            colStats.add(valueCount, size, uncSize, encodings, colValuesStats);
+            colStats.add(valueCount, size, uncompressedSize, encodings, colValuesStats);
         }
 
         public void add(
                 long valueCount,
                 long size,
-                long uncSize,
+                long uncompressedSize,
                 Collection<Encoding> encodings,
                 Statistics colValuesStats) {
             ++blocks;
             valueCountStats.add(valueCount);
             allStats.add(size);
-            uncStats.add(uncSize);
+            uncompressedStats.add(uncompressedSize);
             this.encodings.addAll(encodings);
             this.colValuesStats = colValuesStats;
         }

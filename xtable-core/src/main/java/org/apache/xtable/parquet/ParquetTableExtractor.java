@@ -18,44 +18,35 @@
  
 package org.apache.xtable.parquet;
 
-import java.time.Instant;
-import java.util.List;
-
 import lombok.Builder;
-import java.util.Set;
-import java.util.Map;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.schema.InternalPartitionField;
-import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.storage.DataLayoutStrategy;
-import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.config.InputPartitionFields;
-import org.apache.xtable.model.config.InputPartitionField;
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-import org.apache.parquet.schema.MessageType;
 
 /**
  * Extracts {@link InternalTable} canonical representation of a table at a point in time for Delta.
  */
 @Builder
 public class ParquetTableExtractor {
-  private static final InputPartitionFields partitions=null;
+  private static final InputPartitionFields partitions = null;
 
-  private static final ParquetTableExtractor INSTANCE =
-          new ParquetTableExtractor();
+  private static final ParquetTableExtractor INSTANCE = new ParquetTableExtractor();
+
   public static ParquetTableExtractor getInstance() {
     return INSTANCE;
   }
+
   @Builder.Default
   private static final ParquetTableExtractor tableExtractor = ParquetTableExtractor.getInstance();
-  private static final ParquetSchemaExtractor schemaExtractor = ParquetSchemaExtractor.getInstance();
 
+  private static final ParquetSchemaExtractor schemaExtractor =
+      ParquetSchemaExtractor.getInstance();
 
   @Builder.Default
   private static final ParquetPartitionValueExtractor partitionValueExtractor =
-          ParquetPartitionValueExtractor.getInstance();
+      ParquetPartitionValueExtractor.getInstance();
 
- /* @Builder.Default
+  /* @Builder.Default
   private static final ParquetConversionSource parquetConversionSource =
           ParquetConversionSource.getInstance();*/
 
@@ -63,10 +54,10 @@ public class ParquetTableExtractor {
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
-   private InputPartitionFields initPartitionInfo() {
+  private InputPartitionFields initPartitionInfo() {
     return partitions;
   }
- /* public String getBasePathFromLastModifiedTable(){
+  /* public String getBasePathFromLastModifiedTable(){
     InternalTable table = parquetConversionSource.getTable(-1L);
     return table.getBasePath();
   }*/

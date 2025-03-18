@@ -47,12 +47,12 @@
     </organization>
 
     <modules>
-        <module>xtable-api</module>
-        <module>xtable-hudi-support</module>
+  <!--      <module>xtable-api</module>
+        <module>xtable-hudi-support</module>-->
         <module>xtable-core</module>
-        <module>xtable-utilities</module>
-        <module>xtable-aws</module>
-        <module>xtable-hive-metastore</module>
+        <!--    <module>xtable-utilities</module>
+           <module>xtable-aws</module>
+          <module>xtable-hive-metastore</module>-->
     </modules>
 
     <properties>
@@ -828,7 +828,7 @@
                 <configuration>
                     <java>
                         <googleJavaFormat>
-                            <version>${google.java.format.version}</version>
+                            <version>1.19.2</version> <!--   ${google.java.format.version}  -->
                             <style>GOOGLE</style>
                             <groupArtifact>com.google.googlejavaformat:google-java-format</groupArtifact>
                         </googleJavaFormat>
