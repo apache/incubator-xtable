@@ -47,8 +47,8 @@
     </organization>
 
     <modules>
-  <!--      <module>xtable-api</module>
-        <module>xtable-hudi-support</module>-->
+       <module>xtable-api</module>
+        <!--     <module>xtable-hudi-support</module>-->
         <module>xtable-core</module>
         <!--    <module>xtable-utilities</module>
            <module>xtable-aws</module>

@@ -17,11 +17,13 @@
  */
  
 package org.apache.xtable.model.stat;
-
+import java.util.Set;
 import lombok.Builder;
 import lombok.Value;
 
 import org.apache.xtable.model.schema.InternalField;
+import org.apache.parquet.column.Encoding;
+import org.apache.parquet.column.statistics.Statistics;
 
 /**
  * Captures column level statistics for a field.
@@ -36,4 +38,7 @@ public class ColumnStat {
   long numNulls;
   long numValues;
   long totalSize;
+  long uncompressedSize;
+  Set<Encoding> encodings;
+  Statistics statistics;
 }

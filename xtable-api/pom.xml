@@ -29,6 +29,12 @@
     <name>XTable Project API</name>
 
     <dependencies>
+        <!-- https://mvnrepository.com/artifact/org.apache.parquet/parquet-column -->
+        <dependency>
+            <groupId>org.apache.parquet</groupId>
+            <artifactId>parquet-column</artifactId>
+            <version>1.13.0</version>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>

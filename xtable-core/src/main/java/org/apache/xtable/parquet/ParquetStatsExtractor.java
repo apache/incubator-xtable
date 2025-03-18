@@ -23,6 +23,7 @@ import org.apache.xtable.model.schema.InternalSchema;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -68,23 +69,25 @@ public class ParquetStatsExtractor {
         return INSTANCE;
     }
 
-    public static void getColumnStatsForaFile(ParquetMetadata footer) {
+    public static List<ColumnStat> getColumnStatsForaFile(ParquetMetadata footer) {
+        List<ColumnStat> colStat = new ArrayList<ColumnStat>();
         for (BlockMetaData blockMetaData : footer.getBlocks()) {
-
             MessageType schema = parquetMetadataExtractor.getSchema(footer);
             recordCount += blockMetaData.getRowCount();
             List<ColumnChunkMetaData> columns = blockMetaData.getColumns();
             for (ColumnChunkMetaData columnMetaData : columns) {
                 ColumnDescriptor desc = schema.getColumnDescription(columnMetaData.getPath().toArray());
-                ColStats.add(
-                        desc,
-                        columnMetaData.getValueCount(),
-                        columnMetaData.getTotalSize(),
-                        columnMetaData.getTotalUncompressedSize(),
-                        columnMetaData.getEncodings(),
-                        columnMetaData.getStatistics());
+                colStat.add(ColumnStat.builder()
+                        .numValues(columnMetaData.getValueCount())
+                        .totalSize(columnMetaData.getTotalSize())
+                        .uncompressedSize(columnMetaData.getTotalUncompressedSize())
+                        .encodings(columnMetaData.getEncodings())
+                        .statistics(columnMetaData.getStatistics())
+                        .build()
+                );
             }
         }
+        return colStat;
     }
 
     private InputPartitionFields initPartitionInfo() {

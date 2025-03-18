@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 package org.apache.xtable.parquet;
 
 import java.io.IOException;
@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.io.FileNotFoundException;
 
 import lombok.Builder;
 import lombok.NonNull;
@@ -38,136 +39,122 @@ import org.apache.xtable.model.config.InputPartitionFields;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.*;
+import org.apache.xtable.model.storage.FileFormat;
+import org.apache.xtable.model.stat.PartitionValue;
+import org.apache.hadoop.util.functional.RemoteIterators;
 
 @Builder
 // @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ParquetConversionSource { // implements ConversionSource<Long> {
 
-  private final InputPartitionFields partitions;
-
-  @Builder.Default
-  private static final ParquetSchemaExtractor schemaExtractor =
-      ParquetSchemaExtractor.getInstance();
-
-  /*private static final ParquetConversionSource INSTANCE = new ParquetConversionSource();
-  public static ParquetConversionSource getInstance() {
-      return INSTANCE;
-  }*/
+    @Builder.Default
+    private static final ParquetSchemaExtractor schemaExtractor =
+            ParquetSchemaExtractor.getInstance();
+    /*private static final ParquetConversionSource INSTANCE = new ParquetConversionSource();
+    public static ParquetConversionSource getInstance() {
+        return INSTANCE;
+    }*/
   /*    private static final ParquetSchemaConverter parquetSchemaConverter =
   ParquetSchemaConverter.getInstance();*/
-  @Builder.Default
-  private static final ParquetMetadataExtractor parquetMetadataExtractor =
-      ParquetMetadataExtractor.getInstance();
+    @Builder.Default
+    private static final ParquetMetadataExtractor parquetMetadataExtractor =
+            ParquetMetadataExtractor.getInstance();
+    @Builder.Default
+    private static final ParquetPartitionValueExtractor partitionValueExtractor =
+            ParquetPartitionValueExtractor.getInstance();
+    @Builder.Default
+    private static final ParquetStatsExtractor parquetStatsExtractor =
+            ParquetStatsExtractor.getInstance();
+    private final InputPartitionFields partitions;
+    private final String tableName;
+    private final String basePath;
+    // user config path of the parquet file (partitions)
+    private final String configPath;
+    @NonNull
+    private final Configuration hadoopConf;
 
-  @Builder.Default
-  private static final ParquetPartitionValueExtractor partitionValueExtractor =
-      ParquetPartitionValueExtractor.getInstance();
-
-  @Builder.Default
-  private static final ParquetStatsExtractor parquetStatsExtractor =
-      ParquetStatsExtractor.getInstance();
-
-  private final String tableName;
-  private final String basePath;
-  // user config path of the parquet file (partitions)
-  private final String configPath;
-  @NonNull private final Configuration hadoopConf;
-
-  private InputPartitionFields initPartitionInfo() {
-    // return parquetPartitionExtractor.getPartitionsFromUserConfiguration(configPath);
-    return partitions;
-  }
-
-  //    public Map<String, List<String>> getPartitionFromConfiguration() {
-  //        List<InputPartitionField> partitionFields = initPartitionInfo().getPartitions();
-  //        Map<String, List<String>> partitionsMap = new HashMap<>();
-  //        for (InputPartitionField partition : partitionFields) {
-  //            partitionsMap
-  //                    .computeIfAbsent(partition.getPartitionFieldName(), k -> new ArrayList<>())
-  //                    .addAll(partition.partitionFieldValues());
-  //        }
-  //        return partitionsMap;
-  //    }
-
-  /**
-   * To infer schema getting the latest file assumption is that latest file will have new fields
-   *
-   * @param modificationTime the commit to consider for reading the table state
-   * @return
-   */
-  // @Override
-  public InternalTable getTable(Long modificationTime) {
-
-    Optional<LocatedFileStatus> latestFile =
-        getParquetFiles(hadoopConf, basePath)
-            .max(Comparator.comparing(FileStatus::getModificationTime));
-
-    ParquetMetadata parquetMetadata =
-        parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.get().getPath());
-    // Schema tableSchema =
-    //        new
-    // org.apache.parquet.avro.AvroSchemaConverter().convert(parquetMetadataExtractor.getSchema(parquetMetadata));
-    //        Type tableSchema =
-    //
-    // parquetSchemaConverter.convert(parquetMetadataExtractor.getSchema(parquetMetadata));
-    MessageType tableSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
-
-    List<String> partitionKeys =
-        initPartitionInfo().getPartitions().stream()
-            .map(InputPartitionField::getPartitionFieldName)
-            .collect(Collectors.toList());
-
-    // merge schema of partition into original as partition is not part of parquet file
-    if (!partitionKeys.isEmpty()) {
-      // TODO compilation error
-      //   tableSchema = mergeParquetSchema(tableSchema, partitionKeys);
+    private InputPartitionFields initPartitionInfo() {
+        // return parquetPartitionExtractor.getPartitionsFromUserConfiguration(configPath);
+        return partitions;
     }
-    InternalSchema schema = schemaExtractor.toInternalSchema(tableSchema, null, null);
 
-    List<InternalPartitionField> partitionFields =
-        partitionKeys.isEmpty()
-            ? Collections.emptyList()
-            : partitionValueExtractor.getInternalPartitionFields(partitions);
-    DataLayoutStrategy dataLayoutStrategy =
-        partitionFields.isEmpty()
-            ? DataLayoutStrategy.FLAT
-            : DataLayoutStrategy.HIVE_STYLE_PARTITION;
-    return InternalTable.builder()
-        .tableFormat(TableFormat.PARQUET)
-        .basePath(basePath)
-        .name(tableName)
-        .layoutStrategy(dataLayoutStrategy)
-        .partitioningFields(partitionFields)
-        .readSchema(schema)
-        .latestCommitTime(Instant.ofEpochMilli(latestFile.get().getModificationTime()))
-        .build();
-  }
 
-  public List<InternalDataFile> getInternalDataFiles() {
-    List<InternalDataFile> internalDataFiles = null;
-    /* List<LocatedFileStatus> parquetFiles =
-            getParquetFiles(hadoopConf, basePath).collect(Collectors.toList());
-    List<PartitionValue> partitionValuesFromConfig = partitionValueExtractor.createPartitionValues(partitionValueExtractor.extractPartitionValues(partitions));
-            InternalTable table = getTable(-1L);
-    List<InternalDataFile> internalDataFiles =
-            parquetFiles.stream()
-                    .map(
-                            file ->
-                                    InternalDataFile.builder()
-                                            .physicalPath(file.getPath().toString())
-                                            .fileFormat(FileFormat.APACHE_PARQUET)
-                                            .fileSizeBytes(file.getLen())
-                                            .partitionValues(partitionValuesFromConfig)
-                                            .lastModified(file.getModificationTime())
-                                            .columnStats(
-                                                    parquetStatsExtractor
-                                                            .getColumnStatsForaFile(
-                                                                    parquetMetadataExtractor.readParquetMetadata(
-                                                                            hadoopConf, file.getPath()))
-                                                            .build())
-                                            .collect(Collectors.toList()));*/
-    return internalDataFiles;
-  }
+    /**
+     * To infer schema getting the latest file assumption is that latest file will have new fields
+     *
+     * @param modificationTime the commit to consider for reading the table state
+     * @return
+     */
+    // @Override
+    public InternalTable getTable(Long modificationTime) {
+
+        List<LocatedFileStatus> parquetFiles =
+                getParquetFiles(hadoopConf, basePath);
+        // TODO last file in terms of modifcation time instead
+        LocatedFileStatus latestFile = parquetFiles.get(parquetFiles.size()-1);
+
+                        //.max(Comparator.comparing(FileStatus::getModificationTime));
+
+        ParquetMetadata parquetMetadata =
+                parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.getPath());
+        MessageType tableSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
+
+        List<String> partitionKeys =
+                initPartitionInfo().getPartitions().stream()
+                        .map(InputPartitionField::getPartitionFieldName)
+                        .collect(Collectors.toList());
+
+        // merge schema of partition into original as partition is not part of parquet file
+        if (!partitionKeys.isEmpty()) {
+            // TODO compilation error
+            //   tableSchema = mergeParquetSchema(tableSchema, partitionKeys);
+        }
+        InternalSchema schema = schemaExtractor.toInternalSchema(tableSchema, null, null);
+
+        List<InternalPartitionField> partitionFields =
+                partitionKeys.isEmpty()
+                        ? Collections.emptyList()
+                        : partitionValueExtractor.getInternalPartitionFields(partitions);
+        DataLayoutStrategy dataLayoutStrategy =
+                partitionFields.isEmpty()
+                        ? DataLayoutStrategy.FLAT
+                        : DataLayoutStrategy.HIVE_STYLE_PARTITION;
+        return InternalTable.builder()
+                .tableFormat(TableFormat.PARQUET)
+                .basePath(basePath)
+                .name(tableName)
+                .layoutStrategy(dataLayoutStrategy)
+                .partitioningFields(partitionFields)
+                .readSchema(schema)
+                .latestCommitTime(Instant.ofEpochMilli(latestFile.getModificationTime()))
+                .build();
+    }
+
+    public List<InternalDataFile> getInternalDataFiles() {
+        List<InternalDataFile> internalDataFiles = null;
+        List<LocatedFileStatus> parquetFiles =
+                getParquetFiles(hadoopConf, basePath);
+        List<PartitionValue> partitionValuesFromConfig = partitionValueExtractor.createPartitionValues(partitionValueExtractor.extractPartitionValues(partitions));
+        InternalTable table = getTable(-1L);
+        internalDataFiles =
+                parquetFiles.stream()
+                        .map(
+                                file ->
+                                        InternalDataFile.builder()
+                                                .physicalPath(file.getPath().toString())
+                                                .fileFormat(FileFormat.APACHE_PARQUET)
+                                                .fileSizeBytes(file.getLen())
+                                                .partitionValues(partitionValuesFromConfig)
+                                                .lastModified(file.getModificationTime())
+                                                .columnStats(
+                                                        parquetStatsExtractor
+                                                                .getColumnStatsForaFile(
+                                                                        parquetMetadataExtractor.readParquetMetadata(
+                                                                                hadoopConf, file.getPath())))
+                                                .build())
+                                                .collect(Collectors.toList());
+        return internalDataFiles;
+    }
 
   /*
       @Override
@@ -176,20 +163,20 @@ public class ParquetConversionSource { // implements ConversionSource<Long> {
       }
   */
 
-  /**
-   * Here to get current snapshot listing all files hence the -1 is being passed
-   *
-   * @return
-   */
-  // @Override
-  public InternalSnapshot getCurrentSnapshot() {
+    /**
+     * Here to get current snapshot listing all files hence the -1 is being passed
+     *
+     * @return
+     */
+    // @Override
+    public InternalSnapshot getCurrentSnapshot() {
     /*List<InternalDataFile> internalDataFiles = getInternalDataFiles();
     return InternalSnapshot.builder()
             .table(table)
             .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
             .build();*/
-    return null;
-  }
+        return null;
+    }
 
   /* private Schema mergeAvroSchema(Schema internalSchema, Set<String> parititonFields) {
 
@@ -224,49 +211,21 @@ public class ParquetConversionSource { // implements ConversionSource<Long> {
 
       return fieldsToMerge;
   }*/
-
-  public Stream<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
-    try {
-      FileSystem fs = FileSystem.get(hadoopConf);
-      RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(basePath), true);
-      return null;
-      // remoteIteratorToStream(iterator)
-      //      .filter(file -> file.getPath().getName().endsWith("parquet"));
-    } catch (IOException e) { // | FileNotFoundException e
-      throw new RuntimeException(e);
-    }
-  }
-
-  public Map<String, List<String>> getPartitionFromDirectoryStructure(
-      Configuration hadoopConf, String basePath, Map<String, List<String>> partitionMap) {
-
-    try {
-      FileSystem fs = FileSystem.get(hadoopConf);
-      FileStatus[] baseFileStatus = fs.listStatus(new Path(basePath));
-      Map<String, List<String>> currentPartitionMap = new HashMap<>(partitionMap);
-
-      for (FileStatus dirStatus : baseFileStatus) {
-        if (dirStatus.isDirectory()) {
-          String partitionPath = dirStatus.getPath().getName();
-          if (partitionPath.contains("=")) {
-            String[] partitionKeyValue = partitionPath.split("=");
-            currentPartitionMap
-                .computeIfAbsent(partitionKeyValue[0], k -> new ArrayList<>())
-                .add(partitionKeyValue[1]);
-            getPartitionFromDirectoryStructure(
-                hadoopConf, dirStatus.getPath().toString(), partitionMap);
-          }
+    // was returning Stream<LocatedFileStatus>
+    public List<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
+        try {
+            FileSystem fs = FileSystem.get(hadoopConf);
+            RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(basePath), true);
+            return RemoteIterators.toList(iterator).stream()
+                    .filter(file -> file.getPath().getName().endsWith("parquet"))
+                    .collect(Collectors.toList());
+        } catch (IOException e) { //
+            throw new RuntimeException(e);
         }
-      }
-      return currentPartitionMap;
-
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
-  }
 
-  // @Override
-  public boolean isIncrementalSyncSafeFrom(Instant instant) {
-    return false;
-  }
+    // @Override
+    public boolean isIncrementalSyncSafeFrom(Instant instant) {
+        return false;
+    }
 }
