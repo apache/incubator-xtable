@@ -105,6 +105,7 @@ public class ParquetStatsExtractor {
 
             ParquetMetadata footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
             MessageType schema = parquetMetadataExtractor.getSchema(footer);
+
             InternalSchema internalSchema = schemaExtractor.toInternalSchema(schema, null, null);
              partitionValues = partitionExtractor.createPartitionValues(
                     partitionExtractor.extractPartitionValues(

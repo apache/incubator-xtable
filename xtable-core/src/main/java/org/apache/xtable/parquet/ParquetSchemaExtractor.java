@@ -21,21 +21,32 @@ package org.apache.xtable.parquet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
+import java.util.ArrayList;
+
+import org.apache.xtable.schema.SchemaUtils;
+
+import java.util.Collections;
 import java.util.Optional;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import java.util.Collections;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import org.apache.xtable.hudi.idtracking.models.IdMapping;
 import org.apache.avro.Schema;
 import org.apache.parquet.schema.GroupType;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Type;
-
+import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.UnsupportedSchemaTypeException;
 import org.apache.xtable.hudi.idtracking.models.IdMapping;
 import org.apache.xtable.model.schema.InternalField;
+import org.apache.parquet.schema.Type.Repetition;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 //import org.apache.parquet.avro.AvroSchemaConverter;
@@ -69,22 +80,28 @@ public class ParquetSchemaExtractor {
         return INSTANCE;
     }
 
-/*    private static LogicalTypeAnnotation finalizeSchema(LogicalTypeAnnotation targetSchema, InternalSchema inputSchema) {
-        if (inputSchema.isNullable()) {
-            return targetSchema.union(null); // LogicalTypeAnnotation.unknownType()
-        }
-        return targetSchema;
-    }*/
-
     private static boolean groupTypeContainsNull(GroupType schema) {
         for (Type field : schema.getFields()) {
-            if (field == null) {
+            if (field.getLogicalTypeAnnotation().toOriginalType() == null) {
                 return true;
             }
         }
         return false;
     }
 
+    /*    private static LogicalTypeAnnotation finalizeSchema(LogicalTypeAnnotation targetSchema, InternalSchema inputSchema) {
+            if (inputSchema.isNullable()) {
+                return targetSchema.union(null); // LogicalTypeAnnotation.unknownType()
+            }
+            return targetSchema;
+        }*/
+    private Map<String, IdMapping> getChildIdMap(IdMapping idMapping) {
+        if (idMapping == null) {
+            return Collections.emptyMap();
+        }
+        return idMapping.getFields().stream()
+                .collect(Collectors.toMap(IdMapping::getName, Function.identity()));
+    }
 
     /**
      * Converts the parquet {@link Schema} to {@link InternalSchema}.
@@ -212,12 +229,37 @@ public class ParquetSchemaExtractor {
                     throw new UnsupportedSchemaTypeException(
                             String.format("Unsupported schema type %s", schema));
             }
-        } /*else {
-          //GroupTypes
-          typeName = schema.asGroupType();
-          switch (typeName.getOriginalType()) {
-              case LIST:
-                  IdMapping elementMapping = fieldNameToIdMapping.get(ELEMENT);
+        } else {
+            //GroupTypes
+            //typeName = schema.asGroupType();
+            switch (schema.getOriginalType()) {
+                case LIST://or LIST?
+                    List<InternalField> subFields = new ArrayList<>(schema.getFields().size());
+                    for (Type parquetField : schema.getFields()) {
+                        IdMapping idMapping = fieldNameToIdMapping.get(parquetField.getName());
+                        InternalSchema subFieldSchema =
+                                toInternalSchema(
+                                        new MessageType(parquetField.getName(), parquetField),
+                                        SchemaUtils.getFullyQualifiedPath(parentPath, parquetField.getName()),
+                                        getChildIdMap(idMapping));
+                        //Object defaultValue = getDefaultValue(parquetField);
+                        subFields.add(
+                                InternalField.builder()
+                                        .parentPath(parentPath)
+                                        .name(parquetField.getName())
+                                        .schema(subFieldSchema)
+                                        //.defaultValue(defaultValue)
+                                        .fieldId(idMapping == null ? null : idMapping.getId())
+                                        .build());
+                    }
+                    return InternalSchema.builder()
+                            .name(schema.getName())
+                            //.comment(schema.getDoc())
+                            .dataType(InternalType.RECORD)
+                            .fields(subFields)
+                            .isNullable(groupTypeContainsNull(schema))
+                            .build();
+              /*    IdMapping elementMapping = fieldNameToIdMapping.get(ELEMENT);
                   InternalSchema elementSchema =
                           toInternalSchema(
                                   schema.getName(),
@@ -238,8 +280,8 @@ public class ParquetSchemaExtractor {
                           .isNullable(groupTypeContainsNull(schema))
                           .fields(Collections.singletonList(elementField))
                           .build();
-
-              case MAP:
+*/
+              /*case MAP:
                   IdMapping keyMapping = fieldNameToIdMapping.get(KEY);
                   IdMapping valueMapping = fieldNameToIdMapping.get(VALUE);
                   InternalSchema valueSchema =
@@ -267,18 +309,18 @@ public class ParquetSchemaExtractor {
                                                   .fieldId(keyMapping == null ? null : keyMapping.getId())
                                                   .build(),
                                           valueField))
-                          .build();
-              default:
-                  throw new UnsupportedSchemaTypeException(
-                          String.format("Unsupported schema type %s", schema));
-          }
-      }*/
+                          .build();*/
+                default:
+                    throw new UnsupportedSchemaTypeException(
+                            String.format("Unsupported schema type %s", schema));
+            }
+        }
         newDataType = null;
         return InternalSchema.builder()
                 .name(schema.getName())
                 .dataType(newDataType)
                 .comment(null)
-                .isNullable(false) // to check
+                .isNullable(groupTypeContainsNull(schema)) // to check
                 .metadata(metadata.isEmpty() ? null : metadata)
                 .build();
     }
@@ -315,32 +357,43 @@ public class ParquetSchemaExtractor {
                 return LogicalTypeAnnotation.decimalType(scale, precision);
             case ENUM:
                 return new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createEnum(
-                                internalSchema.getName(),
-                                internalSchema.getComment(),
-                                null,
-                                (List<String>)
-                                        internalSchema.getMetadata().get(InternalSchema.MetadataKey.ENUM_VALUES),
-                                null)).getLogicalTypeAnnotation();
+                        internalSchema.getName(),
+                        internalSchema.getComment(),
+                        null,
+                        (List<String>)
+                                internalSchema.getMetadata().get(InternalSchema.MetadataKey.ENUM_VALUES),
+                        null)).getLogicalTypeAnnotation();
             case DATE:
                 return LogicalTypeAnnotation.dateType();
             case TIMESTAMP:
                 if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION) == InternalSchema.MetadataValue.MICROS) {
                     return LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.MICROS);
                 }
-                if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)== InternalSchema.MetadataValue.MILLIS) {
+                if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION) == InternalSchema.MetadataValue.MILLIS) {
                     return LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.MILLIS);
-                } else if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)== InternalSchema.MetadataValue.NANOS) {
+                } else if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION) == InternalSchema.MetadataValue.NANOS) {
                     return LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.NANOS);
                 }
             case TIMESTAMP_NTZ:
-                if(internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+                if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
                         == InternalSchema.MetadataValue.MICROS) {
                     return LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.MICROS);
 
                 } else {
-                    return  LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.MILLIS);
+                    return LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.MILLIS);
 
                 }
+            case RECORD:
+                List<LogicalTypeAnnotation> fields =
+                        internalSchema.getFields().stream()
+                                .map(
+                                        field ->
+                                                LogicalTypeAnnotation.fromOriginalType(
+                                                        fromInternalSchema(
+                                                                field.getSchema(),
+                                                                SchemaUtils.getFullyQualifiedPath(field.getName(), currentPath)).toOriginalType(),null
+                                                        ))
+                                .collect(CustomCollectors.toList(internalSchema.getFields().size()));
             default:
                 throw new UnsupportedSchemaTypeException("Encountered unhandled type during InternalSchema to parquet conversion:" + internalSchema.getDataType());
         }
