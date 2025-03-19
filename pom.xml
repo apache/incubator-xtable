@@ -319,6 +319,7 @@
                 <version>2.10.0</version>
             </dependency>
 
+
             <!-- https://mvnrepository.com/artifact/org.apache.parquet/parquet-hadoop -->
             <dependency>
                 <groupId>org.apache.parquet</groupId>

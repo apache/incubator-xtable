@@ -314,13 +314,13 @@ public class ParquetSchemaExtractor {
                                 internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
                 return LogicalTypeAnnotation.decimalType(scale, precision);
             case ENUM:
-               /* return AvroSchemaConverter().convert(Schema.createEnum(
+                return new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createEnum(
                                 internalSchema.getName(),
                                 internalSchema.getComment(),
                                 null,
                                 (List<String>)
                                         internalSchema.getMetadata().get(InternalSchema.MetadataKey.ENUM_VALUES),
-                                null));*/
+                                null)).getLogicalTypeAnnotation();
             case DATE:
                 return LogicalTypeAnnotation.dateType();
             case TIMESTAMP:
