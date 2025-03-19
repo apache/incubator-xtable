@@ -30,7 +30,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import org.apache.xtable.iceberg.IcebergCatalogConfig;
+import org.apache.xtable.conversion.CatalogConfig;
 import org.apache.xtable.utilities.RunSync.DatasetConfig;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
@@ -185,7 +185,7 @@ class TestRunSync {
             + "catalogOptions: \n"
             + "  option1: value1\n"
             + "  option2: value2";
-    IcebergCatalogConfig catalogConfig = RunSync.loadIcebergCatalogConfig(icebergConfig.getBytes());
+    CatalogConfig catalogConfig = RunSync.loadIcebergCatalogConfig(icebergConfig.getBytes());
     Assertions.assertEquals("org.apache.xtable.CatalogImpl", catalogConfig.getCatalogImpl());
     Assertions.assertEquals("test", catalogConfig.getCatalogName());
     Assertions.assertEquals(2, catalogConfig.getCatalogOptions().size());

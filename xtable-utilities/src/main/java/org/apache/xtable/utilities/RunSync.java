@@ -25,16 +25,12 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Properties;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import lombok.NonNull;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NonNull;
 import lombok.Value;
 import lombok.extern.jackson.Jacksonized;
 import lombok.extern.log4j.Log4j2;
@@ -53,6 +49,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.annotations.VisibleForTesting;
 
+import org.apache.xtable.conversion.CatalogConfig;
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
@@ -118,9 +115,9 @@ public class RunSync {
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   static SourceTable sourceTableBuilder(
-          @NonNull DatasetConfig.Table table,
-      IcebergCatalogConfig icebergCatalogConfig,
-          @NonNull DatasetConfig datasetConfig,
+      @NonNull DatasetConfig.Table table,
+      CatalogConfig catalogConfig,
+      @NonNull DatasetConfig datasetConfig,
       Properties sourceProperties) {
     SourceTable sourceTable =
         SourceTable.builder()
@@ -128,7 +125,7 @@ public class RunSync {
             .basePath(table.getTableBasePath())
             .namespace(table.getNamespace() == null ? null : table.getNamespace().split("\\."))
             .dataPath(table.getTableDataPath())
-            .catalogConfig(icebergCatalogConfig)
+            .catalogConfig(catalogConfig)
             .additionalProperties(sourceProperties)
             .formatName(datasetConfig.sourceFormat)
             .build();
@@ -136,9 +133,9 @@ public class RunSync {
   }
 
   static List<TargetTable> targetTableBuilder(
-          @NonNull DatasetConfig.Table table,
-          IcebergCatalogConfig icebergCatalogConfig,
-          @NonNull List<String> tableFormatList) {
+      @NonNull DatasetConfig.Table table,
+      CatalogConfig catalogConfig,
+      @NonNull List<String> tableFormatList) {
     List<TargetTable> targetTables =
         tableFormatList.stream()
             .map(
@@ -148,7 +145,7 @@ public class RunSync {
                         .basePath(table.getTableBasePath())
                         .namespace(
                             table.getNamespace() == null ? null : table.getNamespace().split("\\."))
-                        .catalogConfig(icebergCatalogConfig)
+                        .catalogConfig(catalogConfig)
                         .formatName(tableFormat)
                         .build())
             .collect(Collectors.toList());
@@ -158,7 +155,7 @@ public class RunSync {
   static void syncTableMetdata(
       DatasetConfig datasetConfig,
       List<String> tableFormatList,
-      IcebergCatalogConfig icebergCatalogConfig,
+      CatalogConfig catalogConfig,
       Configuration hadoopConf,
       ConversionSourceProvider conversionSourceProvider) {
     ConversionController conversionController = new ConversionController(hadoopConf);
@@ -174,9 +171,8 @@ public class RunSync {
       }
 
       SourceTable sourceTable =
-          sourceTableBuilder(table, icebergCatalogConfig, datasetConfig, sourceProperties);
-      List<TargetTable> targetTables =
-          targetTableBuilder(table, icebergCatalogConfig, tableFormatList);
+          sourceTableBuilder(table, catalogConfig, datasetConfig, sourceProperties);
+      List<TargetTable> targetTables = targetTableBuilder(table, catalogConfig, tableFormatList);
       ConversionConfig conversionConfig =
           ConversionConfig.builder()
               .sourceTable(sourceTable)
@@ -197,7 +193,8 @@ public class RunSync {
                  Files.newInputStream(Paths.get(datasetConfigPath))) {
       return YAML_MAPPER.readValue(inputStream, DatasetConfig.class);
     }
-}
+  }
+
   static Configuration gethadoopConf(String hadoopConfigPath) throws IOException {
     // Load configurations
     byte[] customConfig = getCustomConfigurations(hadoopConfigPath);
@@ -205,12 +202,11 @@ public class RunSync {
     return hadoopConf;
   }
 
-  static IcebergCatalogConfig getIcebergCatalogConfig(String icebergCatalogConfigPath)
-      throws IOException {
+  static CatalogConfig getIcebergCatalogConfig(String icebergCatalogConfigPath) throws IOException {
     // Load configurations
     byte[] icebergCatalogConfigInput = getCustomConfigurations(icebergCatalogConfigPath);
-    IcebergCatalogConfig icebergCatalogConfig = loadIcebergCatalogConfig(icebergCatalogConfigInput);
-    return icebergCatalogConfig;
+    CatalogConfig catalogConfig = loadIcebergCatalogConfig(icebergCatalogConfigInput);
+    return catalogConfig;
   }
 
   static ConversionSourceProvider<?> getConversionSourceProvider(
@@ -265,13 +261,13 @@ public class RunSync {
     String hadoopConfigpath = getValueFromConfig(cmd, HADOOP_CONFIG_PATH);
     String conversionProviderConfigpath = getValueFromConfig(cmd, CONVERTERS_CONFIG_PATH);
     DatasetConfig datasetConfig = getDatasetConfig(datasetConfigpath);
-    IcebergCatalogConfig icebergCatalogConfig = getIcebergCatalogConfig(icebergCatalogConfigpath);
+    CatalogConfig catalogConfig = getIcebergCatalogConfig(icebergCatalogConfigpath);
     Configuration hadoopConf = gethadoopConf(hadoopConfigpath);
     ConversionSourceProvider conversionSourceProvider =
         getConversionSourceProvider(conversionProviderConfigpath, datasetConfig, hadoopConf);
     List<String> tableFormatList = datasetConfig.getTargetFormats();
     syncTableMetdata(
-        datasetConfig, tableFormatList, icebergCatalogConfig, hadoopConf, conversionSourceProvider);
+        datasetConfig, tableFormatList, catalogConfig, hadoopConf, conversionSourceProvider);
   }
 
   static byte[] getCustomConfigurations(String Configpath) throws IOException {
@@ -315,7 +311,7 @@ public class RunSync {
   }
 
   @VisibleForTesting
-  static IcebergCatalogConfig loadIcebergCatalogConfig(byte[] customConfigs) throws IOException {
+  static CatalogConfig loadIcebergCatalogConfig(byte[] customConfigs) throws IOException {
     return customConfigs == null
         ? null
         : YAML_MAPPER.readValue(customConfigs, IcebergCatalogConfig.class);
