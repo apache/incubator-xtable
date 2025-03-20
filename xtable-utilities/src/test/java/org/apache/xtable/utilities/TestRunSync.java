@@ -22,6 +22,7 @@ import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 
@@ -29,12 +30,54 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import org.apache.xtable.iceberg.IcebergCatalogConfig;
+import org.apache.xtable.conversion.CatalogConfig;
+import org.apache.xtable.utilities.RunSync.DatasetConfig;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
 
 class TestRunSync {
 
+  @Test
+  public void testMain() {
+    String projectRoot = System.getProperty("user.dir");
+    // Construct the path to the file in the root directory
+    int lastSlashIndex = projectRoot.lastIndexOf('/');
+    String result = projectRoot.substring(0, lastSlashIndex);
+    File file = new File(result, "/my_config.yaml");
+    String filePath = file.getPath();
+    String[] args = new String[] {"--datasetConfig", filePath};
+    //      RunSync.main(args);
+    Assertions.assertDoesNotThrow(
+        () -> RunSync.main(args), "RunSync.main() threw an unexpected exception.");
+  }
+
+  @Test
+  public void testGetDatasetConfigWithNonExistentFile() {
+    String projectRoot = System.getProperty("user.dir");
+    // Construct the path to the file in the root directory
+    int lastSlashIndex = projectRoot.lastIndexOf('/');
+    String result = projectRoot.substring(0, lastSlashIndex);
+    File file = new File(result, "/my_config1.yaml");
+    String filePath = file.getPath();
+    Assertions.assertThrows(
+        IOException.class,
+        () -> {
+          RunSync.getDatasetConfig(filePath);
+        });
+  }
+
+  @Test
+  public void testGetDatasetConfigWithValidYAML() throws IOException {
+    String projectRoot = System.getProperty("user.dir");
+    // Construct the path to the file in the root directory
+    int lastSlashIndex = projectRoot.lastIndexOf('/');
+    String result = projectRoot.substring(0, lastSlashIndex);
+    File file = new File(result, "/my_config.yaml");
+    String filePath = file.getPath();
+    DatasetConfig config = RunSync.getDatasetConfig(filePath);
+    // Assert
+    Assertions.assertNotNull(config);
+  }
   /** Tests that the default hadoop configs are loaded. */
   @Test
   public void testLoadDefaultHadoopConfig() {
@@ -142,7 +185,7 @@ class TestRunSync {
             + "catalogOptions: \n"
             + "  option1: value1\n"
             + "  option2: value2";
-    IcebergCatalogConfig catalogConfig = RunSync.loadIcebergCatalogConfig(icebergConfig.getBytes());
+    CatalogConfig catalogConfig = RunSync.loadIcebergCatalogConfig(icebergConfig.getBytes());
     Assertions.assertEquals("org.apache.xtable.CatalogImpl", catalogConfig.getCatalogImpl());
     Assertions.assertEquals("test", catalogConfig.getCatalogName());
     Assertions.assertEquals(2, catalogConfig.getCatalogOptions().size());
