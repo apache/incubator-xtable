@@ -24,8 +24,8 @@ import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 
 /** A concrete implementation of {@link ConversionSourceProvider} for Delta Lake table format. */
-public class ParquetConversionSourceProvider { // extends ConversionSourceProvider<Long> {
-  // @Override
+public class ParquetConversionSourceProvider  extends ConversionSourceProvider<Long> {
+  @Override
   public ParquetConversionSource getConversionSourceInstance(SourceTable sourceTable) {
 
     return ParquetConversionSource.builder()

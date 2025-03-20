@@ -222,9 +222,9 @@ public class ParquetSchemaExtractor {
                 case BOOLEAN:
                     newDataType = InternalType.BOOLEAN;
                     break;
-          /* case UNKNOWN:
-          newDataType = InternalType.NULL;
-          break;*/
+             /*   case UNKNOWN:
+                    newDataType = InternalType.NULL;
+                    break;*/
                 default:
                     throw new UnsupportedSchemaTypeException(
                             String.format("Unsupported schema type %s", schema));
@@ -233,7 +233,7 @@ public class ParquetSchemaExtractor {
             //GroupTypes
             //typeName = schema.asGroupType();
             switch (schema.getOriginalType()) {
-                case LIST://or LIST?
+                case LIST:
                     List<InternalField> subFields = new ArrayList<>(schema.getFields().size());
                     for (Type parquetField : schema.getFields()) {
                         IdMapping idMapping = fieldNameToIdMapping.get(parquetField.getName());
@@ -259,28 +259,6 @@ public class ParquetSchemaExtractor {
                             .fields(subFields)
                             .isNullable(groupTypeContainsNull(schema))
                             .build();
-              /*    IdMapping elementMapping = fieldNameToIdMapping.get(ELEMENT);
-                  InternalSchema elementSchema =
-                          toInternalSchema(
-                                  schema.getName(),
-                                  SchemaUtils.getFullyQualifiedPath(
-                                          parentPath, InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME),
-                                  getChildIdMap(elementMapping));
-                  InternalField elementField =
-                          InternalField.builder()
-                                  .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                  .parentPath(parentPath)
-                                  .schema(elementSchema)
-                                  .fieldId(elementMapping == null ? null : elementMapping.getId())
-                                  .build();
-                  return InternalSchema.builder()
-                          .name(schema.getName())
-                          .dataType(InternalType.LIST)
-                          .comment(schema.toString())
-                          .isNullable(groupTypeContainsNull(schema))
-                          .fields(Collections.singletonList(elementField))
-                          .build();
-*/
               /*case MAP:
                   IdMapping keyMapping = fieldNameToIdMapping.get(KEY);
                   IdMapping valueMapping = fieldNameToIdMapping.get(VALUE);
@@ -338,9 +316,9 @@ public class ParquetSchemaExtractor {
     private LogicalTypeAnnotation fromInternalSchema(InternalSchema internalSchema, String currentPath) {
         switch (internalSchema.getDataType()) {
               /*case BYTES:
-                  return finalizeSchema(Schema.create(Schema.Type.BYTES), internalSchema);
-              case BOOLEAN:
-                  return finalizeSchema(Schema.create(Schema.Type.BOOLEAN), internalSchema);*/
+                  return finalizeSchema(Schema.create(Schema.Type.BYTES), internalSchema);*/
+            case BOOLEAN:
+                return LogicalTypeAnnotation.intType(8, false);
             case INT:
                 return LogicalTypeAnnotation.intType(32, false);
             case LONG:
@@ -386,13 +364,14 @@ public class ParquetSchemaExtractor {
             case RECORD:
                 List<LogicalTypeAnnotation> fields =
                         internalSchema.getFields().stream()
+                                // TODO check if field is decimal then its metadata should be not null (below)
                                 .map(
                                         field ->
                                                 LogicalTypeAnnotation.fromOriginalType(
                                                         fromInternalSchema(
                                                                 field.getSchema(),
-                                                                SchemaUtils.getFullyQualifiedPath(field.getName(), currentPath)).toOriginalType(),null
-                                                        ))
+                                                                SchemaUtils.getFullyQualifiedPath(field.getName(), currentPath)).toOriginalType(), null
+                                                ))
                                 .collect(CustomCollectors.toList(internalSchema.getFields().size()));
             default:
                 throw new UnsupportedSchemaTypeException("Encountered unhandled type during InternalSchema to parquet conversion:" + internalSchema.getDataType());

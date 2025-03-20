@@ -24,15 +24,16 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.io.FileNotFoundException;
-
+import org.apache.xtable.model.CommitsBacklog;
 import lombok.Builder;
 import lombok.NonNull;
+import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
-
+import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.*;
 import org.apache.xtable.model.config.InputPartitionField;
 import org.apache.xtable.model.config.InputPartitionFields;
@@ -42,11 +43,12 @@ import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.hadoop.util.functional.RemoteIterators;
+import org.apache.xtable.spi.extractor.ConversionSource;
+import org.apache.parquet.format.FileMetaData;
 
 @Builder
 // @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class ParquetConversionSource { // implements ConversionSource<Long> {
-
+public class ParquetConversionSource  implements ConversionSource<Long> {
     @Builder.Default
     private static final ParquetSchemaExtractor schemaExtractor =
             ParquetSchemaExtractor.getInstance();
@@ -85,7 +87,7 @@ public class ParquetConversionSource { // implements ConversionSource<Long> {
      * @param modificationTime the commit to consider for reading the table state
      * @return
      */
-    // @Override
+    @Override
     public InternalTable getTable(Long modificationTime) {
 
         List<LocatedFileStatus> parquetFiles =
@@ -156,26 +158,34 @@ public class ParquetConversionSource { // implements ConversionSource<Long> {
         return internalDataFiles;
     }
 
-  /*
+      // since we are considering files instead of tables in parquet
       @Override
-      public CommitsBacklog<long> getCommitsBacklog(){
-
+      public CommitsBacklog<java.lang.Long> getCommitsBacklog(InstantsForIncrementalSync lastSyncInstant){
+          long epochMilli = lastSyncInstant.getLastSyncInstant().toEpochMilli();
+          return null;
       }
-  */
+    @Override
+    public TableChange getTableChangeForCommit(java.lang.Long commit){
+        return null;
+    }
+     @Override
+     public InternalTable getCurrentTable(){
+        return null;
+     };
 
     /**
      * Here to get current snapshot listing all files hence the -1 is being passed
      *
      * @return
      */
-    // @Override
+    @Override
     public InternalSnapshot getCurrentSnapshot() {
-    /*List<InternalDataFile> internalDataFiles = getInternalDataFiles();
+    List<InternalDataFile> internalDataFiles = getInternalDataFiles();
+    InternalTable table = getTable(-1L);
     return InternalSnapshot.builder()
             .table(table)
             .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
-            .build();*/
-        return null;
+            .build();
     }
 
   /* private Schema mergeAvroSchema(Schema internalSchema, Set<String> parititonFields) {
@@ -224,8 +234,12 @@ public class ParquetConversionSource { // implements ConversionSource<Long> {
         }
     }
 
-    // @Override
+    @Override
     public boolean isIncrementalSyncSafeFrom(Instant instant) {
         return false;
+    }
+    @Override
+    public void close() {
+
     }
 }
