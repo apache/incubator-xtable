@@ -26,6 +26,9 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import lombok.Builder;
@@ -189,8 +192,7 @@ public class RunSync {
 
   static DatasetConfig getDatasetConfig(String datasetConfigPath) throws IOException {
     // Initialize DatasetConfig
-    try (InputStream inputStream =
-                 Files.newInputStream(Paths.get(datasetConfigPath))) {
+    try (InputStream inputStream = Files.newInputStream(Paths.get(datasetConfigPath))) {
       return YAML_MAPPER.readValue(inputStream, DatasetConfig.class);
     }
   }
@@ -231,7 +233,11 @@ public class RunSync {
     return conversionSourceProvider;
   }
 
-  static CommandLine commandParser(String[] args) {
+  static String getValueFromConfig(CommandLine cmd, String configFlag) {
+    return cmd.getOptionValue(configFlag);
+  }
+
+  public static void main(String[] args) throws IOException {
     CommandLineParser parser = new DefaultParser();
 
     CommandLine cmd;
@@ -239,23 +245,45 @@ public class RunSync {
       cmd = parser.parse(OPTIONS, args);
     } catch (ParseException e) {
       new HelpFormatter().printHelp("xtable.jar", OPTIONS, true);
-      return null;
+      return;
     }
 
     if (cmd.hasOption(HELP_OPTION)) {
       HelpFormatter formatter = new HelpFormatter();
       formatter.printHelp("RunSync", OPTIONS);
-      return null;
+      return;
     }
-    return cmd;
+
+    if (cmd.hasOption(CONTINUOUS_MODE)) {
+      ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
+      long intervalInSeconds = Long.parseLong(cmd.getOptionValue(CONTINUOUS_MODE_INTERVAL, "5"));
+      executorService.scheduleAtFixedRate(
+          () -> {
+            try {
+              runSync(cmd);
+            } catch (IOException ex) {
+              log.error("Sync operation failed", ex);
+            }
+          },
+          0,
+          intervalInSeconds,
+          TimeUnit.SECONDS);
+      while (!Thread.currentThread().isInterrupted()) {
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException ex) {
+          log.debug("Received interrupt signal");
+          Thread.currentThread().interrupt();
+          break;
+        }
+      }
+      executorService.shutdownNow();
+    } else {
+      runSync(cmd);
+    }
   }
 
-  static String getValueFromConfig(CommandLine cmd, String configFlag) {
-    return cmd.getOptionValue(configFlag);
-  }
-
-  public static void main(String[] args) throws IOException {
-    CommandLine cmd = commandParser(args);
+  private static void runSync(CommandLine cmd) throws IOException {
     String datasetConfigpath = getValueFromConfig(cmd, DATASET_CONFIG_OPTION);
     String icebergCatalogConfigpath = getValueFromConfig(cmd, ICEBERG_CATALOG_CONFIG_PATH);
     String hadoopConfigpath = getValueFromConfig(cmd, HADOOP_CONFIG_PATH);
