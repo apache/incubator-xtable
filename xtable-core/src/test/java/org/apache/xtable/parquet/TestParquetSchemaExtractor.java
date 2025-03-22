@@ -22,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
 import org.apache.parquet.schema.*;
 import org.junit.jupiter.api.Assertions;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 
 // Test class added ONLY to cover main() invocation not covered by application tests.
 public class TestParquetSchemaExtractor {

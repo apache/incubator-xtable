@@ -25,12 +25,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.TreeSet;
 
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.stat.Range;
 import lombok.Builder;
 import lombok.Value;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -70,24 +72,29 @@ public class ParquetStatsExtractor {
     }
 
     public static List<ColumnStat> getColumnStatsForaFile(ParquetMetadata footer) {
+        return getStatsForaFile(footer).values().stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
+    }
+
+
+    public static Map<ColumnDescriptor, List<ColumnStat>> getStatsForaFile(ParquetMetadata footer) {
         List<ColumnStat> colStat = new ArrayList<ColumnStat>();
+        Map<ColumnDescriptor, List<ColumnStat>> columnDescStats = new HashMap<>();
         for (BlockMetaData blockMetaData : footer.getBlocks()) {
             MessageType schema = parquetMetadataExtractor.getSchema(footer);
-            recordCount += blockMetaData.getRowCount();
             List<ColumnChunkMetaData> columns = blockMetaData.getColumns();
-            for (ColumnChunkMetaData columnMetaData : columns) {
-                ColumnDescriptor desc = schema.getColumnDescription(columnMetaData.getPath().toArray());
-                colStat.add(ColumnStat.builder()
-                        .numValues(columnMetaData.getValueCount())
-                        .totalSize(columnMetaData.getTotalSize())
-                        .uncompressedSize(columnMetaData.getTotalUncompressedSize())
-                        .encodings(columnMetaData.getEncodings())
-                        .statistics(columnMetaData.getStatistics())
-                        .build()
-                );
-            }
+            columnDescStats =
+                    columns
+                            .stream()
+                            .collect(Collectors.groupingBy(columnMetaData -> schema.getColumnDescription(columnMetaData.getPath().toArray()),
+                                    Collectors.mapping(columnMetaData ->ColumnStat.builder()
+                                            .numValues(columnMetaData.getValueCount())
+                                            .totalSize(columnMetaData.getTotalSize())
+                                            .range(Range.vector(columnMetaData.getStatistics().genericGetMin(), columnMetaData.getStatistics().genericGetMax()))
+                                            .build(), Collectors.toList())));
         }
-        return colStat;
+        return columnDescStats;
     }
 
     private InputPartitionFields initPartitionInfo() {
@@ -97,17 +104,17 @@ public class ParquetStatsExtractor {
     private InternalDataFile toInternalDataFile(
             Configuration hadoopConf, Path parentPath, Map<ColumnDescriptor, ColumnStat> stats) throws java.io.IOException {
         FileStatus file = null;
-        List<PartitionValue> partitionValues =null;
+        List<PartitionValue> partitionValues = null;
         try {
             FileSystem fs = FileSystem.get(hadoopConf);
-             file = fs.getFileStatus(parentPath);
+            file = fs.getFileStatus(parentPath);
             InputPartitionFields partitionInfo = initPartitionInfo();
 
             ParquetMetadata footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
             MessageType schema = parquetMetadataExtractor.getSchema(footer);
 
             InternalSchema internalSchema = schemaExtractor.toInternalSchema(schema, null, null);
-             partitionValues = partitionExtractor.createPartitionValues(
+            partitionValues = partitionExtractor.createPartitionValues(
                     partitionExtractor.extractPartitionValues(
                             partitionInfo));
         } catch (java.io.IOException e) {
