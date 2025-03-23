@@ -23,6 +23,11 @@ import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.HadoopReadOptions;
+import org.apache.parquet.ParquetReadOptions;
+import org.apache.parquet.hadoop.ParquetFileReader;
+import org.apache.parquet.hadoop.util.HadoopInputFile;
+import org.apache.parquet.io.InputFile;
 
 public class ParquetMetadataExtractor {
 
@@ -37,9 +42,15 @@ public class ParquetMetadataExtractor {
     return schema;
   }
 
-  public static ParquetMetadata readParquetMetadata(Configuration conf, Path path) {
-    ParquetMetadata footer = null;
-    // ParquetFileReader.readFooter(conf, path, ParquetMetadataConverter.NO_FILTER);
-    return footer;
+  public static ParquetMetadata readParquetMetadata(Configuration conf, Path filePath) {
+    ParquetFileReader fileReader = null;
+    ParquetReadOptions options = HadoopReadOptions.builder(conf, filePath).build();
+    try {
+      InputFile file = HadoopInputFile.fromPath(filePath, conf);
+      fileReader = ParquetFileReader.open(file, options);
+    } catch (java.io.IOException e) {
+      // TODO add proper processing
+    }
+    return fileReader.getFooter();
   }
 }
