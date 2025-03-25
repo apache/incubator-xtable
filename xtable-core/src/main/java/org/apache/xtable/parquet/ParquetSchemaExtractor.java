@@ -80,12 +80,19 @@ public class ParquetSchemaExtractor {
         return INSTANCE;
     }
 
-    private static boolean groupTypeContainsNull(GroupType schema) {
-        for (Type field : schema.getFields()) {
-            if (field.getLogicalTypeAnnotation().toOriginalType() == null) {
+    private static boolean groupTypeContainsNull(Type schema) {
+        if (!schema.isPrimitive()) {
+            for (Type field : schema.asGroupType().getFields()) {
+                if (field/*.getLogicalTypeAnnotation().toOriginalType()*/ == null) {
+                    return true;
+                }
+            }
+        } else{
+            if (schema.equals(null)){
                 return true;
             }
         }
+
         return false;
     }
 
@@ -114,13 +121,15 @@ public class ParquetSchemaExtractor {
      * @return a converted schema
      */
     public InternalSchema toInternalSchema(
-            MessageType schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
+            Type schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
         // TODO - Does not handle recursion in parquet schema
-        InternalType newDataType;
+        InternalType newDataType = null;
         PrimitiveType typeName;
         LogicalTypeAnnotation logicalType;
         Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
-        if (schema.isPrimitive()) {
+        if (schema.isPrimitive()/*schema.getFields().size()==1*/) {
+            //Type schemaField = schema.getType(0);
+            //typeName = schemaField.asPrimitiveType();
             typeName = schema.asPrimitiveType();
             switch (typeName.getPrimitiveTypeName()) {
                 // PrimitiveTypes
@@ -204,6 +213,7 @@ public class ParquetSchemaExtractor {
                 // TODO add other logicalTypes?
                 case BINARY:
                     // ? Variant,GEOMETRY, GEOGRAPHY,
+                    //logicalType = schemaField.getLogicalTypeAnnotation();
                     logicalType = schema.getLogicalTypeAnnotation();
                     if (logicalType instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
                         metadata.put(
@@ -234,8 +244,8 @@ public class ParquetSchemaExtractor {
             //typeName = schema.asGroupType();
             switch (schema.getOriginalType()) {
                 case LIST:
-                    List<InternalField> subFields = new ArrayList<>(schema.getFields().size());
-                    for (Type parquetField : schema.getFields()) {
+                    List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
+                    for (Type parquetField : schema.asGroupType().getFields()) {
                         IdMapping idMapping = fieldNameToIdMapping.get(parquetField.getName());
                         InternalSchema subFieldSchema =
                                 toInternalSchema(
@@ -257,7 +267,7 @@ public class ParquetSchemaExtractor {
                             //.comment(schema.getDoc())
                             .dataType(InternalType.RECORD)
                             .fields(subFields)
-                            .isNullable(groupTypeContainsNull(schema))
+                            .isNullable(groupTypeContainsNull(schema.asGroupType()))
                             .build();
               /*case MAP:
                   IdMapping keyMapping = fieldNameToIdMapping.get(KEY);
@@ -293,7 +303,7 @@ public class ParquetSchemaExtractor {
                             String.format("Unsupported schema type %s", schema));
             }
         }
-        newDataType = null;
+        //newDataType = null;
         return InternalSchema.builder()
                 .name(schema.getName())
                 .dataType(newDataType)
