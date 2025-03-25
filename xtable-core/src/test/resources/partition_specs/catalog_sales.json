@@ -1,0 +1,11 @@
+{
+  "spec-id": 0,
+  "fields": [
+    {
+      "name": "cs_sold_date_sk",
+      "transform": "identity",
+      "source-id": 7,
+      "field-id": 1000
+    }
+  ]
+}

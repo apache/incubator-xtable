@@ -1,0 +1,72 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+sourceCatalog:
+  catalogId: "source-1"
+  catalogConversionSourceImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogConversionSourceImpl"
+  catalogSyncClientImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogImpl"
+  catalogProperties:
+    key01: "value1"
+    key02: "value2"
+    key03: "value3"
+targetCatalogs:
+  - catalogId: "target-1"
+    catalogSyncClientImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogImpl"
+    catalogProperties:
+      key11: "value1"
+      key12: "value2"
+      key13: "value3"
+  - catalogId: "target-2"
+    catalogSyncClientImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogImpl"
+    catalogProperties:
+      key21: "value1"
+      key22: "value2"
+      key23: "value3"
+  - catalogId: "target-3"
+    catalogSyncClientImpl: "org.apache.xtable.testutil.ITTestUtils$TestCatalogImpl"
+    catalogProperties:
+      key31: "value1"
+      key32: "value2"
+      key33: "value3"
+datasets:
+  - sourceCatalogTableIdentifier:
+      tableIdentifier:
+        hierarchicalId: "source-database-1.source-1"
+        partitionSpec: "cs_sold_date_sk:VALUE"
+    targetCatalogTableIdentifiers:
+      - catalogId: "target-1"
+        tableFormat: "DELTA"
+        tableIdentifier:
+          hierarchicalId: "target-database-1.target-tableName-1"
+      - catalogId: "target-2"
+        tableFormat: "HUDI"
+        tableIdentifier:
+          hierarchicalId: "target-database-2.target-tableName-2-delta"
+  - sourceCatalogTableIdentifier:
+      storageIdentifier:
+        tableBasePath: s3://tpc-ds-datasets/1GB/hudi/catalog_sales
+        tableName: catalog_sales
+        partitionSpec: cs_sold_date_sk:VALUE
+        tableFormat: "HUDI"
+    targetCatalogTableIdentifiers:
+      - catalogId: "target-2"
+        tableFormat: "ICEBERG"
+        tableIdentifier:
+          hierarchicalId: "target-database-2.target-tableName-2"
+      - catalogId: "target-3"
+        tableFormat: "HUDI"
+        tableIdentifier:
+          hierarchicalId: "default-catalog-2.target-database-3.target-tableName-3"
