@@ -37,6 +37,7 @@ import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfi
 
 class TestRunSync {
 
+
   @Test
   public void testMain() {
     String projectRoot = System.getProperty("user.dir");
@@ -78,6 +79,7 @@ class TestRunSync {
     // Assert
     Assertions.assertNotNull(config);
   }
+
   /** Tests that the default hadoop configs are loaded. */
   @Test
   public void testLoadDefaultHadoopConfig() {
