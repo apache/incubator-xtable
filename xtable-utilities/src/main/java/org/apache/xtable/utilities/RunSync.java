@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 
 import lombok.Builder;
 import lombok.Data;
-
 import lombok.NonNull;
 import lombok.Value;
 import lombok.extern.jackson.Jacksonized;
@@ -52,7 +51,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.annotations.VisibleForTesting;
-
 
 import org.apache.xtable.conversion.CatalogConfig;
 import org.apache.xtable.conversion.ConversionConfig;
@@ -118,7 +116,6 @@ public class RunSync {
               true,
               "The interval in seconds to schedule the loop. Requires --continuousMode to be set. Defaults to 5 seconds.")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
-
 
   static SourceTable sourceTableBuilder(
       @NonNull DatasetConfig.Table table,
@@ -305,89 +302,6 @@ public class RunSync {
     byte[] customConfig = null;
     if (Configpath != null) {
       customConfig = Files.readAllBytes(Paths.get(Configpath));
-    DatasetConfig datasetConfig;
-    try (InputStream inputStream =
-        Files.newInputStream(Paths.get(cmd.getOptionValue(DATASET_CONFIG_OPTION)))) {
-      datasetConfig = YAML_MAPPER.readValue(inputStream, DatasetConfig.class);
-    }
-
-    byte[] customConfig = getCustomConfigurations(cmd, HADOOP_CONFIG_PATH);
-    Configuration hadoopConf = loadHadoopConf(customConfig);
-    byte[] icebergCatalogConfigInput = getCustomConfigurations(cmd, ICEBERG_CATALOG_CONFIG_PATH);
-    IcebergCatalogConfig icebergCatalogConfig = loadIcebergCatalogConfig(icebergCatalogConfigInput);
-
-    String sourceFormat = datasetConfig.sourceFormat;
-    customConfig = getCustomConfigurations(cmd, CONVERTERS_CONFIG_PATH);
-    TableFormatConverters tableFormatConverters = loadTableFormatConversionConfigs(customConfig);
-    TableFormatConverters.ConversionConfig sourceConversionConfig =
-        tableFormatConverters.getTableFormatConverters().get(sourceFormat);
-    if (sourceConversionConfig == null) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Source format %s is not supported. Known source and target formats are %s",
-              sourceFormat, tableFormatConverters.getTableFormatConverters().keySet()));
-    }
-    String sourceProviderClass = sourceConversionConfig.conversionSourceProviderClass;
-    ConversionSourceProvider<?> conversionSourceProvider =
-        ReflectionUtils.createInstanceOfClass(sourceProviderClass);
-    conversionSourceProvider.init(hadoopConf);
-
-    List<String> tableFormatList = datasetConfig.getTargetFormats();
-    ConversionController conversionController = new ConversionController(hadoopConf);
-    for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
-      log.info(
-          "Running sync for basePath {} for following table formats {}",
-          table.getTableBasePath(),
-          tableFormatList);
-      Properties sourceProperties = new Properties();
-      if (table.getPartitionSpec() != null) {
-        sourceProperties.put(
-            HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec());
-      }
-      SourceTable sourceTable =
-          SourceTable.builder()
-              .name(table.getTableName())
-              .basePath(table.getTableBasePath())
-              .namespace(table.getNamespace() == null ? null : table.getNamespace().split("\\."))
-              .dataPath(table.getTableDataPath())
-              .catalogConfig(icebergCatalogConfig)
-              .additionalProperties(sourceProperties)
-              .formatName(sourceFormat)
-              .build();
-      List<TargetTable> targetTables =
-          tableFormatList.stream()
-              .map(
-                  tableFormat ->
-                      TargetTable.builder()
-                          .name(table.getTableName())
-                          .basePath(table.getTableBasePath())
-                          .namespace(
-                              table.getNamespace() == null
-                                  ? null
-                                  : table.getNamespace().split("\\."))
-                          .catalogConfig(icebergCatalogConfig)
-                          .formatName(tableFormat)
-                          .build())
-              .collect(Collectors.toList());
-
-      ConversionConfig conversionConfig =
-          ConversionConfig.builder()
-              .sourceTable(sourceTable)
-              .targetTables(targetTables)
-              .syncMode(SyncMode.INCREMENTAL)
-              .build();
-      try {
-        conversionController.sync(conversionConfig, conversionSourceProvider);
-      } catch (Exception e) {
-        log.error("Error running sync for {}", table.getTableBasePath(), e);
-      }
-    }
-  }
-
-  static byte[] getCustomConfigurations(CommandLine cmd, String option) throws IOException {
-    byte[] customConfig = null;
-    if (cmd.hasOption(option)) {
-      customConfig = Files.readAllBytes(Paths.get(cmd.getOptionValue(option)));
     }
     return customConfig;
   }
@@ -425,7 +339,6 @@ public class RunSync {
   }
 
   @VisibleForTesting
-
   static CatalogConfig loadIcebergCatalogConfig(byte[] customConfigs) throws IOException {
     return customConfigs == null
         ? null

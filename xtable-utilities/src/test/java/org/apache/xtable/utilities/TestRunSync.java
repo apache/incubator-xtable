@@ -36,8 +36,6 @@ import org.apache.xtable.utilities.RunSync.TableFormatConverters;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
 
 class TestRunSync {
-
-
   @Test
   public void testMain() {
     String projectRoot = System.getProperty("user.dir");
