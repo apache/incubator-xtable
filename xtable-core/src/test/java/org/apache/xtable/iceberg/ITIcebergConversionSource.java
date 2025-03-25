@@ -25,6 +25,8 @@ import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -32,12 +34,16 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import lombok.SneakyThrows;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -61,6 +67,7 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
+import org.mockito.Mockito;
 
 public class ITIcebergConversionSource {
   private static final Configuration hadoopConf = new Configuration();
@@ -126,7 +133,95 @@ public class ITIcebergConversionSource {
               .build();
       validateTable(
           internalTable,
+          testIcebergTable.getTableName(),
+          TableFormat.ICEBERG,
+          internalSchema,
+          DataLayoutStrategy.FLAT,
           testIcebergTable.getBasePath(),
+          Collections.emptyList());
+    }
+  }
+
+  @Test
+  void getCurrentTableWithCatalogConfigTest() {
+    String tableName = getTableName();
+    try (TestIcebergTable testIcebergTable =
+             new TestIcebergTable(
+                 tableName,
+                 tempDir,
+                 hadoopConf,
+                 "field1",
+                 Collections.singletonList(null),
+                 TestIcebergDataHelper.SchemaType.BASIC)) {
+      testIcebergTable.insertRows(50);
+
+      // create resources
+      Map<String, String> OPTIONS = Collections.singletonMap("key", "value");
+      Catalog mockCatalog = mock(Catalog.class);
+      String catalogName = "catalog1";
+      StubCatalog.registerMock(catalogName, mockCatalog);
+      IcebergCatalogConfig catalogConfig =
+          IcebergCatalogConfig.builder()
+              .catalogImpl(StubCatalog.class.getName())
+              .catalogName(catalogName)
+              .catalogOptions(OPTIONS)
+              .build();
+      Map<Integer, org.apache.iceberg.Schema> map = new HashMap<>();
+      map.put(0, testIcebergTable.getSchema());
+      Table mockTable = mock(Table.class, Mockito.RETURNS_DEEP_STUBS);
+      when(mockTable.name()).thenReturn(tableName);
+      when(mockTable.location()).thenReturn(testIcebergTable.getBasePath());
+      when(mockTable.schemas()).thenReturn(map);
+
+      when(mockCatalog.loadTable(Mockito.any(TableIdentifier.class)))
+          .thenReturn(mockTable);
+
+      // begin test
+      SourceTable tableConfig =
+          SourceTable.builder()
+              .name(testIcebergTable.getTableName())
+              .basePath(testIcebergTable.getBasePath())
+              .formatName(TableFormat.ICEBERG)
+              .catalogConfig(catalogConfig)
+              .build();
+      IcebergConversionSource conversionSource =
+          sourceProvider.getConversionSourceInstance(tableConfig);
+      InternalTable internalTable = conversionSource.getCurrentTable();
+
+      // expectations
+      InternalSchema internalSchema =
+          InternalSchema.builder()
+              .name("record")
+              .dataType(InternalType.RECORD)
+              .fields(
+                  Arrays.asList(
+                      InternalField.builder()
+                          .name("field1")
+                          .fieldId(1)
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(true)
+                                  .build())
+                          .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                          .build(),
+                      InternalField.builder()
+                          .name("field2")
+                          .fieldId(2)
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(true)
+                                  .build())
+                          .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                          .build()))
+              .build();
+
+      validateTable(
+          internalTable,
+          testIcebergTable.getTableName(),
           TableFormat.ICEBERG,
           internalSchema,
           DataLayoutStrategy.FLAT,
