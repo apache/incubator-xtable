@@ -23,17 +23,41 @@ import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import org.apache.xtable.iceberg.IcebergCatalogConfig;
+import org.apache.xtable.conversion.CatalogConfig;
+import org.apache.xtable.utilities.RunSync.DatasetConfig;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters;
 import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfig;
 
 class TestRunSync {
+
+  @Test
+  public void testMain() {
+    String filePath = TestRunSync.class.getClassLoader().getResource("my_config.yaml").getPath();
+    String[] args = new String[] {"--datasetConfig", filePath};
+    Assertions.assertDoesNotThrow(
+        () -> RunSync.main(args), "RunSync.main() threw an unexpected exception.");
+  }
+
+  @Test
+  public void testGetDatasetConfigWithNonExistentFile() {
+    URL resourceUrl = TestRunSync.class.getClassLoader().getResource("my_config1.yaml");
+    Assertions.assertNull(resourceUrl, "Config file not found in classpath");
+  }
+
+  @Test
+  public void testGetDatasetConfigWithValidYAML() throws IOException {
+    String filePath = TestRunSync.class.getClassLoader().getResource("my_config.yaml").getPath();
+    DatasetConfig config = RunSync.getDatasetConfig(filePath);
+    // Assert
+    Assertions.assertNotNull(config);
+  }
 
   /** Tests that the default hadoop configs are loaded. */
   @Test
@@ -142,7 +166,7 @@ class TestRunSync {
             + "catalogOptions: \n"
             + "  option1: value1\n"
             + "  option2: value2";
-    IcebergCatalogConfig catalogConfig = RunSync.loadIcebergCatalogConfig(icebergConfig.getBytes());
+    CatalogConfig catalogConfig = RunSync.loadIcebergCatalogConfig(icebergConfig.getBytes());
     Assertions.assertEquals("org.apache.xtable.CatalogImpl", catalogConfig.getCatalogImpl());
     Assertions.assertEquals("test", catalogConfig.getCatalogName());
     Assertions.assertEquals(2, catalogConfig.getCatalogOptions().size());
