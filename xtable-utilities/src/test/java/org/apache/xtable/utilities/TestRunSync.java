@@ -22,9 +22,9 @@ import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.net.URL;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
@@ -38,41 +38,21 @@ import org.apache.xtable.utilities.RunSync.TableFormatConverters.ConversionConfi
 class TestRunSync {
   @Test
   public void testMain() {
-    String projectRoot = System.getProperty("user.dir");
-    // Construct the path to the file in the root directory
-    int lastSlashIndex = projectRoot.lastIndexOf('/');
-    String result = projectRoot.substring(0, lastSlashIndex);
-    File file = new File(result, "/my_config.yaml");
-    String filePath = file.getPath();
+    String filePath = TestRunSync.class.getClassLoader().getResource("my_config.yaml").getPath();
     String[] args = new String[] {"--datasetConfig", filePath};
-    //      RunSync.main(args);
     Assertions.assertDoesNotThrow(
         () -> RunSync.main(args), "RunSync.main() threw an unexpected exception.");
   }
 
   @Test
   public void testGetDatasetConfigWithNonExistentFile() {
-    String projectRoot = System.getProperty("user.dir");
-    // Construct the path to the file in the root directory
-    int lastSlashIndex = projectRoot.lastIndexOf('/');
-    String result = projectRoot.substring(0, lastSlashIndex);
-    File file = new File(result, "/my_config1.yaml");
-    String filePath = file.getPath();
-    Assertions.assertThrows(
-        IOException.class,
-        () -> {
-          RunSync.getDatasetConfig(filePath);
-        });
+    URL resourceUrl = TestRunSync.class.getClassLoader().getResource("my_config1.yaml");
+    Assertions.assertNull(resourceUrl, "Config file not found in classpath");
   }
 
   @Test
   public void testGetDatasetConfigWithValidYAML() throws IOException {
-    String projectRoot = System.getProperty("user.dir");
-    // Construct the path to the file in the root directory
-    int lastSlashIndex = projectRoot.lastIndexOf('/');
-    String result = projectRoot.substring(0, lastSlashIndex);
-    File file = new File(result, "/my_config.yaml");
-    String filePath = file.getPath();
+    String filePath = TestRunSync.class.getClassLoader().getResource("my_config.yaml").getPath();
     DatasetConfig config = RunSync.getDatasetConfig(filePath);
     // Assert
     Assertions.assertNotNull(config);

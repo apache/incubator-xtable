@@ -19,6 +19,6 @@ targetFormats:
   - DELTA
 datasets:
   -
-    tableBasePath:  /Desktop/opensource/iceberg/warehouse/demo/nyc3/taxis
+    tableBasePath:  /Desktop/opensource/iceberg/warehouse/demo/nyc/taxis
     tableDataPath:  /Desktop/opensource/iceberg/warehouse/demo/nyc/taxis/data
     tableName: taxis
