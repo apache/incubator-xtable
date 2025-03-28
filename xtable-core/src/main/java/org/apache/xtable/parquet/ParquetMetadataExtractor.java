@@ -28,6 +28,7 @@ import org.apache.parquet.ParquetReadOptions;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.parquet.io.InputFile;
+import org.apache.xtable.exception.ReadException;
 
 public class ParquetMetadataExtractor {
 
@@ -44,12 +45,20 @@ public class ParquetMetadataExtractor {
 
   public static ParquetMetadata readParquetMetadata(Configuration conf, Path filePath) {
     ParquetFileReader fileReader = null;
+    InputFile file = null;
     ParquetReadOptions options = HadoopReadOptions.builder(conf, filePath).build();
     try {
-      InputFile file = HadoopInputFile.fromPath(filePath, conf);
+      file = HadoopInputFile.fromPath(filePath, conf);
       fileReader = ParquetFileReader.open(file, options);
-    } catch (java.io.IOException e) {
-      // TODO add proper processing
+    } catch (Exception e) {
+      throw new ReadException("Failed to read the parquet file", e);
+    } finally {
+      try {
+        fileReader.close();
+      } catch (java.io.IOException e) {
+        e.printStackTrace();
+      }
+
     }
     return fileReader.getFooter();
   }
