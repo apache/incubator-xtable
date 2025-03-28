@@ -44,11 +44,11 @@ import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Type;
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.UnsupportedSchemaTypeException;
-import org.apache.xtable.hudi.idtracking.models.IdMapping;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.parquet.schema.Type.Repetition;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
+import org.apache.parquet.schema.Type.ID;
 //import org.apache.parquet.avro.AvroSchemaConverter;
 
 
@@ -102,13 +102,6 @@ public class ParquetSchemaExtractor {
             }
             return targetSchema;
         }*/
-    private Map<String, IdMapping> getChildIdMap(IdMapping idMapping) {
-        if (idMapping == null) {
-            return Collections.emptyMap();
-        }
-        return idMapping.getFields().stream()
-                .collect(Collectors.toMap(IdMapping::getName, Function.identity()));
-    }
 
     /**
      * Converts the parquet {@link Schema} to {@link InternalSchema}.
@@ -116,12 +109,10 @@ public class ParquetSchemaExtractor {
      * @param schema               The schema being converted
      * @param parentPath           If this schema is nested within another, this will be a dot separated string
      *                             representing the path from the top most field to the current schema.
-     * @param fieldNameToIdMapping map of fieldName to IdMapping to track field IDs provided by the
-     *                             source schema. If source schema does not contain IdMappings, map will be empty.
      * @return a converted schema
      */
     public InternalSchema toInternalSchema(
-            Type schema, String parentPath, Map<String, IdMapping> fieldNameToIdMapping) {
+            Type schema, String parentPath) {
         // TODO - Does not handle recursion in parquet schema
         InternalType newDataType = null;
         PrimitiveType typeName;
@@ -163,7 +154,7 @@ public class ParquetSchemaExtractor {
                             newDataType = InternalType.INT;
                         }
                     } else {
-                        newDataType = InternalType.INT;
+                        newDataType = InternalType.LONG;
                     }
                     break;
                 case INT32:
@@ -180,9 +171,9 @@ public class ParquetSchemaExtractor {
                         newDataType = InternalType.INT;
                     }
                     break;
-                case INT96:
+    /*            case INT96:
                     newDataType = InternalType.INT;
-                    break;
+                    break;*/
                 case FLOAT:
                     logicalType = schema.getLogicalTypeAnnotation();
           /*  if (logicalType instanceof LogicalTypeAnnotation.Float16LogicalTypeAnnotation) {
@@ -246,20 +237,21 @@ public class ParquetSchemaExtractor {
                 case LIST:
                     List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
                     for (Type parquetField : schema.asGroupType().getFields()) {
-                        IdMapping idMapping = fieldNameToIdMapping.get(parquetField.getName());
+                        String fieldName = parquetField.getName();
+                        Type.ID fieldId = parquetField.getId();
                         InternalSchema subFieldSchema =
                                 toInternalSchema(
-                                        new MessageType(parquetField.getName(), parquetField),
-                                        SchemaUtils.getFullyQualifiedPath(parentPath, parquetField.getName()),
-                                        getChildIdMap(idMapping));
+                                        new MessageType(fieldName, parquetField),
+                                        SchemaUtils.getFullyQualifiedPath(parentPath, parquetField.getName())
+                                );
                         //Object defaultValue = getDefaultValue(parquetField);
                         subFields.add(
                                 InternalField.builder()
                                         .parentPath(parentPath)
-                                        .name(parquetField.getName())
+                                        .name(fieldName)
                                         .schema(subFieldSchema)
                                         //.defaultValue(defaultValue)
-                                        .fieldId(idMapping == null ? null : idMapping.getId())
+                                        .fieldId(fieldId == null ? null : fieldId.intValue())
                                         .build());
                     }
                     return InternalSchema.builder()

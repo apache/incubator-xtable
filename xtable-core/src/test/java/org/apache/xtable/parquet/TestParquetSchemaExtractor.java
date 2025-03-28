@@ -54,10 +54,10 @@ public class TestParquetSchemaExtractor {
 
 
         Assertions.assertEquals(
-                primitive1, schemaExtractor.toInternalSchema(intPrimitiveType, null, null));
+                primitive1, schemaExtractor.toInternalSchema(intPrimitiveType, null));
 
         Assertions.assertEquals(
-                primitive2, schemaExtractor.toInternalSchema(stringPrimitiveType, null, null));
+                primitive2, schemaExtractor.toInternalSchema(stringPrimitiveType, null));
     }
 
     @Test
