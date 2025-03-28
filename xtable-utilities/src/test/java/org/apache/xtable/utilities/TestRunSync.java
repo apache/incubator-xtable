@@ -23,8 +23,8 @@ import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
 
 import java.io.IOException;
-import java.util.Map;
 import java.net.URL;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
