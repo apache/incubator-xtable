@@ -19,7 +19,6 @@ package org.apache.xtable.parquet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
-
 import org.junit.jupiter.api.Test;
 import org.apache.parquet.schema.*;
 import org.junit.jupiter.api.Assertions;
@@ -32,6 +31,7 @@ import org.apache.parquet.schema.Type.Repetition;
 import org.apache.parquet.schema.Type;
 import org.apache.parquet.schema.Types;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
+import org.apache.parquet.schema.GroupType;
 
 
 public class TestParquetSchemaExtractor {
@@ -44,20 +44,32 @@ public class TestParquetSchemaExtractor {
                 InternalSchema.builder().name("integer").dataType(InternalType.INT).build();
         InternalSchema primitive2 =
                 InternalSchema.builder().name("string").dataType(InternalType.STRING).build();
-        Type stringPrimitiveType = Types
-                .required(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType())
+        InternalSchema group1 =
+                InternalSchema.builder().name("list").dataType(InternalType.LIST).build();
+        Type stringPrimitiveType =Types
+                .required(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType())//.named("string")
                 .named("string");
 
-        Type intPrimitiveType = Types
-                .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.intType(32, false))
+        Type intPrimitiveType =Types
+                .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.intType(32,false))
                 .named("integer");
-
+        Assertions.assertEquals(
+                primitive1  , schemaExtractor.toInternalSchema(intPrimitiveType, null));
 
         Assertions.assertEquals(
-                primitive1, schemaExtractor.toInternalSchema(intPrimitiveType, null));
+                primitive2   , schemaExtractor.toInternalSchema(stringPrimitiveType, null));
 
+        GroupType testGroupType = Types.requiredGroup()
+                .required(INT64).named("id")
+                .optional(BINARY).as(STRING).named("name")
+                .optionalGroup()
+                .required(DATE).as(INT32).named("date")
+                .required(INT32).named("zipcode")
+                .named("address")
+                .named("User");
+        // to do check how to create a LIST for testing
         Assertions.assertEquals(
-                primitive2, schemaExtractor.toInternalSchema(stringPrimitiveType, null));
+                group1   , schemaExtractor.toInternalSchema(testGroupType, null));
     }
 
     @Test
