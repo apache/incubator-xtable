@@ -32,6 +32,7 @@ import org.apache.parquet.schema.Type;
 import org.apache.parquet.schema.Types;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.GroupType;
+import java.util.Map;
 
 
 public class TestParquetSchemaExtractor {
@@ -64,6 +65,19 @@ public class TestParquetSchemaExtractor {
                 .optional(BINARY).as(STRING).named("name")
                 .optionalGroup()
                 .required(DATE).as(INT32).named("date")
+                .required(INT32).named("zipcode")
+                .named("address")
+                .named("User");
+
+        Map<float, int> testMap = Types.requiredMap()
+                .key(FLOAT)
+                .optionalValue(INT32)
+                .named("zipMap");
+        GroupType nestedGroupType =  Types.requiredGroup()
+                .required(INT64).named("id")
+                .optional(BINARY).as(UTF8).named("email")
+                .optionalGroup()
+                .required(BINARY).as(UTF8).named("street")
                 .required(INT32).named("zipcode")
                 .named("address")
                 .named("User");

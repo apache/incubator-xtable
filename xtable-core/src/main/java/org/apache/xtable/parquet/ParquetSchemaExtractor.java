@@ -315,8 +315,32 @@ public class ParquetSchemaExtractor {
                                             valueField))
                             .build();}
                 default:
-                    throw new UnsupportedSchemaTypeException(
-                            String.format("Unsupported schema type %s", schema));
+                    List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
+                    for (Type parquetField : schema.asGroupType().getFields()) {
+                        String fieldName = parquetField.getName();
+                        Type.ID fieldId = parquetField.getId();
+                        InternalSchema subFieldSchema =
+                                toInternalSchema(
+                                        parquetField,
+                                        SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
+                        subFields.add(
+                                InternalField.builder()
+                                        .parentPath(parentPath)
+                                        .name(fieldName)
+                                        .schema(subFieldSchema)
+                                        .defaultValue(null)
+                                        .fieldId(fieldId == null ? null : fieldId.intValue())
+                                        .build());
+                    }
+                    return InternalSchema.builder()
+                            .name(schema.getName())
+                            .comment(null)
+                            .dataType(InternalType.RECORD)
+                            .fields(subFields)
+                            .isNullable(groupTypeContainsNull(schema.asGroupType()))
+                            .build();
+                    //throw new UnsupportedSchemaTypeException(
+                      //      String.format("Unsupported schema type %s", schema));
             }
         }
         //newDataType = null;
