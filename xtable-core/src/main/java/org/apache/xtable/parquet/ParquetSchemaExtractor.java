@@ -267,7 +267,7 @@ public class ParquetSchemaExtractor {
                 Type.ID schemaId = schema.getId();
                 InternalSchema valueSchema =
                         toInternalSchema(
-                                schema,
+                                schema.asGroupType().getType(0),
                                 SchemaUtils.getFullyQualifiedPath(
                                         parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME));
                 InternalField valueField =
