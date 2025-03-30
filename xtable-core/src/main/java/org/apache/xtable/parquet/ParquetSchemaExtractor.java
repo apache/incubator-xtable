@@ -31,6 +31,7 @@ import java.util.Optional;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.function.Function;
@@ -238,9 +239,86 @@ public class ParquetSchemaExtractor {
         } else {
             //GroupTypes
             //typeName = schema.asGroupType();
-            switch (schema.getOriginalType()) {
-                case LIST:{
-                    String schemaName = schema.asGroupType().getName();
+            logicalType = schema.getLogicalTypeAnnotation();
+            if (logicalType instanceof LogicalTypeAnnotation.ListLogicalTypeAnnotation) {
+                String schemaName = schema.asGroupType().getName();
+                Type.ID schemaId = schema.getId();
+                InternalSchema elementSchema =
+                        toInternalSchema(
+                                schema.asGroupType().getType(0),
+                                SchemaUtils.getFullyQualifiedPath(
+                                        parentPath, InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME));
+                InternalField elementField =
+                        InternalField.builder()
+                                .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                .parentPath(parentPath)
+                                .schema(elementSchema)
+                                .fieldId(schemaId == null ? null : schemaId.intValue())
+                                .build();
+                return InternalSchema.builder()
+                        .name(schema.getName())
+                        .dataType(InternalType.LIST)
+                        .comment(null)
+                        .isNullable(groupTypeContainsNull(schema.asGroupType()))
+                        .fields(Collections.singletonList(elementField))
+                        .build();
+            } else if (logicalType instanceof LogicalTypeAnnotation.MapLogicalTypeAnnotation) {
+                String schemaName = schema.asGroupType().getName();
+                Type.ID schemaId = schema.getId();
+                InternalSchema valueSchema =
+                        toInternalSchema(
+                                schema,
+                                SchemaUtils.getFullyQualifiedPath(
+                                        parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME));
+                InternalField valueField =
+                        InternalField.builder()
+                                .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                                .parentPath(parentPath)
+                                .schema(valueSchema)
+                                .fieldId(schemaId == null ? null : schemaId.intValue())
+                                .build();
+                return InternalSchema.builder()
+                        .name(schemaName)
+                        .dataType(InternalType.MAP)
+                        .comment(null)
+                        .isNullable(groupTypeContainsNull(schema.asGroupType()))
+                        .fields(
+                                Arrays.asList(
+                                        MAP_KEY_FIELD.toBuilder()
+                                                .parentPath(parentPath)
+                                                .fieldId(schemaId == null ? null : schemaId.intValue())
+                                                .build(),
+                                        valueField))
+                        .build();
+            } else {
+                List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
+                for (Type parquetField : schema.asGroupType().getFields()) {
+                    String fieldName = parquetField.getName();
+                    Type.ID fieldId = parquetField.getId();
+                    InternalSchema subFieldSchema =
+                            toInternalSchema(
+                                    parquetField,
+                                    SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
+                    subFields.add(
+                            InternalField.builder()
+                                    .parentPath(parentPath)
+                                    .name(fieldName)
+                                    .schema(subFieldSchema)
+                                    .defaultValue(null)
+                                    .fieldId(fieldId == null ? null : fieldId.intValue())
+                                    .build());
+                }
+                return InternalSchema.builder()
+                        .name(schema.getName())
+                        .comment(null)
+                        .dataType(InternalType.RECORD)
+                        .fields(subFields)
+                        .isNullable(groupTypeContainsNull(schema.asGroupType()))
+                        .build();
+            }
+            //switch (schema.getOriginalType()) {
+            //  case LIST: {
+                 /*   String schemaName = schema.asGroupType().getName();
                     Type.ID schemaId = schema.getId();
                     InternalSchema elementSchema =
                             toInternalSchema(
@@ -260,7 +338,8 @@ public class ParquetSchemaExtractor {
                             .comment(null)
                             .isNullable(groupTypeContainsNull(schema.asGroupType()))
                             .fields(Collections.singletonList(elementField))
-                            .build();}
+                            .build();*/
+            //}
                 /*case ARRAY:
                     List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
                     for (Type parquetField : schema.asGroupType().getFields()) {
@@ -286,8 +365,8 @@ public class ParquetSchemaExtractor {
                             .fields(subFields)
                             .isNullable(groupTypeContainsNull(schema.asGroupType()))
                             .build();*/
-                case MAP: {
-                    String schemaName = schema.asGroupType().getName();
+            //case MAP: {
+                    /*String schemaName = schema.asGroupType().getName();
                     Type.ID schemaId = schema.getId();
                     InternalSchema valueSchema =
                             toInternalSchema(
@@ -313,9 +392,10 @@ public class ParquetSchemaExtractor {
                                                     .fieldId(schemaId == null ? null : schemaId.intValue())
                                                     .build(),
                                             valueField))
-                            .build();}
-                default:
-                    List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
+                            .build();*/
+            // }
+            //default:
+                    /*List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
                     for (Type parquetField : schema.asGroupType().getFields()) {
                         String fieldName = parquetField.getName();
                         Type.ID fieldId = parquetField.getId();
@@ -335,13 +415,13 @@ public class ParquetSchemaExtractor {
                     return InternalSchema.builder()
                             .name(schema.getName())
                             .comment(null)
-                            .dataType(InternalType.RECORD)
+                            .dataType(InternalType.LIST)
                             .fields(subFields)
                             .isNullable(groupTypeContainsNull(schema.asGroupType()))
-                            .build();
-                    //throw new UnsupportedSchemaTypeException(
-                      //      String.format("Unsupported schema type %s", schema));
-            }
+                            .build();*/
+            // throw new UnsupportedSchemaTypeException(
+            //       String.format("Unsupported schema type %s", schema));
+            //   }
         }
         //newDataType = null;
         return InternalSchema.builder()
@@ -482,4 +562,3 @@ public class ParquetSchemaExtractor {
         return type;
     }
 }
-

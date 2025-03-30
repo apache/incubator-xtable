@@ -19,6 +19,7 @@ package org.apache.xtable.parquet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 import org.apache.parquet.schema.*;
 import org.junit.jupiter.api.Assertions;
@@ -32,7 +33,12 @@ import org.apache.parquet.schema.Type;
 import org.apache.parquet.schema.Types;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.GroupType;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
+
 import java.util.Map;
+import java.util.Arrays;
 
 
 public class TestParquetSchemaExtractor {
@@ -47,43 +53,122 @@ public class TestParquetSchemaExtractor {
                 InternalSchema.builder().name("string").dataType(InternalType.STRING).build();
         InternalSchema group1 =
                 InternalSchema.builder().name("list").dataType(InternalType.LIST).build();
-        Type stringPrimitiveType =Types
+        InternalSchema recordListElementSchema=
+                InternalSchema.builder()
+                        .name("element")
+                        .isNullable(false)
+                        .fields(
+                                Arrays.asList(
+                                        InternalField.builder()
+                                                .name("requiredDouble")
+                                                .parentPath("recordList._one_field_element")
+                                                .schema(
+                                                        InternalSchema.builder()
+                                                                .name("double")
+                                                                .dataType(InternalType.DOUBLE)
+                                                                .isNullable(false)
+                                                                .build())
+                                                .build(),
+                                        InternalField.builder()
+                                                .name("optionalString")
+                                                .parentPath("recordList._one_field_element")
+                                                .schema(
+                                                        InternalSchema.builder()
+                                                                .name("string")
+                                                                .dataType(InternalType.STRING)
+                                                                .isNullable(true)
+                                                                .build())
+                                                .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                                                .build()))
+                        .dataType(InternalType.RECORD)
+                        .build();
+        InternalSchema internalSchema =
+                InternalSchema.builder()
+                        .name("testRecord")
+                        .dataType(InternalType.RECORD)
+                        .isNullable(false)
+                        .fields(
+                                Arrays.asList(
+                                        InternalField.builder()
+                                                .name("intList")
+                                                .schema(
+                                                        InternalSchema.builder()
+                                                                .name("array")
+                                                                .isNullable(false)
+                                                                .dataType(InternalType.LIST)
+                                                                .fields(
+                                                                        Arrays.asList(
+                                                                                InternalField.builder()
+                                                                                        .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                                                                        .parentPath("intList")
+                                                                                        .schema(
+                                                                                                InternalSchema.builder()
+                                                                                                        .name("int")
+                                                                                                        .dataType(InternalType.INT)
+                                                                                                        .isNullable(false)
+                                                                                                        .build())
+                                                                                        .build()))
+                                                                .build())
+                                                .build(),
+                                        InternalField.builder()
+                                                .name("recordList")
+                                                .schema(
+                                                        InternalSchema.builder()
+                                                                .name("array")
+                                                                .isNullable(true)
+                                                                .dataType(InternalType.LIST)
+                                                                .fields(
+                                                                        Arrays.asList(
+                                                                                InternalField.builder()
+                                                                                        .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                                                                        .parentPath("recordList")
+                                                                                        .schema(recordListElementSchema)
+                                                                                        .build()))
+                                                                .build())
+                                                .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                                                .build()))
+                        .build();
+        Type stringPrimitiveType = Types
                 .required(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType())//.named("string")
                 .named("string");
 
-        Type intPrimitiveType =Types
-                .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.intType(32,false))
+        Type intPrimitiveType = Types
+                .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.intType(32, false))
                 .named("integer");
         Assertions.assertEquals(
-                primitive1  , schemaExtractor.toInternalSchema(intPrimitiveType, null));
+                primitive1, schemaExtractor.toInternalSchema(intPrimitiveType, null));
 
         Assertions.assertEquals(
-                primitive2   , schemaExtractor.toInternalSchema(stringPrimitiveType, null));
+                primitive2, schemaExtractor.toInternalSchema(stringPrimitiveType, null));
 
         GroupType testGroupType = Types.requiredGroup()
-                .required(INT64).named("id")
-                .optional(BINARY).as(STRING).named("name")
-                .optionalGroup()
-                .required(DATE).as(INT32).named("date")
-                .required(INT32).named("zipcode")
-                .named("address")
-                .named("User");
+                .required(PrimitiveTypeName.INT64).named("id")
+                .optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("name")
+                .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.dateType()).named("date")
+                .named("user");
 
-        Map<float, int> testMap = Types.requiredMap()
-                .key(FLOAT)
-                .optionalValue(INT32)
-                .named("zipMap");
-        GroupType nestedGroupType =  Types.requiredGroup()
+ /*       GroupType nestedGroupType = Types.requiredGroup()
                 .required(INT64).named("id")
                 .optional(BINARY).as(UTF8).named("email")
                 .optionalGroup()
                 .required(BINARY).as(UTF8).named("street")
                 .required(INT32).named("zipcode")
                 .named("address")
-                .named("User");
-        // to do check how to create a LIST for testing
+                .named("User");*/
+
+        GroupType testMap = Types.requiredMap()
+                .key(PrimitiveTypeName.FLOAT)
+                .optionalValue(PrimitiveTypeName.INT32)
+                .named("zipMap");
+        GroupType listType = Types.optionalList().setElementType(Types.primitive(PrimitiveTypeName.INT32, Repetition.REQUIRED).named("element")).named("my_list");
+        MessageType messageType = Types.buildMessage()
+                .addField(testGroupType)
+                .addField(testMap)
+                .addField(listType)
+                .named("my_record");
+        // TODO make this test pass!
         Assertions.assertEquals(
-                group1   , schemaExtractor.toInternalSchema(testGroupType, null));
+                internalSchema, schemaExtractor.toInternalSchema(messageType, null));
     }
 
     @Test
