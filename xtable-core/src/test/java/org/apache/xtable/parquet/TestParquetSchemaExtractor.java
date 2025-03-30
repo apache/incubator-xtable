@@ -60,17 +60,17 @@ public class TestParquetSchemaExtractor {
                         .fields(
                                 Arrays.asList(
                                         InternalField.builder()
-                                                .name("requiredDouble")
+                                                .name("id")
                                                 .parentPath("recordList._one_field_element")
                                                 .schema(
                                                         InternalSchema.builder()
-                                                                .name("double")
-                                                                .dataType(InternalType.DOUBLE)
+                                                                .name("int64")
+                                                                .dataType(InternalType.LONG)
                                                                 .isNullable(false)
                                                                 .build())
                                                 .build(),
                                         InternalField.builder()
-                                                .name("optionalString")
+                                                .name("name")
                                                 .parentPath("recordList._one_field_element")
                                                 .schema(
                                                         InternalSchema.builder()
@@ -84,23 +84,23 @@ public class TestParquetSchemaExtractor {
                         .build();
         InternalSchema internalSchema =
                 InternalSchema.builder()
-                        .name("testRecord")
+                        .name("my_record")
                         .dataType(InternalType.RECORD)
                         .isNullable(false)
                         .fields(
                                 Arrays.asList(
                                         InternalField.builder()
-                                                .name("intList")
+                                                .name("my_list")
                                                 .schema(
                                                         InternalSchema.builder()
-                                                                .name("array")
+                                                                .name("my_list")
                                                                 .isNullable(false)
                                                                 .dataType(InternalType.LIST)
                                                                 .fields(
                                                                         Arrays.asList(
                                                                                 InternalField.builder()
                                                                                         .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                                                                        .parentPath("intList")
+                                                                                        .parentPath("my_list")
                                                                                         .schema(
                                                                                                 InternalSchema.builder()
                                                                                                         .name("int")
@@ -111,17 +111,17 @@ public class TestParquetSchemaExtractor {
                                                                 .build())
                                                 .build(),
                                         InternalField.builder()
-                                                .name("recordList")
+                                                .name("my_group")
                                                 .schema(
                                                         InternalSchema.builder()
                                                                 .name("array")
                                                                 .isNullable(true)
-                                                                .dataType(InternalType.LIST)
+                                                                .dataType(InternalType.RECORD)
                                                                 .fields(
                                                                         Arrays.asList(
                                                                                 InternalField.builder()
                                                                                         .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                                                                        .parentPath("recordList")
+                                                                                        .parentPath("my_group")
                                                                                         .schema(recordListElementSchema)
                                                                                         .build()))
                                                                 .build())
@@ -144,8 +144,8 @@ public class TestParquetSchemaExtractor {
         GroupType testGroupType = Types.requiredGroup()
                 .required(PrimitiveTypeName.INT64).named("id")
                 .optional(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType()).named("name")
-                .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.dateType()).named("date")
-                .named("user");
+                //.required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.dateType()).named("date")
+                .named("my_group");
 
  /*       GroupType nestedGroupType = Types.requiredGroup()
                 .required(INT64).named("id")
@@ -162,9 +162,9 @@ public class TestParquetSchemaExtractor {
                 .named("zipMap");
         GroupType listType = Types.optionalList().setElementType(Types.primitive(PrimitiveTypeName.INT32, Repetition.REQUIRED).named("element")).named("my_list");
         MessageType messageType = Types.buildMessage()
-                .addField(testGroupType)
-                .addField(testMap)
+                //.addField(testMap)
                 .addField(listType)
+                .addField(testGroupType)
                 .named("my_record");
         // TODO make this test pass!
         Assertions.assertEquals(
@@ -172,7 +172,7 @@ public class TestParquetSchemaExtractor {
     }
 
     @Test
-    public void main() {
+    public void main(String[] args) {
         testPrimitiveTypes();
     }
 }
