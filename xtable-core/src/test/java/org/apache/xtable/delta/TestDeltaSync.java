@@ -516,7 +516,7 @@ public class TestDeltaSync {
   private InternalSchema getInternalSchema() {
     Map<InternalSchema.MetadataKey, Object> timestampMetadata = new HashMap<>();
     timestampMetadata.put(
-        InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
+        InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
     return InternalSchema.builder()
         .dataType(InternalType.RECORD)
         .name("top_level_schema")
@@ -555,6 +555,16 @@ public class TestDeltaSync {
                         InternalSchema.builder()
                             .name("time")
                             .dataType(InternalType.TIMESTAMP)
+                            .isNullable(true)
+                            .metadata(timestampMetadata)
+                            .build())
+                    .build(),
+                InternalField.builder()
+                    .name("timestamp_ntz_field")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("time_ntz")
+                            .dataType(InternalType.TIMESTAMP_NTZ)
                             .isNullable(true)
                             .metadata(timestampMetadata)
                             .build())
