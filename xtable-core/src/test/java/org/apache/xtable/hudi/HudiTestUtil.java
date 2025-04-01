@@ -18,6 +18,7 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
 
 import java.nio.file.Path;
@@ -60,7 +61,7 @@ public class HudiTestUtil {
         .setTableName("test_table")
         .setPayloadClass(HoodieAvroPayload.class)
         .setPartitionFields(partitionFields)
-        .initTable(new Configuration(), tableBasePath);
+        .initTable(getStorageConf(new Configuration()), tableBasePath);
   }
 
   public static HoodieWriteConfig getHoodieWriteConfig(HoodieTableMetaClient metaClient) {

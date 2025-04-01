@@ -48,7 +48,7 @@ import org.apache.hudi.common.model.HoodieDeltaWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
-import org.apache.hudi.hadoop.CachingPath;
+import org.apache.hudi.hadoop.fs.CachingPath;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
 
 import org.apache.xtable.collectors.CustomCollectors;
@@ -91,7 +91,10 @@ public class BaseFileUpdatesExtractor {
     Set<String> partitionPathsToDrop =
         new HashSet<>(
             FSUtils.getAllPartitionPaths(
-                engineContext, metadataConfig, metaClient.getBasePathV2().toString()));
+                engineContext,
+                metaClient.getStorage(),
+                metadataConfig,
+                metaClient.getBasePathV2().toString()));
     ReplaceMetadata replaceMetadata =
         partitionedDataFiles.stream()
             .map(

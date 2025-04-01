@@ -64,7 +64,7 @@
         <lombok.version>1.18.36</lombok.version>
         <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
         <hadoop.version>3.4.1</hadoop.version>
-        <hudi.version>0.14.0</hudi.version>
+        <hudi.version>0.15.0</hudi.version>
         <aws.version>2.29.40</aws.version>
         <hive.version>2.3.9</hive.version>
         <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
@@ -79,15 +79,15 @@
         <scala13.version>2.13.15</scala13.version>
         <scala.version>${scala12.version}</scala.version>
         <scala.binary.version>2.12</scala.binary.version>
-        <spark.version>3.4.2</spark.version>
-        <spark.version.prefix>3.4</spark.version.prefix>
+        <spark.version>3.5.2</spark.version>
+        <spark.version.prefix>3.5</spark.version.prefix>
         <iceberg.version>1.4.2</iceberg.version>
-        <delta.version>2.4.0</delta.version>
+        <delta.version>3.0.0</delta.version>
         <jackson.version>2.18.2</jackson.version>
         <spotless.version>2.43.0</spotless.version>
         <apache.rat.version>0.16.1</apache.rat.version>
         <google.java.format.version>1.8</google.java.format.version>
-        <delta.standalone.version>0.5.0</delta.standalone.version>
+        <delta.standalone.version>3.3.0</delta.standalone.version>
         <delta.hive.version>3.0.0</delta.hive.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <target.dir.pattern>**/target/**</target.dir.pattern>
@@ -290,7 +290,7 @@
             <!-- Delta -->
             <dependency>
                 <groupId>io.delta</groupId>
-                <artifactId>delta-core_${scala.binary.version}</artifactId>
+                <artifactId>delta-spark_${scala.binary.version}</artifactId>
                 <version>${delta.version}</version>
             </dependency>
             <dependency>

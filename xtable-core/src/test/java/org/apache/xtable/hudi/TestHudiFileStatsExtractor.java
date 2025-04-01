@@ -18,6 +18,7 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -63,6 +64,7 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.storage.StorageConfiguration;
 
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestJavaHudiTable;
@@ -81,7 +83,7 @@ public class TestHudiFileStatsExtractor {
   private static final Schema NESTED_SCHEMA =
       AVRO_SCHEMA.getField("nested_record").schema().getTypes().get(1);
 
-  private final Configuration configuration = new Configuration();
+  private final StorageConfiguration configuration = getStorageConf(new Configuration());
   private final InternalField nestedIntBase = getNestedIntBase();
   private final InternalSchema nestedSchema = getNestedSchema(nestedIntBase, "nested_record");
   private final InternalField longField = getLongField();
@@ -124,6 +126,7 @@ public class TestHudiFileStatsExtractor {
   void columnStatsWithMetadataTable(@TempDir Path tempDir) throws Exception {
     String tableName = GenericTable.getTableName();
     String basePath;
+    HoodieTableMetaClient metaClient;
     try (TestJavaHudiTable table =
         TestJavaHudiTable.withSchema(
             tableName, tempDir, "long_field:SIMPLE", HoodieTableType.COPY_ON_WRITE, AVRO_SCHEMA)) {
@@ -131,10 +134,12 @@ public class TestHudiFileStatsExtractor {
           getRecords().stream().map(this::buildRecord).collect(Collectors.toList());
       table.insertRecords(true, records);
       basePath = table.getBasePath();
+      metaClient = table.getMetaClient();
     }
     HoodieTableMetadata tableMetadata =
         HoodieTableMetadata.create(
             new HoodieJavaEngineContext(configuration),
+            metaClient.getStorage(),
             HoodieMetadataConfig.newBuilder().enable(true).build(),
             basePath,
             true);
@@ -152,8 +157,6 @@ public class TestHudiFileStatsExtractor {
             .fileSizeBytes(4321L)
             .recordCount(0)
             .build();
-    HoodieTableMetaClient metaClient =
-        HoodieTableMetaClient.builder().setBasePath(basePath).setConf(configuration).build();
     HudiFileStatsExtractor fileStatsExtractor = new HudiFileStatsExtractor(metaClient);
     List<InternalDataFile> output =
         fileStatsExtractor
@@ -170,7 +173,8 @@ public class TestHudiFileStatsExtractor {
     try (ParquetWriter<GenericRecord> writer =
         AvroParquetWriter.<GenericRecord>builder(
                 HadoopOutputFile.fromPath(
-                    new org.apache.hadoop.fs.Path(file.toUri()), configuration))
+                    new org.apache.hadoop.fs.Path(file.toUri()),
+                    (Configuration) configuration.unwrapCopy()))
             .withSchema(AVRO_SCHEMA)
             .withDataModel(genericData)
             .build()) {
@@ -190,7 +194,7 @@ public class TestHudiFileStatsExtractor {
             .build();
 
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
-    when(mockMetaClient.getHadoopConf()).thenReturn(configuration);
+    when(mockMetaClient.getStorageConf()).thenReturn(configuration);
     HudiFileStatsExtractor fileStatsExtractor = new HudiFileStatsExtractor(mockMetaClient);
     List<InternalDataFile> output =
         fileStatsExtractor

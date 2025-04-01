@@ -18,6 +18,8 @@
  
 package org.apache.xtable;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -320,7 +322,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
               .withArchivalConfig(archivalConfig)
               .build();
     }
-    HoodieEngineContext context = new HoodieJavaEngineContext(conf);
+    HoodieEngineContext context = new HoodieJavaEngineContext(getStorageConf(conf));
     return new HoodieJavaWriteClient<>(context, writeConfig);
   }
 }
