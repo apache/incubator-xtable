@@ -109,6 +109,31 @@ public class TestIcebergPartitionValueConverter {
     assertEquals(expectedPartitionValues, partitionValues);
   }
 
+  @Test
+  void testToXTableBucketPartitioned() {
+    Schema schemaWithPartition =
+        new Schema(
+            Types.NestedField.optional(1, "id", Types.IntegerType.get()),
+            Types.NestedField.optional(2, "name", Types.StringType.get()),
+            Types.NestedField.optional(3, "birthDate", Types.TimestampType.withZone()),
+            Types.NestedField.optional(4, "name_bucket", Types.IntegerType.get()));
+    StructLike structLike = Row.of(schemaWithPartition, 1, "abc", 1614556800000L, 5);
+    List<PartitionValue> expectedPartitionValues =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(getPartitionField("name", PartitionTransformType.BUCKET))
+                .range(Range.scalar(5))
+                .build());
+    PartitionSpec partitionSpec = PartitionSpec.builderFor(SCHEMA).bucket("name", 8).build();
+    List<PartitionValue> partitionValues =
+        partitionValueConverter.toXTable(
+            buildInternalTable(true, "name", PartitionTransformType.BUCKET),
+            structLike,
+            partitionSpec);
+    assertEquals(1, partitionValues.size());
+    assertEquals(expectedPartitionValues, partitionValues);
+  }
+
   private InternalTable buildInternalTable(boolean isPartitioned) {
     return buildInternalTable(isPartitioned, null, null);
   }

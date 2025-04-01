@@ -35,10 +35,12 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.exception.TableNotFoundException;
 
+import org.apache.xtable.exception.PartitionSpecException;
 import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 
 /** A class used to initialize new Hudi tables and load the metadata of existing tables. */
@@ -124,6 +126,12 @@ public class HudiTableManager {
   @VisibleForTesting
   static String getKeyGeneratorClass(
       List<InternalPartitionField> partitionFields, List<InternalField> recordKeyFields) {
+    if (partitionFields.stream()
+        .anyMatch(
+            internalPartitionField ->
+                internalPartitionField.getTransformType() == PartitionTransformType.BUCKET)) {
+      throw new PartitionSpecException("Bucket partition is not yet supported by Hudi targets");
+    }
     boolean multipleRecordKeyFields = recordKeyFields.size() > 1;
     boolean multiplePartitionFields = partitionFields.size() > 1;
     String keyGeneratorClass;

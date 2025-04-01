@@ -352,7 +352,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     Path baseDataPath = Paths.get(icebergTable.location(), "data");
     String filePath;
     if (icebergDataHelper.getPartitionSpec().isPartitioned()) {
-      String partitionPath = getPartitionPath(partitionKey.get(0, String.class));
+      String partitionPath = ((PartitionKey) partitionKey).toPath();
       filePath =
           baseDataPath.resolve(partitionPath).resolve(UUID.randomUUID() + ".parquet").toString();
     } else {
@@ -433,15 +433,5 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     return recordsByPartition.entrySet().stream()
         .map(entry -> writeAndGetDataFile(entry.getValue(), entry.getKey()))
         .collect(Collectors.toList());
-  }
-
-  private String getPartitionPath(Object partitionValue) {
-    Preconditions.checkArgument(
-        icebergDataHelper.getPartitionFieldNames().size() == 1,
-        "Only single partition field is supported for grouping records by partition");
-    Preconditions.checkArgument(
-        icebergDataHelper.getPartitionFieldNames().get(0).equals("level"),
-        "Only level partition field is supported for grouping records by partition");
-    return "level=" + partitionValue;
   }
 }
