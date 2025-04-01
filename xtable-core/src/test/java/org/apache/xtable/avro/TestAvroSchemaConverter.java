@@ -576,7 +576,7 @@ public class TestAvroSchemaConverter {
                         .schema(
                             InternalSchema.builder()
                                 .name("long")
-                                .dataType(InternalType.TIMESTAMP_NTZ)
+                                .dataType(InternalType.LONG)
                                 .isNullable(false)
                                 .metadata(millisMetadata)
                                 .build())
@@ -586,7 +586,7 @@ public class TestAvroSchemaConverter {
                         .schema(
                             InternalSchema.builder()
                                 .name("long")
-                                .dataType(InternalType.TIMESTAMP_NTZ)
+                                .dataType(InternalType.LONG)
                                 .isNullable(false)
                                 .metadata(microsMetadata)
                                 .build())

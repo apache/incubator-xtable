@@ -322,13 +322,36 @@ public class TestDeltaSchemaExtractor {
                                 .metadata(metadata)
                                 .build())
                         .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build(),
+                    InternalField.builder()
+                        .name("requiredTimestampNtz")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("timestamp_ntz")
+                                .dataType(InternalType.TIMESTAMP_NTZ)
+                                .isNullable(false)
+                                .metadata(metadata)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("optionalTimestampNtz")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("timestamp_ntz")
+                                .dataType(InternalType.TIMESTAMP_NTZ)
+                                .isNullable(true)
+                                .metadata(metadata)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
 
     StructType structRepresentationTimestamp =
         new StructType()
             .add("requiredTimestamp", DataTypes.TimestampType, false)
-            .add("optionalTimestamp", DataTypes.TimestampType, true);
+            .add("optionalTimestamp", DataTypes.TimestampType, true)
+            .add("requiredTimestampNtz", DataTypes.TimestampNTZType, false)
+            .add("optionalTimestampNtz", DataTypes.TimestampNTZType, true);
 
     Assertions.assertEquals(
         internalSchemaTimestamp,
