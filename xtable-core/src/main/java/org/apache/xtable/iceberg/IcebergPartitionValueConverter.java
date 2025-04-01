@@ -66,6 +66,7 @@ public class IcebergPartitionValueConverter {
   private static final String DAY = "day";
   private static final String HOUR = "hour";
   private static final String IDENTITY = "identity";
+  static final String BUCKET = "bucket";
 
   public static IcebergPartitionValueConverter getInstance() {
     return INSTANCE;
@@ -124,8 +125,16 @@ public class IcebergPartitionValueConverter {
           transformType = PartitionTransformType.VALUE;
           break;
         default:
-          throw new NotSupportedException(
-              "Partition transform not supported: " + partitionField.transform().toString());
+          if (partitionField.transform().toString().startsWith(BUCKET)) {
+            value = structLike.get(fieldPosition, Integer.class);
+            transformType = PartitionTransformType.BUCKET;
+          } else if (partitionField.transform().isVoid()) {
+            // skip void type
+            continue;
+          } else {
+            throw new NotSupportedException(
+                "Partition transform not supported: " + partitionField.transform().toString());
+          }
       }
       Types.NestedField partitionSourceField =
           partitionSpec.schema().findField(partitionField.sourceId());

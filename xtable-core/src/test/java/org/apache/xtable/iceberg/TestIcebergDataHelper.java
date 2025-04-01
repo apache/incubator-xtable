@@ -126,7 +126,7 @@ public class TestIcebergDataHelper {
   String recordKeyField;
   List<String> partitionFieldNames;
 
-  public static enum SchemaType {
+  public enum SchemaType {
     BASIC,
     COMMON,
     COMMON_WITH_ADDITIONAL_COLUMNS,
@@ -201,6 +201,13 @@ public class TestIcebergDataHelper {
   public PartitionSpec getPartitionSpec() {
     if (partitionFieldNames.isEmpty()) {
       return PartitionSpec.unpartitioned();
+    }
+    if (partitionFieldNames.equals(Arrays.asList("level", "string_field"))) {
+      return PartitionSpec.builderFor(tableSchema)
+          .alwaysNull("bytes_field")
+          .identity("level")
+          .bucket("string_field", 10)
+          .build();
     }
     if (partitionFieldNames.size() > 1) {
       throw new IllegalArgumentException(

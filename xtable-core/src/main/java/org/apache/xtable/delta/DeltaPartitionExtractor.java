@@ -75,6 +75,7 @@ public class DeltaPartitionExtractor {
   private static final String DATE_FORMAT_FOR_DAY = "yyyy-MM-dd";
   private static final String DATE_FORMAT_FOR_MONTH = "yyyy-MM";
   private static final String DATE_FORMAT_FOR_YEAR = "yyyy";
+  private static final String BUCKET_FUNCTION = "MOD((HASH(%s) & %d), %d)";
   // For timestamp partition fields, actual partition column names in delta format will be of type
   // generated & and with a name like `delta_partition_col_{transform_type}_{source_field_name}`.
   private static final String DELTA_PARTITION_COL_NAME_FORMAT = "xtable_partition_col_%s_%s";
@@ -242,7 +243,7 @@ public class DeltaPartitionExtractor {
         currPartitionColumnName = internalPartitionField.getSourceField().getName();
         field = null;
       } else {
-        // Since partition field of timestamp type, create new field in schema.
+        // Since partition field of timestamp or bucket type, create new field in schema.
         field = getGeneratedField(internalPartitionField);
         currPartitionColumnName = field.name();
       }
@@ -270,6 +271,10 @@ public class DeltaPartitionExtractor {
                 "");
         partitionValuesSerialized.put(
             partitionField.getSourceField().getName(), partitionValueSerialized);
+      } else if (transformType == PartitionTransformType.BUCKET) {
+        partitionValueSerialized = partitionValue.getRange().getMaxValue().toString();
+        partitionValuesSerialized.put(
+            getGeneratedColumnName(partitionField), partitionValueSerialized);
       } else {
         // use appropriate date formatter for value serialization.
         partitionValueSerialized =
@@ -352,7 +357,6 @@ public class DeltaPartitionExtractor {
     String generatedExpression;
     DataType dataType;
     String currPartitionColumnName = getGeneratedColumnName(internalPartitionField);
-    Map<String, String> generatedExpressionMetadata = new HashMap<>();
     switch (internalPartitionField.getTransformType()) {
       case YEAR:
         generatedExpression =
@@ -373,10 +377,23 @@ public class DeltaPartitionExtractor {
             String.format(CAST_FUNCTION, internalPartitionField.getSourceField().getPath());
         dataType = DataTypes.DateType;
         break;
+      case BUCKET:
+        generatedExpression =
+            String.format(
+                BUCKET_FUNCTION,
+                internalPartitionField.getSourceField().getPath(),
+                Integer.MAX_VALUE,
+                (int)
+                    internalPartitionField
+                        .getTransformOptions()
+                        .get(InternalPartitionField.NUM_BUCKETS));
+        dataType = DataTypes.IntegerType;
+        break;
       default:
         throw new PartitionSpecException("Invalid transform type");
     }
-    generatedExpressionMetadata.put(DELTA_GENERATION_EXPRESSION, generatedExpression);
+    Map<String, String> generatedExpressionMetadata =
+        Collections.singletonMap(DELTA_GENERATION_EXPRESSION, generatedExpression);
     Metadata partitionFieldMetadata =
         new Metadata(ScalaUtils.convertJavaMapToScala(generatedExpressionMetadata));
     return new StructField(currPartitionColumnName, dataType, true, partitionFieldMetadata);
