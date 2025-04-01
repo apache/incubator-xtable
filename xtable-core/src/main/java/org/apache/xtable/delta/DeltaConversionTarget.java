@@ -73,9 +73,9 @@ import org.apache.xtable.spi.sync.ConversionTarget;
 
 @Log4j2
 public class DeltaConversionTarget implements ConversionTarget {
-  private static final String MIN_READER_VERSION = String.valueOf(1);
+  private static final int MIN_READER_VERSION = 1;
   // gets access to generated columns.
-  private static final String MIN_WRITER_VERSION = String.valueOf(4);
+  private static final int MIN_WRITER_VERSION = 4;
 
   private DeltaLog deltaLog;
   private DeltaSchemaExtractor schemaExtractor;
@@ -329,8 +329,14 @@ public class DeltaConversionTarget implements ConversionTarget {
 
     private Map<String, String> getConfigurationsForDeltaSync() {
       Map<String, String> configMap = new HashMap<>();
-      configMap.put(DeltaConfigs.MIN_READER_VERSION().key(), MIN_READER_VERSION);
-      configMap.put(DeltaConfigs.MIN_WRITER_VERSION().key(), MIN_WRITER_VERSION);
+      configMap.put(
+          DeltaConfigs.MIN_READER_VERSION().key(),
+          String.valueOf(
+              Math.max(deltaLog.snapshot().protocol().minReaderVersion(), MIN_READER_VERSION)));
+      configMap.put(
+          DeltaConfigs.MIN_WRITER_VERSION().key(),
+          String.valueOf(
+              Math.max(deltaLog.snapshot().protocol().minWriterVersion(), MIN_WRITER_VERSION)));
       configMap.put(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
       // Sets retention for the Delta Log, does not impact underlying files in the table
       configMap.put(
