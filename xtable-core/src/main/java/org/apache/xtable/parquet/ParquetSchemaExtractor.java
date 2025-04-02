@@ -54,6 +54,9 @@ import org.apache.parquet.schema.Type.ID;
 import org.apache.parquet.schema.OriginalType;
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 import org.apache.parquet.schema.Types;
+import org.apache.parquet.column.ColumnDescriptor;
+
+import java.lang.reflect.*;
 
 //import org.apache.parquet.avro.AvroSchemaConverter;
 
@@ -84,6 +87,10 @@ public class ParquetSchemaExtractor {
 
     public static ParquetSchemaExtractor getInstance() {
         return INSTANCE;
+    }
+
+    private static boolean groupTypeIsNullable(Type schema) {
+        return schema.getRepetition() == Repetition.REQUIRED ? true : false;
     }
 
     private static boolean groupTypeContainsNull(Type schema) {
@@ -121,14 +128,13 @@ public class ParquetSchemaExtractor {
             Type schema, String parentPath) {
         // TODO - Does not handle recursion in parquet schema
         InternalType newDataType = null;
-        PrimitiveType typeName;
+        PrimitiveType primitiveType;
         LogicalTypeAnnotation logicalType;
         Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
-        if (schema.isPrimitive()/*schema.getFields().size()==1*/) {
-            //Type schemaField = schema.getType(0);
-            //typeName = schemaField.asPrimitiveType();
-            typeName = schema.asPrimitiveType();
-            switch (typeName.getPrimitiveTypeName()) {
+        String elementName = schema.getName();
+        if (schema.isPrimitive()) {
+            primitiveType = schema.asPrimitiveType();
+            switch (primitiveType.getPrimitiveTypeName()) {
                 // PrimitiveTypes
                 case INT64:
                     logicalType = schema.getLogicalTypeAnnotation();
@@ -233,8 +239,14 @@ public class ParquetSchemaExtractor {
                     newDataType = InternalType.NULL;
                     break;*/
                 default:
+                    /*if (logicalType instanceof LogicalTypeAnnotation.UnknownLogicalTypeAnnotation){
+                        newDataType = InternalType.NULL;
+                    }
+                    else {*/
                     throw new UnsupportedSchemaTypeException(
                             String.format("Unsupported schema type %s", schema));
+                    //}
+                    //break;
             }
         } else {
             //GroupTypes
@@ -291,56 +303,14 @@ public class ParquetSchemaExtractor {
                                         valueField))
                         .build();
             } else {
-                List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
-                for (Type parquetField : schema.asGroupType().getFields()) {
-                    String fieldName = parquetField.getName();
-                    Type.ID fieldId = parquetField.getId();
-                    InternalSchema subFieldSchema =
-                            toInternalSchema(
-                                    parquetField,
-                                    SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
-                    subFields.add(
-                            InternalField.builder()
-                                    .parentPath(parentPath)
-                                    .name(fieldName)
-                                    .schema(subFieldSchema)
-                                    .defaultValue(null)
-                                    .fieldId(fieldId == null ? null : fieldId.intValue())
-                                    .build());
-                }
-                return InternalSchema.builder()
-                        .name(schema.getName())
-                        .comment(null)
-                        .dataType(InternalType.RECORD)
-                        .fields(subFields)
-                        .isNullable(groupTypeContainsNull(schema.asGroupType()))
-                        .build();
-            }
-            //switch (schema.getOriginalType()) {
-            //  case LIST: {
-                 /*   String schemaName = schema.asGroupType().getName();
-                    Type.ID schemaId = schema.getId();
-                    InternalSchema elementSchema =
-                            toInternalSchema(
-                                    schema.asGroupType().getType(0),
-                                    SchemaUtils.getFullyQualifiedPath(
-                                            parentPath, InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME));
-                    InternalField elementField =
-                            InternalField.builder()
-                                    .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                    .parentPath(parentPath)
-                                    .schema(elementSchema)
-                                    .fieldId(schemaId == null ? null : schemaId.intValue())
-                                    .build();
-                    return InternalSchema.builder()
-                            .name(schema.getName())
-                            .dataType(InternalType.LIST)
-                            .comment(null)
-                            .isNullable(groupTypeContainsNull(schema.asGroupType()))
-                            .fields(Collections.singletonList(elementField))
-                            .build();*/
-            //}
-                /*case ARRAY:
+                Type.Repetition currentRepetition = schema.getRepetition();
+                if (currentRepetition == Repetition.REPEATED && (schema.asGroupType().getName() == "list" || Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) && schema.asGroupType().getFields().size() == 1) {
+                    InternalSchema elementSchema = toInternalSchema(
+                            schema.asGroupType().getType(0),
+                            SchemaUtils.getFullyQualifiedPath(parentPath, schema.asGroupType().getName()));
+                    newDataType = elementSchema.getDataType();
+                    elementName = elementSchema.getName();
+                } else {
                     List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
                     for (Type parquetField : schema.asGroupType().getFields()) {
                         String fieldName = parquetField.getName();
@@ -361,71 +331,15 @@ public class ParquetSchemaExtractor {
                     return InternalSchema.builder()
                             .name(schema.getName())
                             .comment(null)
-                            .dataType(InternalType.LIST)
+                            .dataType(InternalType.RECORD)//
                             .fields(subFields)
                             .isNullable(groupTypeContainsNull(schema.asGroupType()))
-                            .build();*/
-            //case MAP: {
-                    /*String schemaName = schema.asGroupType().getName();
-                    Type.ID schemaId = schema.getId();
-                    InternalSchema valueSchema =
-                            toInternalSchema(
-                                    schema,
-                                    SchemaUtils.getFullyQualifiedPath(
-                                            parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME));
-                    InternalField valueField =
-                            InternalField.builder()
-                                    .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
-                                    .parentPath(parentPath)
-                                    .schema(valueSchema)
-                                    .fieldId(schemaId == null ? null : schemaId.intValue())
-                                    .build();
-                    return InternalSchema.builder()
-                            .name(schemaName)
-                            .dataType(InternalType.MAP)
-                            .comment(null)
-                            .isNullable(groupTypeContainsNull(schema.asGroupType()))
-                            .fields(
-                                    Arrays.asList(
-                                            MAP_KEY_FIELD.toBuilder()
-                                                    .parentPath(parentPath)
-                                                    .fieldId(schemaId == null ? null : schemaId.intValue())
-                                                    .build(),
-                                            valueField))
-                            .build();*/
-            // }
-            //default:
-                    /*List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
-                    for (Type parquetField : schema.asGroupType().getFields()) {
-                        String fieldName = parquetField.getName();
-                        Type.ID fieldId = parquetField.getId();
-                        InternalSchema subFieldSchema =
-                                toInternalSchema(
-                                        parquetField,
-                                        SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
-                        subFields.add(
-                                InternalField.builder()
-                                        .parentPath(parentPath)
-                                        .name(fieldName)
-                                        .schema(subFieldSchema)
-                                        .defaultValue(null)
-                                        .fieldId(fieldId == null ? null : fieldId.intValue())
-                                        .build());
-                    }
-                    return InternalSchema.builder()
-                            .name(schema.getName())
-                            .comment(null)
-                            .dataType(InternalType.LIST)
-                            .fields(subFields)
-                            .isNullable(groupTypeContainsNull(schema.asGroupType()))
-                            .build();*/
-            // throw new UnsupportedSchemaTypeException(
-            //       String.format("Unsupported schema type %s", schema));
-            //   }
+                            .build();
+                }
+            }
         }
-        //newDataType = null;
         return InternalSchema.builder()
-                .name(schema.getName())
+                .name(elementName)
                 .dataType(newDataType)
                 .comment(null)
                 .isNullable(groupTypeContainsNull(schema)) // to check

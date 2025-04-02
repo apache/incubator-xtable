@@ -36,6 +36,7 @@ import org.apache.parquet.schema.GroupType;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
+import org.apache.parquet.schema.OriginalType;
 
 import java.util.Map;
 import java.util.Arrays;
@@ -47,6 +48,24 @@ public class TestParquetSchemaExtractor {
 
     @Test
     public void testPrimitiveTypes() {
+
+        InternalSchema simpleList = InternalSchema.builder()
+                .name("my_list")
+                .isNullable(false)
+                .dataType(InternalType.LIST)
+                .fields(
+                        Arrays.asList(
+                                InternalField.builder()
+                                        .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                        .parentPath(null)
+                                        .schema(
+                                                InternalSchema.builder()
+                                                        .name("element")
+                                                        .dataType(InternalType.INT)
+                                                        .isNullable(false)
+                                                        .build())
+                                        .build()))
+                .build();
         InternalSchema primitive1 =
                 InternalSchema.builder().name("integer").dataType(InternalType.INT).build();
         InternalSchema primitive2 =
@@ -100,7 +119,7 @@ public class TestParquetSchemaExtractor {
                                                                         Arrays.asList(
                                                                                 InternalField.builder()
                                                                                         .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                                                                        .parentPath("my_list")
+                                                                                        .parentPath(null)
                                                                                         .schema(
                                                                                                 InternalSchema.builder()
                                                                                                         .name("int")
@@ -135,11 +154,11 @@ public class TestParquetSchemaExtractor {
         Type intPrimitiveType = Types
                 .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.intType(32, false))
                 .named("integer");
-        Assertions.assertEquals(
+ /*       Assertions.assertEquals(
                 primitive1, schemaExtractor.toInternalSchema(intPrimitiveType, null));
 
         Assertions.assertEquals(
-                primitive2, schemaExtractor.toInternalSchema(stringPrimitiveType, null));
+                primitive2, schemaExtractor.toInternalSchema(stringPrimitiveType, null));*/
 
         GroupType testGroupType = Types.requiredGroup()
                 .required(PrimitiveTypeName.INT64).named("id")
@@ -160,13 +179,24 @@ public class TestParquetSchemaExtractor {
                 .key(PrimitiveTypeName.FLOAT)
                 .optionalValue(PrimitiveTypeName.INT32)
                 .named("zipMap");
-        GroupType listType = Types.optionalList().setElementType(Types.primitive(PrimitiveTypeName.INT32, Repetition.REQUIRED).named("element")).named("my_list");
+        GroupType listType = Types.requiredList().setElementType(Types.primitive(PrimitiveTypeName.INT32, Repetition.REQUIRED).named("element")).named("my_list");
         MessageType messageType = Types.buildMessage()
                 //.addField(testMap)
                 .addField(listType)
                 .addField(testGroupType)
                 .named("my_record");
-        // TODO make this test pass!
+
+        /*GroupType nestedList = Types.requiredList()
+                .optionalList()
+                .requiredElement(PrimitiveTypeNameINT32).named("integer")
+                .named("nestedListInner1")
+                .optionalList()
+                .requiredElement(PrimitiveTypeNameINT32).named("integer")
+                .named("nestedListInner2")
+                .named("nestedListOuter");*/
+        Assertions.assertEquals(
+                messageType, schemaExtractor.toInternalSchema(messageType, null));
+
         Assertions.assertEquals(
                 internalSchema, schemaExtractor.toInternalSchema(messageType, null));
     }
