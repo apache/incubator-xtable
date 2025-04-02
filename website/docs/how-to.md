@@ -363,5 +363,5 @@ In this tutorial, we saw how to create a source table and use Apache XTable™ (
 that can be used to query the source table in different target table formats.
 
 ## Next steps
-Go through the [Catalog Integration guides](/docs/catalogs-index) to register the Apache XTable™ (Incubating) synced tables
-in different data catalogs.
+1. Check out [Registering your interoperable tables across multiple catalogs](/docs/how-to-catalog-sync) to learn how to automatically register target tables in multiple catalogs using Apache XTable™ (Incubating).
+2. Explore the [Catalog Integration guides](/docs/catalogs-index) to register the Apache XTable™ (Incubating) synced tables in different data catalogs manually.

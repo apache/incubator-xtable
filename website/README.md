@@ -113,5 +113,9 @@ npm run serve
 1. Create a `.md` file with all the content for Community page.
 2. Add community page to website homepage. 
 
+## Add how-to-use docs for catalog sync.
+1. Create a `.md` file with all the content for how-to-use catalog sync feature.
+2. Add how-to-use catalog sync to website.
+
 ## Maintainers
 [Apache XTable™ (Incubating) Community](https://incubator.apache.org/projects/xtable.html)
