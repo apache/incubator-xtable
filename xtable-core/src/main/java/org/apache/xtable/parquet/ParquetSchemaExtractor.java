@@ -90,7 +90,7 @@ public class ParquetSchemaExtractor {
     }
 
     private static boolean groupTypeIsNullable(Type schema) {
-        return schema.getRepetition() == Repetition.REQUIRED ? true : false;
+        return schema.getRepetition() == Repetition.REQUIRED ? false : true;
     }
 
     private static boolean groupTypeContainsNull(Type schema) {
@@ -331,7 +331,7 @@ public class ParquetSchemaExtractor {
                     return InternalSchema.builder()
                             .name(schema.getName())
                             .comment(null)
-                            .dataType(InternalType.RECORD)//
+                            .dataType(InternalType.RECORD)
                             .fields(subFields)
                             .isNullable(groupTypeContainsNull(schema.asGroupType()))
                             .build();

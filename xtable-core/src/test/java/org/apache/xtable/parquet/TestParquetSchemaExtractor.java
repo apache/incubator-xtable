@@ -131,19 +131,19 @@ public class TestParquetSchemaExtractor {
                                                 .build(),
                                         InternalField.builder()
                                                 .name("my_group")
-                                                .schema(
-                                                        InternalSchema.builder()
-                                                                .name("array")
-                                                                .isNullable(true)
-                                                                .dataType(InternalType.RECORD)
-                                                                .fields(
-                                                                        Arrays.asList(
-                                                                                InternalField.builder()
-                                                                                        .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                                                                        .parentPath("my_group")
-                                                                                        .schema(recordListElementSchema)
-                                                                                        .build()))
-                                                                .build())
+                                                .schema(recordListElementSchema)
+                                                /*InternalSchema.builder()
+                                                        .name("array")
+                                                        .isNullable(true)
+                                                        .dataType(InternalType.RECORD)
+                                                        .fields(
+                                                                Arrays.asList(
+                                                                        InternalField.builder()
+                                                                                .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                                                                .parentPath("my_group")
+                                                                                .schema(recordListElementSchema)
+                                                                                .build()))
+                                                        .build())*/
                                                 .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                                                 .build()))
                         .build();
@@ -195,7 +195,7 @@ public class TestParquetSchemaExtractor {
                 .named("nestedListInner2")
                 .named("nestedListOuter");*/
         Assertions.assertEquals(
-                messageType, schemaExtractor.toInternalSchema(messageType, null));
+                internalSchema, schemaExtractor.toInternalSchema(messageType, null));
 
         Assertions.assertEquals(
                 internalSchema, schemaExtractor.toInternalSchema(messageType, null));
