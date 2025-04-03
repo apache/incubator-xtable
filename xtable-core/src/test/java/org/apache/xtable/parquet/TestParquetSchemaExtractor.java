@@ -74,30 +74,30 @@ public class TestParquetSchemaExtractor {
                 InternalSchema.builder().name("list").dataType(InternalType.LIST).build();
         InternalSchema recordListElementSchema=
                 InternalSchema.builder()
-                        .name("element")
+                        .name("my_group")
                         .isNullable(false)
                         .fields(
                                 Arrays.asList(
                                         InternalField.builder()
                                                 .name("id")
-                                                .parentPath("recordList._one_field_element")
+                                                .parentPath("my_group")
                                                 .schema(
                                                         InternalSchema.builder()
-                                                                .name("int64")
+                                                                .name("id")
                                                                 .dataType(InternalType.LONG)
                                                                 .isNullable(false)
                                                                 .build())
                                                 .build(),
                                         InternalField.builder()
                                                 .name("name")
-                                                .parentPath("recordList._one_field_element")
+                                                .parentPath("my_group")
                                                 .schema(
                                                         InternalSchema.builder()
-                                                                .name("string")
+                                                                .name("name")
                                                                 .dataType(InternalType.STRING)
-                                                                .isNullable(true)
+                                                                .isNullable(false)
                                                                 .build())
-                                                .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                                                .defaultValue(null)
                                                 .build()))
                         .dataType(InternalType.RECORD)
                         .build();
@@ -119,10 +119,10 @@ public class TestParquetSchemaExtractor {
                                                                         Arrays.asList(
                                                                                 InternalField.builder()
                                                                                         .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                                                                        .parentPath(null)
+                                                                                        .parentPath("my_list")
                                                                                         .schema(
                                                                                                 InternalSchema.builder()
-                                                                                                        .name("int")
+                                                                                                        .name("element")
                                                                                                         .dataType(InternalType.INT)
                                                                                                         .isNullable(false)
                                                                                                         .build())
@@ -144,7 +144,7 @@ public class TestParquetSchemaExtractor {
                                                                                 .schema(recordListElementSchema)
                                                                                 .build()))
                                                         .build())*/
-                                                .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                                                .defaultValue(null)
                                                 .build()))
                         .build();
         Type stringPrimitiveType = Types
