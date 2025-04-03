@@ -128,6 +128,7 @@ public class ParquetSchemaExtractor {
             Type schema, String parentPath) {
         // TODO - Does not handle recursion in parquet schema
         InternalType newDataType = null;
+        List<InternalField> subFields = new ArrayList<>();
         PrimitiveType primitiveType;
         LogicalTypeAnnotation logicalType;
         Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
@@ -294,24 +295,38 @@ public class ParquetSchemaExtractor {
                         .dataType(InternalType.MAP)
                         .comment(null)
                         .isNullable(groupTypeContainsNull(schema.asGroupType()))
-                        .fields(
-                                Arrays.asList(
+                        .fields(valueSchema.getFields()
+                                /*Arrays.asList(
                                         MAP_KEY_FIELD.toBuilder()
                                                 .parentPath(parentPath)
                                                 .fieldId(schemaId == null ? null : schemaId.intValue())
                                                 .build(),
-                                        valueField))
+                                        valueField)*/)
                         .build();
             } else {
                 Type.Repetition currentRepetition = schema.getRepetition();
-                if (currentRepetition == Repetition.REPEATED && (schema.asGroupType().getName() == "list" || Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) && schema.asGroupType().getFields().size() == 1) {
-                    InternalSchema elementSchema = toInternalSchema(
-                            schema.asGroupType().getType(0),
-                            SchemaUtils.getFullyQualifiedPath(parentPath, schema.asGroupType().getName()));
-                    newDataType = elementSchema.getDataType();
-                    elementName = elementSchema.getName();
+                subFields = new ArrayList<>(schema.asGroupType().getFields().size());
+                if (currentRepetition == Repetition.REPEATED && (schema.asGroupType().getName() == "list" || Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) /*&& schema.asGroupType().getFields().size() == 1*/) {
+                    for (Type schemaField : schema.asGroupType().getFields()) {
+                        InternalSchema elementSchema = toInternalSchema(
+                                schemaField,
+                                SchemaUtils.getFullyQualifiedPath(parentPath, schema.asGroupType().getType(0).getName()));
+                        if (schema.asGroupType().getFields().size()==1) {//todo Tuple (many subelements in a list)
+                            newDataType = elementSchema.getDataType();
+                            elementName = elementSchema.getName();
+                            break;
+                        }
+                        subFields.add(
+                                InternalField.builder()
+                                        .parentPath(parentPath)
+                                        .name(elementSchema.getName())
+                                        .schema(elementSchema)
+                                        .defaultValue(null)
+                                        .fieldId(null)
+                                        .build());
+                    }
                 } else {
-                    List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
+                    //List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
                     for (Type parquetField : schema.asGroupType().getFields()) {
                         String fieldName = parquetField.getName();
                         Type.ID fieldId = parquetField.getId();
@@ -341,6 +356,7 @@ public class ParquetSchemaExtractor {
         return InternalSchema.builder()
                 .name(elementName)
                 .dataType(newDataType)
+                .fields(subFields.size() == 0 ? null : subFields)
                 .comment(null)
                 .isNullable(groupTypeContainsNull(schema)) // to check
                 .metadata(metadata.isEmpty() ? null : metadata)

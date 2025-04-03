@@ -66,13 +66,47 @@ public class TestParquetSchemaExtractor {
                                                         .build())
                                         .build()))
                 .build();
+
+
+        //map
+
+        InternalSchema internalMap =InternalSchema.builder()
+                .name("map")
+                .isNullable(false)
+                .dataType(InternalType.MAP)
+                .fields(
+                        Arrays.asList(
+                                InternalField.builder()
+                                        .name("key")
+                                        .parentPath("_one_field_value")
+                                        .schema(
+                                                InternalSchema.builder()
+                                                        .name("key")
+                                                        .dataType(InternalType.FLOAT)
+                                                        .isNullable(false)
+                                                        .build())
+                                        .defaultValue(null)
+                                        .build(),
+                                InternalField.builder()
+                                        .name("value")
+                                        .parentPath("_one_field_value")
+                                        .schema(
+                                                InternalSchema.builder()
+                                                        .name("value")
+                                                        .dataType(InternalType.INT)
+                                                        .isNullable(false)
+                                                        .build())
+                                        .build()))
+                .build();
+
+
         InternalSchema primitive1 =
                 InternalSchema.builder().name("integer").dataType(InternalType.INT).build();
         InternalSchema primitive2 =
                 InternalSchema.builder().name("string").dataType(InternalType.STRING).build();
         InternalSchema group1 =
                 InternalSchema.builder().name("list").dataType(InternalType.LIST).build();
-        InternalSchema recordListElementSchema=
+        InternalSchema recordListElementSchema =
                 InternalSchema.builder()
                         .name("my_group")
                         .isNullable(false)
@@ -176,9 +210,9 @@ public class TestParquetSchemaExtractor {
                 .named("User");*/
 
         GroupType testMap = Types.requiredMap()
-                .key(PrimitiveTypeName.FLOAT)
-                .optionalValue(PrimitiveTypeName.INT32)
-                .named("zipMap");
+                .key(Types.primitive(PrimitiveTypeName.FLOAT, Repetition.REQUIRED).named("key"))
+                .value(Types.primitive(PrimitiveTypeName.INT32, Repetition.REQUIRED).named("value"))
+                .named("map");
         GroupType listType = Types.requiredList().setElementType(Types.primitive(PrimitiveTypeName.INT32, Repetition.REQUIRED).named("element")).named("my_list");
         MessageType messageType = Types.buildMessage()
                 //.addField(testMap)
@@ -194,6 +228,8 @@ public class TestParquetSchemaExtractor {
                 .requiredElement(PrimitiveTypeNameINT32).named("integer")
                 .named("nestedListInner2")
                 .named("nestedListOuter");*/
+        Assertions.assertEquals(
+                internalMap, schemaExtractor.toInternalSchema(testMap, null));
         Assertions.assertEquals(
                 internalSchema, schemaExtractor.toInternalSchema(messageType, null));
 
