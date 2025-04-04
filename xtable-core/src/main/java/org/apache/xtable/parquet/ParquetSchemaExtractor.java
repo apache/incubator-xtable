@@ -363,6 +363,10 @@ public class ParquetSchemaExtractor {
      */
     private Type fromInternalSchema(InternalSchema internalSchema, String currentPath) {
         Type type = null;
+        Type listType = null;
+        Type mapType = null;
+        Type mapKeyType = null;
+        Type mapValueType = null;
         String fieldName = internalSchema.getName();
         InternalType internalType = internalSchema.getDataType();
         switch (internalType) {
@@ -451,16 +455,28 @@ public class ParquetSchemaExtractor {
                                                 InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(field.getName()))
                                 .findFirst()
                                 .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
-                type = fromInternalSchema(elementField.getSchema(), elementField.getPath());
+                listType = fromInternalSchema(elementField.getSchema(), elementField.getPath());
+                type = Types.requiredList().setElementType(listType).named(elementField.getName());
                 break;
             case MAP:
+                InternalField keyField =
+                        internalSchema.getFields().stream()
+                                .filter(
+                                        field -> InternalField.Constants.MAP_KEY_FIELD_NAME.equals(field.getName()))
+                                .findFirst()
+                                .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
                 InternalField valueField =
                         internalSchema.getFields().stream()
                                 .filter(
                                         field -> InternalField.Constants.MAP_VALUE_FIELD_NAME.equals(field.getName()))
                                 .findFirst()
                                 .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
-                type = fromInternalSchema(valueField.getSchema(), valueField.getPath());
+                mapKeyType = fromInternalSchema(keyField.getSchema(), valueField.getPath());
+                mapValueType = fromInternalSchema(valueField.getSchema(), valueField.getPath());
+                type = Types.requiredMap()
+                        .key(mapType)
+                        .value(mapValueType)
+                        .named("map");
                 break;
             case RECORD:
                 List<Type> fields =
