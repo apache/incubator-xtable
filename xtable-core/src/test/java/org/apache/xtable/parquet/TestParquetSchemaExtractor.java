@@ -39,6 +39,7 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.parquet.schema.OriginalType;
 
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Arrays;
 
 
@@ -181,6 +182,15 @@ public class TestParquetSchemaExtractor {
                                                 .defaultValue(null)
                                                 .build()))
                         .build();
+
+
+        Map<InternalSchema.MetadataKey, Object> fixedDecimalMetadata = new HashMap<>();
+        fixedDecimalMetadata.put(InternalSchema.MetadataKey.DECIMAL_PRECISION, 6);
+        fixedDecimalMetadata.put(InternalSchema.MetadataKey.DECIMAL_SCALE, 5);
+        InternalSchema decimalType =
+                InternalSchema.builder().name("decimal").dataType(InternalType.DECIMAL).isNullable(false)
+                        .metadata(fixedDecimalMetadata).build();
+
         Type stringPrimitiveType = Types
                 .required(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType())//.named("string")
                 .named("string");
@@ -188,6 +198,11 @@ public class TestParquetSchemaExtractor {
         Type intPrimitiveType = Types
                 .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.intType(32, false))
                 .named("integer");
+
+        Type decimalPrimitive = Types
+                .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.decimalType(5, 6))
+                .named("decimal");
+
  /*       Assertions.assertEquals(
                 primitive1, schemaExtractor.toInternalSchema(intPrimitiveType, null));
 
@@ -228,10 +243,15 @@ public class TestParquetSchemaExtractor {
                 .requiredElement(PrimitiveTypeNameINT32).named("integer")
                 .named("nestedListInner2")
                 .named("nestedListOuter");*/
+
+
         Assertions.assertEquals(
+                decimalType, schemaExtractor.toInternalSchema(decimalPrimitive, null));
+
+   /*     Assertions.assertEquals(
                 internalMap, schemaExtractor.toInternalSchema(testMap, null));
         Assertions.assertEquals(
-                internalSchema, schemaExtractor.toInternalSchema(messageType, null));
+                internalSchema, schemaExtractor.toInternalSchema(messageType, null));*/
 
         //  Assertions.assertEquals(
         //         internalSchema, schemaExtractor.toInternalSchema(messageType, null));

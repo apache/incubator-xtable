@@ -57,7 +57,6 @@ import org.apache.parquet.schema.Types;
 import org.apache.parquet.column.ColumnDescriptor;
 
 
-
 /**
  * Class that converts parquet Schema {@link Schema} to Canonical Schema {@link InternalSchema} and
  * vice-versa. This conversion is fully reversible and there is a strict 1 to 1 mapping between
@@ -164,6 +163,17 @@ public class ParquetSchemaExtractor {
                             // check if INT is the InternalType needed here
                             newDataType = InternalType.INT;
                         }
+                    } else if (logicalType
+                            instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+
+                        metadata.put(
+                                InternalSchema.MetadataKey.DECIMAL_PRECISION,
+                                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getPrecision());
+                        metadata.put(
+                                InternalSchema.MetadataKey.DECIMAL_SCALE,
+                                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getScale());
+                        newDataType = InternalType.DECIMAL;
+
                     } else {
                         newDataType = InternalType.LONG;
                     }
@@ -178,6 +188,17 @@ public class ParquetSchemaExtractor {
                             // check if INT is the InternalType needed here
                             newDataType = InternalType.INT;
                         }
+                    } else if (logicalType
+                            instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+
+                        metadata.put(
+                                InternalSchema.MetadataKey.DECIMAL_PRECISION,
+                                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getPrecision());
+                        metadata.put(
+                                InternalSchema.MetadataKey.DECIMAL_SCALE,
+                                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getScale());
+                        newDataType = InternalType.DECIMAL;
+
                     } else {
                         newDataType = InternalType.INT;
                     }
@@ -190,18 +211,10 @@ public class ParquetSchemaExtractor {
           /*  if (logicalType instanceof LogicalTypeAnnotation.Float16LogicalTypeAnnotation) {
               newDataType = InternalType.FLOAT;
           } else*/
-                    if (logicalType
-                            instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
-                        metadata.put(
-                                InternalSchema.MetadataKey.DECIMAL_PRECISION,
-                                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getPrecision());
-                        metadata.put(
-                                InternalSchema.MetadataKey.DECIMAL_SCALE,
-                                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getScale());
-                        newDataType = InternalType.DECIMAL;
-                    } else {
+                    newDataType = InternalType.FLOAT;
+                   /*else {
                         newDataType = InternalType.FLOAT;
-                    }
+                    }*/
                     break;
                 case FIXED_LEN_BYTE_ARRAY:
                     logicalType = schema.getLogicalTypeAnnotation();
