@@ -56,9 +56,6 @@ import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 import org.apache.parquet.schema.Types;
 import org.apache.parquet.column.ColumnDescriptor;
 
-import java.lang.reflect.*;
-
-//import org.apache.parquet.avro.AvroSchemaConverter;
 
 
 /**
@@ -128,6 +125,7 @@ public class ParquetSchemaExtractor {
             Type schema, String parentPath) {
         // TODO - Does not handle recursion in parquet schema
         InternalType newDataType = null;
+        Type.Repetition currentRepetition = null;
         List<InternalField> subFields = new ArrayList<>();
         PrimitiveType primitiveType;
         LogicalTypeAnnotation logicalType;
@@ -304,45 +302,35 @@ public class ParquetSchemaExtractor {
                                         valueField)*/)
                         .build();
             } else {
-                Type.Repetition currentRepetition = schema.getRepetition();
+
                 subFields = new ArrayList<>(schema.asGroupType().getFields().size());
-                if (currentRepetition == Repetition.REPEATED && (schema.asGroupType().getName() == "list" || Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) /*&& schema.asGroupType().getFields().size() == 1*/) {
-                    for (Type schemaField : schema.asGroupType().getFields()) {
-                        InternalSchema elementSchema = toInternalSchema(
-                                schemaField,
-                                SchemaUtils.getFullyQualifiedPath(parentPath, schema.asGroupType().getType(0).getName()));
-                        if (schema.asGroupType().getFields().size()==1) {//todo Tuple (many subelements in a list)
-                            newDataType = elementSchema.getDataType();
-                            elementName = elementSchema.getName();
-                            break;
-                        }
-                        subFields.add(
-                                InternalField.builder()
-                                        .parentPath(parentPath)
-                                        .name(elementSchema.getName())
-                                        .schema(elementSchema)
-                                        .defaultValue(null)
-                                        .fieldId(null)
-                                        .build());
+                //if (currentRepetition == Repetition.REPEATED// && (schema.asGroupType().getName() == "list" || Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) /*&& schema.asGroupType().getFields().size() == 1*/) {
+                //} else {
+                //List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
+                for (Type parquetField : schema.asGroupType().getFields()) {
+                    String fieldName = parquetField.getName();
+                    Type.ID fieldId = parquetField.getId();
+                    currentRepetition = parquetField.getRepetition();
+                    InternalSchema subFieldSchema =
+                            toInternalSchema(
+                                    parquetField,
+                                    SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
+
+                    if (schema.asGroupType().getFields().size() == 1) {//todo Tuple (many subelements in a list)
+                        newDataType = subFieldSchema.getDataType();
+                        elementName = subFieldSchema.getName();
+                        break;
                     }
-                } else {
-                    //List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
-                    for (Type parquetField : schema.asGroupType().getFields()) {
-                        String fieldName = parquetField.getName();
-                        Type.ID fieldId = parquetField.getId();
-                        InternalSchema subFieldSchema =
-                                toInternalSchema(
-                                        parquetField,
-                                        SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
-                        subFields.add(
-                                InternalField.builder()
-                                        .parentPath(parentPath)
-                                        .name(fieldName)
-                                        .schema(subFieldSchema)
-                                        .defaultValue(null)
-                                        .fieldId(fieldId == null ? null : fieldId.intValue())
-                                        .build());
-                    }
+                    subFields.add(
+                            InternalField.builder()
+                                    .parentPath(parentPath)
+                                    .name(fieldName)
+                                    .schema(subFieldSchema)
+                                    .defaultValue(null)
+                                    .fieldId(fieldId == null ? null : fieldId.intValue())
+                                    .build());
+                }
+                if (currentRepetition != Repetition.REPEATED && schema.asGroupType().getName() != "list" && !Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) {
                     return InternalSchema.builder()
                             .name(schema.getName())
                             .comment(null)
