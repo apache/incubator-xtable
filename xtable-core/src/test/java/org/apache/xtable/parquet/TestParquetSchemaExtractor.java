@@ -129,7 +129,7 @@ public class TestParquetSchemaExtractor {
                                                         InternalSchema.builder()
                                                                 .name("name")
                                                                 .dataType(InternalType.STRING)
-                                                                .isNullable(false)
+                                                                .isNullable(true)
                                                                 .build())
                                                 .defaultValue(null)
                                                 .build()))
@@ -139,7 +139,7 @@ public class TestParquetSchemaExtractor {
                 InternalSchema.builder()
                         .name("my_record")
                         .dataType(InternalType.RECORD)
-                        .isNullable(false)
+                        .isNullable(true)
                         .fields(
                                 Arrays.asList(
                                         InternalField.builder()
@@ -158,7 +158,7 @@ public class TestParquetSchemaExtractor {
                                                                                                 InternalSchema.builder()
                                                                                                         .name("element")
                                                                                                         .dataType(InternalType.INT)
-                                                                                                        .isNullable(false)
+                                                                                                        .isNullable(true)
                                                                                                         .build())
                                                                                         .build()))
                                                                 .build())
@@ -233,8 +233,8 @@ public class TestParquetSchemaExtractor {
         Assertions.assertEquals(
                 internalSchema, schemaExtractor.toInternalSchema(messageType, null));
 
-        Assertions.assertEquals(
-                internalSchema, schemaExtractor.toInternalSchema(messageType, null));
+        //  Assertions.assertEquals(
+        //         internalSchema, schemaExtractor.toInternalSchema(messageType, null));
     }
 
     @Test

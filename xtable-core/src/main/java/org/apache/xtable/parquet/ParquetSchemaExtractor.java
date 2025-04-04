@@ -270,7 +270,7 @@ public class ParquetSchemaExtractor {
                         .name(schema.getName())
                         .dataType(InternalType.LIST)
                         .comment(null)
-                        .isNullable(groupTypeContainsNull(schema.asGroupType()))
+                        .isNullable(groupTypeIsNullable(schema.asGroupType()))
                         .fields(Collections.singletonList(elementField))
                         .build();
             } else if (logicalType instanceof LogicalTypeAnnotation.MapLogicalTypeAnnotation) {
@@ -292,7 +292,7 @@ public class ParquetSchemaExtractor {
                         .name(schemaName)
                         .dataType(InternalType.MAP)
                         .comment(null)
-                        .isNullable(groupTypeContainsNull(schema.asGroupType()))
+                        .isNullable(groupTypeIsNullable(schema.asGroupType()))
                         .fields(valueSchema.getFields()
                                 /*Arrays.asList(
                                         MAP_KEY_FIELD.toBuilder()
@@ -336,7 +336,7 @@ public class ParquetSchemaExtractor {
                             .comment(null)
                             .dataType(InternalType.RECORD)
                             .fields(subFields)
-                            .isNullable(groupTypeContainsNull(schema.asGroupType()))
+                            .isNullable(groupTypeIsNullable(schema.asGroupType()))
                             .build();
                 }
             }
@@ -346,7 +346,7 @@ public class ParquetSchemaExtractor {
                 .dataType(newDataType)
                 .fields(subFields.size() == 0 ? null : subFields)
                 .comment(null)
-                .isNullable(groupTypeContainsNull(schema)) // to check
+                .isNullable(groupTypeIsNullable(schema)) // to check
                 .metadata(metadata.isEmpty() ? null : metadata)
                 .build();
     }
