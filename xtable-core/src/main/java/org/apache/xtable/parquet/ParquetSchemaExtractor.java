@@ -190,7 +190,6 @@ public class ParquetSchemaExtractor {
                         }
                     } else if (logicalType
                             instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
-
                         metadata.put(
                                 InternalSchema.MetadataKey.DECIMAL_PRECISION,
                                 ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getPrecision());
@@ -223,6 +222,16 @@ public class ParquetSchemaExtractor {
                     } else if (logicalType instanceof LogicalTypeAnnotation.IntervalLogicalTypeAnnotation) {
                         metadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 12);
                         newDataType = InternalType.FIXED;
+                    } else if (logicalType
+                            instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+                        metadata.put(
+                                InternalSchema.MetadataKey.DECIMAL_PRECISION,
+                                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getPrecision());
+                        metadata.put(
+                                InternalSchema.MetadataKey.DECIMAL_SCALE,
+                                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getScale());
+                        newDataType = InternalType.DECIMAL;
+
                     }
                     break;
                 // TODO add other logicalTypes?
@@ -240,6 +249,16 @@ public class ParquetSchemaExtractor {
                         newDataType = InternalType.BYTES;
                     } else if (logicalType instanceof LogicalTypeAnnotation.StringLogicalTypeAnnotation) {
                         newDataType = InternalType.STRING;
+                    } else if (logicalType
+                            instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+                        metadata.put(
+                                InternalSchema.MetadataKey.DECIMAL_PRECISION,
+                                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getPrecision());
+                        metadata.put(
+                                InternalSchema.MetadataKey.DECIMAL_SCALE,
+                                ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getScale());
+                        newDataType = InternalType.DECIMAL;
+
                     } else {
                         newDataType = InternalType.BYTES;
                     }
@@ -247,7 +266,7 @@ public class ParquetSchemaExtractor {
                 case BOOLEAN:
                     newDataType = InternalType.BOOLEAN;
                     break;
-             /*   case UNKNOWN:
+                /*case UNKNOWN:
                     newDataType = InternalType.NULL;
                     break;*/
                 default:
@@ -374,7 +393,7 @@ public class ParquetSchemaExtractor {
      *                       records.
      * @return an parquet schema
      */
-    private Type fromInternalSchema(InternalSchema internalSchema, String currentPath) {
+    public Type fromInternalSchema(InternalSchema internalSchema, String currentPath) {
         Type type = null;
         Type listType = null;
         Type mapType = null;
@@ -406,6 +425,9 @@ public class ParquetSchemaExtractor {
                         .named(fieldName);
                 break;
             case FLOAT:
+                type = Types.required(PrimitiveTypeName.FLOAT).named(fieldName);
+                break;
+            case DECIMAL:
                 int precision =
                         (int)
                                 internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
@@ -469,7 +491,8 @@ public class ParquetSchemaExtractor {
                                 .findFirst()
                                 .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
                 listType = fromInternalSchema(elementField.getSchema(), elementField.getPath());
-                type = Types.requiredList().setElementType(listType).named(elementField.getName());
+                type = Types.requiredList().setElementType(listType).named(internalSchema.getName());
+                //TODO nullable lists
                 break;
             case MAP:
                 InternalField keyField =
@@ -487,9 +510,10 @@ public class ParquetSchemaExtractor {
                 mapKeyType = fromInternalSchema(keyField.getSchema(), valueField.getPath());
                 mapValueType = fromInternalSchema(valueField.getSchema(), valueField.getPath());
                 type = Types.requiredMap()
-                        .key(mapType)
+                        .key(mapKeyType)
                         .value(mapValueType)
-                        .named("map");
+                        .named(internalSchema.getName());
+                //TODO nullable lists
                 break;
             case RECORD:
                 List<Type> fields =

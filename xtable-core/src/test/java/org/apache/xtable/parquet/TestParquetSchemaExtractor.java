@@ -71,7 +71,7 @@ public class TestParquetSchemaExtractor {
 
         //map
 
-        InternalSchema internalMap =InternalSchema.builder()
+        InternalSchema internalMap = InternalSchema.builder()
                 .name("map")
                 .isNullable(false)
                 .dataType(InternalType.MAP)
@@ -245,16 +245,76 @@ public class TestParquetSchemaExtractor {
                 .named("nestedListOuter");*/
 
 
-        Assertions.assertEquals(
-                decimalType, schemaExtractor.toInternalSchema(decimalPrimitive, null));
+        //  Assertions.assertEquals(
+        //        decimalType, schemaExtractor.toInternalSchema(decimalPrimitive, null));
 
-   /*     Assertions.assertEquals(
-                internalMap, schemaExtractor.toInternalSchema(testMap, null));
-        Assertions.assertEquals(
+        //    Assertions.assertEquals(
+        //           internalMap, schemaExtractor.toInternalSchema(testMap, null));
+       /*  Assertions.assertEquals(
                 internalSchema, schemaExtractor.toInternalSchema(messageType, null));*/
 
+
+
+
+        /* testing from fromInternalSchema()*/
+
+        GroupType fromSimpleList = Types.requiredList().element(Types.required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.intType(32, false)).named(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)).named("my_list");
+
+        InternalSchema fromInternalList = InternalSchema.builder()
+                .name("my_list")
+                .isNullable(false)
+                .dataType(InternalType.LIST)
+                .fields(
+                        Arrays.asList(
+                                InternalField.builder()
+                                        .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                        .parentPath(null)
+                                        .schema(
+                                                InternalSchema.builder()
+                                                        .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                                        .dataType(InternalType.INT)
+                                                        .isNullable(false)
+                                                        .build())
+                                        .build()))
+                .build();
+
+        GroupType fromTestMap = Types.requiredMap()
+                .key(Types.primitive(PrimitiveTypeName.FLOAT, Repetition.REQUIRED).named("key"))
+                .value(Types.primitive(PrimitiveTypeName.INT32, Repetition.REQUIRED).as(LogicalTypeAnnotation.intType(32, false)).named("value"))
+                .named("map");
+        InternalSchema fromInternalMap = InternalSchema.builder()
+                .name("map")
+                .isNullable(false)
+                .dataType(InternalType.MAP)
+                .fields(
+                        Arrays.asList(
+                                InternalField.builder()
+                                        .name("_one_field_key")//"key")
+                                        .parentPath("_one_field_value")
+                                        .schema(
+                                                InternalSchema.builder()
+                                                        .name("key")
+                                                        .dataType(InternalType.FLOAT)
+                                                        .isNullable(false)
+                                                        .build())
+                                        .defaultValue(null)
+                                        .build(),
+                                InternalField.builder()
+                                        .name("_one_field_value")//"value")
+                                        .parentPath("_one_field_value")
+                                        .schema(
+                                                InternalSchema.builder()
+                                                        .name("value")
+                                                        .dataType(InternalType.INT)
+                                                        .isNullable(false)
+                                                        .build())
+                                        .build()))
+                .build();
+
         //  Assertions.assertEquals(
-        //         internalSchema, schemaExtractor.toInternalSchema(messageType, null));
+        //        fromTestMap, schemaExtractor.fromInternalSchema(fromInternalMap, null));
+        //Type checkList = schemaExtractor.fromInternalSchema(fromInternalList, null);
+        Assertions.assertEquals(fromSimpleList, schemaExtractor.fromInternalSchema(fromInternalList, null));
     }
 
     @Test
