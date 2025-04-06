@@ -121,8 +121,7 @@ public class ParquetStatsExtractor {
             MessageType schema = parquetMetadataExtractor.getSchema(footer);
             columnStatsForAFile = getColumnStatsForaFile(footer);
             partitionValues = partitionExtractor.createPartitionValues(
-                    partitionExtractor.extractPartitionValues(
-                            partitionInfo));
+                    partitionInfo);
         } catch (java.io.IOException e) {
 
         }

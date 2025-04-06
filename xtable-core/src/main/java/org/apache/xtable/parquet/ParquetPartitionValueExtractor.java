@@ -43,6 +43,7 @@ import org.apache.xtable.model.schema.InternalSchema;
 /**
  * Partition value extractor for Parquet.
  */
+
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ParquetPartitionValueExtractor {
     private static final OffsetDateTime EPOCH = Instant.ofEpochSecond(0).atOffset(ZoneOffset.UTC);
@@ -53,49 +54,7 @@ public class ParquetPartitionValueExtractor {
         return INSTANCE;
     }
 
-
-    public List<InternalPartitionField> convertFromParquertUserDefinedPartitionConfig(InputPartitionFields userDefinedPartitionSchema) {
-        if (userDefinedPartitionSchema.getPartitions().isEmpty()) {
-            return Collections.emptyList();
-        }
-        return getInternalPartitionFields(userDefinedPartitionSchema);
-    }
-    public List<InternalPartitionField> getInternalPartitionFields(InputPartitionFields partitions) {
-        List<InternalPartitionField> partitionFields = new ArrayList<>();
-        String sourceField = partitions.getSourceField();
-        for (InputPartitionField partition : partitions.getPartitions()) {
-            partitionFields.add(
-                    InternalPartitionField.builder()
-                            // TODO check the sourceField dataType (from the user config of the partitions)
-                            .sourceField(
-                                    InternalField.builder()
-                                            .name(sourceField)
-                                            .schema(
-                                                    InternalSchema.builder()
-                                                            .name(sourceField)
-                                                            .dataType(InternalType.STRING)
-                                                            .build())
-                                            .build())
-                            .transformType(partition.getTransformType())
-                            .build());
-        }
-        return partitionFields;
-    }
-
-    public List<PartitionValue> createPartitionValues(
-            Map<InternalPartitionField, Range> extractedPartitions) {
-        return extractedPartitions.entrySet()
-                .stream()
-                .map(internalPartitionField ->
-                        PartitionValue.builder()
-                                .partitionField(
-                                        internalPartitionField.getKey())
-                                .range(internalPartitionField.getValue())
-                                .build())
-                .collect(Collectors.toList());
-    }
-
-    public Map<InternalPartitionField, Range> extractPartitionValues(
+    public static Map<InternalPartitionField, Range> extractPartitionValues(
             InputPartitionFields partitionsConf) {
         Map<InternalPartitionField, Range> partitionValues = new HashMap<>();
         List<InputPartitionField> partitions = partitionsConf.getPartitions();
@@ -137,5 +96,49 @@ public class ParquetPartitionValueExtractor {
                 .build();
         partitionValues.put(internalPartitionField, Range.scalar(value));
         return partitionValues;
+    }
+
+    public List<InternalPartitionField> convertFromParquertUserDefinedPartitionConfig(InputPartitionFields userDefinedPartitionSchema) {
+        if (userDefinedPartitionSchema.getPartitions().isEmpty()) {
+            return Collections.emptyList();
+        }
+        return getInternalPartitionFields(userDefinedPartitionSchema);
+    }
+
+    public List<InternalPartitionField> getInternalPartitionFields(InputPartitionFields partitions) {
+        List<InternalPartitionField> partitionFields = new ArrayList<>();
+        String sourceField = partitions.getSourceField();
+        for (InputPartitionField partition : partitions.getPartitions()) {
+            partitionFields.add(
+                    InternalPartitionField.builder()
+                            // TODO check the sourceField dataType (from the user config of the partitions)
+                            .sourceField(
+                                    InternalField.builder()
+                                            .name(sourceField)
+                                            .schema(
+                                                    InternalSchema.builder()
+                                                            .name(sourceField)
+                                                            .dataType(InternalType.STRING)
+                                                            .build())
+                                            .build())
+                            .transformType(partition.getTransformType())
+                            .build());
+        }
+        return partitionFields;
+    }
+
+    public List<PartitionValue> createPartitionValues(
+            InputPartitionFields partitionsConf) {
+        Map<InternalPartitionField, Range> extractedPartitions = extractPartitionValues(
+                partitionsConf);
+        return extractedPartitions.entrySet()
+                .stream()
+                .map(internalPartitionField ->
+                        PartitionValue.builder()
+                                .partitionField(
+                                        internalPartitionField.getKey())
+                                .range(internalPartitionField.getValue())
+                                .build())
+                .collect(Collectors.toList());
     }
 }
