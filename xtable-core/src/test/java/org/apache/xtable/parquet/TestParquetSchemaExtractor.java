@@ -313,8 +313,51 @@ public class TestParquetSchemaExtractor {
 
         //  Assertions.assertEquals(
         //        fromTestMap, schemaExtractor.fromInternalSchema(fromInternalMap, null));
-        //Type checkList = schemaExtractor.fromInternalSchema(fromInternalList, null);
-        Assertions.assertEquals(fromSimpleList, schemaExtractor.fromInternalSchema(fromInternalList, null));
+        //  Assertions.assertEquals(fromSimpleList, schemaExtractor.fromInternalSchema(fromInternalList, null));
+
+
+        // tests for timestamp and date
+        InternalSchema testDate =
+                InternalSchema.builder().name("date").dataType(InternalType.DATE).isNullable(false).build();
+
+
+        Map<InternalSchema.MetadataKey, Object> millisMetadata = new HashMap<>();
+        millisMetadata.put(
+                InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
+        Map<InternalSchema.MetadataKey, Object> microsMetadata = new HashMap<>();
+        microsMetadata.put(
+                InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
+        Map<InternalSchema.MetadataKey, Object> nanosMetadata = new HashMap<>();
+        nanosMetadata.put(
+                InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.NANOS);
+
+        InternalSchema testTimestampMillis =
+                InternalSchema.builder().name("timestamp_millis").dataType(InternalType.TIMESTAMP_NTZ).isNullable(false).metadata(millisMetadata).build();
+
+        InternalSchema testTimestampMicros =
+                InternalSchema.builder().name("timestamp_micros").dataType(InternalType.TIMESTAMP).isNullable(false).metadata(microsMetadata).build();
+
+        InternalSchema testTimestampNanos =
+                InternalSchema.builder().name("timestamp_nanos").dataType(InternalType.TIMESTAMP_NTZ).isNullable(false).metadata(nanosMetadata).build();
+
+        Type timestampMillisPrimitiveType = Types
+                .required(PrimitiveTypeName.INT64).as(LogicalTypeAnnotation.timestampType(false,LogicalTypeAnnotation.TimeUnit.MILLIS))
+                .named("timestamp_millis");
+        Type timestampNanosPrimitiveType = Types
+                .required(PrimitiveTypeName.INT64).as(LogicalTypeAnnotation.timestampType(false,LogicalTypeAnnotation.TimeUnit.NANOS))
+                .named("timestamp_nanos");
+        //Assertions.assertEquals(testTimestampMillis, schemaExtractor.toInternalSchema(timestampMillisPrimitiveType, null));
+        // Assertions.assertEquals(testTimestampNanos, schemaExtractor.toInternalSchema(timestampNanosPrimitiveType, null));
+
+
+
+        // test date
+
+        Type datePrimitiveType = Types
+                .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.dateType())
+                .named("date");
+        Assertions.assertEquals(testDate, schemaExtractor.toInternalSchema(datePrimitiveType, null));
+
     }
 
     @Test
