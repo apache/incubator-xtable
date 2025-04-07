@@ -14,6 +14,28 @@ Here's a quick view of the upcoming community syncs:
 ## Join the Community on Slack
 We have a [Slack channel](https://join.slack.com/t/apachextablei-yoi8504/shared_invite/zt-2y9hqskhv-ZfSwoxzq~PTJlWGj0V1sQw) that you can join for help with any questions, issues, design choices, announcements, etc.
 
+## Contribution Guidelines
+
+### Getting Started
+
+- Fork the repo and create a feature branch from `main`.
+- Open a pull request (PR) against the main branch with a clear summary of your changes.
+  - Use descriptive commit messages. 
+  - Write or update unit tests where applicable.
+- Refer to the [README](https://github.com/apache/incubator-xtable/blob/main/README.md) for more detailed setup instructions.
+
+### Pull Request Review Process
+
+- All PRs are reviewed by project committers.
+- Review comments may request changes, please try to update the PR within a reasonable time.
+- We aim to keep the review loop tight and collaborative.
+
+### Handling Stale Pull Requests
+
+- To keep development moving and reduce backlog, PRs with no activity for many days may be marked as stale. 
+- A committer may pick up a stale PR, incorporate necessary changes (including rebasing or completing the implementation), and merge it. 
+- Attribution to the original author will always be preserved in the commit history. This helps prevent good contributions from getting lost due to inactivity, while staying aligned with Apache’s community-first philosophy.
+
 
 ## Recordings of the Community Calls
 Find date-wise recordings here.
