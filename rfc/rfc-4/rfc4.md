@@ -62,14 +62,12 @@ Below is the first version of the models we will be using internally that allows
  * denied. Some catalogs may only accept ALLOW rules and treat all other operations as denied by
  * default.
  */
-@Value
-@Builder
 public class InternalPrivilege {
   /**
    * The type of privilege, such as SELECT, CREATE, or MODIFY. Each implementation can define its
    * own set of enums.
    */
-  String privilegeType;
+  InternalPrivilegeType privilegeType;
 
   /**
    * The decision, typically ALLOW or DENY. Some catalogs may not support DENY explicitly,
@@ -88,14 +86,14 @@ public class InternalPrivilege {
  * objects that require fine-grained privilege management. Each securable object can have one or
  * more privileges assigned to it.
  */
-@Value
-@Builder
 public class InternalSecurableObject {
+  /** The identifier of the securable object. */
+  InternalSecurableObjectIdentifier securableObjectIdentifier;
   /**
    * The type of securable object, such as TABLE, VIEW, FUNCTION, etc. Each implementation can
    * define its own set of enums.
    */
-  String securableObjectType;
+  InternalSecurableObjectType securableObjectType;
   /** The set of privileges assigned to this object. */
   List<InternalPrivilege> privileges;
 }
@@ -111,8 +109,6 @@ public class InternalSecurableObject {
  * necessary. It can be extended to include additional fields such as reasonForChange or
  * changeDescription.
  */
-@Value
-@Builder
 public class InternalChangeLogInfo {
   /** The username or identifier of the entity that created this record. */
   String createdBy;
@@ -138,8 +134,6 @@ public class InternalChangeLogInfo {
  * privileges. Audit info is stored to track the role's creation and modifications, and a properties
  * map can hold additional metadata.
  */
-@Value
-@Builder
 public class InternalRole {
   /** The unique name or identifier for the role. */
   String name;
@@ -156,6 +150,7 @@ public class InternalRole {
    */
   Map<String, String> properties;
 }
+
 ```
 
 **InternalUser**
@@ -166,16 +161,14 @@ public class InternalRole {
  * <p>A user may be assigned multiple roles, and can also belong to a specific user group. Audit
  * information is stored to allow tracking of who created or last modified the user.
  */
-@Value
-@Builder
 public class InternalUser {
   /** The unique name or identifier for the user. */
   String name;
 
   /** The list of roles assigned to this user. */
   List<InternalRole> roles;
-  
-  /**  Contains information about how and when this user was created and last modified. */
+
+  /** Contains information about how and when this user was created and last modified. */
   InternalChangeLogInfo changeLogInfo;
 }
 ```
@@ -188,8 +181,6 @@ public class InternalUser {
  * <p>Groups can have multiple roles assigned, and also include audit information to track creation
  * and modifications.
  */
-@Value
-@Builder
 public class InternalUserGroup {
   /** The unique name or identifier for the user group. */
   String name;
@@ -205,8 +196,6 @@ public class InternalUserGroup {
 **InternalAccessControlPolicySnapshot**
 ```
 /** A snapshot of all access control data at a given point in time. */
-@Value
-@Builder
 public class InternalAccessControlPolicySnapshot {
   /**
    * A unique identifier representing this snapshot's version.
@@ -227,25 +216,25 @@ public class InternalAccessControlPolicySnapshot {
    * A map of user names to {@link InternalUser} objects, capturing individual users' details such
    * as assigned roles, auditing metadata, etc.
    */
-  Map<String, InternalUser> usersByName;
+  @Builder.Default Map<String, InternalUser> usersByName = Collections.emptyMap();
 
   /**
    * A map of group names to {@link InternalUserGroup} objects, representing logical groupings of
    * users for easier role management.
    */
-  Map<String, InternalUserGroup> groupsByName;
+  @Builder.Default Map<String, InternalUserGroup> groupsByName = Collections.emptyMap();
 
   /**
    * A map of role names to {@link InternalRole} objects, defining the privileges and security rules
    * each role entails.
    */
-  Map<String, InternalRole> rolesByName;
+  @Builder.Default Map<String, InternalRole> rolesByName = Collections.emptyMap();
 
   /**
    * A map of additional properties or metadata related to this snapshot. This map provides
    * flexibility for storing information without modifying the main schema of the snapshot.
    */
-  Map<String, String> properties;
+  @Builder.Default Map<String, String> properties = Collections.emptyMap();
 }
 ```
 
