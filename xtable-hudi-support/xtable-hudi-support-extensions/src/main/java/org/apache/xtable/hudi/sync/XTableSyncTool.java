@@ -45,6 +45,7 @@ import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 
 /**
  * A HoodieSyncTool for syncing a Hudi table to other formats (Delta and Iceberg) with
@@ -107,7 +108,7 @@ public class XTableSyncTool extends HoodieSyncTool {
             .filter(
                 entry ->
                     entry.getValue().getTableFormatSyncStatus().getStatusCode()
-                        != SyncResult.SyncStatusCode.SUCCESS)
+                        != SyncStatusCode.SUCCESS)
             .map(Map.Entry::getKey)
             .collect(Collectors.joining(","));
     if (!failingFormats.isEmpty()) {

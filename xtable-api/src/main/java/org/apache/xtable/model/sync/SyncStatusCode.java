@@ -18,18 +18,18 @@
  
 package org.apache.xtable.model.sync;
 
-import org.apache.xtable.annotations.Stable;
+import org.apache.xtable.annotations.Evolving;
 
-/**
- * Mode of a sync
- *
- * @since 0.1
- */
-@Stable
-public enum SyncMode {
-  // Full sync will create a checkpoint of ALL the files relevant at a certain point in time
-  FULL,
-  // Incremental will sync differential structures to bring the table state from and to points in
-  // the timeline
-  INCREMENTAL
+/** Enum representing the status of a synchronization operation. */
+@Evolving
+public enum SyncStatusCode {
+
+  /** Indicates that the sync was successful. */
+  SUCCESS,
+
+  /** Indicates that the sync was aborted before completion. */
+  ABORTED,
+
+  /** Indicates that an error occurred during sync. */
+  ERROR
 }

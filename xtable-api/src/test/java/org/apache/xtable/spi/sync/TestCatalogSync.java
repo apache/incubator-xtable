@@ -47,6 +47,7 @@ import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 
 @ExtendWith(MockitoExtension.class)
 public class TestCatalogSync<TABLE> {
@@ -110,14 +111,14 @@ public class TestCatalogSync<TABLE> {
             .getCatalogSyncStatusList();
     List<SyncResult.CatalogSyncStatus> errorStatus =
         results.stream()
-            .filter(status -> status.getStatusCode().equals(SyncResult.SyncStatusCode.ERROR))
+            .filter(status -> status.getStatusCode().equals(SyncStatusCode.ERROR))
             .collect(Collectors.toList());
-    assertEquals(SyncResult.SyncStatusCode.ERROR, errorStatus.get(0).getStatusCode());
+    assertEquals(SyncStatusCode.ERROR, errorStatus.get(0).getStatusCode());
     assertEquals(
         3,
         results.stream()
             .map(SyncResult.CatalogSyncStatus::getStatusCode)
-            .filter(statusCode -> statusCode.equals(SyncResult.SyncStatusCode.SUCCESS))
+            .filter(statusCode -> statusCode.equals(SyncStatusCode.SUCCESS))
             .count());
 
     verify(mockClient1, times(1)).createDatabase(tableIdentifier1);

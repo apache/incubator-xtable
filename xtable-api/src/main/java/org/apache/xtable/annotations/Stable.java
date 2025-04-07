@@ -16,20 +16,27 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.sync;
+package org.apache.xtable.annotations;
 
-import org.apache.xtable.annotations.Stable;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * Mode of a sync
- *
- * @since 0.1
+ * Enough applications/users have picked up the API and we deem it stable. We will strive to never
+ * break the stability of such APIs within a given major version release.
  */
-@Stable
-public enum SyncMode {
-  // Full sync will create a checkpoint of ALL the files relevant at a certain point in time
-  FULL,
-  // Incremental will sync differential structures to bring the table state from and to points in
-  // the timeline
-  INCREMENTAL
-}
+@Documented
+@Retention(RetentionPolicy.RUNTIME)
+@Target({
+  ElementType.TYPE,
+  ElementType.FIELD,
+  ElementType.METHOD,
+  ElementType.PARAMETER,
+  ElementType.CONSTRUCTOR,
+  ElementType.LOCAL_VARIABLE,
+  ElementType.PACKAGE
+})
+public @interface Stable {}

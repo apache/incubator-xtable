@@ -34,8 +34,10 @@ import org.apache.commons.lang3.StringUtils;
 
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
+import org.apache.xtable.model.sync.ErrorDetails;
 import org.apache.xtable.model.sync.SyncResult;
 import org.apache.xtable.model.sync.SyncResult.CatalogSyncStatus;
+import org.apache.xtable.model.sync.SyncStatusCode;
 
 /** Provides the functionality to sync metadata from InternalTable to multiple target catalogs */
 @Log4j2
@@ -118,7 +120,7 @@ public class CatalogSync {
     }
     return CatalogSyncStatus.builder()
         .catalogId(catalogSyncClient.getCatalogId())
-        .statusCode(SyncResult.SyncStatusCode.SUCCESS)
+        .statusCode(SyncStatusCode.SUCCESS)
         .build();
   }
 
@@ -126,9 +128,9 @@ public class CatalogSync {
       String catalogId, String catalogImpl, Exception e) {
     return CatalogSyncStatus.builder()
         .catalogId(catalogId)
-        .statusCode(SyncResult.SyncStatusCode.ERROR)
+        .statusCode(SyncStatusCode.ERROR)
         .errorDetails(
-            SyncResult.ErrorDetails.builder()
+            ErrorDetails.builder()
                 .errorMessage(e.getMessage())
                 .errorDescription("catalogSync failed for " + catalogImpl)
                 .build())

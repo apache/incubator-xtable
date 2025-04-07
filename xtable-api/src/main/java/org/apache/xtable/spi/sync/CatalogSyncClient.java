@@ -20,6 +20,7 @@ package org.apache.xtable.spi.sync;
 
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.xtable.annotations.Evolving;
 import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
@@ -30,6 +31,7 @@ import org.apache.xtable.model.catalog.CatalogTableIdentifier;
  *
  * @param <TABLE>
  */
+@Evolving
 public interface CatalogSyncClient<TABLE> extends AutoCloseable {
   /**
    * Returns the user-defined unique identifier for the catalog, allows user to sync table to

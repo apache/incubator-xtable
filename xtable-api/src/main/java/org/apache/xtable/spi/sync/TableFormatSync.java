@@ -33,13 +33,16 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
+import org.apache.xtable.annotations.Stable;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
+import org.apache.xtable.model.sync.ErrorDetails;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 
 /** Provides the functionality to sync from the InternalTable format to the target format. */
 @Log4j2
@@ -58,6 +61,7 @@ public class TableFormatSync {
    * @param snapshot the snapshot to sync
    * @return the result of the sync process
    */
+  @Stable
   public Map<String, SyncResult> syncSnapshot(
       Collection<ConversionTarget> conversionTargets, InternalSnapshot snapshot) {
     Instant startTime = Instant.now();
@@ -91,6 +95,7 @@ public class TableFormatSync {
    * @param changes the changes from the source table format that need to be applied
    * @return the results of trying to sync each change
    */
+  @Stable
   public Map<String, List<SyncResult>> syncChanges(
       Map<ConversionTarget, TableSyncMetadata> conversionTargetWithMetadata,
       IncrementalTableChanges changes) {
@@ -192,9 +197,9 @@ public class TableFormatSync {
         .mode(mode)
         .tableFormatSyncStatus(
             SyncResult.SyncStatus.builder()
-                .statusCode(SyncResult.SyncStatusCode.ERROR)
+                .statusCode(SyncStatusCode.ERROR)
                 .errorDetails(
-                    SyncResult.ErrorDetails.builder()
+                    ErrorDetails.builder()
                         .errorMessage(e.getMessage())
                         .errorDescription("Failed to sync " + mode.name())
                         .canRetryOnFailure(true)
