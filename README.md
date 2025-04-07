@@ -140,7 +140,7 @@ docker run \
 For setting up the repo on IntelliJ, open the project and change the Java version to Java 11 in File->ProjectStructure
 ![img.png](style/IDE.png)
 
-You have found a bug, or have a cool idea you that want to contribute to the project ? Please file a GitHub issue [here](https://github.com/apache/incubator-xtable/issues)
+Found a bug or have a cool idea to contribute? Open a GitHub [issue](https://github.com/apache/incubator-xtable/issues) to get started. For more contribution guidelines and ways to stay involved, visit our [community](https://xtable.apache.org/community/sync) page.
 
 ## Adding a new target format
 Adding a new target format requires a developer implement [ConversionTarget](./xtable-api/src/main/java/org/apache/xtable/spi/sync/ConversionTarget.java). Once you have implemented that interface, you can integrate it into the [ConversionController](./xtable-core/src/main/java/org/apache/xtable/conversion/ConversionController.java). If you think others may find that target useful, please raise a Pull Request to add it to the project.
