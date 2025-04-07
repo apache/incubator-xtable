@@ -18,18 +18,31 @@
  
 package org.apache.xtable.model.sync;
 
-import org.apache.xtable.annotations.Stable;
+import lombok.Builder;
+import lombok.Value;
 
-/**
- * Mode of a sync
- *
- * @since 0.1
- */
-@Stable
-public enum SyncMode {
-  // Full sync will create a checkpoint of ALL the files relevant at a certain point in time
-  FULL,
-  // Incremental will sync differential structures to bring the table state from and to points in
-  // the timeline
-  INCREMENTAL
+import org.apache.xtable.annotations.Evolving;
+
+@Value
+@Builder
+@Evolving
+public class ErrorDetails {
+  // error Message if any
+  String errorMessage;
+  // Readable description of the error
+  String errorDescription;
+  // Can the client retry for this type of error (Transient error=true, persistent error=false)
+  boolean canRetryOnFailure;
+
+  public static ErrorDetails create(Exception e, String errorDescription) {
+    if (e == null) {
+      return null;
+    }
+
+    return ErrorDetails.builder()
+        .errorMessage(e.getMessage())
+        .errorDescription(errorDescription)
+        .canRetryOnFailure(true)
+        .build();
+  }
 }

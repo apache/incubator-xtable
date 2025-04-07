@@ -23,6 +23,7 @@ import java.util.Optional;
 
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.xtable.annotations.Stable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
@@ -32,6 +33,7 @@ import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 /** A client that provides the major functionality for syncing changes to a target system. */
+@Stable
 public interface ConversionTarget {
 
   /**
