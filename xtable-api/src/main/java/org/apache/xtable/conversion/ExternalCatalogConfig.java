@@ -59,6 +59,13 @@ public class ExternalCatalogConfig {
   String catalogConversionSourceImpl;
 
   /**
+   * (Optional) A fully qualified class name that implements the interface for {@link
+   * org.apache.xtable.spi.sync.CatalogAccessControlPolicySyncClient} it can be used if the
+   * implementation for catalogType doesn't exist in XTable.
+   */
+  String catalogPolicySyncClientImpl;
+
+  /**
    * The properties for this catalog, used for providing any custom behaviour during catalog sync
    */
   @NonNull @Builder.Default Map<String, String> catalogProperties = Collections.emptyMap();
