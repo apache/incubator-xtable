@@ -54,18 +54,21 @@
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-hive-runtime</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Delta dependencies  -->
         <dependency>
             <groupId>io.delta</groupId>
             <artifactId>delta-hive_${scala.binary.version}</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <!-- HMS dependencies -->
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-metastore</artifactId>
+            <scope>provided</scope>
             <version>${hive.version}</version>
             <exclusions>
                 <exclusion>
@@ -93,6 +96,7 @@
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-jdbc</artifactId>
+            <scope>provided</scope>
             <version>${hive.version}</version>
             <exclusions>
                 <exclusion>
@@ -116,6 +120,7 @@
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-common</artifactId>
+            <scope>provided</scope>
             <version>${hive.version}</version>
             <exclusions>
                 <exclusion>
@@ -127,6 +132,7 @@
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-exec</artifactId>
+            <scope>provided</scope>
             <version>${hive.version}</version>
             <classifier>core</classifier>
             <exclusions>
