@@ -18,6 +18,7 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -98,7 +99,7 @@ public class TestHudiTableManager {
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder()
             .setBasePath(tableBasePath)
-            .setConf(CONFIGURATION)
+            .setConf(getStorageConf(CONFIGURATION))
             .setLoadActiveTimelineOnLoad(false)
             .build();
     assertFalse(metaClient.getTableConfig().populateMetaFields());

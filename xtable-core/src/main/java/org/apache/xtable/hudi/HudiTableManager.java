@@ -18,6 +18,8 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -68,7 +70,7 @@ public class HudiTableManager {
       return Optional.of(
           HoodieTableMetaClient.builder()
               .setBasePath(tableDataPath)
-              .setConf(configuration)
+              .setConf(getStorageConf(configuration))
               .setLoadActiveTimelineOnLoad(false)
               .build());
     } catch (TableNotFoundException ex) {
@@ -117,7 +119,7 @@ public class HudiTableManager {
                   .map(InternalPartitionField::getSourceField)
                   .map(InternalField::getPath)
                   .collect(Collectors.joining(",")))
-          .initTable(configuration, tableDataPath);
+          .initTable(getStorageConf(configuration), tableDataPath);
     } catch (IOException ex) {
       throw new UpdateException("Unable to initialize Hudi table", ex);
     }
