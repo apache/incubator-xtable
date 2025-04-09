@@ -85,32 +85,10 @@ public class ParquetSchemaExtractor {
         return INSTANCE;
     }
 
-    private static boolean groupTypeIsNullable(Type schema) {
+    private static boolean isNullable(Type schema) {
         return schema.getRepetition() == Repetition.REQUIRED ? false : true;
     }
 
-    private static boolean groupTypeContainsNull(Type schema) {
-        if (!schema.isPrimitive()) {
-            for (Type field : schema.asGroupType().getFields()) {
-                if (field/*.getLogicalTypeAnnotation().toOriginalType()*/ == null) {
-                    return true;
-                }
-            }
-        } else {
-            if (schema.equals(null)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /*    private static LogicalTypeAnnotation finalizeSchema(LogicalTypeAnnotation targetSchema, InternalSchema inputSchema) {
-            if (inputSchema.isNullable()) {
-                return targetSchema.union(null); // LogicalTypeAnnotation.unknownType()
-            }
-            return targetSchema;
-        }*/
 
     /**
      * Converts the parquet {@link Schema} to {@link InternalSchema}.
@@ -122,7 +100,6 @@ public class ParquetSchemaExtractor {
      */
     public InternalSchema toInternalSchema(
             Type schema, String parentPath) {
-        // TODO - Does not handle recursion in parquet schema
         InternalType newDataType = null;
         Type.Repetition currentRepetition = null;
         List<InternalField> subFields = new ArrayList<>();
@@ -160,7 +137,6 @@ public class ParquetSchemaExtractor {
                     } else if (logicalType instanceof LogicalTypeAnnotation.TimeLogicalTypeAnnotation) {
                         LogicalTypeAnnotation.TimeUnit timeUnit = ((LogicalTypeAnnotation.TimeLogicalTypeAnnotation) logicalType).getUnit();
                         if (timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS || timeUnit == LogicalTypeAnnotation.TimeUnit.NANOS) {
-                            // check if INT is the InternalType needed here
                             newDataType = InternalType.INT;
                         }
                     } else if (logicalType
@@ -185,7 +161,6 @@ public class ParquetSchemaExtractor {
                     } else if (logicalType instanceof LogicalTypeAnnotation.TimeLogicalTypeAnnotation) {
                         LogicalTypeAnnotation.TimeUnit timeUnit = ((LogicalTypeAnnotation.TimeLogicalTypeAnnotation) logicalType).getUnit();
                         if (timeUnit == LogicalTypeAnnotation.TimeUnit.MILLIS) {
-                            // check if INT is the InternalType needed here
                             newDataType = InternalType.INT;
                         }
                     } else if (logicalType
@@ -202,18 +177,9 @@ public class ParquetSchemaExtractor {
                         newDataType = InternalType.INT;
                     }
                     break;
-    /*            case INT96:
-                    newDataType = InternalType.INT;
-                    break;*/
                 case FLOAT:
                     logicalType = schema.getLogicalTypeAnnotation();
-          /*  if (logicalType instanceof LogicalTypeAnnotation.Float16LogicalTypeAnnotation) {
-              newDataType = InternalType.FLOAT;
-          } else*/
                     newDataType = InternalType.FLOAT;
-                   /*else {
-                        newDataType = InternalType.FLOAT;
-                    }*/
                     break;
                 case FIXED_LEN_BYTE_ARRAY:
                     logicalType = schema.getLogicalTypeAnnotation();
@@ -234,10 +200,8 @@ public class ParquetSchemaExtractor {
 
                     }
                     break;
-                // TODO add other logicalTypes?
                 case BINARY:
-                    // ? Variant,GEOMETRY, GEOGRAPHY,
-                    //logicalType = schemaField.getLogicalTypeAnnotation();
+                    // TODO Variant,GEOMETRY, GEOGRAPHY,
                     logicalType = schema.getLogicalTypeAnnotation();
                     if (logicalType instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
                         metadata.put(
@@ -276,8 +240,7 @@ public class ParquetSchemaExtractor {
                     else {*/
                     throw new UnsupportedSchemaTypeException(
                             String.format("Unsupported schema type %s", schema));
-                    //}
-                    //break;
+
             }
         } else {
             //GroupTypes
@@ -302,7 +265,7 @@ public class ParquetSchemaExtractor {
                         .name(schema.getName())
                         .dataType(InternalType.LIST)
                         .comment(null)
-                        .isNullable(groupTypeIsNullable(schema.asGroupType()))
+                        .isNullable(isNullable(schema.asGroupType()))
                         .fields(Collections.singletonList(elementField))
                         .build();
             } else if (logicalType instanceof LogicalTypeAnnotation.MapLogicalTypeAnnotation) {
@@ -324,21 +287,12 @@ public class ParquetSchemaExtractor {
                         .name(schemaName)
                         .dataType(InternalType.MAP)
                         .comment(null)
-                        .isNullable(groupTypeIsNullable(schema.asGroupType()))
-                        .fields(valueSchema.getFields()
-                                /*Arrays.asList(
-                                        MAP_KEY_FIELD.toBuilder()
-                                                .parentPath(parentPath)
-                                                .fieldId(schemaId == null ? null : schemaId.intValue())
-                                                .build(),
-                                        valueField)*/)
+                        .isNullable(isNullable(schema.asGroupType()))
+                        .fields(valueSchema.getFields())
                         .build();
             } else {
 
                 subFields = new ArrayList<>(schema.asGroupType().getFields().size());
-                //if (currentRepetition == Repetition.REPEATED// && (schema.asGroupType().getName() == "list" || Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) /*&& schema.asGroupType().getFields().size() == 1*/) {
-                //} else {
-                //List<InternalField> subFields = new ArrayList<>(schema.asGroupType().getFields().size());
                 for (Type parquetField : schema.asGroupType().getFields()) {
                     String fieldName = parquetField.getName();
                     Type.ID fieldId = parquetField.getId();
@@ -368,7 +322,7 @@ public class ParquetSchemaExtractor {
                             .comment(null)
                             .dataType(InternalType.RECORD)
                             .fields(subFields)
-                            .isNullable(groupTypeIsNullable(schema.asGroupType()))
+                            .isNullable(isNullable(schema.asGroupType()))
                             .build();
                 }
             }
@@ -378,7 +332,7 @@ public class ParquetSchemaExtractor {
                 .dataType(newDataType)
                 .fields(subFields.size() == 0 ? null : subFields)
                 .comment(null)
-                .isNullable(groupTypeIsNullable(schema)) // to check
+                .isNullable(isNullable(schema)) // to check
                 .metadata(metadata.isEmpty() ? null : metadata)
                 .build();
     }
@@ -402,8 +356,6 @@ public class ParquetSchemaExtractor {
         String fieldName = internalSchema.getName();
         InternalType internalType = internalSchema.getDataType();
         switch (internalType) {
-              /*case BYTES:
-                  return finalizeSchema(Schema.create(Schema.Type.BYTES), internalSchema);*/
             case BOOLEAN:
                 type = Types
                         .required(PrimitiveTypeName.BOOLEAN).as(LogicalTypeAnnotation.intType(8, false))

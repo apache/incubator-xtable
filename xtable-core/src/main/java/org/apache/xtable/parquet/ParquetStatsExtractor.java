@@ -64,7 +64,7 @@ public class ParquetStatsExtractor {
     private static final ParquetMetadataExtractor parquetMetadataExtractor =
             ParquetMetadataExtractor.getInstance();
 
-    private final InputPartitionFields partitions;
+    private static final InputPartitionFields partitions = null;
 
     public static ParquetStatsExtractor getInstance() {
         return INSTANCE;
@@ -75,7 +75,7 @@ public class ParquetStatsExtractor {
                 .flatMap(List::stream)
                 .collect(Collectors.toList());
     }
-    private Optional<Long> getMaxFromColumnStats(List<ColumnStat> columnStats) {
+    private static Optional<Long> getMaxFromColumnStats(List<ColumnStat> columnStats) {
         return columnStats.stream()
                 .filter(entry -> entry.getField().getParentPath() == null)
                 .map(ColumnStat::getNumValues)
@@ -103,11 +103,11 @@ public class ParquetStatsExtractor {
         return columnDescStats;
     }
 
-    private InputPartitionFields initPartitionInfo() {
+    private static InputPartitionFields initPartitionInfo() {
         return partitions;
     }
 
-    private InternalDataFile toInternalDataFile(
+    public static InternalDataFile toInternalDataFile(
             Configuration hadoopConf, Path parentPath) throws java.io.IOException {
         FileStatus file = null;
         List<PartitionValue> partitionValues = null;
