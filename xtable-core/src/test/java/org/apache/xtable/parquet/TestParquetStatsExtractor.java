@@ -21,6 +21,7 @@ package org.apache.xtable.parquet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.Collections;
 import org.junit.jupiter.api.Test;
 import org.apache.parquet.schema.*;
 import org.junit.jupiter.api.Assertions;
@@ -50,7 +51,7 @@ import org.apache.parquet.hadoop.ParquetFileWriter;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.parquet.column.statistics.IntStatistics;
 import org.apache.parquet.column.statistics.BinaryStatistics;
-
+import org.apache.xtable.model.storage.FileFormat;
 import static org.apache.parquet.column.Encoding.BIT_PACKED;
 import static org.apache.parquet.column.Encoding.PLAIN;
 
@@ -79,6 +80,9 @@ public class TestParquetStatsExtractor {
 
         // include statics using update()
         IntStatistics stats = new IntStatistics(); // or BinaryStatistics
+        stats.updateStats(1);
+        stats.updateStats(2);
+        stats.updateStats(5);
 
         ParquetFileWriter w = new ParquetFileWriter(configuration, schema, path);
         w.start();
@@ -102,18 +106,18 @@ public class TestParquetStatsExtractor {
         File file = null;
         Path parentPath = null;
         InternalDataFile internalDataFile = null;
+        Configuration configuration = new Configuration();
 
         try {
             file = new File("./", "test.parquet");
             parentPath = createParquetFile(file);
             //statsExtractor toInternalDataFile testing
-            internalDataFile = ParquetStatsExtractor.toInternalDataFile(null, parentPath);
+            internalDataFile = ParquetStatsExtractor.toInternalDataFile(configuration, parentPath);
         } catch (IOException e) {
-
+            System.out.println(e);
         }
-        // add assertEqual the above internalDataFile with the following:
 
-        /*InternalDataFile inputFile =
+        InternalDataFile inputFile =
                 InternalDataFile.builder()
                         .physicalPath(file.toString())
                         .columnStats(Collections.emptyList())
@@ -121,7 +125,9 @@ public class TestParquetStatsExtractor {
                         .lastModified(1234L)
                         .fileSizeBytes(4321L)
                         .recordCount(0)
-                        .build();*/
+                        .build();
+        Assertions.assertEquals(
+                inputFile, internalDataFile);
     }
 
     @Test

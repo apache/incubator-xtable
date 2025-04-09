@@ -77,7 +77,7 @@ public class ParquetStatsExtractor {
     }
     private static Optional<Long> getMaxFromColumnStats(List<ColumnStat> columnStats) {
         return columnStats.stream()
-                .filter(entry -> entry.getField().getParentPath() == null)
+                //.filter(entry -> entry.getField().getParentPath() == null)
                 .map(ColumnStat::getNumValues)
                 .filter(numValues -> numValues > 0)
                 .max(Long::compareTo);
@@ -95,6 +95,7 @@ public class ParquetStatsExtractor {
                             .stream()
                             .collect(Collectors.groupingBy(columnMetaData -> schema.getColumnDescription(columnMetaData.getPath().toArray()),
                                     Collectors.mapping(columnMetaData ->ColumnStat.builder()
+                                            //.field(columnMetaData.getPath()) TODO check wether an InternalField type is needed here
                                             .numValues(columnMetaData.getValueCount())
                                             .totalSize(columnMetaData.getTotalSize())
                                             .range(Range.vector(columnMetaData.getStatistics().genericGetMin(), columnMetaData.getStatistics().genericGetMax()))
@@ -120,15 +121,15 @@ public class ParquetStatsExtractor {
             footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
             MessageType schema = parquetMetadataExtractor.getSchema(footer);
             columnStatsForAFile = getColumnStatsForaFile(footer);
-            partitionValues = partitionExtractor.createPartitionValues(
-                    partitionInfo);
+            //partitionValues = partitionExtractor.createPartitionValues(
+            //               partitionInfo);
         } catch (java.io.IOException e) {
 
         }
         return InternalDataFile.builder()
                 .physicalPath(parentPath.toString())
                 .fileFormat(FileFormat.APACHE_PARQUET)
-                .partitionValues(partitionValues)
+                //.partitionValues(partitionValues)
                 .fileSizeBytes(file.getLen())
                 .recordCount(getMaxFromColumnStats(columnStatsForAFile).orElse(0L))
                 .columnStats(columnStatsForAFile)
