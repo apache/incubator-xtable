@@ -148,13 +148,14 @@ public class TestParquetStatsExtractor {
 
         InternalDataFile testInternalFile =
                 InternalDataFile.builder()
-                        .physicalPath(file.toString())
+                        .physicalPath("file:/C:/Users/slims/Downloads/XTable/incubator-xtable/xtable-core/test.parquet")//file.toString()
                         .columnStats(testColumnStats)// TODO what to specify as columnStats for the test?
                         .fileFormat(FileFormat.APACHE_PARQUET)
                         .lastModified(file.lastModified())
                         .fileSizeBytes(file.length())
                         .recordCount(8)
                         .build();
+        // TODO change this equality test with a more adequate one for two objects
         Assertions.assertEquals(
                 testInternalFile, internalDataFile);
     }

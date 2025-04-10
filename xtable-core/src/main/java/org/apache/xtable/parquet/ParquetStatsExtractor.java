@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
@@ -89,25 +90,27 @@ public class ParquetStatsExtractor {
     public static Map<ColumnDescriptor, List<ColumnStat>> getStatsForaFile(ParquetMetadata footer) {
         List<ColumnStat> colStat = new ArrayList<ColumnStat>();
         Map<ColumnDescriptor, List<ColumnStat>> columnDescStats = new HashMap<>();
-        for (BlockMetaData blockMetaData : footer.getBlocks()) {
-            MessageType schema = parquetMetadataExtractor.getSchema(footer);
-            List<ColumnChunkMetaData> columns = blockMetaData.getColumns();
-            columnDescStats =
-                    columns
-                            .stream()
-                            .collect(Collectors.groupingBy(columnMetaData -> schema.getColumnDescription(columnMetaData.getPath().toArray()),
-                                    Collectors.mapping(columnMetaData -> ColumnStat.builder()
-                                            .field(InternalField.builder()
-                                                    .name(columnMetaData.getPrimitiveType().getName())
-                                                    .fieldId(columnMetaData.getPrimitiveType().getId() == null ? null : columnMetaData.getPrimitiveType().getId().intValue())
-                                                    .parentPath(null)
-                                                    .schema(schemaExtractor.toInternalSchema(columnMetaData.getPrimitiveType(), columnMetaData.getPath().toDotString()))
-                                                    .build())
-                                            .numValues(columnMetaData.getValueCount())
-                                            .totalSize(columnMetaData.getTotalSize())
-                                            .range(Range.vector(columnMetaData.getStatistics().getMinBytes()[0], columnMetaData.getStatistics().getMaxBytes()[0]))// TODO convert byte array into numerical representation
-                                            .build(), Collectors.toList())));
+        MessageType schema = parquetMetadataExtractor.getSchema(footer);
+        List<ColumnChunkMetaData> columns = new ArrayList<>();
+        for (BlockMetaData blockMetaData: footer.getBlocks()){
+            columns.addAll(blockMetaData.getColumns());
         }
+        columnDescStats =
+                columns
+                        .stream()
+                        .collect(Collectors.groupingBy(columnMetaData -> schema.getColumnDescription(columnMetaData.getPath().toArray()),
+                                Collectors.mapping(columnMetaData -> ColumnStat.builder()
+                                        .field(InternalField.builder()
+                                                .name(columnMetaData.getPrimitiveType().getName())
+                                                .fieldId(columnMetaData.getPrimitiveType().getId() == null ? null : columnMetaData.getPrimitiveType().getId().intValue())
+                                                .parentPath(null)
+                                                .schema(schemaExtractor.toInternalSchema(columnMetaData.getPrimitiveType(), columnMetaData.getPath().toDotString()))
+                                                .build())
+                                        .numValues(columnMetaData.getValueCount())
+                                        .totalSize(columnMetaData.getTotalSize())
+                                        .range(Range.vector(columnMetaData.getStatistics().getMinBytes()[0], columnMetaData.getStatistics().getMaxBytes()[0]))// TODO convert byte array into numerical representation
+                                        .build(), Collectors.toList())));
+        // }
         return columnDescStats;
     }
 
