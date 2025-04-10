@@ -35,6 +35,7 @@ import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 import lombok.Builder;
+import org.apache.xtable.model.schema.InternalField;
 import lombok.Value;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.hadoop.fs.*;
@@ -75,9 +76,10 @@ public class ParquetStatsExtractor {
                 .flatMap(List::stream)
                 .collect(Collectors.toList());
     }
+
     private static Optional<Long> getMaxFromColumnStats(List<ColumnStat> columnStats) {
         return columnStats.stream()
-                //.filter(entry -> entry.getField().getParentPath() == null)
+                .filter(entry -> entry.getField().getParentPath() == null)
                 .map(ColumnStat::getNumValues)
                 .filter(numValues -> numValues > 0)
                 .max(Long::compareTo);
@@ -94,11 +96,16 @@ public class ParquetStatsExtractor {
                     columns
                             .stream()
                             .collect(Collectors.groupingBy(columnMetaData -> schema.getColumnDescription(columnMetaData.getPath().toArray()),
-                                    Collectors.mapping(columnMetaData ->ColumnStat.builder()
-                                            //.field(columnMetaData.getPath()) TODO check wether an InternalField type is needed here
+                                    Collectors.mapping(columnMetaData -> ColumnStat.builder()
+                                            .field(InternalField.builder()
+                                                    .name(columnMetaData.getPrimitiveType().getName())
+                                                    .fieldId(columnMetaData.getPrimitiveType().getId() == null ? null : columnMetaData.getPrimitiveType().getId().intValue())
+                                                    .parentPath(null)
+                                                    .schema(schemaExtractor.toInternalSchema(columnMetaData.getPrimitiveType(), columnMetaData.getPath().toDotString()))
+                                                    .build())
                                             .numValues(columnMetaData.getValueCount())
                                             .totalSize(columnMetaData.getTotalSize())
-                                            .range(Range.vector(columnMetaData.getStatistics().genericGetMin(), columnMetaData.getStatistics().genericGetMax()))
+                                            .range(Range.vector(columnMetaData.getStatistics().getMinBytes()[0], columnMetaData.getStatistics().getMaxBytes()[0]))// TODO convert byte array into numerical representation
                                             .build(), Collectors.toList())));
         }
         return columnDescStats;

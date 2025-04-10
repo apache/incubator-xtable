@@ -20,8 +20,13 @@ package org.apache.xtable.parquet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
-
+import org.apache.parquet.hadoop.ParquetFileReader;
 import java.util.Collections;
+import java.util.List;
+import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
+import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.parquet.hadoop.metadata.BlockMetaData;
+import org.apache.parquet.hadoop.ParquetReader;
 import org.junit.jupiter.api.Test;
 import org.apache.parquet.schema.*;
 import org.junit.jupiter.api.Assertions;
@@ -43,6 +48,7 @@ import org.apache.parquet.schema.MessageTypeParser;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.xtable.model.stat.Range;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.bytes.BytesInput;
@@ -52,6 +58,7 @@ import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.parquet.column.statistics.IntStatistics;
 import org.apache.parquet.column.statistics.BinaryStatistics;
 import org.apache.xtable.model.storage.FileFormat;
+
 import static org.apache.parquet.column.Encoding.BIT_PACKED;
 import static org.apache.parquet.column.Encoding.PLAIN;
 
@@ -59,14 +66,19 @@ import java.io.File;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.io.IOException;
-
+import lombok.Builder;
 import org.apache.parquet.schema.MessageTypeParser;
 
 
 public class TestParquetStatsExtractor {
 
-    public static Path createParquetFile(File file) throws IOException {
+    @Builder.Default
+    private static final ParquetSchemaExtractor schemaExtractor =
+            ParquetSchemaExtractor.getInstance();
+
+    public static ParquetFileReader createParquetFile(File file) throws IOException {
         Path path = new Path(file.toURI());
         Configuration configuration = new Configuration();
 
@@ -93,41 +105,58 @@ public class TestParquetStatsExtractor {
         w.endColumn();
         w.endBlock();
         w.startBlock(4);
-        w.startColumn(c1, 7, codec);
+        w.startColumn(c1, 8, codec);
         w.writeDataPage(7, 4, BytesInput.from(bytes2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
         w.endColumn();
         w.endBlock();
         w.end(new HashMap<String, String>());
-        return path;
+        return new ParquetFileReader(configuration, path, w.getFooter());
     }
 
     @Test
     public void testToInternalDataFile() {
         File file = null;
-        Path parentPath = null;
+        ParquetFileReader fileReader = null;
         InternalDataFile internalDataFile = null;
         Configuration configuration = new Configuration();
 
         try {
             file = new File("./", "test.parquet");
-            parentPath = createParquetFile(file);
+            fileReader = createParquetFile(file);
             //statsExtractor toInternalDataFile testing
-            internalDataFile = ParquetStatsExtractor.toInternalDataFile(configuration, parentPath);
+            internalDataFile = ParquetStatsExtractor.toInternalDataFile(configuration, fileReader.getPath());
         } catch (IOException e) {
             System.out.println(e);
         }
 
-        InternalDataFile inputFile =
+        List<ColumnStat> testColumnStats = new ArrayList<>();
+        for (BlockMetaData blockMetaData : fileReader.getFooter().getBlocks()) {
+            List<ColumnChunkMetaData> columns = blockMetaData.getColumns();
+            for (ColumnChunkMetaData columnMetaData : columns) {
+                testColumnStats.add(ColumnStat.builder()
+                        .field(InternalField.builder()
+                                .name(columnMetaData.getPrimitiveType().getName())
+                                .parentPath(null)
+                                .schema(schemaExtractor.toInternalSchema(columnMetaData.getPrimitiveType(), columnMetaData.getPath().toDotString()))
+                                .build())
+                        .numValues(columnMetaData.getValueCount())
+                        .totalSize(columnMetaData.getTotalSize())
+                        .range(Range.vector(columnMetaData.getStatistics().genericGetMin(), columnMetaData.getStatistics().genericGetMax()))
+                        .build());
+            }
+        }
+
+        InternalDataFile testInternalFile =
                 InternalDataFile.builder()
                         .physicalPath(file.toString())
-                        .columnStats(Collections.emptyList())
+                        .columnStats(testColumnStats)// TODO what to specify as columnStats for the test?
                         .fileFormat(FileFormat.APACHE_PARQUET)
-                        .lastModified(1234L)
-                        .fileSizeBytes(4321L)
-                        .recordCount(0)
+                        .lastModified(file.lastModified())
+                        .fileSizeBytes(file.length())
+                        .recordCount(8)
                         .build();
         Assertions.assertEquals(
-                inputFile, internalDataFile);
+                testInternalFile, internalDataFile);
     }
 
     @Test
