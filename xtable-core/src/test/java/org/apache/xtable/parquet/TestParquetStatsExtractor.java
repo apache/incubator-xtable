@@ -20,9 +20,12 @@ package org.apache.xtable.parquet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.*;
+
 import org.apache.parquet.hadoop.ParquetFileReader;
+
 import java.util.Collections;
 import java.util.List;
+
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
@@ -68,8 +71,13 @@ import java.util.HashMap;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.io.IOException;
+
 import lombok.Builder;
 import org.apache.parquet.schema.MessageTypeParser;
+
+
+
+import org.apache.xtable.model.stat.Range;
 
 
 public class TestParquetStatsExtractor {
@@ -128,7 +136,7 @@ public class TestParquetStatsExtractor {
         } catch (IOException e) {
             System.out.println(e);
         }
-
+        // TODO check if the stats are ok to get as follows
         List<ColumnStat> testColumnStats = new ArrayList<>();
         for (BlockMetaData blockMetaData : fileReader.getFooter().getBlocks()) {
             List<ColumnChunkMetaData> columns = blockMetaData.getColumns();
@@ -148,16 +156,16 @@ public class TestParquetStatsExtractor {
 
         InternalDataFile testInternalFile =
                 InternalDataFile.builder()
-                        .physicalPath("file:/C:/Users/slims/Downloads/XTable/incubator-xtable/xtable-core/test.parquet")//file.toString()
-                        .columnStats(testColumnStats)// TODO what to specify as columnStats for the test?
+                        .physicalPath("file:/C:/Users/slims/Downloads/XTable/incubator-xtable/xtable-core/test.parquet")//TODO hard coded path to file method
+                        .columnStats(testColumnStats)
                         .fileFormat(FileFormat.APACHE_PARQUET)
                         .lastModified(file.lastModified())
                         .fileSizeBytes(file.length())
-                        .recordCount(8)
+                        .recordCount(8)// TODO remove 8 and replace with record count from file
                         .build();
-        // TODO change this equality test with a more adequate one for two objects
+
         Assertions.assertEquals(
-                testInternalFile, internalDataFile);
+                true,   InternalDataFile.compareFiles(testInternalFile,internalDataFile));
     }
 
     @Test

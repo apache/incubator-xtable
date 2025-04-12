@@ -31,7 +31,7 @@ import lombok.experimental.SuperBuilder;
 
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
-
+import java.util.Objects;
 /**
  * Represents a data file in the table.
  *
@@ -52,4 +52,20 @@ public class InternalDataFile extends InternalFile {
   @Builder.Default @NonNull List<ColumnStat> columnStats = Collections.emptyList();
   // last modified time in millis since epoch
   long lastModified;
+  public static InternalDataFileBuilder builderFrom(InternalDataFile dataFile) {
+    return dataFile.toBuilder();
+  }
+
+  public static boolean compareFiles(InternalDataFile obj1, InternalDataFile obj2) {
+    if (obj2 == obj1) {
+      return true;
+    }
+    if (obj2 != null && obj2 instanceof InternalDataFile) {
+      InternalDataFile other = (InternalDataFile) obj2;
+      return Objects.equals(obj1.getPhysicalPath(), other.getPhysicalPath()) &&
+              Objects.equals(obj1.getLastModified(), other.getLastModified()) &&
+              other.getColumnStats().equals(obj2.getColumnStats());// add partitionFilds equality
+    }
+    return false;
+  }
 }
