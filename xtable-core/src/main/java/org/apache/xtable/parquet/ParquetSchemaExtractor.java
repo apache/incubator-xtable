@@ -86,7 +86,7 @@ public class ParquetSchemaExtractor {
     }
 
     private static boolean isNullable(Type schema) {
-        return schema.getRepetition() == Repetition.REQUIRED ? false : true;
+        return schema.getRepetition() != Repetition.REQUIRED;
     }
 
 
@@ -102,7 +102,7 @@ public class ParquetSchemaExtractor {
             Type schema, String parentPath) {
         InternalType newDataType = null;
         Type.Repetition currentRepetition = null;
-        List<InternalField> subFields = new ArrayList<>();
+        List<InternalField> subFields = null;//new ArrayList<>();
         PrimitiveType primitiveType;
         LogicalTypeAnnotation logicalType;
         Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
@@ -178,7 +178,6 @@ public class ParquetSchemaExtractor {
                     }
                     break;
                 case FLOAT:
-                    logicalType = schema.getLogicalTypeAnnotation();
                     newDataType = InternalType.FLOAT;
                     break;
                 case FIXED_LEN_BYTE_ARRAY:
@@ -234,10 +233,6 @@ public class ParquetSchemaExtractor {
                     newDataType = InternalType.NULL;
                     break;*/
                 default:
-                    /*if (logicalType instanceof LogicalTypeAnnotation.UnknownLogicalTypeAnnotation){
-                        newDataType = InternalType.NULL;
-                    }
-                    else {*/
                     throw new UnsupportedSchemaTypeException(
                             String.format("Unsupported schema type %s", schema));
 
@@ -330,7 +325,7 @@ public class ParquetSchemaExtractor {
         return InternalSchema.builder()
                 .name(elementName)
                 .dataType(newDataType)
-                .fields(subFields.size() == 0 ? null : subFields)
+                .fields(subFields == null || subFields.size()==0 ? null : subFields)
                 .comment(null)
                 .isNullable(isNullable(schema)) // to check
                 .metadata(metadata.isEmpty() ? null : metadata)

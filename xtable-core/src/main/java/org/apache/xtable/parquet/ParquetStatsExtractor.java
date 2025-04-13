@@ -88,13 +88,10 @@ public class ParquetStatsExtractor {
 
 
     public static Map<ColumnDescriptor, List<ColumnStat>> getStatsForaFile(ParquetMetadata footer) {
-        List<ColumnStat> colStat = new ArrayList<ColumnStat>();
         Map<ColumnDescriptor, List<ColumnStat>> columnDescStats = new HashMap<>();
         MessageType schema = parquetMetadataExtractor.getSchema(footer);
         List<ColumnChunkMetaData> columns = new ArrayList<>();
-        for (BlockMetaData blockMetaData: footer.getBlocks()){
-            columns.addAll(blockMetaData.getColumns());
-        }
+        columns = footer.getBlocks().stream().flatMap(blockMetaData -> blockMetaData.getColumns().stream()).collect(Collectors.toList());
         columnDescStats =
                 columns
                         .stream()
@@ -108,9 +105,8 @@ public class ParquetStatsExtractor {
                                                 .build())
                                         .numValues(columnMetaData.getValueCount())
                                         .totalSize(columnMetaData.getTotalSize())
-                                        .range(Range.vector(columnMetaData.getStatistics().getMinBytes()[0], columnMetaData.getStatistics().getMaxBytes()[0]))// TODO convert byte array into numerical representation
+                                        .range(Range.vector(columnMetaData.getStatistics().getMinBytes(), columnMetaData.getStatistics().getMaxBytes()))// TODO convert byte array into numerical representation
                                         .build(), Collectors.toList())));
-        // }
         return columnDescStats;
     }
 

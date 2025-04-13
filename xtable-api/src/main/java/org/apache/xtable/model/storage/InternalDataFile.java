@@ -28,7 +28,7 @@ import lombok.NonNull;
 import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.SuperBuilder;
-
+import java.util.stream.IntStream;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import java.util.Objects;
@@ -56,15 +56,16 @@ public class InternalDataFile extends InternalFile {
     return dataFile.toBuilder();
   }
 
-  public static boolean compareFiles(InternalDataFile obj1, InternalDataFile obj2) {
-    if (obj2 == obj1) {
+  public boolean equals(InternalDataFile obj2) {
+    if (obj2 == this) {
       return true;
     }
     if (obj2 != null && obj2 instanceof InternalDataFile) {
-      InternalDataFile other = (InternalDataFile) obj2;
-      return Objects.equals(obj1.getPhysicalPath(), other.getPhysicalPath()) &&
-              Objects.equals(obj1.getLastModified(), other.getLastModified()) &&
-              other.getColumnStats().equals(obj2.getColumnStats());// add partitionFilds equality
+      return Objects.equals(this.getPhysicalPath(), obj2.getPhysicalPath()) &&
+              Objects.equals(this.getLastModified(), obj2.getLastModified()) &&
+              IntStream.range(0, this.getColumnStats().size())
+                      .allMatch(i -> this.getColumnStats().get(i).equals(obj2.getColumnStats().get(i)));
+      // todo add other attributes (fileFormat, partitionValues...)
     }
     return false;
   }
