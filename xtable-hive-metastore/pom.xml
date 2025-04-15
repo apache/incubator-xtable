@@ -33,12 +33,6 @@
             <groupId>org.apache.xtable</groupId>
             <artifactId>xtable-core_${scala.binary.version}</artifactId>
             <version>${project.version}</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.openjdk.jol</groupId>
-                    <artifactId>jol-core</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
         <!-- Hadoop dependencies -->
