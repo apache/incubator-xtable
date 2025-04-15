@@ -69,7 +69,7 @@ public class CatalogSync {
                 tableIdentifier.getId(),
                 table.getBasePath(),
                 table.getTableFormat(),
-                catalogSyncClient.getClass().getName(), e);
+                catalogSyncClient.getClass().getName());
             results.add(
                 getCatalogSyncFailureStatus(
                     catalogSyncClient.getCatalogId(), catalogSyncClient.getClass().getName(), e));
