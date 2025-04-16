@@ -250,8 +250,13 @@ public class GlueSchemaExtractor {
      */
     return getPartitionKeys(table).stream()
         .map(
-            pKey ->
-                columnsMap.getOrDefault(pKey, Column.builder().name(pKey).type("string").build()))
+            pKey -> {
+              Column column = columnsMap.get(pKey);
+              return Column.builder()
+                  .name(pKey)
+                  .type(column != null ? column.type() : "string")
+                  .build();
+            })
         .collect(Collectors.toList());
   }
 

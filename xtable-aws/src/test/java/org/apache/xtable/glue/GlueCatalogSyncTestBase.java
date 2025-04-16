@@ -96,7 +96,7 @@ public class GlueCatalogSyncTestBase {
                   getInternalField("booleanField", "boolean", InternalType.BOOLEAN)))
           .build();
   protected static final List<Column> PARTITION_KEYS =
-      Collections.singletonList(getColumn(TableFormat.DELTA, "partitionField", "string"));
+      Collections.singletonList(getColumn("partitionField", "string"));
   protected static final List<Column> DELTA_GLUE_SCHEMA =
       Arrays.asList(
           getColumn(TableFormat.DELTA, "intField", "int"),
