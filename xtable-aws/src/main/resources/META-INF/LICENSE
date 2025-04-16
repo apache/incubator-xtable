@@ -224,8 +224,3 @@ javax.activation:javax.activation-api:1.2.0
 javax.xml.bind:jaxb-api:2.2.11
 javax.servlet:javax.servlet-api:3.1.0
 org.glassfish.web:javax.servlet.jsp:2.3.2
-
-GNU General Public License v2.0 with classpath exception
--------
-org.openjdk.jol:jol-core:0.16
-
