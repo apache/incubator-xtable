@@ -18,6 +18,7 @@
 
 package org.apache.xtable.parquet;
 
+
 import static org.apache.parquet.column.Encoding.BIT_PACKED;
 import static org.apache.parquet.column.Encoding.PLAIN;
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,6 +41,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.statistics.IntStatistics;
+import org.apache.parquet.column.statistics.BinaryStatistics;
+import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetFileWriter;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
@@ -82,10 +85,15 @@ public class TestParquetStatsExtractor {
         CompressionCodecName codec = CompressionCodecName.UNCOMPRESSED;
 
         // include statics using update()
-        IntStatistics stats = new IntStatistics(); // or BinaryStatistics
-        stats.updateStats(1);
-        stats.updateStats(2);
-        stats.updateStats(5);
+//        IntStatistics stats = new IntStatistics(); // or BinaryStatistics
+//        stats.updateStats(1);
+//        stats.updateStats(2);
+//        stats.updateStats(5);
+
+        BinaryStatistics stats =  new BinaryStatistics();
+        stats.updateStats(Binary.fromString("1"));
+        stats.updateStats(Binary.fromString("2"));
+        stats.updateStats(Binary.fromString("5"));
 
         // to simplify the test we keep the same stats for both columns
         ParquetFileWriter w = new ParquetFileWriter(configuration, schema, path);
