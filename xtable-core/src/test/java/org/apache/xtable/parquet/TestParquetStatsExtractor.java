@@ -32,6 +32,10 @@ import java.util.List;
 import lombok.Builder;
 
 import org.apache.hadoop.conf.Configuration;
+import java.nio.file.Paths;
+
+import java.nio.file.Files;
+//import java.nio.file.Path;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.column.ColumnDescriptor;
@@ -53,7 +57,11 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 
+import org.junit.jupiter.api.io.TempDir;
+
 public class TestParquetStatsExtractor {
+    @TempDir
+    static java.nio.file.Path tempDir = Paths.get("./");
 
     @Builder.Default
     private static final ParquetSchemaExtractor schemaExtractor =
@@ -124,22 +132,27 @@ public class TestParquetStatsExtractor {
 
     @Test
     public void testToInternalDataFile() throws IOException {
-        File file = null;
+
+
         ParquetFileReader fileReader = null;
         InternalDataFile internalDataFile = null;
         Configuration configuration = new Configuration();
         List<ColumnStat> testColumnStats = new ArrayList<>();
-        file = new File("./", "test.parquet");
+        java.nio.file.Path path = tempDir.resolve("parquet-test-files");
+        File file = path.toFile();
+        file.deleteOnExit();
+        //file = new File("./", "test.parquet");
         // fileReader = createParquetFile(file);
+        //testColumnStats = initFileTest(file);
         testColumnStats = initFileTest(file);
-        Path path = new Path(file.toURI());
+        Path hadoopPath = new Path(file.toURI());
         // statsExtractor toInternalDataFile testing
-        internalDataFile = ParquetStatsExtractor.toInternalDataFile(configuration, path);
-
+        internalDataFile = ParquetStatsExtractor.toInternalDataFile(configuration, hadoopPath);
+        //System.out.println(file.getAbsolutePath());
         InternalDataFile testInternalFile =
                 InternalDataFile.builder()
                         .physicalPath(
-                                "file:/C:/Users/slims/Downloads/XTable/incubator-xtable/xtable-core/test.parquet") // TODO hard coded path to file method
+                                "file:/C:/Users/slims/Downloads/XTable/incubator-xtable/xtable-core/parquet-test-files") // TODO hard coded path to file method
                         .columnStats(testColumnStats)
                         .fileFormat(FileFormat.APACHE_PARQUET)
                         .lastModified(file.lastModified())
@@ -150,7 +163,7 @@ public class TestParquetStatsExtractor {
         Assertions.assertEquals(true, testInternalFile.equals(internalDataFile));
     }
 
-    public void main() throws IOException{
+    public void main() throws IOException {
         testToInternalDataFile();
     }
 }
