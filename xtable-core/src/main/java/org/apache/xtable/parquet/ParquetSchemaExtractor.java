@@ -18,44 +18,33 @@
 
 package org.apache.xtable.parquet;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.List;
+
 import java.util.ArrayList;
-
-import org.apache.xtable.schema.SchemaUtils;
-import org.apache.xtable.exception.SchemaExtractorException;
-
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.Optional;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.EnumMap;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import org.apache.xtable.hudi.idtracking.models.IdMapping;
 import org.apache.avro.Schema;
-import org.apache.parquet.schema.GroupType;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
-import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 import org.apache.parquet.schema.Type;
+import org.apache.parquet.schema.Type.Repetition;
+import org.apache.parquet.schema.Types;
+
 import org.apache.xtable.collectors.CustomCollectors;
+import org.apache.xtable.exception.SchemaExtractorException;
 import org.apache.xtable.exception.UnsupportedSchemaTypeException;
 import org.apache.xtable.model.schema.InternalField;
-import org.apache.parquet.schema.Type.Repetition;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
-import org.apache.parquet.schema.Type.ID;
-import org.apache.parquet.schema.OriginalType;
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
-import org.apache.parquet.schema.Types;
-import org.apache.parquet.column.ColumnDescriptor;
-
+import org.apache.xtable.schema.SchemaUtils;
 
 /**
  * Class that converts parquet Schema {@link Schema} to Canonical Schema {@link InternalSchema} and
@@ -89,23 +78,21 @@ public class ParquetSchemaExtractor {
         return schema.getRepetition() != Repetition.REQUIRED;
     }
 
-
     /**
      * Converts the parquet {@link Schema} to {@link InternalSchema}.
      *
-     * @param schema     The schema being converted
+     * @param schema The schema being converted
      * @param parentPath If this schema is nested within another, this will be a dot separated string
-     *                   representing the path from the top most field to the current schema.
+     *     representing the path from the top most field to the current schema.
      * @return a converted schema
      */
-    public InternalSchema toInternalSchema(
-            Type schema, String parentPath) {
+    public InternalSchema toInternalSchema(Type schema, String parentPath) {
         InternalType newDataType = null;
         Type.Repetition currentRepetition = null;
-        List<InternalField> subFields = null;//new ArrayList<>();
+        List<InternalField> subFields = null; // new ArrayList<>();
         PrimitiveType primitiveType;
         LogicalTypeAnnotation logicalType;
-        Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
+        Map<InternalSchema.MetadataKey, Object> metadata = new EnumMap<>(InternalSchema.MetadataKey.class);//new HashMap<>();
         String elementName = schema.getName();
         if (schema.isPrimitive()) {
             primitiveType = schema.asPrimitiveType();
@@ -116,13 +103,20 @@ public class ParquetSchemaExtractor {
                     if (logicalType instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) {
                         LogicalTypeAnnotation.TimeUnit timeUnit =
                                 ((LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) logicalType).getUnit();
+                        boolean isAdjustedToUTC =
+                                ((LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) logicalType)
+                                        .isAdjustedToUTC();
                         if (timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS) {
                             newDataType = InternalType.TIMESTAMP;
                             metadata.put(
                                     InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
                                     InternalSchema.MetadataValue.MICROS);
                         } else if (timeUnit == LogicalTypeAnnotation.TimeUnit.MILLIS) {
-                            newDataType = InternalType.TIMESTAMP_NTZ;
+                            if (isAdjustedToUTC) {
+                                newDataType = InternalType.TIMESTAMP;
+                            } else {
+                                newDataType = InternalType.TIMESTAMP_NTZ;
+                            }
                             metadata.put(
                                     InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
                                     InternalSchema.MetadataValue.MILLIS);
@@ -135,12 +129,13 @@ public class ParquetSchemaExtractor {
                     } else if (logicalType instanceof LogicalTypeAnnotation.IntLogicalTypeAnnotation) {
                         newDataType = InternalType.INT;
                     } else if (logicalType instanceof LogicalTypeAnnotation.TimeLogicalTypeAnnotation) {
-                        LogicalTypeAnnotation.TimeUnit timeUnit = ((LogicalTypeAnnotation.TimeLogicalTypeAnnotation) logicalType).getUnit();
-                        if (timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS || timeUnit == LogicalTypeAnnotation.TimeUnit.NANOS) {
+                        LogicalTypeAnnotation.TimeUnit timeUnit =
+                                ((LogicalTypeAnnotation.TimeLogicalTypeAnnotation) logicalType).getUnit();
+                        if (timeUnit == LogicalTypeAnnotation.TimeUnit.MICROS
+                                || timeUnit == LogicalTypeAnnotation.TimeUnit.NANOS) {
                             newDataType = InternalType.INT;
                         }
-                    } else if (logicalType
-                            instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+                    } else if (logicalType instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
 
                         metadata.put(
                                 InternalSchema.MetadataKey.DECIMAL_PRECISION,
@@ -159,12 +154,12 @@ public class ParquetSchemaExtractor {
                     if (logicalType instanceof LogicalTypeAnnotation.DateLogicalTypeAnnotation) {
                         newDataType = InternalType.DATE;
                     } else if (logicalType instanceof LogicalTypeAnnotation.TimeLogicalTypeAnnotation) {
-                        LogicalTypeAnnotation.TimeUnit timeUnit = ((LogicalTypeAnnotation.TimeLogicalTypeAnnotation) logicalType).getUnit();
+                        LogicalTypeAnnotation.TimeUnit timeUnit =
+                                ((LogicalTypeAnnotation.TimeLogicalTypeAnnotation) logicalType).getUnit();
                         if (timeUnit == LogicalTypeAnnotation.TimeUnit.MILLIS) {
                             newDataType = InternalType.INT;
                         }
-                    } else if (logicalType
-                            instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+                    } else if (logicalType instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
                         metadata.put(
                                 InternalSchema.MetadataKey.DECIMAL_PRECISION,
                                 ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getPrecision());
@@ -187,8 +182,7 @@ public class ParquetSchemaExtractor {
                     } else if (logicalType instanceof LogicalTypeAnnotation.IntervalLogicalTypeAnnotation) {
                         metadata.put(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 12);
                         newDataType = InternalType.FIXED;
-                    } else if (logicalType
-                            instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+                    } else if (logicalType instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
                         metadata.put(
                                 InternalSchema.MetadataKey.DECIMAL_PRECISION,
                                 ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getPrecision());
@@ -196,7 +190,6 @@ public class ParquetSchemaExtractor {
                                 InternalSchema.MetadataKey.DECIMAL_SCALE,
                                 ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getScale());
                         newDataType = InternalType.DECIMAL;
-
                     }
                     break;
                 case BINARY:
@@ -212,8 +205,7 @@ public class ParquetSchemaExtractor {
                         newDataType = InternalType.BYTES;
                     } else if (logicalType instanceof LogicalTypeAnnotation.StringLogicalTypeAnnotation) {
                         newDataType = InternalType.STRING;
-                    } else if (logicalType
-                            instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+                    } else if (logicalType instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
                         metadata.put(
                                 InternalSchema.MetadataKey.DECIMAL_PRECISION,
                                 ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getPrecision());
@@ -229,17 +221,16 @@ public class ParquetSchemaExtractor {
                 case BOOLEAN:
                     newDataType = InternalType.BOOLEAN;
                     break;
-                /*case UNKNOWN:
-                    newDataType = InternalType.NULL;
-                    break;*/
+          /*case UNKNOWN:
+          newDataType = InternalType.NULL;
+          break;*/
                 default:
                     throw new UnsupportedSchemaTypeException(
                             String.format("Unsupported schema type %s", schema));
-
             }
         } else {
-            //GroupTypes
-            //typeName = schema.asGroupType();
+            // GroupTypes
+            // typeName = schema.asGroupType();
             logicalType = schema.getLogicalTypeAnnotation();
             if (logicalType instanceof LogicalTypeAnnotation.ListLogicalTypeAnnotation) {
                 String schemaName = schema.asGroupType().getName();
@@ -294,10 +285,10 @@ public class ParquetSchemaExtractor {
                     currentRepetition = parquetField.getRepetition();
                     InternalSchema subFieldSchema =
                             toInternalSchema(
-                                    parquetField,
-                                    SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
+                                    parquetField, SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
 
-                    if (schema.asGroupType().getFields().size() == 1) {//todo Tuple (many subelements in a list)
+                    if (schema.asGroupType().getFields().size()
+                            == 1) { // todo Tuple (many subelements in a list)
                         newDataType = subFieldSchema.getDataType();
                         elementName = subFieldSchema.getName();
                         break;
@@ -311,7 +302,9 @@ public class ParquetSchemaExtractor {
                                     .fieldId(fieldId == null ? null : fieldId.intValue())
                                     .build());
                 }
-                if (currentRepetition != Repetition.REPEATED && schema.asGroupType().getName() != "list" && !Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) {
+                if (currentRepetition != Repetition.REPEATED
+                        && schema.asGroupType().getName() != "list"
+                        && !Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) {
                     return InternalSchema.builder()
                             .name(schema.getName())
                             .comment(null)
@@ -325,21 +318,20 @@ public class ParquetSchemaExtractor {
         return InternalSchema.builder()
                 .name(elementName)
                 .dataType(newDataType)
-                .fields(subFields == null || subFields.size()==0 ? null : subFields)
+                .fields(subFields == null || subFields.size() == 0 ? null : subFields)
                 .comment(null)
                 .isNullable(isNullable(schema)) // to check
                 .metadata(metadata.isEmpty() ? null : metadata)
                 .build();
     }
 
-
     /**
      * Internal method for converting the {@link InternalSchema} to parquet {@link Schema}.
      *
      * @param internalSchema internal schema representation
-     * @param currentPath    If this schema is nested within another, this will be a dot separated
-     *                       string. This is used for the parquet namespace to guarantee unique names for nested
-     *                       records.
+     * @param currentPath If this schema is nested within another, this will be a dot separated
+     *     string. This is used for the parquet namespace to guarantee unique names for nested
+     *     records.
      * @return an parquet schema
      */
     public Type fromInternalSchema(InternalSchema internalSchema, String currentPath) {
@@ -352,81 +344,109 @@ public class ParquetSchemaExtractor {
         InternalType internalType = internalSchema.getDataType();
         switch (internalType) {
             case BOOLEAN:
-                type = Types
-                        .required(PrimitiveTypeName.BOOLEAN).as(LogicalTypeAnnotation.intType(8, false))
-                        .named(fieldName);
+                type =
+                        Types.required(PrimitiveTypeName.BOOLEAN)
+                                .as(LogicalTypeAnnotation.intType(8, false))
+                                .named(fieldName);
                 break;
             case INT:
-                type = Types
-                        .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.intType(32, false))
-                        .named(fieldName);
+                type =
+                        Types.required(PrimitiveTypeName.INT32)
+                                .as(LogicalTypeAnnotation.intType(32, false))
+                                .named(fieldName);
                 break;
             case LONG:
-                type = Types
-                        .required(PrimitiveTypeName.INT64).as(LogicalTypeAnnotation.intType(64, false))
-                        .named(fieldName);
+                type =
+                        Types.required(PrimitiveTypeName.INT64)
+                                .as(LogicalTypeAnnotation.intType(64, false))
+                                .named(fieldName);
                 break;
             case STRING:
-                type = Types
-                        .required(PrimitiveTypeName.BINARY).as(LogicalTypeAnnotation.stringType())
-                        .named(fieldName);
+                type =
+                        Types.required(PrimitiveTypeName.BINARY)
+                                .as(LogicalTypeAnnotation.stringType())
+                                .named(fieldName);
                 break;
             case FLOAT:
                 type = Types.required(PrimitiveTypeName.FLOAT).named(fieldName);
                 break;
             case DECIMAL:
                 int precision =
-                        (int)
-                                internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+                        (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
                 int scale =
-                        (int)
-                                internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
-                type = Types
-                        .required(PrimitiveTypeName.FLOAT).as(LogicalTypeAnnotation.decimalType(scale, precision))
-                        .named(fieldName);
+                        (int) internalSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
+                type =
+                        Types.required(PrimitiveTypeName.FLOAT)
+                                .as(LogicalTypeAnnotation.decimalType(scale, precision))
+                                .named(fieldName);
                 break;
 
             case ENUM:
-                type = new org.apache.parquet.avro.AvroSchemaConverter().convert(Schema.createEnum(
-                        fieldName,
-                        internalSchema.getComment(),
-                        null,
-                        (List<String>)
-                                internalSchema.getMetadata().get(InternalSchema.MetadataKey.ENUM_VALUES),
-                        null)).getType(fieldName);
+                type =
+                        new org.apache.parquet.avro.AvroSchemaConverter()
+                                .convert(
+                                        Schema.createEnum(
+                                                fieldName,
+                                                internalSchema.getComment(),
+                                                null,
+                                                (List<String>)
+                                                        internalSchema
+                                                                .getMetadata()
+                                                                .get(InternalSchema.MetadataKey.ENUM_VALUES),
+                                                null))
+                                .getType(fieldName);
                 break;
             case DATE:
-                type = Types
-                        .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.dateType())
-                        .named(fieldName);
+                type =
+                        Types.required(PrimitiveTypeName.INT32)
+                                .as(LogicalTypeAnnotation.dateType())
+                                .named(fieldName);
                 break;
             case TIMESTAMP:
-                if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION) == InternalSchema.MetadataValue.MICROS) {
-                    type = Types
-                            .required(PrimitiveTypeName.INT64).as(LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.MICROS))
-                            .named(fieldName);
+                if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+                        == InternalSchema.MetadataValue.MICROS) {
+                    type =
+                            Types.required(PrimitiveTypeName.INT64)
+                                    .as(
+                                            LogicalTypeAnnotation.timestampType(
+                                                    true, LogicalTypeAnnotation.TimeUnit.MICROS))
+                                    .named(fieldName);
                 }
-                if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION) == InternalSchema.MetadataValue.MILLIS) {
-                    type = Types
-                            .required(PrimitiveTypeName.INT64).as(LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.MILLIS))
-                            .named(fieldName);
-                } else if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION) == InternalSchema.MetadataValue.NANOS) {
-                    type = Types
-                            .required(PrimitiveTypeName.INT64).as(LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.NANOS))
-                            .named(fieldName);
+                if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+                        == InternalSchema.MetadataValue.MILLIS) {
+                    type =
+                            Types.required(PrimitiveTypeName.INT64)
+                                    .as(
+                                            LogicalTypeAnnotation.timestampType(
+                                                    true, LogicalTypeAnnotation.TimeUnit.MILLIS))
+                                    .named(fieldName);
+                } else if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+                        == InternalSchema.MetadataValue.NANOS) {
+                    type =
+                            Types.required(PrimitiveTypeName.INT64)
+                                    .as(
+                                            LogicalTypeAnnotation.timestampType(
+                                                    true, LogicalTypeAnnotation.TimeUnit.NANOS))
+                                    .named(fieldName);
                 }
                 break;
             case TIMESTAMP_NTZ:
                 if (internalSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
                         == InternalSchema.MetadataValue.MICROS) {
-                    type = Types
-                            .required(PrimitiveTypeName.INT64).as(LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.MICROS))
-                            .named(fieldName);
+                    type =
+                            Types.required(PrimitiveTypeName.INT64)
+                                    .as(
+                                            LogicalTypeAnnotation.timestampType(
+                                                    true, LogicalTypeAnnotation.TimeUnit.MICROS))
+                                    .named(fieldName);
 
                 } else {
-                    type = Types
-                            .required(PrimitiveTypeName.INT64).as(LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.MILLIS))
-                            .named(fieldName);
+                    type =
+                            Types.required(PrimitiveTypeName.INT64)
+                                    .as(
+                                            LogicalTypeAnnotation.timestampType(
+                                                    true, LogicalTypeAnnotation.TimeUnit.MILLIS))
+                                    .named(fieldName);
                 }
                 break;
             case LIST:
@@ -439,13 +459,12 @@ public class ParquetSchemaExtractor {
                                 .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
                 listType = fromInternalSchema(elementField.getSchema(), elementField.getPath());
                 type = Types.requiredList().setElementType(listType).named(internalSchema.getName());
-                //TODO nullable lists
+                // TODO nullable lists
                 break;
             case MAP:
                 InternalField keyField =
                         internalSchema.getFields().stream()
-                                .filter(
-                                        field -> InternalField.Constants.MAP_KEY_FIELD_NAME.equals(field.getName()))
+                                .filter(field -> InternalField.Constants.MAP_KEY_FIELD_NAME.equals(field.getName()))
                                 .findFirst()
                                 .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
                 InternalField valueField =
@@ -456,11 +475,9 @@ public class ParquetSchemaExtractor {
                                 .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
                 mapKeyType = fromInternalSchema(keyField.getSchema(), valueField.getPath());
                 mapValueType = fromInternalSchema(valueField.getSchema(), valueField.getPath());
-                type = Types.requiredMap()
-                        .key(mapKeyType)
-                        .value(mapValueType)
-                        .named(internalSchema.getName());
-                //TODO nullable lists
+                type =
+                        Types.requiredMap().key(mapKeyType).value(mapValueType).named(internalSchema.getName());
+                // TODO nullable lists
                 break;
             case RECORD:
                 List<Type> fields =
@@ -469,13 +486,15 @@ public class ParquetSchemaExtractor {
                                         field ->
                                                 fromInternalSchema(
                                                         field.getSchema(),
-                                                        SchemaUtils.getFullyQualifiedPath(field.getName(), currentPath))
-                                )
+                                                        SchemaUtils.getFullyQualifiedPath(field.getName(), currentPath)))
                                 .collect(CustomCollectors.toList(internalSchema.getFields().size()));
-                type = Types.requiredGroup().addFields(fields.stream().toArray(Type[]::new)).named(fieldName);
+                type =
+                        Types.requiredGroup().addFields(fields.stream().toArray(Type[]::new)).named(fieldName);
                 break;
             default:
-                throw new UnsupportedSchemaTypeException("Encountered unhandled type during InternalSchema to parquet conversion:" + internalType);
+                throw new UnsupportedSchemaTypeException(
+                        "Encountered unhandled type during InternalSchema to parquet conversion:"
+                                + internalType);
         }
         return type;
     }

@@ -18,67 +18,40 @@
 
 package org.apache.xtable.parquet;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.*;
-
-import org.apache.parquet.hadoop.ParquetFileReader;
-
-import java.util.Collections;
-import java.util.List;
-
-import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
-import org.apache.xtable.model.stat.ColumnStat;
-import org.apache.parquet.hadoop.metadata.BlockMetaData;
-import org.apache.parquet.hadoop.ParquetReader;
-import org.junit.jupiter.api.Test;
-import org.apache.parquet.schema.*;
-import org.junit.jupiter.api.Assertions;
-import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.schema.InternalType;
-import org.apache.parquet.schema.LogicalTypeAnnotation.IntLogicalTypeAnnotation;
-import org.apache.parquet.schema.LogicalTypeAnnotation.StringLogicalTypeAnnotation;
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
-import org.apache.parquet.schema.Type.Repetition;
-import org.apache.parquet.schema.Type;
-import org.apache.parquet.schema.Types;
-import org.apache.parquet.schema.LogicalTypeAnnotation;
-import org.apache.parquet.schema.GroupType;
-import org.apache.xtable.model.schema.InternalField;
-import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.schema.InternalType;
-import org.apache.parquet.schema.OriginalType;
-import org.apache.parquet.schema.MessageTypeParser;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
-import org.apache.parquet.column.ColumnDescriptor;
-import org.apache.xtable.model.stat.Range;
-import org.apache.parquet.hadoop.metadata.CompressionCodecName;
-import org.apache.parquet.schema.MessageType;
-import org.apache.parquet.bytes.BytesInput;
-import org.apache.parquet.format.Statistics;
-import org.apache.parquet.hadoop.ParquetFileWriter;
-import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.parquet.column.statistics.IntStatistics;
-import org.apache.parquet.column.statistics.BinaryStatistics;
-import org.apache.xtable.model.storage.FileFormat;
-
-
 import static org.apache.parquet.column.Encoding.BIT_PACKED;
 import static org.apache.parquet.column.Encoding.PLAIN;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.File;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Arrays;
-import java.util.ArrayList;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 
 import lombok.Builder;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.bytes.BytesInput;
+import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.column.statistics.IntStatistics;
+import org.apache.parquet.hadoop.ParquetFileReader;
+import org.apache.parquet.hadoop.ParquetFileWriter;
+import org.apache.parquet.hadoop.metadata.CompressionCodecName;
+import org.apache.parquet.schema.*;
+import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
+import org.apache.parquet.schema.Type.Repetition;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
-
+import org.apache.xtable.model.storage.FileFormat;
+import org.apache.xtable.model.storage.InternalDataFile;
 
 public class TestParquetStatsExtractor {
 
@@ -87,11 +60,12 @@ public class TestParquetStatsExtractor {
             ParquetSchemaExtractor.getInstance();
 
     public static List<ColumnStat> initFileTest(File file) throws IOException {
-        //create the parquet file by parsing a schema
+        // create the parquet file by parsing a schema
         Path path = new Path(file.toURI());
         Configuration configuration = new Configuration();
 
-        MessageType schema = MessageTypeParser.parseMessageType("message m { required group a {required binary b;}}");
+        MessageType schema =
+                MessageTypeParser.parseMessageType("message m { required group a {required binary b;}}");
         String[] columnPath = {"a", "b"};
         ColumnDescriptor c1 = schema.getColumnDescription(columnPath);
 
@@ -121,67 +95,62 @@ public class TestParquetStatsExtractor {
         w.endBlock();
         w.end(new HashMap<String, String>());
 
-
         // reconstruct the stats for the InternalDataFile testing object
         byte[] minStat = stats.getMinBytes();
         byte[] maxStat = stats.getMaxBytes();
-        PrimitiveType primitiveType = new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.BINARY, "b");
+        PrimitiveType primitiveType =
+                new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.BINARY, "b");
         List<Integer> col1NumValTotSize = new ArrayList<>(Arrays.asList(5, 8));
         List<Integer> col2NumValTotSize = new ArrayList<>(Arrays.asList(54, 27));
         List<ColumnStat> testColumnStats = new ArrayList<>();
         String[] columnDotPath = {"a.b", "a.b"};
-        for (int i=0;i<columnDotPath.length;i++) {
-            testColumnStats.add(ColumnStat.builder()
-                    .field(InternalField.builder()
-                            .name(primitiveType.getName())
-                            .parentPath(null)
-                            .schema(schemaExtractor.toInternalSchema(primitiveType, columnDotPath[i]))
-                            .build())
-                    .numValues(col1NumValTotSize.get(i))
-                    .totalSize(col2NumValTotSize.get(i))
-                    .range(Range.vector(minStat, maxStat))
-                    .build());
+        for (int i = 0; i < columnDotPath.length; i++) {
+            testColumnStats.add(
+                    ColumnStat.builder()
+                            .field(
+                                    InternalField.builder()
+                                            .name(primitiveType.getName())
+                                            .parentPath(null)
+                                            .schema(schemaExtractor.toInternalSchema(primitiveType, columnDotPath[i]))
+                                            .build())
+                            .numValues(col1NumValTotSize.get(i))
+                            .totalSize(col2NumValTotSize.get(i))
+                            .range(Range.vector(minStat, maxStat))
+                            .build());
         }
 
-        return testColumnStats;//new ParquetFileReader(configuration, path, w.getFooter());
+        return testColumnStats; // new ParquetFileReader(configuration, path, w.getFooter());
     }
 
     @Test
-    public void testToInternalDataFile() {
+    public void testToInternalDataFile() throws IOException {
         File file = null;
         ParquetFileReader fileReader = null;
         InternalDataFile internalDataFile = null;
         Configuration configuration = new Configuration();
         List<ColumnStat> testColumnStats = new ArrayList<>();
-        try {
-            file = new File("./", "test.parquet");
-            //fileReader = createParquetFile(file);
-            testColumnStats = initFileTest(file);
-            Path path = new Path(file.toURI());
-            //statsExtractor toInternalDataFile testing
-            internalDataFile = ParquetStatsExtractor.toInternalDataFile(configuration, path);
-        } catch (IOException e) {
-            System.out.println(e);
-        }
+        file = new File("./", "test.parquet");
+        // fileReader = createParquetFile(file);
+        testColumnStats = initFileTest(file);
+        Path path = new Path(file.toURI());
+        // statsExtractor toInternalDataFile testing
+        internalDataFile = ParquetStatsExtractor.toInternalDataFile(configuration, path);
 
         InternalDataFile testInternalFile =
                 InternalDataFile.builder()
-                        .physicalPath("file:/C:/Users/slims/Downloads/XTable/incubator-xtable/xtable-core/test.parquet")//TODO hard coded path to file method
+                        .physicalPath(
+                                "file:/C:/Users/slims/Downloads/XTable/incubator-xtable/xtable-core/test.parquet") // TODO hard coded path to file method
                         .columnStats(testColumnStats)
                         .fileFormat(FileFormat.APACHE_PARQUET)
                         .lastModified(file.lastModified())
                         .fileSizeBytes(file.length())
-                        .recordCount(8)//from start blocks
+                        .recordCount(8) // from start blocks
                         .build();
 
-        Assertions.assertEquals(
-                true, testInternalFile.equals(internalDataFile));
+        Assertions.assertEquals(true, testInternalFile.equals(internalDataFile));
     }
 
-    @Test
-    public void main() {
+    public void main() throws IOException{
         testToInternalDataFile();
     }
-
-
 }

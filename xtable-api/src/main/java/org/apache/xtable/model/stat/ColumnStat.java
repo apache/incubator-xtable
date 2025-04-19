@@ -18,13 +18,10 @@
 
 package org.apache.xtable.model.stat;
 
-import java.util.Set;
+import java.util.Arrays;
 
 import lombok.Builder;
 import lombok.Value;
-
-import java.util.Objects;
-import java.util.Arrays;
 
 import org.apache.xtable.model.schema.InternalField;
 
@@ -46,9 +43,10 @@ public class ColumnStat {
         if (this.getNumNulls() != colStat.getNumNulls()) return false;
         if (this.getNumValues() != colStat.getNumValues()) return false;
         if (this.getTotalSize() != colStat.getTotalSize()) return false;
-        if (!Arrays.equals((byte[]) this.range.getMinValue(), (byte[]) colStat.range.getMinValue()) || !Arrays.equals((byte[]) this.range.getMaxValue(), (byte[]) colStat.range.getMaxValue()))
+        if (!Arrays.equals((byte[]) this.range.getMinValue(), (byte[]) colStat.range.getMinValue())
+                || !Arrays.equals((byte[]) this.range.getMaxValue(), (byte[]) colStat.range.getMaxValue()))
             return false;
-        // todo add comparison of field attribute
+        if (!this.getField().equals(colStat.getField())) return false;
         return true;
     }
 }
