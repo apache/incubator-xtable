@@ -28,10 +28,10 @@ import lombok.NonNull;
 import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.SuperBuilder;
-
+import java.util.stream.IntStream;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
-
+import java.util.Objects;
 /**
  * Represents a data file in the table.
  *
@@ -52,4 +52,21 @@ public class InternalDataFile extends InternalFile {
   @Builder.Default @NonNull List<ColumnStat> columnStats = Collections.emptyList();
   // last modified time in millis since epoch
   long lastModified;
+  public static InternalDataFileBuilder builderFrom(InternalDataFile dataFile) {
+    return dataFile.toBuilder();
+  }
+
+  public boolean equals(InternalDataFile obj2) {
+    if (obj2 == this) {
+      return true;
+    }
+    if (obj2 != null && obj2 instanceof InternalDataFile) {
+      return Objects.equals(this.getPhysicalPath(), obj2.getPhysicalPath()) &&
+              Objects.equals(this.getLastModified(), obj2.getLastModified()) &&
+              IntStream.range(0, this.getColumnStats().size())
+                      .allMatch(i -> this.getColumnStats().get(i).equals(obj2.getColumnStats().get(i)));
+      // todo add other attributes (fileFormat, partitionValues...)
+    }
+    return false;
+  }
 }
