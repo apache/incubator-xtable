@@ -76,7 +76,10 @@ public class TestParquetStatsExtractor {
         Configuration configuration = new Configuration();
 
         MessageType schema =
-                MessageTypeParser.parseMessageType("message m { required group a {required binary b;}}");
+                //MessageTypeParser.parseMessageType("message m { required group a {required binary b;}}");
+                MessageTypeParser.parseMessageType("message m { required group a {required int32 b;}}");
+        //MessageType schema = MessageTypeParser.parseMessageType(
+        //      "message m { required group a {required binary b;} required group " + "c { required int64 d; }}");
         String[] columnPath = {"a", "b"};
         ColumnDescriptor c1 = schema.getColumnDescription(columnPath);
 
@@ -84,29 +87,35 @@ public class TestParquetStatsExtractor {
         byte[] bytes2 = {2, 3, 4, 5};
         CompressionCodecName codec = CompressionCodecName.UNCOMPRESSED;
 
-        // include statics using update()
-//        IntStatistics stats = new IntStatistics(); // or BinaryStatistics
-//        stats.updateStats(1);
-//        stats.updateStats(2);
-//        stats.updateStats(5);
 
-        BinaryStatistics stats =  new BinaryStatistics();
-        stats.updateStats(Binary.fromString("1"));
-        stats.updateStats(Binary.fromString("2"));
-        stats.updateStats(Binary.fromString("5"));
+        // include statics using update()
+        IntStatistics stats = new IntStatistics(); // or BinaryStatistics
+        stats.updateStats(1);
+        stats.updateStats(2);
+        stats.updateStats(5);
+
+//        BinaryStatistics stats =  new BinaryStatistics();
+//        stats.updateStats(Binary.fromString("1"));
+//        stats.updateStats(Binary.fromString("2"));
+//        stats.updateStats(Binary.fromString("5"));
 
         // to simplify the test we keep the same stats for both columns
         ParquetFileWriter w = new ParquetFileWriter(configuration, schema, path);
         w.start();
         w.startBlock(3);
-        w.startColumn(c1, 5, codec);
-        w.writeDataPage(2, 4, BytesInput.from(bytes1), stats, BIT_PACKED, BIT_PACKED, PLAIN);
-        w.writeDataPage(3, 4, BytesInput.from(bytes1), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+        //w.startColumn(c1, 5, codec);
+        w.startColumn(c1, 2, codec);
+        //w.writeDataPage(2, 4, BytesInput.from(bytes1), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+        w.writeDataPage(3, 3, BytesInput.fromInt(3), stats, BIT_PACKED, BIT_PACKED, PLAIN);//bytes of int 3 are encoded as int32 (the primitive type of the schema)
+        //w.writeDataPage(3, 4, BytesInput.from(bytes2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+        w.writeDataPage(3, 3, BytesInput.fromInt(2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
         w.endColumn();
         w.endBlock();
         w.startBlock(4);
-        w.startColumn(c1, 8, codec);
-        w.writeDataPage(7, 4, BytesInput.from(bytes2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+        //w.startColumn(c1, 8, codec);
+        w.startColumn(c1, 1, codec);
+        //w.writeDataPage(7, 4, BytesInput.from(bytes2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+        w.writeDataPage(3, 3, BytesInput.fromInt(1), stats, BIT_PACKED, BIT_PACKED, PLAIN);
         w.endColumn();
         w.endBlock();
         w.end(new HashMap<String, String>());
@@ -115,8 +124,9 @@ public class TestParquetStatsExtractor {
         byte[] minStat = stats.getMinBytes();
         byte[] maxStat = stats.getMaxBytes();
         PrimitiveType primitiveType =
-                new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.BINARY, "b");
-        List<Integer> col1NumValTotSize = new ArrayList<>(Arrays.asList(5, 8));
+                //   new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.BINARY, "b");
+                new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.INT32, "b");
+        List<Integer> col1NumValTotSize = new ArrayList<>(Arrays.asList(2, 1));//(5, 8)// start column indexes
         List<Integer> col2NumValTotSize = new ArrayList<>(Arrays.asList(54, 27));
         List<ColumnStat> testColumnStats = new ArrayList<>();
         String[] columnDotPath = {"a.b", "a.b"};
@@ -149,9 +159,6 @@ public class TestParquetStatsExtractor {
         java.nio.file.Path path = tempDir.resolve("parquet-test-files");
         File file = path.toFile();
         file.deleteOnExit();
-        //file = new File("./", "test.parquet");
-        // fileReader = createParquetFile(file);
-        //testColumnStats = initFileTest(file);
         testColumnStats = initFileTest(file);
         Path hadoopPath = new Path(file.toURI());
         // statsExtractor toInternalDataFile testing
@@ -165,7 +172,7 @@ public class TestParquetStatsExtractor {
                         .fileFormat(FileFormat.APACHE_PARQUET)
                         .lastModified(file.lastModified())
                         .fileSizeBytes(file.length())
-                        .recordCount(8) // from start blocks
+                        .recordCount(2) //8
                         .build();
 
         Assertions.assertEquals(true, testInternalFile.equals(internalDataFile));
