@@ -89,10 +89,10 @@ public class ParquetSchemaExtractor {
     public InternalSchema toInternalSchema(Type schema, String parentPath) {
         InternalType newDataType = null;
         Type.Repetition currentRepetition = null;
-        List<InternalField> subFields = null; // new ArrayList<>();
+        List<InternalField> subFields = null;
         PrimitiveType primitiveType;
         LogicalTypeAnnotation logicalType;
-        Map<InternalSchema.MetadataKey, Object> metadata = new EnumMap<>(InternalSchema.MetadataKey.class);//new HashMap<>();
+        Map<InternalSchema.MetadataKey, Object> metadata = new EnumMap<>(InternalSchema.MetadataKey.class);
         String elementName = schema.getName();
         if (schema.isPrimitive()) {
             primitiveType = schema.asPrimitiveType();
@@ -221,16 +221,12 @@ public class ParquetSchemaExtractor {
                 case BOOLEAN:
                     newDataType = InternalType.BOOLEAN;
                     break;
-          /*case UNKNOWN:
-          newDataType = InternalType.NULL;
-          break;*/
                 default:
                     throw new UnsupportedSchemaTypeException(
                             String.format("Unsupported schema type %s", schema));
             }
         } else {
             // GroupTypes
-            // typeName = schema.asGroupType();
             logicalType = schema.getLogicalTypeAnnotation();
             if (logicalType instanceof LogicalTypeAnnotation.ListLogicalTypeAnnotation) {
                 String schemaName = schema.asGroupType().getName();
@@ -288,7 +284,7 @@ public class ParquetSchemaExtractor {
                                     parquetField, SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
 
                     if (schema.asGroupType().getFields().size()
-                            == 1) { // todo Tuple (many subelements in a list)
+                            == 1) { // TODO Tuple (many subelements in a list)
                         newDataType = subFieldSchema.getDataType();
                         elementName = subFieldSchema.getName();
                         break;
@@ -320,7 +316,7 @@ public class ParquetSchemaExtractor {
                 .dataType(newDataType)
                 .fields(subFields == null || subFields.size() == 0 ? null : subFields)
                 .comment(null)
-                .isNullable(isNullable(schema)) // to check
+                .isNullable(isNullable(schema))
                 .metadata(metadata.isEmpty() ? null : metadata)
                 .build();
     }

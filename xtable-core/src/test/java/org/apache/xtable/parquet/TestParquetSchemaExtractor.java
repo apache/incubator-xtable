@@ -18,6 +18,7 @@
 package org.apache.xtable.parquet;
 
 
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Arrays;
@@ -323,7 +324,6 @@ public class TestParquetSchemaExtractor {
                         .optional(PrimitiveTypeName.BINARY)
                         .as(LogicalTypeAnnotation.stringType())
                         .named("name")
-                        // .required(PrimitiveTypeName.INT32).as(LogicalTypeAnnotation.dateType()).named("date")
                         .named("my_group");
 
         GroupType testMap =
