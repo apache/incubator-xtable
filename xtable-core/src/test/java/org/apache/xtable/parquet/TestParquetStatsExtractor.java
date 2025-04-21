@@ -15,9 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.parquet;
-
 
 import static org.apache.parquet.column.Encoding.BIT_PACKED;
 import static org.apache.parquet.column.Encoding.PLAIN;
@@ -25,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -33,19 +33,15 @@ import java.util.List;
 import lombok.Builder;
 
 import org.apache.hadoop.conf.Configuration;
-import java.nio.file.Paths;
-
-import java.nio.file.Files;
-//import java.nio.file.Path;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.column.ColumnDescriptor;
-import org.apache.parquet.column.statistics.IntStatistics;
 import org.apache.parquet.column.statistics.BinaryStatistics;
-import org.apache.parquet.io.api.Binary;
+import org.apache.parquet.column.statistics.IntStatistics;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetFileWriter;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
+import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.*;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.MessageTypeParser;
@@ -53,6 +49,7 @@ import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 import org.apache.parquet.schema.Type.Repetition;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.stat.ColumnStat;
@@ -60,125 +57,203 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 
-import org.junit.jupiter.api.io.TempDir;
-
 public class TestParquetStatsExtractor {
-    @TempDir
-    static java.nio.file.Path tempDir = Paths.get("./");
+  @Builder.Default
+  private static final ParquetSchemaExtractor schemaExtractor =
+      ParquetSchemaExtractor.getInstance();
 
-    @Builder.Default
-    private static final ParquetSchemaExtractor schemaExtractor =
-            ParquetSchemaExtractor.getInstance();
+  @TempDir static java.nio.file.Path tempDir = Paths.get("./");
 
-    public static List<ColumnStat> initFileTest(File file) throws IOException {
-        // create the parquet file by parsing a schema
-        Path path = new Path(file.toURI());
-        Configuration configuration = new Configuration();
+  public static List<ColumnStat> initStringFileTest(File file) throws IOException {
+    // create the parquet file by parsing a schema
+    Path path = new Path(file.toURI());
+    Configuration configuration = new Configuration();
 
-        MessageType schema =
-                //MessageTypeParser.parseMessageType("message m { required group a {required binary b;}}");
-                MessageTypeParser.parseMessageType("message m { required group a {required int32 b;}}");
-        //MessageType schema = MessageTypeParser.parseMessageType(
-        //      "message m { required group a {required binary b;} required group " + "c { required int64 d; }}");
-        String[] columnPath = {"a", "b"};
-        ColumnDescriptor c1 = schema.getColumnDescription(columnPath);
+    MessageType schema =
+        MessageTypeParser.parseMessageType(
+            "message m { required group a {required fixed_len_byte_array(10) b;}}");
+    String[] columnPath = {"a", "b"};
+    ColumnDescriptor c1 = schema.getColumnDescription(columnPath);
+    CompressionCodecName codec = CompressionCodecName.UNCOMPRESSED;
+    BinaryStatistics stats = new BinaryStatistics();
+    stats.updateStats(Binary.fromString("1"));
+    stats.updateStats(Binary.fromString("2"));
+    stats.updateStats(Binary.fromString("5"));
 
-        byte[] bytes1 = {0, 1, 2, 3};
-        byte[] bytes2 = {2, 3, 4, 5};
-        CompressionCodecName codec = CompressionCodecName.UNCOMPRESSED;
+    byte[] bytes1 = "First string".getBytes();
+    byte[] bytes2 = "Second string".getBytes();
 
+    // write the string columned file
 
-        // include statics using update()
-        IntStatistics stats = new IntStatistics(); // or BinaryStatistics
-        stats.updateStats(1);
-        stats.updateStats(2);
-        stats.updateStats(5);
+    ParquetFileWriter w = new ParquetFileWriter(configuration, schema, path);
+    w.start();
+    w.startBlock(3);
+    w.startColumn(c1, 5, codec);
+    // w.startColumn(c1, 2, codec);
+    w.writeDataPage(2, 4, BytesInput.from(bytes1), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+    w.writeDataPage(3, 4, BytesInput.from(bytes2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+    w.endColumn();
+    w.endBlock();
+    w.startBlock(4);
+    w.startColumn(c1, 8, codec);
+    // w.startColumn(c1, 1, codec);
+    w.writeDataPage(7, 4, BytesInput.from(bytes2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+    w.endColumn();
+    w.endBlock();
+    w.end(new HashMap<String, String>());
 
-//        BinaryStatistics stats =  new BinaryStatistics();
-//        stats.updateStats(Binary.fromString("1"));
-//        stats.updateStats(Binary.fromString("2"));
-//        stats.updateStats(Binary.fromString("5"));
-
-        // to simplify the test we keep the same stats for both columns
-        ParquetFileWriter w = new ParquetFileWriter(configuration, schema, path);
-        w.start();
-        w.startBlock(3);
-        //w.startColumn(c1, 5, codec);
-        w.startColumn(c1, 2, codec);
-        //w.writeDataPage(2, 4, BytesInput.from(bytes1), stats, BIT_PACKED, BIT_PACKED, PLAIN);
-        w.writeDataPage(3, 3, BytesInput.fromInt(3), stats, BIT_PACKED, BIT_PACKED, PLAIN);//bytes of int 3 are encoded as int32 (the primitive type of the schema)
-        //w.writeDataPage(3, 4, BytesInput.from(bytes2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
-        w.writeDataPage(3, 3, BytesInput.fromInt(2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
-        w.endColumn();
-        w.endBlock();
-        w.startBlock(4);
-        //w.startColumn(c1, 8, codec);
-        w.startColumn(c1, 1, codec);
-        //w.writeDataPage(7, 4, BytesInput.from(bytes2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
-        w.writeDataPage(3, 3, BytesInput.fromInt(1), stats, BIT_PACKED, BIT_PACKED, PLAIN);
-        w.endColumn();
-        w.endBlock();
-        w.end(new HashMap<String, String>());
-
-        // reconstruct the stats for the InternalDataFile testing object
-        byte[] minStat = stats.getMinBytes();
-        byte[] maxStat = stats.getMaxBytes();
-        PrimitiveType primitiveType =
-                //   new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.BINARY, "b");
-                new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.INT32, "b");
-        List<Integer> col1NumValTotSize = new ArrayList<>(Arrays.asList(2, 1));//(5, 8)// start column indexes
-        List<Integer> col2NumValTotSize = new ArrayList<>(Arrays.asList(54, 27));
-        List<ColumnStat> testColumnStats = new ArrayList<>();
-        String[] columnDotPath = {"a.b", "a.b"};
-        for (int i = 0; i < columnDotPath.length; i++) {
-            testColumnStats.add(
-                    ColumnStat.builder()
-                            .field(
-                                    InternalField.builder()
-                                            .name(primitiveType.getName())
-                                            .parentPath(null)
-                                            .schema(schemaExtractor.toInternalSchema(primitiveType, columnDotPath[i]))
-                                            .build())
-                            .numValues(col1NumValTotSize.get(i))
-                            .totalSize(col2NumValTotSize.get(i))
-                            .range(Range.vector(minStat, maxStat))
-                            .build());
-        }
-
-        return testColumnStats; // new ParquetFileReader(configuration, path, w.getFooter());
+    // reconstruct the stats for the InternalDataFile testing object
+    byte[] minStat = stats.getMinBytes();
+    // java.lang.Integer minStat = stats.genericGetMin();
+    byte[] maxStat = stats.getMaxBytes();
+    // java.lang.Integer maxStat = stats.genericGetMax();
+    PrimitiveType primitiveType =
+        //   new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.BINARY, "b");
+        new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY, "b");
+    List<Integer> col1NumValTotSize =
+        new ArrayList<>(Arrays.asList(5, 8)); // (5, 8)// start column indexes
+    List<Integer> col2NumValTotSize = new ArrayList<>(Arrays.asList(71, 36));
+    List<ColumnStat> testColumnStats = new ArrayList<>();
+    String[] columnDotPath = {"a.b", "a.b"};
+    for (int i = 0; i < columnDotPath.length; i++) {
+      testColumnStats.add(
+          ColumnStat.builder()
+              .field(
+                  InternalField.builder()
+                      .name(primitiveType.getName())
+                      .parentPath(null)
+                      .schema(schemaExtractor.toInternalSchema(primitiveType, columnDotPath[i]))
+                      .build())
+              .numValues(col1NumValTotSize.get(i))
+              .totalSize(col2NumValTotSize.get(i))
+              .range(Range.vector(minStat, maxStat))
+              .build());
     }
 
-    @Test
-    public void testToInternalDataFile() throws IOException {
+    return testColumnStats;
+  }
 
+  public static List<ColumnStat> initFileTest(File file) throws IOException {
+    // create the parquet file by parsing a schema
+    Path path = new Path(file.toURI());
+    Configuration configuration = new Configuration();
 
-        ParquetFileReader fileReader = null;
-        InternalDataFile internalDataFile = null;
-        Configuration configuration = new Configuration();
-        List<ColumnStat> testColumnStats = new ArrayList<>();
-        java.nio.file.Path path = tempDir.resolve("parquet-test-files");
-        File file = path.toFile();
-        file.deleteOnExit();
-        testColumnStats = initFileTest(file);
-        Path hadoopPath = new Path(file.toURI());
-        // statsExtractor toInternalDataFile testing
-        internalDataFile = ParquetStatsExtractor.toInternalDataFile(configuration, hadoopPath);
-        //System.out.println(file.getAbsolutePath());
-        InternalDataFile testInternalFile =
-                InternalDataFile.builder()
-                        .physicalPath(
-                                "file:/C:/Users/slims/Downloads/XTable/incubator-xtable/xtable-core/parquet-test-files") // TODO hard coded path to file method
-                        .columnStats(testColumnStats)
-                        .fileFormat(FileFormat.APACHE_PARQUET)
-                        .lastModified(file.lastModified())
-                        .fileSizeBytes(file.length())
-                        .recordCount(2) //8
-                        .build();
+    MessageType schema =
+        // MessageTypeParser.parseMessageType("message m { required group a {required binary b;}}");
+        MessageTypeParser.parseMessageType("message m { required group a {required int32 b;}}");
+    // MessageType schema = MessageTypeParser.parseMessageType(
+    //      "message m { required group a {required binary b;} required group " + "c { required
+    // int64 d; }}");
+    String[] columnPath = {"a", "b"};
+    ColumnDescriptor c1 = schema.getColumnDescription(columnPath);
 
-        Assertions.assertEquals(true, testInternalFile.equals(internalDataFile));
+    byte[] bytes1 = {0, 1, 2, 3};
+    byte[] bytes2 = {2, 3, 4, 5};
+    CompressionCodecName codec = CompressionCodecName.UNCOMPRESSED;
+
+    // if the schema col is of primitiveType then the stat should be of that same type (except
+    // binary schema which enable stats to be int or binary..)
+    // include statics using update()
+    IntStatistics stats = new IntStatistics(); // or BinaryStatistics
+    stats.updateStats(1);
+    stats.updateStats(2);
+    stats.updateStats(5);
+
+    //        BinaryStatistics stats =  new BinaryStatistics();
+    //        stats.updateStats(Binary.fromString("1"));
+    //        stats.updateStats(Binary.fromString("2"));
+    //        stats.updateStats(Binary.fromString("5"));
+
+    // to simplify the test we keep the same stats for both columns
+    ParquetFileWriter w = new ParquetFileWriter(configuration, schema, path);
+    w.start();
+    w.startBlock(3);
+    // w.startColumn(c1, 5, codec);
+    w.startColumn(c1, 2, codec);
+    // w.writeDataPage(2, 4, BytesInput.from(bytes1), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+    w.writeDataPage(
+        3,
+        3,
+        BytesInput.fromInt(3),
+        stats,
+        BIT_PACKED,
+        BIT_PACKED,
+        PLAIN); // bytes of int 3 are encoded as int32 (the primitive type of the schema)
+    // w.writeDataPage(3, 4, BytesInput.from(bytes2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+    w.writeDataPage(3, 3, BytesInput.fromInt(2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+    w.endColumn();
+    w.endBlock();
+    w.startBlock(4);
+    // w.startColumn(c1, 8, codec);
+    w.startColumn(c1, 1, codec);
+    // w.writeDataPage(7, 4, BytesInput.from(bytes2), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+    w.writeDataPage(3, 3, BytesInput.fromInt(1), stats, BIT_PACKED, BIT_PACKED, PLAIN);
+    w.endColumn();
+    w.endBlock();
+    w.end(new HashMap<String, String>());
+
+    // reconstruct the stats for the InternalDataFile testing object
+    byte[] minStat = stats.getMinBytes();
+    // java.lang.Integer minStat = stats.genericGetMin();
+    byte[] maxStat = stats.getMaxBytes();
+    // java.lang.Integer maxStat = stats.genericGetMax();
+    PrimitiveType primitiveType =
+        //   new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.BINARY, "b");
+        new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.INT32, "b");
+    List<Integer> col1NumValTotSize =
+        new ArrayList<>(Arrays.asList(2, 1)); // (5, 8)// start column indexes
+    List<Integer> col2NumValTotSize = new ArrayList<>(Arrays.asList(54, 27));
+    List<ColumnStat> testColumnStats = new ArrayList<>();
+    String[] columnDotPath = {"a.b", "a.b"};
+    for (int i = 0; i < columnDotPath.length; i++) {
+      testColumnStats.add(
+          ColumnStat.builder()
+              .field(
+                  InternalField.builder()
+                      .name(primitiveType.getName())
+                      .parentPath(null)
+                      .schema(schemaExtractor.toInternalSchema(primitiveType, columnDotPath[i]))
+                      .build())
+              .numValues(col1NumValTotSize.get(i))
+              .totalSize(col2NumValTotSize.get(i))
+              .range(Range.vector(minStat, maxStat))
+              .build());
     }
 
-    public void main() throws IOException {
-        testToInternalDataFile();
-    }
+    return testColumnStats;
+  }
+
+  @Test
+  public void testToInternalDataFile() throws IOException {
+
+    ParquetFileReader fileReader = null;
+    InternalDataFile internalDataFile = null;
+    Configuration configuration = new Configuration();
+    List<ColumnStat> testColumnStats = new ArrayList<>();
+    java.nio.file.Path path = tempDir.resolve("parquet-test-files");
+    File file = path.toFile();
+    file.deleteOnExit();
+    // testColumnStats = initFileTest(file);
+    testColumnStats = initStringFileTest(file);
+    Path hadoopPath = new Path(file.toURI());
+    // statsExtractor toInternalDataFile testing
+    internalDataFile = ParquetStatsExtractor.toInternalDataFile(configuration, hadoopPath);
+    // System.out.println(file.getAbsolutePath());
+    InternalDataFile testInternalFile =
+        InternalDataFile.builder()
+            .physicalPath(
+                "file:/C:/Users/slims/Downloads/XTable/incubator-xtable/xtable-core/parquet-test-files") // TODO hard coded path to file method
+            .columnStats(testColumnStats)
+            .fileFormat(FileFormat.APACHE_PARQUET)
+            .lastModified(file.lastModified())
+            .fileSizeBytes(file.length())
+            .recordCount(8) // 2
+            .build();
+
+    Assertions.assertEquals(true, testInternalFile.equals(internalDataFile));
+  }
+
+  public void main() throws IOException {
+    testToInternalDataFile();
+  }
 }

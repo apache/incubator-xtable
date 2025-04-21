@@ -15,9 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.parquet;
-
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -48,117 +47,114 @@ import org.apache.xtable.model.storage.InternalDataFile;
 @Builder
 public class ParquetStatsExtractor {
 
-    private static final ParquetStatsExtractor INSTANCE = null; // new ParquetStatsExtractor();
+  private static final ParquetStatsExtractor INSTANCE = null; // new ParquetStatsExtractor();
 
+  private static final ParquetPartitionValueExtractor partitionExtractor =
+      ParquetPartitionValueExtractor.getInstance();
 
-    private static final ParquetPartitionValueExtractor partitionExtractor =
-            ParquetPartitionValueExtractor.getInstance();
+  private static final ParquetSchemaExtractor schemaExtractor =
+      ParquetSchemaExtractor.getInstance();
 
+  private static final ParquetMetadataExtractor parquetMetadataExtractor =
+      ParquetMetadataExtractor.getInstance();
 
-    private static final ParquetSchemaExtractor schemaExtractor =
-            ParquetSchemaExtractor.getInstance();
+  private static final InputPartitionFields partitions = null;
 
+  public static ParquetStatsExtractor getInstance() {
+    return INSTANCE;
+  }
 
-    private static final ParquetMetadataExtractor parquetMetadataExtractor =
-            ParquetMetadataExtractor.getInstance();
+  public static List<ColumnStat> getColumnStatsForaFile(ParquetMetadata footer) {
+    return getStatsForFile(footer).values().stream()
+        .flatMap(List::stream)
+        .collect(Collectors.toList());
+  }
 
-    private static final InputPartitionFields partitions = null;
+  private static Optional<Long> getMaxFromColumnStats(List<ColumnStat> columnStats) {
+    return columnStats.stream()
+        .filter(entry -> entry.getField().getParentPath() == null)
+        .map(ColumnStat::getNumValues)
+        .filter(numValues -> numValues > 0)
+        .max(Long::compareTo);
+  }
 
-    public static ParquetStatsExtractor getInstance() {
-        return INSTANCE;
+  public static Map<ColumnDescriptor, List<ColumnStat>> getStatsForFile(ParquetMetadata footer) {
+    Map<ColumnDescriptor, List<ColumnStat>> columnDescStats = new HashMap<>();
+    MessageType schema = parquetMetadataExtractor.getSchema(footer);
+    List<ColumnChunkMetaData> columns = new ArrayList<>();
+    columns =
+        footer.getBlocks().stream()
+            .flatMap(blockMetaData -> blockMetaData.getColumns().stream())
+            .collect(Collectors.toList());
+    columnDescStats =
+        columns.stream()
+            .collect(
+                Collectors.groupingBy(
+                    columnMetaData ->
+                        schema.getColumnDescription(columnMetaData.getPath().toArray()),
+                    Collectors.mapping(
+                        columnMetaData ->
+                            ColumnStat.builder()
+                                .field(
+                                    InternalField.builder()
+                                        .name(columnMetaData.getPrimitiveType().getName())
+                                        .fieldId(
+                                            columnMetaData.getPrimitiveType().getId() == null
+                                                ? null
+                                                : columnMetaData
+                                                    .getPrimitiveType()
+                                                    .getId()
+                                                    .intValue())
+                                        .parentPath(null)
+                                        .schema(
+                                            schemaExtractor.toInternalSchema(
+                                                columnMetaData.getPrimitiveType(),
+                                                columnMetaData.getPath().toDotString()))
+                                        .build())
+                                .numValues(columnMetaData.getValueCount())
+                                .totalSize(columnMetaData.getTotalSize())
+                                .range(
+                                    Range.vector(
+                                        columnMetaData.getStatistics().getMinBytes(),
+                                        columnMetaData
+                                            .getStatistics()
+                                            .getMaxBytes())) // TODO convert byte array into
+                                // numerical representation
+                                .build(),
+                        Collectors.toList())));
+    return columnDescStats;
+  }
+
+  private static InputPartitionFields initPartitionInfo() {
+    return partitions;
+  }
+
+  public static InternalDataFile toInternalDataFile(Configuration hadoopConf, Path parentPath)
+      throws java.io.IOException {
+    FileStatus file = null;
+    List<PartitionValue> partitionValues = null;
+    ParquetMetadata footer = null;
+    List<ColumnStat> columnStatsForAFile = null;
+    try {
+      FileSystem fs = FileSystem.get(hadoopConf);
+      file = fs.getFileStatus(parentPath);
+      InputPartitionFields partitionInfo = initPartitionInfo();
+      footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
+      MessageType schema = parquetMetadataExtractor.getSchema(footer);
+      columnStatsForAFile = getColumnStatsForaFile(footer);
+      // partitionValues = partitionExtractor.createPartitionValues(
+      //               partitionInfo);
+    } catch (java.io.IOException e) {
+
     }
-
-    public static List<ColumnStat> getColumnStatsForaFile(ParquetMetadata footer) {
-        return getStatsForFile(footer).values().stream()
-                .flatMap(List::stream)
-                .collect(Collectors.toList());
-    }
-
-    private static Optional<Long> getMaxFromColumnStats(List<ColumnStat> columnStats) {
-        return columnStats.stream()
-                .filter(entry -> entry.getField().getParentPath() == null)
-                .map(ColumnStat::getNumValues)
-                .filter(numValues -> numValues > 0)
-                .max(Long::compareTo);
-    }
-
-    public static Map<ColumnDescriptor, List<ColumnStat>> getStatsForFile(ParquetMetadata footer) {
-        Map<ColumnDescriptor, List<ColumnStat>> columnDescStats = new HashMap<>();
-        MessageType schema = parquetMetadataExtractor.getSchema(footer);
-        List<ColumnChunkMetaData> columns = new ArrayList<>();
-        columns =
-                footer.getBlocks().stream()
-                        .flatMap(blockMetaData -> blockMetaData.getColumns().stream())
-                        .collect(Collectors.toList());
-        columnDescStats =
-                columns.stream()
-                        .collect(
-                                Collectors.groupingBy(
-                                        columnMetaData ->
-                                                schema.getColumnDescription(columnMetaData.getPath().toArray()),
-                                        Collectors.mapping(
-                                                columnMetaData ->
-                                                        ColumnStat.builder()
-                                                                .field(
-                                                                        InternalField.builder()
-                                                                                .name(columnMetaData.getPrimitiveType().getName())
-                                                                                .fieldId(
-                                                                                        columnMetaData.getPrimitiveType().getId() == null
-                                                                                                ? null
-                                                                                                : columnMetaData
-                                                                                                .getPrimitiveType()
-                                                                                                .getId()
-                                                                                                .intValue())
-                                                                                .parentPath(null)
-                                                                                .schema(
-                                                                                        schemaExtractor.toInternalSchema(
-                                                                                                columnMetaData.getPrimitiveType(),
-                                                                                                columnMetaData.getPath().toDotString()))
-                                                                                .build())
-                                                                .numValues(columnMetaData.getValueCount())
-                                                                .totalSize(columnMetaData.getTotalSize())
-                                                                .range(
-                                                                        Range.vector(
-                                                                                columnMetaData.getStatistics().getMinBytes(),
-                                                                                columnMetaData
-                                                                                        .getStatistics()
-                                                                                        .getMaxBytes())) // TODO convert byte array into
-                                                                // numerical representation
-                                                                .build(),
-                                                Collectors.toList())));
-        return columnDescStats;
-    }
-
-    private static InputPartitionFields initPartitionInfo() {
-        return partitions;
-    }
-
-    public static InternalDataFile toInternalDataFile(Configuration hadoopConf, Path parentPath)
-            throws java.io.IOException {
-        FileStatus file = null;
-        List<PartitionValue> partitionValues = null;
-        ParquetMetadata footer = null;
-        List<ColumnStat> columnStatsForAFile = null;
-        try {
-            FileSystem fs = FileSystem.get(hadoopConf);
-            file = fs.getFileStatus(parentPath);
-            InputPartitionFields partitionInfo = initPartitionInfo();
-            footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
-            MessageType schema = parquetMetadataExtractor.getSchema(footer);
-            columnStatsForAFile = getColumnStatsForaFile(footer);
-            // partitionValues = partitionExtractor.createPartitionValues(
-            //               partitionInfo);
-        } catch (java.io.IOException e) {
-
-        }
-        return InternalDataFile.builder()
-                .physicalPath(parentPath.toString())
-                .fileFormat(FileFormat.APACHE_PARQUET)
-                // .partitionValues(partitionValues)
-                .fileSizeBytes(file.getLen())
-                .recordCount(getMaxFromColumnStats(columnStatsForAFile).orElse(0L))
-                .columnStats(columnStatsForAFile)
-                .lastModified(file.getModificationTime())
-                .build();
-    }
+    return InternalDataFile.builder()
+        .physicalPath(parentPath.toString())
+        .fileFormat(FileFormat.APACHE_PARQUET)
+        // .partitionValues(partitionValues)
+        .fileSizeBytes(file.getLen())
+        .recordCount(getMaxFromColumnStats(columnStatsForAFile).orElse(0L))
+        .columnStats(columnStatsForAFile)
+        .lastModified(file.getModificationTime())
+        .build();
+  }
 }

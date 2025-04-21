@@ -15,9 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.xtable.parquet;
-
-
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -78,20 +77,20 @@ public class TestParquetSchemaExtractor {
                         .as(LogicalTypeAnnotation.decimalType(5, 6))
                         .named("decimal");
 
-    /*       Assertions.assertEquals(
-            primitive1, schemaExtractor.toInternalSchema(intPrimitiveType, null));
+        Assertions.assertEquals(
+                primitive1, schemaExtractor.toInternalSchema(intPrimitiveType, null));
 
-    Assertions.assertEquals(
-            primitive2, schemaExtractor.toInternalSchema(stringPrimitiveType, null));*/
+        Assertions.assertEquals(
+                primitive2, schemaExtractor.toInternalSchema(stringPrimitiveType, null));
 
-        //  Assertions.assertEquals(
-        //        decimalType, schemaExtractor.toInternalSchema(decimalPrimitive, null));
+        Assertions.assertEquals(
+                decimalType, schemaExtractor.toInternalSchema(decimalPrimitive, null));
 
         // tests for timestamp and date
         InternalSchema testDate =
                 InternalSchema.builder().name("date").dataType(InternalType.DATE).isNullable(false).build();
 
-        // millisMetadata = new HashMap<>();
+
         Map<InternalSchema.MetadataKey, Object> millisMetadata =
                 Collections.singletonMap(
                         InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
@@ -134,10 +133,10 @@ public class TestParquetSchemaExtractor {
                 Types.required(PrimitiveTypeName.INT64)
                         .as(LogicalTypeAnnotation.timestampType(false, LogicalTypeAnnotation.TimeUnit.NANOS))
                         .named("timestamp_nanos");
-        // Assertions.assertEquals(testTimestampMillis,
-        // schemaExtractor.toInternalSchema(timestampMillisPrimitiveType, null));
-        // Assertions.assertEquals(testTimestampNanos,
-        // schemaExtractor.toInternalSchema(timestampNanosPrimitiveType, null));
+        Assertions.assertEquals(testTimestampMillis,
+                schemaExtractor.toInternalSchema(timestampMillisPrimitiveType, null));
+        Assertions.assertEquals(testTimestampNanos,
+                schemaExtractor.toInternalSchema(timestampNanosPrimitiveType, null));
 
         // test date
 
@@ -312,10 +311,10 @@ public class TestParquetSchemaExtractor {
                                                 .build()))
                         .build();
 
-        //  Assertions.assertEquals(
-        //        fromTestMap, schemaExtractor.fromInternalSchema(fromInternalMap, null));
-        //  Assertions.assertEquals(fromSimpleList, schemaExtractor.fromInternalSchema(fromInternalList,
-        // null));
+        Assertions.assertEquals(
+                fromTestMap, schemaExtractor.fromInternalSchema(fromInternalMap, null));
+        Assertions.assertEquals(fromSimpleList, schemaExtractor.fromInternalSchema(fromInternalList,
+                null));
 
         GroupType testGroupType =
                 Types.requiredGroup()
@@ -343,13 +342,13 @@ public class TestParquetSchemaExtractor {
                         .addField(testGroupType)
                         .named("my_record");
 
-        //    Assertions.assertEquals(
-        //           internalMap, schemaExtractor.toInternalSchema(testMap, null));
+        Assertions.assertEquals(
+                internalMap, schemaExtractor.toInternalSchema(testMap, null));
         Assertions.assertEquals(internalSchema, schemaExtractor.toInternalSchema(messageType, null));
     }
 
     public void main() {
-        // testPrimitiveTypes();
+        testPrimitiveTypes();
         testGroupTypes();
     }
 }

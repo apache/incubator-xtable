@@ -15,11 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.model.storage;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.IntStream;
 
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -29,12 +31,8 @@ import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.SuperBuilder;
 
-import java.util.stream.IntStream;
-
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
-
-import java.util.Objects;
 
 /**
  * Represents a data file in the table.
@@ -47,40 +45,34 @@ import java.util.Objects;
 @EqualsAndHashCode(callSuper = true)
 @Getter
 public class InternalDataFile extends InternalFile {
-    // file format
-    @Builder.Default
-    @NonNull
-    FileFormat fileFormat = FileFormat.APACHE_PARQUET;
-    // partition ranges for the data file
-    @Builder.Default
-    @NonNull
-    List<PartitionValue> partitionValues = Collections.emptyList();
+  // file format
+  @Builder.Default @NonNull FileFormat fileFormat = FileFormat.APACHE_PARQUET;
+  // partition ranges for the data file
+  @Builder.Default @NonNull List<PartitionValue> partitionValues = Collections.emptyList();
 
-    // column stats for each column in the data file
-    @Builder.Default
-    @NonNull
-    List<ColumnStat> columnStats = Collections.emptyList();
-    // last modified time in millis since epoch
-    long lastModified;
+  // column stats for each column in the data file
+  @Builder.Default @NonNull List<ColumnStat> columnStats = Collections.emptyList();
+  // last modified time in millis since epoch
+  long lastModified;
 
-    public static InternalDataFileBuilder builderFrom(InternalDataFile dataFile) {
-        return dataFile.toBuilder();
+  public static InternalDataFileBuilder builderFrom(InternalDataFile dataFile) {
+    return dataFile.toBuilder();
+  }
+
+  public boolean equals(InternalDataFile obj2) {
+    if (obj2 == this) {
+      return true;
     }
-
-    public boolean equals(InternalDataFile obj2) {
-        if (obj2 == this) {
-            return true;
-        }
-        if (obj2 != null && obj2 instanceof InternalDataFile) {
-            return Objects.equals(this.getPhysicalPath(), obj2.getPhysicalPath()) &&
-                    Objects.equals(this.getLastModified(), obj2.getLastModified()) &&
-                    IntStream.range(0, this.getColumnStats().size())
-                            .allMatch(i -> this.getColumnStats().get(i).equals(obj2.getColumnStats().get(i)))
-                    && Objects.equals(this.getFileFormat(), obj2.getFileFormat())
-                    && Objects.equals(this.getFileSizeBytes(), obj2.getFileSizeBytes())
-                    && Objects.equals(this.getRecordCount(), obj2.getRecordCount());
-            // todo add other attributes (partitionValues...)
-        }
-        return false;
+    if (obj2 != null && obj2 instanceof InternalDataFile) {
+      return Objects.equals(this.getPhysicalPath(), obj2.getPhysicalPath())
+          && Objects.equals(this.getLastModified(), obj2.getLastModified())
+          && IntStream.range(0, this.getColumnStats().size())
+              .allMatch(i -> this.getColumnStats().get(i).equals(obj2.getColumnStats().get(i)))
+          && Objects.equals(this.getFileFormat(), obj2.getFileFormat())
+          && Objects.equals(this.getFileSizeBytes(), obj2.getFileSizeBytes())
+          && Objects.equals(this.getRecordCount(), obj2.getRecordCount());
+      // todo add other attributes (partitionValues...)
     }
+    return false;
+  }
 }

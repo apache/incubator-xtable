@@ -18,16 +18,18 @@
  
 package org.apache.xtable.parquet;
 
+import java.io.IOException;
+
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.HadoopReadOptions;
 import org.apache.parquet.ParquetReadOptions;
 import org.apache.parquet.hadoop.ParquetFileReader;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.parquet.io.InputFile;
+import org.apache.parquet.schema.MessageType;
+
 import org.apache.xtable.exception.ReadException;
 
 public class ParquetMetadataExtractor {
@@ -44,22 +46,19 @@ public class ParquetMetadataExtractor {
   }
 
   public static ParquetMetadata readParquetMetadata(Configuration conf, Path filePath) {
-    ParquetFileReader fileReader = null;
+    // ParquetFileReader fileReader = null;
     InputFile file = null;
-    ParquetReadOptions options = HadoopReadOptions.builder(conf, filePath).build();
     try {
       file = HadoopInputFile.fromPath(filePath, conf);
-      fileReader = ParquetFileReader.open(file, options);
+    } catch (IOException e) {
+      throw new ReadException("Failed to read the parquet file", e);
+    }
+
+    ParquetReadOptions options = HadoopReadOptions.builder(conf, filePath).build();
+    try (ParquetFileReader fileReader = ParquetFileReader.open(file, options)) {
+      return fileReader.getFooter();
     } catch (Exception e) {
       throw new ReadException("Failed to read the parquet file", e);
-    } finally {
-      try {
-        fileReader.close();
-      } catch (java.io.IOException e) {
-        e.printStackTrace();
-      }
-
     }
-    return fileReader.getFooter();
   }
 }
