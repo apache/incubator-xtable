@@ -310,7 +310,7 @@ public class TestParquetStatsExtractor {
     InternalDataFile testInternalFile =
             InternalDataFile.builder()
                     .physicalPath(
-                            "file:/C:/Users/slims/Downloads/XTable/incubator-xtable/xtable-core/parquet-test-files") // TODO hard coded path to file method
+                            "file:/".concat(file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/"))) // TODO hard coded path to file method
                     .columnStats(testColumnStats)
                     .fileFormat(FileFormat.APACHE_PARQUET)
                     .lastModified(file.lastModified())
