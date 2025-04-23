@@ -103,10 +103,10 @@ public class TestParquetStatsExtractor {
     w.end(new HashMap<String, String>());
 
     // reconstruct the stats for the InternalDataFile testing object
-    byte[] minStat = stats.getMinBytes();
-    // java.lang.Integer minStat = stats.genericGetMin();
-    byte[] maxStat = stats.getMaxBytes();
-    // java.lang.Integer maxStat = stats.genericGetMax();
+    Binary minStat = stats.genericGetMin();
+
+    Binary maxStat = stats.genericGetMax();
+    
     PrimitiveType primitiveType =
         //   new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.BINARY, "b");
         new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY, "b");

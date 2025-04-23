@@ -67,7 +67,7 @@ public class InternalDataFile extends InternalFile {
       return Objects.equals(this.getPhysicalPath(), obj2.getPhysicalPath())
           && Objects.equals(this.getLastModified(), obj2.getLastModified())
           && IntStream.range(0, this.getColumnStats().size())
-              .allMatch(i -> this.getColumnStats().get(i).equals(obj2.getColumnStats().get(i)))
+              .allMatch(i -> this.getColumnStats().get(i).equals(obj2.getColumnStats().get(i)))//add test for list size equality
           && Objects.equals(this.getFileFormat(), obj2.getFileFormat())
           && Objects.equals(this.getFileSizeBytes(), obj2.getFileSizeBytes())
           && Objects.equals(this.getRecordCount(), obj2.getRecordCount());

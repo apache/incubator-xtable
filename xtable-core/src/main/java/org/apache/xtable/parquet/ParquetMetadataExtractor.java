@@ -46,7 +46,6 @@ public class ParquetMetadataExtractor {
   }
 
   public static ParquetMetadata readParquetMetadata(Configuration conf, Path filePath) {
-    // ParquetFileReader fileReader = null;
     InputFile file = null;
     try {
       file = HadoopInputFile.fromPath(filePath, conf);

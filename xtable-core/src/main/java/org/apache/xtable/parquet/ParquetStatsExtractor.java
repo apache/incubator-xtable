@@ -115,11 +115,10 @@ public class ParquetStatsExtractor {
                                 .totalSize(columnMetaData.getTotalSize())
                                 .range(
                                     Range.vector(
-                                        columnMetaData.getStatistics().getMinBytes(),
+                                        columnMetaData.getStatistics().genericGetMin(),
                                         columnMetaData
                                             .getStatistics()
-                                            .getMaxBytes())) // TODO convert byte array into
-                                // numerical representation
+                                            .genericGetMax()))
                                 .build(),
                         Collectors.toList())));
     return columnDescStats;

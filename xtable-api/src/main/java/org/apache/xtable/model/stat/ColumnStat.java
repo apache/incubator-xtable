@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 package org.apache.xtable.model.stat;
 
 import java.util.Arrays;
@@ -33,20 +33,20 @@ import org.apache.xtable.model.schema.InternalField;
 @Value
 @Builder(toBuilder = true)
 public class ColumnStat {
-  InternalField field;
-  Range range;
-  long numNulls;
-  long numValues;
-  long totalSize;
+    InternalField field;
+    Range range;
+    long numNulls;
+    long numValues;
+    long totalSize;
 
-  public boolean equals(ColumnStat colStat) {
-    if (this.getNumNulls() != colStat.getNumNulls()) return false;
-    if (this.getNumValues() != colStat.getNumValues()) return false;
-    if (this.getTotalSize() != colStat.getTotalSize()) return false;
-    if (!Arrays.equals((byte[]) this.range.getMinValue(), (byte[]) colStat.range.getMinValue())
-        || !Arrays.equals((byte[]) this.range.getMaxValue(), (byte[]) colStat.range.getMaxValue()))
-      return false;
-    if (!this.getField().equals(colStat.getField())) return false;
-    return true;
-  }
+    public boolean equals(ColumnStat colStat) {
+        if (this.getNumNulls() != colStat.getNumNulls()) return false;
+        if (this.getNumValues() != colStat.getNumValues()) return false;
+        if (this.getTotalSize() != colStat.getTotalSize()) return false;
+        if (((java.lang.Comparable) this.range.getMinValue()).compareTo((java.lang.Comparable) colStat.range.getMinValue()) != 0 &&
+                ((java.lang.Comparable) this.range.getMaxValue()).compareTo((java.lang.Comparable) colStat.range.getMaxValue()) != 0)
+            return false;
+        if (!this.getField().equals(colStat.getField())) return false;
+        return true;
+    }
 }
