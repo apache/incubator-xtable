@@ -64,7 +64,7 @@ public class TestParquetSchemaExtractor {
 
         Type stringPrimitiveType =
                 Types.required(PrimitiveTypeName.BINARY)
-                        .as(LogicalTypeAnnotation.stringType()) // .named("string")
+                        .as(LogicalTypeAnnotation.stringType())
                         .named("string");
 
         Type intPrimitiveType =

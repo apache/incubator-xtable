@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
+import java.io.IOException;
 import lombok.Builder;
 import lombok.Value;
 
@@ -47,7 +47,7 @@ import org.apache.xtable.model.storage.InternalDataFile;
 @Builder
 public class ParquetStatsExtractor {
 
-  private static final ParquetStatsExtractor INSTANCE = null; // new ParquetStatsExtractor();
+  private static final ParquetStatsExtractor INSTANCE =  new ParquetStatsExtractor();
 
   private static final ParquetPartitionValueExtractor partitionExtractor =
       ParquetPartitionValueExtractor.getInstance();
@@ -129,7 +129,7 @@ public class ParquetStatsExtractor {
   }
 
   public static InternalDataFile toInternalDataFile(Configuration hadoopConf, Path parentPath)
-      throws java.io.IOException {
+      throws IOException {
     FileStatus file = null;
     List<PartitionValue> partitionValues = null;
     ParquetMetadata footer = null;

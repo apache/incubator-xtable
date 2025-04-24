@@ -320,8 +320,4 @@ public class TestParquetStatsExtractor {
 
     Assertions.assertEquals(true, testInternalFile.equals(internalDataFile));
   }
-
-  public void main() throws IOException {
-    testToInternalDataFile();
-  }
 }
