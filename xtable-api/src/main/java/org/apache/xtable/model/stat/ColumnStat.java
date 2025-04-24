@@ -39,14 +39,4 @@ public class ColumnStat {
     long numValues;
     long totalSize;
 
-    public boolean equals(ColumnStat colStat) {
-        if (this.getNumNulls() != colStat.getNumNulls()) return false;
-        if (this.getNumValues() != colStat.getNumValues()) return false;
-        if (this.getTotalSize() != colStat.getTotalSize()) return false;
-        if (((java.lang.Comparable) this.range.getMinValue()).compareTo((java.lang.Comparable) colStat.range.getMinValue()) != 0 &&
-                ((java.lang.Comparable) this.range.getMaxValue()).compareTo((java.lang.Comparable) colStat.range.getMaxValue()) != 0)
-            return false;
-        if (!this.getField().equals(colStat.getField())) return false;
-        return true;
-    }
 }

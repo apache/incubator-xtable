@@ -55,24 +55,4 @@ public class InternalDataFile extends InternalFile {
   // last modified time in millis since epoch
   long lastModified;
 
-  public static InternalDataFileBuilder builderFrom(InternalDataFile dataFile) {
-    return dataFile.toBuilder();
-  }
-
-  public boolean equals(InternalDataFile obj2) {
-    if (obj2 == this) {
-      return true;
-    }
-    if (obj2 != null && obj2 instanceof InternalDataFile) {
-      return Objects.equals(this.getPhysicalPath(), obj2.getPhysicalPath())
-          && Objects.equals(this.getLastModified(), obj2.getLastModified())
-          && IntStream.range(0, this.getColumnStats().size())
-              .allMatch(i -> this.getColumnStats().get(i).equals(obj2.getColumnStats().get(i)))//add test for list size equality
-          && Objects.equals(this.getFileFormat(), obj2.getFileFormat())
-          && Objects.equals(this.getFileSizeBytes(), obj2.getFileSizeBytes())
-          && Objects.equals(this.getRecordCount(), obj2.getRecordCount());
-      // todo add other attributes (partitionValues...)
-    }
-    return false;
-  }
 }
