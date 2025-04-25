@@ -20,8 +20,6 @@ package org.apache.xtable.model.storage;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.IntStream;
 
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -54,5 +52,4 @@ public class InternalDataFile extends InternalFile {
   @Builder.Default @NonNull List<ColumnStat> columnStats = Collections.emptyList();
   // last modified time in millis since epoch
   long lastModified;
-
 }

@@ -15,10 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.model.stat;
-
-import java.util.Arrays;
 
 import lombok.Builder;
 import lombok.Value;
@@ -33,10 +31,9 @@ import org.apache.xtable.model.schema.InternalField;
 @Value
 @Builder(toBuilder = true)
 public class ColumnStat {
-    InternalField field;
-    Range range;
-    long numNulls;
-    long numValues;
-    long totalSize;
-
+  InternalField field;
+  Range range;
+  long numNulls;
+  long numValues;
+  long totalSize;
 }
