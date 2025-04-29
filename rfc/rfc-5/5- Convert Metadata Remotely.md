@@ -51,72 +51,114 @@ By providing a REST service that confirms to an open spec, it becomes feasible f
 
 ### Open API Spec
 
-Note this is the initial sketch for the apis, and subject to change/evolve during implementation.
+#### Note this is the initial sketch for the apis, and subject to change/evolve during implementation. We will first aim to land the runSync endpoint and then iterate as needed.
 
-#### RunSync Endpoint
+#### Convert Table Endpoint
 
 We can expose an endpoint which will handle metadata conversion inline(meaning the client will wait until our service finishes conversion, and then returns a response). This endpoint effectively would be invoking XTable’s runSync method and will directly be reading paths from an existing table’s metadata in cloud storage.
 
 ```yaml
-/v1/conversion/table:
+  /v1/conversion/table:
     post:
       tags:
         - XTable Service API
-      Summary: Initiate XTable's runSync process on an existing table in storage
-      Description: 
-
-      operationId: runSync
+      summary: Initiate XTable's runSync process to convert a source table format to the requested target table formats.
+      description: |
+        Reads the source table metadata from storage, converts it to the requested
+        target formats.
+      operationId: convertTable
+      parameters:
+        - in: header
+          name: Prefer
+          description: Use 'respond-async' to request asynchronous processing.
+          required: false
+          schema:
+            type: string
+            enum:
+              - respond-async
       requestBody:
+        required: true
         content:
-          application/json: 
+          application/json:
             schema:
-              $ref: '#/components/schemas/RunSyncRequest'
+              $ref: '#/components/schemas/ConvertTableRequest'
       responses:
-        200:
-          $ref: '#/components/responses/RunSyncResponse'
-        403:
+        '200':
+          $ref: '#/components/responses/ConvertTableResponse'
+        '202':
+          $ref: '#/components/responses/SubmittedConversionResponse'
+        '403':
           $ref: '#/components/responses/ForbiddenResponse'
-        503:
+        '503':
           $ref: '#/components/responses/ServiceUnavailableResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
 ```
 
-The client will send a RunSyncRequest which will contain core parameters needed for us to run an XTable sync, similar to what we request users to provide when running the jar here.
+The client will send a ConvertTableRequest which will contain core parameters needed for us to run an XTable sync, similar to what we request users to provide when running the jar here.
 
 ```yaml
-RunSyncRequest:
+ConvertTableRequest:
   type: object
   required:
     - source-format
-    - source-metadata-path
-    - target-format
+    - source-table-name
+    - source-table-path
+    - target-formats
   properties:
     source-format:
       type: string
-    source-metadata-path:
+      description: Name of the source table format (e.g., "ICEBERG", "HUDI", "DELTA")
+    source-table-name:
       type: string
-    target-format:
+      description: Name of the source table
+    source-table-path:
       type: string
+      description: Path to the source table's metadata
+    target-formats:
+      type: array
+      items:
+        type: string
+      description: List of desired output table formats (e.g., "ICEBERG", "HUDI", "DELTA")
+    configurations:
+      type: object
+      description: Additional configuration key/value pairs (e.g., storage credentials or other service configs)
+      additionalProperties:
+        type: string
 ```
 
-The RunSyncResponse which will contain the path to the target’s format metadata, name of the format, and a serialized schema string.
+The ConvertTableResponse will contain a list of `conversions`, where each object is a `TargetTable`. The `TargetTable` contains the path to the target’s format metadata, name of the target-format, and an optional serialized avro schema string.
 
 ```yaml
-RunSyncResponse:
+ConvertTableResponse:
   type: object
-  Required:
+  required:
+    - conversions
+  properties:
+    conversions:
+      type: array
+      description: A list of converted tables, one per requested format
+      items:
+        $ref: '#/components/schemas/TargetTable'
+
+TargetTable:
+  type: object
+  required:
     - target-format
     - target-metadata-path
-    - target-schema
-  Properties:
+  properties:
     target-format:
       type: string
+      description: Name of the target format (e.g., "ICEBERG", "HUDI", "DELTA")
     target-metadata-path:
       type: string
+      description: Path where the converted metadata was written
     target-schema:
-      type: string 
+      type: string
+      description: Schema definition of the converted table
 ```
 
-#### Run Catalog Sync Endpoint
+#### Catalog Sync Endpoint
 
 We can expose an endpoint which will handle running XTable’s runCatalogSync, for users that want to provide XTable with table identifiers rather than storage paths.
 
