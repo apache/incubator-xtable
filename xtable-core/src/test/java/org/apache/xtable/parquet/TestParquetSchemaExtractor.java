@@ -343,7 +343,7 @@ public class TestParquetSchemaExtractor {
   }
 
   public void main() {
-    // testPrimitiveTypes();
+    testPrimitiveTypes();
     testGroupTypes();
   }
 }
