@@ -18,12 +18,15 @@
  
 package org.apache.xtable.service.models;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.util.List;
 import java.util.Map;
 
+import lombok.Builder;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+@Builder
 public class ConvertTableRequest {
   @JsonProperty("source-format")
   private String sourceFormat;
@@ -73,7 +76,7 @@ public class ConvertTableRequest {
     return targetFormats;
   }
 
-  public Map<String, String>  getConfigurations() {
+  public Map<String, String> getConfigurations() {
     return configurations;
   }
 }

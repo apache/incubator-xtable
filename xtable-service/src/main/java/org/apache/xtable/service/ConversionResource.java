@@ -39,7 +39,7 @@ public class ConversionResource {
   @POST
   @Path("/table")
   @Blocking
-  public ConvertTableResponse runSync(ConvertTableRequest req) {
-    return conversionService.runSync(req);
+  public ConvertTableResponse convertTable(ConvertTableRequest req) {
+    return conversionService.convertTable(req);
   }
 }

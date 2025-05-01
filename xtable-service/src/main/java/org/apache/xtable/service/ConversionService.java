@@ -28,16 +28,17 @@ import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
+
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.SchemaParser;
 import org.apache.iceberg.Snapshot;
-
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.hadoop.HadoopTables;
+
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
@@ -48,7 +49,7 @@ import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.service.models.ConvertTableRequest;
 import org.apache.xtable.service.models.ConvertTableResponse;
-import org.apache.xtable.service.models.InternalTable;
+import org.apache.xtable.service.models.RestTargetTable;
 import org.apache.xtable.service.spark.SparkHolder;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -58,7 +59,7 @@ import jakarta.inject.Inject;
 public class ConversionService {
   @Inject SparkHolder sparkHolder;
 
-  public ConvertTableResponse runSync(ConvertTableRequest request) {
+  public ConvertTableResponse convertTable(ConvertTableRequest request) {
     ConversionController conversionController =
         new ConversionController(sparkHolder.jsc().hadoopConfiguration());
     SourceTable sourceTable =
@@ -79,21 +80,18 @@ public class ConversionService {
       targetTables.add(targetTable);
     }
     ConversionConfig conversionConfig =
-        ConversionConfig.builder()
-            .sourceTable(sourceTable)
-            .targetTables(targetTables)
-            .build();
+        ConversionConfig.builder().sourceTable(sourceTable).targetTables(targetTables).build();
     ConversionSourceProvider<?> conversionSourceProvider =
         getConversionSourceProvider(request.getSourceFormat());
     conversionController.sync(conversionConfig, conversionSourceProvider);
 
-    Pair<String, String> responseFields = getIcebergSchemaAndMetadataPath(request.getSourceTablePath(), sparkHolder.jsc().hadoopConfiguration());
+    Pair<String, String> responseFields =
+        getIcebergSchemaAndMetadataPath(
+            request.getSourceTablePath(), sparkHolder.jsc().hadoopConfiguration());
 
-    InternalTable internalTable =
-        new InternalTable(
-            "ICEBERG",
-                responseFields.getLeft(), responseFields.getRight());
-      return new ConvertTableResponse(Collections.singletonList(internalTable));
+    RestTargetTable internalTable =
+        new RestTargetTable("ICEBERG", responseFields.getLeft(), responseFields.getRight());
+    return new ConvertTableResponse(Collections.singletonList(internalTable));
   }
 
   private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
@@ -117,12 +115,12 @@ public class ConversionService {
     }
   }
 
-  public static Pair<String, String> getIcebergSchemaAndMetadataPath(String tableLocation, Configuration conf) {
+  public static Pair<String, String> getIcebergSchemaAndMetadataPath(
+      String tableLocation, Configuration conf) {
     HadoopTables tables = new HadoopTables(conf);
     Table table = tables.load(tableLocation);
     TableOperations ops = ((BaseTable) table).operations();
     TableMetadata current = ops.current();
     return Pair.of(current.metadataFileLocation(), SchemaParser.toJson(current.schema()));
   }
-
 }

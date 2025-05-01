@@ -18,22 +18,24 @@
  
 package org.apache.xtable.service.models;
 
+import java.util.List;
+
+import lombok.Builder;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.util.List;
-
-
+@Builder
 public class ConvertTableResponse {
   @JsonProperty("conversions")
-  private List<InternalTable> conversions;
+  private List<RestTargetTable> conversions;
 
   @JsonCreator
-  public ConvertTableResponse(@JsonProperty List<InternalTable> conversions) {
+  public ConvertTableResponse(@JsonProperty List<RestTargetTable> conversions) {
     this.conversions = conversions;
   }
 
-  public List<InternalTable> getConversions() {
+  public List<RestTargetTable> getConversions() {
     return conversions;
   }
 }

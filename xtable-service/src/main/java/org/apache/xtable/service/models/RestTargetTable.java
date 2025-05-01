@@ -15,40 +15,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.service.models;
+
+import lombok.Builder;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class InternalTable {
-    @JsonProperty("target-format")
-    private String targetFormat;
+@Builder
+public class RestTargetTable {
+  @JsonProperty("target-format")
+  private String targetFormat;
 
-    @JsonProperty("target-metadata-path")
-    private String targetMetadataPath;
+  @JsonProperty("target-metadata-path")
+  private String targetMetadataPath;
 
-    @JsonProperty("target-schema")
-    private String targetSchema;
+  @JsonProperty("target-schema")
+  private String targetSchema;
 
-    @JsonCreator
-    public InternalTable(@JsonProperty String targetFormat,
-                        @JsonProperty String targetMetadataPath,
-                        @JsonProperty String targetSchema) {
-        this.targetFormat = targetFormat;
-        this.targetMetadataPath = targetMetadataPath;
-        this.targetSchema = targetSchema;
-    }
+  @JsonCreator
+  public RestTargetTable(
+      @JsonProperty String targetFormat,
+      @JsonProperty String targetMetadataPath,
+      @JsonProperty String targetSchema) {
+    this.targetFormat = targetFormat;
+    this.targetMetadataPath = targetMetadataPath;
+    this.targetSchema = targetSchema;
+  }
 
-    public String getTargetFormat() {
-        return targetFormat;
-    }
+  public String getTargetFormat() {
+    return targetFormat;
+  }
 
-    public String getTargetMetadataPath() {
-        return targetMetadataPath;
-    }
+  public String getTargetMetadataPath() {
+    return targetMetadataPath;
+  }
 
-    public String getTargetSchema() {
-        return targetSchema;
-    }
+  public String getTargetSchema() {
+    return targetSchema;
+  }
 }
