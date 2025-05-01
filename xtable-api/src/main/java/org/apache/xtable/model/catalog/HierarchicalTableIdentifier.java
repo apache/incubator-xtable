@@ -23,18 +23,12 @@ package org.apache.xtable.model.catalog;
  * table names. Some catalogs may omit the catalog name.
  */
 public interface HierarchicalTableIdentifier extends CatalogTableIdentifier {
-  /**
-   * @return the catalog name if present, otherwise null
-   */
+  /** @return the catalog name if present, otherwise null */
   String getCatalogName();
 
-  /**
-   * @return the database (or schema) name; required
-   */
+  /** @return the database (or schema) name; required */
   String getDatabaseName();
 
-  /**
-   * @return the table name; required
-   */
+  /** @return the table name; required */
   String getTableName();
 }

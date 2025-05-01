@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.utilities;
 
 import static org.apache.xtable.utilities.RunSync.getCustomConfigurations;
@@ -87,28 +87,28 @@ public class RunCatalogSync {
   private static final String CONVERTERS_CONFIG_PATH = "convertersConfig";
   private static final String HELP_OPTION = "h";
   private static final Map<String, ConversionSourceProvider> CONVERSION_SOURCE_PROVIDERS =
-          new HashMap<>();
+      new HashMap<>();
 
   private static final Options OPTIONS =
-          new Options()
-                  .addRequiredOption(
-                          CATALOG_SOURCE_AND_TARGET_CONFIG_PATH,
-                          "catalogSyncConfig",
-                          true,
-                          "The path to a yaml file containing source and target tables catalog configurations along with the table identifiers that need to synced")
-                  .addOption(
-                          HADOOP_CONFIG_PATH,
-                          "hadoopConfig",
-                          true,
-                          "Hadoop config xml file path containing configs necessary to access the "
-                                  + "file system. These configs will override the default configs.")
-                  .addOption(
-                          CONVERTERS_CONFIG_PATH,
-                          "convertersConfig",
-                          true,
-                          "The path to a yaml file containing InternalTable converter configurations. "
-                                  + "These configs will override the default")
-                  .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
+      new Options()
+          .addRequiredOption(
+              CATALOG_SOURCE_AND_TARGET_CONFIG_PATH,
+              "catalogSyncConfig",
+              true,
+              "The path to a yaml file containing source and target tables catalog configurations along with the table identifiers that need to synced")
+          .addOption(
+              HADOOP_CONFIG_PATH,
+              "hadoopConfig",
+              true,
+              "Hadoop config xml file path containing configs necessary to access the "
+                  + "file system. These configs will override the default configs.")
+          .addOption(
+              CONVERTERS_CONFIG_PATH,
+              "convertersConfig",
+              true,
+              "The path to a yaml file containing InternalTable converter configurations. "
+                  + "These configs will override the default")
+          .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   public static void main(String[] args) throws Exception {
     CommandLineParser parser = new DefaultParser();
@@ -128,8 +128,8 @@ public class RunCatalogSync {
 
     DatasetConfig datasetConfig;
     try (InputStream inputStream =
-                 Files.newInputStream(
-                         Paths.get(cmd.getOptionValue(CATALOG_SOURCE_AND_TARGET_CONFIG_PATH)))) {
+        Files.newInputStream(
+            Paths.get(cmd.getOptionValue(CATALOG_SOURCE_AND_TARGET_CONFIG_PATH)))) {
       datasetConfig = YAML_MAPPER.readValue(inputStream, DatasetConfig.class);
     }
     String hadoopConfigpath = getValueFromConfig(cmd, HADOOP_CONFIG_PATH);
@@ -140,59 +140,59 @@ public class RunCatalogSync {
     TableFormatConverters tableFormatConverters = loadTableFormatConversionConfigs(customConfig);
 
     Map<String, ExternalCatalogConfig> catalogsById =
-            datasetConfig.getTargetCatalogs().stream()
-                    .collect(Collectors.toMap(ExternalCatalogConfig::getCatalogId, Function.identity()));
+        datasetConfig.getTargetCatalogs().stream()
+            .collect(Collectors.toMap(ExternalCatalogConfig::getCatalogId, Function.identity()));
     Optional<CatalogConversionSource> catalogConversionSource =
-            getCatalogConversionSource(datasetConfig.getSourceCatalog(), hadoopConf);
+        getCatalogConversionSource(datasetConfig.getSourceCatalog(), hadoopConf);
     ConversionController conversionController = new ConversionController(hadoopConf);
     for (DatasetConfig.Dataset dataset : datasetConfig.getDatasets()) {
       SourceTable sourceTable =
-              getSourceTable(dataset.getSourceCatalogTableIdentifier(), catalogConversionSource);
+          getSourceTable(dataset.getSourceCatalogTableIdentifier(), catalogConversionSource);
       List<TargetTable> targetTables = new ArrayList<>();
       Map<TargetTable, List<TargetCatalogConfig>> targetCatalogs = new HashMap<>();
       for (TargetTableIdentifier targetCatalogTableIdentifier :
-              dataset.getTargetCatalogTableIdentifiers()) {
+          dataset.getTargetCatalogTableIdentifiers()) {
         TargetTable targetTable =
-                TargetTable.builder()
-                        .name(sourceTable.getName())
-                        .basePath(
-                                getSourceTableLocation(
-                                        targetCatalogTableIdentifier.getTableFormat(), sourceTable))
-                        .namespace(sourceTable.getNamespace())
-                        .formatName(targetCatalogTableIdentifier.getTableFormat())
-                        .additionalProperties(sourceTable.getAdditionalProperties())
-                        .build();
+            TargetTable.builder()
+                .name(sourceTable.getName())
+                .basePath(
+                    getSourceTableLocation(
+                        targetCatalogTableIdentifier.getTableFormat(), sourceTable))
+                .namespace(sourceTable.getNamespace())
+                .formatName(targetCatalogTableIdentifier.getTableFormat())
+                .additionalProperties(sourceTable.getAdditionalProperties())
+                .build();
         targetTables.add(targetTable);
         if (!targetCatalogs.containsKey(targetTable)) {
           targetCatalogs.put(targetTable, new ArrayList<>());
         }
         targetCatalogs
-                .get(targetTable)
-                .add(
-                        TargetCatalogConfig.builder()
-                                .catalogTableIdentifier(
-                                        getCatalogTableIdentifier(
-                                                targetCatalogTableIdentifier.getTableIdentifier()))
-                                .catalogConfig(catalogsById.get(targetCatalogTableIdentifier.getCatalogId()))
-                                .build());
+            .get(targetTable)
+            .add(
+                TargetCatalogConfig.builder()
+                    .catalogTableIdentifier(
+                        getCatalogTableIdentifier(
+                            targetCatalogTableIdentifier.getTableIdentifier()))
+                    .catalogConfig(catalogsById.get(targetCatalogTableIdentifier.getCatalogId()))
+                    .build());
       }
       ConversionConfig conversionConfig =
-              ConversionConfig.builder()
-                      .sourceTable(sourceTable)
-                      .targetTables(targetTables)
-                      .targetCatalogs(targetCatalogs)
-                      .syncMode(SyncMode.INCREMENTAL)
-                      .build();
+          ConversionConfig.builder()
+              .sourceTable(sourceTable)
+              .targetTables(targetTables)
+              .targetCatalogs(targetCatalogs)
+              .syncMode(SyncMode.INCREMENTAL)
+              .build();
       List<String> tableFormats =
-              Stream.concat(
-                      Stream.of(sourceTable.getFormatName()),
-                      targetTables.stream().map(TargetTable::getFormatName))
-                      .distinct()
-                      .collect(Collectors.toList());
+          Stream.concat(
+                  Stream.of(sourceTable.getFormatName()),
+                  targetTables.stream().map(TargetTable::getFormatName))
+              .distinct()
+              .collect(Collectors.toList());
       try {
         conversionController.syncTableAcrossCatalogs(
-                conversionConfig,
-                getConversionSourceProviders(tableFormats, tableFormatConverters, hadoopConf));
+            conversionConfig,
+            getConversionSourceProviders(tableFormats, tableFormatConverters, hadoopConf));
       } catch (Exception e) {
         log.error("Error running sync for {}", sourceTable.getBasePath(), e);
       }
@@ -200,45 +200,45 @@ public class RunCatalogSync {
   }
 
   static Optional<CatalogConversionSource> getCatalogConversionSource(
-          ExternalCatalogConfig sourceCatalog, Configuration hadoopConf) {
+      ExternalCatalogConfig sourceCatalog, Configuration hadoopConf) {
     if (CatalogType.STORAGE.equals(sourceCatalog.getCatalogType())) {
       return Optional.empty();
     }
     return Optional.of(
-            CatalogConversionFactory.createCatalogConversionSource(sourceCatalog, hadoopConf));
+        CatalogConversionFactory.createCatalogConversionSource(sourceCatalog, hadoopConf));
   }
 
   static SourceTable getSourceTable(
-          DatasetConfig.SourceTableIdentifier sourceTableIdentifier,
-          Optional<CatalogConversionSource> catalogConversionSource) {
+      DatasetConfig.SourceTableIdentifier sourceTableIdentifier,
+      Optional<CatalogConversionSource> catalogConversionSource) {
     SourceTable sourceTable = null;
     if (sourceTableIdentifier.getStorageIdentifier() != null) {
       StorageIdentifier storageIdentifier = sourceTableIdentifier.getStorageIdentifier();
       Properties sourceProperties = new Properties();
       if (storageIdentifier.getPartitionSpec() != null) {
         sourceProperties.put(
-                HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, storageIdentifier.getPartitionSpec());
+            HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, storageIdentifier.getPartitionSpec());
       }
       sourceTable =
-              SourceTable.builder()
-                      .name(storageIdentifier.getTableName())
-                      .basePath(storageIdentifier.getTableBasePath())
-                      .namespace(
-                              storageIdentifier.getNamespace() == null
-                                      ? null
-                                      : storageIdentifier.getNamespace().split("\\."))
-                      .dataPath(storageIdentifier.getTableDataPath())
-                      .formatName(storageIdentifier.getTableFormat())
-                      .additionalProperties(sourceProperties)
-                      .build();
+          SourceTable.builder()
+              .name(storageIdentifier.getTableName())
+              .basePath(storageIdentifier.getTableBasePath())
+              .namespace(
+                  storageIdentifier.getNamespace() == null
+                      ? null
+                      : storageIdentifier.getNamespace().split("\\."))
+              .dataPath(storageIdentifier.getTableDataPath())
+              .formatName(storageIdentifier.getTableFormat())
+              .additionalProperties(sourceProperties)
+              .build();
     } else if (catalogConversionSource.isPresent()) {
       TableIdentifier tableIdentifier = sourceTableIdentifier.getTableIdentifier();
       sourceTable =
-              catalogConversionSource.get().getSourceTable(getCatalogTableIdentifier(tableIdentifier));
+          catalogConversionSource.get().getSourceTable(getCatalogTableIdentifier(tableIdentifier));
       if (tableIdentifier.getPartitionSpec() != null) {
         sourceTable
-                .getAdditionalProperties()
-                .put(HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, tableIdentifier.getPartitionSpec());
+            .getAdditionalProperties()
+            .put(HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, tableIdentifier.getPartitionSpec());
       }
     }
     return sourceTable;
@@ -247,29 +247,29 @@ public class RunCatalogSync {
   static String getSourceTableLocation(String targetTableFormat, SourceTable sourceTable) {
     return sourceTable.getFormatName().equals(TableFormat.ICEBERG)
             && targetTableFormat.equals(TableFormat.HUDI)
-            ? sourceTable.getDataPath()
-            : sourceTable.getBasePath();
+        ? sourceTable.getDataPath()
+        : sourceTable.getBasePath();
   }
 
   static Map<String, ConversionSourceProvider> getConversionSourceProviders(
-          List<String> tableFormats,
-          TableFormatConverters tableFormatConverters,
-          Configuration hadoopConf) {
+      List<String> tableFormats,
+      TableFormatConverters tableFormatConverters,
+      Configuration hadoopConf) {
     for (String tableFormat : tableFormats) {
       if (CONVERSION_SOURCE_PROVIDERS.containsKey(tableFormat)) {
         continue;
       }
       TableFormatConverters.ConversionConfig sourceConversionConfig =
-              tableFormatConverters.getTableFormatConverters().get(tableFormat);
+          tableFormatConverters.getTableFormatConverters().get(tableFormat);
       if (sourceConversionConfig == null) {
         throw new IllegalArgumentException(
-                String.format(
-                        "Source format %s is not supported. Known source and target formats are %s",
-                        tableFormat, tableFormatConverters.getTableFormatConverters().keySet()));
+            String.format(
+                "Source format %s is not supported. Known source and target formats are %s",
+                tableFormat, tableFormatConverters.getTableFormatConverters().keySet()));
       }
       String sourceProviderClass = sourceConversionConfig.conversionSourceProviderClass;
       ConversionSourceProvider<?> conversionSourceProvider =
-              ReflectionUtils.createInstanceOfClass(sourceProviderClass);
+          ReflectionUtils.createInstanceOfClass(sourceProviderClass);
       conversionSourceProvider.init(hadoopConf);
       CONVERSION_SOURCE_PROVIDERS.put(tableFormat, conversionSourceProvider);
     }
@@ -283,7 +283,7 @@ public class RunCatalogSync {
   static CatalogTableIdentifier getCatalogTableIdentifier(TableIdentifier tableIdentifier) {
     if (tableIdentifier.getHierarchicalId() != null) {
       return ThreePartHierarchicalTableIdentifier.fromDotSeparatedIdentifier(
-              tableIdentifier.getHierarchicalId());
+          tableIdentifier.getHierarchicalId());
     }
     throw new IllegalArgumentException("Invalid tableIdentifier configuration provided");
   }
