@@ -172,7 +172,6 @@ public class TestParquetStatsExtractor {
 
     Binary maxStat = stats.genericGetMax();
     PrimitiveType primitiveType =
-
         new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY, "b");
     List<Integer> col1NumValTotSize =
         new ArrayList<>(Arrays.asList(5, 8)); // (5, 8)// start column indexes
@@ -247,8 +246,7 @@ public class TestParquetStatsExtractor {
     Binary maxStat = stats.genericGetMax();
     PrimitiveType primitiveType =
         new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.BINARY, "b");
-    List<Integer> col1NumValTotSize =
-        new ArrayList<>(Arrays.asList(5, 1));
+    List<Integer> col1NumValTotSize = new ArrayList<>(Arrays.asList(5, 1));
     List<Integer> col2NumValTotSize = new ArrayList<>(Arrays.asList(54, 27));
     List<ColumnStat> testColumnStats = new ArrayList<>();
     String[] columnDotPath = {"a.b", "a.b"};
@@ -324,8 +322,7 @@ public class TestParquetStatsExtractor {
     java.lang.Integer maxStat = stats.genericGetMax();
     PrimitiveType primitiveType =
         new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.INT32, "b");
-    List<Integer> col1NumValTotSize =
-        new ArrayList<>(Arrays.asList(2, 1));
+    List<Integer> col1NumValTotSize = new ArrayList<>(Arrays.asList(2, 1));
     List<Integer> col2NumValTotSize = new ArrayList<>(Arrays.asList(54, 27));
     List<ColumnStat> testColumnStats = new ArrayList<>();
     String[] columnDotPath = {"a.b", "a.b"};
@@ -365,13 +362,7 @@ public class TestParquetStatsExtractor {
             .physicalPath(
                 "file:/"
                     .concat(
-                        file.toPath()
-                            .normalize()
-                            .toAbsolutePath()
-                            .toString()
-                            .replace(
-                                "\\",
-                                "/")))
+                        file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
             .fileFormat(FileFormat.APACHE_PARQUET)
             .lastModified(file.lastModified())
@@ -379,7 +370,7 @@ public class TestParquetStatsExtractor {
             .recordCount(8)
             .build();
 
-    Assertions.assertEquals(true, testInternalFile.equals(internalDataFile));
+    Assertions.assertEquals(testInternalFile, internalDataFile);
   }
 
   @Test
@@ -400,13 +391,7 @@ public class TestParquetStatsExtractor {
             .physicalPath(
                 "file:/"
                     .concat(
-                        file.toPath()
-                            .normalize()
-                            .toAbsolutePath()
-                            .toString()
-                            .replace(
-                                "\\",
-                                "/")))
+                        file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
             .fileFormat(FileFormat.APACHE_PARQUET)
             .lastModified(file.lastModified())
@@ -414,7 +399,7 @@ public class TestParquetStatsExtractor {
             .recordCount(5)
             .build();
 
-    Assertions.assertEquals(true, testInternalFile.equals(internalDataFile));
+    Assertions.assertEquals(testInternalFile, internalDataFile);
   }
 
   @Test
@@ -435,13 +420,7 @@ public class TestParquetStatsExtractor {
             .physicalPath(
                 "file:/"
                     .concat(
-                        file.toPath()
-                            .normalize()
-                            .toAbsolutePath()
-                            .toString()
-                            .replace(
-                                "\\",
-                                "/")))
+                        file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
             .fileFormat(FileFormat.APACHE_PARQUET)
             .lastModified(file.lastModified())
@@ -449,7 +428,7 @@ public class TestParquetStatsExtractor {
             .recordCount(2)
             .build();
 
-    Assertions.assertEquals(true, testInternalFile.equals(internalDataFile));
+    Assertions.assertEquals(testInternalFile, internalDataFile);
   }
 
   @Test
@@ -472,13 +451,7 @@ public class TestParquetStatsExtractor {
             .physicalPath(
                 "file:/"
                     .concat(
-                        file.toPath()
-                            .normalize()
-                            .toAbsolutePath()
-                            .toString()
-                            .replace(
-                                "\\",
-                                "/"))) 
+                        file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
             .fileFormat(FileFormat.APACHE_PARQUET)
             .lastModified(file.lastModified())
@@ -486,6 +459,6 @@ public class TestParquetStatsExtractor {
             .recordCount(8)
             .build();
 
-    Assertions.assertEquals(true, testInternalFile.equals(internalDataFile));
+    Assertions.assertEquals(testInternalFile, internalDataFile);
   }
 }
