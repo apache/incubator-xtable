@@ -794,7 +794,7 @@
                 <configuration>
                     <java>
                         <googleJavaFormat>
-                            <version>1.19.2</version> <!--  ${google.java.format.version} -->
+                            <version>${google.java.format.version}</version>
                             <style>GOOGLE</style>
                             <groupArtifact>com.google.googlejavaformat:google-java-format</groupArtifact>
                         </googleJavaFormat>
