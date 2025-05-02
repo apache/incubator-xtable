@@ -18,7 +18,15 @@
  
 package org.apache.xtable.service;
 
-import io.smallrye.config.ConfigMapping;
+import org.apache.hadoop.conf.Configuration;
 
-@ConfigMapping(prefix = "xtable.service")
-public interface ConversionServiceConfig {}
+import org.apache.xtable.conversion.ConversionController;
+
+import jakarta.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
+public class ConversionControllerFactory {
+  public ConversionController create(Configuration conf) {
+    return new ConversionController(conf);
+  }
+}

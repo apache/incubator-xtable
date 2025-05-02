@@ -31,13 +31,7 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 
-import org.apache.iceberg.BaseTable;
-import org.apache.iceberg.SchemaParser;
 import org.apache.iceberg.Snapshot;
-import org.apache.iceberg.Table;
-import org.apache.iceberg.TableMetadata;
-import org.apache.iceberg.TableOperations;
-import org.apache.iceberg.hadoop.HadoopTables;
 
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
@@ -51,17 +45,31 @@ import org.apache.xtable.service.models.ConvertTableRequest;
 import org.apache.xtable.service.models.ConvertTableResponse;
 import org.apache.xtable.service.models.RestTargetTable;
 import org.apache.xtable.service.spark.SparkHolder;
+import org.apache.xtable.service.utils.IcebergMetadataUtil;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 @ApplicationScoped
 public class ConversionService {
-  @Inject SparkHolder sparkHolder;
+  private final SparkHolder sparkHolder;
+  private final ConversionControllerFactory controllerFactory;
+  private final IcebergMetadataUtil icebergUtil;
+
+  @Inject
+  public ConversionService(
+      SparkHolder sparkHolder,
+      ConversionControllerFactory controllerFactory,
+      IcebergMetadataUtil icebergUtil) {
+    this.sparkHolder = sparkHolder;
+    this.controllerFactory = controllerFactory;
+    this.icebergUtil = icebergUtil;
+  }
 
   public ConvertTableResponse convertTable(ConvertTableRequest request) {
-    ConversionController conversionController =
-        new ConversionController(sparkHolder.jsc().hadoopConfiguration());
+    Configuration conf = sparkHolder.jsc().hadoopConfiguration();
+    ConversionController conversionController = controllerFactory.create(conf);
+
     SourceTable sourceTable =
         SourceTable.builder()
             .name(request.getSourceTableName())
@@ -86,7 +94,7 @@ public class ConversionService {
     conversionController.sync(conversionConfig, conversionSourceProvider);
 
     Pair<String, String> responseFields =
-        getIcebergSchemaAndMetadataPath(
+        icebergUtil.getIcebergSchemaAndMetadataPath(
             request.getSourceTablePath(), sparkHolder.jsc().hadoopConfiguration());
 
     RestTargetTable internalTable =
@@ -113,14 +121,5 @@ public class ConversionService {
     } else {
       throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
     }
-  }
-
-  public static Pair<String, String> getIcebergSchemaAndMetadataPath(
-      String tableLocation, Configuration conf) {
-    HadoopTables tables = new HadoopTables(conf);
-    Table table = tables.load(tableLocation);
-    TableOperations ops = ((BaseTable) table).operations();
-    TableMetadata current = ops.current();
-    return Pair.of(current.metadataFileLocation(), SchemaParser.toJson(current.schema()));
   }
 }

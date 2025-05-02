@@ -45,7 +45,7 @@ class TestConversionResource {
   @InjectMocks private ConversionResource resource;
 
   @Test
-  void convertTable_delegatesToService_andReturnsExpectedResponse() {
+  void testConvertTableResource() {
     ConvertTableRequest req =
         ConvertTableRequest.builder()
             .sourceFormat("DELTA")

@@ -20,10 +20,10 @@ package org.apache.xtable.service.spark;
 
 import java.io.InputStream;
 
+import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.SparkSession;
-
-import org.apache.xtable.service.ConversionServiceUtil;
 
 import io.quarkus.runtime.ShutdownEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -42,7 +42,7 @@ public class SparkHolder {
         if (spark == null) {
           spark =
               SparkSession.builder()
-                  .config(ConversionServiceUtil.getSparkConf())
+                  .config(getSparkConf())
                   .appName("xtable-conversion-service")
                   .getOrCreate();
           jsc = JavaSparkContext.fromSparkContext(spark.sparkContext());
@@ -70,5 +70,30 @@ public class SparkHolder {
     if (spark != null) {
       spark.stop();
     }
+  }
+
+  public SparkConf getSparkConf() {
+    return new SparkConf()
+        .setMaster("local[4]")
+        .setAppName("xtable-service")
+        .set("spark.ui.enabled", "false") // disable Spark UI
+        .set("spark.driver.bindAddress", "127.0.0.1")
+        .set("spark.serializer", KryoSerializer.class.getName())
+        .set("spark.sql.catalog.default_iceberg", "org.apache.iceberg.spark.SparkCatalog")
+        .set("spark.sql.catalog.default_iceberg.type", "hadoop")
+        .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        .set("parquet.avro.write-old-list-structure", "false")
+        // Needed for ignoring not nullable constraints on nested columns in Delta.
+        .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
+        .set("spark.sql.shuffle.partitions", "1")
+        .set("spark.default.parallelism", "1")
+        .set("spark.sql.session.timeZone", "UTC")
+        .set("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .set("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        .set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
+        .set("spark.databricks.delta.schema.autoMerge.enabled", "true");
+    // .set("spark.sql.catalog.default_iceberg.warehouse", tempDir.toString()) add this back for
+    // iceberg
+    // .set("spark.sql.hive.convertMetastoreParquet", "false"); add this back for hudi
   }
 }
