@@ -341,9 +341,4 @@ public class TestParquetSchemaExtractor {
     Assertions.assertEquals(internalMap, schemaExtractor.toInternalSchema(testMap, null));
     Assertions.assertEquals(internalSchema, schemaExtractor.toInternalSchema(messageType, null));
   }
-
-  public void main() {
-    testPrimitiveTypes();
-    testGroupTypes();
-  }
 }

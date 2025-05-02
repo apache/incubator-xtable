@@ -101,8 +101,7 @@ public class TestParquetStatsExtractor {
     boolean maxStat = stats.genericGetMax();
     PrimitiveType primitiveType =
         new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.BOOLEAN, "b");
-    List<Integer> col1NumValTotSize =
-        new ArrayList<>(Arrays.asList(5, 8)); // (5, 8)// start column indexes
+    List<Integer> col1NumValTotSize = new ArrayList<>(Arrays.asList(5, 8)); // start column indexes
     List<Integer> col2NumValTotSize = new ArrayList<>(Arrays.asList(54, 27));
     List<ColumnStat> testColumnStats = new ArrayList<>();
     String[] columnDotPath = {"a.b", "a.b"};
@@ -402,13 +401,7 @@ public class TestParquetStatsExtractor {
             .physicalPath(
                 "file:/"
                     .concat(
-                        file.toPath()
-                            .normalize()
-                            .toAbsolutePath()
-                            .toString()
-                            .replace(
-                                "\\",
-                                "/"))) // C:/Users/slims/Downloads/XTable/incubator-xtable/xtable-core/parquet-test-files") // TODO hard coded path to file method
+                        file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
             .fileFormat(FileFormat.APACHE_PARQUET)
             .lastModified(file.lastModified())

@@ -36,7 +36,6 @@ import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
-import org.apache.xtable.model.config.InputPartitionFields;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -50,16 +49,13 @@ public class ParquetStatsExtractor {
 
   private static final ParquetStatsExtractor INSTANCE = new ParquetStatsExtractor();
 
-  private static final ParquetPartitionValueExtractor partitionExtractor =
-      ParquetPartitionValueExtractor.getInstance();
-
   private static final ParquetSchemaExtractor schemaExtractor =
       ParquetSchemaExtractor.getInstance();
 
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
-  private static final InputPartitionFields partitions = null;
+  // private static final InputPartitionFields partitions = null;
 
   public static ParquetStatsExtractor getInstance() {
     return INSTANCE;
@@ -123,9 +119,9 @@ public class ParquetStatsExtractor {
     return columnDescStats;
   }
 
-  private static InputPartitionFields initPartitionInfo() {
+  /*  private static InputPartitionFields initPartitionInfo() {
     return partitions;
-  }
+  }*/
 
   public static InternalDataFile toInternalDataFile(Configuration hadoopConf, Path parentPath)
       throws IOException {
@@ -136,7 +132,7 @@ public class ParquetStatsExtractor {
     try {
       FileSystem fs = FileSystem.get(hadoopConf);
       file = fs.getFileStatus(parentPath);
-      InputPartitionFields partitionInfo = initPartitionInfo();
+      // InputPartitionFields partitionInfo = initPartitionInfo();
       footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
       MessageType schema = parquetMetadataExtractor.getSchema(footer);
       columnStatsForAFile = getColumnStatsForaFile(footer);
