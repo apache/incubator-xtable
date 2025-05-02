@@ -167,10 +167,13 @@ public class TestParquetStatsExtractor {
     w.end(new HashMap<String, String>());
 
     // reconstruct the stats for the InternalDataFile testing object
+    BinaryStatistics stats_clone = new BinaryStatistics();
+    stats_clone.updateStats(Binary.fromString("1"));
+    stats_clone.updateStats(Binary.fromString("2"));
+    stats_clone.updateStats(Binary.fromString("5"));
+    Binary minStat = stats_clone.genericGetMin();
 
-    Binary minStat = stats.genericGetMin();
-
-    Binary maxStat = stats.genericGetMax();
+    Binary maxStat = stats_clone.genericGetMax();
     PrimitiveType primitiveType =
         new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY, "b");
     List<Integer> col1NumValTotSize =
@@ -241,9 +244,13 @@ public class TestParquetStatsExtractor {
     w.end(new HashMap<String, String>());
 
     // reconstruct the stats for the InternalDataFile testing object
+    BinaryStatistics stats_clone =  new BinaryStatistics();
+    stats_clone.updateStats(Binary.fromString("1"));
+    stats_clone.updateStats(Binary.fromString("2"));
+    stats_clone.updateStats(Binary.fromString("5"));
 
-    Binary minStat = stats.genericGetMin(); // byte[] maxStat = stats.getMaxBytes();
-    Binary maxStat = stats.genericGetMax();
+    Binary minStat = stats_clone.genericGetMin();
+    Binary maxStat = stats_clone.genericGetMax();
     PrimitiveType primitiveType =
         new PrimitiveType(Repetition.REQUIRED, PrimitiveTypeName.BINARY, "b");
     List<Integer> col1NumValTotSize = new ArrayList<>(Arrays.asList(5, 1));
@@ -360,7 +367,7 @@ public class TestParquetStatsExtractor {
     InternalDataFile testInternalFile =
         InternalDataFile.builder()
             .physicalPath(
-                "file:/"
+                "file://"
                     .concat(
                         file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
@@ -389,7 +396,7 @@ public class TestParquetStatsExtractor {
     InternalDataFile testInternalFile =
         InternalDataFile.builder()
             .physicalPath(
-                "file:/"
+                "file://"
                     .concat(
                         file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
@@ -418,7 +425,7 @@ public class TestParquetStatsExtractor {
     InternalDataFile testInternalFile =
         InternalDataFile.builder()
             .physicalPath(
-                "file:/"
+                "file://"
                     .concat(
                         file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
@@ -449,7 +456,7 @@ public class TestParquetStatsExtractor {
     InternalDataFile testInternalFile =
         InternalDataFile.builder()
             .physicalPath(
-                "file:/"
+                "file://"
                     .concat(
                         file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
