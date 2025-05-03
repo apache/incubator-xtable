@@ -23,7 +23,6 @@ import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -45,6 +44,8 @@ import org.apache.xtable.service.models.ConvertTableRequest;
 import org.apache.xtable.service.models.ConvertTableResponse;
 import org.apache.xtable.service.models.RestTargetTable;
 import org.apache.xtable.service.spark.SparkHolder;
+import org.apache.xtable.service.utils.DeltaMetadataUtil;
+import org.apache.xtable.service.utils.HudiMedataUtil;
 import org.apache.xtable.service.utils.IcebergMetadataUtil;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -55,15 +56,21 @@ public class ConversionService {
   private final SparkHolder sparkHolder;
   private final ConversionControllerFactory controllerFactory;
   private final IcebergMetadataUtil icebergUtil;
+  private final HudiMedataUtil hudiUtil;
+  private final DeltaMetadataUtil deltaUtil;
 
   @Inject
   public ConversionService(
       SparkHolder sparkHolder,
       ConversionControllerFactory controllerFactory,
-      IcebergMetadataUtil icebergUtil) {
+      IcebergMetadataUtil icebergUtil,
+      HudiMedataUtil hudiUtil,
+      DeltaMetadataUtil deltaUtil) {
     this.sparkHolder = sparkHolder;
     this.controllerFactory = controllerFactory;
     this.icebergUtil = icebergUtil;
+    this.hudiUtil = hudiUtil;
+    this.deltaUtil = deltaUtil;
   }
 
   public ConvertTableResponse convertTable(ConvertTableRequest request) {
@@ -93,13 +100,32 @@ public class ConversionService {
         getConversionSourceProvider(request.getSourceFormat());
     conversionController.sync(conversionConfig, conversionSourceProvider);
 
-    Pair<String, String> responseFields =
-        icebergUtil.getIcebergSchemaAndMetadataPath(
-            request.getSourceTablePath(), sparkHolder.jsc().hadoopConfiguration());
-
-    RestTargetTable internalTable =
-        new RestTargetTable("ICEBERG", responseFields.getLeft(), responseFields.getRight());
-    return new ConvertTableResponse(Collections.singletonList(internalTable));
+    List<RestTargetTable> restTargetTables = new ArrayList<>();
+    for (String targetFormat : request.getTargetFormats()) {
+      if (targetFormat.equals("ICEBERG")) {
+        Pair<String, String> responseFields =
+                icebergUtil.getIcebergSchemaAndMetadataPath(
+                        request.getSourceTablePath(), sparkHolder.jsc().hadoopConfiguration());
+        RestTargetTable icebergTable =
+                new RestTargetTable("ICEBERG", responseFields.getLeft(), responseFields.getRight());
+        restTargetTables.add(icebergTable);
+      } else if (targetFormat.equals("HUDI")) {
+        Pair<String, String> responseFields =
+                hudiUtil.getHudiSchemaAndMetadataPath(
+                        request.getSourceTablePath(), sparkHolder.jsc().hadoopConfiguration());
+        RestTargetTable hudiTable =
+                new RestTargetTable("HUDI", responseFields.getLeft(), responseFields.getRight());
+        restTargetTables.add(hudiTable);
+      } else if(targetFormat.equals("DELTA")){
+        Pair<String, String> responseFields =
+                deltaUtil.getDeltaSchemaAndMetadataPath(
+                        request.getSourceTablePath(), sparkHolder.spark());
+        RestTargetTable deltaTable =
+                new RestTargetTable("DELTA", responseFields.getLeft(), responseFields.getRight());
+        restTargetTables.add(deltaTable);
+      }
+    }
+    return new ConvertTableResponse(restTargetTables);
   }
 
   private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {

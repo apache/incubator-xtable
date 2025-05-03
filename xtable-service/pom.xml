@@ -104,6 +104,12 @@
             <artifactId>mockito-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
+            <version>${jol.core.version}</version>
+            <scope>runtime</scope>
+        </dependency>
 
     </dependencies>
     <build>

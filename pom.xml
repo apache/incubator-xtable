@@ -102,6 +102,7 @@
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.version>3.2.12.Final</quarkus.platform.version> <!-- compatible with Java 11 -->
         <antlr4.version>4.9.3</antlr4.version> <!-- added to resolve dep conflict with service-->
+        <jol.core.version>0.16</jol.core.version>
         
         <!-- Test properties -->
         <skipTests>false</skipTests>
@@ -472,7 +473,7 @@
             <dependency>
                 <groupId>org.openjdk.jol</groupId>
                 <artifactId>jol-core</artifactId>
-                <version>0.16</version>
+                <version>${jol.core.version}</version>
                 <scope>test</scope>
             </dependency>
 
