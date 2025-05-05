@@ -122,6 +122,10 @@
             <artifactId>hadoop-common</artifactId>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.parquet</groupId>
+            <artifactId>parquet-avro</artifactId>
+        </dependency>
 
         <!-- Logging API -->
         <dependency>
