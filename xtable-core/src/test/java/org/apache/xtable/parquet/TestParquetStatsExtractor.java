@@ -168,9 +168,15 @@ public class TestParquetStatsExtractor {
 
     // reconstruct the stats for the InternalDataFile testing object
     BinaryStatistics stats_clone = new BinaryStatistics();
-    stats_clone.updateStats(Binary.fromString("1"));
-    stats_clone.updateStats(Binary.fromString("2"));
-    stats_clone.updateStats(Binary.fromString("5"));
+    Binary originalBinary1 = Binary.fromString("1");
+    Binary originalBinary2 = Binary.fromString("2");
+    Binary originalBinary5 = Binary.fromString("5");
+    stats_clone.updateStats(Binary.fromByteArray(originalBinary1.getBytes()));
+    stats_clone.updateStats(Binary.fromByteArray(originalBinary2.getBytes()));
+    stats_clone.updateStats(Binary.fromByteArray(originalBinary5.getBytes()));
+    //    stats_clone.updateStats(Binary.fromString("1"));
+    //    stats_clone.updateStats(Binary.fromString("2"));
+    //    stats_clone.updateStats(Binary.fromString("5"));
     Binary minStat = stats_clone.genericGetMin();
 
     Binary maxStat = stats_clone.genericGetMax();
@@ -217,10 +223,10 @@ public class TestParquetStatsExtractor {
     // binary schema which enable stats to be int or binary..)
     // include statics using update()
 
-    BinaryStatistics stats = new BinaryStatistics();
-    stats.updateStats(Binary.fromString("1"));
-    stats.updateStats(Binary.fromString("2"));
-    stats.updateStats(Binary.fromString("5"));
+    //    BinaryStatistics stats = new BinaryStatistics();
+    //    stats.updateStats(Binary.fromString("1"));
+    //    stats.updateStats(Binary.fromString("2"));
+    //    stats.updateStats(Binary.fromString("5"));
 
     // to simplify the test we keep the same stats for both columns
     ParquetFileWriter w = new ParquetFileWriter(configuration, schema, path);
@@ -244,10 +250,16 @@ public class TestParquetStatsExtractor {
     w.end(new HashMap<String, String>());
 
     // reconstruct the stats for the InternalDataFile testing object
-    BinaryStatistics stats_clone =  new BinaryStatistics();
-    stats_clone.updateStats(Binary.fromString("1"));
-    stats_clone.updateStats(Binary.fromString("2"));
-    stats_clone.updateStats(Binary.fromString("5"));
+    BinaryStatistics stats_clone = new BinaryStatistics();
+    Binary originalBinary1 = Binary.fromString("1");
+    Binary originalBinary2 = Binary.fromString("2");
+    Binary originalBinary5 = Binary.fromString("5");
+    stats_clone.updateStats(Binary.fromByteArray(originalBinary1.getBytes()));
+    stats_clone.updateStats(Binary.fromByteArray(originalBinary2.getBytes()));
+    stats_clone.updateStats(Binary.fromByteArray(originalBinary5.getBytes()));
+    //    stats_clone.updateStats(Binary.fromString("1"));
+    //    stats_clone.updateStats(Binary.fromString("2"));
+    //    stats_clone.updateStats(Binary.fromString("5"));
 
     Binary minStat = stats_clone.genericGetMin();
     Binary maxStat = stats_clone.genericGetMax();
@@ -367,7 +379,7 @@ public class TestParquetStatsExtractor {
     InternalDataFile testInternalFile =
         InternalDataFile.builder()
             .physicalPath(
-                "file://"
+                "file:"
                     .concat(
                         file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
@@ -396,7 +408,7 @@ public class TestParquetStatsExtractor {
     InternalDataFile testInternalFile =
         InternalDataFile.builder()
             .physicalPath(
-                "file://"
+                "file:"
                     .concat(
                         file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
@@ -425,7 +437,7 @@ public class TestParquetStatsExtractor {
     InternalDataFile testInternalFile =
         InternalDataFile.builder()
             .physicalPath(
-                "file://"
+                "file:"
                     .concat(
                         file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
@@ -456,7 +468,7 @@ public class TestParquetStatsExtractor {
     InternalDataFile testInternalFile =
         InternalDataFile.builder()
             .physicalPath(
-                "file://"
+                "file:"
                     .concat(
                         file.toPath().normalize().toAbsolutePath().toString().replace("\\", "/")))
             .columnStats(testColumnStats)
