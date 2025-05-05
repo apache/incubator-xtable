@@ -216,7 +216,10 @@ public class TestParquetStatsExtractor {
         byte[] bytes1 = {0, 1, 2, 3};
         byte[] bytes2 = {2, 3, 4, 5};
         CompressionCodecName codec = CompressionCodecName.UNCOMPRESSED;
-
+        BinaryStatistics stats = new BinaryStatistics();
+        stats.updateStats(Binary.fromString("1"));
+        stats.updateStats(Binary.fromString("2"));
+        stats.updateStats(Binary.fromString("5"));
 
         // to simplify the test we keep the same stats for both columns
         ParquetFileWriter w = new ParquetFileWriter(configuration, schema, path);
