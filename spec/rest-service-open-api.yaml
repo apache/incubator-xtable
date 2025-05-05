@@ -1,0 +1,240 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+openapi: 3.0.3
+info:
+  title: XTable REST Service API
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+  version: 0.0.1
+  description: |
+    A REST API for initiating metadata conversion using Apache XTable. Note this spec is still under active development and is subject to changes.
+
+servers:
+  - url: "{scheme}://{host}/{prefix}"
+    description: Server URL when the port can be inferred from the scheme
+    variables:
+      scheme:
+        description: The scheme of the URI, either http or https.
+        default: https
+      host:
+        description: The host address for the specified server
+        default: localhost
+      prefix:
+        description: Optional prefix to be appended to all routes
+        default: ""
+  - url: "{scheme}://{host}:{port}/{prefix}"
+    description: Generic base server URL, with all parts configurable
+    variables:
+      scheme:
+        description: The scheme of the URI, either http or https.
+        default: https
+      host:
+        description: The host address for the specified server
+        default: localhost
+      port:
+        description: The port used when addressing the host
+        default: "8080"
+      prefix:
+        description: Optional prefix to be appended to all routes
+        default: ""
+
+paths:
+  /v1/conversion/table:
+    post:
+      tags:
+        - XTable Service API
+      summary: Initiate XTable's runSync process to convert a source table format to the requested target table formats.
+      description: |
+        Reads the source table metadata from storage, converts it to the requested
+        target formats.
+      operationId: convertTable
+      parameters:
+        - in: header
+          name: Prefer
+          description: Use 'respond-async' to request asynchronous processing.
+          required: false
+          schema:
+            type: string
+            enum:
+              - respond-async
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConvertTableRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/ConvertTableResponse'
+        '202':
+          $ref: '#/components/responses/SubmittedConversionResponse'
+        '403':
+          $ref: '#/components/responses/ForbiddenResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+  /v1/conversion/table/{conversion-id}:
+    get:
+      tags:
+        - XTable Service API
+      summary: Polls on a conversion-id to see if converting a table has finished.
+      operationId: getConversionStatus
+      parameters:
+        - in: path
+          name: conversion-id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/ConvertTableResponse'
+        '202':
+          description: Still processing; conversion has not yet finished.
+        '403':
+          $ref: '#/components/responses/ForbiddenResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailableResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  schemas:
+    ConvertTableRequest:
+      type: object
+      required:
+        - source-format
+        - source-table-name
+        - source-table-path
+        - target-formats
+      properties:
+        source-format:
+          type: string
+          description: Name of the source table format (e.g., "ICEBERG", "HUDI", "DELTA")
+        source-table-name:
+          type: string
+          description: Name of the source table
+        source-table-path:
+          type: string
+          description: Path to the source table's metadata
+        target-formats:
+          type: array
+          items:
+            type: string
+          description: List of desired output table formats (e.g., "ICEBERG", "HUDI", "DELTA")
+        configurations:
+          type: object
+          description: Additional configuration key/value pairs (e.g., storage credentials or other service configs)
+          additionalProperties:
+            type: string
+
+    TargetTable:
+      type: object
+      required:
+        - target-format
+        - target-metadata-path
+      properties:
+        target-format:
+          type: string
+          description: Name of the target format (e.g., "ICEBERG", "HUDI", "DELTA")
+        target-metadata-path:
+          type: string
+          description: Path where the converted metadata was written
+        target-schema:
+          type: string
+          description: Schema definition of the converted table
+
+    ConvertTableResponse:
+      type: object
+      required:
+        - conversions
+      properties:
+        conversions:
+          type: array
+          description: A list of converted tables, one per requested format
+          items:
+            $ref: '#/components/schemas/TargetTable'
+
+    SubmittedConversionResponse:
+      type: object
+      properties:
+        conversion-id:
+          type: string
+          description: ID to use when polling for the final result
+
+    ErrorModel:
+      type: object
+      description: JSON error payload returned in a response with further details on the error
+      required:
+        - message
+        - type
+        - code
+      properties:
+        message:
+          type: string
+          description: Human-readable error message
+        type:
+          type: string
+          description: Internal type definition of the error
+        code:
+          type: integer
+          minimum: 400
+          maximum: 600
+          description: HTTP response code
+        stack:
+          type: array
+          description: Optional stack trace elements for debugging
+          items:
+            type: string
+
+  responses:
+    ConvertTableResponse:
+      description: Successful conversion result
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConvertTableResponse'
+
+    SubmittedConversionResponse:
+      description: Request accepted for asynchronous processing
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SubmittedConversionResponse'
+
+    ForbiddenResponse:
+      description: Caller does not have permission to perform this operation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorModel'
+
+    ServiceUnavailableResponse:
+      description: Conversion service is temporarily unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorModel'
+
+    ErrorResponse:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorModel'

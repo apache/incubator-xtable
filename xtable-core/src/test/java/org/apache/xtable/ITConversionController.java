@@ -100,6 +100,7 @@ import org.apache.xtable.delta.DeltaConversionSourceProvider;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
+import org.apache.xtable.iceberg.TestIcebergDataHelper;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 
@@ -769,6 +770,34 @@ public class ITConversionController {
       // assert that proper settings are enabled for delta log
       DeltaLog deltaLog = DeltaLog.forTable(sparkSession, table.getBasePath());
       Assertions.assertTrue(deltaLog.enableExpiredLogCleanup(deltaLog.snapshot().metadata()));
+    }
+  }
+
+  @Test
+  void otherIcebergPartitionTypes() {
+    String tableName = getTableName();
+    ConversionController conversionController = new ConversionController(jsc.hadoopConfiguration());
+    List<String> targetTableFormats = Collections.singletonList(DELTA);
+
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(ICEBERG);
+    try (TestIcebergTable table =
+        new TestIcebergTable(
+            tableName,
+            tempDir,
+            jsc.hadoopConfiguration(),
+            "id",
+            Arrays.asList("level", "string_field"),
+            TestIcebergDataHelper.SchemaType.COMMON)) {
+      table.insertRows(100);
+
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              ICEBERG, SyncMode.FULL, tableName, table, targetTableFormats, null, null);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(ICEBERG, table, targetTableFormats, 100);
+      // Query with filter to assert partition does not impact ability to query
+      checkDatasetEquivalenceWithFilter(
+          ICEBERG, table, targetTableFormats, "level == 'INFO' AND string_field > 'abc'");
     }
   }
 

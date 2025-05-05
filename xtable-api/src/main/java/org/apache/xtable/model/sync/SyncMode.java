@@ -18,11 +18,14 @@
  
 package org.apache.xtable.model.sync;
 
+import org.apache.xtable.annotations.Stable;
+
 /**
  * Mode of a sync
  *
  * @since 0.1
  */
+@Stable
 public enum SyncMode {
   // Full sync will create a checkpoint of ALL the files relevant at a certain point in time
   FULL,

@@ -501,14 +501,18 @@ public class TestIcebergSchemaExtractor {
                 1, "requiredTimestampMillis", Types.TimestampType.withZone()),
             Types.NestedField.optional(
                 2, "optionalTimestampMillis", Types.TimestampType.withZone()),
-            Types.NestedField.required(3, "requiredTimestampNtzMillis", Types.LongType.get()),
-            Types.NestedField.optional(4, "optionalTimestampNtzMillis", Types.LongType.get()),
+            Types.NestedField.required(
+                3, "requiredTimestampNtzMillis", Types.TimestampType.withoutZone()),
+            Types.NestedField.optional(
+                4, "optionalTimestampNtzMillis", Types.TimestampType.withoutZone()),
             Types.NestedField.required(
                 5, "requiredTimestampMicros", Types.TimestampType.withZone()),
             Types.NestedField.optional(
                 6, "optionalTimestampMicros", Types.TimestampType.withZone()),
-            Types.NestedField.required(7, "requiredTimestampNtzMicros", Types.LongType.get()),
-            Types.NestedField.optional(8, "optionalTimestampNtzMicros", Types.LongType.get()));
+            Types.NestedField.required(
+                7, "requiredTimestampNtzMicros", Types.TimestampType.withoutZone()),
+            Types.NestedField.optional(
+                8, "optionalTimestampNtzMicros", Types.TimestampType.withoutZone()));
     assertTrue(expectedTargetSchema.sameSchema(SCHEMA_EXTRACTOR.toIceberg(irSchema)));
 
     Schema sourceSchema =

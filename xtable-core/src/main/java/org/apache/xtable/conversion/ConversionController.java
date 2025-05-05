@@ -48,6 +48,7 @@ import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 import org.apache.xtable.spi.extractor.ConversionSource;
 import org.apache.xtable.spi.extractor.ExtractFromSource;
 import org.apache.xtable.spi.sync.CatalogSync;
@@ -207,13 +208,11 @@ public class ConversionController {
     Map<String, SyncResult> syncResultsMerged =
         new HashMap<>(syncResultForIncrementalSync.getLastSyncResult());
     syncResultsMerged.putAll(syncResultForSnapshotSync.getLastSyncResult());
-    String successfulSyncs =
-        getFormatsWithStatusCode(syncResultsMerged, SyncResult.SyncStatusCode.SUCCESS);
+    String successfulSyncs = getFormatsWithStatusCode(syncResultsMerged, SyncStatusCode.SUCCESS);
     if (!successfulSyncs.isEmpty()) {
       log.info("Sync is successful for the following formats {}", successfulSyncs);
     }
-    String failedSyncs =
-        getFormatsWithStatusCode(syncResultsMerged, SyncResult.SyncStatusCode.ERROR);
+    String failedSyncs = getFormatsWithStatusCode(syncResultsMerged, SyncStatusCode.ERROR);
     if (!failedSyncs.isEmpty()) {
       log.error("Sync failed for the following formats {}", failedSyncs);
     }
@@ -243,7 +242,7 @@ public class ConversionController {
   }
 
   private static String getFormatsWithStatusCode(
-      Map<String, SyncResult> syncResultsMerged, SyncResult.SyncStatusCode statusCode) {
+      Map<String, SyncResult> syncResultsMerged, SyncStatusCode statusCode) {
     return syncResultsMerged.entrySet().stream()
         .filter(entry -> entry.getValue().getTableFormatSyncStatus().getStatusCode() == statusCode)
         .map(Map.Entry::getKey)

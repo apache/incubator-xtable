@@ -92,7 +92,7 @@ public class TestGlueSchemaExtractor extends TestSchemaExtractorBase {
           .partitionFieldNames(Collections.singletonList("dateOfBirth"))
           .build();
 
-  private static Column getColumn(String name, String type) {
+  public static Column getColumn(String name, String type) {
     return Column.builder().name(name).type(type).build();
   }
 

@@ -52,8 +52,10 @@ import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.model.sync.ErrorDetails;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.model.sync.SyncStatusCode;
 
 public class TestTableFormatSync {
   private final ConversionTarget mockConversionTarget1 = mock(ConversionTarget.class);
@@ -99,9 +101,9 @@ public class TestTableFormatSync {
     assertSyncResultTimes(failureResult, start);
     assertEquals(
         SyncResult.SyncStatus.builder()
-            .statusCode(SyncResult.SyncStatusCode.ERROR)
+            .statusCode(SyncStatusCode.ERROR)
             .errorDetails(
-                SyncResult.ErrorDetails.builder()
+                ErrorDetails.builder()
                     .errorMessage("Failure")
                     .errorDescription("Failed to sync FULL")
                     .canRetryOnFailure(true)
@@ -197,9 +199,9 @@ public class TestTableFormatSync {
     assertSyncResultTimes(partialSuccessResults.get(1), start);
     assertEquals(
         SyncResult.SyncStatus.builder()
-            .statusCode(SyncResult.SyncStatusCode.ERROR)
+            .statusCode(SyncStatusCode.ERROR)
             .errorDetails(
-                SyncResult.ErrorDetails.builder()
+                ErrorDetails.builder()
                     .errorMessage("Failure")
                     .errorDescription("Failed to sync INCREMENTAL")
                     .canRetryOnFailure(true)

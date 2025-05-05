@@ -18,6 +18,7 @@
  
 package org.apache.xtable.delta;
 
+import static org.apache.xtable.delta.DeltaPartitionExtractor.DELTA_GENERATION_EXPRESSION;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.Arrays;
@@ -492,6 +493,42 @@ public class TestDeltaPartitionExtractor {
         deltaPartitionExtractor.partitionValueExtraction(
             scalaMap, Arrays.asList(internalPartitionField1, internalPartitionField2));
     assertEquals(expectedPartitionValues, partitionValues);
+  }
+
+  @Test
+  void convertBucketPartition() {
+    InternalPartitionField internalPartitionField =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("partition_column1")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
+                    .build())
+            .transformType(PartitionTransformType.BUCKET)
+            .transformOptions(Collections.singletonMap(InternalPartitionField.NUM_BUCKETS, 5))
+            .build();
+    Map<String, StructField> actual =
+        deltaPartitionExtractor.convertToDeltaPartitionFormat(
+            Collections.singletonList(internalPartitionField));
+    Metadata expectedPartitionFieldMetadata =
+        new Metadata(
+            ScalaUtils.convertJavaMapToScala(
+                Collections.singletonMap(
+                    DELTA_GENERATION_EXPRESSION,
+                    "MOD((HASH(partition_column1) & 2147483647), 5)")));
+    Map<String, StructField> expected =
+        Collections.singletonMap(
+            "xtable_partition_col_BUCKET_partition_column1",
+            new StructField(
+                "xtable_partition_col_BUCKET_partition_column1",
+                DataTypes.IntegerType,
+                true,
+                expectedPartitionFieldMetadata));
+    assertEquals(expected, actual);
   }
 
   private scala.collection.mutable.Map<String, String> convertJavaMapToScalaMap(

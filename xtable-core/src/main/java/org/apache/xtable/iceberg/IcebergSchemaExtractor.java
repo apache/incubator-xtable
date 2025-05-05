@@ -173,7 +173,6 @@ public class IcebergSchemaExtractor {
       case INT:
         return Types.IntegerType.get();
       case LONG:
-      case TIMESTAMP_NTZ: // TODO - revisit this
         return Types.LongType.get();
       case BYTES:
         return Types.BinaryType.get();
@@ -189,6 +188,8 @@ public class IcebergSchemaExtractor {
         return Types.DateType.get();
       case TIMESTAMP:
         return Types.TimestampType.withZone();
+      case TIMESTAMP_NTZ:
+        return Types.TimestampType.withoutZone();
       case DOUBLE:
         return Types.DoubleType.get();
       case DECIMAL:

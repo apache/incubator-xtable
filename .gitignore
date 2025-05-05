@@ -42,3 +42,7 @@ target/
 demo/jars/*
 demo/notebook/.ipynb_checkpoints/*
 my_config.yaml
+my_config_catalog.yaml
+
+# REST generated models
+spec/generated

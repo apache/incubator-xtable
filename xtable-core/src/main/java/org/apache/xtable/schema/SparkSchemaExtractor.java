@@ -62,7 +62,6 @@ public class SparkSchemaExtractor {
       case INT:
         return DataTypes.IntegerType;
       case LONG:
-      case TIMESTAMP_NTZ:
         return DataTypes.LongType;
       case BYTES:
       case FIXED:
@@ -76,6 +75,8 @@ public class SparkSchemaExtractor {
         return DataTypes.DateType;
       case TIMESTAMP:
         return DataTypes.TimestampType;
+      case TIMESTAMP_NTZ:
+        return DataTypes.TimestampNTZType;
       case DOUBLE:
         return DataTypes.DoubleType;
       case DECIMAL:

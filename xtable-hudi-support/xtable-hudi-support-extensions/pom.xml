@@ -136,6 +136,11 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_${scala.binary.version}</artifactId>
             <scope>test</scope>
@@ -205,7 +210,7 @@
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/LICENSE</resource>
-                                    <file>target/classes/META-INF/LICENSE</file>
+                                    <file>target/classes/META-INF/LICENSE-bundled</file>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/NOTICE</resource>
