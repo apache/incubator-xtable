@@ -56,12 +56,6 @@
             <artifactId>guava</artifactId>
         </dependency>
 
-        <!-- Avro -->
-        <!-- https://mvnrepository.com/artifact/org.apache.parquet/parquet-avro -->
-        <!--<dependency>
-            <groupId>org.apache.parquet</groupId>
-            <artifactId>parquet-avro</artifactId>
-        </dependency>-->
 
         <dependency>
             <groupId>org.apache.avro</groupId>
