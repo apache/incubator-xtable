@@ -64,6 +64,7 @@
         <avro.version>1.11.4</avro.version>
         <log4j.version>2.22.0</log4j.version>
         <junit.version>5.11.4</junit.version>
+        <junit.platform.runner.version>1.11.4</junit.platform.runner.version>
         <lombok.version>1.18.36</lombok.version>
         <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
         <hadoop.version>3.4.1</hadoop.version>
@@ -489,7 +490,7 @@
             <dependency>
                 <groupId>org.junit.platform</groupId>
                 <artifactId>junit-platform-runner</artifactId>
-                <version>1.11.4</version>
+                <version>${junit.platform.runner.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>

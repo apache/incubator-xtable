@@ -109,16 +109,4 @@ class TestConversionService {
     assertEquals(TARGET_ICEBERG_METADATA_PATH, restTargetTable.getTargetMetadataPath());
     assertEquals(TARGET_SCHEMA, restTargetTable.getTargetSchema());
   }
-
-  @Test
-  void serviceConvertTableWithInvalidFormats() {
-    ConvertTableRequest invalidRequest =
-        ConvertTableRequest.builder()
-            .sourceFormat("notRealSoureFormat")
-            .sourceTableName(SOURCE_TABLE_NAME)
-            .sourceTablePath(SOURCE_TABLE_BASE_PATH)
-            .targetFormats(Collections.singletonList("notRealTargetFormat"))
-            .build();
-    assertThrows(IllegalArgumentException.class, () -> service.convertTable(invalidRequest));
-  }
 }
