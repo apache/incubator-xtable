@@ -24,13 +24,13 @@ import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 
-import org.apache.xtable.model.storage.TableFormat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.service.models.ConvertTableRequest;
 import org.apache.xtable.service.models.ConvertTableResponse;
 import org.apache.xtable.service.models.ConvertedTable;

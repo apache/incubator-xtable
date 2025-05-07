@@ -18,6 +18,10 @@
  
 package org.apache.xtable.service.utils;
 
+import static org.apache.xtable.model.storage.TableFormat.DELTA;
+import static org.apache.xtable.model.storage.TableFormat.HUDI;
+import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+
 import java.io.IOException;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -41,15 +45,12 @@ import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.Snapshot;
 
-import jakarta.enterprise.context.ApplicationScoped;
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 
-import static org.apache.xtable.model.storage.TableFormat.DELTA;
-import static org.apache.xtable.model.storage.TableFormat.HUDI;
-import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import jakarta.enterprise.context.ApplicationScoped;
 
 @ApplicationScoped
 public class ConversionServiceUtil {
@@ -101,20 +102,21 @@ public class ConversionServiceUtil {
     return Pair.of(current.metadataFileLocation(), SchemaParser.toJson(current.schema()));
   }
 
-  public ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat, Configuration hadoopConf) {
+  public ConversionSourceProvider<?> getConversionSourceProvider(
+      String sourceTableFormat, Configuration hadoopConf) {
     if (sourceTableFormat.equalsIgnoreCase(HUDI)) {
       ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
-              new HudiConversionSourceProvider();
+          new HudiConversionSourceProvider();
       hudiConversionSourceProvider.init(hadoopConf);
       return hudiConversionSourceProvider;
     } else if (sourceTableFormat.equalsIgnoreCase(DELTA)) {
       ConversionSourceProvider<Long> deltaConversionSourceProvider =
-              new DeltaConversionSourceProvider();
+          new DeltaConversionSourceProvider();
       deltaConversionSourceProvider.init(hadoopConf);
       return deltaConversionSourceProvider;
     } else if (sourceTableFormat.equalsIgnoreCase(ICEBERG)) {
       ConversionSourceProvider<org.apache.iceberg.Snapshot> icebergConversionSourceProvider =
-              new IcebergConversionSourceProvider();
+          new IcebergConversionSourceProvider();
       icebergConversionSourceProvider.init(hadoopConf);
       return icebergConversionSourceProvider;
     } else {

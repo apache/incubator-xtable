@@ -69,12 +69,14 @@ class TestConversionService {
   private static final String SOURCE_TABLE_BASE_PATH = "s3://bucket/tables/users";
   private static final String TARGET_ICEBERG_METADATA_PATH =
       "s3://bucket/tables/users/metadata/v1.metadata.json";
-  private static final String TARGET_SCHEMA =  "{\n"
+  private static final String TARGET_SCHEMA =
+      "{\n"
           + "  \"type\": \"struct\",\n"
           + "  \"fields\": [\n"
           + "    { \"id\": 1, \"name\": \"id\", \"required\": true, \"type\": \"string\" },\n"
           + "  ]\n"
-          + "}";;
+          + "}";
+  ;
   private final Configuration conf = new Configuration();
 
   @Mock SparkHolder sparkHolder;
