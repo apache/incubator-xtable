@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 
+import org.apache.xtable.model.storage.TableFormat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -37,6 +38,7 @@ import org.apache.xtable.service.models.ConvertedTable;
 @ExtendWith(MockitoExtension.class)
 class TestConversionResource {
 
+  private static final String SOURCE_TABLE_NAME = "users";
   private static final String SOURCE_TABLE_BASE_PATH = "s3://bucket/tables/users";
   private static final String TARGET_ICEBERG_METADATA_PATH = "s3://bucket/tables/users/metadata";
 
@@ -48,15 +50,15 @@ class TestConversionResource {
   void testConvertTableResource() {
     ConvertTableRequest req =
         ConvertTableRequest.builder()
-            .sourceFormat("DELTA")
-            .sourceTableName("users")
+            .sourceFormat(TableFormat.DELTA)
+            .sourceTableName(SOURCE_TABLE_NAME)
             .sourceTablePath(SOURCE_TABLE_BASE_PATH)
-            .targetFormats(Arrays.asList("ICEBERG"))
+            .targetFormats(Arrays.asList(TableFormat.ICEBERG))
             .build();
 
     ConvertedTable icebergTable =
         ConvertedTable.builder()
-            .targetFormat("ICEBERG")
+            .targetFormat(TableFormat.ICEBERG)
             .targetMetadataPath(TARGET_ICEBERG_METADATA_PATH)
             .build();
 
@@ -70,7 +72,7 @@ class TestConversionResource {
     assertSame(expected, actual, "Resource should return the exact response from the service");
 
     assertEquals(1, actual.getConvertedTables().size());
-    assertEquals("ICEBERG", actual.getConvertedTables().get(0).getTargetFormat());
+    assertEquals(TableFormat.ICEBERG, actual.getConvertedTables().get(0).getTargetFormat());
     assertEquals(
         TARGET_ICEBERG_METADATA_PATH, actual.getConvertedTables().get(0).getTargetMetadataPath());
   }
