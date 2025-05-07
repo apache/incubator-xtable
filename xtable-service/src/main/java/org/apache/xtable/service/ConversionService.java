@@ -26,126 +26,131 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.conf.Configuration;
 
-import org.apache.hudi.common.table.timeline.HoodieInstant;
-
-import org.apache.iceberg.Snapshot;
+import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
-import org.apache.xtable.delta.DeltaConversionSourceProvider;
-import org.apache.xtable.hudi.HudiConversionSourceProvider;
-import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.service.models.ConvertTableRequest;
 import org.apache.xtable.service.models.ConvertTableResponse;
-import org.apache.xtable.service.models.RestTargetTable;
+import org.apache.xtable.service.models.ConvertedTable;
 import org.apache.xtable.service.spark.SparkHolder;
-import org.apache.xtable.service.utils.DeltaMetadataUtil;
-import org.apache.xtable.service.utils.HudiMedataUtil;
-import org.apache.xtable.service.utils.IcebergMetadataUtil;
+import org.apache.xtable.service.utils.ConversionServiceUtil;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+/**
+ * Service for managing table format conversions.
+ *
+ * <p>It supports formats such as ICEBERG, HUDI, and DELTA. The conversion process involves creating
+ * a source table, generating target tables, and then executing the conversion via a designated
+ * conversion controller.
+ */
 @ApplicationScoped
 public class ConversionService {
   private final SparkHolder sparkHolder;
-  private final ConversionControllerFactory controllerFactory;
-  private final IcebergMetadataUtil icebergUtil;
-  private final HudiMedataUtil hudiUtil;
-  private final DeltaMetadataUtil deltaUtil;
+  private final ConversionController conversionController;
+  private final ConversionServiceUtil conversionServiceUtil;
 
+  /**
+   * Constructs a ConversionService instance with required dependencies.
+   *
+   * @param sparkHolder the Spark holder instance containing the Spark context and configuration
+   * @param conversionServiceUtil utility for handling metadata operations
+   */
   @Inject
-  public ConversionService(
-      SparkHolder sparkHolder,
-      ConversionControllerFactory controllerFactory,
-      IcebergMetadataUtil icebergUtil,
-      HudiMedataUtil hudiUtil,
-      DeltaMetadataUtil deltaUtil) {
+  public ConversionService(SparkHolder sparkHolder, ConversionServiceUtil conversionServiceUtil) {
     this.sparkHolder = sparkHolder;
-    this.controllerFactory = controllerFactory;
-    this.icebergUtil = icebergUtil;
-    this.hudiUtil = hudiUtil;
-    this.deltaUtil = deltaUtil;
+    this.conversionServiceUtil = conversionServiceUtil;
+    this.conversionController = new ConversionController(sparkHolder.jsc().hadoopConfiguration());
   }
 
-  public ConvertTableResponse convertTable(ConvertTableRequest request) {
-    Configuration conf = sparkHolder.jsc().hadoopConfiguration();
-    ConversionController conversionController = controllerFactory.create(conf);
+  /**
+   * Constructs a ConversionService instance using dependency injection for testing.
+   *
+   * @param sparkHolder the Spark holder instance
+   * @param conversionController a preconfigured conversion controller
+   * @param conversionServiceUtil utility for handling metadata operations
+   */
+  @VisibleForTesting
+  public ConversionService(
+      SparkHolder sparkHolder,
+      ConversionServiceUtil conversionServiceUtil,
+      ConversionController conversionController) {
+    this.sparkHolder = sparkHolder;
+    this.conversionController = conversionController;
+    this.conversionServiceUtil = conversionServiceUtil;
+  }
 
+  /**
+   * Converts a source table to one or more target table formats.
+   *
+   * <p>The method builds a SourceTable based on the request parameters and constructs corresponding
+   * TargetTable instances for each target format. It then performs a synchronous conversion through
+   * the conversion controller. After conversion, it retrieves schema and metadata paths for each
+   * target table.
+   *
+   * @param convertTableRequest the conversion request containing source table details and target
+   *     formats
+   * @return a response containing details of converted target tables
+   */
+  public ConvertTableResponse convertTable(ConvertTableRequest convertTableRequest) {
     SourceTable sourceTable =
         SourceTable.builder()
-            .name(request.getSourceTableName())
-            .basePath(request.getSourceTablePath())
-            .formatName(request.getSourceFormat())
+            .name(convertTableRequest.getSourceTableName())
+            .basePath(convertTableRequest.getSourceTablePath())
+            .formatName(convertTableRequest.getSourceFormat())
             .build();
 
     List<TargetTable> targetTables = new ArrayList<>();
-    for (String targetFormat : request.getTargetFormats()) {
+    for (String targetFormat : convertTableRequest.getTargetFormats()) {
       TargetTable targetTable =
           TargetTable.builder()
-              .name(request.getSourceTableName())
-              .basePath(request.getSourceTablePath())
+              .name(convertTableRequest.getSourceTableName())
+              .basePath(convertTableRequest.getSourceTablePath())
               .formatName(targetFormat)
               .build();
       targetTables.add(targetTable);
     }
+
     ConversionConfig conversionConfig =
         ConversionConfig.builder().sourceTable(sourceTable).targetTables(targetTables).build();
+
     ConversionSourceProvider<?> conversionSourceProvider =
-        getConversionSourceProvider(request.getSourceFormat());
+        conversionServiceUtil.getConversionSourceProvider(
+            convertTableRequest.getSourceFormat(), sparkHolder.jsc().hadoopConfiguration());
+
     conversionController.sync(conversionConfig, conversionSourceProvider);
 
-    List<RestTargetTable> restTargetTables = new ArrayList<>();
-    for (String targetFormat : request.getTargetFormats()) {
-      if (targetFormat.equals("ICEBERG")) {
+    List<ConvertedTable> restTargetTables = new ArrayList<>();
+    for (String targetFormat : convertTableRequest.getTargetFormats()) {
+      if (targetFormat.equals(ICEBERG)) {
         Pair<String, String> responseFields =
-                icebergUtil.getIcebergSchemaAndMetadataPath(
-                        request.getSourceTablePath(), sparkHolder.jsc().hadoopConfiguration());
-        RestTargetTable icebergTable =
-                new RestTargetTable("ICEBERG", responseFields.getLeft(), responseFields.getRight());
+            conversionServiceUtil.getIcebergSchemaAndMetadataPath(
+                convertTableRequest.getSourceTablePath(), sparkHolder.jsc().hadoopConfiguration());
+        ConvertedTable icebergTable =
+            new ConvertedTable(ICEBERG, responseFields.getLeft(), responseFields.getRight());
         restTargetTables.add(icebergTable);
-      } else if (targetFormat.equals("HUDI")) {
+      } else if (targetFormat.equals(HUDI)) {
         Pair<String, String> responseFields =
-                hudiUtil.getHudiSchemaAndMetadataPath(
-                        request.getSourceTablePath(), sparkHolder.jsc().hadoopConfiguration());
-        RestTargetTable hudiTable =
-                new RestTargetTable("HUDI", responseFields.getLeft(), responseFields.getRight());
+            conversionServiceUtil.getHudiSchemaAndMetadataPath(
+                convertTableRequest.getSourceTablePath(), sparkHolder.jsc().hadoopConfiguration());
+        ConvertedTable hudiTable =
+            new ConvertedTable(HUDI, responseFields.getLeft(), responseFields.getRight());
         restTargetTables.add(hudiTable);
-      } else if(targetFormat.equals("DELTA")){
+      } else if (targetFormat.equals(DELTA)) {
         Pair<String, String> responseFields =
-                deltaUtil.getDeltaSchemaAndMetadataPath(
-                        request.getSourceTablePath(), sparkHolder.spark());
-        RestTargetTable deltaTable =
-                new RestTargetTable("DELTA", responseFields.getLeft(), responseFields.getRight());
+            conversionServiceUtil.getDeltaSchemaAndMetadataPath(
+                convertTableRequest.getSourceTablePath(), sparkHolder.spark());
+        ConvertedTable deltaTable =
+            new ConvertedTable(DELTA, responseFields.getLeft(), responseFields.getRight());
         restTargetTables.add(deltaTable);
       }
     }
     return new ConvertTableResponse(restTargetTables);
-  }
-
-  private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
-    if (sourceTableFormat.equalsIgnoreCase(HUDI)) {
-      ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
-          new HudiConversionSourceProvider();
-      hudiConversionSourceProvider.init(sparkHolder.jsc().hadoopConfiguration());
-      return hudiConversionSourceProvider;
-    } else if (sourceTableFormat.equalsIgnoreCase(DELTA)) {
-      ConversionSourceProvider<Long> deltaConversionSourceProvider =
-          new DeltaConversionSourceProvider();
-      deltaConversionSourceProvider.init(sparkHolder.jsc().hadoopConfiguration());
-      return deltaConversionSourceProvider;
-    } else if (sourceTableFormat.equalsIgnoreCase(ICEBERG)) {
-      ConversionSourceProvider<Snapshot> icebergConversionSourceProvider =
-          new IcebergConversionSourceProvider();
-      icebergConversionSourceProvider.init(sparkHolder.jsc().hadoopConfiguration());
-      return icebergConversionSourceProvider;
-    } else {
-      throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
-    }
   }
 }

@@ -18,23 +18,31 @@
  
 package org.apache.xtable.service.spark;
 
+import static org.apache.xtable.service.ConversionServiceConfig.HADOOP_DEFAULTS_XML;
+
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.SparkSession;
 
+import org.apache.xtable.service.ConversionServiceConfig;
+
 import io.quarkus.runtime.ShutdownEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
+import jakarta.inject.Inject;
 
 @ApplicationScoped
 public class SparkHolder {
 
   private volatile SparkSession spark;
   private volatile JavaSparkContext jsc;
-  private static final String HADOOP_DEFAULTS_PATH = "xtable-hadoop-defaults.xml";
+
+  @Inject private ConversionServiceConfig conversionServiceConfig;
 
   public SparkSession spark() {
     if (spark == null) {
@@ -46,12 +54,19 @@ public class SparkHolder {
                   .appName("xtable-conversion-service")
                   .getOrCreate();
           jsc = JavaSparkContext.fromSparkContext(spark.sparkContext());
-          InputStream resourceStream =
-              SparkHolder.class.getClassLoader().getResourceAsStream(HADOOP_DEFAULTS_PATH);
-          if (resourceStream != null) {
-            spark.sparkContext().hadoopConfiguration().addResource(resourceStream);
-          } else {
-            throw new RuntimeException("Failed to load resource xtable-hadoop-defaults.xml");
+
+          // Load user-provided Hadoop XML file if available, otherwise load the default
+          try (InputStream configStream =
+              !conversionServiceConfig.getHadoopConfigPath().equals(HADOOP_DEFAULTS_XML)
+                  ? Files.newInputStream(Paths.get(conversionServiceConfig.getHadoopConfigPath()))
+                  : SparkHolder.class.getClassLoader().getResourceAsStream(HADOOP_DEFAULTS_XML)) {
+            if (configStream != null) {
+              spark.sparkContext().hadoopConfiguration().addResource(configStream);
+            } else {
+              throw new RuntimeException("Failed to load Hadoop configuration file");
+            }
+          } catch (Exception e) {
+            throw new RuntimeException("Error loading Hadoop configuration file", e);
           }
         }
       }

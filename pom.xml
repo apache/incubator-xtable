@@ -358,16 +358,6 @@
                 <version>${spark.version}</version>
                 <scope>provided</scope>
             </dependency>
-            <dependency>
-                <groupId>org.antlr</groupId>
-                <artifactId>antlr4-runtime</artifactId>
-                <version>${antlr4.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.scala-lang</groupId>
-                <artifactId>scala-reflect</artifactId>
-                <version>${scala.version}</version>
-            </dependency>
 
             <dependency>
                 <groupId>commons-cli</groupId>

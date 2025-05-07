@@ -27,7 +27,6 @@
 
     <artifactId>xtable-service</artifactId>
 
-    <!-- Ensure xtable-service inherits the quarkus BOM -->
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -36,6 +35,16 @@
                 <version>${quarkus.platform.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr4-runtime</artifactId>
+                <version>${antlr4.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.scala-lang</groupId>
+                <artifactId>scala-reflect</artifactId>
+                <version>${scala.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

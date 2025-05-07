@@ -48,7 +48,6 @@ import java.util.Collections;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -59,9 +58,9 @@ import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.service.models.ConvertTableRequest;
 import org.apache.xtable.service.models.ConvertTableResponse;
-import org.apache.xtable.service.models.RestTargetTable;
+import org.apache.xtable.service.models.ConvertedTable;
 import org.apache.xtable.service.spark.SparkHolder;
-import org.apache.xtable.service.utils.IcebergMetadataUtil;
+import org.apache.xtable.service.utils.ConversionServiceUtil;
 
 @ExtendWith(MockitoExtension.class)
 class TestConversionService {
@@ -74,23 +73,17 @@ class TestConversionService {
   private final Configuration conf = new Configuration();
 
   @Mock SparkHolder sparkHolder;
-  @Mock ConversionControllerFactory controllerFactory;
-  @Mock IcebergMetadataUtil icebergUtil;
+  @Mock ConversionServiceUtil conversionServiceUtil;
   @Mock ConversionController controller;
   @Mock JavaSparkContext jsc;
 
   @InjectMocks ConversionService service;
 
-  @BeforeEach
-  void setUp() {
-    when(sparkHolder.jsc()).thenReturn(jsc);
-    when(jsc.hadoopConfiguration()).thenReturn(conf);
-    when(controllerFactory.create(conf)).thenReturn(controller);
-  }
-
   @Test
   void serviceConvertTableWithDeltaSourceAndTargetIceberg() {
-    when(icebergUtil.getIcebergSchemaAndMetadataPath(SOURCE_TABLE_BASE_PATH, conf))
+    when(sparkHolder.jsc()).thenReturn(jsc);
+    when(jsc.hadoopConfiguration()).thenReturn(conf);
+    when(conversionServiceUtil.getIcebergSchemaAndMetadataPath(SOURCE_TABLE_BASE_PATH, conf))
         .thenReturn(Pair.of(TARGET_ICEBERG_METADATA_PATH, TARGET_SCHEMA));
 
     ConvertTableRequest req =
@@ -104,7 +97,7 @@ class TestConversionService {
     ConvertTableResponse resp = service.convertTable(req);
     verify(controller, times(1)).sync(any(ConversionConfig.class), any());
 
-    RestTargetTable restTargetTable = resp.getConversions().get(0);
+    ConvertedTable restTargetTable = resp.getConvertedTables().get(0);
     assertEquals("ICEBERG", restTargetTable.getTargetFormat());
     assertEquals(TARGET_ICEBERG_METADATA_PATH, restTargetTable.getTargetMetadataPath());
     assertEquals(TARGET_SCHEMA, restTargetTable.getTargetSchema());

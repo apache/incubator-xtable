@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Builder
-public class RestTargetTable {
+public class ConvertedTable {
   @JsonProperty("target-format")
   private String targetFormat;
 
@@ -35,7 +35,7 @@ public class RestTargetTable {
   private String targetSchema;
 
   @JsonCreator
-  public RestTargetTable(
+  public ConvertedTable(
       @JsonProperty String targetFormat,
       @JsonProperty String targetMetadataPath,
       @JsonProperty String targetSchema) {

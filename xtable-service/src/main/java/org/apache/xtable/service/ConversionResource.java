@@ -39,7 +39,7 @@ public class ConversionResource {
   @POST
   @Path("/table")
   @Blocking
-  public ConvertTableResponse convertTable(ConvertTableRequest req) {
-    return conversionService.convertTable(req);
+  public ConvertTableResponse convertTable(ConvertTableRequest convertTableRequest) {
+    return conversionService.convertTable(convertTableRequest);
   }
 }

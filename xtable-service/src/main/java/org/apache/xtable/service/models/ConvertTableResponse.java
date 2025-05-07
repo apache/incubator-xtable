@@ -27,15 +27,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Builder
 public class ConvertTableResponse {
-  @JsonProperty("conversions")
-  private List<RestTargetTable> conversions;
+  @JsonProperty("convertedTables")
+  private List<ConvertedTable> convertedTables;
 
   @JsonCreator
-  public ConvertTableResponse(@JsonProperty List<RestTargetTable> conversions) {
-    this.conversions = conversions;
+  public ConvertTableResponse(@JsonProperty List<ConvertedTable> convertedTables) {
+    this.convertedTables = convertedTables;
   }
 
-  public List<RestTargetTable> getConversions() {
-    return conversions;
+  public List<ConvertedTable> getConvertedTables() {
+    return convertedTables;
   }
 }

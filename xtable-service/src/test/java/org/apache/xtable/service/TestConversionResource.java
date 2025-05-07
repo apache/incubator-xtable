@@ -32,7 +32,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import org.apache.xtable.service.models.ConvertTableRequest;
 import org.apache.xtable.service.models.ConvertTableResponse;
-import org.apache.xtable.service.models.RestTargetTable;
+import org.apache.xtable.service.models.ConvertedTable;
 
 @ExtendWith(MockitoExtension.class)
 class TestConversionResource {
@@ -54,14 +54,14 @@ class TestConversionResource {
             .targetFormats(Arrays.asList("ICEBERG"))
             .build();
 
-    RestTargetTable icebergTable =
-        RestTargetTable.builder()
+    ConvertedTable icebergTable =
+        ConvertedTable.builder()
             .targetFormat("ICEBERG")
             .targetMetadataPath(TARGET_ICEBERG_METADATA_PATH)
             .build();
 
     ConvertTableResponse expected =
-        ConvertTableResponse.builder().conversions(Arrays.asList(icebergTable)).build();
+        ConvertTableResponse.builder().convertedTables(Arrays.asList(icebergTable)).build();
     when(conversionService.convertTable(req)).thenReturn(expected);
     ConvertTableResponse actual = resource.convertTable(req);
     verify(conversionService).convertTable(req);
@@ -69,9 +69,9 @@ class TestConversionResource {
     assertNotNull(actual);
     assertSame(expected, actual, "Resource should return the exact response from the service");
 
-    assertEquals(1, actual.getConversions().size());
-    assertEquals("ICEBERG", actual.getConversions().get(0).getTargetFormat());
+    assertEquals(1, actual.getConvertedTables().size());
+    assertEquals("ICEBERG", actual.getConvertedTables().get(0).getTargetFormat());
     assertEquals(
-        TARGET_ICEBERG_METADATA_PATH, actual.getConversions().get(0).getTargetMetadataPath());
+        TARGET_ICEBERG_METADATA_PATH, actual.getConvertedTables().get(0).getTargetMetadataPath());
   }
 }

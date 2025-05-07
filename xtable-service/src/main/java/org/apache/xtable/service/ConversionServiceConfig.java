@@ -15,24 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+ 
+package org.apache.xtable.service;
 
-package org.apache.xtable.service.utils;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.delta.DeltaLog;
-import org.apache.spark.sql.delta.Snapshot;
-import org.apache.spark.sql.types.StructType;
 
 @ApplicationScoped
-public class DeltaMetadataUtil {
-    public Pair<String, String> getDeltaSchemaAndMetadataPath(String basePath, SparkSession sparkSession) {
-        DeltaLog deltaLog = DeltaLog.forTable(sparkSession, basePath);
-        Snapshot snapshot = deltaLog.snapshot();
-        StructType schema = snapshot.metadata().schema();
-        String metadataPath = snapshot.path().toString();
-        String schemaStr =  schema.json();
-        return Pair.of(metadataPath, schemaStr);
-    }
+public class ConversionServiceConfig {
+
+  public static final String HADOOP_DEFAULTS_XML = "xtable-hadoop-defaults.xml";
+
+  @ConfigProperty(name = "xtable.hadoop-config-path", defaultValue = HADOOP_DEFAULTS_XML)
+  private String hadoopConfigPath;
+
+  public String getHadoopConfigPath() {
+    return hadoopConfigPath;
+  }
 }
