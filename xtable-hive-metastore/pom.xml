@@ -47,7 +47,6 @@
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-hive-sync</artifactId>
             <version>${hudi.version}</version>
-            <scope>provided</scope>
         </dependency>
 
         <!-- Iceberg dependencies  -->
