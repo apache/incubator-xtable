@@ -116,12 +116,6 @@ public class IcebergSchemaSync {
       String parentPath) {
     Map<Integer, Supplier<UpdateSchema>> updates = new HashMap<>();
     if (!latestColumn.equals(currentColumn)) {
-      // update the name of the column
-      if (!latestColumn.name().equals(currentColumn.name())) {
-        updates.put(
-            latestColumn.fieldId(),
-            () -> updateSchema.renameColumn(currentColumn.name(), latestColumn.name()));
-      }
       // update the type of the column
       if (latestColumn.type().isPrimitiveType()
           && !latestColumn.type().equals(currentColumn.type())) {
@@ -130,6 +124,12 @@ public class IcebergSchemaSync {
             () ->
                 updateSchema.updateColumn(
                     latestColumn.name(), latestColumn.type().asPrimitiveType()));
+      }
+      // update the name of the column
+      if (!latestColumn.name().equals(currentColumn.name())) {
+        updates.put(
+            latestColumn.fieldId(),
+            () -> updateSchema.renameColumn(currentColumn.name(), latestColumn.name()));
       }
       // update whether the column is required
       if (latestColumn.isOptional() != currentColumn.isOptional()) {
