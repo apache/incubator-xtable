@@ -18,6 +18,18 @@
  
 package org.apache.xtable.conversion;
 
+import static org.apache.xtable.model.storage.TableFormat.DELTA;
+import static org.apache.xtable.model.storage.TableFormat.HUDI;
+import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+
+import org.apache.hadoop.conf.Configuration;
+
+import org.apache.hudi.common.table.timeline.HoodieInstant;
+
+import org.apache.xtable.delta.DeltaConversionSourceProvider;
+import org.apache.xtable.hudi.HudiConversionSourceProvider;
+import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
+
 public class ConversionUtils {
 
   public static SourceTable convertToSourceTable(TargetTable table) {
@@ -29,5 +41,27 @@ public class ConversionUtils {
         table.getNamespace(),
         table.getCatalogConfig(),
         table.getAdditionalProperties());
+  }
+
+  public static ConversionSourceProvider<?> getConversionSourceProvider(
+      String sourceTableFormat, Configuration hadoopConf) {
+    if (sourceTableFormat.equalsIgnoreCase(HUDI)) {
+      ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
+          new HudiConversionSourceProvider();
+      hudiConversionSourceProvider.init(hadoopConf);
+      return hudiConversionSourceProvider;
+    } else if (sourceTableFormat.equalsIgnoreCase(DELTA)) {
+      ConversionSourceProvider<Long> deltaConversionSourceProvider =
+          new DeltaConversionSourceProvider();
+      deltaConversionSourceProvider.init(hadoopConf);
+      return deltaConversionSourceProvider;
+    } else if (sourceTableFormat.equalsIgnoreCase(ICEBERG)) {
+      ConversionSourceProvider<org.apache.iceberg.Snapshot> icebergConversionSourceProvider =
+          new IcebergConversionSourceProvider();
+      icebergConversionSourceProvider.init(hadoopConf);
+      return icebergConversionSourceProvider;
+    } else {
+      throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
+    }
   }
 }
