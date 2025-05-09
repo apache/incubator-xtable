@@ -52,6 +52,8 @@ public interface GenericTable<T, Q> extends AutoCloseable {
 
   String getBasePath();
 
+  String getMetadataPath();
+
   default String getDataPath() {
     return getBasePath();
   }
