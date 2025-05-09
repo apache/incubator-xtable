@@ -50,4 +50,6 @@ public class InternalTable {
   List<InternalPartitionField> partitioningFields;
   // latest commit(write) on the table.
   Instant latestCommitTime;
+  // Path to latest metadata
+  String latestMetdataPath;
 }
