@@ -19,10 +19,12 @@
 package org.apache.xtable.service.models;
 
 import lombok.Builder;
+import lombok.Getter;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+@Getter
 @Builder
 public class ConvertedTable {
   @JsonProperty("target-format")
@@ -42,17 +44,5 @@ public class ConvertedTable {
     this.targetFormat = targetFormat;
     this.targetMetadataPath = targetMetadataPath;
     this.targetSchema = targetSchema;
-  }
-
-  public String getTargetFormat() {
-    return targetFormat;
-  }
-
-  public String getTargetMetadataPath() {
-    return targetMetadataPath;
-  }
-
-  public String getTargetSchema() {
-    return targetSchema;
   }
 }

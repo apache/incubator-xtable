@@ -21,10 +21,12 @@ package org.apache.xtable.service.models;
 import java.util.List;
 
 import lombok.Builder;
+import lombok.Getter;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+@Getter
 @Builder
 public class ConvertTableResponse {
   @JsonProperty("convertedTables")
@@ -33,9 +35,5 @@ public class ConvertTableResponse {
   @JsonCreator
   public ConvertTableResponse(@JsonProperty List<ConvertedTable> convertedTables) {
     this.convertedTables = convertedTables;
-  }
-
-  public List<ConvertedTable> getConvertedTables() {
-    return convertedTables;
   }
 }

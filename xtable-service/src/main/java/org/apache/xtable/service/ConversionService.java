@@ -19,13 +19,20 @@
 package org.apache.xtable.service;
 
 import static org.apache.xtable.conversion.ConversionUtils.convertToSourceTable;
+import static org.apache.xtable.model.storage.TableFormat.DELTA;
+import static org.apache.xtable.model.storage.TableFormat.HUDI;
+import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
+
+import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import org.apache.iceberg.SchemaParser;
 
@@ -34,9 +41,12 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
-import org.apache.xtable.conversion.ConversionUtils;
+import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.delta.DeltaConversionSourceProvider;
+import org.apache.xtable.hudi.HudiConversionSourceProvider;
+import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.IcebergSchemaExtractor;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.storage.TableFormat;
@@ -61,9 +71,14 @@ public class ConversionService {
   private final ConversionController conversionController;
   private final ConversionServiceConfig serviceConfig;
   private final Configuration hadoopConf;
+  private Map<String, ConversionSourceProvider<?>> sourceProviders;
 
   /**
    * Constructs a ConversionService instance with required dependencies.
+   *
+   * <p>This constructor initializes the ConversionService using the provided service configuration.
+   * It retrieves the Hadoop configuration, creates a new ConversionController with the Hadoop
+   * configuration, and initializes conversion source providers based on the Hadoop configuration.
    *
    * @param serviceConfig the conversion service configuration
    */
@@ -72,8 +87,19 @@ public class ConversionService {
     this.serviceConfig = serviceConfig;
     this.hadoopConf = getHadoopConf();
     this.conversionController = new ConversionController(hadoopConf);
+    this.sourceProviders = initSourceProviders(hadoopConf);
   }
 
+  /**
+   * Retrieves the Hadoop configuration.
+   *
+   * <p>This method creates a new {@code Configuration} instance, reads the Hadoop configuration
+   * file path from the service configuration, and attempts to load the configuration from the
+   * specified XML file. If no resources are loaded, it logs a warning. If an error occurs during
+   * configuration loading, it logs an error message.
+   *
+   * @return the initialized Hadoop {@code Configuration}
+   */
   private Configuration getHadoopConf() {
     Configuration conf = new Configuration();
     String hadoopConfigPath = serviceConfig.getHadoopConfigPath();
@@ -98,31 +124,66 @@ public class ConversionService {
   }
 
   /**
-   * Constructs a ConversionService instance using dependency injection for testing.
+   * Initializes conversion source providers for different table formats using the provided Hadoop
+   * configuration.
    *
+   * <p>This method creates and initializes source providers for HUDI, DELTA, and ICEBERG formats.
+   * Each provider is initialized with the given Hadoop configuration and then mapped to its
+   * respective table format identifier.
+   *
+   * @param hadoopConf the Hadoop configuration used to initialize the source providers
+   * @return a map mapping table format identifiers to their corresponding initialized conversion
+   *     source providers
+   */
+  private Map<String, ConversionSourceProvider<?>> initSourceProviders(Configuration hadoopConf) {
+    Map<String, ConversionSourceProvider<?>> sourceProviders = new HashMap<>();
+    ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
+        new HudiConversionSourceProvider();
+    ConversionSourceProvider<Long> deltaConversionSourceProvider =
+        new DeltaConversionSourceProvider();
+    ConversionSourceProvider<org.apache.iceberg.Snapshot> icebergConversionSourceProvider =
+        new IcebergConversionSourceProvider();
+
+    hudiConversionSourceProvider.init(hadoopConf);
+    deltaConversionSourceProvider.init(hadoopConf);
+    icebergConversionSourceProvider.init(hadoopConf);
+
+    sourceProviders.put(HUDI, hudiConversionSourceProvider);
+    sourceProviders.put(DELTA, deltaConversionSourceProvider);
+    sourceProviders.put(ICEBERG, icebergConversionSourceProvider);
+
+    return sourceProviders;
+  }
+
+  /**
+   * Constructs a new ConversionService instance for testing purposes.
+   *
+   * <p>This constructor is visible for testing using dependency injection. It allows the injection
+   * of a preconfigured ConversionController, Hadoop configuration, and source providers.
+   *
+   * @param serviceConfig the conversion service configuration
    * @param conversionController a preconfigured conversion controller
+   * @param hadoopConf the Hadoop configuration to be used for initializing resources
+   * @param sourceProviders a map of conversion source providers keyed by table format
    */
   @VisibleForTesting
   public ConversionService(
       ConversionServiceConfig serviceConfig,
       ConversionController conversionController,
-      Configuration hadoopConf) {
+      Configuration hadoopConf,
+      Map<String, ConversionSourceProvider<?>> sourceProviders) {
     this.serviceConfig = serviceConfig;
     this.conversionController = conversionController;
     this.hadoopConf = hadoopConf;
+    this.sourceProviders = sourceProviders;
   }
 
   /**
    * Converts a source table to one or more target table formats.
    *
-   * <p>The method builds a SourceTable based on the request parameters and constructs corresponding
-   * TargetTable instances for each target format. It then performs a synchronous conversion through
-   * the conversion controller. After conversion, it retrieves schema and metadata paths for each
-   * target table.
-   *
    * @param convertTableRequest the conversion request containing source table details and target
    *     formats
-   * @return a response containing details of converted target tables
+   * @return a ConvertTableResponse containing details of the converted target tables
    */
   public ConvertTableResponse convertTable(ConvertTableRequest convertTableRequest) {
     SourceTable sourceTable =
@@ -147,39 +208,16 @@ public class ConversionService {
         ConversionConfig.builder().sourceTable(sourceTable).targetTables(targetTables).build();
 
     conversionController.sync(
-        conversionConfig,
-        ConversionUtils.getConversionSourceProvider(
-            convertTableRequest.getSourceFormat(), hadoopConf));
+        conversionConfig, sourceProviders.get(convertTableRequest.getSourceFormat()));
 
     List<ConvertedTable> convertedTables = new ArrayList<>();
     for (TargetTable targetTable : targetTables) {
       InternalTable internalTable =
-          ConversionUtils.getConversionSourceProvider(targetTable.getFormatName(), hadoopConf)
+          sourceProviders
+              .get(targetTable.getFormatName())
               .getConversionSourceInstance(convertToSourceTable(targetTable))
               .getCurrentTable();
-      String schemaString;
-      switch (targetTable.getFormatName()) {
-        case TableFormat.HUDI:
-          schemaString =
-              AvroSchemaConverter.getInstance()
-                  .fromInternalSchema(internalTable.getReadSchema())
-                  .toString();
-          break;
-        case TableFormat.ICEBERG:
-          org.apache.iceberg.Schema iceSchema =
-              IcebergSchemaExtractor.getInstance().toIceberg(internalTable.getReadSchema());
-          schemaString = SchemaParser.toJson(iceSchema);
-          break;
-        case TableFormat.DELTA:
-          schemaString =
-              SparkSchemaExtractor.getInstance()
-                  .fromInternalSchema(internalTable.getReadSchema())
-                  .json();
-          break;
-        default:
-          throw new UnsupportedOperationException(
-              "Unsupported table format: " + targetTable.getFormatName());
-      }
+      String schemaString = extractSchemaString(targetTable, internalTable);
       convertedTables.add(
           ConvertedTable.builder()
               .targetFormat(internalTable.getName())
@@ -188,5 +226,44 @@ public class ConversionService {
               .build());
     }
     return new ConvertTableResponse(convertedTables);
+  }
+
+  /**
+   * Extracts the schema string from the given internal table based on the target table format.
+   *
+   * <p>This method supports the following table formats:
+   *
+   * <ul>
+   *   <li><b>HUDI</b>: Converts the internal schema to an Avro schema and returns its string
+   *       representation.
+   *   <li><b>ICEBERG</b>: Converts the internal schema to an Iceberg schema and returns its JSON
+   *       representation.
+   *   <li><b>DELTA</b>: Converts the internal schema to a Spark schema and returns its JSON
+   *       representation.
+   * </ul>
+   *
+   * @param targetTable the target table containing the desired format information
+   * @param internalTable the internal table from which the schema is read
+   * @return the string representation of the converted schema
+   * @throws UnsupportedOperationException if the target table format is not supported
+   */
+  private String extractSchemaString(TargetTable targetTable, InternalTable internalTable) {
+    switch (targetTable.getFormatName()) {
+      case TableFormat.HUDI:
+        return AvroSchemaConverter.getInstance()
+            .fromInternalSchema(internalTable.getReadSchema())
+            .toString();
+      case TableFormat.ICEBERG:
+        org.apache.iceberg.Schema iceSchema =
+            IcebergSchemaExtractor.getInstance().toIceberg(internalTable.getReadSchema());
+        return SchemaParser.toJson(iceSchema);
+      case TableFormat.DELTA:
+        return SparkSchemaExtractor.getInstance()
+            .fromInternalSchema(internalTable.getReadSchema())
+            .json();
+      default:
+        throw new UnsupportedOperationException(
+            "Unsupported table format: " + targetTable.getFormatName());
+    }
   }
 }

@@ -21,9 +21,14 @@ package org.apache.xtable.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
@@ -38,10 +43,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.apache.iceberg.SchemaParser;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
-import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
-import org.apache.xtable.conversion.ConversionUtils;
 import org.apache.xtable.iceberg.IcebergSchemaExtractor;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -94,12 +97,15 @@ class TestConversionService {
   @BeforeEach
   void setUp() {
     this.conf = new Configuration();
-    this.service = new ConversionService(serviceConfig, controller, this.conf);
+    Map<String, ConversionSourceProvider<?>> providers = new HashMap<>();
+    providers.put(TableFormat.DELTA, provider);
+    providers.put(TableFormat.HUDI, provider);
+    providers.put(TableFormat.ICEBERG, provider);
+    service = new ConversionService(serviceConfig, controller, this.conf, providers);
   }
 
   @Test
   void convertToTargetHudi() {
-    // build request
     ConvertTableRequest req =
         ConvertTableRequest.builder()
             .sourceFormat(TableFormat.DELTA)
@@ -109,17 +115,8 @@ class TestConversionService {
             .build();
 
     Schema avroSchema = new Schema.Parser().parse(HUDI_SCHEMA_JSON);
-    try (MockedStatic<ConversionUtils> utils = mockStatic(ConversionUtils.class);
-        MockedStatic<AvroSchemaConverter> avroConv = mockStatic(AvroSchemaConverter.class)) {
-
-      utils
-          .when(() -> ConversionUtils.getConversionSourceProvider(TableFormat.DELTA, conf))
-          .thenReturn(provider);
-      utils
-          .when(() -> ConversionUtils.getConversionSourceProvider(TableFormat.HUDI, conf))
-          .thenReturn(provider);
-
-      when(controller.sync(any(ConversionConfig.class), eq(provider))).thenReturn(null);
+    try (MockedStatic<AvroSchemaConverter> avroConv = mockStatic(AvroSchemaConverter.class)) {
+      when(controller.sync(any(), eq(provider))).thenReturn(null);
       when(provider.getConversionSourceInstance(any())).thenReturn(conversionSrc);
       when(conversionSrc.getCurrentTable()).thenReturn(internalTbl);
 
@@ -133,8 +130,7 @@ class TestConversionService {
 
       ConvertTableResponse resp = service.convertTable(req);
 
-      // verify & assert
-      verify(controller, times(1)).sync(any(ConversionConfig.class), eq(provider));
+      verify(controller).sync(any(), eq(provider));
       assertEquals(1, resp.getConvertedTables().size());
       ConvertedTable ct = resp.getConvertedTables().get(0);
       assertEquals(TableFormat.HUDI, ct.getTargetFormat());
@@ -154,18 +150,10 @@ class TestConversionService {
             .build();
 
     org.apache.iceberg.Schema icebergSchema = mock(org.apache.iceberg.Schema.class);
-    try (MockedStatic<ConversionUtils> utils = mockStatic(ConversionUtils.class);
-        MockedStatic<IcebergSchemaExtractor> iceExt = mockStatic(IcebergSchemaExtractor.class);
+    try (MockedStatic<IcebergSchemaExtractor> iceExt = mockStatic(IcebergSchemaExtractor.class);
         MockedStatic<SchemaParser> parserMock = mockStatic(SchemaParser.class)) {
 
-      utils
-          .when(() -> ConversionUtils.getConversionSourceProvider(TableFormat.DELTA, conf))
-          .thenReturn(provider);
-      utils
-          .when(() -> ConversionUtils.getConversionSourceProvider(TableFormat.ICEBERG, conf))
-          .thenReturn(provider);
-
-      when(controller.sync(any(ConversionConfig.class), eq(provider))).thenReturn(null);
+      when(controller.sync(any(), eq(provider))).thenReturn(null);
       when(provider.getConversionSourceInstance(any())).thenReturn(conversionSrc);
       when(conversionSrc.getCurrentTable()).thenReturn(internalTbl);
 
@@ -181,7 +169,7 @@ class TestConversionService {
 
       ConvertTableResponse resp = service.convertTable(req);
 
-      verify(controller, times(1)).sync(any(ConversionConfig.class), eq(provider));
+      verify(controller).sync(any(), eq(provider));
       assertEquals(1, resp.getConvertedTables().size());
       ConvertedTable ct = resp.getConvertedTables().get(0);
       assertEquals(TableFormat.ICEBERG, ct.getTargetFormat());
@@ -201,17 +189,8 @@ class TestConversionService {
             .build();
 
     StructType structType = mock(StructType.class);
-    try (MockedStatic<ConversionUtils> utils = mockStatic(ConversionUtils.class);
-        MockedStatic<SparkSchemaExtractor> sparkExt = mockStatic(SparkSchemaExtractor.class)) {
-
-      utils
-          .when(() -> ConversionUtils.getConversionSourceProvider(TableFormat.ICEBERG, conf))
-          .thenReturn(provider);
-      utils
-          .when(() -> ConversionUtils.getConversionSourceProvider(TableFormat.DELTA, conf))
-          .thenReturn(provider);
-
-      when(controller.sync(any(ConversionConfig.class), eq(provider))).thenReturn(null);
+    try (MockedStatic<SparkSchemaExtractor> sparkExt = mockStatic(SparkSchemaExtractor.class)) {
+      when(controller.sync(any(), eq(provider))).thenReturn(null);
       when(provider.getConversionSourceInstance(any())).thenReturn(conversionSrc);
       when(conversionSrc.getCurrentTable()).thenReturn(internalTbl);
 
@@ -226,7 +205,7 @@ class TestConversionService {
 
       ConvertTableResponse resp = service.convertTable(req);
 
-      verify(controller, times(1)).sync(any(ConversionConfig.class), eq(provider));
+      verify(controller).sync(any(), eq(provider));
       assertEquals(1, resp.getConvertedTables().size());
       ConvertedTable ct = resp.getConvertedTables().get(0);
       assertEquals(TableFormat.DELTA, ct.getTargetFormat());

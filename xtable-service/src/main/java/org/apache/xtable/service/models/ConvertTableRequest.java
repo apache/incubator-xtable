@@ -22,10 +22,12 @@ import java.util.List;
 import java.util.Map;
 
 import lombok.Builder;
+import lombok.Getter;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+@Getter
 @Builder
 public class ConvertTableRequest {
   @JsonProperty("source-format")
@@ -58,25 +60,5 @@ public class ConvertTableRequest {
     this.sourceTablePath = sourceTablePath;
     this.targetFormats = targetFormat;
     this.configurations = configurations;
-  }
-
-  public String getSourceTableName() {
-    return sourceTableName;
-  }
-
-  public String getSourceFormat() {
-    return sourceFormat;
-  }
-
-  public String getSourceTablePath() {
-    return sourceTablePath;
-  }
-
-  public List<String> getTargetFormats() {
-    return targetFormats;
-  }
-
-  public Map<String, String> getConfigurations() {
-    return configurations;
   }
 }
