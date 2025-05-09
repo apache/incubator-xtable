@@ -189,6 +189,10 @@ public abstract class TestAbstractHudiTable
     return basePath;
   }
 
+  public String getMetadataPath() {
+    return metaClient.getMetaPath().toString();
+  }
+
   protected HoodieRecord<HoodieAvroPayload> getRecord(
       Schema schema,
       String key,

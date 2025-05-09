@@ -40,6 +40,7 @@ import lombok.SneakyThrows;
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.iceberg.AppendFiles;
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.OverwriteFiles;
@@ -49,6 +50,7 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.StructLike;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.Record;
@@ -247,6 +249,12 @@ public class TestIcebergTable implements GenericTable<Record, String> {
   @Override
   public String getBasePath() {
     return removeSlash(basePath) + "/" + tableName;
+  }
+
+  @Override
+  public String getMetadataPath() {
+    TableOperations iceOps = ((BaseTable) icebergTable).operations();
+    return iceOps.current().metadataFileLocation();
   }
 
   public String getDataPath() {

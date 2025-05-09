@@ -46,12 +46,14 @@ public class ITTestUtils {
       InternalSchema readSchema,
       DataLayoutStrategy dataLayoutStrategy,
       String basePath,
+      String latestMetadataPath,
       List<InternalPartitionField> partitioningFields) {
     Assertions.assertEquals(tableName, internalTable.getName());
     Assertions.assertEquals(tableFormat, internalTable.getTableFormat());
     Assertions.assertEquals(readSchema, internalTable.getReadSchema());
     Assertions.assertEquals(dataLayoutStrategy, internalTable.getLayoutStrategy());
     Assertions.assertEquals(basePath, internalTable.getBasePath());
+    Assertions.assertEquals(latestMetadataPath, internalTable.getLatestMetdataPath());
     Assertions.assertEquals(partitioningFields, internalTable.getPartitioningFields());
   }
 
