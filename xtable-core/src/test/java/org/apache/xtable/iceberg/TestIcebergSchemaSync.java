@@ -335,6 +335,33 @@ public class TestIcebergSchemaSync {
     verify(mockUpdateSchema).commit();
   }
 
+  @Test
+  public void testUpdateColumnName() {
+    UpdateSchema mockUpdateSchema = Mockito.mock(UpdateSchema.class);
+    when(mockTransaction.updateSchema()).thenReturn(mockUpdateSchema);
+    schemaSync.sync(SCHEMA, updateColumnName(2), mockTransaction);
+
+    verify(mockUpdateSchema).renameColumn(SCHEMA.findColumnName(2), "updateColumnName");
+    verify(mockUpdateSchema).commit();
+  }
+
+  private Schema updateColumnName(int fieldId) {
+    List<Types.NestedField> fields = new ArrayList<>();
+    for (Types.NestedField existingField : SCHEMA.columns()) {
+      if (existingField.fieldId() == fieldId) {
+        fields.add(
+            Types.NestedField.of(
+                existingField.fieldId(),
+                existingField.isOptional(),
+                "updateColumnName",
+                existingField.type()));
+      } else {
+        fields.add(existingField);
+      }
+    }
+    return new Schema(fields);
+  }
+
   private Schema addColumnToDefault(Schema schema, Types.NestedField field, Integer parentId) {
     List<Types.NestedField> fields = new ArrayList<>();
     for (Types.NestedField existingField : schema.columns()) {
