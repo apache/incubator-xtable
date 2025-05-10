@@ -71,7 +71,7 @@ public class ConversionService {
   private final ConversionController conversionController;
   private final ConversionServiceConfig serviceConfig;
   private final Configuration hadoopConf;
-  private Map<String, ConversionSourceProvider<?>> sourceProviders;
+  private final Map<String, ConversionSourceProvider<?>> sourceProviders;
 
   /**
    * Constructs a ConversionService instance with required dependencies.
