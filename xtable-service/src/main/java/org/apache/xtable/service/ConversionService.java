@@ -190,10 +190,14 @@ public class ConversionService {
   public ConvertTableResponse convertTable(ConvertTableRequest convertTableRequest) {
 
     Properties sourceProperties = new Properties();
-    String partitionSpec =
-        convertTableRequest.getConfigurations().getOrDefault("partition-spec", null);
-    if (partitionSpec != null) {
-      sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionSpec);
+    if (convertTableRequest.getConfigurations() != null) {
+      String partitionSpec =
+          convertTableRequest.getConfigurations().getOrDefault("partition-spec", null);
+      if (partitionSpec != null
+          && (HUDI.equals(convertTableRequest.getSourceFormat())
+              || convertTableRequest.getTargetFormats().contains(HUDI))) {
+        sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionSpec);
+      }
     }
 
     SourceTable sourceTable =
