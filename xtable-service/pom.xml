@@ -168,6 +168,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-spark-runtime-3.4_2.12</artifactId>
+            <version>1.4.2</version> 
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
     <build>
         <plugins>

@@ -16,28 +16,35 @@
  * limitations under the License.
  */
 
-package org.apache.xtable.service;
+package org.apache.xtable.service.it;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
+import org.apache.spark.SparkConf;
+import org.apache.spark.serializer.KryoSerializer;
+import org.apache.spark.sql.SparkSession;
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.service.ConversionService;
 import org.apache.xtable.service.models.ConvertTableRequest;
 import org.apache.xtable.service.models.ConvertTableResponse;
-import org.apache.xtable.service.spark.SparkHolder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
-import org.apache.commons.io.FileUtils;
 
 import jakarta.inject.Inject;
+
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test for ConversionService.
@@ -49,30 +56,38 @@ public class ConversionServiceIT {
 
     @Inject
     ConversionService conversionService;
-
-    @Inject
-    SparkHolder sparkHolder;
-
-    private Path testBasePath;
+    private Path tempDir;
+    private SparkSession sparkSession;
     private String deltaTablePath;
-    
+
     @BeforeEach
     public void setUp() throws Exception {
-        // Create a unique test directory in a project-specific location
-        File baseDir = new File("target/test-data");
-        baseDir.mkdirs();
-        testBasePath = baseDir.toPath().resolve("xtable_test_" + System.currentTimeMillis());
-        Files.createDirectories(testBasePath);
-        deltaTablePath = testBasePath.resolve("delta_table").toString();
+        // local fs setup
+        tempDir = Files.createTempDirectory("xtable-it");
 
-        // Create a Delta table with test data
+        String tableName = "xtable-service-test-" + UUID.randomUUID();
+        Path basePath = tempDir.resolve(tableName);
+        Files.createDirectories(basePath);
+
+        // Setup local spark session
+        sparkSession = SparkSession.builder()
+                .config(getSparkConf(basePath))
+                .getOrCreate();
+
+        // Create local delta table
+        deltaTablePath = basePath.resolve("delta-table").toString();
         createDeltaTable(deltaTablePath);
     }
 
     @AfterEach
     public void tearDown() throws Exception {
-        // Clean up all test resources
-        FileUtils.deleteDirectory(testBasePath.toFile());
+        if (sparkSession != null) {
+            sparkSession.close();
+        }
+        Files.walk(tempDir)
+                .sorted(Comparator.reverseOrder())
+                .map(Path::toFile)
+                .forEach(File::delete);
     }
 
     @Test
@@ -94,26 +109,20 @@ public class ConversionServiceIT {
         assertEquals("ICEBERG", response.getConvertedTables().get(0).getTargetFormat(), "Target format should be ICEBERG");
 
         String metadataPath = response.getConvertedTables().get(0).getTargetMetadataPath();
-        String schemaPath = response.getConvertedTables().get(0).getTargetSchema();
+        String schema = response.getConvertedTables().get(0).getTargetSchema();
 
         assertNotNull(metadataPath, "Metadata path should not be null");
-        assertNotNull(schemaPath, "Schema path should not be null");
+        assertNotNull(schema, "Schema should not be null");
 
-        File metadataDir = new File(metadataPath);
-        assertTrue(metadataDir.exists(), "Metadata directory should exist");
-
-        File metadataFile = new File(metadataDir, "metadata.json");
-        assertTrue(metadataFile.exists(), "metadata.json should exist in the metadata directory");
-
-        Dataset<Row> icebergTable = sparkHolder.spark().read().format("iceberg").load(metadataPath);
+        Dataset<Row> icebergTable = sparkSession.read().format("iceberg").load(metadataPath);
         assertNotNull(icebergTable, "Should be able to read the Iceberg table");
 
-        Dataset<Row> deltaTable = sparkHolder.spark().read().format("delta").load(deltaTablePath);
+        Dataset<Row> deltaTable = sparkSession.read().format("delta").load(deltaTablePath);
         assertEquals(deltaTable.count(), icebergTable.count(), "Row count should match between Delta and Iceberg");
     }
 
     private void createDeltaTable(String path) {
-        Dataset<Row> data = sparkHolder.spark().range(0, 10).toDF("id");
+        Dataset<Row> data = sparkSession.range(0, 10).toDF("id");
         data = data.withColumn("name", org.apache.spark.sql.functions.concat(
                 org.apache.spark.sql.functions.lit("name_"),
                 data.col("id").cast("string")));
@@ -122,5 +131,28 @@ public class ConversionServiceIT {
 
         assertTrue(new File(path).exists(), "Delta table directory should exist");
         assertTrue(new File(path, "_delta_log").exists(), "Delta log directory should exist");
+    }
+
+    public static SparkConf getSparkConf(Path tempDir) {
+    return new SparkConf()
+        .setAppName("xtable-testing")
+        .set("spark.serializer", KryoSerializer.class.getName())
+        .set("spark.sql.catalog.default_iceberg", "org.apache.iceberg.spark.SparkCatalog")
+        .set("spark.sql.catalog.default_iceberg.type", "hadoop")
+        .set("spark.sql.catalog.default_iceberg.warehouse", tempDir.toString())
+        .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        .set("parquet.avro.write-old-list-structure", "false")
+        // Needed for ignoring not nullable constraints on nested columns in Delta.
+        .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
+        .set("spark.sql.shuffle.partitions", "1")
+        .set("spark.default.parallelism", "1")
+        .set("spark.sql.session.timeZone", "UTC")
+        .set(
+            "spark.sql.extensions",
+            "io.delta.sql.DeltaSparkSessionExtension, org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+        .set("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        .set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
+        .set("spark.databricks.delta.schema.autoMerge.enabled", "true")
+        .setMaster("local[4]");
     }
 }

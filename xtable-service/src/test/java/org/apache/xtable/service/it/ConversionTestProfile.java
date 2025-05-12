@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.xtable.service;
+package org.apache.xtable.service.it;
 
 import io.quarkus.test.junit.QuarkusTestProfile;
 import java.util.Map;
@@ -34,11 +34,6 @@ public class ConversionTestProfile implements QuarkusTestProfile {
     public Map<String, String> getConfigOverrides() {
         Map<String, String> config = new HashMap<>();
         config.put("quarkus.log.level", "INFO");
-        config.put("spark.master", "local[2]");
-        config.put("spark.driver.host", "localhost");
-        config.put("spark.driver.bindAddress", "localhost");
-        config.put("spark.ui.enabled", "false");
-        config.put("spark.sql.catalogImplementation", "in-memory");
         config.put("java.security.manager", "allow");
         return config;
     }
