@@ -15,26 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.service.it;
 
-import io.quarkus.test.junit.QuarkusTestProfile;
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
 
+import io.quarkus.test.junit.QuarkusTestProfile;
 
 public class ConversionTestProfile implements QuarkusTestProfile {
 
-    @Override
-    public String getConfigProfile() {
-        return "conversion-test";
-    }
+  @Override
+  public String getConfigProfile() {
+    return "conversion-test";
+  }
 
-    @Override
-    public Map<String, String> getConfigOverrides() {
-        Map<String, String> config = new HashMap<>();
-        config.put("quarkus.log.level", "INFO");
-        config.put("java.security.manager", "allow");
-        return config;
-    }
+  @Override
+  public Map<String, String> getConfigOverrides() {
+    Map<String, String> config = new HashMap<>();
+    config.put("quarkus.log.level", "INFO");
+    config.put("java.security.manager", "allow");
+    return config;
+  }
 }

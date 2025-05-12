@@ -15,25 +15,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.service.it;
 
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
-import org.apache.spark.SparkConf;
-import org.apache.spark.serializer.KryoSerializer;
-import org.apache.spark.sql.SparkSession;
-import org.apache.xtable.model.storage.TableFormat;
-import org.apache.xtable.service.ConversionService;
-import org.apache.xtable.service.models.ConvertTableRequest;
-import org.apache.xtable.service.models.ConvertTableResponse;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
-
-import jakarta.inject.Inject;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -42,98 +29,115 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.apache.spark.SparkConf;
+import org.apache.spark.serializer.KryoSerializer;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.service.ConversionService;
+import org.apache.xtable.service.models.ConvertTableRequest;
+import org.apache.xtable.service.models.ConvertTableResponse;
+
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
+import jakarta.inject.Inject;
 
 /**
- * Integration test for ConversionService.
- * This test creates an actual Delta table and converts it to Iceberg format.
+ * Integration test for ConversionService. This test creates an actual Delta table and converts it
+ * to Iceberg format.
  */
 @TestProfile(ConversionTestProfile.class)
 @QuarkusTest
 public class ConversionServiceIT {
 
-    @Inject
-    ConversionService conversionService;
-    private Path tempDir;
-    private SparkSession sparkSession;
-    private String deltaTablePath;
+  @Inject ConversionService conversionService;
+  private Path tempDir;
+  private SparkSession sparkSession;
+  private String deltaTablePath;
 
-    @BeforeEach
-    public void setUp() throws Exception {
-        // local fs setup
-        tempDir = Files.createTempDirectory("xtable-it");
+  @BeforeEach
+  public void setUp() throws Exception {
+    // local fs setup
+    tempDir = Files.createTempDirectory("xtable-it");
 
-        String tableName = "xtable-service-test-" + UUID.randomUUID();
-        Path basePath = tempDir.resolve(tableName);
-        Files.createDirectories(basePath);
+    String tableName = "xtable-service-test-" + UUID.randomUUID();
+    Path basePath = tempDir.resolve(tableName);
+    Files.createDirectories(basePath);
 
-        // Setup local spark session
-        sparkSession = SparkSession.builder()
-                .config(getSparkConf(basePath))
-                .getOrCreate();
+    // Setup local spark session
+    sparkSession = SparkSession.builder().config(getSparkConf(basePath)).getOrCreate();
 
-        // Create local delta table
-        deltaTablePath = basePath.resolve("delta-table").toString();
-        createDeltaTable(deltaTablePath);
+    // Create local delta table
+    deltaTablePath = basePath.resolve("delta-table").toString();
+    createDeltaTable(deltaTablePath);
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (sparkSession != null) {
+      sparkSession.close();
     }
+    Files.walk(tempDir).sorted(Comparator.reverseOrder()).map(Path::toFile).forEach(File::delete);
+  }
 
-    @AfterEach
-    public void tearDown() throws Exception {
-        if (sparkSession != null) {
-            sparkSession.close();
-        }
-        Files.walk(tempDir)
-                .sorted(Comparator.reverseOrder())
-                .map(Path::toFile)
-                .forEach(File::delete);
-    }
-
-    @Test
-    public void testConvertDeltaToIceberg() {
-        // Create the conversion request
-        ConvertTableRequest request = ConvertTableRequest.builder()
+  @Test
+  public void testConvertDeltaToIceberg() {
+    // Create the conversion request
+    ConvertTableRequest request =
+        ConvertTableRequest.builder()
             .sourceTablePath(deltaTablePath)
             .sourceTableName("test_delta_table")
             .sourceFormat(TableFormat.DELTA)
             .targetFormats(Arrays.asList(TableFormat.ICEBERG))
             .build();
 
-        // Execute the conversion
-        ConvertTableResponse response = conversionService.convertTable(request);
+    // Execute the conversion
+    ConvertTableResponse response = conversionService.convertTable(request);
 
-        // Verify the response
-        assertNotNull(response, "Response should not be null");
-        assertEquals(1, response.getConvertedTables().size(), "Should have one converted table");
-        assertEquals("ICEBERG", response.getConvertedTables().get(0).getTargetFormat(), "Target format should be ICEBERG");
+    // Verify the response
+    assertNotNull(response, "Response should not be null");
+    assertEquals(1, response.getConvertedTables().size(), "Should have one converted table");
+    assertEquals(
+        "ICEBERG",
+        response.getConvertedTables().get(0).getTargetFormat(),
+        "Target format should be ICEBERG");
 
-        String metadataPath = response.getConvertedTables().get(0).getTargetMetadataPath();
-        String schema = response.getConvertedTables().get(0).getTargetSchema();
+    String metadataPath = response.getConvertedTables().get(0).getTargetMetadataPath();
+    String schema = response.getConvertedTables().get(0).getTargetSchema();
 
-        assertNotNull(metadataPath, "Metadata path should not be null");
-        assertNotNull(schema, "Schema should not be null");
+    assertNotNull(metadataPath, "Metadata path should not be null");
+    assertNotNull(schema, "Schema should not be null");
 
-        Dataset<Row> icebergTable = sparkSession.read().format("iceberg").load(metadataPath);
-        assertNotNull(icebergTable, "Should be able to read the Iceberg table");
+    Dataset<Row> icebergTable = sparkSession.read().format("iceberg").load(metadataPath);
+    assertNotNull(icebergTable, "Should be able to read the Iceberg table");
 
-        Dataset<Row> deltaTable = sparkSession.read().format("delta").load(deltaTablePath);
-        assertEquals(deltaTable.count(), icebergTable.count(), "Row count should match between Delta and Iceberg");
-    }
+    Dataset<Row> deltaTable = sparkSession.read().format("delta").load(deltaTablePath);
+    assertEquals(
+        deltaTable.count(),
+        icebergTable.count(),
+        "Row count should match between Delta and Iceberg");
+  }
 
-    private void createDeltaTable(String path) {
-        Dataset<Row> data = sparkSession.range(0, 10).toDF("id");
-        data = data.withColumn("name", org.apache.spark.sql.functions.concat(
-                org.apache.spark.sql.functions.lit("name_"),
-                data.col("id").cast("string")));
+  private void createDeltaTable(String path) {
+    Dataset<Row> data = sparkSession.range(0, 10).toDF("id");
+    data =
+        data.withColumn(
+            "name",
+            org.apache.spark.sql.functions.concat(
+                org.apache.spark.sql.functions.lit("name_"), data.col("id").cast("string")));
 
-        data.write().format("delta").mode("overwrite").save(path);
+    data.write().format("delta").mode("overwrite").save(path);
 
-        assertTrue(new File(path).exists(), "Delta table directory should exist");
-        assertTrue(new File(path, "_delta_log").exists(), "Delta log directory should exist");
-    }
+    assertTrue(new File(path).exists(), "Delta table directory should exist");
+    assertTrue(new File(path, "_delta_log").exists(), "Delta log directory should exist");
+  }
 
-    public static SparkConf getSparkConf(Path tempDir) {
+  public static SparkConf getSparkConf(Path tempDir) {
     return new SparkConf()
         .setAppName("xtable-testing")
         .set("spark.serializer", KryoSerializer.class.getName())
@@ -154,5 +158,5 @@ public class ConversionServiceIT {
         .set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
         .set("spark.databricks.delta.schema.autoMerge.enabled", "true")
         .setMaster("local[4]");
-    }
+  }
 }
