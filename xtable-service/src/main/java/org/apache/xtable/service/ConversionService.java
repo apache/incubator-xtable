@@ -236,7 +236,7 @@ public class ConversionService {
       String schemaString = extractSchemaString(targetTable, internalTable);
       convertedTables.add(
           ConvertedTable.builder()
-              .targetFormat(internalTable.getName())
+              .targetFormat(internalTable.getTableFormat())
               .targetSchema(schemaString)
               .targetMetadataPath(internalTable.getLatestMetdataPath())
               .build());
