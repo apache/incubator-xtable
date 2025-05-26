@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.Test;
 import java.util.Optional;
+import java.io.IOException;
 
 import io.delta.kernel.*;
 import io.delta.kernel.defaults.*;
@@ -44,12 +45,10 @@ import static io.delta.kernel.internal.util.Utils.singletonCloseableIterator;
 public class DeltaTableKernel {
     private static final Logger logger = LoggerFactory.getLogger(DeltaTableKernel.class);
       @Test
-  public void readDeltaKernel() {
-            logger.info("hello");
+  public void readDeltaKernel() throws IOException{
             String myTablePath ="/Users/vaibhakumar/Desktop/opensource/iceberg/warehouse/demo/nyc/taxis"; // fully qualified
             Configuration hadoopConf = new Configuration();
             Engine myEngine = DefaultEngine.create(hadoopConf);
-
             Table myTable = Table.forPath(myEngine, myTablePath);
             Snapshot mySnapshot = myTable.getLatestSnapshot(myEngine);
             long version = mySnapshot.getVersion(myEngine);
@@ -87,26 +86,31 @@ public class DeltaTableKernel {
                               while (transformedData.hasNext()) {
                                   FilteredColumnarBatch logicalData = transformedData.next();
                                   ColumnarBatch dataBatch = logicalData.getData();
-//                                  Optional<ColumnVector> selectionVector = dataReadResult.getSelectionVector();
+
 
                                   // access the data for the column at ordinal 0
                                   ColumnVector column0 = dataBatch.getColumnVector(0);
-                                  for (int rowIndex = 0; rowIndex < column0.getSize(); rowIndex++) {
-                                      // check if the row is selected or not
+                                  ColumnVector column1 = dataBatch.getColumnVector(1);
+                                  ColumnVector column2 = dataBatch.getColumnVector(2);
+                                  ColumnVector column3 = dataBatch.getColumnVector(3);
 
-                                          // Assuming the column type is String.
-                                          // If it is a different type, call the relevant function on the `ColumnVector`
-                                          System.out.println(column0.getString(rowIndex));
+                                  for (int rowIndex = 0; rowIndex < column0.getSize() ; rowIndex++) {
+                                      System.out.println(column0.getInt(rowIndex));
 
                                   }
+                                  for (int rowIndex = 0; rowIndex < column1.getSize() ; rowIndex++) {
+                                      System.out.println(column1.getString(rowIndex));
 
+                                  }
                               }
                           }
                       }
                   }
               }
-          } finally {
-              fileIter.close();
+          } catch (IOException e)
+          {
+              e.printStackTrace();
+              System.out.println("IOException occurred: " + e.getMessage());
           }
 
 
