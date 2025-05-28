@@ -29,6 +29,6 @@ public class TableFormat {
   public static final String DELTA = "DELTA";
 
   public static String[] values() {
-    return new String[] {"ICEBERG", "DELTA"};
+    return new String[] {"HUDI", "ICEBERG", "DELTA"};
   }
 }
