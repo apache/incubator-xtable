@@ -15,11 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.service.it;
 
 import static org.apache.xtable.GenericTable.getTableName;
-
 import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
@@ -33,7 +32,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -47,24 +45,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
-import jakarta.inject.Inject;
-
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.xtable.GenericTable;
-
-import org.apache.xtable.service.ConversionService;
-import org.apache.xtable.service.models.ConvertTableRequest;
-import org.apache.xtable.service.models.ConvertTableResponse;
-import org.apache.xtable.service.models.ConvertedTable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -76,8 +63,17 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import org.apache.xtable.GenericTable;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.model.storage.TableFormat;
+import org.apache.xtable.service.ConversionService;
+import org.apache.xtable.service.models.ConvertTableRequest;
+import org.apache.xtable.service.models.ConvertTableResponse;
+import org.apache.xtable.service.models.ConvertedTable;
+
+import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
+import jakarta.inject.Inject;
 
 @TestProfile(ConversionTestProfile.class)
 @QuarkusTest
@@ -99,15 +95,14 @@ public class ITConversionService {
       Files.createDirectories(basePath);
 
       SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
-      sparkSession =
-              SparkSession.builder().config(sparkConf).getOrCreate();
+      sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
       sparkSession
-              .sparkContext()
-              .hadoopConfiguration()
-              .set("parquet.avro.write-old-list-structure", "false");
+          .sparkContext()
+          .hadoopConfiguration()
+          .set("parquet.avro.write-old-list-structure", "false");
       jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
     } catch (IOException e) {
-        throw new RuntimeException(e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -125,24 +120,27 @@ public class ITConversionService {
       throw new RuntimeException(e);
     }
   }
-  
+
   @ParameterizedTest
   @MethodSource("generateTestParametersFormatsAndPartitioning")
-  public void testVariousOperations(
-          String sourceTableFormat, boolean isPartitioned) {
+  public void testVariousOperations(String sourceTableFormat, boolean isPartitioned) {
     String tableName = getTableName();
     List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
     String partitionConfig = isPartitioned ? "level:VALUE" : null;
 
     try (GenericTable table =
-                 GenericTable.getInstance(
-                         tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
+        GenericTable.getInstance(
+            tableName, tempDir, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
       List<?> insertRecords = table.insertRows(100);
 
       // Create and execute conversion request
       ConvertTableRequest request =
-              createConvertTableRequest(
-                      sourceTableFormat, tableName, table.getBasePath(), targetTableFormats, partitionConfig);
+          createConvertTableRequest(
+              sourceTableFormat,
+              tableName,
+              table.getBasePath(),
+              targetTableFormats,
+              partitionConfig);
       ConvertTableResponse response = conversionService.convertTable(request);
       assertConversionResponse(response, targetTableFormats);
 
@@ -160,7 +158,7 @@ public class ITConversionService {
       assertConversionResponse(response, targetTableFormats);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 180);
       checkDatasetEquivalenceWithFilter(
-              sourceTableFormat, table, targetTableFormats, table.getFilterQuery());
+          sourceTableFormat, table, targetTableFormats, table.getFilterQuery());
     }
   }
 
@@ -176,8 +174,8 @@ public class ITConversionService {
 
   protected static List<String> getOtherFormats(String sourceTableFormat) {
     return Arrays.stream(TableFormat.values())
-            .filter(format -> !format.equals(sourceTableFormat))
-            .collect(Collectors.toList());
+        .filter(format -> !format.equals(sourceTableFormat))
+        .collect(Collectors.toList());
   }
 
   private void compareDatasetWithUUID(List<String> dataset1Rows, List<String> dataset2Rows) {
@@ -196,31 +194,31 @@ public class ITConversionService {
           UUID uuid2 = new UUID(bb.getLong(), bb.getLong());
           String uuidStr2 = uuid2.toString();
           assertEquals(
-                  uuidStr1,
-                  uuidStr2,
-                  String.format(
-                          "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
-                          uuidStr1, uuidStr2));
+              uuidStr1,
+              uuidStr2,
+              String.format(
+                  "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
+                  uuidStr1, uuidStr2));
 
           // check other fields
           ((ObjectNode) node1).remove("uuid_field");
           ((ObjectNode) node2).remove("uuid_field");
           assertEquals(
-                  node1.toString(),
-                  node2.toString(),
-                  String.format(
-                          "Datasets are not equivalent when comparing other fields. Source: %s, Target: %s",
-                          node1, node2));
+              node1.toString(),
+              node2.toString(),
+              String.format(
+                  "Datasets are not equivalent when comparing other fields. Source: %s, Target: %s",
+                  node1, node2));
         } catch (JsonProcessingException e) {
           throw new RuntimeException(e);
         }
       } else {
         assertEquals(
-                row1,
-                row2,
-                String.format(
-                        "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
-                        row1, row2));
+            row1,
+            row2,
+            String.format(
+                "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
+                row1, row2));
       }
     }
   }
@@ -235,142 +233,141 @@ public class ITConversionService {
   }
 
   protected void checkDatasetEquivalenceWithFilter(
-          String sourceFormat,
-          GenericTable<?, ?> sourceTable,
-          List<String> targetFormats,
-          String filter) {
+      String sourceFormat,
+      GenericTable<?, ?> sourceTable,
+      List<String> targetFormats,
+      String filter) {
     checkDatasetEquivalence(
-            sourceFormat,
-            sourceTable,
-            Collections.emptyMap(),
-            targetFormats,
-            Collections.emptyMap(),
-            null,
-            filter);
+        sourceFormat,
+        sourceTable,
+        Collections.emptyMap(),
+        targetFormats,
+        Collections.emptyMap(),
+        null,
+        filter);
   }
 
   protected void checkDatasetEquivalence(
-          String sourceFormat,
-          GenericTable<?, ?> sourceTable,
-          List<String> targetFormats,
-          Integer expectedCount) {
+      String sourceFormat,
+      GenericTable<?, ?> sourceTable,
+      List<String> targetFormats,
+      Integer expectedCount) {
     checkDatasetEquivalence(
-            sourceFormat,
-            sourceTable,
-            Collections.emptyMap(),
-            targetFormats,
-            Collections.emptyMap(),
-            expectedCount,
-            "1 = 1");
+        sourceFormat,
+        sourceTable,
+        Collections.emptyMap(),
+        targetFormats,
+        Collections.emptyMap(),
+        expectedCount,
+        "1 = 1");
   }
 
   private void checkDatasetEquivalence(
-          String sourceFormat,
-          GenericTable<?, ?> sourceTable,
-          Map<String, String> sourceOptions,
-          List<String> targetFormats,
-          Map<String, Map<String, String>> targetOptions,
-          Integer expectedCount,
-          String filterCondition) {
+      String sourceFormat,
+      GenericTable<?, ?> sourceTable,
+      Map<String, String> sourceOptions,
+      List<String> targetFormats,
+      Map<String, Map<String, String>> targetOptions,
+      Integer expectedCount,
+      String filterCondition) {
     Dataset<Row> sourceRows =
-            sparkSession
-                    .read()
-                    .options(sourceOptions)
-                    .format(sourceFormat.toLowerCase())
-                    .load(sourceTable.getBasePath())
-                    .orderBy(sourceTable.getOrderByColumn())
-                    .filter(filterCondition);
+        sparkSession
+            .read()
+            .options(sourceOptions)
+            .format(sourceFormat.toLowerCase())
+            .load(sourceTable.getBasePath())
+            .orderBy(sourceTable.getOrderByColumn())
+            .filter(filterCondition);
     Map<String, Dataset<Row>> targetRowsByFormat =
-            targetFormats.stream()
-                    .collect(
-                            Collectors.toMap(
-                                    Function.identity(),
-                                    targetFormat -> {
-                                      Map<String, String> finalTargetOptions =
-                                              targetOptions.getOrDefault(targetFormat, Collections.emptyMap());
-                                      if (targetFormat.equals(HUDI)) {
-                                        finalTargetOptions = new HashMap<>(finalTargetOptions);
-                                        finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
-                                        finalTargetOptions.put(
-                                                "hoodie.datasource.read.extract.partition.values.from.path", "true");
-                                      }
-                                      return sparkSession
-                                              .read()
-                                              .options(finalTargetOptions)
-                                              .format(targetFormat.toLowerCase())
-                                              .load(sourceTable.getBasePath())
-                                              .orderBy(sourceTable.getOrderByColumn())
-                                              .filter(filterCondition);
-                                    }));
+        targetFormats.stream()
+            .collect(
+                Collectors.toMap(
+                    Function.identity(),
+                    targetFormat -> {
+                      Map<String, String> finalTargetOptions =
+                          targetOptions.getOrDefault(targetFormat, Collections.emptyMap());
+                      if (targetFormat.equals(HUDI)) {
+                        finalTargetOptions = new HashMap<>(finalTargetOptions);
+                        finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
+                        finalTargetOptions.put(
+                            "hoodie.datasource.read.extract.partition.values.from.path", "true");
+                      }
+                      return sparkSession
+                          .read()
+                          .options(finalTargetOptions)
+                          .format(targetFormat.toLowerCase())
+                          .load(sourceTable.getBasePath())
+                          .orderBy(sourceTable.getOrderByColumn())
+                          .filter(filterCondition);
+                    }));
 
     String[] selectColumnsArr = sourceTable.getColumnsToSelect().toArray(new String[] {});
     List<String> dataset1Rows = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
     targetRowsByFormat.forEach(
-            (format, targetRows) -> {
-              List<String> dataset2Rows =
-                      targetRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
-              assertEquals(
-                      dataset1Rows.size(),
-                      dataset2Rows.size(),
-                      String.format(
-                              "Datasets have different row counts when reading from Spark. Source: %s, Target: %s",
-                              sourceFormat, format));
-              // sanity check the count to ensure test is set up properly
-              if (expectedCount != null) {
-                assertEquals(expectedCount, dataset1Rows.size());
-              } else {
-                // if count is not known ahead of time, ensure datasets are non-empty
-                assertFalse(dataset1Rows.isEmpty());
-              }
+        (format, targetRows) -> {
+          List<String> dataset2Rows =
+              targetRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
+          assertEquals(
+              dataset1Rows.size(),
+              dataset2Rows.size(),
+              String.format(
+                  "Datasets have different row counts when reading from Spark. Source: %s, Target: %s",
+                  sourceFormat, format));
+          // sanity check the count to ensure test is set up properly
+          if (expectedCount != null) {
+            assertEquals(expectedCount, dataset1Rows.size());
+          } else {
+            // if count is not known ahead of time, ensure datasets are non-empty
+            assertFalse(dataset1Rows.isEmpty());
+          }
 
-              if (containsUUIDFields(dataset1Rows) && containsUUIDFields(dataset2Rows)) {
-                compareDatasetWithUUID(dataset1Rows, dataset2Rows);
-              } else {
-                assertEquals(
-                        dataset1Rows,
-                        dataset2Rows,
-                        String.format(
-                                "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
-                                sourceFormat, format));
-              }
-            });
+          if (containsUUIDFields(dataset1Rows) && containsUUIDFields(dataset2Rows)) {
+            compareDatasetWithUUID(dataset1Rows, dataset2Rows);
+          } else {
+            assertEquals(
+                dataset1Rows,
+                dataset2Rows,
+                String.format(
+                    "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
+                    sourceFormat, format));
+          }
+        });
   }
 
   private ConvertTableRequest createConvertTableRequest(
-          String sourceFormat,
-          String tableName,
-          String tablePath,
-          List<String> targetFormats,
-          String partitionConfig) {
+      String sourceFormat,
+      String tableName,
+      String tablePath,
+      List<String> targetFormats,
+      String partitionConfig) {
     Map<String, String> configs = new HashMap<>();
     if (partitionConfig != null) {
       configs.put("partition-spec", partitionConfig);
     }
     return ConvertTableRequest.builder()
-            .sourceFormat(sourceFormat)
-            .sourceTableName(tableName)
-            .sourceTablePath(tablePath)
-            .targetFormats(targetFormats)
-            .configurations(configs)
-            .build();
+        .sourceFormat(sourceFormat)
+        .sourceTableName(tableName)
+        .sourceTablePath(tablePath)
+        .targetFormats(targetFormats)
+        .configurations(configs)
+        .build();
   }
 
   private void assertConversionResponse(
-          ConvertTableResponse response, List<String> expectedFormats) {
+      ConvertTableResponse response, List<String> expectedFormats) {
     assertNotNull(response, "Response should not be null");
     assertNotNull(response.getConvertedTables(), "Converted tables should not be null");
     assertEquals(
-            expectedFormats.size(),
-            response.getConvertedTables().size(),
-            "Should have converted tables for all target formats");
+        expectedFormats.size(),
+        response.getConvertedTables().size(),
+        "Should have converted tables for all target formats");
 
     for (ConvertedTable convertedTable : response.getConvertedTables()) {
       assertTrue(
-              expectedFormats.contains(convertedTable.getTargetFormat()),
-              "Unexpected target format: " + convertedTable.getTargetFormat());
+          expectedFormats.contains(convertedTable.getTargetFormat()),
+          "Unexpected target format: " + convertedTable.getTargetFormat());
       assertNotNull(convertedTable.getTargetSchema(), "Schema should not be null");
       assertNotNull(convertedTable.getTargetMetadataPath(), "Metadata path should not be null");
     }
   }
 }
-
