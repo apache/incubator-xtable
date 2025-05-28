@@ -28,15 +28,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -72,7 +69,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -104,7 +100,7 @@ public class ITConversionService {
 
       SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
       sparkSession =
-              SparkSession.builder().config(HoodieReadClient.addHoodieSupport(sparkConf)).getOrCreate();
+              SparkSession.builder().config(sparkConf).getOrCreate();
       sparkSession
               .sparkContext()
               .hadoopConfiguration()
