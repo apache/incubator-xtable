@@ -39,6 +39,9 @@ public class ConvertTableRequest {
   @JsonProperty("source-table-path")
   private String sourceTablePath;
 
+  @JsonProperty("source-data-path")
+  private String sourceDataPath;
+
   @JsonProperty("target-formats")
   private List<String> targetFormats;
 
@@ -52,12 +55,14 @@ public class ConvertTableRequest {
       @JsonProperty("source-format") String sourceFormat,
       @JsonProperty("source-table-name") String sourceTableName,
       @JsonProperty("source-table-path") String sourceTablePath,
+      @JsonProperty("source-data-path") String sourceDataPath,
       @JsonProperty("target-format") List<String> targetFormat,
       @JsonProperty("configurations") Map<String, String> configurations) {
 
     this.sourceFormat = sourceFormat;
     this.sourceTableName = sourceTableName;
     this.sourceTablePath = sourceTablePath;
+    this.sourceDataPath = sourceDataPath;
     this.targetFormats = targetFormat;
     this.configurations = configurations;
   }
