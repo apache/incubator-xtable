@@ -192,7 +192,7 @@ public class ConversionService {
     Properties sourceProperties = new Properties();
     if (convertTableRequest.getConfigurations() != null) {
       String partitionSpec =
-              convertTableRequest.getConfigurations().getOrDefault("partition-spec", null);
+          convertTableRequest.getConfigurations().getOrDefault("partition-spec", null);
       if (partitionSpec != null) {
         sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionSpec);
       }
