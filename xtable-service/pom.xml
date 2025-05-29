@@ -176,7 +176,7 @@
 
         <dependency>
             <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-spark-runtime-3.4_2.12</artifactId>
+            <artifactId>iceberg-spark-runtime-${spark.version.prefix}_${scala.binary.version}</artifactId>
             <version>${iceberg.version}</version>
             <scope>test</scope>
         </dependency>
