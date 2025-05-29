@@ -192,10 +192,8 @@ public class ConversionService {
     Properties sourceProperties = new Properties();
     if (convertTableRequest.getConfigurations() != null) {
       String partitionSpec =
-          convertTableRequest.getConfigurations().getOrDefault("partition-spec", null);
-      if (partitionSpec != null
-          && (HUDI.equals(convertTableRequest.getSourceFormat())
-              || convertTableRequest.getTargetFormats().contains(HUDI))) {
+              convertTableRequest.getConfigurations().getOrDefault("partition-spec", null);
+      if (partitionSpec != null) {
         sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionSpec);
       }
     }
@@ -204,6 +202,7 @@ public class ConversionService {
         SourceTable.builder()
             .name(convertTableRequest.getSourceTableName())
             .basePath(convertTableRequest.getSourceTablePath())
+            .dataPath(convertTableRequest.getSourceDataPath())
             .formatName(convertTableRequest.getSourceFormat())
             .additionalProperties(sourceProperties)
             .build();
@@ -213,7 +212,8 @@ public class ConversionService {
       TargetTable targetTable =
           TargetTable.builder()
               .name(convertTableRequest.getSourceTableName())
-              .basePath(convertTableRequest.getSourceTablePath())
+              // set the metadata path to the data path as the default (required by Hudi)
+              .basePath(convertTableRequest.getSourceDataPath())
               .formatName(targetFormat)
               .additionalProperties(sourceProperties)
               .build();

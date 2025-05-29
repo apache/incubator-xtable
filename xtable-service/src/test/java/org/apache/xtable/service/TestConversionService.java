@@ -59,6 +59,7 @@ import org.apache.xtable.spi.extractor.ConversionSource;
 class TestConversionService {
   private static final String SOURCE_NAME = "users";
   private static final String SOURCE_PATH = "s3://bucket/tables/users";
+  private static final String SOURCE_DATA_PATH = "s3://bucket/tables/users/data";
   private static final String HUDI_META_PATH = "s3://bucket/tables/users/.hoodie";
   private static final String ICEBERG_META_PATH =
       "s3://bucket/tables/users/metadata/v1.metadata.json";
@@ -111,6 +112,7 @@ class TestConversionService {
             .sourceFormat(TableFormat.DELTA)
             .sourceTableName(SOURCE_NAME)
             .sourceTablePath(SOURCE_PATH)
+            .sourceDataPath(SOURCE_DATA_PATH)
             .targetFormats(Collections.singletonList(TableFormat.HUDI))
             .build();
 
@@ -120,7 +122,7 @@ class TestConversionService {
       when(provider.getConversionSourceInstance(any())).thenReturn(conversionSrc);
       when(conversionSrc.getCurrentTable()).thenReturn(internalTbl);
 
-      when(internalTbl.getName()).thenReturn(TableFormat.HUDI);
+      when(internalTbl.getTableFormat()).thenReturn(TableFormat.HUDI);
       when(internalTbl.getLatestMetdataPath()).thenReturn(HUDI_META_PATH);
       when(internalTbl.getReadSchema()).thenReturn(internalSchema);
 
@@ -146,6 +148,7 @@ class TestConversionService {
             .sourceFormat(TableFormat.DELTA)
             .sourceTableName(SOURCE_NAME)
             .sourceTablePath(SOURCE_PATH)
+            .sourceDataPath(SOURCE_DATA_PATH)
             .targetFormats(Collections.singletonList(TableFormat.ICEBERG))
             .build();
 
@@ -157,7 +160,7 @@ class TestConversionService {
       when(provider.getConversionSourceInstance(any())).thenReturn(conversionSrc);
       when(conversionSrc.getCurrentTable()).thenReturn(internalTbl);
 
-      when(internalTbl.getName()).thenReturn(TableFormat.ICEBERG);
+      when(internalTbl.getTableFormat()).thenReturn(TableFormat.ICEBERG);
       when(internalTbl.getLatestMetdataPath()).thenReturn(ICEBERG_META_PATH);
       when(internalTbl.getReadSchema()).thenReturn(internalSchema);
 
@@ -185,6 +188,7 @@ class TestConversionService {
             .sourceFormat(TableFormat.ICEBERG)
             .sourceTableName(SOURCE_NAME)
             .sourceTablePath(SOURCE_PATH)
+            .sourceDataPath(SOURCE_DATA_PATH)
             .targetFormats(Collections.singletonList(TableFormat.DELTA))
             .build();
 
@@ -194,7 +198,7 @@ class TestConversionService {
       when(provider.getConversionSourceInstance(any())).thenReturn(conversionSrc);
       when(conversionSrc.getCurrentTable()).thenReturn(internalTbl);
 
-      when(internalTbl.getName()).thenReturn(TableFormat.DELTA);
+      when(internalTbl.getTableFormat()).thenReturn(TableFormat.DELTA);
       when(internalTbl.getLatestMetdataPath()).thenReturn(DELTA_META_PATH);
       when(internalTbl.getReadSchema()).thenReturn(internalSchema);
 
