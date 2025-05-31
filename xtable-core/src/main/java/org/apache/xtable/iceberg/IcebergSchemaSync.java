@@ -74,12 +74,12 @@ public class IcebergSchemaSync {
       UpdateSchema updateSchema,
       String parentPath) {
     Map<Integer, Supplier<UpdateSchema>> updates = new HashMap<>();
-    Set<String> allColumnNames = new HashSet<>();
-    current.fields().stream().map(Types.NestedField::name).forEach(allColumnNames::add);
-    latest.fields().stream().map(Types.NestedField::name).forEach(allColumnNames::add);
-    for (String columnName : allColumnNames) {
-      Types.NestedField latestColumn = latest.field(columnName);
-      Types.NestedField currentColumn = current.field(columnName);
+    Set<Integer> allColumnFieldIds = new HashSet<>();
+    current.fields().stream().map(Types.NestedField::fieldId).forEach(allColumnFieldIds::add);
+    latest.fields().stream().map(Types.NestedField::fieldId).forEach(allColumnFieldIds::add);
+    for (int columnFieldId : allColumnFieldIds) {
+      Types.NestedField latestColumn = latest.field(columnFieldId);
+      Types.NestedField currentColumn = current.field(columnFieldId);
       if (currentColumn == null) {
         // add a new column
         if (latestColumn.isOptional()) {
@@ -99,7 +99,9 @@ public class IcebergSchemaSync {
         // drop the existing column, use fieldId 0 to perform deletes first
         updates.put(
             0,
-            () -> updateSchema.deleteColumn(constructFullyQualifiedName(columnName, parentPath)));
+            () ->
+                updateSchema.deleteColumn(
+                    constructFullyQualifiedName(currentColumn.name(), parentPath)));
       } else {
         updates.putAll(updateColumn(latestColumn, currentColumn, updateSchema, parentPath));
       }
@@ -122,6 +124,12 @@ public class IcebergSchemaSync {
             () ->
                 updateSchema.updateColumn(
                     latestColumn.name(), latestColumn.type().asPrimitiveType()));
+      }
+      // update the name of the column
+      if (!latestColumn.name().equals(currentColumn.name())) {
+        updates.put(
+            latestColumn.fieldId(),
+            () -> updateSchema.renameColumn(currentColumn.name(), latestColumn.name()));
       }
       // update whether the column is required
       if (latestColumn.isOptional() != currentColumn.isOptional()) {
