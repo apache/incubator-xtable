@@ -53,7 +53,7 @@ public class ITTestUtils {
     Assertions.assertEquals(readSchema, internalTable.getReadSchema());
     Assertions.assertEquals(dataLayoutStrategy, internalTable.getLayoutStrategy());
     Assertions.assertEquals(basePath, internalTable.getBasePath());
-    Assertions.assertEquals(latestMetadataPath, internalTable.getLatestMetdataPath());
+    Assertions.assertEquals(latestMetadataPath, internalTable.getLatestMetadataPath());
     Assertions.assertEquals(partitioningFields, internalTable.getPartitioningFields());
   }
 

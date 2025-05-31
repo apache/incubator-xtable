@@ -219,7 +219,7 @@ public class ITHudiConversionSource {
           internalSchema,
           DataLayoutStrategy.FLAT,
           "file:" + basePath + "_v1",
-          internalTable.getLatestMetdataPath(),
+          internalTable.getLatestMetadataPath(),
           Collections.emptyList());
     }
   }

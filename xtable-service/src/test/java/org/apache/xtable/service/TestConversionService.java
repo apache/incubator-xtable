@@ -123,7 +123,7 @@ class TestConversionService {
       when(conversionSrc.getCurrentTable()).thenReturn(internalTbl);
 
       when(internalTbl.getTableFormat()).thenReturn(TableFormat.HUDI);
-      when(internalTbl.getLatestMetdataPath()).thenReturn(HUDI_META_PATH);
+      when(internalTbl.getLatestMetadataPath()).thenReturn(HUDI_META_PATH);
       when(internalTbl.getReadSchema()).thenReturn(internalSchema);
 
       AvroSchemaConverter converter = mock(AvroSchemaConverter.class);
@@ -161,7 +161,7 @@ class TestConversionService {
       when(conversionSrc.getCurrentTable()).thenReturn(internalTbl);
 
       when(internalTbl.getTableFormat()).thenReturn(TableFormat.ICEBERG);
-      when(internalTbl.getLatestMetdataPath()).thenReturn(ICEBERG_META_PATH);
+      when(internalTbl.getLatestMetadataPath()).thenReturn(ICEBERG_META_PATH);
       when(internalTbl.getReadSchema()).thenReturn(internalSchema);
 
       IcebergSchemaExtractor extractor = mock(IcebergSchemaExtractor.class);
@@ -199,7 +199,7 @@ class TestConversionService {
       when(conversionSrc.getCurrentTable()).thenReturn(internalTbl);
 
       when(internalTbl.getTableFormat()).thenReturn(TableFormat.DELTA);
-      when(internalTbl.getLatestMetdataPath()).thenReturn(DELTA_META_PATH);
+      when(internalTbl.getLatestMetadataPath()).thenReturn(DELTA_META_PATH);
       when(internalTbl.getReadSchema()).thenReturn(internalSchema);
 
       SparkSchemaExtractor extractor = mock(SparkSchemaExtractor.class);

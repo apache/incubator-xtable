@@ -188,7 +188,7 @@ public class ITDeltaConversionSource {
             .build(),
         DataLayoutStrategy.FLAT,
         "file:" + basePath,
-        snapshot.getTable().getLatestMetdataPath(),
+        snapshot.getTable().getLatestMetadataPath(),
         Collections.emptyList());
     // Validate data files
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
@@ -245,7 +245,7 @@ public class ITDeltaConversionSource {
             .build(),
         DataLayoutStrategy.FLAT,
         "file:" + basePath,
-        internalTable.getLatestMetdataPath(),
+        internalTable.getLatestMetadataPath(),
         Collections.emptyList());
   }
 
@@ -297,7 +297,7 @@ public class ITDeltaConversionSource {
             .build(),
         DataLayoutStrategy.HIVE_STYLE_PARTITION,
         "file:" + basePath,
-        snapshot.getTable().getLatestMetdataPath(),
+        snapshot.getTable().getLatestMetadataPath(),
         Collections.singletonList(
             InternalPartitionField.builder()
                 .sourceField(partCol)
