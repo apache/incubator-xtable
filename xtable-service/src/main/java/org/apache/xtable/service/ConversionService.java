@@ -238,7 +238,7 @@ public class ConversionService {
           ConvertedTable.builder()
               .targetFormat(internalTable.getTableFormat())
               .targetSchema(schemaString)
-              .targetMetadataPath(internalTable.getLatestMetdataPath())
+              .targetMetadataPath(internalTable.getLatestMetadataPath())
               .build());
     }
     return new ConvertTableResponse(convertedTables);
