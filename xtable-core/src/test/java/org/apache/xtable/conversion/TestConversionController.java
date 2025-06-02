@@ -173,11 +173,12 @@ public class TestConversionController {
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
     Optional<TableSyncMetadata> conversionTarget1Metadata =
         Optional.of(
-            TableSyncMetadata.of(icebergLastSyncInstant, pendingInstantsForIceberg, "TEST", "0"));
+            TableSyncMetadata.of(
+                icebergLastSyncInstant, pendingInstantsForIceberg, "TEST", "0", null));
     when(mockConversionTarget1.getTableMetadata()).thenReturn(conversionTarget1Metadata);
     Optional<TableSyncMetadata> conversionTarget2Metadata =
         Optional.of(
-            TableSyncMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta, "TEST", "0"));
+            TableSyncMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta, "TEST", "0", null));
     when(mockConversionTarget2.getTableMetadata()).thenReturn(conversionTarget2Metadata);
     when(mockConversionSource.getCommitsBacklog(instantsForIncrementalSync))
         .thenReturn(commitsBacklog);
@@ -251,10 +252,12 @@ public class TestConversionController {
     // Both Iceberg and Delta last synced at instantAt5 and have no pending instants.
     when(mockConversionTarget1.getTableMetadata())
         .thenReturn(
-            Optional.of(TableSyncMetadata.of(instantAt5, Collections.emptyList(), "TEST", "0")));
+            Optional.of(
+                TableSyncMetadata.of(instantAt5, Collections.emptyList(), "TEST", "0", null)));
     when(mockConversionTarget2.getTableMetadata())
         .thenReturn(
-            Optional.of(TableSyncMetadata.of(instantAt5, Collections.emptyList(), "TEST", "0")));
+            Optional.of(
+                TableSyncMetadata.of(instantAt5, Collections.emptyList(), "TEST", "0", null)));
 
     when(mockConversionSource.getCurrentSnapshot()).thenReturn(internalSnapshot);
     when(tableFormatSync.syncSnapshot(
@@ -316,10 +319,10 @@ public class TestConversionController {
         .thenReturn(
             Optional.of(
                 TableSyncMetadata.of(
-                    icebergLastSyncInstant, pendingInstantsForIceberg, "TEST", "0")));
+                    icebergLastSyncInstant, pendingInstantsForIceberg, "TEST", "0", null)));
     Optional<TableSyncMetadata> conversionTarget2Metadata =
         Optional.of(
-            TableSyncMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta, "TEST", "0"));
+            TableSyncMetadata.of(deltaLastSyncInstant, pendingInstantsForDelta, "TEST", "0", null));
     when(mockConversionTarget2.getTableMetadata()).thenReturn(conversionTarget2Metadata);
     when(mockConversionSource.getCommitsBacklog(instantsForIncrementalSync))
         .thenReturn(commitsBacklog);
@@ -398,11 +401,12 @@ public class TestConversionController {
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
     Optional<TableSyncMetadata> conversionTarget1Metadata =
         Optional.of(
-            TableSyncMetadata.of(icebergLastSyncInstant, Collections.emptyList(), "TEST", "0"));
+            TableSyncMetadata.of(
+                icebergLastSyncInstant, Collections.emptyList(), "TEST", "0", null));
     when(mockConversionTarget1.getTableMetadata()).thenReturn(conversionTarget1Metadata);
     Optional<TableSyncMetadata> conversionTarget2Metadata =
         Optional.of(
-            TableSyncMetadata.of(deltaLastSyncInstant, Collections.emptyList(), "TEST", "0"));
+            TableSyncMetadata.of(deltaLastSyncInstant, Collections.emptyList(), "TEST", "0", null));
     when(mockConversionTarget2.getTableMetadata()).thenReturn(conversionTarget2Metadata);
     when(mockConversionSource.getCommitsBacklog(instantsForIncrementalSync))
         .thenReturn(commitsBacklog);

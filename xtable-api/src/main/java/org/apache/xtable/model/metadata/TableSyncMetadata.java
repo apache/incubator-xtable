@@ -56,6 +56,7 @@ public class TableSyncMetadata {
   int version;
   String sourceTableFormat;
   String sourceIdentifier;
+  String latestTableOperationId;
 
   /**
    * @deprecated Use {@link #of(Instant, List, String, String)} instead. This method exists for
@@ -64,20 +65,22 @@ public class TableSyncMetadata {
   @Deprecated
   public static TableSyncMetadata of(
       Instant lastInstantSynced, List<Instant> instantsToConsiderForNextSync) {
-    return TableSyncMetadata.of(lastInstantSynced, instantsToConsiderForNextSync, null, null);
+    return TableSyncMetadata.of(lastInstantSynced, instantsToConsiderForNextSync, null, null, null);
   }
 
   public static TableSyncMetadata of(
       Instant lastInstantSynced,
       List<Instant> instantsToConsiderForNextSync,
       String sourceTableFormat,
-      String sourceIdentifier) {
+      String sourceIdentifier,
+      String latestTableOperationId) {
     return new TableSyncMetadata(
         lastInstantSynced,
         instantsToConsiderForNextSync,
         CURRENT_VERSION,
         sourceTableFormat,
-        sourceIdentifier);
+        sourceIdentifier,
+        latestTableOperationId);
   }
 
   public String toJson() {

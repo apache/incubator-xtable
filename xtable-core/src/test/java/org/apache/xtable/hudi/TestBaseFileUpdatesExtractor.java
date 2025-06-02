@@ -18,6 +18,7 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.xtable.hudi.HudiTestUtil.createWriteStatus;
 import static org.apache.xtable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.apache.xtable.hudi.HudiTestUtil.initTableAndGetMetaClient;
@@ -48,9 +49,10 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
-import org.apache.hudi.hadoop.CachingPath;
+import org.apache.hudi.hadoop.fs.CachingPath;
 
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -73,7 +75,7 @@ public class TestBaseFileUpdatesExtractor {
   private static final long RECORD_COUNT = 200L;
   private static final long LAST_MODIFIED = System.currentTimeMillis();
   private static final HoodieEngineContext CONTEXT =
-      new HoodieJavaEngineContext(new Configuration());
+      new HoodieJavaEngineContext(getStorageConf(new Configuration()));
   private static final InternalPartitionField PARTITION_FIELD =
       InternalPartitionField.builder()
           .sourceField(
@@ -161,12 +163,12 @@ public class TestBaseFileUpdatesExtractor {
   void extractSnapshotChanges_emptyTargetTable() throws IOException {
     String tableBasePath = tempDir.resolve(UUID.randomUUID().toString()).toString();
     HoodieTableMetaClient metaClient =
-        HoodieTableMetaClient.withPropertyBuilder()
+        HoodieTableMetaClient.newTableBuilder()
             .setTableType(HoodieTableType.COPY_ON_WRITE)
             .setTableName("test_table")
             .setPayloadClass(HoodieAvroPayload.class)
             .setPartitionFields("partition_field")
-            .initTable(new Configuration(), tableBasePath);
+            .initTable(getStorageConf(new Configuration()), tableBasePath);
 
     String partitionPath1 = "partition1";
     String fileName1 = "file1.parquet";
@@ -253,7 +255,8 @@ public class TestBaseFileUpdatesExtractor {
               new HoodieInstant(
                   HoodieInstant.State.REQUESTED,
                   HoodieTimeline.REPLACE_COMMIT_ACTION,
-                  initialInstant),
+                  initialInstant,
+                  InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR),
               Option.empty());
       writeClient.commit(
           initialInstant,
@@ -347,7 +350,8 @@ public class TestBaseFileUpdatesExtractor {
               new HoodieInstant(
                   HoodieInstant.State.REQUESTED,
                   HoodieTimeline.REPLACE_COMMIT_ACTION,
-                  initialInstant),
+                  initialInstant,
+                  InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR),
               Option.empty());
       writeClient.commit(
           initialInstant,

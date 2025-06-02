@@ -44,21 +44,21 @@ import org.apache.iceberg.mapping.NameMappingParser;
 
 @AllArgsConstructor(staticName = "of")
 @Log4j2
-class IcebergTableManager {
+public class IcebergTableManager {
   private static final Map<IcebergCatalogConfig, Catalog> CATALOG_CACHE = new ConcurrentHashMap<>();
   private final Configuration hadoopConfiguration;
 
   @Getter(lazy = true, value = lombok.AccessLevel.PRIVATE)
   private final HadoopTables hadoopTables = new HadoopTables(hadoopConfiguration);
 
-  Table getTable(
+  public Table getTable(
       IcebergCatalogConfig catalogConfig, TableIdentifier tableIdentifier, String basePath) {
     return getCatalog(catalogConfig)
         .map(catalog -> catalog.loadTable(tableIdentifier))
         .orElseGet(() -> getHadoopTables().load(basePath));
   }
 
-  boolean tableExists(
+  public boolean tableExists(
       IcebergCatalogConfig catalogConfig, TableIdentifier tableIdentifier, String basePath) {
     return getCatalog(catalogConfig)
         .map(catalog -> catalog.tableExists(tableIdentifier))

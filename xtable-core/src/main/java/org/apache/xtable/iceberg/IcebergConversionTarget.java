@@ -29,6 +29,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
+import org.apache.iceberg.ExpireSnapshots;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
@@ -277,6 +278,18 @@ public class IcebergConversionTarget implements ConversionTarget {
       }
     }
     return Optional.empty();
+  }
+
+  public void expireSnapshotIds(List<Long> snapshotIds) {
+    ExpireSnapshots expireSnapshots = transaction.expireSnapshots().deleteWith(this::safeDelete);
+    for (Long snapshotId : snapshotIds) {
+      expireSnapshots.expireSnapshotId(snapshotId);
+    }
+    expireSnapshots.commit();
+    transaction.commitTransaction();
+    transaction = null;
+    internalTableState = null;
+    tableSyncMetadata = null;
   }
 
   private void rollbackCorruptCommits() {

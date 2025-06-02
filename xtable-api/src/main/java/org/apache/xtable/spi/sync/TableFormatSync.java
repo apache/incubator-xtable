@@ -168,7 +168,8 @@ public class TableFormatSync {
             tableState.getLatestCommitTime(),
             pendingCommits,
             tableState.getTableFormat(),
-            sourceIdentifier);
+            sourceIdentifier,
+            tableState.getLatestTableOperationId());
     conversionTarget.syncMetadata(latestState);
     // sync schema updates
     conversionTarget.syncSchema(tableState.getReadSchema());
@@ -178,6 +179,11 @@ public class TableFormatSync {
     fileSyncMethod.sync(conversionTarget);
     conversionTarget.completeSync();
 
+    log.info(
+        "Took {} sec in mode {} to sync table change for {}",
+        Duration.between(startTime, Instant.now()).getSeconds(),
+        mode,
+        conversionTarget.getTableFormat());
     return SyncResult.builder()
         .mode(mode)
         .tableFormatSyncStatus(SyncResult.SyncStatus.SUCCESS)

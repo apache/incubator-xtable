@@ -142,7 +142,8 @@ public class TestHudiConversionTarget {
     HudiConversionTarget.CommitState mockCommitState =
         initMocksForBeginSync(targetClient).getLeft();
     TableSyncMetadata metadata =
-        TableSyncMetadata.of(COMMIT_TIME, Collections.emptyList(), "TEST", "0");
+        TableSyncMetadata.of(
+            COMMIT_TIME, Collections.emptyList(), "TEST", "0", TABLE.getLatestTableOperationId());
     targetClient.syncMetadata(metadata);
     // validate that metadata is set in commitState
     verify(mockCommitState).setTableSyncMetadata(metadata);

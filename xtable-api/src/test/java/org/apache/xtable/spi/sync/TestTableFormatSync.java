@@ -173,11 +173,11 @@ public class TestTableFormatSync {
     conversionTargetWithMetadata.put(
         mockConversionTarget1,
         TableSyncMetadata.of(
-            Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList(), "TEST", "0"));
+            Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList(), "TEST", "0", null));
     conversionTargetWithMetadata.put(
         mockConversionTarget2,
         TableSyncMetadata.of(
-            Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList(), "TEST", "1"));
+            Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList(), "TEST", "1", null));
 
     Map<String, List<SyncResult>> result =
         TableFormatSync.getInstance()
@@ -297,7 +297,8 @@ public class TestTableFormatSync {
             tableChange2.getTableAsOfChange().getLatestCommitTime(),
             Collections.singletonList(tableChange1.getTableAsOfChange().getLatestCommitTime()),
             "TEST",
-            tableChange2.getSourceIdentifier()));
+            tableChange2.getSourceIdentifier(),
+            null));
     // mockConversionTarget2 will have synced the first table change previously
     conversionTargetWithMetadata.put(
         mockConversionTarget2,
@@ -305,7 +306,8 @@ public class TestTableFormatSync {
             tableChange1.getTableAsOfChange().getLatestCommitTime(),
             Collections.emptyList(),
             "TEST",
-            tableChange1.getSourceIdentifier()));
+            tableChange1.getSourceIdentifier(),
+            null));
 
     Map<String, List<SyncResult>> result =
         TableFormatSync.getInstance()
@@ -399,12 +401,12 @@ public class TestTableFormatSync {
     // mockConversionTarget1 will have nothing to sync
     conversionTargetWithMetadata.put(
         mockConversionTarget1,
-        TableSyncMetadata.of(Instant.now(), Collections.emptyList(), "TEST", "0"));
+        TableSyncMetadata.of(Instant.now(), Collections.emptyList(), "TEST", "0", null));
     // mockConversionTarget2 will have synced the first table change previously
     conversionTargetWithMetadata.put(
         mockConversionTarget2,
         TableSyncMetadata.of(
-            Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList(), "TEST", "1"));
+            Instant.now().minus(1, ChronoUnit.HOURS), Collections.emptyList(), "TEST", "1", null));
 
     Map<String, List<SyncResult>> result =
         TableFormatSync.getInstance()
@@ -479,6 +481,7 @@ public class TestTableFormatSync {
                 startingTableState.getLatestCommitTime(),
                 pendingCommitInstants,
                 startingTableState.getTableFormat(),
-                sourceIdentifier));
+                sourceIdentifier,
+                null));
   }
 }
