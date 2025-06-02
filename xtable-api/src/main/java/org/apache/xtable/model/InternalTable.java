@@ -52,4 +52,6 @@ public class InternalTable {
   Instant latestCommitTime;
   // Path to latest metadata
   String latestMetadataPath;
+  // latest operation on the table.
+  String latestTableOperationId;
 }

@@ -25,7 +25,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -57,6 +59,8 @@ import org.apache.hudi.common.table.view.SyncableFileSystemView;
 import org.apache.hudi.common.table.view.TableFileSystemView;
 import org.apache.hudi.hadoop.fs.HadoopFSUtils;
 import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.storage.StoragePath;
+import org.apache.hudi.storage.StoragePathInfo;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.NotSupportedException;
@@ -112,6 +116,21 @@ public class HudiDataFileExtractor implements AutoCloseable {
     this.fileStatsExtractor = hudiFileStatsExtractor;
   }
 
+  public HudiDataFileExtractor(
+      HoodieTableMetaClient metaClient,
+      HudiPartitionValuesExtractor hudiPartitionValuesExtractor,
+      HudiFileStatsExtractor hudiFileStatsExtractor,
+      FileSystemViewManager fileSystemViewManager) {
+    this.engineContext = new HoodieLocalEngineContext(metaClient.getStorageConf());
+    this.metadataConfig = HoodieMetadataConfig.newBuilder().enable(false).build();
+    this.basePath = HadoopFSUtils.convertToHadoopPath(metaClient.getBasePath());
+    this.tableMetadata = null;
+    this.fileSystemViewManager = fileSystemViewManager;
+    this.metaClient = metaClient;
+    this.partitionValuesExtractor = hudiPartitionValuesExtractor;
+    this.fileStatsExtractor = hudiFileStatsExtractor;
+  }
+
   public List<PartitionFileGroup> getFilesCurrentState(InternalTable table) {
     try {
       List<String> allPartitionPaths =
@@ -143,6 +162,106 @@ public class HudiDataFileExtractor implements AutoCloseable {
     List<InternalDataFile> filesRemoved = allInfo.getRemoved();
 
     return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
+  }
+
+  public InternalFilesDiff getDiffForCommit(
+      InternalTable table, HoodieCommitMetadata commitMetadata, HoodieInstant commit) {
+    SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
+    List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
+    List<InternalDataFile> filesToRemove = new ArrayList<>();
+    Map<String, StoragePathInfo> fullPathInfo =
+        commitMetadata.getFullPathToInfo(metaClient.getStorage(), basePath.toString());
+    commitMetadata
+        .getPartitionToWriteStats()
+        .forEach(
+            (partitionPath, writeStats) -> {
+              List<PartitionValue> partitionValues =
+                  partitionValuesExtractor.extractPartitionValues(
+                      table.getPartitioningFields(), partitionPath);
+              Map<String, HoodieBaseFile> currentBaseFilesInPartition =
+                  fsView
+                      .getLatestBaseFiles(partitionPath)
+                      .collect(Collectors.toMap(HoodieBaseFile::getFileId, Function.identity()));
+              for (HoodieWriteStat writeStat : writeStats) {
+                if (FSUtils.isLogFile(new StoragePath(writeStat.getPath()))) {
+                  continue;
+                }
+                StoragePath baseFileFullPath =
+                    FSUtils.constructAbsolutePath(metaClient.getBasePath(), writeStat.getPath());
+                if (FSUtils.getCommitTimeWithFullPath(baseFileFullPath.toString())
+                    .equals(commit.requestedTime())) {
+                  filesAddedWithoutStats.add(
+                      buildFileWithoutStats(
+                          partitionValues,
+                          new HoodieBaseFile(fullPathInfo.get(baseFileFullPath.getName()))));
+                }
+                if (currentBaseFilesInPartition.containsKey(writeStat.getFileId())) {
+                  filesToRemove.add(
+                      buildFileWithoutStats(
+                          partitionValues, currentBaseFilesInPartition.get(writeStat.getFileId())));
+                }
+              }
+            });
+    List<InternalDataFile> filesAdded =
+        fileStatsExtractor
+            .addStatsToFiles(tableMetadata, filesAddedWithoutStats.stream(), table.getReadSchema())
+            .collect(Collectors.toList());
+    return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesToRemove).build();
+  }
+
+  public InternalFilesDiff getDiffForReplaceCommit(
+      InternalTable table,
+      HoodieReplaceCommitMetadata replaceCommitMetadata,
+      HoodieInstant commit) {
+    SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient);
+    List<InternalDataFile> filesAddedWithoutStats = new ArrayList<>();
+    List<InternalDataFile> filesToRemove = new ArrayList<>();
+    replaceCommitMetadata
+        .getPartitionToReplaceFileIds()
+        .forEach(
+            (partitionPath, fileIds) -> {
+              List<PartitionValue> partitionValues =
+                  partitionValuesExtractor.extractPartitionValues(
+                      table.getPartitioningFields(), partitionPath);
+              Map<String, HoodieBaseFile> currentBaseFilesInPartition =
+                  fsView
+                      .getLatestBaseFiles(partitionPath)
+                      .collect(Collectors.toMap(HoodieBaseFile::getFileId, Function.identity()));
+              filesToRemove.addAll(
+                  fileIds.stream()
+                      .map(
+                          fileId ->
+                              buildFileWithoutStats(
+                                  partitionValues, currentBaseFilesInPartition.get(fileId)))
+                      .collect(Collectors.toList()));
+            });
+    replaceCommitMetadata
+        .getPartitionToWriteStats()
+        .forEach(
+            (partitionPath, writeStats) -> {
+              List<PartitionValue> partitionValues =
+                  partitionValuesExtractor.extractPartitionValues(
+                      table.getPartitioningFields(), partitionPath);
+              filesAddedWithoutStats.addAll(
+                  writeStats.stream()
+                      .map(
+                          writeStat ->
+                              FSUtils.constructAbsolutePath(
+                                      metaClient.getBasePath(), writeStat.getPath())
+                                  .toString())
+                      .filter(
+                          baseFileFullPath ->
+                              FSUtils.getCommitTimeWithFullPath(baseFileFullPath)
+                                  .equals(commit.requestedTime()))
+                      .map(HoodieBaseFile::new)
+                      .map(hoodieBaseFile -> buildFileWithoutStats(partitionValues, hoodieBaseFile))
+                      .collect(Collectors.toList()));
+            });
+    List<InternalDataFile> filesAdded =
+        fileStatsExtractor
+            .addStatsToFiles(tableMetadata, filesAddedWithoutStats.stream(), table.getReadSchema())
+            .collect(Collectors.toList());
+    return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesToRemove).build();
   }
 
   private AddedAndRemovedFiles getAddedAndRemovedPartitionInfo(
