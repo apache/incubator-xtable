@@ -52,7 +52,8 @@ public class HudiIncrementalTableChangeExtractor {
     InternalFilesDiff dataFilesDiff;
     if (commitMetadata instanceof HoodieReplaceCommitMetadata) {
       dataFilesDiff =
-          dataFileExtractor.getDiffForCommit(internalTable, commitMetadata, completedInstant);
+          dataFileExtractor.getDiffForReplaceCommit(
+              internalTable, (HoodieReplaceCommitMetadata) commitMetadata, completedInstant);
     } else {
       dataFilesDiff =
           dataFileExtractor.getDiffForCommit(internalTable, commitMetadata, completedInstant);

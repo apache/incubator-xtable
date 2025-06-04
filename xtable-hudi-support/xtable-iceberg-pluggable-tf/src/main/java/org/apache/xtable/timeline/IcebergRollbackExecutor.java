@@ -18,20 +18,14 @@
  
 package org.apache.xtable.timeline;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
 
-import org.apache.hadoop.conf.Configuration;
-
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
-import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.common.table.timeline.InstantComparison;
 import org.apache.hudi.common.table.timeline.dto.InstantDTO;
 
-import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 
@@ -46,7 +40,7 @@ import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 
 @Log4j2
-public class IcebergTimelineArchiver {
+public class IcebergRollbackExecutor {
   private static final ObjectMapper MAPPER =
       new ObjectMapper()
           .registerModule(new JavaTimeModule())
@@ -57,40 +51,52 @@ public class IcebergTimelineArchiver {
   private final IcebergConversionTarget target;
   private final IcebergTableManager tableManager;
 
-  public IcebergTimelineArchiver(HoodieTableMetaClient metaClient, IcebergConversionTarget target) {
+  public IcebergRollbackExecutor(HoodieTableMetaClient metaClient, IcebergConversionTarget target) {
     this.metaClient = metaClient;
     this.target = target;
     this.tableManager =
-        IcebergTableManager.of((Configuration) metaClient.getStorageConf().unwrap());
+        IcebergTableManager.of(
+            (org.apache.hadoop.conf.Configuration) metaClient.getStorageConf().unwrap());
   }
 
   @SneakyThrows
-  public void archiveInstants(InternalTable internalTable, List<HoodieInstant> archivedInstants) {
+  public void rollbackSnapshot(InternalTable internalTable, HoodieInstant instantToRollback) {
     TableIdentifier tableIdentifier =
         TableIdentifier.of(metaClient.getTableConfig().getTableName());
     if (tableManager.tableExists(null, tableIdentifier, metaClient.getBasePath().toString())) {
       Table table =
           tableManager.getTable(null, tableIdentifier, metaClient.getBasePath().toString());
-      List<Long> expireSnapshots = new ArrayList<>();
-      for (Snapshot snapshot : table.snapshots()) {
-        TableSyncMetadata syncMetadata =
-            TableSyncMetadata.fromJson(snapshot.summary().get(TableSyncMetadata.XTABLE_METADATA))
-                .get();
-        HoodieInstant hoodieInstant =
-            InstantDTO.toInstant(
-                MAPPER.readValue(syncMetadata.getLatestTableOperationId(), InstantDTO.class),
-                metaClient.getInstantGenerator());
-        if (HoodieTimeline.SAVEPOINT_ACTION.equals(hoodieInstant.getAction())) {
-          log.warn(
-              "Skipping expiring next set of snapshots because of savepoint {}", hoodieInstant);
-          break;
-        }
-        if (archivedInstants.contains(hoodieInstant)) {
-          expireSnapshots.add(snapshot.snapshotId());
-        }
+      TableSyncMetadata syncMetadata =
+          TableSyncMetadata.fromJson(
+                  table.currentSnapshot().summary().get(TableSyncMetadata.XTABLE_METADATA))
+              .get();
+      HoodieInstant latestHoodieInstantInIceberg =
+          InstantDTO.toInstant(
+              MAPPER.readValue(syncMetadata.getLatestTableOperationId(), InstantDTO.class),
+              metaClient.getInstantGenerator());
+      if (latestHoodieInstantInIceberg.equals(instantToRollback)) {
+        // The instant to rollback is committed in iceberg, so rollback to previous snapshot.
+        // NOTE: This is equivalent to hudi restore and should be performed by killing all active
+        // writers.
+        target.beginSync(internalTable);
+        target.rollbackToSnapshotId(table.currentSnapshot().snapshotId());
+      } else if (InstantComparison.compareTimestamps(
+          latestHoodieInstantInIceberg.getCompletionTime(),
+          InstantComparison.LESSER_THAN,
+          instantToRollback.getCompletionTime())) {
+        // In this case, instantToRollback was not committed in iceberg, so we can will be ignoring
+        // it.
+        log.info(
+            "Ignoring rollback to instant {}' because it is not committed in Iceberg. Latest committed instant in Iceberg {}'",
+            instantToRollback,
+            latestHoodieInstantInIceberg);
+      } else {
+        throw new IllegalArgumentException(
+            String.format(
+                "Cannot rollback to instant '%s' because it is older than the latest committed Hudi instant in Iceberg '%s'. "
+                    + "Rolling back would create an inconsistent state.",
+                instantToRollback, latestHoodieInstantInIceberg));
       }
-      target.beginSync(internalTable);
-      target.expireSnapshotIds(expireSnapshots);
     }
   }
 }
