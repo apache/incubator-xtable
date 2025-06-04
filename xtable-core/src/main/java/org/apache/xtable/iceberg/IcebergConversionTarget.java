@@ -292,6 +292,14 @@ public class IcebergConversionTarget implements ConversionTarget {
     tableSyncMetadata = null;
   }
 
+  public void rollbackToSnapshotId(long snapshotId) {
+    table.manageSnapshots().rollbackTo(snapshotId).commit();
+    transaction.commitTransaction();
+    transaction = null;
+    internalTableState = null;
+    tableSyncMetadata = null;
+  }
+
   private void rollbackCorruptCommits() {
     if (table == null) {
       // there is no existing table so exit early

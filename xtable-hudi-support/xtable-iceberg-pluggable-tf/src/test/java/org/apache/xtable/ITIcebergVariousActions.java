@@ -24,7 +24,6 @@ import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -36,13 +35,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import lombok.Builder;
 import lombok.SneakyThrows;
-import lombok.Value;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
@@ -50,6 +46,7 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -58,9 +55,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.client.HoodieReadClient;
-import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieAvroPayload;
-import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -126,6 +121,7 @@ public class ITIcebergVariousActions {
             "hudi",
             false,
             Arrays.asList(
+                new Schema.Field("key", Schema.create(Schema.Type.STRING)),
                 new Schema.Field("field1", Schema.create(Schema.Type.STRING)),
                 new Schema.Field("field2", Schema.create(Schema.Type.STRING))));
     HudiConversionSource hudiClient = null;
@@ -199,6 +195,16 @@ public class ITIcebergVariousActions {
                           .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                           .build(),
                       InternalField.builder()
+                          .name("key")
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(false)
+                                  .build())
+                          .defaultValue(null)
+                          .build(),
+                      InternalField.builder()
                           .name("field1")
                           .schema(
                               InternalSchema.builder()
@@ -218,7 +224,18 @@ public class ITIcebergVariousActions {
                                   .build())
                           .defaultValue(null)
                           .build()))
-              .recordKeyFields(Collections.singletonList(null))
+              .recordKeyFields(
+                  Collections.singletonList(
+                      InternalField.builder()
+                          .name("key")
+                          .schema(
+                              InternalSchema.builder()
+                                  .name("string")
+                                  .dataType(InternalType.STRING)
+                                  .isNullable(false)
+                                  .build())
+                          .defaultValue(null)
+                          .build()))
               .build();
       validateTable(
           internalTable,
@@ -461,12 +478,11 @@ public class ITIcebergVariousActions {
           insertsForCommit1.stream().collect(groupingBy(HoodieRecord::getPartitionPath));
       String selectedPartition = recordsByPartition.keySet().stream().sorted().findAny().get();
       table.deleteRecords(recordsByPartition.get(selectedPartition), true);
-      String zeroFileSlice = getFileSliceForPartition(metaClient, selectedPartition);
-      allBaseFilePaths.add(removeFileSlice(table.getAllLatestBaseFilePaths(), zeroFileSlice));
+      allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 
       // Insert few records for deleted partition again to make it interesting.
       table.insertRecords(20, selectedPartition, true);
-      allBaseFilePaths.add(removeFileSlice(table.getAllLatestBaseFilePaths(), zeroFileSlice));
+      allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 
       hudiClient = getHudiSourceClient(CONFIGURATION, table.getBasePath(), "level:VALUE");
       // Get the current snapshot
@@ -537,18 +553,33 @@ public class ITIcebergVariousActions {
       InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
       ValidationTestHelper.validateSnapshot(
           internalSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
+      // commitInstant1 would have been archived.
+      Assertions.assertFalse(
+          hudiClient.isIncrementalSyncSafeFrom(
+              HudiInstantUtils.parseFromInstantTime(commitInstant1)));
       // Get changes in Incremental format.
       InstantsForIncrementalSync instantsForIncrementalSync =
           InstantsForIncrementalSync.builder()
-              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
+              .lastSyncInstant(
+                  HudiInstantUtils.parseFromInstantTime(
+                      table
+                          .getMetaClient()
+                          .getActiveTimeline()
+                          .firstInstant()
+                          .get()
+                          .requestedTime()))
               .build();
+
       CommitsBacklog<HoodieInstant> instantCommitsBacklog =
           hudiClient.getCommitsBacklog(instantsForIncrementalSync);
       for (HoodieInstant instant : instantCommitsBacklog.getCommitsToProcess()) {
         TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
         allTableChanges.add(tableChange);
       }
-      ValidationTestHelper.validateTableChanges(allBaseFilePaths, allTableChanges);
+      List<List<String>> baseFilesForInstantsNotSynced =
+          allBaseFilePaths.subList(
+              allBaseFilePaths.size() - allTableChanges.size() - 1, allBaseFilePaths.size());
+      ValidationTestHelper.validateTableChanges(baseFilesForInstantsNotSynced, allTableChanges);
     } finally {
       safeClose(hudiClient);
     }
@@ -709,90 +740,6 @@ public class ITIcebergVariousActions {
         new ConfigurationBasedPartitionSpecExtractor(
             HudiSourceConfig.fromPartitionFieldSpecConfig(xTablePartitionConfig));
     return new HudiConversionSource(hoodieTableMetaClient, partitionSpecExtractor);
-  }
-
-  private List<String> removeFileSlice(List<String> files, String fileSlice) {
-    return files.stream().filter(file -> !file.contains(fileSlice)).collect(Collectors.toList());
-  }
-
-  private String getFileSliceForPartition(
-      HoodieTableMetaClient metaClient, String selectedPartition) throws IOException {
-    HoodieInstant lastInstant = metaClient.reloadActiveTimeline().lastInstant().get();
-    HoodieCommitMetadata commitMetadata =
-        metaClient.getActiveTimeline().readCommitMetadata(lastInstant);
-    return commitMetadata.getPartitionToWriteStats().get(selectedPartition).get(0).getPath();
-  }
-
-  private boolean checkIfNewFileGroupIsAdded(String activePath, TableChange tableChange) {
-    String activePathFileGroupId = getFileGroupInfo(activePath).getFileId();
-    String activePathCommitTime = getFileGroupInfo(activePath).getCommitTime();
-    Map<String, String> fileIdToCommitTimeMap =
-        tableChange.getFilesDiff().getFilesAdded().stream()
-            .collect(
-                Collectors.groupingBy(
-                    oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).getFileId(),
-                    Collectors.collectingAndThen(
-                        Collectors.mapping(
-                            oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).getCommitTime(),
-                            Collectors.toList()),
-                        list -> {
-                          if (list.size() > 1) {
-                            throw new IllegalStateException(
-                                "Some fileIds have more than one commit time.");
-                          }
-                          return list.get(0);
-                        })));
-    if (!fileIdToCommitTimeMap.containsKey(activePathFileGroupId)) {
-      return false;
-    }
-    Instant newCommitInstant =
-        HudiInstantUtils.parseFromInstantTime(fileIdToCommitTimeMap.get(activePathFileGroupId));
-    Instant oldCommitInstant = HudiInstantUtils.parseFromInstantTime(activePathCommitTime);
-    return newCommitInstant.isAfter(oldCommitInstant);
-  }
-
-  private boolean checkIfFileIsRemoved(String activePath, TableChange tableChange) {
-    String activePathFileGroupId = getFileGroupInfo(activePath).getFileId();
-    String activePathCommitTime = getFileGroupInfo(activePath).getCommitTime();
-    Map<String, String> fileIdToCommitTimeMap =
-        tableChange.getFilesDiff().getFilesRemoved().stream()
-            .collect(
-                Collectors.groupingBy(
-                    oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).getFileId(),
-                    Collectors.collectingAndThen(
-                        Collectors.mapping(
-                            oneDf -> getFileGroupInfo(oneDf.getPhysicalPath()).getCommitTime(),
-                            Collectors.toList()),
-                        list -> {
-                          if (list.size() > 1) {
-                            throw new IllegalStateException(
-                                "Some fileIds have more than one commit time.");
-                          }
-                          return list.get(0);
-                        })));
-    if (!fileIdToCommitTimeMap.containsKey(activePathFileGroupId)) {
-      return false;
-    }
-    if (!fileIdToCommitTimeMap.get(activePathFileGroupId).equals(activePathCommitTime)) {
-      return false;
-    }
-    return true;
-  }
-
-  private FileGroupInfo getFileGroupInfo(String path) {
-    String[] pathParts = path.split("/");
-    String fileName = pathParts[pathParts.length - 1];
-    return FileGroupInfo.builder()
-        .fileId(FSUtils.getFileId(fileName))
-        .commitTime(FSUtils.getCommitTime(fileName))
-        .build();
-  }
-
-  @Builder
-  @Value
-  private static class FileGroupInfo {
-    String fileId;
-    String commitTime;
   }
 
   @SneakyThrows

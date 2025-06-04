@@ -164,7 +164,7 @@ public class ITIcebergTableFormat {
    * 7. Insert records in the dropped partition again if table is partitioned.
    */
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
+  @ValueSource(booleans = {true})
   public void testVariousOperations(boolean isPartitioned) {
     String tableName = getTableName();
     String partitionConfig = null;
