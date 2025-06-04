@@ -22,11 +22,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 import lombok.SneakyThrows;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.dto.InstantDTO;
 
 import org.apache.iceberg.Snapshot;
@@ -43,6 +45,7 @@ import org.apache.xtable.iceberg.IcebergTableManager;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 
+@Log4j2
 public class IcebergTimelineArchiver {
   private static final ObjectMapper MAPPER =
       new ObjectMapper()
@@ -77,6 +80,11 @@ public class IcebergTimelineArchiver {
             InstantDTO.toInstant(
                 MAPPER.readValue(syncMetadata.getLatestTableOperationId(), InstantDTO.class),
                 metaClient.getInstantGenerator());
+        if (HoodieTimeline.SAVEPOINT_ACTION.equals(hoodieInstant.getAction())) {
+          log.warn(
+              "Skipping expiring next set of snapshots because of savepoint {}", hoodieInstant);
+          break;
+        }
         if (archivedInstants.contains(hoodieInstant)) {
           expireSnapshots.add(snapshot.snapshotId());
         }

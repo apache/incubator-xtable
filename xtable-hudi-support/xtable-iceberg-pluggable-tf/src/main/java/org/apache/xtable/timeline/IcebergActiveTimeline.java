@@ -104,7 +104,7 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
               metaClient.getInstantGenerator());
       instantsFromIceberg.put(hoodieInstant.requestedTime(), hoodieInstant);
     }
-    List<HoodieInstant> instantsAbsentInIceberg =
+    List<HoodieInstant> inflightInstantsInIceberg =
         instantsFromHoodieTimeline.stream()
             .filter(
                 hoodieInstant -> !instantsFromIceberg.containsKey(hoodieInstant.requestedTime()))
@@ -121,7 +121,11 @@ public class IcebergActiveTimeline extends ActiveTimelineV2 {
                   return instant;
                 })
             .collect(Collectors.toList());
-    return Stream.concat(instantsFromIceberg.values().stream(), instantsAbsentInIceberg.stream())
+    List<HoodieInstant> completedInstantsInIceberg =
+        instantsFromIceberg.values().stream()
+            .filter(instantsFromHoodieTimeline::contains)
+            .collect(Collectors.toList());
+    return Stream.concat(completedInstantsInIceberg.stream(), inflightInstantsInIceberg.stream())
         .sorted(InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR)
         .collect(Collectors.toList());
   }

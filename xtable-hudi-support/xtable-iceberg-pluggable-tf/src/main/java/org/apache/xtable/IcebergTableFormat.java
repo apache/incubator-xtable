@@ -23,8 +23,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
@@ -59,19 +57,18 @@ import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.spi.sync.TableFormatSync;
+import org.apache.xtable.timeline.IcebergRollbackExecutor;
 import org.apache.xtable.timeline.IcebergTimelineArchiver;
 import org.apache.xtable.timeline.IcebergTimelineFactory;
 
 public class IcebergTableFormat implements TableFormat {
   private transient TableFormatSync tableFormatSync;
-  private transient ExecutorService executorService;
 
   public IcebergTableFormat() {}
 
   @Override
   public void init(Properties properties) {
     this.tableFormatSync = TableFormatSync.getInstance();
-    this.executorService = Executors.newSingleThreadExecutor();
   }
 
   @Override
@@ -115,7 +112,9 @@ public class IcebergTableFormat implements TableFormat {
     InternalTable internalTable =
         hudiTableExtractor
             .getTableExtractor()
-            .table(metaClient, metaClient.getActiveTimeline().lastInstant().get());
+            .table(
+                metaClient,
+                metaClient.getActiveTimeline().filterCompletedInstants().lastInstant().get());
     archiveInstants(metaClient, internalTable, archivedInstants);
   }
 
@@ -125,7 +124,29 @@ public class IcebergTableFormat implements TableFormat {
       HoodieEngineContext engineContext,
       HoodieTableMetaClient metaClient,
       FileSystemViewManager viewManager) {
-    throw new UnsupportedOperationException("Rollback not supported yet");
+    HudiIncrementalTableChangeExtractor hudiTableExtractor =
+        getHudiTableExtractor(metaClient, viewManager);
+    InternalTable internalTable =
+        hudiTableExtractor
+            .getTableExtractor()
+            .table(
+                metaClient,
+                metaClient.getActiveTimeline().filterCompletedInstants().lastInstant().get());
+    IcebergRollbackExecutor rollbackExecutor =
+        new IcebergRollbackExecutor(metaClient, getIcebergConversionTarget(metaClient));
+    rollbackExecutor.rollbackSnapshot(internalTable, completedInstant);
+  }
+
+  @Override
+  public void completedRollback(
+      HoodieInstant rollbackInstant,
+      HoodieEngineContext engineContext,
+      HoodieTableMetaClient metaClient,
+      FileSystemViewManager viewManager) {
+    metaClient.reloadActiveTimeline();
+    HudiIncrementalTableChangeExtractor hudiTableExtractor =
+        getHudiTableExtractor(metaClient, viewManager);
+    completeInstant(metaClient, hudiTableExtractor.extractTableChanges(rollbackInstant));
   }
 
   @Override
@@ -134,16 +155,9 @@ public class IcebergTableFormat implements TableFormat {
       HoodieEngineContext engineContext,
       HoodieTableMetaClient metaClient,
       FileSystemViewManager viewManager) {
-    throw new UnsupportedOperationException("Savepoint not supported yet");
-  }
-
-  @Override
-  public void restore(
-      HoodieInstant savepoint,
-      HoodieEngineContext engineContext,
-      HoodieTableMetaClient metaClient,
-      FileSystemViewManager viewManager) {
-    throw new UnsupportedOperationException("Restore not supported yet");
+    HudiIncrementalTableChangeExtractor hudiTableExtractor =
+        getHudiTableExtractor(metaClient, viewManager);
+    completeInstant(metaClient, hudiTableExtractor.extractTableChanges(instant));
   }
 
   @Override
