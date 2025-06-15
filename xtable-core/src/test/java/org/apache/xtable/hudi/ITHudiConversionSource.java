@@ -19,6 +19,7 @@
 package org.apache.xtable.hudi;
 
 import static java.util.stream.Collectors.groupingBy;
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -689,7 +690,7 @@ public class ITHudiConversionSource {
       Configuration conf, String basePath, String xTablePartitionConfig) {
     HoodieTableMetaClient hoodieTableMetaClient =
         HoodieTableMetaClient.builder()
-            .setConf(conf)
+            .setConf(getStorageConf(conf))
             .setBasePath(basePath)
             .setLoadActiveTimelineOnLoad(true)
             .build();
