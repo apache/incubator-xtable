@@ -54,6 +54,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 
 import org.apache.xtable.GenericTable;
@@ -84,7 +85,8 @@ public class ITConversionService {
       Files.createDirectories(basePath);
 
       SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
-      sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
+      sparkSession =
+          SparkSession.builder().config(HoodieReadClient.addHoodieSupport(sparkConf)).getOrCreate();
       sparkSession
           .sparkContext()
           .hadoopConfiguration()
