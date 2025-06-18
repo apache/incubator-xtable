@@ -15,21 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
-package org.apache.xtable.model.storage;
+
+package org.apache.xtable.parquet;
+
+import java.util.Map;
+
+import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
 
 /**
- * Default constants for supported Table Formats
- *
- * @since 0.1
+ * Partition spec extractor interface specifically designed for Parquet to parse partition values
+ * appropriately.
  */
-public class TableFormat {
-  public static final String HUDI = "HUDI";
-  public static final String ICEBERG = "ICEBERG";
-  public static final String DELTA = "DELTA";
-  public static final String PARQUET = "PARQUET";
-
-  public static String[] values() {
-    return new String[] {"HUDI", "ICEBERG", "DELTA","PARQUET"};
-  }
+public interface ParquetSourcePartitionSpecExtractor extends SourcePartitionSpecExtractor {
+    Map<String, String> getPathToPartitionFieldFormat();
 }
