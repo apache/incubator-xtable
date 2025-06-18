@@ -16,20 +16,22 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.storage;
+package org.apache.xtable.parquet;
 
-/**
- * Default constants for supported Table Formats
- *
- * @since 0.1
- */
-public class TableFormat {
-  public static final String HUDI = "HUDI";
-  public static final String ICEBERG = "ICEBERG";
-  public static final String DELTA = "DELTA";
-  public static final String PARQUET = "PARQUET";
+import org.apache.hadoop.conf.Configuration;
 
-  public static String[] values() {
-    return new String[] {"HUDI", "ICEBERG", "DELTA","PARQUET"};
+import org.apache.xtable.conversion.ConversionSourceProvider;
+import org.apache.xtable.conversion.SourceTable;
+
+/** A concrete implementation of {@link ConversionSourceProvider} for Delta Lake table format. */
+public class ParquetConversionSourceProvider extends ConversionSourceProvider<Long> {
+  @Override
+  public ParquetConversionSource getConversionSourceInstance(SourceTable sourceTable) {
+
+    return ParquetConversionSource.builder()
+        .tableName(sourceTable.getName())
+        .basePath(sourceTable.getBasePath())
+        .hadoopConf(new Configuration())
+        .build();
   }
 }
