@@ -29,6 +29,7 @@ import lombok.AllArgsConstructor;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.PartitionFieldSpec;
 import org.apache.xtable.schema.SchemaFieldFinder;
 
 /**
@@ -49,7 +50,7 @@ public class ParquetPartitionSpecExtractor implements ParquetSourcePartitionSpec
     public List<InternalPartitionField> spec(InternalSchema tableSchema) {
         List<InternalPartitionField> partitionFields =
                 new ArrayList<>(config.getPartitionFieldSpecs().size());
-        for (ParquetSourceConfig.PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
+        for (PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
             InternalField sourceField =
                     SchemaFieldFinder.getInstance()
                             .findFieldByPath(tableSchema, fieldSpec.getSourceFieldPath());

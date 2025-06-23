@@ -70,22 +70,40 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     @NonNull
     private final Configuration hadoopConf;
 
-    /**
-     * To infer schema getting the latest file assumption is that latest file will have new fields
-     *
-     * @param modificationTime the commit to consider for reading the table state
-     * @return
-     */
-    @Override
-    public InternalTable getTable(Long modificationTime) {
 
-        List<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
-        // TODO last file in terms of modifcation time instead
-        LocatedFileStatus latestFile = parquetFiles.get(parquetFiles.size() - 1);
+    private InternalTable getMostRecentTable(List<LocatedFileStatus> parquetFiles){
+        Optional<LocatedFileStatus> latestFile =
+                parquetFiles.stream().max(Comparator.comparing(FileStatus::getModificationTime));
 
         ParquetMetadata parquetMetadata =
-                parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.getPath());
+                parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.get().getPath());
 
+        List<InternalPartitionField> partitionFields = partitionValueExtractor.extractParquertPartitions(parquetMetadata, latestFile.get().getPath().toString());
+        MessageType parquetSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
+        InternalSchema schema = schemaExtractor.toInternalSchema(parquetSchema, latestFile.get().getPath().toString());
+        DataLayoutStrategy dataLayoutStrategy =
+                partitionFields.isEmpty()
+                        ? DataLayoutStrategy.FLAT
+                        : DataLayoutStrategy.HIVE_STYLE_PARTITION;
+        return InternalTable.builder()
+                .tableFormat(TableFormat.PARQUET)
+                .basePath(basePath)
+                .name(tableName)
+                .layoutStrategy(dataLayoutStrategy)
+                .partitioningFields(partitionFields)
+                .readSchema(schema)
+                .latestCommitTime(Instant.ofEpochMilli(latestFile.get().getModificationTime()))
+                .build();
+        //InternalTable table= getTable(latestFile.get().getModificationTime());
+        //return table;
+    }
+    @Override
+    public InternalTable getTable(Long modificationTime) {
+        return null;
+       /* List<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
+        LocatedFileStatus latestFile = parquetFiles.get(parquetFiles.size() - 1);
+        ParquetMetadata parquetMetadata =
+                parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.getPath());
         List<InternalPartitionField> partitionFields = partitionValueExtractor.extractParquertPartitions(parquetMetadata, latestFile.getPath().toString());
         MessageType parquetSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
         InternalSchema schema = schemaExtractor.toInternalSchema(parquetSchema, latestFile.getPath().toString());
@@ -100,16 +118,12 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                 .layoutStrategy(dataLayoutStrategy)
                 .partitioningFields(partitionFields)
                 .readSchema(schema)
-                .latestCommitTime(Instant.ofEpochMilli(latestFile.getModificationTime()))
-                .build();
+                .latestCommitTime(Instant.ofEpochMilli(modificationTime))
+                .build();*/
     }
 
-    public List<InternalDataFile> getInternalDataFiles() {
-        List<InternalDataFile> internalDataFiles = null;
-        List<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
-        InternalTable table = getTable(-1L);
-        internalDataFiles =
-                parquetFiles.stream()
+    private List<InternalDataFile> getInternalDataFiles(List<LocatedFileStatus> parquetFiles) {
+        return parquetFiles.stream()
                         .map(
                                 file ->
                                         InternalDataFile.builder()
@@ -127,19 +141,18 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                                                                         hadoopConf, file.getPath())))
                                                 .build())
                         .collect(Collectors.toList());
-        return internalDataFiles;
     }
 
     // since we are considering files instead of tables in parquet
     @Override
-    public CommitsBacklog<java.lang.Long> getCommitsBacklog(
+    public CommitsBacklog<Long> getCommitsBacklog(
             InstantsForIncrementalSync lastSyncInstant) {
         long epochMilli = lastSyncInstant.getLastSyncInstant().toEpochMilli();
         return null;
     }
 
     @Override
-    public TableChange getTableChangeForCommit(java.lang.Long commit) {
+    public TableChange getTableChangeForCommit(Long commit) {
         return null;
     }
 
@@ -156,8 +169,9 @@ public class ParquetConversionSource implements ConversionSource<Long> {
      */
     @Override
     public InternalSnapshot getCurrentSnapshot() {
-        List<InternalDataFile> internalDataFiles = getInternalDataFiles();
-        InternalTable table = getTable(-1L);
+        List<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
+        List<InternalDataFile> internalDataFiles = getInternalDataFiles(parquetFiles);
+        InternalTable table = getMostRecentTable(parquetFiles);
         return InternalSnapshot.builder()
                 .table(table)
                 .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
@@ -165,7 +179,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     }
 
 
-    public List<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
+    private List<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
         try {
             FileSystem fs = FileSystem.get(hadoopConf);
             RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(basePath), true);
