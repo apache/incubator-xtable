@@ -30,6 +30,6 @@ public class TableFormat {
   public static final String PARQUET = "PARQUET";
 
   public static String[] values() {
-    return new String[] {"HUDI", "ICEBERG", "DELTA","PARQUET"};
+    return new String[] {"HUDI", "ICEBERG", "DELTA", "PARQUET"};
   }
 }

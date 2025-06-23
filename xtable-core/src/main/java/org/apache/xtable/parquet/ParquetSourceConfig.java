@@ -29,6 +29,7 @@ import lombok.Value;
 import com.google.common.base.Preconditions;
 
 import org.apache.xtable.model.schema.PartitionTransformType;
+import org.apache.xtable.model.schema.PartitionFieldSpec;
 import org.apache.xtable.reflection.ReflectionUtils;
 
 /** Configuration of Parquet source format for the sync process. */
@@ -59,12 +60,12 @@ public class ParquetSourceConfig {
         return new ParquetSourceConfig(partitionSpecExtractorClass, partitionFieldSpecs);
     }
 
-    @Value
+   /* @Value
     static class PartitionFieldSpec {
         String sourceFieldPath;
         PartitionTransformType transformType;
         String format;
-    }
+    }*/
 
     private static List<PartitionFieldSpec> parsePartitionFieldSpecs(String input) {
         if (input == null || input.isEmpty()) {
