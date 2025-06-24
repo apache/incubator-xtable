@@ -115,7 +115,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                             basePath))
                     .lastModified(file.getModificationTime())
                     .columnStats(
-                        parquetStatsExtractor.getColumnStatsForFile(
+                        parquetStatsExtractor.getColumnStatsForaFile(
                             parquetMetadataExtractor.readParquetMetadata(
                                 hadoopConf, file.getPath())))
                     .build())
@@ -134,7 +134,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         .lastModified(parquetFile.getModificationTime())
         .fileSizeBytes(parquetFile.getLen())
         .columnStats(
-            parquetStatsExtractor.getColumnStatsForFile(
+            parquetStatsExtractor.getColumnStatsForaFile(
                 parquetMetadataExtractor.readParquetMetadata(hadoopConf, parquetFile.getPath())))
         .build();
   }
