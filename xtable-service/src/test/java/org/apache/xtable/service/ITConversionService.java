@@ -50,27 +50,33 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
+import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import org.apache.xtable.GenericTable;
+import org.apache.xtable.conversion.ConversionController;
+import org.apache.xtable.conversion.ConversionSourceProvider;
+import org.apache.xtable.delta.DeltaConversionSourceProvider;
+import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.hudi.HudiTestUtil;
+import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.service.models.ConvertTableRequest;
 import org.apache.xtable.service.models.ConvertTableResponse;
 import org.apache.xtable.service.models.ConvertedTable;
 
 import io.quarkus.test.junit.QuarkusTest;
-import jakarta.inject.Inject;
 
 @QuarkusTest
 public class ITConversionService {
 
-  @Inject ConversionService conversionService;
+  private ConversionService conversionService;
   private static Path tempDir;
   protected static JavaSparkContext jsc;
   protected static SparkSession sparkSession;
@@ -95,6 +101,32 @@ public class ITConversionService {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @BeforeEach
+  public void setUp() {
+    // Create ConversionService with test's configuration
+    ConversionServiceConfig serviceConfig = new ConversionServiceConfig();
+    ConversionController conversionController = new ConversionController(jsc.hadoopConfiguration());
+    
+    Map<String, ConversionSourceProvider<?>> sourceProviders = new HashMap<>();
+    ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
+        new HudiConversionSourceProvider();
+    ConversionSourceProvider<Long> deltaConversionSourceProvider =
+        new DeltaConversionSourceProvider();
+    ConversionSourceProvider<org.apache.iceberg.Snapshot> icebergConversionSourceProvider =
+        new IcebergConversionSourceProvider();
+
+    hudiConversionSourceProvider.init(jsc.hadoopConfiguration());
+    deltaConversionSourceProvider.init(jsc.hadoopConfiguration());
+    icebergConversionSourceProvider.init(jsc.hadoopConfiguration());
+
+    sourceProviders.put(HUDI, hudiConversionSourceProvider);
+    sourceProviders.put(DELTA, deltaConversionSourceProvider);
+    sourceProviders.put(ICEBERG, icebergConversionSourceProvider);
+    
+    this.conversionService = new ConversionService(
+        serviceConfig, conversionController, jsc.hadoopConfiguration(), sourceProviders);
   }
 
   @AfterAll
