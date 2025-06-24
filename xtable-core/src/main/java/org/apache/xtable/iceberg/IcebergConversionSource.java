@@ -131,7 +131,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         .latestCommitTime(Instant.ofEpochMilli(snapshot.timestampMillis()))
         .readSchema(irSchema)
         .layoutStrategy(dataLayoutStrategy)
-        .latestMetdataPath(iceOps.current().metadataFileLocation())
+        .latestMetadataPath(iceOps.current().metadataFileLocation())
         .build();
   }
 
