@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.parquet;
 
 import java.util.Map;
@@ -27,5 +27,5 @@ import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
  * appropriately.
  */
 public interface ParquetSourcePartitionSpecExtractor extends SourcePartitionSpecExtractor {
-    Map<String, String> getPathToPartitionFieldFormat();
+  Map<String, String> getPathToPartitionFieldFormat();
 }

@@ -18,8 +18,6 @@
  
 package org.apache.xtable.parquet;
 
-import org.apache.hadoop.conf.Configuration;
-
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 

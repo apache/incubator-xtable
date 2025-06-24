@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.parquet;
 
 import java.util.ArrayList;
@@ -28,66 +28,65 @@ import lombok.Value;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.schema.PartitionFieldSpec;
+import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.reflection.ReflectionUtils;
 
 /** Configuration of Parquet source format for the sync process. */
 @Value
 public class ParquetSourceConfig {
-    public static final String PARTITION_SPEC_EXTRACTOR_CLASS =
-            "xtable.parquet.source.partition_spec_extractor_class";
-    public static final String PARTITION_FIELD_SPEC_CONFIG =
-            "xtable.parquet.source.partition_field_spec_config";
+  public static final String PARTITION_SPEC_EXTRACTOR_CLASS =
+      "xtable.parquet.source.partition_spec_extractor_class";
+  public static final String PARTITION_FIELD_SPEC_CONFIG =
+      "xtable.parquet.source.partition_field_spec_config";
 
-    String partitionSpecExtractorClass;
-    List<PartitionFieldSpec> partitionFieldSpecs;
+  String partitionSpecExtractorClass;
+  List<PartitionFieldSpec> partitionFieldSpecs;
 
-    public static ParquetSourceConfig fromPartitionFieldSpecConfig(String partitionFieldSpecConfig) {
-        return new ParquetSourceConfig(
-                ParquetPartitionSpecExtractor.class.getName(),
-                parsePartitionFieldSpecs(partitionFieldSpecConfig));
+  public static ParquetSourceConfig fromPartitionFieldSpecConfig(String partitionFieldSpecConfig) {
+    return new ParquetSourceConfig(
+        ParquetPartitionSpecExtractor.class.getName(),
+        parsePartitionFieldSpecs(partitionFieldSpecConfig));
+  }
+
+  public static ParquetSourceConfig fromProperties(Properties properties) {
+    String partitionSpecExtractorClass =
+        properties.getProperty(
+            PARTITION_SPEC_EXTRACTOR_CLASS, ParquetPartitionSpecExtractor.class.getName());
+    String partitionFieldSpecString = properties.getProperty(PARTITION_FIELD_SPEC_CONFIG);
+    List<PartitionFieldSpec> partitionFieldSpecs =
+        parsePartitionFieldSpecs(partitionFieldSpecString);
+    return new ParquetSourceConfig(partitionSpecExtractorClass, partitionFieldSpecs);
+  }
+
+  /* @Value
+  static class PartitionFieldSpec {
+      String sourceFieldPath;
+      PartitionTransformType transformType;
+      String format;
+  }*/
+
+  private static List<PartitionFieldSpec> parsePartitionFieldSpecs(String input) {
+    if (input == null || input.isEmpty()) {
+      return Collections.emptyList();
     }
+    String[] perFieldConfigs = input.split(",");
+    List<PartitionFieldSpec> partitionFields = new ArrayList<>(perFieldConfigs.length);
+    for (String fieldConfig : perFieldConfigs) {
+      String[] parts = fieldConfig.split(":");
+      String path = parts[0];
+      PartitionTransformType type =
+          PartitionTransformType.valueOf(parts[1].toUpperCase(Locale.ROOT));
+      String format = parts.length == 3 ? parts[2] : null;
 
-    public static ParquetSourceConfig fromProperties(Properties properties) {
-        String partitionSpecExtractorClass =
-                properties.getProperty(
-                        PARTITION_SPEC_EXTRACTOR_CLASS,
-                        ParquetPartitionSpecExtractor.class.getName());
-        String partitionFieldSpecString = properties.getProperty(PARTITION_FIELD_SPEC_CONFIG);
-        List<PartitionFieldSpec> partitionFieldSpecs =
-                parsePartitionFieldSpecs(partitionFieldSpecString);
-        return new ParquetSourceConfig(partitionSpecExtractorClass, partitionFieldSpecs);
+      partitionFields.add(new PartitionFieldSpec(path, type, format));
     }
+    return partitionFields;
+  }
 
-   /* @Value
-    static class PartitionFieldSpec {
-        String sourceFieldPath;
-        PartitionTransformType transformType;
-        String format;
-    }*/
-
-    private static List<PartitionFieldSpec> parsePartitionFieldSpecs(String input) {
-        if (input == null || input.isEmpty()) {
-            return Collections.emptyList();
-        }
-        String[] perFieldConfigs = input.split(",");
-        List<PartitionFieldSpec> partitionFields = new ArrayList<>(perFieldConfigs.length);
-        for (String fieldConfig : perFieldConfigs) {
-            String[] parts = fieldConfig.split(":");
-            String path = parts[0];
-            PartitionTransformType type =
-                    PartitionTransformType.valueOf(parts[1].toUpperCase(Locale.ROOT));
-            String format = parts.length == 3 ? parts[2] : null;
-
-            partitionFields.add(new PartitionFieldSpec(path, type, format));
-        }
-        return partitionFields;
-    }
-
-    public ParquetSourcePartitionSpecExtractor loadSourcePartitionSpecExtractor() {
-        Preconditions.checkNotNull(
-                partitionSpecExtractorClass, "ParquetSourcePartitionSpecExtractor class not provided");
-        return ReflectionUtils.createInstanceOfClass(partitionSpecExtractorClass, this);
-    }
+  public ParquetSourcePartitionSpecExtractor loadSourcePartitionSpecExtractor() {
+    Preconditions.checkNotNull(
+        partitionSpecExtractorClass, "ParquetSourcePartitionSpecExtractor class not provided");
+    return ReflectionUtils.createInstanceOfClass(partitionSpecExtractorClass, this);
+  }
 }

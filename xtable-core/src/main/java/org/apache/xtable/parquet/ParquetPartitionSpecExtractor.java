@@ -15,16 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.parquet;
-
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import lombok.AllArgsConstructor;
 
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -36,45 +33,44 @@ import org.apache.xtable.schema.SchemaFieldFinder;
  * Parses the InternalPartitionFields from a configured list of specs with the format
  * path:type:format for date types or path:type for value types.
  */
-//@AllArgsConstructor
+// @AllArgsConstructor
 public class ParquetPartitionSpecExtractor implements ParquetSourcePartitionSpecExtractor {
-    private static final ParquetPartitionSpecExtractor INSTANCE = new ParquetPartitionSpecExtractor();
-    private final ParquetSourceConfig config = null;//TODO shouldn't be init to null?
+  private static final ParquetPartitionSpecExtractor INSTANCE = new ParquetPartitionSpecExtractor();
+  private final ParquetSourceConfig config = null; // TODO shouldn't be init to null?
 
-    public static ParquetPartitionSpecExtractor getInstance() {
-        return INSTANCE;
+  public static ParquetPartitionSpecExtractor getInstance() {
+    return INSTANCE;
+  }
+
+  @Override
+  public List<InternalPartitionField> spec(InternalSchema tableSchema) {
+    List<InternalPartitionField> partitionFields =
+        new ArrayList<>(config.getPartitionFieldSpecs().size());
+    for (PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
+      InternalField sourceField =
+          SchemaFieldFinder.getInstance()
+              .findFieldByPath(tableSchema, fieldSpec.getSourceFieldPath());
+      partitionFields.add(
+          InternalPartitionField.builder()
+              .sourceField(sourceField)
+              .transformType(fieldSpec.getTransformType())
+              .build());
     }
+    return partitionFields;
+  }
 
-
-    @Override
-    public List<InternalPartitionField> spec(InternalSchema tableSchema) {
-        List<InternalPartitionField> partitionFields =
-                new ArrayList<>(config.getPartitionFieldSpecs().size());
-        for (PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
-            InternalField sourceField =
-                    SchemaFieldFinder.getInstance()
-                            .findFieldByPath(tableSchema, fieldSpec.getSourceFieldPath());
-            partitionFields.add(
-                    InternalPartitionField.builder()
-                            .sourceField(sourceField)
-                            .transformType(fieldSpec.getTransformType())
-                            .build());
-        }
-        return partitionFields;
-    }
-
-    @Override
-    public Map<String, String> getPathToPartitionFieldFormat() {
-        Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
-        config
-                .getPartitionFieldSpecs()
-                .forEach(
-                        partitionFieldSpec -> {
-                            if (partitionFieldSpec.getFormat() != null) {
-                                pathToPartitionFieldFormat.put(
-                                        partitionFieldSpec.getSourceFieldPath(), partitionFieldSpec.getFormat());
-                            }
-                        });
-        return pathToPartitionFieldFormat;
-    }
+  @Override
+  public Map<String, String> getPathToPartitionFieldFormat() {
+    Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
+    config
+        .getPartitionFieldSpecs()
+        .forEach(
+            partitionFieldSpec -> {
+              if (partitionFieldSpec.getFormat() != null) {
+                pathToPartitionFieldFormat.put(
+                    partitionFieldSpec.getSourceFieldPath(), partitionFieldSpec.getFormat());
+              }
+            });
+    return pathToPartitionFieldFormat;
+  }
 }
