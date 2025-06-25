@@ -108,7 +108,7 @@ public class ITConversionService {
     // Create ConversionService with test's configuration
     ConversionServiceConfig serviceConfig = new ConversionServiceConfig();
     ConversionController conversionController = new ConversionController(jsc.hadoopConfiguration());
-    
+
     Map<String, ConversionSourceProvider<?>> sourceProviders = new HashMap<>();
     ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
         new HudiConversionSourceProvider();
@@ -124,9 +124,10 @@ public class ITConversionService {
     sourceProviders.put(HUDI, hudiConversionSourceProvider);
     sourceProviders.put(DELTA, deltaConversionSourceProvider);
     sourceProviders.put(ICEBERG, icebergConversionSourceProvider);
-    
-    this.conversionService = new ConversionService(
-        serviceConfig, conversionController, jsc.hadoopConfiguration(), sourceProviders);
+
+    this.conversionService =
+        new ConversionService(
+            serviceConfig, conversionController, jsc.hadoopConfiguration(), sourceProviders);
   }
 
   @AfterAll
