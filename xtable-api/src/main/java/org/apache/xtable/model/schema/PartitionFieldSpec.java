@@ -16,20 +16,13 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.storage;
+package org.apache.xtable.model.schema;
 
-/**
- * Default constants for supported Table Formats
- *
- * @since 0.1
- */
-public class TableFormat {
-  public static final String HUDI = "HUDI";
-  public static final String ICEBERG = "ICEBERG";
-  public static final String DELTA = "DELTA";
-  public static final String PARQUET = "PARQUET";
+import lombok.Value;
 
-  public static String[] values() {
-    return new String[] {"HUDI", "ICEBERG", "DELTA", "PARQUET"};
-  }
+@Value
+public class PartitionFieldSpec {
+  String sourceFieldPath;
+  PartitionTransformType transformType;
+  String format;
 }
