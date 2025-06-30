@@ -1,0 +1,43 @@
+---
+title: "Release 0.3.0-incubating"
+sidebar_position: -3
+---
+
+## [Release 0.3.0-incubating](https://github.com/apache/incubator-xtable/releases/tag/0.3.0-incubating) ([docs](https://xtable.apache.org/docs/how-to))
+This is the third official Apache release for Apache XTable (Incubating), an incubating project under the Apache Software Foundation.
+Apache XTable™ (Incubating) facilitates omni-directional interoperability across data processing systems and query engines by allowing users to convert between open table formats without the need to rewrite any data files.
+Currently, Apache XTable™ (Incubating) supports the open-source table formats for Apache Hudi, Apache Iceberg, and Delta Lake.
+
+## ✨ What's Changed
+### 🔄 Core Functionality Enhancements
+
+#### Catalog Sync:
+* Introduced `CatalogSyncClient` and `CatalogSync` interfaces.
+* Implemented **Glue** and **HMS catalog sync** for **Iceberg**, **Delta**, and **Hudi**.
+* Additional information can be found in [docs](https://xtable.apache.org/docs/how-to-catalog-sync).
+
+#### Table Format Sync Improvements:
+* Added support for **continuous sync** using `RunSync`.
+* Support **restore/rollback** sync during conversion across all three formats.
+* Added support for **bucket partition transform** (Iceberg → Delta).
+* Synced **schema field comments** and **record counts** in Delta source.
+* Improved **decimal field scale** handling in iceberg and fixed bug in **column stats**.
+* Supporting **timestamp_ntz** type in conversion logic.
+
+#### Breaking changes
+* We have refactored `SyncStatusCode` and `ErrorDetails` into dedicated classes, refactor code by fixing the import path if you are using these classes.
+
+### 🧪 Testing & Quality
+* Fixed flaky tests and normalized base paths for test stability.
+* Addressed minor issues found via **static analysis tooling**.
+* Dockerfile syntax fix and test class name corrections.
+
+### 📘 Documentation & Community
+* Added **downloads page** for `0.2.0-incubating` release.
+* Introduced **RFC template** and new **change proposals**.
+* Updated **community sync** and **blog** pages.
+
+### 🧰 Infrastructure & Maintenance
+* Upgraded **parquet-avro** to 1.15.1 to fix critical vulnerabilities found recently.
+* Upgraded **Hadoop** and **AWS SDK** dependencies.
+* Refactored `RunSync` for better modularity and reusability.

@@ -19,6 +19,7 @@
 package org.apache.xtable.service;
 
 import static org.apache.xtable.conversion.ConversionUtils.convertToSourceTable;
+import static org.apache.xtable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
 import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -186,11 +188,23 @@ public class ConversionService {
    * @return a ConvertTableResponse containing details of the converted target tables
    */
   public ConvertTableResponse convertTable(ConvertTableRequest convertTableRequest) {
+
+    Properties sourceProperties = new Properties();
+    if (convertTableRequest.getConfigurations() != null) {
+      String partitionSpec =
+          convertTableRequest.getConfigurations().getOrDefault("partition-spec", null);
+      if (partitionSpec != null) {
+        sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionSpec);
+      }
+    }
+
     SourceTable sourceTable =
         SourceTable.builder()
             .name(convertTableRequest.getSourceTableName())
             .basePath(convertTableRequest.getSourceTablePath())
+            .dataPath(convertTableRequest.getSourceDataPath())
             .formatName(convertTableRequest.getSourceFormat())
+            .additionalProperties(sourceProperties)
             .build();
 
     List<TargetTable> targetTables = new ArrayList<>();
@@ -198,8 +212,10 @@ public class ConversionService {
       TargetTable targetTable =
           TargetTable.builder()
               .name(convertTableRequest.getSourceTableName())
-              .basePath(convertTableRequest.getSourceTablePath())
+              // set the metadata path to the data path as the default (required by Hudi)
+              .basePath(convertTableRequest.getSourceDataPath())
               .formatName(targetFormat)
+              .additionalProperties(sourceProperties)
               .build();
       targetTables.add(targetTable);
     }
@@ -220,9 +236,9 @@ public class ConversionService {
       String schemaString = extractSchemaString(targetTable, internalTable);
       convertedTables.add(
           ConvertedTable.builder()
-              .targetFormat(internalTable.getName())
+              .targetFormat(internalTable.getTableFormat())
               .targetSchema(schemaString)
-              .targetMetadataPath(internalTable.getLatestMetdataPath())
+              .targetMetadataPath(internalTable.getLatestMetadataPath())
               .build());
     }
     return new ConvertTableResponse(convertedTables);

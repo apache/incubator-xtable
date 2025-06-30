@@ -51,5 +51,5 @@ public class InternalTable {
   // latest commit(write) on the table.
   Instant latestCommitTime;
   // Path to latest metadata
-  String latestMetdataPath;
+  String latestMetadataPath;
 }
