@@ -18,6 +18,7 @@
  
 package org.apache.xtable;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.hudi.keygen.constant.KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME;
 import static org.apache.xtable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -48,6 +49,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import lombok.Getter;
 import lombok.SneakyThrows;
 
 import org.apache.avro.LogicalType;
@@ -94,6 +96,7 @@ import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieCompactionConfig;
 import org.apache.hudi.config.HoodieLockConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.hadoop.fs.HadoopFSUtils;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.KeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
@@ -132,7 +135,7 @@ public abstract class TestAbstractHudiTable
   protected String tableName;
   // Base path for the table
   protected String basePath;
-  protected HoodieTableMetaClient metaClient;
+  @Getter protected HoodieTableMetaClient metaClient;
   protected TypedProperties typedProperties;
   protected KeyGenerator keyGenerator;
   protected Schema schema;
@@ -591,14 +594,14 @@ public abstract class TestAbstractHudiTable
   @SneakyThrows
   protected HoodieTableMetaClient getMetaClient(
       TypedProperties keyGenProperties, HoodieTableType hoodieTableType, Configuration conf) {
-    LocalFileSystem fs = (LocalFileSystem) FSUtils.getFs(basePath, conf);
+    LocalFileSystem fs = (LocalFileSystem) HadoopFSUtils.getFs(basePath, conf);
     // Enforce checksum such that fs.open() is consistent to DFS
     fs.setVerifyChecksum(true);
     fs.mkdirs(new org.apache.hadoop.fs.Path(basePath));
 
     if (fs.exists(new org.apache.hadoop.fs.Path(basePath + "/.hoodie"))) {
       return HoodieTableMetaClient.builder()
-          .setConf(conf)
+          .setConf(getStorageConf(conf))
           .setBasePath(basePath)
           .setLoadActiveTimelineOnLoad(true)
           .build();
@@ -615,7 +618,8 @@ public abstract class TestAbstractHudiTable
             .setCommitTimezone(HoodieTimelineTimeZone.UTC)
             .setBaseFileFormat(HoodieFileFormat.PARQUET.toString())
             .build();
-    return HoodieTableMetaClient.initTableAndGetMetaClient(conf, this.basePath, properties);
+    return HoodieTableMetaClient.initTableAndGetMetaClient(
+        getStorageConf(conf), this.basePath, properties);
   }
 
   private static Schema.Field copyField(Schema.Field input) {
