@@ -248,7 +248,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   @Override
   public String getCommitIdentifier(Long aLong) {
-    return null;
+    return String.valueOf(aLong);
   }
 
   @Override
