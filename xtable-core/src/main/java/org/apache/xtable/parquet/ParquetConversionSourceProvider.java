@@ -25,7 +25,6 @@ import org.apache.xtable.conversion.SourceTable;
 public class ParquetConversionSourceProvider extends ConversionSourceProvider<Long> {
   @Override
   public ParquetConversionSource getConversionSourceInstance(SourceTable sourceTable) {
-    this.init(hadoopConf);
     return ParquetConversionSource.builder()
         .tableName(sourceTable.getName())
         .basePath(sourceTable.getBasePath())
