@@ -29,6 +29,7 @@ import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.schema.SchemaFieldFinder;
+import org.apache.xtable.model.schema.PartitionFieldSpec;
 
 /**
  * Parses the InternalPartitionFields from a configured list of specs with the format
@@ -42,7 +43,7 @@ public class ConfigurationBasedPartitionSpecExtractor implements HudiSourceParti
   public List<InternalPartitionField> spec(InternalSchema tableSchema) {
     List<InternalPartitionField> partitionFields =
         new ArrayList<>(config.getPartitionFieldSpecs().size());
-    for (HudiSourceConfig.PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
+    for (PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
       InternalField sourceField =
           SchemaFieldFinder.getInstance()
               .findFieldByPath(tableSchema, fieldSpec.getSourceFieldPath());
