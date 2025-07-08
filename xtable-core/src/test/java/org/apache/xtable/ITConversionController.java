@@ -21,9 +21,7 @@ package org.apache.xtable;
 import static org.apache.xtable.GenericTable.getTableName;
 import static org.apache.xtable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
 import static org.apache.xtable.hudi.HudiTestUtil.PartitionConfig;
-import static org.apache.xtable.model.storage.TableFormat.DELTA;
-import static org.apache.xtable.model.storage.TableFormat.HUDI;
-import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import static org.apache.xtable.model.storage.TableFormat.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -61,6 +59,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.xtable.parquet.ParquetConversionSourceProvider;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -141,7 +140,7 @@ public class ITConversionController {
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
-    for (String sourceTableFormat : Arrays.asList(HUDI, DELTA, ICEBERG)) {
+    for (String sourceTableFormat : Arrays.asList(HUDI, DELTA, ICEBERG, PARQUET)) {
       for (SyncMode syncMode : SyncMode.values()) {
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceTableFormat, syncMode, isPartitioned));
@@ -184,7 +183,12 @@ public class ITConversionController {
           new IcebergConversionSourceProvider();
       icebergConversionSourceProvider.init(jsc.hadoopConfiguration());
       return icebergConversionSourceProvider;
-    } else {
+    } else if (sourceTableFormat.equalsIgnoreCase(PARQUET)) {
+      ConversionSourceProvider<Long> parquetConversionSourceProvider =
+              new ParquetConversionSourceProvider();
+      parquetConversionSourceProvider.init(jsc.hadoopConfiguration());
+      return parquetConversionSourceProvider;
+    }else {
       throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
     }
   }
@@ -422,7 +426,7 @@ public class ITConversionController {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {HUDI, DELTA, ICEBERG})
+  @ValueSource(strings = {HUDI, DELTA, ICEBERG, PARQUET})
   public void testTimeTravelQueries(String sourceTableFormat) throws Exception {
     String tableName = getTableName();
     try (GenericTable table =
@@ -488,7 +492,7 @@ public class ITConversionController {
         .filter(format -> !format.equals(sourceTableFormat))
         .collect(Collectors.toList());
   }
-
+// TODO add tests for Parquet format
   private static Stream<Arguments> provideArgsForPartitionTesting() {
     String timestampFilter =
         String.format(
