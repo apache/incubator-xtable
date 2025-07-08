@@ -28,13 +28,13 @@ import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionFieldSpec;
 import org.apache.xtable.schema.SchemaFieldFinder;
-
+import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 /**
  * Parses the InternalPartitionFields from a configured list of specs with the format
  * path:type:format for date types or path:type for value types.
  */
 // @AllArgsConstructor
-public class ParquetPartitionSpecExtractor implements ParquetSourcePartitionSpecExtractor {
+public class ParquetPartitionSpecExtractor implements PathBasedPartitionSpecExtractor {
   private static final ParquetPartitionSpecExtractor INSTANCE = new ParquetPartitionSpecExtractor();
   private final ParquetSourceConfig config = null; // TODO shouldn't be init to null?
 

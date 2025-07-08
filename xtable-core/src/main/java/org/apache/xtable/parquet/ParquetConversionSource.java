@@ -42,6 +42,7 @@ import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.spi.extractor.ConversionSource;
+import org.apache.xtable.hudi.PathBasedPartitionValuesExtractor;
 
 @Builder
 // @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -53,11 +54,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   @Builder.Default
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
-
-  @Builder.Default
-  private static final ParquetPartitionValueExtractor partitionValueExtractor =
-      ParquetPartitionValueExtractor.getInstance();
-
+  private final ParquetPartitionValueExtractor partitionValueExtractor;
   @Builder.Default
   private static final ParquetStatsExtractor parquetStatsExtractor =
       ParquetStatsExtractor.getInstance();
@@ -73,7 +70,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.get().getPath());
 
     List<InternalPartitionField> partitionFields =
-        partitionValueExtractor.extractParquertPartitions(
+            partitionValueExtractor.extractParquetPartitions(
             parquetMetadata, latestFile.get().getPath().toString());
     MessageType parquetSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
     InternalSchema schema =
@@ -108,7 +105,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                     .fileSizeBytes(file.getLen())
                     .partitionValues(
                         partitionValueExtractor.extractPartitionValues(
-                            partitionValueExtractor.extractParquertPartitions(
+                            partitionValueExtractor.extractParquetPartitions(
                                 parquetMetadataExtractor.readParquetMetadata(
                                     hadoopConf, file.getPath()),
                                 file.getPath().toString()),
@@ -127,7 +124,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         .physicalPath(parquetFile.getPath().toString())
         .partitionValues(
             partitionValueExtractor.extractPartitionValues(
-                partitionValueExtractor.extractParquertPartitions(
+                partitionValueExtractor.extractParquetPartitions(
                     parquetMetadataExtractor.readParquetMetadata(hadoopConf, parquetFile.getPath()),
                     parquetFile.getPath().toString()),
                 basePath))

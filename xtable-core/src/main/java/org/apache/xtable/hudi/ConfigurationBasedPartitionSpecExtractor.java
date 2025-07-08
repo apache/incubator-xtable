@@ -36,7 +36,7 @@ import org.apache.xtable.model.schema.PartitionFieldSpec;
  * path:type:format for date types or path:type for value types.
  */
 @AllArgsConstructor
-public class ConfigurationBasedPartitionSpecExtractor implements HudiSourcePartitionSpecExtractor {
+public class ConfigurationBasedPartitionSpecExtractor implements PathBasedPartitionSpecExtractor {
   private final HudiSourceConfig config;
 
   @Override

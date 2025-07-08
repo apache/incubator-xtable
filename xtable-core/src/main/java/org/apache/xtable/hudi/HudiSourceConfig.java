@@ -77,7 +77,7 @@ public class HudiSourceConfig {
     return partitionFields;
   }
 
-  public HudiSourcePartitionSpecExtractor loadSourcePartitionSpecExtractor() {
+  public PathBasedPartitionSpecExtractor loadSourcePartitionSpecExtractor() {
     Preconditions.checkNotNull(
         partitionSpecExtractorClass, "HudiSourcePartitionSpecExtractor class not provided");
     return ReflectionUtils.createInstanceOfClass(partitionSpecExtractorClass, this);

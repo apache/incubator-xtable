@@ -16,16 +16,16 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.parquet;
+package org.apache.xtable.hudi;
 
 import java.util.Map;
 
 import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
 
 /**
- * Partition spec extractor interface specifically designed for Parquet to parse partition values
+ * Partition spec extractor interface specifically designed for Hudi/Parquet to parse partition values
  * appropriately.
  */
-public interface ParquetSourcePartitionSpecExtractor extends SourcePartitionSpecExtractor {
+public interface PathBasedPartitionSpecExtractor extends SourcePartitionSpecExtractor {
   Map<String, String> getPathToPartitionFieldFormat();
 }

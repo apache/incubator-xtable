@@ -22,11 +22,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.TimeZone;
+import java.util.*;
 
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
@@ -38,12 +34,12 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 
-/** Extracts Partition Values for Hudi from Partition Path. */
+/** Extracts Partition Values for Hudi/Parquet from Partition Path. */
 @AllArgsConstructor
-public class HudiPartitionValuesExtractor {
+public class PathBasedPartitionValuesExtractor {
   private static final String HIVE_DEFAULT_PARTITION = "__HIVE_DEFAULT_PARTITION__";
   @NonNull private final Map<String, String> pathToPartitionFieldFormat;
-
+  
   public List<PartitionValue> extractPartitionValues(
       List<InternalPartitionField> partitionColumns, String partitionPath) {
     if (partitionColumns == null) {

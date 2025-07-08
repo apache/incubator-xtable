@@ -693,7 +693,7 @@ public class ITHudiConversionSource {
             .setBasePath(basePath)
             .setLoadActiveTimelineOnLoad(true)
             .build();
-    HudiSourcePartitionSpecExtractor partitionSpecExtractor =
+    PathBasedPartitionSpecExtractor partitionSpecExtractor =
         new ConfigurationBasedPartitionSpecExtractor(
             HudiSourceConfig.fromPartitionFieldSpecConfig(xTablePartitionConfig));
     return new HudiConversionSource(hoodieTableMetaClient, partitionSpecExtractor);

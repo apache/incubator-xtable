@@ -75,7 +75,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
   private final HoodieTableMetadata tableMetadata;
   private final HoodieTableMetaClient metaClient;
   private final HoodieEngineContext engineContext;
-  private final HudiPartitionValuesExtractor partitionValuesExtractor;
+  private final PathBasedPartitionValuesExtractor partitionValuesExtractor;
   private final HudiFileStatsExtractor fileStatsExtractor;
   private final HoodieMetadataConfig metadataConfig;
   private final FileSystemViewManager fileSystemViewManager;
@@ -83,7 +83,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
   public HudiDataFileExtractor(
       HoodieTableMetaClient metaClient,
-      HudiPartitionValuesExtractor hudiPartitionValuesExtractor,
+      PathBasedPartitionValuesExtractor hudiPartitionValuesExtractor,
       HudiFileStatsExtractor hudiFileStatsExtractor) {
     this.engineContext = new HoodieLocalEngineContext(metaClient.getHadoopConf());
     metadataConfig =
