@@ -15,14 +15,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 package org.apache.xtable.model.schema;
 
 import lombok.Value;
 
+/**
+ * PartitionFieldSpec represents a schema for the partition format as specified through the user configuration for the conversion
+ *
+ * @since 0.3
+ */
 @Value
 public class PartitionFieldSpec {
-  String sourceFieldPath;
-  PartitionTransformType transformType;
-  String format;
+    String sourceFieldPath;
+    PartitionTransformType transformType;
+    String format;
 }
