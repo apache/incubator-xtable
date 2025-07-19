@@ -240,21 +240,21 @@ public class ITDeltaKernelConversionSource {
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
 
-//    validatePartitionDataFiles(
-//        PartitionFileGroup.builder()
-//            .files(
-//                Collections.singletonList(
-//                    InternalDataFile.builder()
-//                        .physicalPath("file:/fake/path")
-//                        .fileFormat(FileFormat.APACHE_PARQUET)
-//                        .partitionValues(Collections.emptyList())
-//                        .fileSizeBytes(716)
-//                        .recordCount(1)
-//                        .columnStats(columnStats)
-//                        .build()))
-//            .partitionValues(Collections.emptyList())
-//            .build(),
-//        snapshot.getPartitionedDataFiles().get(0));
+    //    validatePartitionDataFiles(
+    //        PartitionFileGroup.builder()
+    //            .files(
+    //                Collections.singletonList(
+    //                    InternalDataFile.builder()
+    //                        .physicalPath("file:/fake/path")
+    //                        .fileFormat(FileFormat.APACHE_PARQUET)
+    //                        .partitionValues(Collections.emptyList())
+    //                        .fileSizeBytes(716)
+    //                        .recordCount(1)
+    //                        .columnStats(columnStats)
+    //                        .build()))
+    //            .partitionValues(Collections.emptyList())
+    //            .build(),
+    //        snapshot.getPartitionedDataFiles().get(0));
     //    System.out.println(snapshot.getPartitionedDataFiles().get(0).getDataFiles());
     //    Configuration hadoopConf = new Configuration();
     //    Engine myEngine = DefaultEngine.create(hadoopConf);
