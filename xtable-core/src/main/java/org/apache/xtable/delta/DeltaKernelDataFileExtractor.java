@@ -22,14 +22,12 @@ package org.apache.xtable.delta;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import io.delta.kernel.internal.actions.AddFile;
 import lombok.Builder;
 
 import org.apache.hadoop.conf.Configuration;
 
 import io.delta.kernel.Scan;
 import io.delta.kernel.Snapshot;
-import io.delta.kernel.Table;
 import io.delta.kernel.data.FilteredColumnarBatch;
 import io.delta.kernel.data.Row;
 import io.delta.kernel.defaults.engine.DefaultEngine;

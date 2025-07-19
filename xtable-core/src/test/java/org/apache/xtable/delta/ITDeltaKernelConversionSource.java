@@ -18,11 +18,9 @@
  
 package org.apache.xtable.delta;
 
-import static io.delta.kernel.internal.util.Utils.singletonCloseableIterator;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
@@ -32,42 +30,28 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
-import io.delta.kernel.Scan;
-import io.delta.kernel.data.ColumnVector;
-import io.delta.kernel.data.ColumnarBatch;
-import io.delta.kernel.data.FilteredColumnarBatch;
-import io.delta.kernel.data.Row;
-import io.delta.kernel.internal.InternalScanFileUtils;
-import io.delta.kernel.internal.data.ScanStateRow;
-import io.delta.kernel.types.StructType;
-import io.delta.kernel.utils.CloseableIterator;
-import io.delta.kernel.utils.FileStatus;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.SparkSession;
-import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.stat.ColumnStat;
-import org.apache.xtable.model.stat.Range;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
+
+import io.delta.kernel.*;
 
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.kernel.DeltaKernelConversionSource;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
-
-import io.delta.kernel.utils.CloseableIterator;
-import io.delta.kernel.defaults.engine.DefaultEngine;
-import io.delta.kernel.engine.Engine;
-import io.delta.kernel.*;
 
 public class ITDeltaKernelConversionSource {
   private static final InternalField COL1_INT_FIELD =
@@ -106,21 +90,21 @@ public class ITDeltaKernelConversionSource {
           .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
           .build();
   private static final ColumnStat COL2_COLUMN_STAT =
-          ColumnStat.builder()
-                  .field(COL2_INT_FIELD)
-                  .range(Range.vector(2, 2))
-                  .numNulls(0)
-                  .numValues(1)
-                  .totalSize(0)
-                  .build();
+      ColumnStat.builder()
+          .field(COL2_INT_FIELD)
+          .range(Range.vector(2, 2))
+          .numNulls(0)
+          .numValues(1)
+          .totalSize(0)
+          .build();
   private static final ColumnStat COL1_COLUMN_STAT =
-          ColumnStat.builder()
-                  .field(COL1_INT_FIELD)
-                  .range(Range.vector(1, 1))
-                  .numNulls(0)
-                  .numValues(1)
-                  .totalSize(0)
-                  .build();
+      ColumnStat.builder()
+          .field(COL1_INT_FIELD)
+          .range(Range.vector(1, 1))
+          .numNulls(0)
+          .numValues(1)
+          .totalSize(0)
+          .build();
 
   private DeltaKernelConversionSourceProvider conversionSourceProvider;
   private static SparkSession sparkSession;
@@ -144,12 +128,14 @@ public class ITDeltaKernelConversionSource {
   }
 
   @TempDir private static Path tempDir;
+
   @AfterAll
   public static void teardown() {
     if (sparkSession != null) {
       sparkSession.close();
     }
   }
+
   @BeforeEach
   void setUp() {
     Configuration hadoopConf = new Configuration();
@@ -178,19 +164,19 @@ public class ITDeltaKernelConversionSource {
             .basePath(basePath.toString())
             .formatName(TableFormat.DELTA)
             .build();
-//    System.out.println(
-//        "Table Config: " + tableConfig.getBasePath() + ", " + tableConfig.getDataPath());
+    //    System.out.println(
+    //        "Table Config: " + tableConfig.getBasePath() + ", " + tableConfig.getDataPath());
     DeltaKernelConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
     // Get current table
     InternalTable internalTable = conversionSource.getCurrentTable();
     List<InternalField> fields = Arrays.asList(COL1_INT_FIELD, COL2_INT_FIELD, COL3_STR_FIELD);
-//    System.out.println("Internal Table: " + internalTable);
-//    System.out.println("Fields: " + fields);
-//    System.out.println("Table Format: " + TableFormat.DELTA);
-//    System.out.println("Data Layout Strategy: " + DataLayoutStrategy.FLAT);
-//    System.out.println("Base Path: " + basePath);
-//    System.out.println("Latest getReadSchema : " + internalTable.getReadSchema());
+    //    System.out.println("Internal Table: " + internalTable);
+    //    System.out.println("Fields: " + fields);
+    //    System.out.println("Table Format: " + TableFormat.DELTA);
+    //    System.out.println("Data Layout Strategy: " + DataLayoutStrategy.FLAT);
+    //    System.out.println("Base Path: " + basePath);
+    //    System.out.println("Latest getReadSchema : " + internalTable.getReadSchema());
     //    System.out.println("Latest getLatestMetadataPath : " + InternalSchema);
     validateTable(
         internalTable,
@@ -217,124 +203,128 @@ public class ITDeltaKernelConversionSource {
     System.out.println("Base Path: " + basePath);
     // Create table with a single row using Spark
     sparkSession.sql(
-            "CREATE TABLE `"
-                    + tableName
-                    + "` USING DELTA LOCATION '"
-                    + basePath
-                    + "' AS SELECT * FROM VALUES (1, 2)");
+        "CREATE TABLE `"
+            + tableName
+            + "` USING DELTA LOCATION '"
+            + basePath
+            + "' AS SELECT * FROM VALUES (1, 2)");
     // Create Delta source
     SourceTable tableConfig =
-            SourceTable.builder()
-                    .name(tableName)
-                    .basePath(basePath.toString())
-                    .formatName(TableFormat.DELTA)
-                    .build();
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
+            .build();
     DeltaKernelConversionSource conversionSource =
-            conversionSourceProvider.getConversionSourceInstance(tableConfig);
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
     // Get current snapshot
     InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
 
-//    snapshot.getPartitionedDataFiles().get(0)
+    //    snapshot.getPartitionedDataFiles().get(0)
     // Validate table
     List<InternalField> fields = Arrays.asList(COL1_INT_FIELD, COL2_INT_FIELD);
     validateTable(
-            snapshot.getTable(),
-            tableName,
-            TableFormat.DELTA,
-            InternalSchema.builder()
-                    .name("struct")
-                    .dataType(InternalType.RECORD)
-                    .fields(fields)
-                    .build(),
-            DataLayoutStrategy.FLAT,
-            "file://" + basePath,
-            snapshot.getTable().getLatestMetadataPath(),
-            Collections.emptyList());
+        snapshot.getTable(),
+        tableName,
+        TableFormat.DELTA,
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .fields(fields)
+            .build(),
+        DataLayoutStrategy.FLAT,
+        "file://" + basePath,
+        snapshot.getTable().getLatestMetadataPath(),
+        Collections.emptyList());
     // Validate data files
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
 
-//    validatePartitionDataFiles(
-//            PartitionFileGroup.builder()
-//                    .files(
-//                            Collections.singletonList(
-//                                    InternalDataFile.builder()
-//                                            .physicalPath("file:/fake/path")
-//                                            .fileFormat(FileFormat.APACHE_PARQUET)
-//                                            .partitionValues(Collections.emptyList())
-//                                            .fileSizeBytes(716)
-//                                            .recordCount(1)
-//                                            .columnStats(columnStats)
-//                                            .build()))
-//                    .partitionValues(Collections.emptyList())
-//                    .build(),
-//            snapshot.getPartitionedDataFiles().get(0));
-//    System.out.println(snapshot.getPartitionedDataFiles().get(0).getDataFiles());
-//    Configuration hadoopConf = new Configuration();
-//    Engine myEngine = DefaultEngine.create(hadoopConf);
-//    Table myTable = Table.forPath(myEngine, basePath.toString());
-//    Snapshot mySnapshot = myTable.getLatestSnapshot(myEngine);
-//    Scan myScan = mySnapshot.getScanBuilder().build();
-//
-//
-//    // Common information about scanning for all data files to read.
-//    Row scanState = myScan.getScanState(myEngine);
-//
-//    // Information about the list of scan files to read
-//    CloseableIterator<FilteredColumnarBatch> fileIter = myScan.getScanFiles(myEngine);
-//    int readRecordCount = 0;
-//    try {
-//      StructType physicalReadSchema = ScanStateRow.getPhysicalDataReadSchema(myEngine, scanState);
-//      while (fileIter.hasNext()) {
-//        FilteredColumnarBatch scanFilesBatch = fileIter.next();
-//        try (CloseableIterator<Row> scanFileRows = scanFilesBatch.getRows()) {
-//          while (scanFileRows.hasNext()) {
-//            Row scanFileRow = scanFileRows.next();
-//            FileStatus fileStatus = InternalScanFileUtils.getAddFileStatus(scanFileRow);
-//            CloseableIterator<ColumnarBatch> physicalDataIter =
-//                    myEngine
-//                            .getParquetHandler()
-//                            .readParquetFiles(
-//                                    singletonCloseableIterator(fileStatus),
-//                                    physicalReadSchema,
-//                                    Optional.empty());
-//            try (CloseableIterator<FilteredColumnarBatch> transformedData =
-//                         Scan.transformPhysicalData(myEngine, scanState, scanFileRow, physicalDataIter)) {
-//              while (transformedData.hasNext()) {
-//                FilteredColumnarBatch logicalData = transformedData.next();
-//                ColumnarBatch dataBatch = logicalData.getData();
-//
-//                // access the data for the column at ordinal 0
-//                ColumnVector column0 = dataBatch.getColumnVector(0);
-//                ColumnVector column1 = dataBatch.getColumnVector(1);
-////
-////                for (int rowIndex = 0; rowIndex < column0.getSize(); rowIndex++) {
-////                  System.out.println(column0.getInt(rowIndex));
-////                }
-//                for (int rowIndex = 0; rowIndex < column1.getSize(); rowIndex++) {
-//                  System.out.println(column1.getInt(rowIndex));
-//                }
-//              }
-//            }
-//          }
-//        }
-//      }
-//    } catch (IOException e) {
-//      e.printStackTrace();
-//      System.out.println("IOException occurred: " + e.getMessage());
-//    }
+        validatePartitionDataFiles(
+                PartitionFileGroup.builder()
+                        .files(
+                                Collections.singletonList(
+                                        InternalDataFile.builder()
+                                                .physicalPath("file:/fake/path")
+                                                .fileFormat(FileFormat.APACHE_PARQUET)
+                                                .partitionValues(Collections.emptyList())
+                                                .fileSizeBytes(716)
+                                                .recordCount(1)
+                                                .columnStats(columnStats)
+                                                .build()))
+                        .partitionValues(Collections.emptyList())
+                        .build(),
+                snapshot.getPartitionedDataFiles().get(0));
+    //    System.out.println(snapshot.getPartitionedDataFiles().get(0).getDataFiles());
+    //    Configuration hadoopConf = new Configuration();
+    //    Engine myEngine = DefaultEngine.create(hadoopConf);
+    //    Table myTable = Table.forPath(myEngine, basePath.toString());
+    //    Snapshot mySnapshot = myTable.getLatestSnapshot(myEngine);
+    //    Scan myScan = mySnapshot.getScanBuilder().build();
+    //
+    //
+    //    // Common information about scanning for all data files to read.
+    //    Row scanState = myScan.getScanState(myEngine);
+    //
+    //    // Information about the list of scan files to read
+    //    CloseableIterator<FilteredColumnarBatch> fileIter = myScan.getScanFiles(myEngine);
+    //    int readRecordCount = 0;
+    //    try {
+    //      StructType physicalReadSchema = ScanStateRow.getPhysicalDataReadSchema(myEngine,
+    // scanState);
+    //      while (fileIter.hasNext()) {
+    //        FilteredColumnarBatch scanFilesBatch = fileIter.next();
+    //        try (CloseableIterator<Row> scanFileRows = scanFilesBatch.getRows()) {
+    //          while (scanFileRows.hasNext()) {
+    //            Row scanFileRow = scanFileRows.next();
+    //            FileStatus fileStatus = InternalScanFileUtils.getAddFileStatus(scanFileRow);
+    //            CloseableIterator<ColumnarBatch> physicalDataIter =
+    //                    myEngine
+    //                            .getParquetHandler()
+    //                            .readParquetFiles(
+    //                                    singletonCloseableIterator(fileStatus),
+    //                                    physicalReadSchema,
+    //                                    Optional.empty());
+    //            try (CloseableIterator<FilteredColumnarBatch> transformedData =
+    //                         Scan.transformPhysicalData(myEngine, scanState, scanFileRow,
+    // physicalDataIter)) {
+    //              while (transformedData.hasNext()) {
+    //                FilteredColumnarBatch logicalData = transformedData.next();
+    //                ColumnarBatch dataBatch = logicalData.getData();
+    //
+    //                // access the data for the column at ordinal 0
+    //                ColumnVector column0 = dataBatch.getColumnVector(0);
+    //                ColumnVector column1 = dataBatch.getColumnVector(1);
+    ////
+    ////                for (int rowIndex = 0; rowIndex < column0.getSize(); rowIndex++) {
+    ////                  System.out.println(column0.getInt(rowIndex));
+    ////                }
+    //                for (int rowIndex = 0; rowIndex < column1.getSize(); rowIndex++) {
+    //                  System.out.println(column1.getInt(rowIndex));
+    //                }
+    //              }
+    //            }
+    //          }
+    //        }
+    //      }
+    //    } catch (IOException e) {
+    //      e.printStackTrace();
+    //      System.out.println("IOException occurred: " + e.getMessage());
+    //    }
 
-}
+  }
+
   private void validatePartitionDataFiles(
-          PartitionFileGroup expectedPartitionFiles, PartitionFileGroup actualPartitionFiles)
-          throws URISyntaxException {
+      PartitionFileGroup expectedPartitionFiles, PartitionFileGroup actualPartitionFiles)
+      throws URISyntaxException {
     assertEquals(
-            expectedPartitionFiles.getPartitionValues(), actualPartitionFiles.getPartitionValues());
+        expectedPartitionFiles.getPartitionValues(), actualPartitionFiles.getPartitionValues());
     validateDataFiles(expectedPartitionFiles.getDataFiles(), actualPartitionFiles.getDataFiles());
   }
+
   private void validateDataFiles(
-          List<InternalDataFile> expectedFiles, List<InternalDataFile> actualFiles)
-          throws URISyntaxException {
+      List<InternalDataFile> expectedFiles, List<InternalDataFile> actualFiles)
+      throws URISyntaxException {
     Assertions.assertEquals(expectedFiles.size(), actualFiles.size());
     for (int i = 0; i < expectedFiles.size(); i++) {
       InternalDataFile expected = expectedFiles.get(i);
@@ -342,30 +332,30 @@ public class ITDeltaKernelConversionSource {
       validatePropertiesDataFile(expected, actual);
     }
   }
+
   private void validatePropertiesDataFile(InternalDataFile expected, InternalDataFile actual)
-          throws URISyntaxException {
+      throws URISyntaxException {
     Assertions.assertTrue(
-            Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
-            () -> "path == " + actual.getPhysicalPath() + " is not absolute");
+        Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
+        () -> "path == " + actual.getPhysicalPath() + " is not absolute");
     Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
     Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
     Assertions.assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
     System.out.println("Expected File Size: " + expected);
     System.out.println("Actual File Size: " + actual);
-//    Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
-//    Instant now = Instant.now();
-//    long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
-//    long maxRange = now.toEpochMilli();
-//    Assertions.assertTrue(
-//            actual.getLastModified() > minRange && actual.getLastModified() <= maxRange,
-//            () ->
-//                    "last modified == "
-//                            + actual.getLastModified()
-//                            + " is expected between "
-//                            + minRange
-//                            + " and "
-//                            + maxRange);
-//    Assertions.assertEquals(expected.getColumnStats(), actual.getColumnStats());
+    //    Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
+    Instant now = Instant.now();
+    long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
+    long maxRange = now.toEpochMilli();
+    Assertions.assertTrue(
+            actual.getLastModified() > minRange && actual.getLastModified() <= maxRange,
+            () ->
+                    "last modified == "
+                            + actual.getLastModified()
+                            + " is expected between "
+                            + minRange
+                            + " and "
+                            + maxRange);
+    Assertions.assertEquals(expected.getColumnStats(), actual.getColumnStats());
   }
-
 }

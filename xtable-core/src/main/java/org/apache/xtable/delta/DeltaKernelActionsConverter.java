@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import io.delta.kernel.statistics.DataFileStatistics;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -68,15 +67,15 @@ public class DeltaKernelActionsConverter {
       DeltaKernelPartitionExtractor partitionExtractor,
       DeltaKernelStatsExtractor fileStatsExtractor,
       Map<String, String> partitionValues) {
-    DataFileStatus dataFileStatus = new DataFileStatus(
+    DataFileStatus dataFileStatus =
+        new DataFileStatus(
             addFile.getPath(),
             addFile.getModificationTime(),
             addFile.getSize(),
             Optional.empty() // or Optional.empty() if not available
-    );
+            );
     System.out.println("dataFileStatus:" + dataFileStatus);
-    FileStats fileStats =
-        fileStatsExtractor.getColumnStatsForFile(dataFileStatus, fields);
+    FileStats fileStats = fileStatsExtractor.getColumnStatsForFile(dataFileStatus, fields);
     System.out.println("fileStats:" + fileStats);
     List<ColumnStat> columnStats =
         includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
