@@ -20,6 +20,8 @@ package org.apache.xtable.kernel;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 import lombok.Builder;
 
@@ -30,29 +32,31 @@ import io.delta.kernel.Table;
 import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
 
-import org.apache.xtable.delta.DeltaKernelTableExtractor;
+import org.apache.xtable.delta.*;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.*;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.spi.extractor.ConversionSource;
+import org.apache.xtable.spi.extractor.DataFileIterator;
 
 @Builder
 public class DeltaKernelConversionSource implements ConversionSource<Long> {
+
+  @Builder.Default
+  private final DeltaKernelDataFileExtractor dataFileExtractor =
+      DeltaKernelDataFileExtractor.builder().build();
+
   private final String basePath;
   private final String tableName;
   private final Engine engine;
+
   //  private final DeltaKernelTableExtractor tableExtractor;
 
   @Builder.Default
   private final DeltaKernelTableExtractor tableExtractor =
       DeltaKernelTableExtractor.builder().build();
-  //    private final DeltaKernelActionsConverter actionsConverter;
-
-  //  public DeltaKernelConversionSource(String basePath, String tableName, Engine engine) {
-  //    this.basePath = basePath;
-  //    this.tableName = tableName;
-  //    this.engine = engine;
-  //
-  //  }
 
   @Override
   public InternalTable getTable(Long version) {
@@ -80,7 +84,17 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
   @Override
   public InternalSnapshot getCurrentSnapshot() {
-    return null;
+    Configuration hadoopConf = new Configuration();
+    Engine engine = DefaultEngine.create(hadoopConf);
+    System.out.println("getCurrentSnapshot12: " + basePath);
+    Table table_snapshot = Table.forPath(engine, basePath);
+    Snapshot snapshot = table_snapshot.getLatestSnapshot(engine);
+    InternalTable table = getTable(snapshot.getVersion());
+    return InternalSnapshot.builder()
+        .table(table)
+        .partitionedDataFiles(getInternalDataFiles(snapshot, table.getReadSchema()))
+        .sourceIdentifier(getCommitIdentifier(snapshot.getVersion()))
+        .build();
   }
 
   @Override
@@ -102,6 +116,17 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   @Override
   public String getCommitIdentifier(Long aLong) {
     return "";
+  }
+
+  private List<PartitionFileGroup> getInternalDataFiles(
+      io.delta.kernel.Snapshot snapshot, InternalSchema schema) {
+    try (DataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
+      List<InternalDataFile> dataFiles = new ArrayList<>();
+      fileIterator.forEachRemaining(dataFiles::add);
+      return PartitionFileGroup.fromFiles(dataFiles);
+    } catch (Exception e) {
+      throw new ReadException("Failed to iterate through Delta data files", e);
+    }
   }
 
   @Override
