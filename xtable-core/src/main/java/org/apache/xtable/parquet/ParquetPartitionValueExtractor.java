@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
+import lombok.AllArgsConstructor;
 import lombok.NonNull;
 import lombok.Value;
 
@@ -57,9 +58,9 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
-  private static final ParquetPartitionSpecExtractor partitionsSpecExtractor =
-      ParquetPartitionSpecExtractor.getInstance();
-
+//  private static final ParquetPartitionSpecExtractor partitionsSpecExtractor =
+//      ParquetPartitionSpecExtractor.getInstance();
+  private ParquetPartitionSpecExtractor partitionsSpecExtractor;
   public ParquetPartitionValueExtractor(@NonNull Map<String, String> pathToPartitionFieldFormat) {
     super(pathToPartitionFieldFormat);
   }
@@ -68,8 +69,6 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
     return INSTANCE;
   }
 
-  private static final String HIVE_DEFAULT_PARTITION = "__HIVE_DEFAULT_PARTITION__";
-  private final Map<String, String> pathToPartitionFieldFormat = null;
 
   public List<InternalPartitionField> extractParquetPartitions(
       ParquetMetadata footer, String path) {

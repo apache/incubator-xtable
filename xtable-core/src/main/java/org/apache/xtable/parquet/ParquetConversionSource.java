@@ -57,6 +57,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     private static final ParquetStatsExtractor parquetStatsExtractor =
             ParquetStatsExtractor.getInstance();
     private final ParquetPartitionValueExtractor partitionValueExtractor;
+    private final ParquetPartitionSpecExtractor partitionSpecExtractor;
     private final String tableName;
     private final String basePath;
     private final String configPath;
@@ -66,13 +67,13 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     private InternalTable createInternalTableFromTable(LocatedFileStatus latestFile) {
         ParquetMetadata parquetMetadata =
                 parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.getPath());
-
-        List<InternalPartitionField> partitionFields =
-                partitionValueExtractor.extractParquetPartitions(
-                        parquetMetadata, latestFile.getPath().toString());
         MessageType parquetSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
         InternalSchema schema =
                 schemaExtractor.toInternalSchema(parquetSchema, latestFile.getPath().toString());
+        List<InternalPartitionField> partitionFields =
+                partitionSpecExtractor.spec(
+                        schema);
+
         DataLayoutStrategy dataLayoutStrategy =
                 partitionFields.isEmpty()
                         ? DataLayoutStrategy.FLAT

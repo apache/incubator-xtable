@@ -37,13 +37,14 @@ import org.apache.xtable.model.schema.PartitionFieldSpec;
  */
 @AllArgsConstructor
 public class ConfigurationBasedPartitionSpecExtractor implements PathBasedPartitionSpecExtractor {
-  private final HudiSourceConfig config;
+  //private final HudiSourceConfig config;
+  private final List<PartitionFieldSpec> partitionFieldSpecs;
 
   @Override
   public List<InternalPartitionField> spec(InternalSchema tableSchema) {
     List<InternalPartitionField> partitionFields =
-        new ArrayList<>(config.getPartitionFieldSpecs().size());
-    for (PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
+        new ArrayList<>(partitionFieldSpecs.size());
+    for (PartitionFieldSpec fieldSpec : partitionFieldSpecs) {
       InternalField sourceField =
           SchemaFieldFinder.getInstance()
               .findFieldByPath(tableSchema, fieldSpec.getSourceFieldPath());
@@ -59,8 +60,7 @@ public class ConfigurationBasedPartitionSpecExtractor implements PathBasedPartit
   @Override
   public Map<String, String> getPathToPartitionFieldFormat() {
     Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
-    config
-        .getPartitionFieldSpecs()
+    partitionFieldSpecs
         .forEach(
             partitionFieldSpec -> {
               if (partitionFieldSpec.getFormat() != null) {
