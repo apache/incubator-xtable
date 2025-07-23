@@ -161,18 +161,10 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                 parquetFiles.stream()
                         .filter(fileStatus -> fileStatus.getModificationTime() > modificationTime)
                         .collect(Collectors.toList());
-        List<FileStatus> tableChangesBefore =
-                parquetFiles.stream()
-                        .filter(fileStatus -> fileStatus.getModificationTime() < modificationTime)
-                        .collect(Collectors.toList());
         InternalTable internalTable = getMostRecentTable(parquetFiles);
-
         for (FileStatus tableStatus : tableChangesAfter) {
-            boolean isPresent = tableChangesBefore.contains(tableStatus);
-            if (!isPresent) {
                 InternalDataFile currentDataFile = createInternalDataFileFromParquetFile(tableStatus);
                 addedInternalDataFiles.add(currentDataFile);
-            }
         }
 
         return TableChange.builder()
