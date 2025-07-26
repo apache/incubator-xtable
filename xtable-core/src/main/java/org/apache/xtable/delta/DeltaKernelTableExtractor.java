@@ -19,19 +19,19 @@
 package org.apache.xtable.delta;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import lombok.Builder;
 
 import io.delta.kernel.*;
 import io.delta.kernel.engine.Engine;
+import io.delta.kernel.types.StructField;
+import io.delta.kernel.types.StructType;
 
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
 
@@ -51,42 +51,29 @@ public class DeltaKernelTableExtractor {
     try {
       // Get schema from Delta Kernel's snapshot
       io.delta.kernel.types.StructType schema = snapshot.getSchema();
+      InternalSchema internalSchema = schemaExtractor.toInternalSchema(schema);
+      // Get partition columns);
+      StructType fullSchema = snapshot.getSchema(); // The full table schema
+      List<String> partitionColumns = snapshot.getPartitionColumnNames(); // List<String>
 
-      System.out.println("Kernelschema: " + schema);
+      List<StructField> partitionFields_strfld =
+          fullSchema.fields().stream()
+              .filter(field -> partitionColumns.contains(field.getName()))
+              .collect(Collectors.toList());
 
-      InternalSchema internalSchema = schemaExtractor.toInternalSchema_v2(schema);
-      //      io.delta.kernel.types.StructType schema = snapshot.getSchema();
-      ////      InternalSchema internalSchema = schemaExtractor.toInternalSchema_v2(schema);
-      //      InternalSchema internalSchema =
-      // schemaExtractor.toInternalSchema(snapshot.getSchema());
+      StructType partitionSchema = new StructType(partitionFields_strfld);
 
-      // Get partition columns
-      System.out.println("Partition columns: " + internalSchema);
-      List<String> partitionColumnNames = snapshot.getPartitionColumnNames();
-      List<InternalPartitionField> partitionFields = new ArrayList<>();
-      for (String columnName : partitionColumnNames) {
-        InternalField sourceField =
-            InternalField.builder()
-                .name(columnName)
-                .schema(
-                    InternalSchema.builder()
-                        .name(columnName)
-                        .dataType(InternalType.STRING) // Assuming string type for partition columns
-                        .build())
-                .build();
-
-        // Create the partition field with the source field
-        partitionFields.add(InternalPartitionField.builder().sourceField(sourceField).build());
-      }
+      List<InternalPartitionField> partitionFields =
+          DeltaKernelPartitionExtractor.getInstance()
+              .convertFromDeltaPartitionFormat(internalSchema, partitionSchema);
 
       DataLayoutStrategy dataLayoutStrategy =
-          partitionFields.isEmpty()
-              ? DataLayoutStrategy.FLAT
-              : DataLayoutStrategy.HIVE_STYLE_PARTITION;
+          !partitionFields.isEmpty()
+              ? DataLayoutStrategy.HIVE_STYLE_PARTITION
+              : DataLayoutStrategy.FLAT;
 
       // Get the timestamp
       long timestamp = snapshot.getTimestamp(engine) * 1000; // Convert to milliseconds
-      System.out.println("InternalTable basepath" + basePath);
       return InternalTable.builder()
           .tableFormat(TableFormat.DELTA)
           .basePath(basePath)

@@ -20,24 +20,25 @@ package org.apache.xtable.delta;
 
 // import scala.collection.Map;
 import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import lombok.Builder;
 
 import org.apache.hadoop.conf.Configuration;
 
-import io.delta.kernel.Scan;
 import io.delta.kernel.Snapshot;
 import io.delta.kernel.data.FilteredColumnarBatch;
 import io.delta.kernel.data.Row;
 import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.InternalScanFileUtils;
+import io.delta.kernel.internal.ScanImpl;
 import io.delta.kernel.internal.SnapshotImpl;
+import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
 import io.delta.kernel.utils.CloseableIterator;
-import io.delta.kernel.utils.FileStatus;
 
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -101,8 +102,15 @@ public class DeltaKernelDataFileExtractor {
       Configuration hadoopConf = new Configuration();
       Engine engine = DefaultEngine.create(hadoopConf);
 
-      Scan myScan = snapshot.getScanBuilder().build();
-      CloseableIterator<FilteredColumnarBatch> scanFiles = myScan.getScanFiles(engine);
+      //      Scan myScan = snapshot.getScanBuilder().build();
+      //      CloseableIterator<FilteredColumnarBatch> scanFiles = myScan.getScanFiles(engine);
+
+      ScanImpl myScan = (ScanImpl) snapshot.getScanBuilder().build();
+      CloseableIterator<FilteredColumnarBatch> scanFiles =
+          myScan.getScanFiles(engine, includeColumnStats);
+      //      String statsJson = extractStatsJson(scanFiles,fullSchema);
+      //      System.out.println("StatsJson: " + statsJson);
+
       this.dataFilesIterator =
           Collections
               .emptyIterator(); // Initialize the dataFilesIterator by iterating over the scan files
@@ -111,10 +119,12 @@ public class DeltaKernelDataFileExtractor {
         CloseableIterator<Row> scanFileRows = scanFileColumnarBatch.getRows();
         while (scanFileRows.hasNext()) {
           Row scanFileRow = scanFileRows.next();
-
           // From the scan file row, extract the file path, size and modification time metadata
           // needed to read the file.
-          FileStatus fileStatus = InternalScanFileUtils.getAddFileStatus(scanFileRow);
+          AddFile addFile =
+              new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
+
+          //          FileStatus fileStatus = InternalScanFileUtils.getAddFileStatus(scanFileRow);
           Map<String, String> partitionValues =
               InternalScanFileUtils.getPartitionValues(scanFileRow);
           // Convert the FileStatus to InternalDataFile using the actionsConverter
@@ -122,7 +132,7 @@ public class DeltaKernelDataFileExtractor {
           this.dataFilesIterator =
               Collections.singletonList(
                       actionsConverter.convertAddActionToInternalDataFile(
-                          fileStatus,
+                          addFile,
                           snapshot,
                           fileFormat,
                           partitionFields,

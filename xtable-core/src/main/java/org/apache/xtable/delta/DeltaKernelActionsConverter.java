@@ -23,7 +23,6 @@ import static org.apache.xtable.delta.DeltaActionsConverter.getFullPathToFile;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -37,9 +36,8 @@ import io.delta.kernel.Snapshot;
 import io.delta.kernel.Table;
 import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
+import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.types.*;
-import io.delta.kernel.utils.DataFileStatus;
-import io.delta.kernel.utils.FileStatus;
 
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
@@ -58,7 +56,7 @@ public class DeltaKernelActionsConverter {
   }
 
   public InternalDataFile convertAddActionToInternalDataFile(
-      FileStatus addFile,
+      AddFile addFile,
       Snapshot deltaSnapshot,
       FileFormat fileFormat,
       List<InternalPartitionField> partitionFields,
@@ -67,16 +65,7 @@ public class DeltaKernelActionsConverter {
       DeltaKernelPartitionExtractor partitionExtractor,
       DeltaKernelStatsExtractor fileStatsExtractor,
       Map<String, String> partitionValues) {
-    DataFileStatus dataFileStatus =
-        new DataFileStatus(
-            addFile.getPath(),
-            addFile.getModificationTime(),
-            addFile.getSize(),
-            Optional.empty() // or Optional.empty() if not available
-            );
-    System.out.println("dataFileStatus:" + dataFileStatus);
-    FileStats fileStats = fileStatsExtractor.getColumnStatsForFile(dataFileStatus, fields);
-    System.out.println("fileStats:" + fileStats);
+    FileStats fileStats = fileStatsExtractor.getColumnStatsForFile(addFile, fields);
     List<ColumnStat> columnStats =
         includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
     long recordCount = fileStats.getNumRecords();

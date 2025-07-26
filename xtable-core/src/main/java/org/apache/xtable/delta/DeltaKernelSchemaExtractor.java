@@ -44,13 +44,13 @@ public class DeltaKernelSchemaExtractor {
     return INSTANCE;
   }
 
-  public InternalSchema toInternalSchema_v2(StructType structType) {
-    return toInternalSchema_v2(structType, null, false, null);
+  public InternalSchema toInternalSchema(StructType structType) {
+    return toInternalSchema(structType, null, false, null);
   }
 
   String trimmedTypeName = "";
 
-  private InternalSchema toInternalSchema_v2(
+  private InternalSchema toInternalSchema(
       DataType dataType, String parentPath, boolean nullable, String comment) {
 
     Map<InternalSchema.MetadataKey, Object> metadata = null;
@@ -88,7 +88,7 @@ public class DeltaKernelSchemaExtractor {
                             ? field.getMetadata().getString("comment")
                             : null;
                     InternalSchema schema =
-                        toInternalSchema_v2(
+                        toInternalSchema(
                             field.getDataType(),
                             SchemaUtils.getFullyQualifiedPath(parentPath, field.getName()),
                             field.isNullable(),

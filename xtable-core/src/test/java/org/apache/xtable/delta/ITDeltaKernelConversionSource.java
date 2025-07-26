@@ -44,10 +44,9 @@ import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.kernel.DeltaKernelConversionSource;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.model.schema.InternalField;
-import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.schema.*;
 import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
@@ -130,9 +129,10 @@ public class ITDeltaKernelConversionSource {
   @TempDir private static Path tempDir;
 
   @AfterAll
-  public static void teardown() {
+  public static void tearDownSparkSession() {
     if (sparkSession != null) {
-      sparkSession.close();
+      sparkSession.catalog().clearCache();
+      sparkSession.stop();
     }
   }
 
@@ -146,61 +146,11 @@ public class ITDeltaKernelConversionSource {
   }
 
   @Test
-  void getCurrentTableTest() {
-    // Table name
-    final String tableName = GenericTable.getTableName();
-    final Path basePath = tempDir.resolve(tableName);
-    // Create table with a single row using Spark
-    sparkSession.sql(
-        "CREATE TABLE `"
-            + tableName
-            + "` USING DELTA LOCATION '"
-            + basePath
-            + "' AS SELECT * FROM VALUES (1, 2, 3)");
-    // Create Delta source
-    SourceTable tableConfig =
-        SourceTable.builder()
-            .name(tableName)
-            .basePath(basePath.toString())
-            .formatName(TableFormat.DELTA)
-            .build();
-    //    System.out.println(
-    //        "Table Config: " + tableConfig.getBasePath() + ", " + tableConfig.getDataPath());
-    DeltaKernelConversionSource conversionSource =
-        conversionSourceProvider.getConversionSourceInstance(tableConfig);
-    // Get current table
-    InternalTable internalTable = conversionSource.getCurrentTable();
-    List<InternalField> fields = Arrays.asList(COL1_INT_FIELD, COL2_INT_FIELD, COL3_STR_FIELD);
-    //    System.out.println("Internal Table: " + internalTable);
-    //    System.out.println("Fields: " + fields);
-    //    System.out.println("Table Format: " + TableFormat.DELTA);
-    //    System.out.println("Data Layout Strategy: " + DataLayoutStrategy.FLAT);
-    //    System.out.println("Base Path: " + basePath);
-    //    System.out.println("Latest getReadSchema : " + internalTable.getReadSchema());
-    //    System.out.println("Latest getLatestMetadataPath : " + InternalSchema);
-    validateTable(
-        internalTable,
-        tableName,
-        TableFormat.DELTA,
-        InternalSchema.builder()
-            .name("struct")
-            .dataType(InternalType.RECORD)
-            .fields(fields)
-            .build(),
-        DataLayoutStrategy.FLAT,
-        "file://" + basePath,
-        internalTable.getLatestMetadataPath(),
-        Collections.emptyList());
-  }
-
-  @Test
   void getCurrentSnapshotNonPartitionedTest() throws URISyntaxException {
     // Table name
     final String tableName = GenericTable.getTableName();
     final Path basePath = tempDir.resolve(tableName);
-
-    System.out.println("Table Name: " + tableName);
-    System.out.println("Base Path: " + basePath);
+    System.out.println("Table Name Non partitioned : " + basePath);
     // Create table with a single row using Spark
     sparkSession.sql(
         "CREATE TABLE `"
@@ -219,8 +169,6 @@ public class ITDeltaKernelConversionSource {
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
     // Get current snapshot
     InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
-
-    //    snapshot.getPartitionedDataFiles().get(0)
     // Validate table
     List<InternalField> fields = Arrays.asList(COL1_INT_FIELD, COL2_INT_FIELD);
     validateTable(
@@ -240,78 +188,145 @@ public class ITDeltaKernelConversionSource {
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
     Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
 
-    //    validatePartitionDataFiles(
-    //        PartitionFileGroup.builder()
-    //            .files(
-    //                Collections.singletonList(
-    //                    InternalDataFile.builder()
-    //                        .physicalPath("file:/fake/path")
-    //                        .fileFormat(FileFormat.APACHE_PARQUET)
-    //                        .partitionValues(Collections.emptyList())
-    //                        .fileSizeBytes(716)
-    //                        .recordCount(1)
-    //                        .columnStats(columnStats)
-    //                        .build()))
-    //            .partitionValues(Collections.emptyList())
-    //            .build(),
-    //        snapshot.getPartitionedDataFiles().get(0));
-    //    System.out.println(snapshot.getPartitionedDataFiles().get(0).getDataFiles());
-    //    Configuration hadoopConf = new Configuration();
-    //    Engine myEngine = DefaultEngine.create(hadoopConf);
-    //    Table myTable = Table.forPath(myEngine, basePath.toString());
-    //    Snapshot mySnapshot = myTable.getLatestSnapshot(myEngine);
-    //    Scan myScan = mySnapshot.getScanBuilder().build();
-    //
-    //
-    //    // Common information about scanning for all data files to read.
-    //    Row scanState = myScan.getScanState(myEngine);
-    //
-    //    // Information about the list of scan files to read
-    //    CloseableIterator<FilteredColumnarBatch> fileIter = myScan.getScanFiles(myEngine);
-    //    int readRecordCount = 0;
-    //    try {
-    //      StructType physicalReadSchema = ScanStateRow.getPhysicalDataReadSchema(myEngine,
-    // scanState);
-    //      while (fileIter.hasNext()) {
-    //        FilteredColumnarBatch scanFilesBatch = fileIter.next();
-    //        try (CloseableIterator<Row> scanFileRows = scanFilesBatch.getRows()) {
-    //          while (scanFileRows.hasNext()) {
-    //            Row scanFileRow = scanFileRows.next();
-    //            FileStatus fileStatus = InternalScanFileUtils.getAddFileStatus(scanFileRow);
-    //            CloseableIterator<ColumnarBatch> physicalDataIter =
-    //                    myEngine
-    //                            .getParquetHandler()
-    //                            .readParquetFiles(
-    //                                    singletonCloseableIterator(fileStatus),
-    //                                    physicalReadSchema,
-    //                                    Optional.empty());
-    //            try (CloseableIterator<FilteredColumnarBatch> transformedData =
-    //                         Scan.transformPhysicalData(myEngine, scanState, scanFileRow,
-    // physicalDataIter)) {
-    //              while (transformedData.hasNext()) {
-    //                FilteredColumnarBatch logicalData = transformedData.next();
-    //                ColumnarBatch dataBatch = logicalData.getData();
-    //
-    //                // access the data for the column at ordinal 0
-    //                ColumnVector column0 = dataBatch.getColumnVector(0);
-    //                ColumnVector column1 = dataBatch.getColumnVector(1);
-    ////
-    ////                for (int rowIndex = 0; rowIndex < column0.getSize(); rowIndex++) {
-    ////                  System.out.println(column0.getInt(rowIndex));
-    ////                }
-    //                for (int rowIndex = 0; rowIndex < column1.getSize(); rowIndex++) {
-    //                  System.out.println(column1.getInt(rowIndex));
-    //                }
-    //              }
-    //            }
-    //          }
-    //        }
-    //      }
-    //    } catch (IOException e) {
-    //      e.printStackTrace();
-    //      System.out.println("IOException occurred: " + e.getMessage());
-    //    }
+    validatePartitionDataFiles(
+        PartitionFileGroup.builder()
+            .files(
+                Collections.singletonList(
+                    InternalDataFile.builder()
+                        .physicalPath("file:/fake/path")
+                        .fileFormat(FileFormat.APACHE_PARQUET)
+                        .partitionValues(Collections.emptyList())
+                        .fileSizeBytes(716)
+                        .recordCount(1)
+                        .columnStats(columnStats)
+                        .build()))
+            .partitionValues(Collections.emptyList())
+            .build(),
+        snapshot.getPartitionedDataFiles().get(0));
+  }
 
+  @Test
+  void getCurrentTableTest() {
+    // Table name
+    final String tableName = GenericTable.getTableName();
+    final Path basePath = tempDir.resolve(tableName);
+    ;
+    // Create table with a single row using Spark
+    sparkSession.sql(
+        "CREATE TABLE `"
+            + tableName
+            + "` USING DELTA LOCATION '"
+            + basePath
+            + "' AS SELECT * FROM VALUES (1, 2, 3)");
+    // Create Delta source
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
+            .build();
+    DeltaKernelConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+    // Get current table
+    InternalTable internalTable = conversionSource.getCurrentTable();
+    List<InternalField> fields = Arrays.asList(COL1_INT_FIELD, COL2_INT_FIELD, COL3_STR_FIELD);
+    validateTable(
+        internalTable,
+        tableName,
+        TableFormat.DELTA,
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .fields(fields)
+            .build(),
+        DataLayoutStrategy.FLAT,
+        "file://" + basePath,
+        internalTable.getLatestMetadataPath(),
+        Collections.emptyList());
+  }
+
+  @Test
+  void getCurrentSnapshotPartitionedTest() throws URISyntaxException {
+    // Table name
+    final String tableName = GenericTable.getTableName();
+    final Path basePath = tempDir.resolve(tableName);
+    // Create table with a single row using Spark
+    sparkSession.sql(
+        "CREATE TABLE `"
+            + tableName
+            + "` USING DELTA PARTITIONED BY (part_col)\n"
+            + "LOCATION '"
+            + basePath
+            + "' AS SELECT 'SingleValue' AS part_col, 1 AS col1, 2 AS col2");
+    // Create Delta source
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
+            .build();
+    DeltaKernelConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+    // Get current snapshot
+    InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
+    // Validate table
+    InternalField partCol =
+        InternalField.builder()
+            .name("part_col")
+            .schema(
+                InternalSchema.builder()
+                    .name("string")
+                    .dataType(InternalType.STRING)
+                    .isNullable(true)
+                    .build())
+            .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+            .build();
+    List<InternalField> fields = Arrays.asList(partCol, COL1_INT_FIELD, COL2_INT_FIELD);
+    validateTable(
+        snapshot.getTable(),
+        tableName,
+        TableFormat.DELTA,
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .fields(fields)
+            .build(),
+        DataLayoutStrategy.HIVE_STYLE_PARTITION,
+        "file://" + basePath,
+        snapshot.getTable().getLatestMetadataPath(),
+        Collections.singletonList(
+            InternalPartitionField.builder()
+                .sourceField(partCol)
+                .transformType(PartitionTransformType.VALUE)
+                .build()));
+    // Validate data files
+    List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
+    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
+    List<PartitionValue> partitionValue =
+        Collections.singletonList(
+            PartitionValue.builder()
+                .partitionField(
+                    InternalPartitionField.builder()
+                        .sourceField(partCol)
+                        .transformType(PartitionTransformType.VALUE)
+                        .build())
+                .range(Range.scalar("SingleValue"))
+                .build());
+    validatePartitionDataFiles(
+        PartitionFileGroup.builder()
+            .partitionValues(partitionValue)
+            .files(
+                Collections.singletonList(
+                    InternalDataFile.builder()
+                        .physicalPath("file:/fake/path")
+                        .fileFormat(FileFormat.APACHE_PARQUET)
+                        .partitionValues(partitionValue)
+                        .fileSizeBytes(716)
+                        .recordCount(1)
+                        .columnStats(columnStats)
+                        .build()))
+            .build(),
+        snapshot.getPartitionedDataFiles().get(0));
   }
 
   private void validatePartitionDataFiles(
@@ -343,7 +358,7 @@ public class ITDeltaKernelConversionSource {
     Assertions.assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
     System.out.println("Expected File Size: " + expected);
     System.out.println("Actual File Size: " + actual);
-    //    Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
+    Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
     Instant now = Instant.now();
     long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
     long maxRange = now.toEpochMilli();

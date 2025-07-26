@@ -39,8 +39,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 
-import io.delta.kernel.statistics.DataFileStatistics;
-import io.delta.kernel.utils.DataFileStatus;
+import io.delta.kernel.internal.actions.AddFile;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.exception.ParseException;
@@ -179,20 +178,16 @@ public class DeltaKernelStatsExtractor {
     }
   }
 
-  public FileStats getColumnStatsForFile(DataFileStatus addFile, List<InternalField> fields) {
+  public FileStats getColumnStatsForFile(AddFile addFile, List<InternalField> fields) {
 
-    Optional<String> statsOpt = addFile.getStatistics().map(DataFileStatistics::toString);
-    System.out.println("statsOpt:" + statsOpt);
+    Optional<String> statsOpt = addFile.getStatsJson();
     if (!statsOpt.isPresent() || StringUtils.isEmpty(statsOpt.get())) {
-      System.out.println("No statistics available1");
       // No statistics available
       return FileStats.builder().columnStats(Collections.emptyList()).numRecords(0).build();
     }
     // TODO: Additional work needed to track maps & arrays.
     try {
-      DeltaStats deltaStats =
-          MAPPER.readValue(addFile.getStatistics().get().toString(), DeltaStats.class);
-      System.out.println("deltaStats:" + deltaStats);
+      DeltaStats deltaStats = MAPPER.readValue(statsOpt.get(), DeltaStats.class);
       collectUnsupportedStats(deltaStats.getAdditionalStats());
 
       Map<String, Object> fieldPathToMaxValue = flattenStatMap(deltaStats.getMaxValues());

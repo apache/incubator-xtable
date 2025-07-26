@@ -49,6 +49,9 @@ public class ITTestUtils {
       String latestMetadataPath,
       List<InternalPartitionField> partitioningFields) {
 
+    System.out.println("readSchema: " + readSchema);
+    System.out.println("internalTable readSchema: " + internalTable.getReadSchema());
+
     Assertions.assertEquals(tableName, internalTable.getName());
     Assertions.assertEquals(tableFormat, internalTable.getTableFormat());
     Assertions.assertEquals(readSchema, internalTable.getReadSchema());
