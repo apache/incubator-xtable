@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Properties;
 
 import lombok.Value;
+
 import com.google.common.base.Preconditions;
 
 import org.apache.xtable.model.schema.PartitionFieldSpec;

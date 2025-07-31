@@ -18,39 +18,24 @@
  
 package org.apache.xtable.parquet;
 
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 
-import lombok.AllArgsConstructor;
 import lombok.NonNull;
-import lombok.Value;
 
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
-import org.apache.xtable.exception.PartitionValuesExtractorException;
+import org.apache.xtable.hudi.PathBasedPartitionValuesExtractor;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.schema.InternalType;
-import org.apache.xtable.model.stat.PartitionValue;
-import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.hudi.PathBasedPartitionValuesExtractor;
 
 /** Partition value extractor for Parquet. */
 // Extracts the partitionFields and values and create InputParitionFields object (fields and types)
 // then convert those to InternalPartitionField for the ConversionSource
 // @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtractor{
+public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtractor {
   private static final ParquetPartitionValueExtractor INSTANCE =
       new ParquetPartitionValueExtractor(Collections.emptyMap());
   private static final ParquetSchemaExtractor schemaExtractor =
@@ -58,9 +43,10 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
-//  private static final ParquetPartitionSpecExtractor partitionsSpecExtractor =
-//      ParquetPartitionSpecExtractor.getInstance();
+  //  private static final ParquetPartitionSpecExtractor partitionsSpecExtractor =
+  //      ParquetPartitionSpecExtractor.getInstance();
   private ParquetPartitionSpecExtractor partitionsSpecExtractor;
+
   public ParquetPartitionValueExtractor(@NonNull Map<String, String> pathToPartitionFieldFormat) {
     super(pathToPartitionFieldFormat);
   }
@@ -69,7 +55,6 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
     return INSTANCE;
   }
 
-
   public List<InternalPartitionField> extractParquetPartitions(
       ParquetMetadata footer, String path) {
     MessageType parquetSchema = parquetMetadataExtractor.getSchema(footer);
@@ -77,5 +62,4 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
     List<InternalPartitionField> partitions = partitionsSpecExtractor.spec(internalSchema);
     return partitions;
   }
-
 }

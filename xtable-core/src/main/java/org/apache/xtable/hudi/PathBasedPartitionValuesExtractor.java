@@ -39,7 +39,7 @@ import org.apache.xtable.model.stat.Range;
 public class PathBasedPartitionValuesExtractor {
   private static final String HIVE_DEFAULT_PARTITION = "__HIVE_DEFAULT_PARTITION__";
   @NonNull private final Map<String, String> pathToPartitionFieldFormat;
-  
+
   public List<PartitionValue> extractPartitionValues(
       List<InternalPartitionField> partitionColumns, String partitionPath) {
     if (partitionColumns == null) {

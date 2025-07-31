@@ -18,15 +18,13 @@
  
 package org.apache.xtable.hudi;
 
-import java.util.List;
 import java.util.Map;
 
-import org.apache.xtable.model.schema.PartitionFieldSpec;
 import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
 
 /**
- * Partition spec extractor interface specifically designed for Hudi/Parquet to parse partition values
- * appropriately.
+ * Partition spec extractor interface specifically designed for Hudi/Parquet to parse partition
+ * values appropriately.
  */
 public interface PathBasedPartitionSpecExtractor extends SourcePartitionSpecExtractor {
   Map<String, String> getPathToPartitionFieldFormat();

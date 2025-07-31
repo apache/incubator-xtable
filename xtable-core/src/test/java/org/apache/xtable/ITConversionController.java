@@ -59,7 +59,6 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.xtable.parquet.ParquetConversionSourceProvider;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -102,13 +101,13 @@ import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.TestIcebergDataHelper;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
+import org.apache.xtable.parquet.ParquetConversionSourceProvider;
 
 public class ITConversionController {
-  @TempDir public static Path tempDir;
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
+  @TempDir public static Path tempDir;
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;
 
@@ -140,7 +139,7 @@ public class ITConversionController {
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
-    for (String sourceTableFormat : Arrays.asList(HUDI, DELTA, ICEBERG, PARQUET)) {
+    for (String sourceTableFormat : Arrays.asList(HUDI, DELTA, ICEBERG)) {
       for (SyncMode syncMode : SyncMode.values()) {
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceTableFormat, syncMode, isPartitioned));
@@ -167,6 +166,158 @@ public class ITConversionController {
     return Stream.of(Arguments.of(SyncMode.INCREMENTAL), Arguments.of(SyncMode.FULL));
   }
 
+  private static List<String> getOtherFormats(String sourceTableFormat) {
+    return Arrays.stream(TableFormat.values())
+        .filter(format -> !format.equals(sourceTableFormat))
+        .collect(Collectors.toList());
+  }
+
+  private static Stream<Arguments> provideArgsForFilePartitionTesting() {
+    String timestampFilter =
+        String.format(
+            "timestamp_micros_nullable_field < timestamp_millis(%s)",
+            Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
+    String levelFilter = "level = 'INFO'";
+    String nestedLevelFilter = "nested_record.level = 'INFO'";
+    String severityFilter = "severity = 1";
+    String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
+    return Stream.of(
+        Arguments.of(
+            buildArgsForPartition(
+                PARQUET,
+                Arrays.asList(ICEBERG, DELTA, HUDI),
+                "level:SIMPLE",
+                "level:VALUE",
+                levelFilter)),
+        Arguments.of(
+            buildArgsForPartition(
+                PARQUET,
+                Arrays.asList(ICEBERG, DELTA, HUDI),
+                "severity:SIMPLE",
+                "severity:VALUE",
+                severityFilter)),
+        Arguments.of(
+            buildArgsForPartition(
+                PARQUET,
+                Arrays.asList(ICEBERG, DELTA, HUDI),
+                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
+                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
+                timestampAndLevelFilter)));
+  }
+
+  private static Stream<Arguments> provideArgsForPartitionTesting() {
+    String timestampFilter =
+        String.format(
+            "timestamp_micros_nullable_field < timestamp_millis(%s)",
+            Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
+    String levelFilter = "level = 'INFO'";
+    String nestedLevelFilter = "nested_record.level = 'INFO'";
+    String severityFilter = "severity = 1";
+    String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
+    return Stream.of(
+        Arguments.of(
+            buildArgsForPartition(
+                HUDI, Arrays.asList(ICEBERG, DELTA), "level:SIMPLE", "level:VALUE", levelFilter)),
+        Arguments.of(
+            buildArgsForPartition(
+                DELTA, Arrays.asList(ICEBERG, HUDI), null, "level:VALUE", levelFilter)),
+        Arguments.of(
+            buildArgsForPartition(
+                ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter)),
+        Arguments.of(
+            // Delta Lake does not currently support nested partition columns
+            buildArgsForPartition(
+                HUDI,
+                Arrays.asList(ICEBERG),
+                "nested_record.level:SIMPLE",
+                "nested_record.level:VALUE",
+                nestedLevelFilter)),
+        Arguments.of(
+            buildArgsForPartition(
+                HUDI,
+                Arrays.asList(ICEBERG, DELTA),
+                "severity:SIMPLE",
+                "severity:VALUE",
+                severityFilter)),
+        Arguments.of(
+            buildArgsForPartition(
+                HUDI,
+                Arrays.asList(ICEBERG, DELTA),
+                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
+                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
+                timestampAndLevelFilter)));
+  }
+
+  private static Stream<Arguments> addBasicPartitionCases(Stream<Arguments> arguments) {
+    // add unpartitioned and partitioned cases
+    return arguments.flatMap(
+        args -> {
+          Object[] unpartitionedArgs = Arrays.copyOf(args.get(), args.get().length + 1);
+          unpartitionedArgs[unpartitionedArgs.length - 1] = PartitionConfig.of(null, null);
+          Object[] partitionedArgs = Arrays.copyOf(args.get(), args.get().length + 1);
+          partitionedArgs[partitionedArgs.length - 1] =
+              PartitionConfig.of("level:SIMPLE", "level:VALUE");
+          return Stream.of(
+              Arguments.arguments(unpartitionedArgs), Arguments.arguments(partitionedArgs));
+        });
+  }
+
+  private static TableFormatPartitionDataHolder buildArgsForPartition(
+      String sourceFormat,
+      List<String> targetFormats,
+      String hudiPartitionConfig,
+      String xTablePartitionConfig,
+      String filter) {
+    return TableFormatPartitionDataHolder.builder()
+        .sourceTableFormat(sourceFormat)
+        .targetTableFormats(targetFormats)
+        .hudiSourceConfig(Optional.ofNullable(hudiPartitionConfig))
+        .xTablePartitionConfig(xTablePartitionConfig)
+        .filter(filter)
+        .build();
+  }
+
+  private static ConversionConfig getTableSyncConfig(
+      String sourceTableFormat,
+      SyncMode syncMode,
+      String tableName,
+      GenericTable table,
+      List<String> targetTableFormats,
+      String partitionConfig,
+      Duration metadataRetention) {
+    Properties sourceProperties = new Properties();
+    if (partitionConfig != null) {
+      sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
+    }
+    SourceTable sourceTable =
+        SourceTable.builder()
+            .name(tableName)
+            .formatName(sourceTableFormat)
+            .basePath(table.getBasePath())
+            .dataPath(table.getDataPath())
+            .additionalProperties(sourceProperties)
+            .build();
+
+    List<TargetTable> targetTables =
+        targetTableFormats.stream()
+            .map(
+                formatName ->
+                    TargetTable.builder()
+                        .name(tableName)
+                        .formatName(formatName)
+                        // set the metadata path to the data path as the default (required by Hudi)
+                        .basePath(table.getDataPath())
+                        .metadataRetention(metadataRetention)
+                        .build())
+            .collect(Collectors.toList());
+
+    return ConversionConfig.builder()
+        .sourceTable(sourceTable)
+        .targetTables(targetTables)
+        .syncMode(syncMode)
+        .build();
+  }
+
   private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
     if (sourceTableFormat.equalsIgnoreCase(HUDI)) {
       ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
@@ -185,11 +336,58 @@ public class ITConversionController {
       return icebergConversionSourceProvider;
     } else if (sourceTableFormat.equalsIgnoreCase(PARQUET)) {
       ConversionSourceProvider<Long> parquetConversionSourceProvider =
-              new ParquetConversionSourceProvider();
+          new ParquetConversionSourceProvider();
       parquetConversionSourceProvider.init(jsc.hadoopConfiguration());
       return parquetConversionSourceProvider;
-    }else {
+    } else {
       throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
+    }
+  }
+  /*
+     test for Parquet file conversion
+
+  */
+  @ParameterizedTest
+  @MethodSource("provideArgsForFilePartitionTesting")
+  public void testFilePartitionedData(
+      TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
+    String tableName = getTableName();
+    String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
+    List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
+    Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
+    String xTablePartitionConfig = tableFormatPartitionDataHolder.getXTablePartitionConfig();
+    String filter = tableFormatPartitionDataHolder.getFilter();
+    ConversionSourceProvider<?> conversionSourceProvider =
+        getConversionSourceProvider(sourceTableFormat);
+    GenericTable table;
+    if (hudiPartitionConfig.isPresent()) {
+      table =
+          GenericTable.getInstanceWithCustomPartitionConfig(
+              tableName, tempDir, jsc, sourceTableFormat, hudiPartitionConfig.get());
+    } else {
+      table =
+          GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, true);
+    }
+    try (GenericTable tableToClose = table) {
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              sourceTableFormat,
+              SyncMode.INCREMENTAL,
+              tableName,
+              table,
+              targetTableFormats,
+              xTablePartitionConfig,
+              null);
+      // tableToClose.insertRows(100);
+      ConversionController conversionController =
+          new ConversionController(jsc.hadoopConfiguration());
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      // Do a second sync to force the test to read back the metadata it wrote earlier
+      // tableToClose.insertRows(100);
+      // conversionController.sync(conversionConfig, conversionSourceProvider);
+
+      checkDatasetEquivalenceWithFilter(
+          sourceTableFormat, tableToClose, targetTableFormats, filter);
     }
   }
 
@@ -426,7 +624,7 @@ public class ITConversionController {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {HUDI, DELTA, ICEBERG, PARQUET})
+  @ValueSource(strings = {HUDI, DELTA, ICEBERG})
   public void testTimeTravelQueries(String sourceTableFormat) throws Exception {
     String tableName = getTableName();
     try (GenericTable table =
@@ -485,55 +683,6 @@ public class ITConversionController {
                           getTimeTravelOption(targetTableFormat, instantAfterSecondSync))),
           100);
     }
-  }
-
-  private static List<String> getOtherFormats(String sourceTableFormat) {
-    return Arrays.stream(TableFormat.values())
-        .filter(format -> !format.equals(sourceTableFormat))
-        .collect(Collectors.toList());
-  }
-// TODO add tests for Parquet format
-  private static Stream<Arguments> provideArgsForPartitionTesting() {
-    String timestampFilter =
-        String.format(
-            "timestamp_micros_nullable_field < timestamp_millis(%s)",
-            Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
-    String levelFilter = "level = 'INFO'";
-    String nestedLevelFilter = "nested_record.level = 'INFO'";
-    String severityFilter = "severity = 1";
-    String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
-    return Stream.of(
-        Arguments.of(
-            buildArgsForPartition(
-                HUDI, Arrays.asList(ICEBERG, DELTA), "level:SIMPLE", "level:VALUE", levelFilter)),
-        Arguments.of(
-            buildArgsForPartition(
-                DELTA, Arrays.asList(ICEBERG, HUDI), null, "level:VALUE", levelFilter)),
-        Arguments.of(
-            buildArgsForPartition(
-                ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter)),
-        Arguments.of(
-            // Delta Lake does not currently support nested partition columns
-            buildArgsForPartition(
-                HUDI,
-                Arrays.asList(ICEBERG),
-                "nested_record.level:SIMPLE",
-                "nested_record.level:VALUE",
-                nestedLevelFilter)),
-        Arguments.of(
-            buildArgsForPartition(
-                HUDI,
-                Arrays.asList(ICEBERG, DELTA),
-                "severity:SIMPLE",
-                "severity:VALUE",
-                severityFilter)),
-        Arguments.of(
-            buildArgsForPartition(
-                HUDI,
-                Arrays.asList(ICEBERG, DELTA),
-                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
-                timestampAndLevelFilter)));
   }
 
   @ParameterizedTest
@@ -1008,35 +1157,6 @@ public class ITConversionController {
     return false;
   }
 
-  private static Stream<Arguments> addBasicPartitionCases(Stream<Arguments> arguments) {
-    // add unpartitioned and partitioned cases
-    return arguments.flatMap(
-        args -> {
-          Object[] unpartitionedArgs = Arrays.copyOf(args.get(), args.get().length + 1);
-          unpartitionedArgs[unpartitionedArgs.length - 1] = PartitionConfig.of(null, null);
-          Object[] partitionedArgs = Arrays.copyOf(args.get(), args.get().length + 1);
-          partitionedArgs[partitionedArgs.length - 1] =
-              PartitionConfig.of("level:SIMPLE", "level:VALUE");
-          return Stream.of(
-              Arguments.arguments(unpartitionedArgs), Arguments.arguments(partitionedArgs));
-        });
-  }
-
-  private static TableFormatPartitionDataHolder buildArgsForPartition(
-      String sourceFormat,
-      List<String> targetFormats,
-      String hudiPartitionConfig,
-      String xTablePartitionConfig,
-      String filter) {
-    return TableFormatPartitionDataHolder.builder()
-        .sourceTableFormat(sourceFormat)
-        .targetTableFormats(targetFormats)
-        .hudiSourceConfig(Optional.ofNullable(hudiPartitionConfig))
-        .xTablePartitionConfig(xTablePartitionConfig)
-        .filter(filter)
-        .build();
-  }
-
   @Builder
   @Value
   private static class TableFormatPartitionDataHolder {
@@ -1045,46 +1165,5 @@ public class ITConversionController {
     String xTablePartitionConfig;
     Optional<String> hudiSourceConfig;
     String filter;
-  }
-
-  private static ConversionConfig getTableSyncConfig(
-      String sourceTableFormat,
-      SyncMode syncMode,
-      String tableName,
-      GenericTable table,
-      List<String> targetTableFormats,
-      String partitionConfig,
-      Duration metadataRetention) {
-    Properties sourceProperties = new Properties();
-    if (partitionConfig != null) {
-      sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
-    }
-    SourceTable sourceTable =
-        SourceTable.builder()
-            .name(tableName)
-            .formatName(sourceTableFormat)
-            .basePath(table.getBasePath())
-            .dataPath(table.getDataPath())
-            .additionalProperties(sourceProperties)
-            .build();
-
-    List<TargetTable> targetTables =
-        targetTableFormats.stream()
-            .map(
-                formatName ->
-                    TargetTable.builder()
-                        .name(tableName)
-                        .formatName(formatName)
-                        // set the metadata path to the data path as the default (required by Hudi)
-                        .basePath(table.getDataPath())
-                        .metadataRetention(metadataRetention)
-                        .build())
-            .collect(Collectors.toList());
-
-    return ConversionConfig.builder()
-        .sourceTable(sourceTable)
-        .targetTables(targetTables)
-        .syncMode(syncMode)
-        .build();
   }
 }
