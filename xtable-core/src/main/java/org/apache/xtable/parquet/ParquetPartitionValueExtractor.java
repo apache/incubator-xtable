@@ -43,9 +43,9 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
-  //  private static final ParquetPartitionSpecExtractor partitionsSpecExtractor =
-  //      ParquetPartitionSpecExtractor.getInstance();
-  private ParquetPartitionSpecExtractor partitionsSpecExtractor;
+    private static final ParquetPartitionSpecExtractor partitionsSpecExtractor =
+        ParquetPartitionSpecExtractor.getInstance();
+  //private ParquetPartitionSpecExtractor partitionsSpecExtractor;
 
   public ParquetPartitionValueExtractor(@NonNull Map<String, String> pathToPartitionFieldFormat) {
     super(pathToPartitionFieldFormat);
