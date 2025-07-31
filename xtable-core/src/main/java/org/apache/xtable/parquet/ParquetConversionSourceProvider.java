@@ -15,25 +15,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 package org.apache.xtable.parquet;
 
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.hudi.ConfigurationBasedPartitionSpecExtractor;
 import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 
-/** A concrete implementation of {@link ConversionSourceProvider} for Delta Lake table format. */
+/**
+ * A concrete implementation of {@link ConversionSourceProvider} for Delta Lake table format.
+ */
 public class ParquetConversionSourceProvider extends ConversionSourceProvider<Long> {
-  @Override
-  public ParquetConversionSource getConversionSourceInstance(SourceTable sourceTable) {
-    final PathBasedPartitionSpecExtractor sourcePartitionSpecExtractor =
-            ParquetSourceConfig.fromProperties(sourceTable.getAdditionalProperties())
-                    .loadSourcePartitionSpecExtractor();
-    return ParquetConversionSource.builder()
-        .tableName(sourceTable.getName())
-        .basePath(sourceTable.getBasePath())
-        .hadoopConf(this.hadoopConf)
-        .build();
-  }
+    @Override
+    public ParquetConversionSource getConversionSourceInstance(SourceTable sourceTable) {
+        final ConfigurationBasedPartitionSpecExtractor sourcePartitionSpecExtractor =
+                ParquetSourceConfig.fromProperties(sourceTable.getAdditionalProperties())
+                        .loadSourcePartitionSpecExtractor();
+        ParquetPartitionValueExtractor partitionValueExtractor = new ParquetPartitionValueExtractor(sourcePartitionSpecExtractor.getPathToPartitionFieldFormat());
+        return ParquetConversionSource.builder()
+                .tableName(sourceTable.getName())
+                .basePath(sourceTable.getBasePath())
+                .hadoopConf(this.hadoopConf)
+                .partitionSpecExtractor(sourcePartitionSpecExtractor)
+                .partitionValueExtractor(partitionValueExtractor)
+                .build();
+    }
 }

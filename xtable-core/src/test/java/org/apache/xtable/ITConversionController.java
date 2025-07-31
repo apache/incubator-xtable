@@ -366,7 +366,6 @@ public class ITConversionController {
     Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
     String xTablePartitionConfig = tableFormatPartitionDataHolder.getXTablePartitionConfig();
     String filter = tableFormatPartitionDataHolder.getFilter();
-    ParquetPartitionSpecExtractor specExtractor = getParquetSpecExtractor(xTablePartitionConfig);
     ConversionSourceProvider<?> conversionSourceProvider =
         getConversionSourceProvider(sourceTableFormat);
     GenericTable table;
@@ -392,10 +391,6 @@ public class ITConversionController {
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
       conversionController.sync(conversionConfig, conversionSourceProvider);
-      // Do a second sync to force the test to read back the metadata it wrote earlier
-      // tableToClose.insertRows(100);
-      // conversionController.sync(conversionConfig, conversionSourceProvider);
-
       checkDatasetEquivalenceWithFilter(
           sourceTableFormat, tableToClose, targetTableFormats, filter);
     }

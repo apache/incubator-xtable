@@ -28,6 +28,7 @@ import lombok.Value;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.xtable.hudi.ConfigurationBasedPartitionSpecExtractor;
 import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.schema.PartitionFieldSpec;
 import org.apache.xtable.model.schema.PartitionTransformType;
@@ -78,7 +79,7 @@ public class ParquetSourceConfig {
     return partitionFields;
   }
 
-  public PathBasedPartitionSpecExtractor loadSourcePartitionSpecExtractor() {
+  public ConfigurationBasedPartitionSpecExtractor loadSourcePartitionSpecExtractor() {
     Preconditions.checkNotNull(
         partitionSpecExtractorClass, "PathBasedPartitionSpecExtractor class not provided");
     return ReflectionUtils.createInstanceOfClass(partitionSpecExtractorClass, this);

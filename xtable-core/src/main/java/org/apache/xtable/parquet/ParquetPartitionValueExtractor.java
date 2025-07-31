@@ -34,9 +34,6 @@ import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.PartitionValue;
 
 /** Partition value extractor for Parquet. */
-// Extracts the partitionFields and values and create InputParitionFields object (fields and types)
-// then convert those to InternalPartitionField for the ConversionSource
-// @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtractor {
   private static final ParquetPartitionValueExtractor INSTANCE =
       new ParquetPartitionValueExtractor(Collections.emptyMap());
@@ -47,7 +44,6 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
 
     private static final ParquetPartitionSpecExtractor partitionsSpecExtractor =
         ParquetPartitionSpecExtractor.getInstance();
-  //private ParquetPartitionSpecExtractor partitionsSpecExtractor;
 
   public ParquetPartitionValueExtractor(@NonNull Map<String, String> pathToPartitionFieldFormat) {
     super(pathToPartitionFieldFormat);
@@ -57,15 +53,10 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
     return INSTANCE;
   }
 
-  public static List<InternalPartitionField> extractParquetPartitions(
+  public List<InternalPartitionField> extractParquetPartitions(
       ParquetMetadata footer, String path) {
     MessageType parquetSchema = parquetMetadataExtractor.getSchema(footer);
     InternalSchema internalSchema = schemaExtractor.toInternalSchema(parquetSchema, path);
     return partitionsSpecExtractor.spec(internalSchema);
-  }
-  public static List<PartitionValue> extractPartitionValues(List<InternalPartitionField> partitionFields){
-    //TODO using format of every partitionField and path get the value
-    return new ArrayList<>();
-
   }
 }

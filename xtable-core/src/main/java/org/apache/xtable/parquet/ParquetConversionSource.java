@@ -61,19 +61,10 @@ public class ParquetConversionSource implements ConversionSource<Long> {
       ParquetStatsExtractor.getInstance();
 
   private final ParquetPartitionValueExtractor partitionValueExtractor;
-  private final ParquetPartitionSpecExtractor partitionSpecExtractor;
+  private final ConfigurationBasedPartitionSpecExtractor partitionSpecExtractor;
   private final String tableName;
   private final String basePath;
   @NonNull private final Configuration hadoopConf;
-
-  public ParquetConversionSource(
-          ParquetPartitionSpecExtractor sourcePartitionSpecExtractor,ParquetPartitionValueExtractor partitionValueExtractor,String tableName,String basePath,String configPath, Configuration hadoopConf) {
-    this.partitionSpecExtractor = sourcePartitionSpecExtractor;
-    this.partitionValueExtractor = partitionValueExtractor;
-    this.tableName = tableName;
-    this.basePath = basePath;
-    this.hadoopConf = hadoopConf;
-  }
 
   private InternalTable createInternalTableFromTable(LocatedFileStatus latestFile) {
     ParquetMetadata parquetMetadata =
