@@ -54,11 +54,18 @@ import java.util.stream.StreamSupport;
 import lombok.Builder;
 import lombok.Value;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.xtable.hudi.*;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.parquet.ParquetConversionSource;
+import org.apache.xtable.parquet.ParquetPartitionSpecExtractor;
+import org.apache.xtable.parquet.ParquetSourceConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -95,8 +102,6 @@ import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
-import org.apache.xtable.hudi.HudiConversionSourceProvider;
-import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.TestIcebergDataHelper;
 import org.apache.xtable.model.storage.TableFormat;
@@ -347,6 +352,10 @@ public class ITConversionController {
      test for Parquet file conversion
 
   */
+  private ParquetPartitionSpecExtractor getParquetSpecExtractor(String xTablePartitionConfig) {
+    return new ParquetPartitionSpecExtractor(
+                    ParquetSourceConfig.parsePartitionFieldSpecs(xTablePartitionConfig));
+  }
   @ParameterizedTest
   @MethodSource("provideArgsForFilePartitionTesting")
   public void testFilePartitionedData(
@@ -357,6 +366,7 @@ public class ITConversionController {
     Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
     String xTablePartitionConfig = tableFormatPartitionDataHolder.getXTablePartitionConfig();
     String filter = tableFormatPartitionDataHolder.getFilter();
+    ParquetPartitionSpecExtractor specExtractor = getParquetSpecExtractor(xTablePartitionConfig);
     ConversionSourceProvider<?> conversionSourceProvider =
         getConversionSourceProvider(sourceTableFormat);
     GenericTable table;

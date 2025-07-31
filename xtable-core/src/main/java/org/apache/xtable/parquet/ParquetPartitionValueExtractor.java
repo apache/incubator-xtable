@@ -18,6 +18,7 @@
  
 package org.apache.xtable.parquet;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.apache.parquet.schema.MessageType;
 import org.apache.xtable.hudi.PathBasedPartitionValuesExtractor;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.stat.PartitionValue;
 
 /** Partition value extractor for Parquet. */
 // Extracts the partitionFields and values and create InputParitionFields object (fields and types)
@@ -55,11 +57,15 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
     return INSTANCE;
   }
 
-  public List<InternalPartitionField> extractParquetPartitions(
+  public static List<InternalPartitionField> extractParquetPartitions(
       ParquetMetadata footer, String path) {
     MessageType parquetSchema = parquetMetadataExtractor.getSchema(footer);
     InternalSchema internalSchema = schemaExtractor.toInternalSchema(parquetSchema, path);
-    List<InternalPartitionField> partitions = partitionsSpecExtractor.spec(internalSchema);
-    return partitions;
+    return partitionsSpecExtractor.spec(internalSchema);
+  }
+  public static List<PartitionValue> extractPartitionValues(List<InternalPartitionField> partitionFields){
+    //TODO using format of every partitionField and path get the value
+    return new ArrayList<>();
+
   }
 }

@@ -60,7 +60,7 @@ public class ParquetSourceConfig {
     return new ParquetSourceConfig(partitionSpecExtractorClass, partitionFieldSpecs);
   }
 
-  private static List<PartitionFieldSpec> parsePartitionFieldSpecs(String input) {
+  public static List<PartitionFieldSpec> parsePartitionFieldSpecs(String input) {
     if (input == null || input.isEmpty()) {
       return Collections.emptyList();
     }

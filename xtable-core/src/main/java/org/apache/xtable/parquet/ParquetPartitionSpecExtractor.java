@@ -38,18 +38,18 @@ import org.apache.xtable.schema.SchemaFieldFinder;
  */
 @AllArgsConstructor
 public class ParquetPartitionSpecExtractor implements PathBasedPartitionSpecExtractor {
-
-  private final String partitionFieldSpecConfig;//input partition format (or properties (ParquetSourceConfig))
-  private static final ParquetPartitionSpecExtractor INSTANCE = new ParquetPartitionSpecExtractor(new String());
+  private final List<PartitionFieldSpec> partitionFieldSpecs;
+  //private final String partitionFieldSpecConfig;//input partition format (or properties (ParquetSourceConfig))
+  private static final ParquetPartitionSpecExtractor INSTANCE = new ParquetPartitionSpecExtractor(new ArrayList<>());
   public static ParquetPartitionSpecExtractor getInstance() {
     return INSTANCE;
   }
   @Override
   public List<InternalPartitionField> spec(InternalSchema tableSchema) {
 
-    ParquetSourceConfig partitionConfig = ParquetSourceConfig.fromPartitionFieldSpecConfig(partitionFieldSpecConfig);
-    List<InternalPartitionField> partitionFields = new ArrayList<>(partitionConfig.getPartitionFieldSpecs().size());
-    for (PartitionFieldSpec fieldSpec : partitionConfig.getPartitionFieldSpecs()) {
+
+    List<InternalPartitionField> partitionFields = new ArrayList<>(partitionFieldSpecs.size());
+    for (PartitionFieldSpec fieldSpec : partitionFieldSpecs) {
       InternalField sourceField =
           SchemaFieldFinder.getInstance()
               .findFieldByPath(tableSchema, fieldSpec.getSourceFieldPath());
@@ -65,8 +65,8 @@ public class ParquetPartitionSpecExtractor implements PathBasedPartitionSpecExtr
   @Override
   public Map<String, String> getPathToPartitionFieldFormat() {
     Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
-    ParquetSourceConfig partitionConfig = ParquetSourceConfig.fromPartitionFieldSpecConfig(partitionFieldSpecConfig);
-    partitionConfig.getPartitionFieldSpecs().forEach(
+    //ParquetSourceConfig partitionConfig = ParquetSourceConfig.fromPartitionFieldSpecConfig(partitionFieldSpecConfig);
+    partitionFieldSpecs.forEach(
         partitionFieldSpec -> {
           if (partitionFieldSpec.getFormat() != null) {
             pathToPartitionFieldFormat.put(

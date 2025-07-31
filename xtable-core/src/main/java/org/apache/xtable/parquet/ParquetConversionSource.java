@@ -29,9 +29,11 @@ import lombok.NonNull;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.util.functional.RemoteIterators;
+import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
+import org.apache.xtable.hudi.*;
 import org.apache.xtable.model.*;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -62,8 +64,16 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   private final ParquetPartitionSpecExtractor partitionSpecExtractor;
   private final String tableName;
   private final String basePath;
-  private final String configPath;
   @NonNull private final Configuration hadoopConf;
+
+  public ParquetConversionSource(
+          ParquetPartitionSpecExtractor sourcePartitionSpecExtractor,ParquetPartitionValueExtractor partitionValueExtractor,String tableName,String basePath,String configPath, Configuration hadoopConf) {
+    this.partitionSpecExtractor = sourcePartitionSpecExtractor;
+    this.partitionValueExtractor = partitionValueExtractor;
+    this.tableName = tableName;
+    this.basePath = basePath;
+    this.hadoopConf = hadoopConf;
+  }
 
   private InternalTable createInternalTableFromTable(LocatedFileStatus latestFile) {
     ParquetMetadata parquetMetadata =
