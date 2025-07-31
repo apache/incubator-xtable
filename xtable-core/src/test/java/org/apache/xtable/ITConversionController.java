@@ -168,7 +168,7 @@ public class ITConversionController {
 
   private static List<String> getOtherFormats(String sourceTableFormat) {
     return Arrays.stream(TableFormat.values())
-        .filter(format -> !format.equals(sourceTableFormat))
+        .filter(format -> !format.equals(sourceTableFormat) && !format.equals(PARQUET))//excluded file formats
         .collect(Collectors.toList());
   }
 
