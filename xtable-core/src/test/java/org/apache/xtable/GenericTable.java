@@ -21,6 +21,7 @@ package org.apache.xtable;
 import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -120,6 +121,7 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       String partitionConfig) {
     switch (sourceFormat) {
       case HUDI:
+      case PARQUET:
         return TestSparkHudiTable.forStandardSchema(
             tableName, tempDir, jsc, partitionConfig, HoodieTableType.COPY_ON_WRITE);
       default:
