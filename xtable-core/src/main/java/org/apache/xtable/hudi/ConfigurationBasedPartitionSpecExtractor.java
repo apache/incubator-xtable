@@ -25,6 +25,7 @@ import java.util.Map;
 
 import lombok.AllArgsConstructor;
 
+import lombok.NoArgsConstructor;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -36,9 +37,10 @@ import org.apache.xtable.schema.SchemaFieldFinder;
  * path:type:format for date types or path:type for value types.
  */
 @AllArgsConstructor
+@NoArgsConstructor(force = true)//force default values
 public class ConfigurationBasedPartitionSpecExtractor implements PathBasedPartitionSpecExtractor {
   // private final HudiSourceConfig config;
-  private final List<PartitionFieldSpec> partitionFieldSpecs;
+  private final List<PartitionFieldSpec> partitionFieldSpecs;//default values are null/0/false
 
   @Override
   public List<InternalPartitionField> spec(InternalSchema tableSchema) {
