@@ -37,10 +37,9 @@ import org.apache.xtable.schema.SchemaFieldFinder;
  * path:type:format for date types or path:type for value types.
  */
 @AllArgsConstructor
-@NoArgsConstructor(force = true)//force default values
 public class ConfigurationBasedPartitionSpecExtractor implements PathBasedPartitionSpecExtractor {
   // private final HudiSourceConfig config;
-  private final List<PartitionFieldSpec> partitionFieldSpecs;//default values are null/0/false
+  private final List<PartitionFieldSpec> partitionFieldSpecs;
 
   @Override
   public List<InternalPartitionField> spec(InternalSchema tableSchema) {
