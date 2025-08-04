@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import lombok.Builder;
 import lombok.NonNull;
@@ -88,7 +90,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         .build();
   }
 
-  private InternalTable getMostRecentTable(List<LocatedFileStatus> parquetFiles) {
+  private InternalTable getMostRecentTable(Stream<LocatedFileStatus> parquetFiles) {
     LocatedFileStatus latestFile = getMostRecentParquetFile(parquetFiles);
     return createInternalTableFromFile(latestFile);
   }
@@ -96,13 +98,13 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   @Override
   public InternalTable getTable(Long modificationTime) {
     // get parquetFile at specific time modificationTime
-    List<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
+    Stream<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
     LocatedFileStatus file = getParquetFileAt(parquetFiles, modificationTime);
     return createInternalTableFromFile(file);
   }
 
-  private List<InternalDataFile> getInternalDataFiles(List<LocatedFileStatus> parquetFiles) {
-    return parquetFiles.stream()
+  private List<InternalDataFile> getInternalDataFiles(Stream<LocatedFileStatus> parquetFiles) {
+    return parquetFiles
         .map(
             file ->
                 InternalDataFile.builder()
@@ -152,11 +154,11 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   @Override
   public TableChange getTableChangeForCommit(Long modificationTime) {
-    List<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
+    Stream<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
     Set<InternalDataFile> addedInternalDataFiles = new HashSet<>();
 
     List<FileStatus> tableChangesAfter =
-        parquetFiles.stream()
+        parquetFiles
             .filter(fileStatus -> fileStatus.getModificationTime() > modificationTime)
             .collect(Collectors.toList());
     InternalTable internalTable = getMostRecentTable(parquetFiles);
@@ -173,7 +175,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   @Override
   public InternalTable getCurrentTable() {
-    List<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
+    Stream<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
     return getMostRecentTable(parquetFiles);
   }
 
@@ -184,7 +186,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
    */
   @Override
   public InternalSnapshot getCurrentSnapshot() {
-    List<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
+    Stream<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
     List<InternalDataFile> internalDataFiles = getInternalDataFiles(parquetFiles);
     InternalTable table = getMostRecentTable(parquetFiles);
     return InternalSnapshot.builder()
@@ -193,15 +195,15 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         .build();
   }
 
-  private LocatedFileStatus getMostRecentParquetFile(List<LocatedFileStatus> parquetFiles) {
-    return parquetFiles.stream()
+  private LocatedFileStatus getMostRecentParquetFile(Stream<LocatedFileStatus> parquetFiles) {
+    return parquetFiles
         .max(Comparator.comparing(FileStatus::getModificationTime))
         .orElseThrow(() -> new IllegalStateException("No files found"));
   }
 
   private LocatedFileStatus getParquetFileAt(
-      List<LocatedFileStatus> parquetFiles, long modificationTime) {
-    return parquetFiles.stream()
+      Stream<LocatedFileStatus> parquetFiles, long modificationTime) {
+    return parquetFiles
         .filter(fileStatus -> fileStatus.getModificationTime() == modificationTime)
         .findFirst()
         .orElseThrow(
@@ -218,13 +220,12 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         .collect(Collectors.toList());
   }
 
-  private List<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
+  private Stream<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
     try {
       FileSystem fs = FileSystem.get(hadoopConf);
       RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(basePath), true);
-      return RemoteIterators.toList(iterator).stream()
-          .filter(file -> file.getPath().getName().endsWith("parquet"))
-          .collect(Collectors.toList());
+      return ParquetFilesUtil.remoteIteratorToStream(iterator)
+          .filter(file -> file.getPath().getName().endsWith("parquet"));
     } catch (IOException e) { //
       throw new RuntimeException(e);
     }
@@ -233,12 +234,13 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
     long modficationTime = instant.getEpochSecond();
-    List<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
+    Stream<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
     LocatedFileStatus parquetFile = getMostRecentParquetFile(parquetFiles);
+    Path parquetFilePath = parquetFile.getPath();
     // check if its predecessor in terms of modification time is within instant (as done in Hudi)
     while (parquetFile.isFile() && parquetFile.getModificationTime() > modficationTime) {
       // check the preceeding parquetFile
-      parquetFiles.remove(parquetFile);
+      parquetFiles.filter(file -> !file.getPath().equals(parquetFilePath));
       parquetFile = getMostRecentParquetFile(parquetFiles);
     }
     return parquetFile.isFile();
