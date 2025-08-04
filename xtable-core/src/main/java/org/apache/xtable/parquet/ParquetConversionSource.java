@@ -46,7 +46,6 @@ import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.spi.extractor.ConversionSource;
 
 @Builder
-// @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ParquetConversionSource implements ConversionSource<Long> {
   @Builder.Default
   private static final ParquetSchemaExtractor schemaExtractor =
@@ -66,7 +65,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   private final String basePath;
   @NonNull private final Configuration hadoopConf;
 
-  private InternalTable createInternalTableFromTable(LocatedFileStatus latestFile) {
+  private InternalTable createInternalTableFromFile(LocatedFileStatus latestFile) {
     ParquetMetadata parquetMetadata =
         parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.getPath());
     MessageType parquetSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
@@ -91,7 +90,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   private InternalTable getMostRecentTable(List<LocatedFileStatus> parquetFiles) {
     LocatedFileStatus latestFile = getMostRecentParquetFile(parquetFiles);
-    return createInternalTableFromTable(latestFile);
+    return createInternalTableFromFile(latestFile);
   }
 
   @Override
@@ -99,7 +98,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     // get parquetFile at specific time modificationTime
     List<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
     LocatedFileStatus file = getParquetFileAt(parquetFiles, modificationTime);
-    return createInternalTableFromTable(file);
+    return createInternalTableFromFile(file);
   }
 
   private List<InternalDataFile> getInternalDataFiles(List<LocatedFileStatus> parquetFiles) {

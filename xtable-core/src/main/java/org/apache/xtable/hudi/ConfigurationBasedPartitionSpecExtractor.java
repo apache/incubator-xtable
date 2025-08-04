@@ -38,7 +38,6 @@ import org.apache.xtable.schema.SchemaFieldFinder;
  */
 @AllArgsConstructor
 public class ConfigurationBasedPartitionSpecExtractor implements PathBasedPartitionSpecExtractor {
-  // private final HudiSourceConfig config;
   private final List<PartitionFieldSpec> partitionFieldSpecs;
 
   @Override
