@@ -54,7 +54,7 @@ public class ParquetSourceConfig {
     properties = new Properties();
     properties.setProperty(PARTITION_FIELD_SPEC_CONFIG, "year:YEAR");
     String partitionFieldSpecString = properties.getProperty(PARTITION_FIELD_SPEC_CONFIG);
-    
+
     List<PartitionFieldSpec> partitionFieldSpecs =
         parsePartitionFieldSpecs(partitionFieldSpecString);
     return new ParquetSourceConfig(partitionSpecExtractorClass, partitionFieldSpecs);
