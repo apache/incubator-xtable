@@ -252,7 +252,7 @@ public class BaseFileUpdatesExtractor {
                     columnStat.getNumValues(),
                     columnStat.getTotalSize(),
                     -1L))
-        .collect(Collectors.toMap(HoodieColumnRangeMetadata::getColumnName, Function.identity()));
+            .collect(Collectors.toMap(HoodieColumnRangeMetadata::getColumnName, metadata -> metadata));
   }
 
   /** Holds the information needed to create a "replace" commit in the Hudi table. */

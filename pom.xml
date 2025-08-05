@@ -60,7 +60,9 @@
         <project.version>0.2.0-SNAPSHOT</project.version>
         <!-- To ensure build content is re-producible -->
         <project.build.outputTimestamp>2025-01-01T00:00:00Z</project.build.outputTimestamp>
-        <maven.compiler.target>8</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target><!--8-->
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <avro.version>1.11.4</avro.version>
         <log4j.version>2.22.0</log4j.version>
         <junit.version>5.11.4</junit.version>
@@ -90,7 +92,7 @@
         <jackson.version>2.18.2</jackson.version>
         <spotless.version>2.43.0</spotless.version>
         <apache.rat.version>0.16.1</apache.rat.version>
-        <google.java.format.version>1.8</google.java.format.version>
+        <google.java.format.version>1.10.0</google.java.format.version><!--1.8-->
         <delta.standalone.version>3.3.0</delta.standalone.version>
         <delta.hive.version>3.0.0</delta.hive.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -655,7 +657,7 @@
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>
+            </plugin><!--
             <plugin>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok-maven-plugin</artifactId>
@@ -674,6 +676,21 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>-->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version> <configuration>
+                <source>${maven.compiler.source}</source>
+                <target>${maven.compiler.target}</target>
+                <annotationProcessorPaths>
+                    <path>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok</artifactId>
+                        <version>${lombok.version}</version>
+                    </path>
+                </annotationProcessorPaths>
+            </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -704,6 +721,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.22.2</version>
                 <executions>
                     <execution>
                         <goals>
@@ -712,6 +730,7 @@
                     </execution>
                 </executions>
                 <configuration>
+                    <argLine>--add-opens=java.base/sun.nio.ch=ALL-UNNAMED</argLine>
                     <skip>${skipUTs}</skip>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <trimStackTrace>false</trimStackTrace>

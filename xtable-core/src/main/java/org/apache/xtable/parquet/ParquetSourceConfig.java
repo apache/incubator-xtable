@@ -45,17 +45,16 @@ public class ParquetSourceConfig {
   String partitionSpecExtractorClass;
   List<PartitionFieldSpec> partitionFieldSpecs;
 
-  public static ParquetSourceConfig fromPartitionFieldSpecConfig(String partitionFieldSpecConfig) {
-    return new ParquetSourceConfig(
-        ParquetPartitionSpecExtractor.class.getName(),
-        parsePartitionFieldSpecs(partitionFieldSpecConfig));
-  }
 
   public static ParquetSourceConfig fromProperties(Properties properties) {
     String partitionSpecExtractorClass =
         properties.getProperty(
             PARTITION_SPEC_EXTRACTOR_CLASS, ParquetPartitionSpecExtractor.class.getName());
+    //testing partition config as not empty
+    properties = new Properties();
+    properties.setProperty(PARTITION_FIELD_SPEC_CONFIG, "year:YEAR");
     String partitionFieldSpecString = properties.getProperty(PARTITION_FIELD_SPEC_CONFIG);
+    
     List<PartitionFieldSpec> partitionFieldSpecs =
         parsePartitionFieldSpecs(partitionFieldSpecString);
     return new ParquetSourceConfig(partitionSpecExtractorClass, partitionFieldSpecs);
@@ -81,7 +80,7 @@ public class ParquetSourceConfig {
 
   public ConfigurationBasedPartitionSpecExtractor loadSourcePartitionSpecExtractor() {
     Preconditions.checkNotNull(
-        partitionSpecExtractorClass, "PathBasedPartitionSpecExtractor class not provided");
-    return ReflectionUtils.createInstanceOfClass(partitionSpecExtractorClass, this);
+            this.partitionSpecExtractorClass, "PathBasedPartitionSpecExtractor class not provided");
+    return ReflectionUtils.createInstanceOfClass(this.partitionSpecExtractorClass, this.partitionFieldSpecs);
   }
 }
