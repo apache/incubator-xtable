@@ -21,9 +21,12 @@ package org.apache.xtable.delta;
 import static org.apache.xtable.delta.DeltaActionsConverter.getFullPathToFile;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.delta.kernel.data.MapValue;
+import io.delta.kernel.internal.InternalScanFileUtils;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -64,7 +67,8 @@ public class DeltaKernelActionsConverter {
       boolean includeColumnStats,
       DeltaKernelPartitionExtractor partitionExtractor,
       DeltaKernelStatsExtractor fileStatsExtractor,
-      Map<String, String> partitionValues) {
+      Map<String, String> partitionValues)
+  {
     FileStats fileStats = fileStatsExtractor.getColumnStatsForFile(addFile, fields);
     List<ColumnStat> columnStats =
         includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
@@ -73,8 +77,9 @@ public class DeltaKernelActionsConverter {
     Engine myEngine = DefaultEngine.create(hadoopConf);
     Table myTable = Table.forPath(myEngine, addFile.getPath());
     // The immutable map from Java to Scala is not working, need to
+
     scala.collection.mutable.Map<String, String> scalaMap =
-        JavaConverters.mapAsScalaMap(partitionValues);
+            JavaConverters.mapAsScalaMap(partitionValues);
 
     return InternalDataFile.builder()
         .physicalPath(getFullPathToFile(deltaSnapshot, addFile.getPath(), myTable))
@@ -86,22 +91,6 @@ public class DeltaKernelActionsConverter {
         .recordCount(recordCount)
         .build();
   }
-
-  //
-  //    public InternalDataFile convertRemoveActionToInternalDataFile(
-  //            RemoveFile removeFile,
-  //            Snapshot deltaSnapshot,
-  //            FileFormat fileFormat,
-  //            List<InternalPartitionField> partitionFields,
-  //            DeltaPartitionExtractor partitionExtractor) {
-  //        return InternalDataFile.builder()
-  //                .physicalPath(getFullPathToFile(deltaSnapshot, removeFile.path()))
-  //                .fileFormat(fileFormat)
-  //                .partitionValues(
-  //                        partitionExtractor.partitionValueExtraction(
-  //                                removeFile.partitionValues(), partitionFields))
-  //                .build();
-  //    }
 
   public FileFormat convertToFileFormat(String provider) {
     if (provider.equals("parquet")) {
@@ -116,32 +105,13 @@ public class DeltaKernelActionsConverter {
   static String getFullPathToFile(Snapshot snapshot, String dataFilePath, Table myTable) {
     Configuration hadoopConf = new Configuration();
     Engine myEngine = DefaultEngine.create(hadoopConf);
-
+//    Table myTable = Table.forPath(myEngine, basePath.toString());
     String tableBasePath = myTable.getPath(myEngine);
-    //        String tableBasePath = snapshot.dataPath().toUri().toString();
+//            String tableBasePath = snapshot.dataPath().toUri().toString();
     if (dataFilePath.startsWith(tableBasePath)) {
       return dataFilePath;
     }
-    return tableBasePath + Path.SEPARATOR + dataFilePath;
+    return tableBasePath ;
   }
 
-  /**
-   * Extracts the representation of the deletion vector information corresponding to an AddFile
-   * action. Currently, this method extracts and returns the path to the data file for which a
-   * deletion vector data is present.
-   *
-   * @param snapshot the commit snapshot
-   * @param addFile the add file action
-   * @return the deletion vector representation (path of data file), or null if no deletion vector
-   *     is present
-   */
-  //    public String extractDeletionVectorFile(Snapshot snapshot, AddFile addFile) {
-  //        DeletionVectorDescriptor deletionVector = addFile.deletionVector();
-  //        if (deletionVector == null) {
-  //            return null;
-  //        }
-  //
-  //        String dataFilePath = addFile.path();
-  //        return getFullPathToFile(snapshot, dataFilePath);
-  //    }
 }

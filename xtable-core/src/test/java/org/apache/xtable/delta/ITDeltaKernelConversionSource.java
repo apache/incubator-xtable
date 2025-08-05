@@ -27,13 +27,19 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.serializer.KryoSerializer;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.xtable.TestSparkDeltaTable;
+import org.apache.xtable.ValidationTestHelper;
+import org.apache.xtable.model.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -42,8 +48,6 @@ import io.delta.kernel.*;
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.kernel.DeltaKernelConversionSource;
-import org.apache.xtable.model.InternalSnapshot;
-import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.*;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -51,6 +55,9 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class ITDeltaKernelConversionSource {
   private static final InternalField COL1_INT_FIELD =
@@ -150,7 +157,6 @@ public class ITDeltaKernelConversionSource {
     // Table name
     final String tableName = GenericTable.getTableName();
     final Path basePath = tempDir.resolve(tableName);
-    System.out.println("Table Name Non partitioned : " + basePath);
     // Create table with a single row using Spark
     sparkSession.sql(
         "CREATE TABLE `"
@@ -329,6 +335,71 @@ public class ITDeltaKernelConversionSource {
         snapshot.getPartitionedDataFiles().get(0));
   }
 
+
+  @ParameterizedTest
+  @MethodSource("testWithPartitionToggle")
+  public void testInsertsUpsertsAndDeletes(boolean isPartitioned) {
+    String tableName = GenericTable.getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+            new TestSparkDeltaTable(
+                    tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
+//    System.out.println("testSparkDeltaTable" + testSparkDeltaTable.getColumnsToSelect());
+    List<List<String>> allActiveFiles = new ArrayList<>();
+    List<TableChange> allTableChanges = new ArrayList<>();
+    testSparkDeltaTable.insertRows(50);
+     testSparkDeltaTable.getLastCommitTimestamp();
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+//    testSparkDeltaTable.upsertRows(rows.subList(0, 20));
+//    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+//
+//    testSparkDeltaTable.insertRows(50);
+//    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+//
+//
+//    testSparkDeltaTable.insertRows(50);
+//    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    SourceTable tableConfig =
+            SourceTable.builder()
+                    .name(testSparkDeltaTable.getTableName())
+                    .basePath(testSparkDeltaTable.getBasePath())
+                    .formatName(TableFormat.DELTA)
+                    .build();
+    DeltaKernelConversionSource conversionSource =
+            conversionSourceProvider.getConversionSourceInstance(tableConfig);
+    assertEquals(100L, testSparkDeltaTable.getNumRows());
+    InternalSnapshot internalSnapshot = conversionSource.getCurrentSnapshot();
+
+    if (isPartitioned) {
+      validateDeltaPartitioning(internalSnapshot);
+    }
+    ValidationTestHelper.validateSnapshot(
+            internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+//    // Get changes in incremental format.
+//    InstantsForIncrementalSync instantsForIncrementalSync =
+//            InstantsForIncrementalSync.builder()
+//                    .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+//                    .build();
+//    CommitsBacklog<Long> commitsBacklog =
+//            conversionSource.getCommitsBacklog(instantsForIncrementalSync);
+//    for (Long version : commitsBacklog.getCommitsToProcess()) {
+//      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
+//      allTableChanges.add(tableChange);
+//    }
+//    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
+  }
+
+  private void validateDeltaPartitioning(InternalSnapshot internalSnapshot) {
+    List<InternalPartitionField> partitionFields =
+            internalSnapshot.getTable().getPartitioningFields();
+    assertEquals(1, partitionFields.size());
+    InternalPartitionField partitionField = partitionFields.get(0);
+    assertEquals("birthDate", partitionField.getSourceField().getName());
+    assertEquals(PartitionTransformType.YEAR, partitionField.getTransformType());
+  }
   private void validatePartitionDataFiles(
       PartitionFileGroup expectedPartitionFiles, PartitionFileGroup actualPartitionFiles)
       throws URISyntaxException {
@@ -348,6 +419,10 @@ public class ITDeltaKernelConversionSource {
     }
   }
 
+  private static Stream<Arguments> testWithPartitionToggle() {
+    return Stream.of( Arguments.of(false), Arguments.of(true));
+  }
+
   private void validatePropertiesDataFile(InternalDataFile expected, InternalDataFile actual)
       throws URISyntaxException {
     Assertions.assertTrue(
@@ -356,8 +431,6 @@ public class ITDeltaKernelConversionSource {
     Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
     Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
     Assertions.assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
-    System.out.println("Expected File Size: " + expected);
-    System.out.println("Actual File Size: " + actual);
     Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
     Instant now = Instant.now();
     long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();

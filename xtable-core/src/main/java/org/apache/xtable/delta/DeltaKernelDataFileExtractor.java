@@ -108,9 +108,10 @@ public class DeltaKernelDataFileExtractor {
       ScanImpl myScan = (ScanImpl) snapshot.getScanBuilder().build();
       CloseableIterator<FilteredColumnarBatch> scanFiles =
           myScan.getScanFiles(engine, includeColumnStats);
+
       //      String statsJson = extractStatsJson(scanFiles,fullSchema);
       //      System.out.println("StatsJson: " + statsJson);
-
+      List<InternalDataFile> dataFiles = new ArrayList<>();
       this.dataFilesIterator =
           Collections
               .emptyIterator(); // Initialize the dataFilesIterator by iterating over the scan files
@@ -123,14 +124,10 @@ public class DeltaKernelDataFileExtractor {
           // needed to read the file.
           AddFile addFile =
               new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
-
-          //          FileStatus fileStatus = InternalScanFileUtils.getAddFileStatus(scanFileRow);
           Map<String, String> partitionValues =
               InternalScanFileUtils.getPartitionValues(scanFileRow);
           // Convert the FileStatus to InternalDataFile using the actionsConverter
-          System.out.println("Calling the ActionToInternalDataFile");
-          this.dataFilesIterator =
-              Collections.singletonList(
+          dataFiles.add(
                       actionsConverter.convertAddActionToInternalDataFile(
                           addFile,
                           snapshot,
@@ -140,10 +137,11 @@ public class DeltaKernelDataFileExtractor {
                           includeColumnStats,
                           partitionExtractor,
                           fileStatsExtractor,
-                          partitionValues))
-                  .iterator();
+                              partitionValues));
+
         }
       }
+      this.dataFilesIterator = dataFiles.iterator();
     }
 
     @Override
