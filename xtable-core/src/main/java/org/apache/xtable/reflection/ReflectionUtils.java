@@ -18,6 +18,7 @@
  
 package org.apache.xtable.reflection;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -43,17 +44,31 @@ public class ReflectionUtils {
       if (constructorArgs.length == 0) {
         return clazz.newInstance();
       }
-      Class<?>[] constructorArgTypes =
+      /*Class<?>[] constructorArgTypes =
           Arrays.stream(constructorArgs).map(Object::getClass).toArray(Class[]::new);
       if (hasConstructor(clazz, constructorArgTypes)) {
         return clazz.getConstructor(constructorArgTypes).newInstance(constructorArgs);
       } else {
         return clazz.newInstance();
+      }*/
+      for (Constructor<?> constructor : clazz.getConstructors()) {
+        Class<?>[] parameterTypes = constructor.getParameterTypes();
+        if (parameterTypes.length == constructorArgs.length) {
+          boolean matches = true;
+          for (int i = 0; i < parameterTypes.length; i++) {
+            if (!parameterTypes[i].isAssignableFrom(constructorArgs[i].getClass())) {
+              matches = false;
+              break;
+            }
+          }
+          if (matches) {
+            return (T) constructor.newInstance(constructorArgs);
+          }
+        }
       }
-    } catch (InstantiationException
-        | IllegalAccessException
-        | NoSuchMethodException
-        | InvocationTargetException e) {
+      throw new NoSuchMethodException("Could not find a suitable constructor for class: " + className);
+
+    } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
       throw new ConfigurationException("Unable to load class: " + className, e);
     }
   }

@@ -78,7 +78,7 @@ public class ParquetSourceConfig {
     return partitionFields;
   }
 
-  public ConfigurationBasedPartitionSpecExtractor loadSourcePartitionSpecExtractor() {
+  public PathBasedPartitionSpecExtractor loadSourcePartitionSpecExtractor() {
     Preconditions.checkNotNull(
             this.partitionSpecExtractorClass, "PathBasedPartitionSpecExtractor class not provided");
     return ReflectionUtils.createInstanceOfClass(this.partitionSpecExtractorClass, this.partitionFieldSpecs);

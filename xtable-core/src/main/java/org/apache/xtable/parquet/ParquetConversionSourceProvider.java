@@ -30,7 +30,7 @@ import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 public class ParquetConversionSourceProvider extends ConversionSourceProvider<Long> {
     @Override
     public ParquetConversionSource getConversionSourceInstance(SourceTable sourceTable) {
-        final ConfigurationBasedPartitionSpecExtractor sourcePartitionSpecExtractor =
+        final PathBasedPartitionSpecExtractor sourcePartitionSpecExtractor =
                 ParquetSourceConfig.fromProperties(sourceTable.getAdditionalProperties())
                         .loadSourcePartitionSpecExtractor();
         ParquetPartitionValueExtractor partitionValueExtractor = new ParquetPartitionValueExtractor(sourcePartitionSpecExtractor.getPathToPartitionFieldFormat());

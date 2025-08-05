@@ -43,9 +43,9 @@ public class ParquetPartitionSpecExtractor implements PathBasedPartitionSpecExtr
   public static ParquetPartitionSpecExtractor getInstance() {
     return INSTANCE;
   }
+
   @Override
   public List<InternalPartitionField> spec(InternalSchema tableSchema) {
-
 
     List<InternalPartitionField> partitionFields = new ArrayList<>(partitionFieldSpecs.size());
     for (PartitionFieldSpec fieldSpec : partitionFieldSpecs) {
