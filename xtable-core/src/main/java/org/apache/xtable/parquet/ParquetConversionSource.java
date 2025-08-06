@@ -19,6 +19,9 @@
 package org.apache.xtable.parquet;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -191,6 +194,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     InternalTable table = getMostRecentTable(parquetFiles);
     return InternalSnapshot.builder()
         .table(table)
+        .sourceIdentifier(getCommitIdentifier(1L))//TODO check for version number instead
         .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
         .build();
   }
@@ -214,11 +218,13 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   private Collection<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
     try {
       FileSystem fs = FileSystem.get(hadoopConf);
-      RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(basePath), true);
+      URI uriBasePath = new URI(basePath);
+      String parentPath =Paths.get(uriBasePath).getParent().toString();
+      RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(parentPath), true);
       return RemoteIterators.toList(iterator).stream()
-              .filter(file -> file.getPath().getName().endsWith("parquet"))
+              .filter(file -> file.getPath().getName().toString().endsWith("parquet"))
               .collect(Collectors.toList());
-    } catch (IOException e) { //
+    } catch (IOException | URISyntaxException e) {
       throw new RuntimeException(e);
     }
   }

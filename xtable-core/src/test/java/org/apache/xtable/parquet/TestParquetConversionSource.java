@@ -23,7 +23,10 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.iceberg.Snapshot;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.*;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.conversion.*;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
@@ -92,9 +95,6 @@ import lombok.Builder;
 import lombok.Value;
 
 
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
-
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 
 import org.apache.xtable.conversion.ConversionConfig;
@@ -127,12 +127,46 @@ public class TestParquetConversionSource {
     public static void setupOnce() {
         SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
         String extraJavaOptions = "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED";
-        //sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
+        sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
         sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
         sparkConf.set("parquet.avro.write-old-list-structure", "false");
+        // TODO kryo serializer causing error (replaced it with Java's)
+        sparkConf.set("spark.serializer", "org.apache.spark.serializer.JavaSerializer");
+        /*String javaOpts = "--add-opens=java.base/java.nio=ALL-UNNAMED " +
+                "--add-opens=java.base/java.lang=ALL-UNNAMED " +
+                "--add-opens=java.base/java.util=ALL-UNNAMED " +
+                "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED " +
+                "--add-opens=java.base/java.io=ALL-UNNAMED";
+
+        sparkConf.set("spark.driver.extraJavaOptions", javaOpts);
+        sparkConf.set("spark.executor.extraJavaOptions", javaOpts);*/
+
         sparkSession =
                 SparkSession.builder().config(sparkConf).getOrCreate();
         jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
+
+        List<Row> data = Arrays.asList(
+                RowFactory.create(1, "Alice", 30, "New York"),
+                RowFactory.create(2, "Bob", 24, "Los Angeles"),
+                RowFactory.create(3, "Charlie", 35, "Chicago"),
+                RowFactory.create(4, "David", 29, "Houston"),
+                RowFactory.create(5, "Eve", 22, "Phoenix")
+        );
+
+        StructType schema = DataTypes.createStructType(new StructField[]{
+                DataTypes.createStructField("id", DataTypes.IntegerType, false),
+                DataTypes.createStructField("name", DataTypes.StringType, false),
+                DataTypes.createStructField("age", DataTypes.IntegerType, false),
+                DataTypes.createStructField("date", DataTypes.StringType, false)
+        });
+
+        Dataset<Row> df = sparkSession.createDataFrame(data, schema);
+        df.write().mode(SaveMode.Overwrite).parquet(tempDir.toAbsolutePath().toString());
+
+        //test if data was written correctly
+        Dataset<Row> reloadedDf = sparkSession.read().parquet(tempDir.toAbsolutePath().toString());
+        reloadedDf.show();
+        reloadedDf.printSchema();
     }
 
     @AfterAll
@@ -309,10 +343,6 @@ public class TestParquetConversionSource {
        test for Parquet file conversion
 
     */
-    private ParquetPartitionSpecExtractor getParquetSpecExtractor(String xTablePartitionConfig) {
-        return new ParquetPartitionSpecExtractor(
-                ParquetSourceConfig.parsePartitionFieldSpecs(xTablePartitionConfig));
-    }
 
     @ParameterizedTest
     @MethodSource("provideArgsForFilePartitionTesting")
