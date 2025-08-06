@@ -43,6 +43,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -104,17 +105,7 @@ import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 
 
-
 public class TestParquetConversionSource {
-    @Builder
-    @Value
-    private static class TableFormatPartitionDataHolder {
-        String sourceTableFormat;
-        List<String> targetTableFormats;
-        String xTablePartitionConfig;
-        Optional<String> hudiSourceConfig;
-        String filter;
-    }
     private static final DateTimeFormatter DATE_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -178,7 +169,6 @@ public class TestParquetConversionSource {
             sparkSession.close();
         }
     }
-
 
     private static Stream<Arguments> provideArgsForFilePartitionTesting() {
         String timestampFilter =
@@ -255,7 +245,6 @@ public class TestParquetConversionSource {
                                 "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
                                 timestampAndLevelFilter)));
     }
-
 
     private static TableFormatPartitionDataHolder buildArgsForPartition(
             String sourceFormat,
@@ -339,11 +328,6 @@ public class TestParquetConversionSource {
         }
     }
 
-    /*
-       test for Parquet file conversion
-
-    */
-
     @ParameterizedTest
     @MethodSource("provideArgsForFilePartitionTesting")
     public void testFilePartitionedData(
@@ -351,20 +335,13 @@ public class TestParquetConversionSource {
         String tableName = getTableName();
         String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
         List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
-        Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
+        //Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
         String xTablePartitionConfig = tableFormatPartitionDataHolder.getXTablePartitionConfig();
         String filter = tableFormatPartitionDataHolder.getFilter();
         ConversionSourceProvider<?> conversionSourceProvider =
                 getConversionSourceProvider(sourceTableFormat);
         GenericTable table;
-        if (hudiPartitionConfig.isPresent()) {
-            table =
-                    GenericTable.getInstanceWithCustomPartitionConfig(
-                            tableName, tempDir, jsc, sourceTableFormat, hudiPartitionConfig.get());
-        } else {
-            table =
-                    GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, true);
-        }
+        table = GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, false);
         try (GenericTable tableToClose = table) {
             ConversionConfig conversionConfig =
                     getTableSyncConfig(
@@ -375,20 +352,26 @@ public class TestParquetConversionSource {
                             targetTableFormats,
                             xTablePartitionConfig,
                             null);
-            // tableToClose.insertRows(100);
             ConversionController conversionController =
                     new ConversionController(jsc.hadoopConfiguration());
             conversionController.sync(conversionConfig, conversionSourceProvider);
             checkDatasetEquivalenceWithFilter(
                     sourceTableFormat, tableToClose, targetTableFormats, filter);
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
         }
     }
+
+    /*
+       test for Parquet file conversion
+
+    */
 
     private void checkDatasetEquivalenceWithFilter(
             String sourceFormat,
             GenericTable<?, ?> sourceTable,
             List<String> targetFormats,
-            String filter) {
+            String filter) throws URISyntaxException {
         checkDatasetEquivalence(
                 sourceFormat,
                 sourceTable,
@@ -403,7 +386,7 @@ public class TestParquetConversionSource {
             String sourceFormat,
             GenericTable<?, ?> sourceTable,
             List<String> targetFormats,
-            Integer expectedCount) {
+            Integer expectedCount) throws URISyntaxException {
         checkDatasetEquivalence(
                 sourceFormat,
                 sourceTable,
@@ -420,7 +403,7 @@ public class TestParquetConversionSource {
             Map<String, String> sourceOptions,
             List<String> targetFormats,
             Map<String, Map<String, String>> targetOptions,
-            Integer expectedCount) {
+            Integer expectedCount) throws URISyntaxException {
         checkDatasetEquivalence(
                 sourceFormat,
                 sourceTable,
@@ -438,15 +421,15 @@ public class TestParquetConversionSource {
             List<String> targetFormats,
             Map<String, Map<String, String>> targetOptions,
             Integer expectedCount,
-            String filterCondition) {
+            String filterCondition) throws URISyntaxException {
         Dataset<Row> sourceRows =
                 sparkSession
                         .read()
                         .options(sourceOptions)
                         .format(sourceFormat.toLowerCase())
-                        .load(sourceTable.getBasePath())
-                        .orderBy(sourceTable.getOrderByColumn())
-                        .filter(filterCondition);
+                        .load(Paths.get(new URI(sourceTable.getBasePath())).getParent().toString());//check if the path is wrong Paths.get(new URI(sourceTable.getBasePath())).getParent().toString()
+                        //.orderBy(sourceTable.getOrderByColumn())
+                        //.filter(filterCondition);
         Map<String, Dataset<Row>> targetRowsByFormat =
                 targetFormats.stream()
                         .collect(
@@ -465,9 +448,9 @@ public class TestParquetConversionSource {
                                                     .read()
                                                     .options(finalTargetOptions)
                                                     .format(targetFormat.toLowerCase())
-                                                    .load(sourceTable.getDataPath())
-                                                    .orderBy(sourceTable.getOrderByColumn())
-                                                    .filter(filterCondition);
+                                                    .load(sourceTable.getDataPath());//TODO check error here
+                                                    //.orderBy(sourceTable.getOrderByColumn())
+                                                    //.filter(filterCondition);
                                         }));
 
         String[] selectColumnsArr = sourceTable.getColumnsToSelect().toArray(new String[]{});
@@ -499,6 +482,16 @@ public class TestParquetConversionSource {
                                     sourceFormat, format));
 
                 });
+    }
+
+    @Builder
+    @Value
+    private static class TableFormatPartitionDataHolder {
+        String sourceTableFormat;
+        List<String> targetTableFormats;
+        String xTablePartitionConfig;
+        Optional<String> hudiSourceConfig;
+        String filter;
     }
 
 

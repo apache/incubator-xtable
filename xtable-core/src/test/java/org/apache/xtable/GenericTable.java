@@ -78,6 +78,7 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       boolean isPartitioned) {
     switch (sourceFormat) {
       case HUDI:
+      case PARQUET:
         return TestSparkHudiTable.forStandardSchemaAndPartitioning(
             tableName, tempDir, jsc, isPartitioned);
       case DELTA:
