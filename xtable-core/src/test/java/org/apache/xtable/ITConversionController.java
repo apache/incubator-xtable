@@ -177,38 +177,6 @@ public class ITConversionController {
         .collect(Collectors.toList());
   }
 
-  private static Stream<Arguments> provideArgsForFilePartitionTesting() {
-    String timestampFilter =
-        String.format(
-            "timestamp_micros_nullable_field < timestamp_millis(%s)",
-            Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
-    String levelFilter = "level = 'INFO'";
-    String nestedLevelFilter = "nested_record.level = 'INFO'";
-    String severityFilter = "severity = 1";
-    String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
-    return Stream.of(
-        Arguments.of(
-            buildArgsForPartition(
-                PARQUET,
-                Arrays.asList(ICEBERG, DELTA, HUDI),
-                "level:SIMPLE",
-                "level:VALUE",
-                levelFilter)),
-        Arguments.of(
-            buildArgsForPartition(
-                PARQUET,
-                Arrays.asList(ICEBERG, DELTA, HUDI),
-                "severity:SIMPLE",
-                "severity:VALUE",
-                severityFilter)),
-        Arguments.of(
-            buildArgsForPartition(
-                PARQUET,
-                Arrays.asList(ICEBERG, DELTA, HUDI),
-                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
-                timestampAndLevelFilter)));
-  }
 
   private static Stream<Arguments> provideArgsForPartitionTesting() {
     String timestampFilter =
@@ -339,11 +307,6 @@ public class ITConversionController {
           new IcebergConversionSourceProvider();
       icebergConversionSourceProvider.init(jsc.hadoopConfiguration());
       return icebergConversionSourceProvider;
-    } else if (sourceTableFormat.equalsIgnoreCase(PARQUET)) {
-      ConversionSourceProvider<Long> parquetConversionSourceProvider =
-          new ParquetConversionSourceProvider();
-      parquetConversionSourceProvider.init(jsc.hadoopConfiguration());
-      return parquetConversionSourceProvider;
     } else {
       throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
     }
@@ -352,49 +315,6 @@ public class ITConversionController {
      test for Parquet file conversion
 
   */
-  private ParquetPartitionSpecExtractor getParquetSpecExtractor(String xTablePartitionConfig) {
-    return new ParquetPartitionSpecExtractor(
-                    ParquetSourceConfig.parsePartitionFieldSpecs(xTablePartitionConfig));
-  }
-  @ParameterizedTest
-  @MethodSource("provideArgsForFilePartitionTesting")
-  public void testFilePartitionedData(
-      TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
-    String tableName = getTableName();
-    String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
-    List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
-    Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
-    String xTablePartitionConfig = tableFormatPartitionDataHolder.getXTablePartitionConfig();
-    String filter = tableFormatPartitionDataHolder.getFilter();
-    ConversionSourceProvider<?> conversionSourceProvider =
-        getConversionSourceProvider(sourceTableFormat);
-    GenericTable table;
-    if (hudiPartitionConfig.isPresent()) {
-      table =
-          GenericTable.getInstanceWithCustomPartitionConfig(
-              tableName, tempDir, jsc, sourceTableFormat, hudiPartitionConfig.get());
-    } else {
-      table =
-          GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, true);
-    }
-    try (GenericTable tableToClose = table) {
-      ConversionConfig conversionConfig =
-          getTableSyncConfig(
-              sourceTableFormat,
-              SyncMode.INCREMENTAL,
-              tableName,
-              table,
-              targetTableFormats,
-              xTablePartitionConfig,
-              null);
-      // tableToClose.insertRows(100);
-      ConversionController conversionController =
-          new ConversionController(jsc.hadoopConfiguration());
-      conversionController.sync(conversionConfig, conversionSourceProvider);
-      checkDatasetEquivalenceWithFilter(
-          sourceTableFormat, tableToClose, targetTableFormats, filter);
-    }
-  }
 
   /*
    * This test has the following steps at a high level.
