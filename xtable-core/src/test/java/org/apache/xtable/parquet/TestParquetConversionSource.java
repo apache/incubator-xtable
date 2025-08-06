@@ -137,11 +137,11 @@ public class TestParquetConversionSource {
         jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
 
         List<Row> data = Arrays.asList(
-                RowFactory.create(1, "Alice", 30, "New York"),
-                RowFactory.create(2, "Bob", 24, "Los Angeles"),
-                RowFactory.create(3, "Charlie", 35, "Chicago"),
-                RowFactory.create(4, "David", 29, "Houston"),
-                RowFactory.create(5, "Eve", 22, "Phoenix")
+                RowFactory.create(1, "Alice", 30, "2004"),
+                RowFactory.create(2, "Bob", 24, "1954"),
+                RowFactory.create(3, "Charlie", 35, "1999"),
+                RowFactory.create(4, "David", 29, "1978"),
+                RowFactory.create(5, "Eve", 22, "1992")
         );
 
         StructType schema = DataTypes.createStructType(new StructField[]{

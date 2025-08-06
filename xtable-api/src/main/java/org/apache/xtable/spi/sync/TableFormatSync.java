@@ -68,7 +68,7 @@ public class TableFormatSync {
     Map<String, SyncResult> results = new HashMap<>();
     for (ConversionTarget conversionTarget : conversionTargets) {
       try {
-        InternalTable internalTable = snapshot.getTable();
+        InternalTable internalTable = snapshot.getTable();//TODO check error internalTable.getPartitioningFields() and getSourceField() are being returned null
         results.put(
             conversionTarget.getTableFormat(),
             getSyncResult(
