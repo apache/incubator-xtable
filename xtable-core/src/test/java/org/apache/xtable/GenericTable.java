@@ -32,6 +32,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 
 import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.xtable.parquet.TestSparkParquetTable;
 
 public interface GenericTable<T, Q> extends AutoCloseable {
   // A list of values for the level field which serves as a basic field to partition on for tests
@@ -77,9 +78,9 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       String sourceFormat,
       boolean isPartitioned) {
     switch (sourceFormat) {
-      case HUDI:
-        // TODO implement utility class for Parquet test
       case PARQUET:
+        return TestSparkParquetTable.forStandardSchemaAndPartitioning(tableName, tempDir, jsc, isPartitioned);
+      case HUDI:
         return TestSparkHudiTable.forStandardSchemaAndPartitioning(
             tableName, tempDir, jsc, isPartitioned);
       case DELTA:
@@ -123,7 +124,6 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       String partitionConfig) {
     switch (sourceFormat) {
       case HUDI:
-      case PARQUET:
         return TestSparkHudiTable.forStandardSchema(
             tableName, tempDir, jsc, partitionConfig, HoodieTableType.COPY_ON_WRITE);
       default:
