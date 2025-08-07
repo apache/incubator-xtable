@@ -372,7 +372,7 @@ public class HudiConversionTarget implements ConversionTarget {
 
     public void setReplaceMetadata(BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata) {
       if (!writeStatuses.isEmpty() || !partitionToReplacedFileIds.isEmpty()) {
-        throw new IllegalArgumentException("Replace metadata can only be set once");
+        throw new IllegalArgumentException("Replace metadata can only be set once");//TODO check error here because writeStatuses is of size 1
       }
       this.writeStatuses = replaceMetadata.getWriteStatuses();
       this.partitionToReplacedFileIds = replaceMetadata.getPartitionToReplacedFileIds();

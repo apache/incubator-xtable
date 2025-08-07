@@ -111,7 +111,7 @@ public class DeltaStatsExtractor {
             .maxValues(getMaxValues(validColumnStats))
             .nullCount(getNullCount(validColumnStats))
             .build();
-    return MAPPER.writeValueAsString(deltaStats);
+    return MAPPER.writeValueAsString(deltaStats);//TODO check error here (serialization of stats)
   }
 
   private Set<String> getPathsFromStructSchemaForMinAndMaxStats(InternalSchema schema) {
