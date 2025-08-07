@@ -25,12 +25,10 @@ import java.util.stream.Collectors;
 
 import lombok.Builder;
 
-import org.apache.hadoop.conf.Configuration;
-import io.delta.kernel.Table;
 import io.delta.kernel.Snapshot;
+import io.delta.kernel.Table;
 import io.delta.kernel.data.FilteredColumnarBatch;
 import io.delta.kernel.data.Row;
-import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.InternalScanFileUtils;
 import io.delta.kernel.internal.ScanImpl;
@@ -70,7 +68,8 @@ public class DeltaKernelDataFileExtractor {
    *
    * @return Delta table file iterator
    */
-  public DataFileIterator iterator(Snapshot deltaSnapshot, Table table, Engine engine, InternalSchema schema)  {
+  public DataFileIterator iterator(
+      Snapshot deltaSnapshot, Table table, Engine engine, InternalSchema schema) {
     return new DeltaDataFileIterator(deltaSnapshot, table, engine, schema, true);
   }
 
@@ -81,7 +80,11 @@ public class DeltaKernelDataFileExtractor {
     private Iterator<InternalDataFile> dataFilesIterator = Collections.emptyIterator();
 
     private DeltaDataFileIterator(
-            Snapshot snapshot, Table table, Engine engine, InternalSchema schema, boolean includeColumnStats) {
+        Snapshot snapshot,
+        Table table,
+        Engine engine,
+        InternalSchema schema,
+        boolean includeColumnStats) {
       String provider = ((SnapshotImpl) snapshot).getMetadata().getFormat().getProvider();
       this.fileFormat = actionsConverter.convertToFileFormat(provider);
 
@@ -121,17 +124,16 @@ public class DeltaKernelDataFileExtractor {
               InternalScanFileUtils.getPartitionValues(scanFileRow);
           // Convert the FileStatus to InternalDataFile using the actionsConverter
           dataFiles.add(
-                      actionsConverter.convertAddActionToInternalDataFile(
-                          addFile,
-                          table,
-                          fileFormat,
-                          partitionFields,
-                          fields,
-                          includeColumnStats,
-                          partitionExtractor,
-                          fileStatsExtractor,
-                              partitionValues));
-
+              actionsConverter.convertAddActionToInternalDataFile(
+                  addFile,
+                  table,
+                  fileFormat,
+                  partitionFields,
+                  fields,
+                  includeColumnStats,
+                  partitionExtractor,
+                  fileStatsExtractor,
+                  partitionValues));
         }
       }
       this.dataFilesIterator = dataFiles.iterator();

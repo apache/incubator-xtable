@@ -37,17 +37,20 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.xtable.TestSparkDeltaTable;
-import org.apache.xtable.ValidationTestHelper;
-import org.apache.xtable.model.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import io.delta.kernel.*;
 
 import org.apache.xtable.GenericTable;
+import org.apache.xtable.TestSparkDeltaTable;
+import org.apache.xtable.ValidationTestHelper;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.kernel.DeltaKernelConversionSource;
+import org.apache.xtable.model.*;
 import org.apache.xtable.model.schema.*;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -55,9 +58,6 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 
 public class ITDeltaKernelConversionSource {
   private static final InternalField COL1_INT_FIELD =
@@ -335,15 +335,14 @@ public class ITDeltaKernelConversionSource {
         snapshot.getPartitionedDataFiles().get(0));
   }
 
-
   @ParameterizedTest
   @MethodSource("testWithPartitionToggle")
   public void testInsertsUpsertsAndDeletes(boolean isPartitioned) {
     String tableName = GenericTable.getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-            new TestSparkDeltaTable(
-                    tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
-//    System.out.println("testSparkDeltaTable" + testSparkDeltaTable.getColumnsToSelect());
+        new TestSparkDeltaTable(
+            tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
+    //    System.out.println("testSparkDeltaTable" + testSparkDeltaTable.getColumnsToSelect());
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
@@ -359,17 +358,16 @@ public class ITDeltaKernelConversionSource {
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
-
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
     SourceTable tableConfig =
-            SourceTable.builder()
-                    .name(testSparkDeltaTable.getTableName())
-                    .basePath(testSparkDeltaTable.getBasePath())
-                    .formatName(TableFormat.DELTA)
-                    .build();
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
+            .build();
     DeltaKernelConversionSource conversionSource =
-            conversionSourceProvider.getConversionSourceInstance(tableConfig);
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
     assertEquals(200L, testSparkDeltaTable.getNumRows());
     InternalSnapshot internalSnapshot = conversionSource.getCurrentSnapshot();
 
@@ -377,29 +375,30 @@ public class ITDeltaKernelConversionSource {
       validateDeltaPartitioning(internalSnapshot);
     }
     ValidationTestHelper.validateSnapshot(
-            internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
+        internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
     // Get changes in incremental format.
     InstantsForIncrementalSync instantsForIncrementalSync =
-            InstantsForIncrementalSync.builder()
-                    .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
-                    .build();
-//    CommitsBacklog<Long> commitsBacklog =
-//            conversionSource.getCommitsBacklog(instantsForIncrementalSync);
-//    for (Long version : commitsBacklog.getCommitsToProcess()) {
-//      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
-//      allTableChanges.add(tableChange);
-//    }
-//    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+            .build();
+    //    CommitsBacklog<Long> commitsBacklog =
+    //            conversionSource.getCommitsBacklog(instantsForIncrementalSync);
+    //    for (Long version : commitsBacklog.getCommitsToProcess()) {
+    //      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
+    //      allTableChanges.add(tableChange);
+    //    }
+    //    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
   }
 
   private void validateDeltaPartitioning(InternalSnapshot internalSnapshot) {
     List<InternalPartitionField> partitionFields =
-            internalSnapshot.getTable().getPartitioningFields();
+        internalSnapshot.getTable().getPartitioningFields();
     assertEquals(1, partitionFields.size());
     InternalPartitionField partitionField = partitionFields.get(0);
     assertEquals("birthDate", partitionField.getSourceField().getName());
     assertEquals(PartitionTransformType.YEAR, partitionField.getTransformType());
   }
+
   private void validatePartitionDataFiles(
       PartitionFileGroup expectedPartitionFiles, PartitionFileGroup actualPartitionFiles)
       throws URISyntaxException {
@@ -420,7 +419,7 @@ public class ITDeltaKernelConversionSource {
   }
 
   private static Stream<Arguments> testWithPartitionToggle() {
-    return Stream.of( Arguments.of(false), Arguments.of(true));
+    return Stream.of(Arguments.of(false), Arguments.of(true));
   }
 
   private void validatePropertiesDataFile(InternalDataFile expected, InternalDataFile actual)

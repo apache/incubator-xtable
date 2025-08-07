@@ -203,13 +203,18 @@ public class DeltaKernelStatsExtractor {
                     Object minRaw = fieldPathToMinValue.get(fieldPath);
                     Object maxRaw = fieldPathToMaxValue.get(fieldPath);
                     Object nullCountRaw = fieldPathToNullCount.get(fieldPath);
-                    Object minValue = minRaw != null
-                            ? DeltaValueConverter.convertFromDeltaColumnStatValue(minRaw, field.getSchema())
+                    Object minValue =
+                        minRaw != null
+                            ? DeltaValueConverter.convertFromDeltaColumnStatValue(
+                                minRaw, field.getSchema())
                             : null;
-                    Object maxValue = maxRaw != null
-                            ? DeltaValueConverter.convertFromDeltaColumnStatValue(maxRaw, field.getSchema())
+                    Object maxValue =
+                        maxRaw != null
+                            ? DeltaValueConverter.convertFromDeltaColumnStatValue(
+                                maxRaw, field.getSchema())
                             : null;
-                    long nullCount = nullCountRaw instanceof Number ? ((Number) nullCountRaw).longValue() : 0;
+                    long nullCount =
+                        nullCountRaw instanceof Number ? ((Number) nullCountRaw).longValue() : 0;
                     Range range = Range.vector(minValue, maxValue);
                     return ColumnStat.builder()
                         .field(field)

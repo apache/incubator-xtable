@@ -21,12 +21,9 @@ package org.apache.xtable.delta;
 import static org.apache.xtable.delta.DeltaActionsConverter.getFullPathToFile;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import io.delta.kernel.data.MapValue;
-import io.delta.kernel.internal.InternalScanFileUtils;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -35,7 +32,6 @@ import org.apache.hadoop.fs.Path;
 
 import scala.collection.JavaConverters;
 
-import io.delta.kernel.Snapshot;
 import io.delta.kernel.Table;
 import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
@@ -67,8 +63,7 @@ public class DeltaKernelActionsConverter {
       boolean includeColumnStats,
       DeltaKernelPartitionExtractor partitionExtractor,
       DeltaKernelStatsExtractor fileStatsExtractor,
-      Map<String, String> partitionValues)
-  {
+      Map<String, String> partitionValues) {
     FileStats fileStats = fileStatsExtractor.getColumnStatsForFile(addFile, fields);
     List<ColumnStat> columnStats =
         includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
@@ -76,10 +71,10 @@ public class DeltaKernelActionsConverter {
     // The immutable map from Java to Scala is not working, need to
 
     scala.collection.mutable.Map<String, String> scalaMap =
-            JavaConverters.mapAsScalaMap(partitionValues);
+        JavaConverters.mapAsScalaMap(partitionValues);
 
     return InternalDataFile.builder()
-        .physicalPath(getFullPathToFile( addFile.getPath(), table))
+        .physicalPath(getFullPathToFile(addFile.getPath(), table))
         .fileFormat(fileFormat)
         .fileSizeBytes(addFile.getSize())
         .lastModified(addFile.getModificationTime())
@@ -99,15 +94,15 @@ public class DeltaKernelActionsConverter {
         String.format("delta file format %s is not recognized", provider));
   }
 
-  static String getFullPathToFile( String dataFilePath, Table table) {
+  static String getFullPathToFile(String dataFilePath, Table table) {
     Configuration hadoopConf = new Configuration();
     Engine myEngine = DefaultEngine.create(hadoopConf);
-    String tableBasePath = table.getPath(myEngine);;
-//            String tableBasePath = snapshot.dataPath().toUri().toString();
+    String tableBasePath = table.getPath(myEngine);
+    ;
+    //            String tableBasePath = snapshot.dataPath().toUri().toString();
     if (dataFilePath.startsWith(tableBasePath)) {
       return dataFilePath;
     }
     return tableBasePath + Path.SEPARATOR + dataFilePath;
   }
-
 }
