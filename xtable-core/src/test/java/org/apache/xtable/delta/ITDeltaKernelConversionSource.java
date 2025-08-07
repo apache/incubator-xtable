@@ -346,22 +346,22 @@ public class ITDeltaKernelConversionSource {
 //    System.out.println("testSparkDeltaTable" + testSparkDeltaTable.getColumnsToSelect());
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
-    testSparkDeltaTable.insertRows(50);
-     testSparkDeltaTable.getLastCommitTimestamp();
+    List<Row> rows = testSparkDeltaTable.insertRows(50);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
     testSparkDeltaTable.insertRows(50);
     allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
 
-//    testSparkDeltaTable.upsertRows(rows.subList(0, 20));
-//    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
-//
-//    testSparkDeltaTable.insertRows(50);
-//    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
-//
-//
-//    testSparkDeltaTable.insertRows(50);
-//    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    testSparkDeltaTable.upsertRows(rows.subList(0, 20));
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
     SourceTable tableConfig =
             SourceTable.builder()
                     .name(testSparkDeltaTable.getTableName())
@@ -370,7 +370,7 @@ public class ITDeltaKernelConversionSource {
                     .build();
     DeltaKernelConversionSource conversionSource =
             conversionSourceProvider.getConversionSourceInstance(tableConfig);
-    assertEquals(100L, testSparkDeltaTable.getNumRows());
+    assertEquals(200L, testSparkDeltaTable.getNumRows());
     InternalSnapshot internalSnapshot = conversionSource.getCurrentSnapshot();
 
     if (isPartitioned) {
@@ -378,11 +378,11 @@ public class ITDeltaKernelConversionSource {
     }
     ValidationTestHelper.validateSnapshot(
             internalSnapshot, allActiveFiles.get(allActiveFiles.size() - 1));
-//    // Get changes in incremental format.
-//    InstantsForIncrementalSync instantsForIncrementalSync =
-//            InstantsForIncrementalSync.builder()
-//                    .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
-//                    .build();
+    // Get changes in incremental format.
+    InstantsForIncrementalSync instantsForIncrementalSync =
+            InstantsForIncrementalSync.builder()
+                    .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+                    .build();
 //    CommitsBacklog<Long> commitsBacklog =
 //            conversionSource.getCommitsBacklog(instantsForIncrementalSync);
 //    for (Long version : commitsBacklog.getCommitsToProcess()) {

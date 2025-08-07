@@ -60,7 +60,7 @@ public class DeltaKernelActionsConverter {
 
   public InternalDataFile convertAddActionToInternalDataFile(
       AddFile addFile,
-      Snapshot deltaSnapshot,
+      Table table,
       FileFormat fileFormat,
       List<InternalPartitionField> partitionFields,
       List<InternalField> fields,
@@ -73,16 +73,13 @@ public class DeltaKernelActionsConverter {
     List<ColumnStat> columnStats =
         includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
     long recordCount = fileStats.getNumRecords();
-    Configuration hadoopConf = new Configuration();
-    Engine myEngine = DefaultEngine.create(hadoopConf);
-    Table myTable = Table.forPath(myEngine, addFile.getPath());
     // The immutable map from Java to Scala is not working, need to
 
     scala.collection.mutable.Map<String, String> scalaMap =
             JavaConverters.mapAsScalaMap(partitionValues);
 
     return InternalDataFile.builder()
-        .physicalPath(getFullPathToFile(deltaSnapshot, addFile.getPath(), myTable))
+        .physicalPath(getFullPathToFile( addFile.getPath(), table))
         .fileFormat(fileFormat)
         .fileSizeBytes(addFile.getSize())
         .lastModified(addFile.getModificationTime())
@@ -102,16 +99,15 @@ public class DeltaKernelActionsConverter {
         String.format("delta file format %s is not recognized", provider));
   }
 
-  static String getFullPathToFile(Snapshot snapshot, String dataFilePath, Table myTable) {
+  static String getFullPathToFile( String dataFilePath, Table table) {
     Configuration hadoopConf = new Configuration();
     Engine myEngine = DefaultEngine.create(hadoopConf);
-//    Table myTable = Table.forPath(myEngine, basePath.toString());
-    String tableBasePath = myTable.getPath(myEngine);
+    String tableBasePath = table.getPath(myEngine);;
 //            String tableBasePath = snapshot.dataPath().toUri().toString();
     if (dataFilePath.startsWith(tableBasePath)) {
       return dataFilePath;
     }
-    return tableBasePath ;
+    return tableBasePath + Path.SEPARATOR + dataFilePath;
   }
 
 }

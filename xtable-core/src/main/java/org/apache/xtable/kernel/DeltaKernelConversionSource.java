@@ -110,7 +110,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
     InternalTable table = getTable(snapshot.getVersion());
     return InternalSnapshot.builder()
         .table(table)
-        .partitionedDataFiles(getInternalDataFiles(snapshot, table.getReadSchema()))
+            .partitionedDataFiles(getInternalDataFiles(snapshot, table_snapshot, engine, table.getReadSchema()))
         .sourceIdentifier(getCommitIdentifier(snapshot.getVersion()))
         .build();
   }
@@ -149,7 +149,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
         InternalDataFile dataFile =
                 actionsConverter.convertAddActionToInternalDataFile(
                         (AddFile) scanFileRow,
-                        snapshot,
+                        table,
                         fileFormat,
                         tableAtVersion.getPartitioningFields(),
                         tableAtVersion.getReadSchema().getFields(),
@@ -177,7 +177,6 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   @Override
   public CommitsBacklog<Long> getCommitsBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync) {
-    return null;
 //    DeltaHistoryManager.Commit deltaCommitAtLastSyncInstant =
 //            deltaLog.
 //                    .getActiveCommitAtTime(
@@ -187,21 +186,49 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 //    return CommitsBacklog.<Long>builder()
 //            .commitsToProcess(getChangesState().getVersionsInSortedOrder())
 //            .build();
+    Configuration hadoopConf = new Configuration();
+    Engine engine = DefaultEngine.create(hadoopConf);
+    Table table = Table.forPath(engine, basePath);
+    Snapshot snapshot = table.getSnapshotAsOfTimestamp(engine, Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()).getTime());
+
+    long versionNumberAtLastSyncInstant = snapshot.getVersion();
+//    resetState(versionNumberAtLastSyncInstant + 1);
+    return CommitsBacklog.<Long>builder()
+            .commitsToProcess(getChangesState().getVersionsInSortedOrder())
+            .build();
+
   }
 
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
-    return false;
+    Configuration hadoopConf = new Configuration();
+    Engine engine = DefaultEngine.create(hadoopConf);
+    Table table = Table.forPath(engine, basePath);
+    Snapshot snapshot = table.getSnapshotAsOfTimestamp(engine, Timestamp.from(instant).getTime());
+
+    // There is a chance earliest commit of the table is returned if the instant is before the
+    // earliest commit of the table, hence the additional check.
+    Instant deltaCommitInstant = Instant.ofEpochMilli(snapshot.getTimestamp(engine));
+    return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
   }
 
   @Override
-  public String getCommitIdentifier(Long aLong) {
-    return "";
+  public String getCommitIdentifier(Long commit) {
+    return String.valueOf(commit);
   }
+//
+//  private void resetState(long versionToStartFrom) {
+//    deltaIncrementalChangesState =
+//            Optional.of(
+//                    DeltaIncrementalChangesState.builder()
+//                            .deltaLog(deltaLog)
+//                            .versionToStartFrom(versionToStartFrom)
+//                            .build());
+//  }
 
   private List<PartitionFileGroup> getInternalDataFiles(
-      io.delta.kernel.Snapshot snapshot, InternalSchema schema) {
-    try (DataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
+     io.delta.kernel.Snapshot snapshot, Table table, Engine engine, InternalSchema schema) {
+        try (DataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, table, engine, schema)) {
 
       List<InternalDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);
