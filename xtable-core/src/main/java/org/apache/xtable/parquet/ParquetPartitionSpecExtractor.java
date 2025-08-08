@@ -49,7 +49,7 @@ public class ParquetPartitionSpecExtractor implements PathBasedPartitionSpecExtr
 
     List<InternalPartitionField> partitionFields = new ArrayList<>(partitionFieldSpecs.size());
     for (PartitionFieldSpec fieldSpec : partitionFieldSpecs) {
-      InternalField sourceField =
+      InternalField sourceField = // replace it with a builder?
           SchemaFieldFinder.getInstance()
               .findFieldByPath(tableSchema, fieldSpec.getSourceFieldPath());
       partitionFields.add(

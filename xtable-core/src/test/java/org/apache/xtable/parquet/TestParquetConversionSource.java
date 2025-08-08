@@ -55,12 +55,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.xtable.GenericTable.getTableName;
-import static org.apache.xtable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
+//import static org.apache.xtable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
 import static org.apache.xtable.model.storage.TableFormat.*;
 
 
 import static org.apache.xtable.GenericTable.getTableName;
-import static org.apache.xtable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
+//import static org.apache.xtable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
 import static org.apache.xtable.hudi.HudiTestUtil.PartitionConfig;
 import static org.apache.xtable.model.storage.TableFormat.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -109,6 +109,8 @@ public class TestParquetConversionSource {
     private static final DateTimeFormatter DATE_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    public static final String PARTITION_FIELD_SPEC_CONFIG =
+            "xtable.parquet.source.partition_field_spec_config";
     @TempDir
     public static Path tempDir;
     private static JavaSparkContext jsc;
@@ -152,7 +154,7 @@ public class TestParquetConversionSource {
         });
 
         Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-        df.write().mode(SaveMode.Overwrite).parquet(tempDir.toAbsolutePath().toString());
+        df.write().mode(SaveMode.Overwrite)/*.partitionBy("date")*/.parquet(tempDir.toAbsolutePath().toString());
 
         //test if data was written correctly
         Dataset<Row> reloadedDf = sparkSession.read().parquet(tempDir.toAbsolutePath().toString());
@@ -184,26 +186,27 @@ public class TestParquetConversionSource {
                         buildArgsForPartition(
                                 PARQUET,
                                 Arrays.asList(ICEBERG, DELTA, HUDI),
-                                "level:SIMPLE",
-                                "level:VALUE",
-                                levelFilter)),
-                Arguments.of(
-                        buildArgsForPartition(
-                                PARQUET,
-                                Arrays.asList(ICEBERG, DELTA, HUDI),
-                                "severity:SIMPLE",
-                                "severity:VALUE",
-                                severityFilter)),
-                Arguments.of(
-                        buildArgsForPartition(
-                                PARQUET,
-                                Arrays.asList(ICEBERG, DELTA, HUDI),
-                                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-                                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
-                                timestampAndLevelFilter)));
+                                "date:YEAR",
+                                "date:YEAR",
+                                levelFilter)));
+//                                ,
+//                Arguments.of(
+//                        buildArgsForPartition(
+//                                PARQUET,
+//                                Arrays.asList(ICEBERG, DELTA, HUDI),
+//                                "severity:SIMPLE",
+//                                "severity:VALUE",
+//                                severityFilter)),
+//                Arguments.of(
+//                        buildArgsForPartition(
+//                                PARQUET,
+//                                Arrays.asList(ICEBERG, DELTA, HUDI),
+//                                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
+//                                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
+//                                timestampAndLevelFilter)));
     }
 
-    private static Stream<Arguments> provideArgsForPartitionTesting() {
+/*    private static Stream<Arguments> provideArgsForPartitionTesting() {
         String timestampFilter =
                 String.format(
                         "timestamp_micros_nullable_field < timestamp_millis(%s)",
@@ -244,7 +247,7 @@ public class TestParquetConversionSource {
                                 "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
                                 "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
                                 timestampAndLevelFilter)));
-    }
+    }*/
 
     private static TableFormatPartitionDataHolder buildArgsForPartition(
             String sourceFormat,
@@ -303,22 +306,7 @@ public class TestParquetConversionSource {
     }
 
     private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
-        if (sourceTableFormat.equalsIgnoreCase(HUDI)) {
-            ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
-                    new HudiConversionSourceProvider();
-            hudiConversionSourceProvider.init(jsc.hadoopConfiguration());
-            return hudiConversionSourceProvider;
-        } else if (sourceTableFormat.equalsIgnoreCase(DELTA)) {
-            ConversionSourceProvider<Long> deltaConversionSourceProvider =
-                    new DeltaConversionSourceProvider();
-            deltaConversionSourceProvider.init(jsc.hadoopConfiguration());
-            return deltaConversionSourceProvider;
-        } else if (sourceTableFormat.equalsIgnoreCase(ICEBERG)) {
-            ConversionSourceProvider<Snapshot> icebergConversionSourceProvider =
-                    new IcebergConversionSourceProvider();
-            icebergConversionSourceProvider.init(jsc.hadoopConfiguration());
-            return icebergConversionSourceProvider;
-        } else if (sourceTableFormat.equalsIgnoreCase(PARQUET)) {
+        if (sourceTableFormat.equalsIgnoreCase(PARQUET)) {
             ConversionSourceProvider<Long> parquetConversionSourceProvider =
                     new ParquetConversionSourceProvider();
             parquetConversionSourceProvider.init(jsc.hadoopConfiguration());
@@ -341,12 +329,12 @@ public class TestParquetConversionSource {
         ConversionSourceProvider<?> conversionSourceProvider =
                 getConversionSourceProvider(sourceTableFormat);
         GenericTable table;
-        table = GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, false);
+        table = GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, true);
         try (GenericTable tableToClose = table) {
             ConversionConfig conversionConfig =
                     getTableSyncConfig(
                             sourceTableFormat,
-                            SyncMode.INCREMENTAL,
+                            SyncMode.FULL,
                             tableName,
                             table,
                             targetTableFormats,

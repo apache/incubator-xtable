@@ -120,10 +120,6 @@ public class ParquetStatsExtractor {
     return columnDescStats;
   }
 
-  /*  private static InputPartitionFields initPartitionInfo() {
-    return partitions;
-  }*/
-
   public static InternalDataFile toInternalDataFile(Configuration hadoopConf, Path parentPath)
       throws IOException {
     FileStatus file = null;
@@ -133,7 +129,6 @@ public class ParquetStatsExtractor {
     try {
       FileSystem fs = FileSystem.get(hadoopConf);
       file = fs.getFileStatus(parentPath);
-      // InputPartitionFields partitionInfo = initPartitionInfo();
       footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
       MessageType schema = parquetMetadataExtractor.getSchema(footer);
       columnStatsForAFile = getColumnStatsForaFile(footer);
@@ -142,8 +137,6 @@ public class ParquetStatsExtractor {
                       parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
                       file.getPath().toString()),
               parentPath.toString());
-      // partitionValues = partitionExtractor.createPartitionValues(
-      //               partitionInfo);
     } catch (java.io.IOException e) {
 
     }

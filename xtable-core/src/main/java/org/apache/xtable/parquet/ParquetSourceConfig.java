@@ -50,9 +50,9 @@ public class ParquetSourceConfig {
     String partitionSpecExtractorClass =
         properties.getProperty(
             PARTITION_SPEC_EXTRACTOR_CLASS, ParquetPartitionSpecExtractor.class.getName());
-    //testing partition config as not empty
-    properties = new Properties();
-    properties.setProperty(PARTITION_FIELD_SPEC_CONFIG, "date:YEAR");
+//    //testing partition config as not empty
+//    properties = new Properties();
+//    properties.setProperty(PARTITION_FIELD_SPEC_CONFIG, "date:YEAR");
     String partitionFieldSpecString = properties.getProperty(PARTITION_FIELD_SPEC_CONFIG);
 
     List<PartitionFieldSpec> partitionFieldSpecs =

@@ -219,7 +219,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     try {
       FileSystem fs = FileSystem.get(hadoopConf);
       URI uriBasePath = new URI(basePath);
-      String parentPath =Paths.get(uriBasePath).getParent().toString();
+      String parentPath =Paths.get(uriBasePath).toString();
       RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(parentPath), true);
       return RemoteIterators.toList(iterator).stream()
               .filter(file -> file.getPath().getName().toString().endsWith("parquet"))

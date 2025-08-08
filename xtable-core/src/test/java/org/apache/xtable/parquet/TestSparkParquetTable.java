@@ -73,7 +73,7 @@ public class TestSparkParquetTable implements GenericTable<Group, String> {
     }
 
     protected String initBasePath(Path tempDir, String tableName) throws IOException {
-        Path basePath = tempDir.resolve(tableName + "_data");
+        Path basePath = tempDir.resolve(tableName).getParent();
         Files.createDirectories(basePath);
         return basePath.toUri().toString();
     }
