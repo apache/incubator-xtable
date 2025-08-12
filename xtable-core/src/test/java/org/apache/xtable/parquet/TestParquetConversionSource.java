@@ -154,7 +154,7 @@ public class TestParquetConversionSource {
         });
 
         Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-        df.write().mode(SaveMode.Overwrite)/*.partitionBy("date")*/.parquet(tempDir.toAbsolutePath().toString());
+        df.write().mode(SaveMode.Overwrite).partitionBy("date").parquet(tempDir.toAbsolutePath().toString());
 
         //test if data was written correctly
         Dataset<Row> reloadedDf = sparkSession.read().parquet(tempDir.toAbsolutePath().toString());

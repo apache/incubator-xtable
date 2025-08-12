@@ -76,7 +76,9 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     MessageType parquetSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
     InternalSchema schema =
         schemaExtractor.toInternalSchema(parquetSchema, latestFile.getPath().toString());
-    List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(schema);
+    //fields that are NOT in the footer but in the dataset are the partition fields
+    //List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(schema);
+    List<InternalPartitionField> partitionFields = ParquetPartitionSpecExtractor.inferPartitionField(schema, basePath);
 
     DataLayoutStrategy dataLayoutStrategy =
         partitionFields.isEmpty()
