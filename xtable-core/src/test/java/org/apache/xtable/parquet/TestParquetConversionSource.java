@@ -15,60 +15,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+ 
 package org.apache.xtable.parquet;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.hudi.client.HoodieReadClient;
-import org.apache.hudi.common.table.timeline.HoodieInstant;
-import org.apache.iceberg.Snapshot;
-import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.sql.*;
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
-import org.apache.xtable.GenericTable;
-import org.apache.xtable.conversion.*;
-import org.apache.xtable.delta.DeltaConversionSourceProvider;
-import org.apache.xtable.hudi.HudiConversionSourceProvider;
-import org.apache.xtable.hudi.HudiTestUtil;
-import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
-import org.apache.xtable.model.storage.TableFormat;
-import org.apache.xtable.model.sync.SyncMode;
-import org.apache.xtable.model.sync.SyncStatusCode;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import java.net.URISyntaxException;
-import java.nio.file.Path;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import static org.apache.xtable.GenericTable.getTableName;
-//import static org.apache.xtable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
-import static org.apache.xtable.model.storage.TableFormat.*;
-
-
-import static org.apache.xtable.GenericTable.getTableName;
-//import static org.apache.xtable.hudi.HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG;
-import static org.apache.xtable.hudi.HudiTestUtil.PartitionConfig;
 import static org.apache.xtable.model.storage.TableFormat.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.net.URI;
-import java.nio.ByteBuffer;
-import java.nio.file.Files;
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -76,411 +32,434 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import lombok.Builder;
 import lombok.Value;
 
+import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.sql.*;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
+import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.apache.xtable.GenericTable;
+import org.apache.xtable.conversion.*;
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
-
+import org.apache.xtable.hudi.HudiTestUtil;
+import org.apache.xtable.model.sync.SyncMode;
 
 public class TestParquetConversionSource {
-    private static final DateTimeFormatter DATE_FORMAT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    public static final String PARTITION_FIELD_SPEC_CONFIG =
-            "xtable.parquet.source.partition_field_spec_config";
-    @TempDir
-    public static Path tempDir;
-    private static JavaSparkContext jsc;
-    private static SparkSession sparkSession;
+  private static final DateTimeFormatter DATE_FORMAT =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  public static final String PARTITION_FIELD_SPEC_CONFIG =
+      "xtable.parquet.source.partition_field_spec_config";
+  @TempDir public static Path tempDir;
+  private static JavaSparkContext jsc;
+  private static SparkSession sparkSession;
 
-    @BeforeAll
-    public static void setupOnce() {
-        SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
-        String extraJavaOptions = "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED";
-        sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
-        sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
-        sparkConf.set("parquet.avro.write-old-list-structure", "false");
-        // TODO kryo serializer causing error (replaced it with Java's)
-        sparkConf.set("spark.serializer", "org.apache.spark.serializer.JavaSerializer");
-        /*String javaOpts = "--add-opens=java.base/java.nio=ALL-UNNAMED " +
-                "--add-opens=java.base/java.lang=ALL-UNNAMED " +
-                "--add-opens=java.base/java.util=ALL-UNNAMED " +
-                "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED " +
-                "--add-opens=java.base/java.io=ALL-UNNAMED";
+  @BeforeAll
+  public static void setupOnce() {
+    SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
+    String extraJavaOptions = "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED";
+    sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
+    sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
+    sparkConf.set("parquet.avro.write-old-list-structure", "false");
+    // TODO kryo serializer causing error (replaced it with Java's)
+    sparkConf.set("spark.serializer", "org.apache.spark.serializer.JavaSerializer");
+    /*String javaOpts = "--add-opens=java.base/java.nio=ALL-UNNAMED " +
+            "--add-opens=java.base/java.lang=ALL-UNNAMED " +
+            "--add-opens=java.base/java.util=ALL-UNNAMED " +
+            "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED " +
+            "--add-opens=java.base/java.io=ALL-UNNAMED";
 
-        sparkConf.set("spark.driver.extraJavaOptions", javaOpts);
-        sparkConf.set("spark.executor.extraJavaOptions", javaOpts);*/
+    sparkConf.set("spark.driver.extraJavaOptions", javaOpts);
+    sparkConf.set("spark.executor.extraJavaOptions", javaOpts);*/
 
-        sparkSession =
-                SparkSession.builder().config(sparkConf).getOrCreate();
-        jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
+    sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
+    jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
 
-        List<Row> data = Arrays.asList(
-                RowFactory.create(1, "Alice", 30, "2004"),
-                RowFactory.create(2, "Bob", 24, "1954"),
-                RowFactory.create(3, "Charlie", 35, "1999"),
-                RowFactory.create(4, "David", 29, "1978"),
-                RowFactory.create(5, "Eve", 22, "1992")
-        );
+    List<Row> data =
+        Arrays.asList(
+            RowFactory.create(1, "Alice", 30, "2004"),
+            RowFactory.create(2, "Bob", 24, "1954"),
+            RowFactory.create(3, "Charlie", 35, "1999"),
+            RowFactory.create(4, "David", 29, "1978"),
+            RowFactory.create(5, "Eve", 22, "1992"));
 
-        StructType schema = DataTypes.createStructType(new StructField[]{
-                DataTypes.createStructField("id", DataTypes.IntegerType, false),
-                DataTypes.createStructField("name", DataTypes.StringType, false),
-                DataTypes.createStructField("age", DataTypes.IntegerType, false),
-                DataTypes.createStructField("date", DataTypes.StringType, false)
-        });
+    StructType schema =
+        DataTypes.createStructType(
+            new StructField[] {
+              DataTypes.createStructField("id", DataTypes.IntegerType, false),
+              DataTypes.createStructField("name", DataTypes.StringType, false),
+              DataTypes.createStructField("age", DataTypes.IntegerType, false),
+              DataTypes.createStructField("date", DataTypes.StringType, false)
+            });
 
-        Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-        df.write().mode(SaveMode.Overwrite).partitionBy("date").parquet(tempDir.toAbsolutePath().toString());
+    Dataset<Row> df = sparkSession.createDataFrame(data, schema);
+    df.withColumn("date_year", functions.col("date"))
+        .write()
+        .mode(SaveMode.Overwrite)
+        .partitionBy("date")
+        .parquet(tempDir.toAbsolutePath().toString());
 
-        //test if data was written correctly
-        Dataset<Row> reloadedDf = sparkSession.read().parquet(tempDir.toAbsolutePath().toString());
-        reloadedDf.show();
-        reloadedDf.printSchema();
+    // test if data was written correctly
+    Dataset<Row> reloadedDf = sparkSession.read().parquet(tempDir.toAbsolutePath().toString());
+    reloadedDf.show();
+    reloadedDf.printSchema();
+  }
+
+  @AfterAll
+  public static void teardown() {
+    if (jsc != null) {
+      jsc.close();
     }
-
-    @AfterAll
-    public static void teardown() {
-        if (jsc != null) {
-            jsc.close();
-        }
-        if (sparkSession != null) {
-            sparkSession.close();
-        }
+    if (sparkSession != null) {
+      sparkSession.close();
     }
+  }
 
-    private static Stream<Arguments> provideArgsForFilePartitionTesting() {
-        String timestampFilter =
-                String.format(
-                        "timestamp_micros_nullable_field < timestamp_millis(%s)",
-                        Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
-        String levelFilter = "level = 'INFO'";
-        String nestedLevelFilter = "nested_record.level = 'INFO'";
-        String severityFilter = "severity = 1";
-        String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
-        return Stream.of(
-                Arguments.of(
-                        buildArgsForPartition(
-                                PARQUET,
-                                Arrays.asList(ICEBERG, DELTA, HUDI),
-                                "date:YEAR",
-                                "date:YEAR",
-                                levelFilter)));
-//                                ,
-//                Arguments.of(
-//                        buildArgsForPartition(
-//                                PARQUET,
-//                                Arrays.asList(ICEBERG, DELTA, HUDI),
-//                                "severity:SIMPLE",
-//                                "severity:VALUE",
-//                                severityFilter)),
-//                Arguments.of(
-//                        buildArgsForPartition(
-//                                PARQUET,
-//                                Arrays.asList(ICEBERG, DELTA, HUDI),
-//                                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-//                                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
-//                                timestampAndLevelFilter)));
+  private static Stream<Arguments> provideArgsForFilePartitionTesting() {
+    String timestampFilter =
+        String.format(
+            "timestamp_micros_nullable_field < timestamp_millis(%s)",
+            Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
+    String levelFilter = "level = 'INFO'";
+    String nestedLevelFilter = "nested_record.level = 'INFO'";
+    String severityFilter = "severity = 1";
+    String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
+    return Stream.of(
+        Arguments.of(
+            buildArgsForPartition(
+                PARQUET,
+                Arrays.asList(ICEBERG, DELTA, HUDI),
+                "date_year:YEAR",
+                "date_year:YEAR",
+                levelFilter)));
+    //                                ,
+    //                Arguments.of(
+    //                        buildArgsForPartition(
+    //                                PARQUET,
+    //                                Arrays.asList(ICEBERG, DELTA, HUDI),
+    //                                "severity:SIMPLE",
+    //                                "severity:VALUE",
+    //                                severityFilter)),
+    //                Arguments.of(
+    //                        buildArgsForPartition(
+    //                                PARQUET,
+    //                                Arrays.asList(ICEBERG, DELTA, HUDI),
+    //                                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
+    //                                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
+    //                                timestampAndLevelFilter)));
+  }
+
+  /*    private static Stream<Arguments> provideArgsForPartitionTesting() {
+      String timestampFilter =
+              String.format(
+                      "timestamp_micros_nullable_field < timestamp_millis(%s)",
+                      Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
+      String levelFilter = "level = 'INFO'";
+      String nestedLevelFilter = "nested_record.level = 'INFO'";
+      String severityFilter = "severity = 1";
+      String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
+      return Stream.of(
+              Arguments.of(
+                      buildArgsForPartition(
+                              HUDI, Arrays.asList(ICEBERG, DELTA), "level:SIMPLE", "level:VALUE", levelFilter)),
+              Arguments.of(
+                      buildArgsForPartition(
+                              DELTA, Arrays.asList(ICEBERG, HUDI), null, "level:VALUE", levelFilter)),
+              Arguments.of(
+                      buildArgsForPartition(
+                              ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter)),
+              Arguments.of(
+                      // Delta Lake does not currently support nested partition columns
+                      buildArgsForPartition(
+                              HUDI,
+                              Arrays.asList(ICEBERG),
+                              "nested_record.level:SIMPLE",
+                              "nested_record.level:VALUE",
+                              nestedLevelFilter)),
+              Arguments.of(
+                      buildArgsForPartition(
+                              HUDI,
+                              Arrays.asList(ICEBERG, DELTA),
+                              "severity:SIMPLE",
+                              "severity:VALUE",
+                              severityFilter)),
+              Arguments.of(
+                      buildArgsForPartition(
+                              HUDI,
+                              Arrays.asList(ICEBERG, DELTA),
+                              "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
+                              "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
+                              timestampAndLevelFilter)));
+  }*/
+
+  private static TableFormatPartitionDataHolder buildArgsForPartition(
+      String sourceFormat,
+      List<String> targetFormats,
+      String hudiPartitionConfig,
+      String xTablePartitionConfig,
+      String filter) {
+    return TableFormatPartitionDataHolder.builder()
+        .sourceTableFormat(sourceFormat)
+        .targetTableFormats(targetFormats)
+        .hudiSourceConfig(Optional.ofNullable(hudiPartitionConfig))
+        .xTablePartitionConfig(xTablePartitionConfig)
+        .filter(filter)
+        .build();
+  }
+
+  private static ConversionConfig getTableSyncConfig(
+      String sourceTableFormat,
+      SyncMode syncMode,
+      String tableName,
+      GenericTable table,
+      List<String> targetTableFormats,
+      String partitionConfig,
+      Duration metadataRetention) {
+    Properties sourceProperties = new Properties();
+    if (partitionConfig != null) {
+      sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
     }
+    SourceTable sourceTable =
+        SourceTable.builder()
+            .name(tableName)
+            .formatName(sourceTableFormat)
+            .basePath(table.getBasePath())
+            .dataPath(table.getDataPath())
+            .additionalProperties(sourceProperties)
+            .build();
 
-/*    private static Stream<Arguments> provideArgsForPartitionTesting() {
-        String timestampFilter =
-                String.format(
-                        "timestamp_micros_nullable_field < timestamp_millis(%s)",
-                        Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
-        String levelFilter = "level = 'INFO'";
-        String nestedLevelFilter = "nested_record.level = 'INFO'";
-        String severityFilter = "severity = 1";
-        String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
-        return Stream.of(
-                Arguments.of(
-                        buildArgsForPartition(
-                                HUDI, Arrays.asList(ICEBERG, DELTA), "level:SIMPLE", "level:VALUE", levelFilter)),
-                Arguments.of(
-                        buildArgsForPartition(
-                                DELTA, Arrays.asList(ICEBERG, HUDI), null, "level:VALUE", levelFilter)),
-                Arguments.of(
-                        buildArgsForPartition(
-                                ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter)),
-                Arguments.of(
-                        // Delta Lake does not currently support nested partition columns
-                        buildArgsForPartition(
-                                HUDI,
-                                Arrays.asList(ICEBERG),
-                                "nested_record.level:SIMPLE",
-                                "nested_record.level:VALUE",
-                                nestedLevelFilter)),
-                Arguments.of(
-                        buildArgsForPartition(
-                                HUDI,
-                                Arrays.asList(ICEBERG, DELTA),
-                                "severity:SIMPLE",
-                                "severity:VALUE",
-                                severityFilter)),
-                Arguments.of(
-                        buildArgsForPartition(
-                                HUDI,
-                                Arrays.asList(ICEBERG, DELTA),
-                                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-                                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
-                                timestampAndLevelFilter)));
-    }*/
-
-    private static TableFormatPartitionDataHolder buildArgsForPartition(
-            String sourceFormat,
-            List<String> targetFormats,
-            String hudiPartitionConfig,
-            String xTablePartitionConfig,
-            String filter) {
-        return TableFormatPartitionDataHolder.builder()
-                .sourceTableFormat(sourceFormat)
-                .targetTableFormats(targetFormats)
-                .hudiSourceConfig(Optional.ofNullable(hudiPartitionConfig))
-                .xTablePartitionConfig(xTablePartitionConfig)
-                .filter(filter)
-                .build();
-    }
-
-    private static ConversionConfig getTableSyncConfig(
-            String sourceTableFormat,
-            SyncMode syncMode,
-            String tableName,
-            GenericTable table,
-            List<String> targetTableFormats,
-            String partitionConfig,
-            Duration metadataRetention) {
-        Properties sourceProperties = new Properties();
-        if (partitionConfig != null) {
-            sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
-        }
-        SourceTable sourceTable =
-                SourceTable.builder()
+    List<TargetTable> targetTables =
+        targetTableFormats.stream()
+            .map(
+                formatName ->
+                    TargetTable.builder()
                         .name(tableName)
-                        .formatName(sourceTableFormat)
-                        .basePath(table.getBasePath())
-                        .dataPath(table.getDataPath())
-                        .additionalProperties(sourceProperties)
-                        .build();
+                        .formatName(formatName)
+                        // set the metadata path to the data path as the default (required by Hudi)
+                        .basePath(table.getDataPath())
+                        .metadataRetention(metadataRetention)
+                        .build())
+            .collect(Collectors.toList());
 
-        List<TargetTable> targetTables =
-                targetTableFormats.stream()
-                        .map(
-                                formatName ->
-                                        TargetTable.builder()
-                                                .name(tableName)
-                                                .formatName(formatName)
-                                                // set the metadata path to the data path as the default (required by Hudi)
-                                                .basePath(table.getDataPath())
-                                                .metadataRetention(metadataRetention)
-                                                .build())
-                        .collect(Collectors.toList());
+    return ConversionConfig.builder()
+        .sourceTable(sourceTable)
+        .targetTables(targetTables)
+        .syncMode(syncMode)
+        .build();
+  }
 
-        return ConversionConfig.builder()
-                .sourceTable(sourceTable)
-                .targetTables(targetTables)
-                .syncMode(syncMode)
-                .build();
+  private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
+    if (sourceTableFormat.equalsIgnoreCase(PARQUET)) {
+      ConversionSourceProvider<Long> parquetConversionSourceProvider =
+          new ParquetConversionSourceProvider();
+      parquetConversionSourceProvider.init(jsc.hadoopConfiguration());
+      return parquetConversionSourceProvider;
+    } else {
+      throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
     }
+  }
 
-    private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
-        if (sourceTableFormat.equalsIgnoreCase(PARQUET)) {
-            ConversionSourceProvider<Long> parquetConversionSourceProvider =
-                    new ParquetConversionSourceProvider();
-            parquetConversionSourceProvider.init(jsc.hadoopConfiguration());
-            return parquetConversionSourceProvider;
-        } else {
-            throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
-        }
+  @ParameterizedTest
+  @MethodSource("provideArgsForFilePartitionTesting")
+  public void testFilePartitionedData(
+      TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
+    String tableName = getTableName();
+    String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
+    List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
+    // Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
+    String xTablePartitionConfig = tableFormatPartitionDataHolder.getXTablePartitionConfig();
+    String filter = tableFormatPartitionDataHolder.getFilter();
+    ConversionSourceProvider<?> conversionSourceProvider =
+        getConversionSourceProvider(sourceTableFormat);
+    GenericTable table;
+    table =
+        GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, true);
+    try (GenericTable tableToClose = table) {
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              sourceTableFormat,
+              SyncMode.FULL,
+              tableName,
+              table,
+              targetTableFormats,
+              xTablePartitionConfig,
+              null);
+      ConversionController conversionController =
+          new ConversionController(jsc.hadoopConfiguration());
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalenceWithFilter(
+          sourceTableFormat, tableToClose, targetTableFormats, filter);
+    } catch (URISyntaxException e) {
+      e.printStackTrace();
     }
+  }
 
-    @ParameterizedTest
-    @MethodSource("provideArgsForFilePartitionTesting")
-    public void testFilePartitionedData(
-            TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
-        String tableName = getTableName();
-        String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
-        List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
-        //Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
-        String xTablePartitionConfig = tableFormatPartitionDataHolder.getXTablePartitionConfig();
-        String filter = tableFormatPartitionDataHolder.getFilter();
-        ConversionSourceProvider<?> conversionSourceProvider =
-                getConversionSourceProvider(sourceTableFormat);
-        GenericTable table;
-        table = GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, true);
-        try (GenericTable tableToClose = table) {
-            ConversionConfig conversionConfig =
-                    getTableSyncConfig(
-                            sourceTableFormat,
-                            SyncMode.FULL,
-                            tableName,
-                            table,
-                            targetTableFormats,
-                            xTablePartitionConfig,
-                            null);
-            ConversionController conversionController =
-                    new ConversionController(jsc.hadoopConfiguration());
-            conversionController.sync(conversionConfig, conversionSourceProvider);
-            checkDatasetEquivalenceWithFilter(
-                    sourceTableFormat, tableToClose, targetTableFormats, filter);
-        } catch (URISyntaxException e) {
-            e.printStackTrace();
-        }
-    }
+  /*
+     test for Parquet file conversion
 
-    /*
-       test for Parquet file conversion
+  */
 
-    */
+  private void checkDatasetEquivalenceWithFilter(
+      String sourceFormat,
+      GenericTable<?, ?> sourceTable,
+      List<String> targetFormats,
+      String filter)
+      throws URISyntaxException {
+    checkDatasetEquivalence(
+        sourceFormat,
+        sourceTable,
+        Collections.emptyMap(),
+        targetFormats,
+        Collections.emptyMap(),
+        null,
+        filter);
+  }
 
-    private void checkDatasetEquivalenceWithFilter(
-            String sourceFormat,
-            GenericTable<?, ?> sourceTable,
-            List<String> targetFormats,
-            String filter) throws URISyntaxException {
-        checkDatasetEquivalence(
-                sourceFormat,
-                sourceTable,
-                Collections.emptyMap(),
-                targetFormats,
-                Collections.emptyMap(),
-                null,
-                filter);
-    }
+  private void checkDatasetEquivalence(
+      String sourceFormat,
+      GenericTable<?, ?> sourceTable,
+      List<String> targetFormats,
+      Integer expectedCount)
+      throws URISyntaxException {
+    checkDatasetEquivalence(
+        sourceFormat,
+        sourceTable,
+        Collections.emptyMap(),
+        targetFormats,
+        Collections.emptyMap(),
+        expectedCount,
+        "1 = 1");
+  }
 
-    private void checkDatasetEquivalence(
-            String sourceFormat,
-            GenericTable<?, ?> sourceTable,
-            List<String> targetFormats,
-            Integer expectedCount) throws URISyntaxException {
-        checkDatasetEquivalence(
-                sourceFormat,
-                sourceTable,
-                Collections.emptyMap(),
-                targetFormats,
-                Collections.emptyMap(),
-                expectedCount,
-                "1 = 1");
-    }
+  private void checkDatasetEquivalence(
+      String sourceFormat,
+      GenericTable<?, ?> sourceTable,
+      Map<String, String> sourceOptions,
+      List<String> targetFormats,
+      Map<String, Map<String, String>> targetOptions,
+      Integer expectedCount)
+      throws URISyntaxException {
+    checkDatasetEquivalence(
+        sourceFormat,
+        sourceTable,
+        sourceOptions,
+        targetFormats,
+        targetOptions,
+        expectedCount,
+        "1 = 1");
+  }
 
-    private void checkDatasetEquivalence(
-            String sourceFormat,
-            GenericTable<?, ?> sourceTable,
-            Map<String, String> sourceOptions,
-            List<String> targetFormats,
-            Map<String, Map<String, String>> targetOptions,
-            Integer expectedCount) throws URISyntaxException {
-        checkDatasetEquivalence(
-                sourceFormat,
-                sourceTable,
-                sourceOptions,
-                targetFormats,
-                targetOptions,
-                expectedCount,
-                "1 = 1");
-    }
+  private void checkDatasetEquivalence(
+      String sourceFormat,
+      GenericTable<?, ?> sourceTable,
+      Map<String, String> sourceOptions,
+      List<String> targetFormats,
+      Map<String, Map<String, String>> targetOptions,
+      Integer expectedCount,
+      String filterCondition)
+      throws URISyntaxException {
+    Dataset<Row> sourceRows =
+        sparkSession
+            .read()
+            .options(sourceOptions)
+            .format(sourceFormat.toLowerCase())
+            .load(
+                Paths.get(new URI(sourceTable.getBasePath()))
+                    .getParent()
+                    .toString()); // check if the path is wrong Paths.get(new
+    // URI(sourceTable.getBasePath())).getParent().toString()
+    // .orderBy(sourceTable.getOrderByColumn())
+    // .filter(filterCondition);
+    Map<String, Dataset<Row>> targetRowsByFormat =
+        targetFormats.stream()
+            .collect(
+                Collectors.toMap(
+                    Function.identity(),
+                    targetFormat -> {
+                      Map<String, String> finalTargetOptions =
+                          targetOptions.getOrDefault(targetFormat, Collections.emptyMap());
+                      if (targetFormat.equals(HUDI)) {
+                        finalTargetOptions = new HashMap<>(finalTargetOptions);
+                        finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
+                        finalTargetOptions.put(
+                            "hoodie.datasource.read.extract.partition.values.from.path", "true");
+                      }
+                      return sparkSession
+                          .read()
+                          .options(finalTargetOptions)
+                          .format(targetFormat.toLowerCase())
+                          .load(sourceTable.getDataPath()); // TODO check error here
+                      // .orderBy(sourceTable.getOrderByColumn())
+                      // .filter(filterCondition);
+                    }));
 
-    private void checkDatasetEquivalence(
-            String sourceFormat,
-            GenericTable<?, ?> sourceTable,
-            Map<String, String> sourceOptions,
-            List<String> targetFormats,
-            Map<String, Map<String, String>> targetOptions,
-            Integer expectedCount,
-            String filterCondition) throws URISyntaxException {
-        Dataset<Row> sourceRows =
-                sparkSession
-                        .read()
-                        .options(sourceOptions)
-                        .format(sourceFormat.toLowerCase())
-                        .load(Paths.get(new URI(sourceTable.getBasePath())).getParent().toString());//check if the path is wrong Paths.get(new URI(sourceTable.getBasePath())).getParent().toString()
-                        //.orderBy(sourceTable.getOrderByColumn())
-                        //.filter(filterCondition);
-        Map<String, Dataset<Row>> targetRowsByFormat =
-                targetFormats.stream()
-                        .collect(
-                                Collectors.toMap(
-                                        Function.identity(),
-                                        targetFormat -> {
-                                            Map<String, String> finalTargetOptions =
-                                                    targetOptions.getOrDefault(targetFormat, Collections.emptyMap());
-                                            if (targetFormat.equals(HUDI)) {
-                                                finalTargetOptions = new HashMap<>(finalTargetOptions);
-                                                finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
-                                                finalTargetOptions.put(
-                                                        "hoodie.datasource.read.extract.partition.values.from.path", "true");
-                                            }
-                                            return sparkSession
-                                                    .read()
-                                                    .options(finalTargetOptions)
-                                                    .format(targetFormat.toLowerCase())
-                                                    .load(sourceTable.getDataPath());//TODO check error here
-                                                    //.orderBy(sourceTable.getOrderByColumn())
-                                                    //.filter(filterCondition);
-                                        }));
+    String[] selectColumnsArr = sourceTable.getColumnsToSelect().toArray(new String[] {});
+    List<String> dataset1Rows = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
+    targetRowsByFormat.forEach(
+        (format, targetRows) -> {
+          List<String> dataset2Rows =
+              targetRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
+          assertEquals(
+              dataset1Rows.size(),
+              dataset2Rows.size(),
+              String.format(
+                  "Datasets have different row counts when reading from Spark. Source: %s, Target: %s",
+                  sourceFormat, format));
+          // sanity check the count to ensure test is set up properly
+          if (expectedCount != null) {
+            assertEquals(expectedCount, dataset1Rows.size());
+          } else {
+            // if count is not known ahead of time, ensure datasets are non-empty
+            assertFalse(dataset1Rows.isEmpty());
+          }
 
-        String[] selectColumnsArr = sourceTable.getColumnsToSelect().toArray(new String[]{});
-        List<String> dataset1Rows = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
-        targetRowsByFormat.forEach(
-                (format, targetRows) -> {
-                    List<String> dataset2Rows =
-                            targetRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
-                    assertEquals(
-                            dataset1Rows.size(),
-                            dataset2Rows.size(),
-                            String.format(
-                                    "Datasets have different row counts when reading from Spark. Source: %s, Target: %s",
-                                    sourceFormat, format));
-                    // sanity check the count to ensure test is set up properly
-                    if (expectedCount != null) {
-                        assertEquals(expectedCount, dataset1Rows.size());
-                    } else {
-                        // if count is not known ahead of time, ensure datasets are non-empty
-                        assertFalse(dataset1Rows.isEmpty());
-                    }
+          assertEquals(
+              dataset1Rows,
+              dataset2Rows,
+              String.format(
+                  "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
+                  sourceFormat, format));
+        });
+  }
 
-
-                    assertEquals(
-                            dataset1Rows,
-                            dataset2Rows,
-                            String.format(
-                                    "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
-                                    sourceFormat, format));
-
-                });
-    }
-
-    @Builder
-    @Value
-    private static class TableFormatPartitionDataHolder {
-        String sourceTableFormat;
-        List<String> targetTableFormats;
-        String xTablePartitionConfig;
-        Optional<String> hudiSourceConfig;
-        String filter;
-    }
-
-
+  @Builder
+  @Value
+  private static class TableFormatPartitionDataHolder {
+    String sourceTableFormat;
+    List<String> targetTableFormats;
+    String xTablePartitionConfig;
+    Optional<String> hudiSourceConfig;
+    String filter;
+  }
 }

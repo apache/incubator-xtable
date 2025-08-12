@@ -25,8 +25,6 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import lombok.Builder;
 import lombok.NonNull;
@@ -34,7 +32,6 @@ import lombok.NonNull;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.util.functional.RemoteIterators;
-import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
@@ -76,9 +73,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     MessageType parquetSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
     InternalSchema schema =
         schemaExtractor.toInternalSchema(parquetSchema, latestFile.getPath().toString());
-    //fields that are NOT in the footer but in the dataset are the partition fields
-    //List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(schema);
-    List<InternalPartitionField> partitionFields = ParquetPartitionSpecExtractor.inferPartitionField(schema, basePath);
+    List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(schema);
 
     DataLayoutStrategy dataLayoutStrategy =
         partitionFields.isEmpty()
@@ -196,7 +191,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     InternalTable table = getMostRecentTable(parquetFiles);
     return InternalSnapshot.builder()
         .table(table)
-        .sourceIdentifier(getCommitIdentifier(1L))//TODO check for version number instead
+        .sourceIdentifier(getCommitIdentifier(1L)) // TODO check for version number instead
         .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
         .build();
   }
@@ -216,16 +211,15 @@ public class ParquetConversionSource implements ConversionSource<Long> {
             () -> new IllegalStateException("No file found at " + Long.valueOf(modificationTime)));
   }
 
-
   private Collection<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
     try {
       FileSystem fs = FileSystem.get(hadoopConf);
       URI uriBasePath = new URI(basePath);
-      String parentPath =Paths.get(uriBasePath).toString();
+      String parentPath = Paths.get(uriBasePath).toString();
       RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(parentPath), true);
       return RemoteIterators.toList(iterator).stream()
-              .filter(file -> file.getPath().getName().toString().endsWith("parquet"))
-              .collect(Collectors.toList());
+          .filter(file -> file.getPath().getName().toString().endsWith("parquet"))
+          .collect(Collectors.toList());
     } catch (IOException | URISyntaxException e) {
       throw new RuntimeException(e);
     }

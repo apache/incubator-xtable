@@ -15,18 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+ 
 package org.apache.xtable.parquet;
-
-import org.apache.avro.Schema;
-import org.apache.hudi.common.config.TypedProperties;
-import org.apache.hudi.common.model.HoodieTableType;
-import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.keygen.KeyGenerator;
-import org.apache.parquet.schema.Type;
-import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.xtable.GenericTable;
-import org.apache.xtable.TestSparkHudiTable;
-import org.apache.parquet.schema.MessageType;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -36,97 +26,86 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.apache.parquet.example.data.Group;
+import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.Type;
+import org.apache.spark.api.java.JavaSparkContext;
+
+import org.apache.xtable.GenericTable;
 
 public class TestSparkParquetTable implements GenericTable<Group, String> {
-    // Name of the table
-    protected String tableName;
-    // Base path for the table
-    protected String basePath;
-    protected Path tempDir;
-    protected String partitionConfig;
-    protected MessageType schema;
-    protected List<String> partitionFieldNames;
-    private JavaSparkContext jsc;
+  // Name of the table
+  protected String tableName;
+  // Base path for the table
+  protected String basePath;
+  protected Path tempDir;
+  protected String partitionConfig;
+  protected MessageType schema;
+  protected List<String> partitionFieldNames;
+  private JavaSparkContext jsc;
 
-    private TestSparkParquetTable(
-            String name,
-            Path tempDir,
-            JavaSparkContext jsc,
-            String partitionConfig) {
-        // initialize spark session
-        try {
-            this.tableName = name;
-            this.tempDir = tempDir;
-            this.partitionConfig = partitionConfig;
-            this.jsc = jsc;
-            this.basePath = initBasePath(tempDir, name);
-        } catch (IOException ex) {
-            throw new UncheckedIOException("Unable to initialize Test Parquet File", ex);
-        }
+  private TestSparkParquetTable(
+      String name, Path tempDir, JavaSparkContext jsc, String partitionConfig) {
+    // initialize spark session
+    try {
+      this.tableName = name;
+      this.tempDir = tempDir;
+      this.partitionConfig = partitionConfig;
+      this.jsc = jsc;
+      this.basePath = initBasePath(tempDir, name);
+    } catch (IOException ex) {
+      throw new UncheckedIOException("Unable to initialize Test Parquet File", ex);
     }
+  }
 
-    public static TestSparkParquetTable forStandardSchemaAndPartitioning(
-            String tableName, Path tempDir, JavaSparkContext jsc, boolean isPartitioned) {
-        String partitionConfig = isPartitioned ? "level:SIMPLE" : null;
-        return new TestSparkParquetTable(tableName, tempDir, jsc, partitionConfig);
+  public static TestSparkParquetTable forStandardSchemaAndPartitioning(
+      String tableName, Path tempDir, JavaSparkContext jsc, boolean isPartitioned) {
+    String partitionConfig = isPartitioned ? "level:SIMPLE" : null;
+    return new TestSparkParquetTable(tableName, tempDir, jsc, partitionConfig);
+  }
 
-    }
+  protected String initBasePath(Path tempDir, String tableName) throws IOException {
+    Path basePath = tempDir.resolve(tableName).getParent();
+    Files.createDirectories(basePath);
+    return basePath.toUri().toString();
+  }
 
-    protected String initBasePath(Path tempDir, String tableName) throws IOException {
-        Path basePath = tempDir.resolve(tableName).getParent();
-        Files.createDirectories(basePath);
-        return basePath.toUri().toString();
-    }
+  public List<Group> insertRows(int numRows) {
+    return null;
+  }
 
-    public List<Group> insertRows(int numRows) {
-        return null;
-    }
+  public List<Group> insertRecordsForSpecialPartition(int numRows) {
+    return null;
+  }
 
-    public List<Group> insertRecordsForSpecialPartition(int numRows) {
-        return null;
-    }
+  public void upsertRows(List<Group> rows) {}
 
-    public void upsertRows(List<Group> rows) {
+  public void deleteRows(List<Group> rows) {}
 
-    }
+  public void deletePartition(String partitionValue) {}
 
-    public void deleteRows(List<Group> rows) {
+  public void deleteSpecialPartition() {}
 
-    }
+  public String getBasePath() {
+    return basePath;
+  }
 
-    public void deletePartition(String partitionValue) {
+  public String getMetadataPath() {
+    return null;
+  }
 
-    }
+  public String getOrderByColumn() {
+    return null;
+  }
 
-    public void deleteSpecialPartition() {
+  public void close() {}
 
-    }
+  public void reload() {}
 
-    public String getBasePath() {
-        return basePath;
-    }
+  public List<String> getColumnsToSelect() {
+    return schema.getFields().stream().map(Type::getName).collect(Collectors.toList());
+  }
 
-    public String getMetadataPath() {
-        return null;
-    }
-
-    public String getOrderByColumn() {
-        return null;
-    }
-
-    public void close() {
-
-    }
-
-    public void reload() {
-
-    }
-
-    public List<String> getColumnsToSelect() {
-        return schema.getFields().stream().map(Type::getName).collect(Collectors.toList());
-    }
-
-    public String getFilterQuery() {
-        return null;
-    }
+  public String getFilterQuery() {
+    return null;
+  }
 }

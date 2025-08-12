@@ -60,8 +60,10 @@ public class ParquetStatsExtractor {
   public static ParquetStatsExtractor getInstance() {
     return INSTANCE;
   }
+
   private static final ParquetPartitionValueExtractor partitionValueExtractor =
-          ParquetPartitionValueExtractor.getInstance();
+      ParquetPartitionValueExtractor.getInstance();
+
   public static List<ColumnStat> getColumnStatsForaFile(ParquetMetadata footer) {
     return getStatsForFile(footer).values().stream()
         .flatMap(List::stream)
@@ -132,10 +134,11 @@ public class ParquetStatsExtractor {
       footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
       MessageType schema = parquetMetadataExtractor.getSchema(footer);
       columnStatsForAFile = getColumnStatsForaFile(footer);
-      partitionValues = partitionValueExtractor.extractPartitionValues(
+      partitionValues =
+          partitionValueExtractor.extractPartitionValues(
               partitionValueExtractor.extractParquetPartitions(
-                      parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
-                      file.getPath().toString()),
+                  parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
+                  file.getPath().toString()),
               parentPath.toString());
     } catch (java.io.IOException e) {
 
@@ -143,7 +146,7 @@ public class ParquetStatsExtractor {
     return InternalDataFile.builder()
         .physicalPath(parentPath.toString())
         .fileFormat(FileFormat.APACHE_PARQUET)
-            .partitionValues(partitionValues)
+        .partitionValues(partitionValues)
         .fileSizeBytes(file.getLen())
         .recordCount(getMaxFromColumnStats(columnStatsForAFile).orElse(0L))
         .columnStats(columnStatsForAFile)

@@ -54,18 +54,11 @@ import java.util.stream.StreamSupport;
 import lombok.Builder;
 import lombok.Value;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.xtable.hudi.*;
-import org.apache.xtable.model.InternalTable;
-import org.apache.xtable.parquet.ParquetConversionSource;
-import org.apache.xtable.parquet.ParquetPartitionSpecExtractor;
-import org.apache.xtable.parquet.ParquetSourceConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -102,11 +95,11 @@ import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
+import org.apache.xtable.hudi.*;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.TestIcebergDataHelper;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
-import org.apache.xtable.parquet.ParquetConversionSourceProvider;
 
 public class ITConversionController {
   private static final DateTimeFormatter DATE_FORMAT =
@@ -173,10 +166,12 @@ public class ITConversionController {
 
   private static List<String> getOtherFormats(String sourceTableFormat) {
     return Arrays.stream(TableFormat.values())
-        .filter(format -> !format.equals(sourceTableFormat) && !format.equals(PARQUET))//excluded file formats
+        .filter(
+            format ->
+                !format.equals(sourceTableFormat)
+                    && !format.equals(PARQUET)) // excluded file formats
         .collect(Collectors.toList());
   }
-
 
   private static Stream<Arguments> provideArgsForPartitionTesting() {
     String timestampFilter =

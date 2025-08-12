@@ -25,7 +25,6 @@ import java.util.Map;
 
 import lombok.AllArgsConstructor;
 
-import lombok.NoArgsConstructor;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;

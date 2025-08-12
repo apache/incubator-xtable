@@ -28,7 +28,6 @@ import lombok.Value;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.xtable.hudi.ConfigurationBasedPartitionSpecExtractor;
 import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.schema.PartitionFieldSpec;
 import org.apache.xtable.model.schema.PartitionTransformType;
@@ -45,14 +44,13 @@ public class ParquetSourceConfig {
   String partitionSpecExtractorClass;
   List<PartitionFieldSpec> partitionFieldSpecs;
 
-
   public static ParquetSourceConfig fromProperties(Properties properties) {
     String partitionSpecExtractorClass =
         properties.getProperty(
             PARTITION_SPEC_EXTRACTOR_CLASS, ParquetPartitionSpecExtractor.class.getName());
-//    //testing partition config as not empty
-//    properties = new Properties();
-//    properties.setProperty(PARTITION_FIELD_SPEC_CONFIG, "date:YEAR");
+    //    //testing partition config as not empty
+    //    properties = new Properties();
+    //    properties.setProperty(PARTITION_FIELD_SPEC_CONFIG, "date:YEAR");
     String partitionFieldSpecString = properties.getProperty(PARTITION_FIELD_SPEC_CONFIG);
 
     List<PartitionFieldSpec> partitionFieldSpecs =
@@ -80,7 +78,8 @@ public class ParquetSourceConfig {
 
   public PathBasedPartitionSpecExtractor loadSourcePartitionSpecExtractor() {
     Preconditions.checkNotNull(
-            this.partitionSpecExtractorClass, "PathBasedPartitionSpecExtractor class not provided");
-    return ReflectionUtils.createInstanceOfClass(this.partitionSpecExtractorClass, this.partitionFieldSpecs);
+        this.partitionSpecExtractorClass, "PathBasedPartitionSpecExtractor class not provided");
+    return ReflectionUtils.createInstanceOfClass(
+        this.partitionSpecExtractorClass, this.partitionFieldSpecs);
   }
 }

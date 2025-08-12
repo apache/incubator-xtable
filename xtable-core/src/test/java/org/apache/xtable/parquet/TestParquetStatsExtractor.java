@@ -58,8 +58,7 @@ public class TestParquetStatsExtractor {
 
   private static final ParquetSchemaExtractor schemaExtractor =
       ParquetSchemaExtractor.getInstance();
-  private static final ParquetStatsExtractor statsExtractor =
-          ParquetStatsExtractor.getInstance();
+  private static final ParquetStatsExtractor statsExtractor = ParquetStatsExtractor.getInstance();
 
   @TempDir static java.nio.file.Path tempDir = Paths.get("./");
 
@@ -351,7 +350,7 @@ public class TestParquetStatsExtractor {
     Path hadoopPath = new Path(file.toURI());
     // statsExtractor toInternalDataFile testing
     InternalDataFile internalDataFile =
-            statsExtractor.toInternalDataFile(configuration, hadoopPath);
+        statsExtractor.toInternalDataFile(configuration, hadoopPath);
     InternalDataFile testInternalFile =
         InternalDataFile.builder()
             .physicalPath(
@@ -380,7 +379,7 @@ public class TestParquetStatsExtractor {
     Path hadoopPath = new Path(file.toURI());
     // statsExtractor toInternalDataFile testing
     InternalDataFile internalDataFile =
-            statsExtractor.toInternalDataFile(configuration, hadoopPath);
+        statsExtractor.toInternalDataFile(configuration, hadoopPath);
     InternalDataFile testInternalFile =
         InternalDataFile.builder()
             .physicalPath(
@@ -408,7 +407,7 @@ public class TestParquetStatsExtractor {
     Path hadoopPath = new Path(file.toURI());
     // statsExtractor toInternalDataFile testing
     InternalDataFile internalDataFile =
-            statsExtractor.toInternalDataFile(configuration, hadoopPath);
+        statsExtractor.toInternalDataFile(configuration, hadoopPath);
     InternalDataFile testInternalFile =
         InternalDataFile.builder()
             .physicalPath(
@@ -437,7 +436,7 @@ public class TestParquetStatsExtractor {
     Path hadoopPath = new Path(file.toURI());
     // statsExtractor toInternalDataFile testing
     InternalDataFile internalDataFile =
-            statsExtractor.toInternalDataFile(configuration, hadoopPath);
+        statsExtractor.toInternalDataFile(configuration, hadoopPath);
     InternalDataFile testInternalFile =
         InternalDataFile.builder()
             .physicalPath(

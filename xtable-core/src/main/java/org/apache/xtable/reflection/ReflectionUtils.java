@@ -22,7 +22,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.Arrays;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -66,9 +65,13 @@ public class ReflectionUtils {
           }
         }
       }
-      throw new NoSuchMethodException("Could not find a suitable constructor for class: " + className);
+      throw new NoSuchMethodException(
+          "Could not find a suitable constructor for class: " + className);
 
-    } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+    } catch (InstantiationException
+        | IllegalAccessException
+        | InvocationTargetException
+        | NoSuchMethodException e) {
       throw new ConfigurationException("Unable to load class: " + className, e);
     }
   }
