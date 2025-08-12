@@ -93,15 +93,18 @@ public class TestParquetConversionSource {
     sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
     // TODO kryo serializer causing error (replaced it with Java's)
-    sparkConf.set("spark.serializer", "org.apache.spark.serializer.JavaSerializer");
-    /*String javaOpts = "--add-opens=java.base/java.nio=ALL-UNNAMED " +
-            "--add-opens=java.base/java.lang=ALL-UNNAMED " +
-            "--add-opens=java.base/java.util=ALL-UNNAMED " +
-            "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED " +
-            "--add-opens=java.base/java.io=ALL-UNNAMED";
+    // sparkConf.set("spark.serializer", "org.apache.spark.serializer.JavaSerializer");
+    String javaOpts =
+        "--add-opens=java.base/java.nio=ALL-UNNAMED "
+            + "--add-opens=java.base/java.lang=ALL-UNNAMED "
+            + "--add-opens=java.base/java.util=ALL-UNNAMED "
+            + "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED "
+            + "--add-opens=java.base/java.io=ALL-UNNAMED"
+            + "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED"
+            + "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED";
 
     sparkConf.set("spark.driver.extraJavaOptions", javaOpts);
-    sparkConf.set("spark.executor.extraJavaOptions", javaOpts);*/
+    sparkConf.set("spark.executor.extraJavaOptions", javaOpts);
 
     sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
@@ -127,7 +130,7 @@ public class TestParquetConversionSource {
     df.withColumn("date_year", functions.col("date"))
         .write()
         .mode(SaveMode.Overwrite)
-        .partitionBy("date")
+        .partitionBy("date_year")
         .parquet(tempDir.toAbsolutePath().toString());
 
     // test if data was written correctly
@@ -160,8 +163,8 @@ public class TestParquetConversionSource {
             buildArgsForPartition(
                 PARQUET,
                 Arrays.asList(ICEBERG, DELTA, HUDI),
-                "date_year:YEAR",
-                "date_year:YEAR",
+                "date:YEAR",
+                "date:YEAR",
                 levelFilter)));
     //                                ,
     //                Arguments.of(

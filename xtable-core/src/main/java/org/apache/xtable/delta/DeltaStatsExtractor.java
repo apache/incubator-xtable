@@ -40,6 +40,7 @@ import lombok.Value;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.parquet.io.api.Binary;
 
 import org.apache.spark.sql.delta.actions.AddFile;
 
@@ -47,6 +48,7 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.xtable.collectors.CustomCollectors;
@@ -57,6 +59,7 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.FileStats;
 import org.apache.xtable.model.stat.Range;
+import org.apache.xtable.parquet.ParquetConversionUtils;
 
 /**
  * DeltaStatsExtractor extracts column stats and also responsible for their serialization leveraging
@@ -111,7 +114,11 @@ public class DeltaStatsExtractor {
             .maxValues(getMaxValues(validColumnStats))
             .nullCount(getNullCount(validColumnStats))
             .build();
-    return MAPPER.writeValueAsString(deltaStats); // TODO check error here (serialization of stats)
+    // Binary type in Parquet stats serialization is handled with BinarySerializer()
+    SimpleModule module = new SimpleModule();
+    module.addSerializer(Binary.class, new ParquetConversionUtils.BinarySerializer());
+    MAPPER.registerModule(module);
+    return MAPPER.writeValueAsString(deltaStats);
   }
 
   private Set<String> getPathsFromStructSchemaForMinAndMaxStats(InternalSchema schema) {
