@@ -63,7 +63,7 @@ public class IcebergPartitionSpecExtractor {
       String fieldPath = partitioningField.getSourceField().getPath();
       switch (partitioningField.getTransformType()) {
         case YEAR:
-          partitionSpecBuilder.year(fieldPath); //TODO check error here cannot find column
+          partitionSpecBuilder.year(fieldPath);
           break;
         case MONTH:
           partitionSpecBuilder.month(fieldPath);
