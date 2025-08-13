@@ -109,11 +109,11 @@ public class TestParquetConversionSource {
 
     List<Row> data =
         Arrays.asList(
-            RowFactory.create(1, "Alice", 30, "2004"),
-            RowFactory.create(2, "Bob", 24, "1954"),
-            RowFactory.create(3, "Charlie", 35, "1999"),
-            RowFactory.create(4, "David", 29, "1978"),
-            RowFactory.create(5, "Eve", 22, "1992"));
+            RowFactory.create(1, "Alice", 30, "2004-07-23"),
+            RowFactory.create(2, "Bob", 24, "1954-01-15"),
+            RowFactory.create(3, "Charlie", 35, "1999-11-01"),
+            RowFactory.create(4, "David", 29, "1978-09-28"),
+            RowFactory.create(5, "Eve", 22, "1992-04-10"));
 
     StructType schema =
         DataTypes.createStructType(
@@ -121,14 +121,14 @@ public class TestParquetConversionSource {
               DataTypes.createStructField("id", DataTypes.IntegerType, false),
               DataTypes.createStructField("name", DataTypes.StringType, false),
               DataTypes.createStructField("age", DataTypes.IntegerType, false),
-              DataTypes.createStructField("date", DataTypes.StringType, false)
+              DataTypes.createStructField("timestamp", DataTypes.StringType, false)
             });
 
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-    df // .withColumn("date_year", functions.col("date"))
+    df .withColumn("year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
         .write()
         .mode(SaveMode.Overwrite)
-        // .partitionBy("date")
+        .partitionBy("year")
         .parquet(tempDir.toAbsolutePath().toString());
 
     // test if data was written correctly
@@ -161,8 +161,8 @@ public class TestParquetConversionSource {
             buildArgsForPartition(
                 PARQUET,
                 Arrays.asList(ICEBERG, DELTA, HUDI),
-                "date:YEAR",
-                "date:YEAR",
+                "timestamp:YEAR",
+                "timestamp:YEAR",
                 levelFilter)));
   }
 
