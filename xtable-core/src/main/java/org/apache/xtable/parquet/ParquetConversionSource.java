@@ -71,8 +71,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     ParquetMetadata parquetMetadata =
         parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.getPath());
     MessageType parquetSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
-    InternalSchema schema =
-        schemaExtractor.toInternalSchema(parquetSchema, latestFile.getPath().toString());
+    InternalSchema schema = schemaExtractor.toInternalSchema(parquetSchema, "");
     List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(schema);
 
     DataLayoutStrategy dataLayoutStrategy =

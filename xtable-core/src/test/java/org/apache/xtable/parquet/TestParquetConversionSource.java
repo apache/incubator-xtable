@@ -92,8 +92,6 @@ public class TestParquetConversionSource {
     sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
     sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
-    // TODO kryo serializer causing error (replaced it with Java's)
-    // sparkConf.set("spark.serializer", "org.apache.spark.serializer.JavaSerializer");
     String javaOpts =
         "--add-opens=java.base/java.nio=ALL-UNNAMED "
             + "--add-opens=java.base/java.lang=ALL-UNNAMED "
@@ -127,10 +125,10 @@ public class TestParquetConversionSource {
             });
 
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-    df.withColumn("date_year", functions.col("date"))
+    df // .withColumn("date_year", functions.col("date"))
         .write()
         .mode(SaveMode.Overwrite)
-        .partitionBy("date_year")
+        // .partitionBy("date")
         .parquet(tempDir.toAbsolutePath().toString());
 
     // test if data was written correctly
@@ -166,65 +164,7 @@ public class TestParquetConversionSource {
                 "date:YEAR",
                 "date:YEAR",
                 levelFilter)));
-    //                                ,
-    //                Arguments.of(
-    //                        buildArgsForPartition(
-    //                                PARQUET,
-    //                                Arrays.asList(ICEBERG, DELTA, HUDI),
-    //                                "severity:SIMPLE",
-    //                                "severity:VALUE",
-    //                                severityFilter)),
-    //                Arguments.of(
-    //                        buildArgsForPartition(
-    //                                PARQUET,
-    //                                Arrays.asList(ICEBERG, DELTA, HUDI),
-    //                                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-    //                                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
-    //                                timestampAndLevelFilter)));
   }
-
-  /*    private static Stream<Arguments> provideArgsForPartitionTesting() {
-      String timestampFilter =
-              String.format(
-                      "timestamp_micros_nullable_field < timestamp_millis(%s)",
-                      Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
-      String levelFilter = "level = 'INFO'";
-      String nestedLevelFilter = "nested_record.level = 'INFO'";
-      String severityFilter = "severity = 1";
-      String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
-      return Stream.of(
-              Arguments.of(
-                      buildArgsForPartition(
-                              HUDI, Arrays.asList(ICEBERG, DELTA), "level:SIMPLE", "level:VALUE", levelFilter)),
-              Arguments.of(
-                      buildArgsForPartition(
-                              DELTA, Arrays.asList(ICEBERG, HUDI), null, "level:VALUE", levelFilter)),
-              Arguments.of(
-                      buildArgsForPartition(
-                              ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter)),
-              Arguments.of(
-                      // Delta Lake does not currently support nested partition columns
-                      buildArgsForPartition(
-                              HUDI,
-                              Arrays.asList(ICEBERG),
-                              "nested_record.level:SIMPLE",
-                              "nested_record.level:VALUE",
-                              nestedLevelFilter)),
-              Arguments.of(
-                      buildArgsForPartition(
-                              HUDI,
-                              Arrays.asList(ICEBERG, DELTA),
-                              "severity:SIMPLE",
-                              "severity:VALUE",
-                              severityFilter)),
-              Arguments.of(
-                      buildArgsForPartition(
-                              HUDI,
-                              Arrays.asList(ICEBERG, DELTA),
-                              "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-                              "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
-                              timestampAndLevelFilter)));
-  }*/
 
   private static TableFormatPartitionDataHolder buildArgsForPartition(
       String sourceFormat,

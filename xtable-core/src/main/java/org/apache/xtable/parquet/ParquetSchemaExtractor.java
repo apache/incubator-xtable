@@ -210,7 +210,6 @@ public class ParquetSchemaExtractor {
                 InternalSchema.MetadataKey.DECIMAL_SCALE,
                 ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getScale());
             newDataType = InternalType.DECIMAL;
-
           } else {
             newDataType = InternalType.BYTES;
           }
@@ -255,13 +254,6 @@ public class ParquetSchemaExtractor {
                 schema.asGroupType().getType(0),
                 SchemaUtils.getFullyQualifiedPath(
                     parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME));
-        InternalField valueField =
-            InternalField.builder()
-                .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
-                .parentPath(parentPath)
-                .schema(valueSchema)
-                .fieldId(schemaId == null ? null : schemaId.intValue())
-                .build();
         return InternalSchema.builder()
             .name(schemaName)
             .dataType(InternalType.MAP)
@@ -270,7 +262,6 @@ public class ParquetSchemaExtractor {
             .fields(valueSchema.getFields())
             .build();
       } else {
-
         subFields = new ArrayList<>(schema.asGroupType().getFields().size());
         for (Type parquetField : schema.asGroupType().getFields()) {
           String fieldName = parquetField.getName();

@@ -55,8 +55,6 @@ public class ParquetStatsExtractor {
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
-  // private static final InputPartitionFields partitions = null;
-
   public static ParquetStatsExtractor getInstance() {
     return INSTANCE;
   }
