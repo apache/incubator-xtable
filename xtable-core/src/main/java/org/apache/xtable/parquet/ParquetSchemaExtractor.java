@@ -97,6 +97,12 @@ public class ParquetSchemaExtractor {
       primitiveType = schema.asPrimitiveType();
       switch (primitiveType.getPrimitiveTypeName()) {
           // PrimitiveTypes
+        case INT96://TODO check logicaltypes of INT96
+          metadata.put(
+                  InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
+                  InternalSchema.MetadataValue.MILLIS);
+          newDataType = InternalType.TIMESTAMP;
+          break;
         case INT64:
           logicalType = schema.getLogicalTypeAnnotation();
           if (logicalType instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) {

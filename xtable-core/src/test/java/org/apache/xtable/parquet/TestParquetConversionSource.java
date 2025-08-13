@@ -27,6 +27,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -51,6 +52,7 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.*;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.MetadataBuilder;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.AfterAll;
@@ -109,11 +111,11 @@ public class TestParquetConversionSource {
 
     List<Row> data =
         Arrays.asList(
-            RowFactory.create(1, "Alice", 30, "2004-07-23"),
-            RowFactory.create(2, "Bob", 24, "1954-01-15"),
-            RowFactory.create(3, "Charlie", 35, "1999-11-01"),
-            RowFactory.create(4, "David", 29, "1978-09-28"),
-            RowFactory.create(5, "Eve", 22, "1992-04-10"));
+            RowFactory.create(1, "Alice", 30, new Timestamp(System.currentTimeMillis())),
+            RowFactory.create(2, "Bob", 24, new Timestamp(System.currentTimeMillis()+1000)),
+            RowFactory.create(3, "Charlie", 35, new Timestamp(System.currentTimeMillis()+2000)),
+            RowFactory.create(4, "David", 29, new Timestamp(System.currentTimeMillis()+3000)),
+            RowFactory.create(5, "Eve", 22, new Timestamp(System.currentTimeMillis()+4000)));
 
     StructType schema =
         DataTypes.createStructType(
@@ -121,11 +123,11 @@ public class TestParquetConversionSource {
               DataTypes.createStructField("id", DataTypes.IntegerType, false),
               DataTypes.createStructField("name", DataTypes.StringType, false),
               DataTypes.createStructField("age", DataTypes.IntegerType, false),
-              DataTypes.createStructField("timestamp", DataTypes.StringType, false)
+              DataTypes.createStructField("timestamp", DataTypes.TimestampType, false,new MetadataBuilder().build())
             });
 
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-    df .withColumn("year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
+    df .withColumn("year", functions.year(functions.col("timestamp")))
         .write()
         .mode(SaveMode.Overwrite)
         .partitionBy("year")
