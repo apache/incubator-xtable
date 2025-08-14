@@ -39,6 +39,9 @@ import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 
+import java.nio.charset.StandardCharsets;
+import org.apache.parquet.io.api.Binary;
+
 /** Column stats extractor for iceberg table format. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class IcebergColumnStatsConverter {
@@ -50,7 +53,7 @@ public class IcebergColumnStatsConverter {
     return INSTANCE;
   }
 
-  public Metrics toIceberg(Schema schema, long totalRowCount, List<ColumnStat> fieldColumnStats) {
+  public Metrics toIceberg(Schema schema, long totalRowCount, List<ColumnStat> fieldColumnStats, String format) {
     Map<Integer, Long> columnSizes = new HashMap<>();
     Map<Integer, Long> valueCounts = new HashMap<>();
     Map<Integer, Long> nullValueCounts = new HashMap<>();
@@ -68,12 +71,27 @@ public class IcebergColumnStatsConverter {
           nullValueCounts.put(fieldId, columnStats.getNumNulls());
           Type fieldType = icebergField.type();
           if (columnStats.getRange().getMinValue() != null) {
-            lowerBounds.put(
-                fieldId, Conversions.toByteBuffer(fieldType, columnStats.getRange().getMinValue()));
+              if (fieldType.toString()=="string" && format=="APACHE_PARQUET") {
+                  Binary binaryMinStatsValue = (Binary) columnStats.getRange().getMinValue();
+                  String stringMinStatsValue = new String(binaryMinStatsValue.getBytes(), StandardCharsets.UTF_8);
+                  lowerBounds.put(
+                          fieldId, Conversions.toByteBuffer(fieldType, stringMinStatsValue));
+              }
+              else {
+              lowerBounds.put(
+                      fieldId, Conversions.toByteBuffer(fieldType, columnStats.getRange().getMinValue()));
+              }
           }
           if (columnStats.getRange().getMaxValue() != null) {
-            upperBounds.put(
-                fieldId, Conversions.toByteBuffer(fieldType, columnStats.getRange().getMaxValue()));
+              if (fieldType.toString() == "string" && format=="APACHE_PARQUET") {
+                  Binary binaryMaxStatsValue = (Binary) columnStats.getRange().getMaxValue();
+                  String stringMaxStatsValue = new String(binaryMaxStatsValue.getBytes(), StandardCharsets.UTF_8);
+                  lowerBounds.put(
+                          fieldId, Conversions.toByteBuffer(fieldType, stringMaxStatsValue));
+              } else {
+                  upperBounds.put(
+                          fieldId, Conversions.toByteBuffer(fieldType, columnStats.getRange().getMaxValue()));
+              }
           }
         });
     return new Metrics(
