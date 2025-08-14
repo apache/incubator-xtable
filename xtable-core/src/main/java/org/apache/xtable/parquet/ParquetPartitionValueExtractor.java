@@ -51,10 +51,10 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
     return INSTANCE;
   }
 
-  public List<InternalPartitionField> extractParquetPartitions(
+  public InternalSchema extractSchemaForParquetPartitions(
       ParquetMetadata footer, String path) {
     MessageType parquetSchema = parquetMetadataExtractor.getSchema(footer);
     InternalSchema internalSchema = schemaExtractor.toInternalSchema(parquetSchema, path);
-    return partitionsSpecExtractor.spec(internalSchema);
+    return internalSchema;//partitionsSpecExtractor.spec(internalSchema);
   }
 }

@@ -95,7 +95,7 @@ public class TestParquetConversionSource {
     sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
     // TODO delta check disabled (causing error of sync)
-    sparkConf.set("spark.databricks.delta.commitValidation.enabled", "false");
+    //sparkConf.set("spark.databricks.delta.commitValidation.enabled", "false");
     String javaOpts =
         "--add-opens=java.base/java.nio=ALL-UNNAMED "
             + "--add-opens=java.base/java.lang=ALL-UNNAMED "

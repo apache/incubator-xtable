@@ -36,6 +36,7 @@ import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
+import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -61,6 +62,8 @@ public class ParquetStatsExtractor {
 
   private static final ParquetPartitionValueExtractor partitionValueExtractor =
       ParquetPartitionValueExtractor.getInstance();
+  private static PathBasedPartitionSpecExtractor partitionSpecExtractor =
+          ParquetPartitionSpecExtractor.getInstance();
 
   public static List<ColumnStat> getColumnStatsForaFile(ParquetMetadata footer) {
     return getStatsForFile(footer).values().stream()
@@ -133,11 +136,12 @@ public class ParquetStatsExtractor {
       MessageType schema = parquetMetadataExtractor.getSchema(footer);
       columnStatsForAFile = getColumnStatsForaFile(footer);
       partitionValues =
-          partitionValueExtractor.extractPartitionValues(
-              partitionValueExtractor.extractParquetPartitions(
-                  parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
-                  file.getPath().toString()),
-              parentPath.toString());
+          partitionValueExtractor.extractPartitionValues(partitionSpecExtractor.spec(
+                  partitionValueExtractor.extractSchemaForParquetPartitions(
+                          parquetMetadataExtractor.readParquetMetadata(
+                                  hadoopConf, file.getPath()),
+                          file.getPath().toString())),
+                  parentPath.toString());
     } catch (java.io.IOException e) {
 
     }
