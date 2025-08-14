@@ -94,8 +94,6 @@ public class TestParquetConversionSource {
     sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
     sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
-    // TODO delta check disabled (causing error of sync)
-    //sparkConf.set("spark.databricks.delta.commitValidation.enabled", "false");
     String javaOpts =
         "--add-opens=java.base/java.nio=ALL-UNNAMED "
             + "--add-opens=java.base/java.lang=ALL-UNNAMED "
@@ -128,9 +126,9 @@ public class TestParquetConversionSource {
               DataTypes.createStructField("timestamp", DataTypes.TimestampType, false,new MetadataBuilder().build())
             });
 
+
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
     df .withColumn("year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
-     .withColumn("name", functions.col("name").cast(DataTypes.StringType))
         .write()
         .mode(SaveMode.Overwrite)
         .partitionBy("year")

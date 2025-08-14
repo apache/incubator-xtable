@@ -58,6 +58,9 @@ import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
+import java.nio.charset.StandardCharsets;
+import org.apache.parquet.io.api.Binary;
+
 @AllArgsConstructor(staticName = "of")
 public class BaseFileUpdatesExtractor {
   private static final Pattern HUDI_BASE_FILE_PATTERN =
@@ -230,13 +233,13 @@ public class BaseFileUpdatesExtractor {
     writeStat.setNumWrites(file.getRecordCount());
     writeStat.setTotalWriteBytes(file.getFileSizeBytes());
     writeStat.setFileSizeInBytes(file.getFileSizeBytes());
-    writeStat.putRecordsStats(convertColStats(fileName, file.getColumnStats()));
+    writeStat.putRecordsStats(convertColStats(fileName, file.getColumnStats(),file.getFileFormat().toString()));
     writeStatus.setStat(writeStat);
     return writeStatus;
   }
 
   private Map<String, HoodieColumnRangeMetadata<Comparable>> convertColStats(
-      String fileName, List<ColumnStat> columnStatMap) {
+      String fileName, List<ColumnStat> columnStatMap,String fileFormat) {
     return columnStatMap.stream()
         .filter(
             entry ->
@@ -246,8 +249,8 @@ public class BaseFileUpdatesExtractor {
                 HoodieColumnRangeMetadata.<Comparable>create(
                     fileName,
                     convertFromXTablePath(columnStat.getField().getPath()),
-                    (Comparable) columnStat.getRange().getMinValue(),
-                    (Comparable) columnStat.getRange().getMaxValue(),
+                    fileFormat.equals("APACHE_PARQUET") && columnStat.getField().getSchema().getDataType().getName().equals("string")?  new String(((Binary) columnStat.getRange().getMinValue()).getBytes(), StandardCharsets.UTF_8) :(Comparable) columnStat.getRange().getMinValue(),
+                        fileFormat.equals("APACHE_PARQUET") && columnStat.getField().getSchema().getDataType().getName().equals("string")?  new String(((Binary) columnStat.getRange().getMaxValue()).getBytes(), StandardCharsets.UTF_8) :(Comparable) columnStat.getRange().getMaxValue(),
                     columnStat.getNumNulls(),
                     columnStat.getNumValues(),
                     columnStat.getTotalSize(),

@@ -272,7 +272,7 @@ public class ParquetSchemaExtractor {
         for (Type parquetField : schema.asGroupType().getFields()) {
           String fieldName = parquetField.getName();
           Type.ID fieldId = parquetField.getId();
-          currentRepetition = parquetField.getRepetition();
+          //currentRepetition = parquetField.getRepetition();
           InternalSchema subFieldSchema =
               toInternalSchema(
                   parquetField, SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
@@ -281,6 +281,7 @@ public class ParquetSchemaExtractor {
               == 1) { // TODO Tuple (many subelements in a list)
             newDataType = subFieldSchema.getDataType();
             elementName = subFieldSchema.getName();
+            subFields = subFieldSchema.getFields();
             break;
           }
           subFields.add(
@@ -292,16 +293,16 @@ public class ParquetSchemaExtractor {
                   .fieldId(fieldId == null ? null : fieldId.intValue())
                   .build());
         }
-        if (currentRepetition != Repetition.REPEATED
-            && schema.asGroupType().getName() != "list"
-            && !Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) {
+        //RECORD Type (non-nullable elements)
+        if (schema.asGroupType().getName() != "list"
+                && !Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())){
           return InternalSchema.builder()
-              .name(schema.getName())
-              .comment(null)
-              .dataType(InternalType.RECORD)
-              .fields(subFields)
-              .isNullable(isNullable(schema.asGroupType()))
-              .build();
+                  .name(schema.getName())
+                  .comment(null)
+                  .dataType(InternalType.RECORD)
+                  .fields(subFields)
+                  .isNullable(false) // isNullable should be set false: if all fields are required then it is NOT nullable as opposed to Parquet nature to assign repeated for a record as a collection of data
+                  .build();
         }
       }
     }
