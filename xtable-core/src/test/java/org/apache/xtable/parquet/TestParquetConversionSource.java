@@ -94,6 +94,7 @@ public class TestParquetConversionSource {
     sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
     sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
+    // sparkConf.set("hoodie.metadata.enabled", "false");
     String javaOpts =
         "--add-opens=java.base/java.nio=ALL-UNNAMED "
             + "--add-opens=java.base/java.lang=ALL-UNNAMED "
@@ -112,10 +113,10 @@ public class TestParquetConversionSource {
     List<Row> data =
         Arrays.asList(
             RowFactory.create(1, "Alice", 30, new Timestamp(System.currentTimeMillis())),
-            RowFactory.create(2, "Bob", 24, new Timestamp(System.currentTimeMillis()+1000)),
-            RowFactory.create(3, "Charlie", 35, new Timestamp(System.currentTimeMillis()+2000)),
-            RowFactory.create(4, "David", 29, new Timestamp(System.currentTimeMillis()+3000)),
-            RowFactory.create(5, "Eve", 22, new Timestamp(System.currentTimeMillis()+4000)));
+            RowFactory.create(2, "Bob", 24, new Timestamp(System.currentTimeMillis() + 1000)),
+            RowFactory.create(3, "Charlie", 35, new Timestamp(System.currentTimeMillis() + 2000)),
+            RowFactory.create(4, "David", 29, new Timestamp(System.currentTimeMillis() + 3000)),
+            RowFactory.create(5, "Eve", 22, new Timestamp(System.currentTimeMillis() + 4000)));
 
     StructType schema =
         DataTypes.createStructType(
@@ -123,12 +124,12 @@ public class TestParquetConversionSource {
               DataTypes.createStructField("id", DataTypes.IntegerType, false),
               DataTypes.createStructField("name", DataTypes.StringType, false),
               DataTypes.createStructField("age", DataTypes.IntegerType, false),
-              DataTypes.createStructField("timestamp", DataTypes.TimestampType, false,new MetadataBuilder().build())
+              DataTypes.createStructField(
+                  "timestamp", DataTypes.TimestampType, false, new MetadataBuilder().build())
             });
 
-
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-    df .withColumn("year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
+    df.withColumn("year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
         .write()
         .mode(SaveMode.Overwrite)
         .partitionBy("year")
@@ -342,7 +343,7 @@ public class TestParquetConversionSource {
             .format(sourceFormat.toLowerCase())
             .load(
                 Paths.get(new URI(sourceTable.getBasePath()))
-                    //.getParent()
+                    // .getParent()
                     .toString()); // check if the path is wrong Paths.get(new
     // URI(sourceTable.getBasePath())).getParent().toString()
     // .orderBy(sourceTable.getOrderByColumn())

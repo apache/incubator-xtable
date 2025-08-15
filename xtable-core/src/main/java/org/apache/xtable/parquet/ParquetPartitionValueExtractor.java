@@ -19,7 +19,6 @@
 package org.apache.xtable.parquet;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 
 import lombok.NonNull;
@@ -28,7 +27,6 @@ import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
 import org.apache.xtable.hudi.PathBasedPartitionValuesExtractor;
-import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 
 /** Partition value extractor for Parquet. */
@@ -40,7 +38,6 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
-
   public ParquetPartitionValueExtractor(@NonNull Map<String, String> pathToPartitionFieldFormat) {
     super(pathToPartitionFieldFormat);
   }
@@ -49,8 +46,7 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
     return INSTANCE;
   }
 
-  public InternalSchema extractSchemaForParquetPartitions(
-      ParquetMetadata footer, String path) {
+  public InternalSchema extractSchemaForParquetPartitions(ParquetMetadata footer, String path) {
     MessageType parquetSchema = parquetMetadataExtractor.getSchema(footer);
     return schemaExtractor.toInternalSchema(parquetSchema, path);
   }

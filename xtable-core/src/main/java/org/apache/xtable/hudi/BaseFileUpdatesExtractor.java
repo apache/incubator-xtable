@@ -20,6 +20,7 @@ package org.apache.xtable.hudi;
 
 import static org.apache.xtable.hudi.HudiSchemaExtractor.convertFromXTablePath;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,6 +38,7 @@ import lombok.NonNull;
 import lombok.Value;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.parquet.io.api.Binary;
 
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
@@ -57,9 +59,6 @@ import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
-
-import java.nio.charset.StandardCharsets;
-import org.apache.parquet.io.api.Binary;
 
 @AllArgsConstructor(staticName = "of")
 public class BaseFileUpdatesExtractor {
@@ -233,13 +232,14 @@ public class BaseFileUpdatesExtractor {
     writeStat.setNumWrites(file.getRecordCount());
     writeStat.setTotalWriteBytes(file.getFileSizeBytes());
     writeStat.setFileSizeInBytes(file.getFileSizeBytes());
-    writeStat.putRecordsStats(convertColStats(fileName, file.getColumnStats(),file.getFileFormat().toString()));
+    writeStat.putRecordsStats(
+        convertColStats(fileName, file.getColumnStats(), file.getFileFormat().toString()));
     writeStatus.setStat(writeStat);
     return writeStatus;
   }
 
   private Map<String, HoodieColumnRangeMetadata<Comparable>> convertColStats(
-      String fileName, List<ColumnStat> columnStatMap,String fileFormat) {
+      String fileName, List<ColumnStat> columnStatMap, String fileFormat) {
     return columnStatMap.stream()
         .filter(
             entry ->
@@ -249,8 +249,28 @@ public class BaseFileUpdatesExtractor {
                 HoodieColumnRangeMetadata.<Comparable>create(
                     fileName,
                     convertFromXTablePath(columnStat.getField().getPath()),
-                    fileFormat.equals("APACHE_PARQUET") && columnStat.getField().getSchema().getDataType().getName().equals("string")?  new String(((Binary) columnStat.getRange().getMinValue()).getBytes(), StandardCharsets.UTF_8) :(Comparable) columnStat.getRange().getMinValue(),
-                        fileFormat.equals("APACHE_PARQUET") && columnStat.getField().getSchema().getDataType().getName().equals("string")?  new String(((Binary) columnStat.getRange().getMaxValue()).getBytes(), StandardCharsets.UTF_8) :(Comparable) columnStat.getRange().getMaxValue(),
+                    fileFormat.equals("APACHE_PARQUET")
+                            && columnStat
+                                .getField()
+                                .getSchema()
+                                .getDataType()
+                                .getName()
+                                .equals("string")
+                        ? new String(
+                            ((Binary) columnStat.getRange().getMinValue()).getBytes(),
+                            StandardCharsets.UTF_8)
+                        : (Comparable) columnStat.getRange().getMinValue(),
+                    fileFormat.equals("APACHE_PARQUET")
+                            && columnStat
+                                .getField()
+                                .getSchema()
+                                .getDataType()
+                                .getName()
+                                .equals("string")
+                        ? new String(
+                            ((Binary) columnStat.getRange().getMaxValue()).getBytes(),
+                            StandardCharsets.UTF_8)
+                        : (Comparable) columnStat.getRange().getMaxValue(),
                     columnStat.getNumNulls(),
                     columnStat.getNumValues(),
                     columnStat.getTotalSize(),

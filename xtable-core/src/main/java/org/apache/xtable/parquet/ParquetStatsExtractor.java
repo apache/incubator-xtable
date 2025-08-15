@@ -63,7 +63,7 @@ public class ParquetStatsExtractor {
   private static final ParquetPartitionValueExtractor partitionValueExtractor =
       ParquetPartitionValueExtractor.getInstance();
   private static PathBasedPartitionSpecExtractor partitionSpecExtractor =
-          ParquetPartitionSpecExtractor.getInstance();
+      ParquetPartitionSpecExtractor.getInstance();
 
   public static List<ColumnStat> getColumnStatsForaFile(ParquetMetadata footer) {
     return getStatsForFile(footer).values().stream()
@@ -136,12 +136,12 @@ public class ParquetStatsExtractor {
       MessageType schema = parquetMetadataExtractor.getSchema(footer);
       columnStatsForAFile = getColumnStatsForaFile(footer);
       partitionValues =
-          partitionValueExtractor.extractPartitionValues(partitionSpecExtractor.spec(
+          partitionValueExtractor.extractPartitionValues(
+              partitionSpecExtractor.spec(
                   partitionValueExtractor.extractSchemaForParquetPartitions(
-                          parquetMetadataExtractor.readParquetMetadata(
-                                  hadoopConf, file.getPath()),
-                          file.getPath().toString())),
-                  parentPath.toString());
+                      parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
+                      file.getPath().toString())),
+              parentPath.toString());
     } catch (java.io.IOException e) {
 
     }

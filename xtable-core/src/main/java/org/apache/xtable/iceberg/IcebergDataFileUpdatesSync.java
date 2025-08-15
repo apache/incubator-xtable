@@ -113,7 +113,10 @@ public class IcebergDataFileUpdatesSync {
             .withFileSizeInBytes(dataFile.getFileSizeBytes())
             .withMetrics(
                 columnStatsConverter.toIceberg(
-                    schema, dataFile.getRecordCount(), dataFile.getColumnStats(), dataFile.getFileFormat().toString()))
+                    schema,
+                    dataFile.getRecordCount(),
+                    dataFile.getColumnStats(),
+                    dataFile.getFileFormat().toString()))
             .withFormat(convertFileFormat(dataFile.getFileFormat()));
     if (partitionSpec.isPartitioned()) {
       builder.withPartition(

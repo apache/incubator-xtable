@@ -97,10 +97,9 @@ public class ParquetSchemaExtractor {
       primitiveType = schema.asPrimitiveType();
       switch (primitiveType.getPrimitiveTypeName()) {
           // PrimitiveTypes
-        case INT96://TODO check logicaltypes of INT96
+        case INT96: // TODO check logicaltypes of INT96
           metadata.put(
-                  InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
-                  InternalSchema.MetadataValue.MILLIS);
+              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
           newDataType = InternalType.TIMESTAMP;
           break;
         case INT64:
@@ -272,7 +271,7 @@ public class ParquetSchemaExtractor {
         for (Type parquetField : schema.asGroupType().getFields()) {
           String fieldName = parquetField.getName();
           Type.ID fieldId = parquetField.getId();
-          //currentRepetition = parquetField.getRepetition();
+          // currentRepetition = parquetField.getRepetition();
           InternalSchema subFieldSchema =
               toInternalSchema(
                   parquetField, SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
@@ -293,16 +292,20 @@ public class ParquetSchemaExtractor {
                   .fieldId(fieldId == null ? null : fieldId.intValue())
                   .build());
         }
-        //RECORD Type (non-nullable elements)
+        // RECORD Type (non-nullable elements)
         if (schema.asGroupType().getName() != "list"
-                && !Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())){
+            && !Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) {
           return InternalSchema.builder()
-                  .name(schema.getName())
-                  .comment(null)
-                  .dataType(InternalType.RECORD)
-                  .fields(subFields)
-                  .isNullable(false) // isNullable should be set false: if all fields are required then it is NOT nullable as opposed to Parquet nature to assign repeated for a record as a collection of data
-                  .build();
+              .name(schema.getName())
+              .comment(null)
+              .recordKeyFields(subFields) // necessary for Hudi metadata
+              .dataType(InternalType.RECORD)
+              .fields(subFields)
+              .isNullable(
+                  false) // isNullable should be set false: if all fields are required then it is
+              // NOT nullable as opposed to Parquet nature to assign repeated for a
+              // record as a collection of data
+              .build();
         }
       }
     }

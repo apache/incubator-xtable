@@ -112,10 +112,10 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                     .fileSizeBytes(file.getLen())
                     .partitionValues(
                         partitionValueExtractor.extractPartitionValues(
-                                partitionSpecExtractor.spec(
-                            partitionValueExtractor.extractSchemaForParquetPartitions(
+                            partitionSpecExtractor.spec(
+                                partitionValueExtractor.extractSchemaForParquetPartitions(
                                     parquetMetadataExtractor.readParquetMetadata(
-                                            hadoopConf, file.getPath()),
+                                        hadoopConf, file.getPath()),
                                     file.getPath().toString())),
                             basePath))
                     .lastModified(file.getModificationTime())
@@ -131,13 +131,13 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     return InternalDataFile.builder()
         .physicalPath(parquetFile.getPath().toString())
         .partitionValues(
-                partitionValueExtractor.extractPartitionValues(
-                        partitionSpecExtractor.spec(
-                                partitionValueExtractor.extractSchemaForParquetPartitions(
-                                        parquetMetadataExtractor.readParquetMetadata(
-                                                hadoopConf, parquetFile.getPath()),
-                                        parquetFile.getPath().toString())),
-                        basePath))
+            partitionValueExtractor.extractPartitionValues(
+                partitionSpecExtractor.spec(
+                    partitionValueExtractor.extractSchemaForParquetPartitions(
+                        parquetMetadataExtractor.readParquetMetadata(
+                            hadoopConf, parquetFile.getPath()),
+                        parquetFile.getPath().toString())),
+                basePath))
         .lastModified(parquetFile.getModificationTime())
         .fileSizeBytes(parquetFile.getLen())
         .columnStats(
