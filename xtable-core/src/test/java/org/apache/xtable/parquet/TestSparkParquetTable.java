@@ -105,7 +105,7 @@ public class TestSparkParquetTable implements GenericTable<Group, String> {
   public void close() {}
 
   public void reload() {}
-
+// TODO either create BASIC_SCHEMA = new Schema.Parser().parse(schema); or move this code out
   public List<String> getColumnsToSelect() {
     return schema.getFields().stream().map(Type::getName).collect(Collectors.toList());
   }

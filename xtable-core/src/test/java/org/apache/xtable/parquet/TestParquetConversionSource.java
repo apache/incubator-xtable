@@ -48,6 +48,7 @@ import java.util.stream.Stream;
 import lombok.Builder;
 import lombok.Value;
 
+import org.apache.parquet.schema.Type;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.*;
@@ -372,7 +373,8 @@ public class TestParquetConversionSource {
                       // .filter(filterCondition);
                     }));
 
-    String[] selectColumnsArr = sourceTable.getColumnsToSelect().toArray(new String[] {});
+    //String[] selectColumnsArr = sourceTable.getColumnsToSelect().toArray(new String[] {});
+    String[] selectColumnsArr = schema.fieldNames();
     List<String> dataset1Rows = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
     targetRowsByFormat.forEach(
         (format, targetRows) -> {
