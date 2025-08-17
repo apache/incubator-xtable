@@ -53,7 +53,7 @@ public class TestSparkParquetTable implements GenericTable<Group, String> {
       this.partitionConfig = partitionConfig;
       this.jsc = jsc;
       this.basePath = initBasePath(tempDir, name);
-      this.dataPath = initBasePath(tempDir, name)+"/data/";
+      this.dataPath = initBasePath(tempDir, name)+"data/";
     } catch (IOException ex) {
       throw new UncheckedIOException("Unable to initialize Test Parquet File", ex);
     }
