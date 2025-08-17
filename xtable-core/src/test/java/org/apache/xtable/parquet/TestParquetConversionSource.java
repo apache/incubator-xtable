@@ -86,6 +86,7 @@ public class TestParquetConversionSource {
   @TempDir public static Path tempDir;
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;
+  private static StructType schema;
 
   @BeforeAll
   public static void setupOnce() {
@@ -118,7 +119,7 @@ public class TestParquetConversionSource {
             RowFactory.create(4, "David", 29, new Timestamp(System.currentTimeMillis() + 3000)),
             RowFactory.create(5, "Eve", 22, new Timestamp(System.currentTimeMillis() + 4000)));
 
-    StructType schema =
+     schema =
         DataTypes.createStructType(
             new StructField[] {
               DataTypes.createStructField("id", DataTypes.IntegerType, false),
@@ -339,12 +340,12 @@ public class TestParquetConversionSource {
     Dataset<Row> sourceRows =
         sparkSession
             .read()
+                .schema(schema)
             .options(sourceOptions)
+                .option("basePath", sourceTable.getBasePath())
             .format(sourceFormat.toLowerCase())
             .load(
-                Paths.get(new URI(sourceTable.getBasePath()))
-                    // .getParent()
-                    .toString()); // check if the path is wrong Paths.get(new
+                sourceTable.getDataPath());
     // URI(sourceTable.getBasePath())).getParent().toString()
     // .orderBy(sourceTable.getOrderByColumn())
     // .filter(filterCondition);
