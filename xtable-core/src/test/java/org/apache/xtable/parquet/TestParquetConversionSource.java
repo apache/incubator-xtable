@@ -135,10 +135,10 @@ public class TestParquetConversionSource {
         .write()
         .mode(SaveMode.Overwrite)
         .partitionBy("year")
-        .parquet(tempDir.toAbsolutePath().toString());
+        .parquet(tempDir.toAbsolutePath().toString()/*+"/data/"*/);
 
     // test if data was written correctly
-    Dataset<Row> reloadedDf = sparkSession.read().parquet(tempDir.toAbsolutePath().toString());
+    Dataset<Row> reloadedDf = sparkSession.read().parquet(tempDir.toAbsolutePath().toString()/*+"/data/"*/);
     reloadedDf.show();
     reloadedDf.printSchema();
   }
@@ -343,10 +343,10 @@ public class TestParquetConversionSource {
             .read()
                 .schema(schema)
             .options(sourceOptions)
-                .option("basePath", sourceTable.getBasePath())
+             //   .option("basePath", sourceTable.getBasePath())
             .format(sourceFormat.toLowerCase())
             .load(
-                sourceTable.getDataPath());
+                sourceTable.getBasePath()/*+"year=2025/"*/);// parquet file should be written under a folder which contains only the partition data (year=2025/...) without the metadata folders
     // URI(sourceTable.getBasePath())).getParent().toString()
     // .orderBy(sourceTable.getOrderByColumn())
     // .filter(filterCondition);
