@@ -18,6 +18,7 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.xtable.hudi.HudiTestUtil.createWriteStatus;
 import static org.apache.xtable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.apache.xtable.hudi.HudiTestUtil.initTableAndGetMetaClient;
@@ -72,6 +73,7 @@ import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.metadata.HoodieBackedTableMetadata;
 import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
+import org.apache.hudi.storage.StorageConfiguration;
 
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
@@ -98,7 +100,7 @@ import org.apache.xtable.spi.sync.ConversionTarget;
  */
 public class ITHudiConversionTarget {
   @TempDir public static Path tempDir;
-  private static final Configuration CONFIGURATION = new Configuration();
+  private static final StorageConfiguration CONFIGURATION = getStorageConf(new Configuration());
   private static final HoodieEngineContext CONTEXT = new HoodieJavaEngineContext(CONFIGURATION);
 
   private static final String TABLE_NAME = "test_table";
@@ -218,7 +220,11 @@ public class ITHudiConversionTarget {
         metaClient, partitionPath, Collections.singletonList(Pair.of(fileName, filePath)));
     try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
         new HoodieBackedTableMetadata(
-            CONTEXT, writeConfig.getMetadataConfig(), tableBasePath, true)) {
+            CONTEXT,
+            metaClient.getStorage(),
+            writeConfig.getMetadataConfig(),
+            tableBasePath,
+            true)) {
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
     }
     // include meta fields since the table was created with meta fields enabled
@@ -259,7 +265,11 @@ public class ITHudiConversionTarget {
         metaClient, partitionPath, Collections.singletonList(Pair.of(fileName, filePath)));
     try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
         new HoodieBackedTableMetadata(
-            CONTEXT, getHoodieWriteConfig(metaClient).getMetadataConfig(), tableBasePath, true)) {
+            CONTEXT,
+            metaClient.getStorage(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig(),
+            tableBasePath,
+            true)) {
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
     }
     assertSchema(metaClient, false);
@@ -306,7 +316,11 @@ public class ITHudiConversionTarget {
         metaClient, partitionPath, Arrays.asList(file0Pair, Pair.of(fileName1, filePath1)));
     try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
         new HoodieBackedTableMetadata(
-            CONTEXT, getHoodieWriteConfig(metaClient).getMetadataConfig(), tableBasePath, true)) {
+            CONTEXT,
+            metaClient.getStorage(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig(),
+            tableBasePath,
+            true)) {
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
     }
 
@@ -324,7 +338,11 @@ public class ITHudiConversionTarget {
         metaClient, partitionPath, Arrays.asList(file0Pair, Pair.of(fileName2, filePath2)));
     try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
         new HoodieBackedTableMetadata(
-            CONTEXT, getHoodieWriteConfig(metaClient).getMetadataConfig(), tableBasePath, true)) {
+            CONTEXT,
+            metaClient.getStorage(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig(),
+            tableBasePath,
+            true)) {
       // the metadata for fileName1 should still be present until the cleaner kicks in
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
       // new file stats should be present
@@ -375,7 +393,11 @@ public class ITHudiConversionTarget {
     // col stats should be cleaned up for fileName1 but present for fileName2 and fileName3
     try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
         new HoodieBackedTableMetadata(
-            CONTEXT, getHoodieWriteConfig(metaClient).getMetadataConfig(), tableBasePath, true)) {
+            CONTEXT,
+            metaClient.getStorage(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig(),
+            tableBasePath,
+            true)) {
       // assertEmptyColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName3);
       assertColStats(hoodieBackedTableMetadata, partitionPath, fileName4);
@@ -731,7 +753,7 @@ public class ITHudiConversionTarget {
             .name("test_table")
             .metadataRetention(Duration.of(4, ChronoUnit.HOURS))
             .build(),
-        CONFIGURATION,
+        (Configuration) CONFIGURATION.unwrapCopy(),
         3);
   }
 }
