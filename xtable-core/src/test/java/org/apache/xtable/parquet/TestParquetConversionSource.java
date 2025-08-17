@@ -341,8 +341,6 @@ public class TestParquetConversionSource {
             .read()
             .schema(schema)
             .options(sourceOptions)
-            //   .option("basePath", sourceTable.getBasePath())
-            // .format(sourceFormat.toLowerCase())
             .parquet(sourceTable.getDataPath() + "/**/*.parquet");
     // .orderBy(sourceTable.getOrderByColumn())
     // .filter(filterCondition);
