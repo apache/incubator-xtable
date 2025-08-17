@@ -53,7 +53,7 @@ public class HudiPartitionValuesExtractor {
     List<PartitionValue> result = new ArrayList<>(totalNumberOfPartitions);
     String remainingPartitionPath = partitionPath;
     for (InternalPartitionField partitionField : partitionColumns) {
-      String sourceFieldName = partitionField.getSourceField().getName();
+      String sourceFieldName = partitionField.getSourceField().getPath();
       if (remainingPartitionPath.startsWith(sourceFieldName + "=")) {
         // Strip off hive style partitioning
         remainingPartitionPath = remainingPartitionPath.substring(sourceFieldName.length() + 1);
