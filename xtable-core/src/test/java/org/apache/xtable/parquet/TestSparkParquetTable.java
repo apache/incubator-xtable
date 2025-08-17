@@ -53,7 +53,7 @@ public class TestSparkParquetTable implements GenericTable<Group, String> {
       this.partitionConfig = partitionConfig;
       this.jsc = jsc;
       this.basePath = initBasePath(tempDir, name);
-      this.dataPath = initBasePath(tempDir, name)+"../xtable_metadata/";
+      this.dataPath = initBasePath(tempDir, name); // +"../xtable_metadata/";
     } catch (IOException ex) {
       throw new UncheckedIOException("Unable to initialize Test Parquet File", ex);
     }
@@ -90,6 +90,7 @@ public class TestSparkParquetTable implements GenericTable<Group, String> {
   public String getBasePath() {
     return basePath;
   }
+
   public String getDataPath() {
     return dataPath;
   }
@@ -105,7 +106,7 @@ public class TestSparkParquetTable implements GenericTable<Group, String> {
   public void close() {}
 
   public void reload() {}
-// TODO either create BASIC_SCHEMA = new Schema.Parser().parse(schema); or move this code out
+  // TODO either create BASIC_SCHEMA = new Schema.Parser().parse(schema); or move this code out
   public List<String> getColumnsToSelect() {
     return schema.getFields().stream().map(Type::getName).collect(Collectors.toList());
   }
