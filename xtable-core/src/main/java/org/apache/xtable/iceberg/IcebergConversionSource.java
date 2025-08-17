@@ -123,10 +123,18 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         irPartitionFields.size() > 0
             ? DataLayoutStrategy.HIVE_STYLE_PARTITION
             : DataLayoutStrategy.FLAT;
+    // When the table name is not explicitly specified, Iceberg assumes the table is HDFS-based,
+    // treating the table name as the location in HDFS. This assumption can lead to mismatches
+    // during metadata conversion. To mitigate this issue, we rely on the table name provided in the
+    // source configuration of the conversation so target matches the user's expectations.
+    // See https://github.com/apache/incubator-xtable/issues/494
     return InternalTable.builder()
         .tableFormat(TableFormat.ICEBERG)
         .basePath(iceTable.location())
-        .name(iceTable.name())
+        .name(
+            iceTable.name().contains(iceTable.location())
+                ? sourceTableConfig.getName()
+                : iceTable.name())
         .partitioningFields(irPartitionFields)
         .latestCommitTime(Instant.ofEpochMilli(snapshot.timestampMillis()))
         .readSchema(irSchema)
