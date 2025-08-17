@@ -344,10 +344,6 @@ public class TestParquetConversionSource {
             //   .option("basePath", sourceTable.getBasePath())
             // .format(sourceFormat.toLowerCase())
             .parquet(sourceTable.getDataPath() + "/**/*.parquet");
-    // .load(
-    //  sourceTable.getBasePath()/*+"year=2025/"*/);// parquet file should be written under a folder
-    // which contains only the partition data (year=2025/...) without the metadata folders
-    // URI(sourceTable.getBasePath())).getParent().toString()
     // .orderBy(sourceTable.getOrderByColumn())
     // .filter(filterCondition);
     Map<String, Dataset<Row>> targetRowsByFormat =
@@ -373,42 +369,15 @@ public class TestParquetConversionSource {
                       // .filter(filterCondition);
                     }));
 
-    // String[] selectColumnsArr = sourceTable.getColumnsToSelect().toArray(new String[] {});
     String[] selectColumnsArr = schema.fieldNames();
     List<String> dataset1Rows = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
-    /*targetRowsByFormat.forEach(
-    (format, targetRows) -> {
-      List<String> dataset2Rows =
-          targetRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
-      assertEquals(
-          dataset1Rows.size(),
-          dataset2Rows.size(),
-          String.format(
-              "Datasets have different row counts when reading from Spark. Source: %s, Target: %s",
-              sourceFormat, format));
-      // sanity check the count to ensure test is set up properly
-      if (expectedCount != null) {
-        assertEquals(expectedCount, dataset1Rows.size());
-      } else {
-        // if count is not known ahead of time, ensure datasets are non-empty
-        assertFalse(dataset1Rows.isEmpty());
-      }
 
-      assertEquals(
-          dataset1Rows,
-          dataset2Rows,
-          String.format(
-              "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
-              sourceFormat, format));
-    });*/
 
-    // Assuming 'targetRowsByFormat' is a Map<Format, Dataset<Row>>
     Set<Map.Entry<String, Dataset<Row>>> entrySet = targetRowsByFormat.entrySet();
 
     for (Map.Entry<String, Dataset<Row>> entry : entrySet) {
 
       String format = entry.getKey();
-      if (format.equals("HUDI")) continue;
       Dataset<Row> targetRows = entry.getValue();
 
       List<String> dataset2Rows = targetRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
@@ -420,11 +389,9 @@ public class TestParquetConversionSource {
               "Datasets have different row counts when reading from Spark. Source: %s, Target: %s",
               sourceFormat, format));
 
-      // sanity check the count to ensure test is set up properly
       if (expectedCount != null) {
         assertEquals(expectedCount, dataset1Rows.size());
       } else {
-        // if count is not known ahead of time, ensure datasets are non-empty
         assertFalse(dataset1Rows.isEmpty());
       }
 
