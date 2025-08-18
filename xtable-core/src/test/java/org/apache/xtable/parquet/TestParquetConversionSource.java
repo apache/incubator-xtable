@@ -93,7 +93,7 @@ public class TestParquetConversionSource {
     sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
     sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
-    // sparkConf.set("hoodie.metadata.enabled", "false");
+    //sparkConf.set("hoodie.datasource.write.partitionpath.field", "timestamp");
     String javaOpts =
         "--add-opens=java.base/java.nio=ALL-UNNAMED "
             + "--add-opens=java.base/java.lang=ALL-UNNAMED "
@@ -132,11 +132,11 @@ public class TestParquetConversionSource {
         .write()
         .mode(SaveMode.Overwrite)
         .partitionBy("year")
-        .parquet(tempDir.toAbsolutePath().toString() /*+"/data/"*/);
+        .parquet(tempDir.toAbsolutePath().toString());
 
     // test if data was written correctly
     Dataset<Row> reloadedDf =
-        sparkSession.read().parquet(tempDir.toAbsolutePath().toString() /*+"/data/"*/);
+        sparkSession.read().parquet(tempDir.toAbsolutePath().toString() );
     reloadedDf.show();
     reloadedDf.printSchema();
   }
@@ -356,7 +356,7 @@ public class TestParquetConversionSource {
                         finalTargetOptions = new HashMap<>(finalTargetOptions);
                         finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
                         finalTargetOptions.put(
-                            "hoodie.datasource.read.extract.partition.values.from.path", "true");
+                            "hoodie.datasource.read.extract.partition.values.from.path", "false");;
                       }
                       return sparkSession
                           .read()
@@ -376,7 +376,9 @@ public class TestParquetConversionSource {
     for (Map.Entry<String, Dataset<Row>> entry : entrySet) {
 
       String format = entry.getKey();
+
       Dataset<Row> targetRows = entry.getValue();
+      targetRows.show();
 
       List<String> dataset2Rows = targetRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
 
