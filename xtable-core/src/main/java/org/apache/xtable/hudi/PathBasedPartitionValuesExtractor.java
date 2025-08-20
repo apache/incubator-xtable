@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 package org.apache.xtable.hudi;
 
 import java.math.BigDecimal;
@@ -75,17 +75,15 @@ public class PathBasedPartitionValuesExtractor {
     }
     return result;
   }
-
   private PartialResult parsePartitionPath(
-      InternalPartitionField field, String basePath, int totalNumberOfPartitions) {
+          InternalPartitionField field, String remainingPath, int totalNumberOfPartitions) {
     switch (field.getTransformType()) {
       case YEAR:
-        return parseDate(basePath, field.getSourceField().getPath(), "yyyy");
       case MONTH:
       case DAY:
       case HOUR:
         return parseDate(
-            basePath, field.getSourceField().getPath(), ""); // TODO adjust for other cases
+                remainingPath, pathToPartitionFieldFormat.get(field.getSourceField().getName()));//changed from getPath()
       case VALUE:
         // if there is only one partition field, then assume full partition path is used even if
         // value contains slashes
@@ -93,24 +91,25 @@ public class PathBasedPartitionValuesExtractor {
         // to custom partitioning logic
         boolean isSlashDelimited = totalNumberOfPartitions > 1;
         return parseValue(
-            basePath, field.getSourceField().getSchema().getDataType(), isSlashDelimited);
+                remainingPath, field.getSourceField().getSchema().getDataType(), isSlashDelimited);
       default:
         throw new IllegalArgumentException(
-            "Unexpected partition type: " + field.getTransformType());
+                "Unexpected partition type: " + field.getTransformType());
     }
   }
 
-  private static PartialResult parseDate(String basePath, String fullPath, String format) {
+  private static PartialResult parseDate(String remainingPath, String format) {
     try {
-      String dateString =
-          fullPath.substring(basePath.length() - 1, fullPath.length()).split("/")[0].split("=")[1];
+      String dateString = remainingPath.substring(0, format.length());
       SimpleDateFormat simpleDateFormat = new SimpleDateFormat(format);
       simpleDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
       long dateAsEpochMillis = simpleDateFormat.parse(dateString).toInstant().toEpochMilli();
-      return new PartialResult(dateAsEpochMillis, basePath + dateString);
+      return new PartialResult(
+              dateAsEpochMillis,
+              remainingPath.substring(Math.min(remainingPath.length(), format.length() + 1)));
     } catch (ParseException ex) {
       throw new PartitionValuesExtractorException(
-          "Unable to parse date from path: " + basePath, ex);
+              "Unable to parse date from path: " + remainingPath, ex);
     }
   }
 

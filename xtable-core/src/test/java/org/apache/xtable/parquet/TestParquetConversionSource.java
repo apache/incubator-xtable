@@ -163,8 +163,8 @@ public class TestParquetConversionSource {
             buildArgsForPartition(
                 PARQUET,
                 Arrays.asList(ICEBERG, DELTA, HUDI),
-                "timestamp:YEAR",
-                "timestamp:YEAR",
+                "timestamp:YEAR:yyyy",
+                "timestamp:YEAR:yyyy",
                 levelFilter)));
   }
 

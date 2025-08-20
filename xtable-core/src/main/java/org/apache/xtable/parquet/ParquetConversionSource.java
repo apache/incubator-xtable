@@ -26,6 +26,8 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.fs.Path;
+
 
 import lombok.Builder;
 import lombok.NonNull;
@@ -47,6 +49,7 @@ import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.spi.extractor.ConversionSource;
+import org.apache.xtable.hudi.HudiPathUtils;
 
 @Builder
 public class ParquetConversionSource implements ConversionSource<Long> {
@@ -111,7 +114,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                                     parquetMetadataExtractor.readParquetMetadata(
                                         hadoopConf, file.getPath()),
                                     file.getPath().toString())),
-                            basePath))
+                                HudiPathUtils.getPartitionPathValue(new Path(basePath),new Path(file.getPath().toString()))))
                     .lastModified(file.getModificationTime())
                     .columnStats(
                         parquetStatsExtractor.getColumnStatsForaFile(
