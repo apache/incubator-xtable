@@ -868,7 +868,7 @@ public class TestIcebergSync {
     Metrics[] responses =
         IntStream.of(times - 1).mapToObj(unused -> response).toArray(Metrics[]::new);
     when(mockColumnStatsConverter.toIceberg(
-            any(Schema.class), eq(dataFile.getRecordCount()), eq(Collections.emptyList()), ""))
+            any(Schema.class), eq(dataFile.getRecordCount()), eq(Collections.emptyList()), eq("")))
         .thenReturn(response, responses);
   }
 }
