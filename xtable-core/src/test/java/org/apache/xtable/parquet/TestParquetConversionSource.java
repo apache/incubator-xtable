@@ -93,7 +93,6 @@ public class TestParquetConversionSource {
     sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
     sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
-    //sparkConf.set("hoodie.datasource.write.partitionpath.field", "timestamp");
     String javaOpts =
         "--add-opens=java.base/java.nio=ALL-UNNAMED "
             + "--add-opens=java.base/java.lang=ALL-UNNAMED "
@@ -135,8 +134,7 @@ public class TestParquetConversionSource {
         .parquet(tempDir.toAbsolutePath().toString());
 
     // test if data was written correctly
-    Dataset<Row> reloadedDf =
-        sparkSession.read().parquet(tempDir.toAbsolutePath().toString() );
+    Dataset<Row> reloadedDf = sparkSession.read().parquet(tempDir.toAbsolutePath().toString());
     reloadedDf.show();
     reloadedDf.printSchema();
   }
@@ -356,7 +354,7 @@ public class TestParquetConversionSource {
                         finalTargetOptions = new HashMap<>(finalTargetOptions);
                         finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
                         finalTargetOptions.put(
-                            "hoodie.datasource.read.extract.partition.values.from.path", "false");;
+                            "hoodie.datasource.read.extract.partition.values.from.path", "false");
                       }
                       return sparkSession
                           .read()
@@ -369,7 +367,6 @@ public class TestParquetConversionSource {
 
     String[] selectColumnsArr = schema.fieldNames();
     List<String> dataset1Rows = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
-
 
     Set<Map.Entry<String, Dataset<Row>>> entrySet = targetRowsByFormat.entrySet();
 

@@ -72,7 +72,7 @@ public class IcebergColumnStatsConverter {
           nullValueCounts.put(fieldId, columnStats.getNumNulls());
           Type fieldType = icebergField.type();
           if (columnStats.getRange().getMinValue() != null) {
-            if (fieldType.toString() == "string" && format == "APACHE_PARQUET") {
+            if (fieldType.toString().equals("string") && format.equals("APACHE_PARQUET")) {
               Binary binaryMinStatsValue = (Binary) columnStats.getRange().getMinValue();
               String stringMinStatsValue =
                   new String(binaryMinStatsValue.getBytes(), StandardCharsets.UTF_8);
@@ -84,7 +84,7 @@ public class IcebergColumnStatsConverter {
             }
           }
           if (columnStats.getRange().getMaxValue() != null) {
-            if (fieldType.toString() == "string" && format == "APACHE_PARQUET") {
+            if (fieldType.toString().equals("string") && format.equals("APACHE_PARQUET")) {
               Binary binaryMaxStatsValue = (Binary) columnStats.getRange().getMaxValue();
               String stringMaxStatsValue =
                   new String(binaryMaxStatsValue.getBytes(), StandardCharsets.UTF_8);
