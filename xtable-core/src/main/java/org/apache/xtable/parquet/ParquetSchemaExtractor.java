@@ -305,7 +305,7 @@ public class ParquetSchemaExtractor {
           return InternalSchema.builder()
               .name(schema.getName())
               .comment(null)
-              .recordKeyFields(subFields) // necessary for Hudi metadata
+              //.recordKeyFields(subFields) // necessary for Hudi metadata
               .dataType(InternalType.RECORD)
               .fields(subFields)
               .isNullable(
