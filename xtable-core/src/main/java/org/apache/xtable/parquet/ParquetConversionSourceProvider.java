@@ -22,7 +22,7 @@ import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 
-/** A concrete implementation of {@link ConversionSourceProvider} for Delta Lake table format. */
+/** A concrete implementation of {@link ConversionSourceProvider} for Parquet file format. */
 public class ParquetConversionSourceProvider extends ConversionSourceProvider<Long> {
   @Override
   public ParquetConversionSource getConversionSourceInstance(SourceTable sourceTable) {

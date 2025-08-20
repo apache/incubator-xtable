@@ -34,7 +34,7 @@ import org.apache.xtable.schema.SchemaFieldFinder;
 public class ParquetPartitionSpecExtractor implements PathBasedPartitionSpecExtractor {
   private static final ParquetPartitionSpecExtractor INSTANCE =
       new ParquetPartitionSpecExtractor(new ArrayList<>());
-  private final List<PartitionFieldSpec> partitionFieldSpecs;
+  private List<PartitionFieldSpec> partitionFieldSpecs;
 
   public static ParquetPartitionSpecExtractor getInstance() {
     return INSTANCE;
@@ -60,8 +60,7 @@ public class ParquetPartitionSpecExtractor implements PathBasedPartitionSpecExtr
   @Override
   public Map<String, String> getPathToPartitionFieldFormat() {
     Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
-    // ParquetSourceConfig partitionConfig =
-    // ParquetSourceConfig.fromPartitionFieldSpecConfig(partitionFieldSpecConfig);
+
     partitionFieldSpecs.forEach(
         partitionFieldSpec -> {
           if (partitionFieldSpec.getFormat() != null) {
