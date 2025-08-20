@@ -309,7 +309,7 @@ public class ParquetSchemaExtractor {
               .dataType(InternalType.RECORD)
               .fields(subFields)
               .isNullable(
-                  true) // isNullable should be set false: if all fields are required then it is
+                  isNullable(schema.asGroupType())) // isNullable should be set false: if all fields are required then it is
               // NOT nullable as opposed to Parquet nature to assign repeated for a
               // record as a collection of data
               .build();
