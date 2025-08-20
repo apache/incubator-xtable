@@ -259,6 +259,13 @@ public class ParquetSchemaExtractor {
                 schema.asGroupType().getType(0),
                 SchemaUtils.getFullyQualifiedPath(
                     parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME));
+					InternalField valueField =
+		InternalField.builder()
+			.name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+			.parentPath(parentPath)
+			.schema(valueSchema)
+			.fieldId(schemaId == null ? null : schemaId.intValue())
+			.build();
         return InternalSchema.builder()
             .name(schemaName)
             .dataType(InternalType.MAP)
@@ -302,7 +309,7 @@ public class ParquetSchemaExtractor {
               .dataType(InternalType.RECORD)
               .fields(subFields)
               .isNullable(
-                  false) // isNullable should be set false: if all fields are required then it is
+                  true) // isNullable should be set false: if all fields are required then it is
               // NOT nullable as opposed to Parquet nature to assign repeated for a
               // record as a collection of data
               .build();

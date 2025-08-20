@@ -60,8 +60,8 @@
         <project.version>0.2.0-SNAPSHOT</project.version>
         <!-- To ensure build content is re-producible -->
         <project.build.outputTimestamp>2025-01-01T00:00:00Z</project.build.outputTimestamp>
-        <maven.compiler.source>8</maven.compiler.source><!--should be 8 for CI-->
-        <maven.compiler.target>8</maven.compiler.target><!--should be 8 for CI-->
+        <maven.compiler.source>17</maven.compiler.source><!--should be 8 for CI-->
+        <maven.compiler.target>17</maven.compiler.target><!--should be 8 for CI-->
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version><!--should be commented for CI-->
         <avro.version>1.11.4</avro.version>
         <log4j.version>2.22.0</log4j.version>
