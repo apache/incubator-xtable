@@ -28,6 +28,7 @@ public class HudiPathUtils {
     int endIndex = pathStr.length() - fileName.length() - 1;
     return endIndex <= startIndex ? "" : pathStr.substring(startIndex, endIndex);
   }
+
   public static String getPartitionPathValue(Path tableBasePath, Path filePath) {
     return getPartitionPath(tableBasePath, filePath).split("=")[1];
   }

@@ -20,7 +20,6 @@ package org.apache.xtable.hudi;
 
 import static org.apache.xtable.hudi.HudiSchemaExtractor.convertFromXTablePath;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,7 +37,6 @@ import lombok.NonNull;
 import lombok.Value;
 
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.io.api.Binary;
 
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
@@ -249,28 +247,8 @@ public class BaseFileUpdatesExtractor {
                 HoodieColumnRangeMetadata.<Comparable>create(
                     fileName,
                     convertFromXTablePath(columnStat.getField().getPath()),
-                    fileFormat.equals("APACHE_PARQUET")
-                            && columnStat
-                                .getField()
-                                .getSchema()
-                                .getDataType()
-                                .getName()
-                                .equals("string")
-                        ? new String(
-                            ((Binary) columnStat.getRange().getMinValue()).getBytes(),
-                            StandardCharsets.UTF_8)
-                        : (Comparable) columnStat.getRange().getMinValue(),
-                    fileFormat.equals("APACHE_PARQUET")
-                            && columnStat
-                                .getField()
-                                .getSchema()
-                                .getDataType()
-                                .getName()
-                                .equals("string")
-                        ? new String(
-                            ((Binary) columnStat.getRange().getMaxValue()).getBytes(),
-                            StandardCharsets.UTF_8)
-                        : (Comparable) columnStat.getRange().getMaxValue(),
+                    (Comparable) columnStat.getRange().getMinValue(),
+                    (Comparable) columnStat.getRange().getMaxValue(),
                     columnStat.getNumNulls(),
                     columnStat.getNumValues(),
                     columnStat.getTotalSize(),

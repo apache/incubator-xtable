@@ -19,7 +19,6 @@
 package org.apache.xtable.iceberg;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -28,8 +27,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-
-import org.apache.parquet.io.api.Binary;
 
 import org.apache.iceberg.Metrics;
 import org.apache.iceberg.Schema;
@@ -72,28 +69,12 @@ public class IcebergColumnStatsConverter {
           nullValueCounts.put(fieldId, columnStats.getNumNulls());
           Type fieldType = icebergField.type();
           if (columnStats.getRange().getMinValue() != null) {
-            if (fieldType.toString().equals("string") && format.equals("APACHE_PARQUET")) {
-              Binary binaryMinStatsValue = (Binary) columnStats.getRange().getMinValue();
-              String stringMinStatsValue =
-                  new String(binaryMinStatsValue.getBytes(), StandardCharsets.UTF_8);
-              lowerBounds.put(fieldId, Conversions.toByteBuffer(fieldType, stringMinStatsValue));
-            } else {
-              lowerBounds.put(
-                  fieldId,
-                  Conversions.toByteBuffer(fieldType, columnStats.getRange().getMinValue()));
-            }
+            lowerBounds.put(
+                fieldId, Conversions.toByteBuffer(fieldType, columnStats.getRange().getMinValue()));
           }
           if (columnStats.getRange().getMaxValue() != null) {
-            if (fieldType.toString().equals("string") && format.equals("APACHE_PARQUET")) {
-              Binary binaryMaxStatsValue = (Binary) columnStats.getRange().getMaxValue();
-              String stringMaxStatsValue =
-                  new String(binaryMaxStatsValue.getBytes(), StandardCharsets.UTF_8);
-              lowerBounds.put(fieldId, Conversions.toByteBuffer(fieldType, stringMaxStatsValue));
-            } else {
-              upperBounds.put(
-                  fieldId,
-                  Conversions.toByteBuffer(fieldType, columnStats.getRange().getMaxValue()));
-            }
+            upperBounds.put(
+                fieldId, Conversions.toByteBuffer(fieldType, columnStats.getRange().getMaxValue()));
           }
         });
     return new Metrics(

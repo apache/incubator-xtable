@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.hudi;
 
 import java.math.BigDecimal;
@@ -75,15 +75,18 @@ public class PathBasedPartitionValuesExtractor {
     }
     return result;
   }
+
   private PartialResult parsePartitionPath(
-          InternalPartitionField field, String remainingPath, int totalNumberOfPartitions) {
+      InternalPartitionField field, String remainingPath, int totalNumberOfPartitions) {
     switch (field.getTransformType()) {
       case YEAR:
       case MONTH:
       case DAY:
       case HOUR:
         return parseDate(
-                remainingPath, pathToPartitionFieldFormat.get(field.getSourceField().getName()));//changed from getPath()
+            remainingPath,
+            pathToPartitionFieldFormat.get(
+                field.getSourceField().getName())); // changed from getPath()
       case VALUE:
         // if there is only one partition field, then assume full partition path is used even if
         // value contains slashes
@@ -91,10 +94,10 @@ public class PathBasedPartitionValuesExtractor {
         // to custom partitioning logic
         boolean isSlashDelimited = totalNumberOfPartitions > 1;
         return parseValue(
-                remainingPath, field.getSourceField().getSchema().getDataType(), isSlashDelimited);
+            remainingPath, field.getSourceField().getSchema().getDataType(), isSlashDelimited);
       default:
         throw new IllegalArgumentException(
-                "Unexpected partition type: " + field.getTransformType());
+            "Unexpected partition type: " + field.getTransformType());
     }
   }
 
@@ -105,11 +108,11 @@ public class PathBasedPartitionValuesExtractor {
       simpleDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
       long dateAsEpochMillis = simpleDateFormat.parse(dateString).toInstant().toEpochMilli();
       return new PartialResult(
-              dateAsEpochMillis,
-              remainingPath.substring(Math.min(remainingPath.length(), format.length() + 1)));
+          dateAsEpochMillis,
+          remainingPath.substring(Math.min(remainingPath.length(), format.length() + 1)));
     } catch (ParseException ex) {
       throw new PartitionValuesExtractorException(
-              "Unable to parse date from path: " + remainingPath, ex);
+          "Unable to parse date from path: " + remainingPath, ex);
     }
   }
 

@@ -19,6 +19,7 @@
 package org.apache.xtable.parquet;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,7 +35,9 @@ import org.apache.hadoop.fs.*;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.PrimitiveType;
 
 import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.schema.InternalField;
@@ -116,8 +119,30 @@ public class ParquetStatsExtractor {
                                 .totalSize(columnMetaData.getTotalSize())
                                 .range(
                                     Range.vector(
-                                        columnMetaData.getStatistics().genericGetMin(),
-                                        columnMetaData.getStatistics().genericGetMax()))
+                                        columnMetaData.getPrimitiveType().getPrimitiveTypeName()
+                                                == PrimitiveType.PrimitiveTypeName.BINARY
+                                            ? new String(
+                                                ((Binary)
+                                                        columnMetaData
+                                                            .getStatistics()
+                                                            .genericGetMin())
+                                                    .getBytes(),
+                                                StandardCharsets.UTF_8)
+                                            : columnMetaData
+                                                .getStatistics()
+                                                .genericGetMin(), // if stats are string convert to
+                                        // litteraly a string stat and
+                                        // store to range
+                                        columnMetaData.getPrimitiveType().getPrimitiveTypeName()
+                                                == PrimitiveType.PrimitiveTypeName.BINARY
+                                            ? new String(
+                                                ((Binary)
+                                                        columnMetaData
+                                                            .getStatistics()
+                                                            .genericGetMax())
+                                                    .getBytes(),
+                                                StandardCharsets.UTF_8)
+                                            : columnMetaData.getStatistics().genericGetMax()))
                                 .build(),
                         Collectors.toList())));
     return columnDescStats;
