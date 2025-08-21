@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.parquet;
 
 import java.io.IOException;
@@ -120,33 +120,53 @@ public class ParquetStatsExtractor {
                                 .range(
                                     Range.vector(
                                         columnMetaData.getPrimitiveType().getPrimitiveTypeName()
-                                                == PrimitiveType.PrimitiveTypeName.BINARY // TODO how about DECIMAL, JSON, BSON and ENUM logicalTypes?
-                                            ? columnMetaData.getPrimitiveType().getLogicalTypeAnnotation()!= null ? columnMetaData.getPrimitiveType().getLogicalTypeAnnotation().toString().equals("STRING") ? new String(
-                                                ((Binary)
-                                                        columnMetaData
-                                                            .getStatistics()
-                                                            .genericGetMin())
-                                                    .getBytes(),
-                                                StandardCharsets.UTF_8)
+                                                == PrimitiveType.PrimitiveTypeName
+                                                    .BINARY // TODO how about DECIMAL, JSON, BSON
+                                            // and ENUM logicalTypes?
+                                            ? columnMetaData
+                                                        .getPrimitiveType()
+                                                        .getLogicalTypeAnnotation()
+                                                    != null
+                                                ? columnMetaData
+                                                        .getPrimitiveType()
+                                                        .getLogicalTypeAnnotation()
+                                                        .toString()
+                                                        .equals("STRING")
+                                                    ? new String(
+                                                        ((Binary)
+                                                                columnMetaData
+                                                                    .getStatistics()
+                                                                    .genericGetMin())
+                                                            .getBytes(),
+                                                        StandardCharsets.UTF_8)
+                                                    : columnMetaData.getStatistics().genericGetMin()
+                                                : columnMetaData.getStatistics().genericGetMin()
                                             : columnMetaData
-                                                .getStatistics()
-                                                .genericGetMin():columnMetaData
-                                                .getStatistics()
-                                                .genericGetMin():columnMetaData
                                                 .getStatistics()
                                                 .genericGetMin(), // if stats are string convert to
                                         // litteraly a string stat and
                                         // store to range
                                         columnMetaData.getPrimitiveType().getPrimitiveTypeName()
-                                                == PrimitiveType.PrimitiveTypeName.BINARY ? columnMetaData.getPrimitiveType().getLogicalTypeAnnotation()!= null ? columnMetaData.getPrimitiveType().getLogicalTypeAnnotation().toString().equals("STRING")
-                                                ? new String(
-                                                ((Binary)
-                                                        columnMetaData
-                                                            .getStatistics()
-                                                            .genericGetMax())
-                                                    .getBytes(),
-                                                StandardCharsets.UTF_8)
-                                            : columnMetaData.getStatistics().genericGetMax(): columnMetaData.getStatistics().genericGetMax(): columnMetaData.getStatistics().genericGetMax()))
+                                                == PrimitiveType.PrimitiveTypeName.BINARY
+                                            ? columnMetaData
+                                                        .getPrimitiveType()
+                                                        .getLogicalTypeAnnotation()
+                                                    != null
+                                                ? columnMetaData
+                                                        .getPrimitiveType()
+                                                        .getLogicalTypeAnnotation()
+                                                        .toString()
+                                                        .equals("STRING")
+                                                    ? new String(
+                                                        ((Binary)
+                                                                columnMetaData
+                                                                    .getStatistics()
+                                                                    .genericGetMax())
+                                                            .getBytes(),
+                                                        StandardCharsets.UTF_8)
+                                                    : columnMetaData.getStatistics().genericGetMax()
+                                                : columnMetaData.getStatistics().genericGetMax()
+                                            : columnMetaData.getStatistics().genericGetMax()))
                                 .build(),
                         Collectors.toList())));
     return columnDescStats;

@@ -93,6 +93,8 @@ public class TestParquetConversionSource {
     sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
     sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
+    sparkConf.set("spark.sql.parquet.int96TimestampConversion", "true");
+
     String javaOpts =
         "--add-opens=java.base/java.nio=ALL-UNNAMED "
             + "--add-opens=java.base/java.lang=ALL-UNNAMED "
@@ -123,7 +125,10 @@ public class TestParquetConversionSource {
               DataTypes.createStructField("name", DataTypes.StringType, false),
               DataTypes.createStructField("age", DataTypes.IntegerType, false),
               DataTypes.createStructField(
-                  "timestamp", DataTypes.TimestampType, false, new MetadataBuilder().build())
+                  "timestamp",
+                  DataTypes.TimestampType,
+                  false,
+                  new MetadataBuilder().putString("precision", "millis").build())
             });
 
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
@@ -354,7 +359,7 @@ public class TestParquetConversionSource {
                         finalTargetOptions = new HashMap<>(finalTargetOptions);
                         finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
                         finalTargetOptions.put(
-                            "hoodie.datasource.read.extract.partition.values.from.path", "false");
+                            "hoodie.datasource.read.extract.partition.values.from.path", "true");
                       }
                       return sparkSession
                           .read()
@@ -373,7 +378,7 @@ public class TestParquetConversionSource {
     for (Map.Entry<String, Dataset<Row>> entry : entrySet) {
 
       String format = entry.getKey();
-      //if (format.equals("HUDI")) continue;
+
       Dataset<Row> targetRows = entry.getValue();
       targetRows.show();
 
@@ -391,13 +396,27 @@ public class TestParquetConversionSource {
       } else {
         assertFalse(dataset1Rows.isEmpty());
       }
-
-      assertEquals(
-          dataset1Rows,
-          dataset2Rows,
-          String.format(
-              "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
-              sourceFormat, format));
+      if (!format.equals("HUDI")) {
+        assertEquals(
+            dataset1Rows,
+            dataset2Rows,
+            String.format(
+                "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
+                sourceFormat, format));
+      } else {
+        assertEquals(
+            sourceRows
+                .selectExpr(selectColumnsArr)
+                .withColumn(
+                    "timestamp",
+                    functions.year(functions.col("timestamp")).cast(DataTypes.StringType))
+                .toJSON()
+                .collectAsList(),
+            dataset2Rows,
+            String.format(
+                "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
+                sourceFormat, format));
+      }
     }
   }
 
