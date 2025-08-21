@@ -193,7 +193,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     InternalTable table = getMostRecentTable(getParquetFiles(hadoopConf, basePath));
     return InternalSnapshot.builder()
         .table(table)
-        .sourceIdentifier(getCommitIdentifier(1L)) // TODO check for version number instead
+        .sourceIdentifier(getCommitIdentifier(getMostRecentParquetFile(getParquetFiles(hadoopConf, basePath)).getModificationTime())) // TODO check for version number instead
         .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
         .build();
   }
