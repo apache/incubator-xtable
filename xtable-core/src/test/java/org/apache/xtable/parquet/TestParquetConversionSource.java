@@ -373,7 +373,7 @@ public class TestParquetConversionSource {
     for (Map.Entry<String, Dataset<Row>> entry : entrySet) {
 
       String format = entry.getKey();
-      if (format.equals("HUDI")) continue;
+      //if (format.equals("HUDI")) continue;
       Dataset<Row> targetRows = entry.getValue();
       targetRows.show();
 
