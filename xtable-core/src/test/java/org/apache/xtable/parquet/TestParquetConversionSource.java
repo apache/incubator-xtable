@@ -94,6 +94,9 @@ public class TestParquetConversionSource {
     sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
     sparkConf.set("spark.sql.parquet.int96TimestampConversion", "true");
+	sparkConf.set("spark.sql.catalog.default_iceberg", "org.apache.iceberg.spark.SparkCatalog");
+	sparkConf.set("spark.sql.catalog.default_iceberg.type", "hadoop");
+	sparkConf.set("spark.sql.catalog.default_iceberg.warehouse", "/tmp/warehouse");
 
     String javaOpts =
         "--add-opens=java.base/java.nio=ALL-UNNAMED "
@@ -378,7 +381,7 @@ public class TestParquetConversionSource {
     for (Map.Entry<String, Dataset<Row>> entry : entrySet) {
 
       String format = entry.getKey();
-
+      
       Dataset<Row> targetRows = entry.getValue();
       targetRows.show();
 
