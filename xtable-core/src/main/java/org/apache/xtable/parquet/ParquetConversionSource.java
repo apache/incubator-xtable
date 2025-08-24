@@ -181,7 +181,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   }
 
   /**
-   * Here to get current snapshot listing all files hence the -1 is being passed
+   * get current snapshot
    *
    * @return
    */
@@ -193,7 +193,10 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     InternalTable table = getMostRecentTable(getParquetFiles(hadoopConf, basePath));
     return InternalSnapshot.builder()
         .table(table)
-        .sourceIdentifier(getCommitIdentifier(getMostRecentParquetFile(getParquetFiles(hadoopConf, basePath)).getModificationTime())) // TODO check for version number instead
+        .sourceIdentifier(
+            getCommitIdentifier(
+                getMostRecentParquetFile(getParquetFiles(hadoopConf, basePath))
+                    .getModificationTime())) // TODO check for version number instead
         .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
         .build();
   }

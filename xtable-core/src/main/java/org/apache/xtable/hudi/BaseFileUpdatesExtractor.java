@@ -230,14 +230,13 @@ public class BaseFileUpdatesExtractor {
     writeStat.setNumWrites(file.getRecordCount());
     writeStat.setTotalWriteBytes(file.getFileSizeBytes());
     writeStat.setFileSizeInBytes(file.getFileSizeBytes());
-    writeStat.putRecordsStats(
-        convertColStats(fileName, file.getColumnStats(), file.getFileFormat().toString()));
+    writeStat.putRecordsStats(convertColStats(fileName, file.getColumnStats()));
     writeStatus.setStat(writeStat);
     return writeStatus;
   }
 
   private Map<String, HoodieColumnRangeMetadata<Comparable>> convertColStats(
-      String fileName, List<ColumnStat> columnStatMap, String fileFormat) {
+      String fileName, List<ColumnStat> columnStatMap) {
     return columnStatMap.stream()
         .filter(
             entry ->
