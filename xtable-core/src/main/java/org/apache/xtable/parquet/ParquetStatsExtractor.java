@@ -119,54 +119,10 @@ public class ParquetStatsExtractor {
                                 .totalSize(columnMetaData.getTotalSize())
                                 .range(
                                     Range.vector(
-                                        columnMetaData.getPrimitiveType().getPrimitiveTypeName()
-                                                == PrimitiveType.PrimitiveTypeName
-                                                    .BINARY // TODO how about DECIMAL, JSON, BSON
-                                            // and ENUM logicalTypes?
-                                            ? columnMetaData
-                                                        .getPrimitiveType()
-                                                        .getLogicalTypeAnnotation()
-                                                    != null
-                                                ? columnMetaData
-                                                        .getPrimitiveType()
-                                                        .getLogicalTypeAnnotation()
-                                                        .toString()
-                                                        .equals("STRING")
-                                                    ? new String(
-                                                        ((Binary)
-                                                                columnMetaData
-                                                                    .getStatistics()
-                                                                    .genericGetMin())
-                                                            .getBytes(),
-                                                        StandardCharsets.UTF_8)
-                                                    : columnMetaData.getStatistics().genericGetMin()
-                                                : columnMetaData.getStatistics().genericGetMin()
-                                            : columnMetaData
-                                                .getStatistics()
-                                                .genericGetMin(), // if stats are string convert to
+                                            ParquetStatsConverterUtil.convertStatBinaryTypeToLogicalType(columnMetaData,true), // if stats are string convert to
                                         // litteraly a string stat and
                                         // store to range
-                                        columnMetaData.getPrimitiveType().getPrimitiveTypeName()
-                                                == PrimitiveType.PrimitiveTypeName.BINARY
-                                            ? columnMetaData
-                                                        .getPrimitiveType()
-                                                        .getLogicalTypeAnnotation()
-                                                    != null
-                                                ? columnMetaData
-                                                        .getPrimitiveType()
-                                                        .getLogicalTypeAnnotation()
-                                                        .toString()
-                                                        .equals("STRING")
-                                                    ? new String(
-                                                        ((Binary)
-                                                                columnMetaData
-                                                                    .getStatistics()
-                                                                    .genericGetMax())
-                                                            .getBytes(),
-                                                        StandardCharsets.UTF_8)
-                                                    : columnMetaData.getStatistics().genericGetMax()
-                                                : columnMetaData.getStatistics().genericGetMax()
-                                            : columnMetaData.getStatistics().genericGetMax()))
+                                            ParquetStatsConverterUtil.convertStatBinaryTypeToLogicalType(columnMetaData,false)))
                                 .build(),
                         Collectors.toList())));
     return columnDescStats;
