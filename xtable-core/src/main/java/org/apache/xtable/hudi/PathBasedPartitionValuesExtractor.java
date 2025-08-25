@@ -38,7 +38,7 @@ import org.apache.xtable.model.stat.Range;
 @AllArgsConstructor
 public class PathBasedPartitionValuesExtractor {
   private static final String HIVE_DEFAULT_PARTITION = "__HIVE_DEFAULT_PARTITION__";
-  @NonNull private final Map<String, String> pathToPartitionFieldFormat;
+  @NonNull protected final Map<String, String> pathToPartitionFieldFormat;
 
   public List<PartitionValue> extractPartitionValues(
       List<InternalPartitionField> partitionColumns, String partitionPath) {
@@ -54,18 +54,9 @@ public class PathBasedPartitionValuesExtractor {
         // Strip off hive style partitioning
         remainingPartitionPath = remainingPartitionPath.substring(sourceFieldName.length() + 1);
       }
-      // handle hive default partition case
-      PartialResult valueAndRemainingPath;
-      if (remainingPartitionPath.startsWith(HIVE_DEFAULT_PARTITION)) {
-        String remaining =
-            remainingPartitionPath.length() > HIVE_DEFAULT_PARTITION.length()
-                ? remainingPartitionPath.substring(HIVE_DEFAULT_PARTITION.length() + 1)
-                : "";
-        valueAndRemainingPath = new PartialResult(null, remaining);
-      } else {
-        valueAndRemainingPath =
+      PartialResult valueAndRemainingPath =
             parsePartitionPath(partitionField, remainingPartitionPath, totalNumberOfPartitions);
-      }
+
       result.add(
           PartitionValue.builder()
               .partitionField(partitionField)
@@ -101,7 +92,7 @@ public class PathBasedPartitionValuesExtractor {
     }
   }
 
-  private static PartialResult parseDate(String remainingPath, String format) {
+  protected static PartialResult parseDate(String remainingPath, String format) {
     try {
       String dateString = remainingPath.substring(0, format.length());
       SimpleDateFormat simpleDateFormat = new SimpleDateFormat(format);
@@ -116,7 +107,7 @@ public class PathBasedPartitionValuesExtractor {
     }
   }
 
-  private static PartialResult parseValue(
+  protected static PartialResult parseValue(
       String remainingPath, InternalType sourceFieldType, boolean isSlashDelimited) {
     if (remainingPath.isEmpty()) {
       throw new PartitionValuesExtractorException("Missing partition value");
@@ -171,7 +162,7 @@ public class PathBasedPartitionValuesExtractor {
   }
 
   @Value
-  private static class PartialResult {
+  protected static class PartialResult {
     Object value;
     String remainingPath;
   }

@@ -112,7 +112,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                                 parquetMetadataExtractor.readParquetMetadata(
                                     hadoopConf, file.getPath()),
                                 file.getPath().toString())),
-                        HudiPathUtils.getPartitionPathValue(
+                        HudiPathUtils.getPartitionPath(
                             new Path(basePath), new Path(file.getPath().toString()))))
                 .lastModified(file.getModificationTime())
                 .columnStats(
@@ -142,7 +142,6 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   @Override
   public CommitsBacklog<Long> getCommitsBacklog(InstantsForIncrementalSync syncInstants) {
-    // based on either table formats?
     List<Long> commitsToProcess =
         Collections.singletonList(syncInstants.getLastSyncInstant().toEpochMilli());
     return CommitsBacklog.<Long>builder().commitsToProcess(commitsToProcess).build();
@@ -196,7 +195,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         .sourceIdentifier(
             getCommitIdentifier(
                 getMostRecentParquetFile(getParquetFiles(hadoopConf, basePath))
-                    .getModificationTime())) // TODO check for version number instead
+                    .getModificationTime()))
         .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
         .build();
   }
@@ -235,7 +234,6 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     Stream<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
     LocatedFileStatus parquetFile = getMostRecentParquetFile(parquetFiles);
     Path parquetFilePath = parquetFile.getPath();
-    // check if its predecessor in terms of modification time is within instant (as done in Hudi)
     while (parquetFile.isFile() && parquetFile.getModificationTime() > modficationTime) {
       // check the preceeding parquetFile
       parquetFiles.filter(file -> !file.getPath().equals(parquetFilePath));
