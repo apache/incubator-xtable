@@ -51,7 +51,7 @@ public class IcebergColumnStatsConverter {
   }
 
   public Metrics toIceberg(
-      Schema schema, long totalRowCount, List<ColumnStat> fieldColumnStats, String format) {
+      Schema schema, long totalRowCount, List<ColumnStat> fieldColumnStats) {
     Map<Integer, Long> columnSizes = new HashMap<>();
     Map<Integer, Long> valueCounts = new HashMap<>();
     Map<Integer, Long> nullValueCounts = new HashMap<>();

@@ -215,7 +215,7 @@ public class TestIcebergColumnStatsConverter {
 
     Metrics actual =
         IcebergColumnStatsConverter.getInstance()
-            .toIceberg(icebergSchema, totalRowCount, columnStats, "");
+            .toIceberg(icebergSchema, totalRowCount, columnStats);
     // Metrics does not implement equals, so we need to manually compare fields
     assertEquals(expected.columnSizes(), actual.columnSizes());
     assertEquals(expected.nanValueCounts(), actual.nanValueCounts());
@@ -264,7 +264,7 @@ public class TestIcebergColumnStatsConverter {
 
     Metrics actual =
         IcebergColumnStatsConverter.getInstance()
-            .toIceberg(icebergSchema, totalRowCount, columnStats, "");
+            .toIceberg(icebergSchema, totalRowCount, columnStats);
     // Metrics does not implement equals, so we need to manually compare fields
     assertEquals(expected.columnSizes(), actual.columnSizes());
     assertEquals(expected.nanValueCounts(), actual.nanValueCounts());
