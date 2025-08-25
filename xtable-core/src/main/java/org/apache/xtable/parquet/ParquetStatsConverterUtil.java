@@ -30,7 +30,7 @@ public class ParquetStatsConverterUtil {
     Object returnedObj = null;
     PrimitiveType primitiveType = columnMetaData.getPrimitiveType();
     switch (primitiveType.getPrimitiveTypeName()) {
-      case BINARY:
+      case BINARY:// TODO check if other primitiveType' needs to be handled as well
         if (primitiveType.getLogicalTypeAnnotation() != null) {
           if (columnMetaData
               .getPrimitiveType()
@@ -57,6 +57,11 @@ public class ParquetStatsConverterUtil {
                   : columnMetaData.getStatistics().genericGetMax();
         }
         break;
+      default:
+        returnedObj =
+                isMin
+                        ? columnMetaData.getStatistics().genericGetMin()
+                        : columnMetaData.getStatistics().genericGetMax();
         // TODO JSON and DECIMAL... of BINARY primitiveType
     }
     return returnedObj;
