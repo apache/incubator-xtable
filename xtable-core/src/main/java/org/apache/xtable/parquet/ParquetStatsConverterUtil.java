@@ -15,41 +15,50 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.parquet;
+
+import java.nio.charset.StandardCharsets;
 
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.schema.PrimitiveType;
 
-
-import java.nio.charset.StandardCharsets;
-
 public class ParquetStatsConverterUtil {
-    public static Object convertStatBinaryTypeToLogicalType(ColumnChunkMetaData columnMetaData, boolean isMin) {
-        Object returnedObj = null;
-        PrimitiveType primitiveType = columnMetaData.getPrimitiveType();
-        switch (primitiveType.getPrimitiveTypeName()) {
-            case BINARY:
-                if (primitiveType
-                        .getLogicalTypeAnnotation()
-                        != null) {
-                    if (columnMetaData
-                            .getPrimitiveType()
-                            .getLogicalTypeAnnotation()
-                            .toString()
-                            .equals("STRING")) {
-                        returnedObj= new String(
-                                (isMin ?
-                                        (Binary) columnMetaData.getStatistics().genericGetMin() :
-                                        (Binary) columnMetaData.getStatistics().genericGetMax())
-                                        .getBytes(),
-                                StandardCharsets.UTF_8);
-                    }
-                }
-                break;
-            //TODO JSON and DECIMAL... of BINARY primitiveType
+  public static Object convertStatBinaryTypeToLogicalType(
+      ColumnChunkMetaData columnMetaData, boolean isMin) {
+    Object returnedObj = null;
+    PrimitiveType primitiveType = columnMetaData.getPrimitiveType();
+    switch (primitiveType.getPrimitiveTypeName()) {
+      case BINARY:
+        if (primitiveType.getLogicalTypeAnnotation() != null) {
+          if (columnMetaData
+              .getPrimitiveType()
+              .getLogicalTypeAnnotation()
+              .toString()
+              .equals("STRING")) {
+            returnedObj =
+                new String(
+                    (isMin
+                            ? (Binary) columnMetaData.getStatistics().genericGetMin()
+                            : (Binary) columnMetaData.getStatistics().genericGetMax())
+                        .getBytes(),
+                    StandardCharsets.UTF_8);
+          } else {
+            returnedObj =
+                isMin
+                    ? columnMetaData.getStatistics().genericGetMin()
+                    : columnMetaData.getStatistics().genericGetMax();
+          }
+        } else {
+          returnedObj =
+              isMin
+                  ? columnMetaData.getStatistics().genericGetMin()
+                  : columnMetaData.getStatistics().genericGetMax();
         }
-        return returnedObj;
+        break;
+        // TODO JSON and DECIMAL... of BINARY primitiveType
     }
+    return returnedObj;
+  }
 }
