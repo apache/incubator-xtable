@@ -308,7 +308,7 @@ public class ParquetSchemaExtractor {
               .dataType(InternalType.RECORD)
               .fields(subFields)
               .isNullable(
-                      false) // false isNullable(schema.asGroupType()) (TODO causing
+                      isNullable(schema.asGroupType())) // false isNullable(schema.asGroupType()) (TODO causing
               // metadata error in
               // Hudi) isNullable
               // should be set false: if all fields are required then
