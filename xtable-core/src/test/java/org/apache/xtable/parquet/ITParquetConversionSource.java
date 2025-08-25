@@ -75,7 +75,7 @@ import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.model.sync.SyncMode;
 
-public class TestParquetConversionSource {
+public class ITParquetConversionSource {
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
