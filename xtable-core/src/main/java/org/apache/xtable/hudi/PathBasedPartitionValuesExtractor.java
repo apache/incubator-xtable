@@ -54,9 +54,18 @@ public class PathBasedPartitionValuesExtractor {
         // Strip off hive style partitioning
         remainingPartitionPath = remainingPartitionPath.substring(sourceFieldName.length() + 1);
       }
-      PartialResult valueAndRemainingPath =
-            parsePartitionPath(partitionField, remainingPartitionPath, totalNumberOfPartitions);
-
+      // handle hive default partition case
+      PartialResult valueAndRemainingPath;
+      if (remainingPartitionPath.startsWith(HIVE_DEFAULT_PARTITION)) {
+        String remaining =
+                remainingPartitionPath.length() > HIVE_DEFAULT_PARTITION.length()
+                        ? remainingPartitionPath.substring(HIVE_DEFAULT_PARTITION.length() + 1)
+                        : "";
+        valueAndRemainingPath = new PartialResult(null, remaining);
+      } else {
+        valueAndRemainingPath =
+                parsePartitionPath(partitionField, remainingPartitionPath, totalNumberOfPartitions);
+      }
       result.add(
           PartitionValue.builder()
               .partitionField(partitionField)
