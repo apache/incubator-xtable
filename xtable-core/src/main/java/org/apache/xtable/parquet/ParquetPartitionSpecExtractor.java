@@ -19,13 +19,14 @@
 package org.apache.xtable.parquet;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import lombok.AllArgsConstructor;
 
 import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.schema.*;
 import org.apache.xtable.schema.SchemaFieldFinder;
-import java.util.stream.Collectors;
+
 /**
  * Parses the InternalPartitionFields from a configured list of specs with the format
  * path:type:format for date types or path:type for value types.
@@ -51,17 +52,17 @@ public class ParquetPartitionSpecExtractor implements PathBasedPartitionSpecExtr
       partitionFields.add(
           InternalPartitionField.builder()
               .sourceField(sourceField)
-                  .partitionFieldNames(getListPartitionNamesFromFormatInput(fieldSpec.getFormat()))
+              .partitionFieldNames(getListPartitionNamesFromFormatInput(fieldSpec.getFormat()))
               .transformType(fieldSpec.getTransformType())
               .build());
     }
     return partitionFields;
   }
 
-  public List<String> getListPartitionNamesFromFormatInput(String inputFormat){
+  public List<String> getListPartitionNamesFromFormatInput(String inputFormat) {
     return Arrays.stream(inputFormat.split("/"))
-            .map(s -> s.split("=")[0])
-            .collect(Collectors.toList());
+        .map(s -> s.split("=")[0])
+        .collect(Collectors.toList());
   }
 
   @Override

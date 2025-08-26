@@ -29,7 +29,7 @@ public class HudiPathUtils {
     return endIndex <= startIndex ? "" : pathStr.substring(startIndex, endIndex);
   }
 
- /* public static String getPartitionPathValue(Path tableBasePath, Path filePath) {
+  /* public static String getPartitionPathValue(Path tableBasePath, Path filePath) {
     return getPartitionPath(tableBasePath, filePath).split("=")[1];
   }*/
 }

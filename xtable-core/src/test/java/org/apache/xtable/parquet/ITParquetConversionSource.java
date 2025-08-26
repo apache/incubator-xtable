@@ -170,7 +170,8 @@ public class ITParquetConversionSource {
             buildArgsForPartition(
                 PARQUET,
                 Arrays.asList(ICEBERG, DELTA, HUDI),
-                "timestamp:YEAR:year=YYYY",//ts:DAY:year=YYYY/month=MM/day=DD  "year=YYYY/month=MM/day=DD"
+                "timestamp:YEAR:year=YYYY", // ts:DAY:year=YYYY/month=MM/day=DD
+                // "year=YYYY/month=MM/day=DD"
                 "timestamp:YEAR:year=YYYY",
                 levelFilter)));
   }

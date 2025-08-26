@@ -58,13 +58,13 @@ public class PathBasedPartitionValuesExtractor {
       PartialResult valueAndRemainingPath;
       if (remainingPartitionPath.startsWith(HIVE_DEFAULT_PARTITION)) {
         String remaining =
-                remainingPartitionPath.length() > HIVE_DEFAULT_PARTITION.length()
-                        ? remainingPartitionPath.substring(HIVE_DEFAULT_PARTITION.length() + 1)
-                        : "";
+            remainingPartitionPath.length() > HIVE_DEFAULT_PARTITION.length()
+                ? remainingPartitionPath.substring(HIVE_DEFAULT_PARTITION.length() + 1)
+                : "";
         valueAndRemainingPath = new PartialResult(null, remaining);
       } else {
         valueAndRemainingPath =
-                parsePartitionPath(partitionField, remainingPartitionPath, totalNumberOfPartitions);
+            parsePartitionPath(partitionField, remainingPartitionPath, totalNumberOfPartitions);
       }
       result.add(
           PartitionValue.builder()
