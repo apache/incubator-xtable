@@ -77,7 +77,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   private final DeltaKernelTableExtractor tableExtractor =
       DeltaKernelTableExtractor.builder().build();
 
-  private Optional<DeltaIncrementalChangesState> deltaIncrementalChangesState = Optional.empty();
+  private Optional<DeltaKernelIncrementalChangesState> deltaKernelIncrementalChangesState = Optional.empty();
 
   @Override
   public InternalTable getTable(Long version) {
@@ -187,7 +187,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
     long versionNumberAtLastSyncInstant = snapshot.getVersion();
     System.out.println("versionNumberAtLastSyncInstant: " + versionNumberAtLastSyncInstant);
-    //    resetState(versionNumberAtLastSyncInstant + 1);
+//    resetState(0, engine,table);
     return CommitsBacklog.<Long>builder()
         .commitsToProcess(getChangesState().getVersionsInSortedOrder())
         .build();
@@ -211,14 +211,16 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
     return String.valueOf(commit);
   }
 
-  //  private void resetState(long versionToStartFrom) {
-  //    deltaIncrementalChangesState =
-  //            Optional.of(
-  //                    DeltaIncrementalChangesState.builder()
-  //                            .deltaLog(deltaLog)
-  //                            .versionToStartFrom(versionToStartFrom)
-  //                            .build());
-  //  }
+    private void resetState(long versionToStartFrom, Engine engine, Table table) {
+      deltaKernelIncrementalChangesState =
+              Optional.of(
+                      DeltaKernelIncrementalChangesState.builder()
+                              .engine(engine)
+                              .table(table)
+                              .versionToStartFrom(versionToStartFrom)
+                              .endVersion(table.getLatestSnapshot(engine).getVersion())
+                              .build());
+    }
 
   private List<PartitionFileGroup> getInternalDataFiles(
       io.delta.kernel.Snapshot snapshot, Table table, Engine engine, InternalSchema schema) {
@@ -236,8 +238,8 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   @Override
   public void close() throws IOException {}
 
-  private DeltaIncrementalChangesState getChangesState() {
-    return deltaIncrementalChangesState.orElseThrow(
+  private DeltaKernelIncrementalChangesState getChangesState() {
+    return deltaKernelIncrementalChangesState.orElseThrow(
         () -> new IllegalStateException("DeltaIncrementalChangesState is not initialized"));
   }
 }
