@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.delta;
+package org.apache.xtable.kernel;
 
 import java.io.IOException;
 import java.util.*;
@@ -42,6 +42,7 @@ import com.google.common.annotations.VisibleForTesting;
 import io.delta.kernel.internal.actions.AddFile;
 
 import org.apache.xtable.collectors.CustomCollectors;
+import org.apache.xtable.delta.DeltaValueConverter;
 import org.apache.xtable.model.exception.ParseException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;

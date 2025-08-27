@@ -16,13 +16,14 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.delta;
+package org.apache.xtable.kernel;
 
 import java.util.*;
 
 import io.delta.kernel.types.*;
 
 import org.apache.xtable.collectors.CustomCollectors;
+import org.apache.xtable.delta.DeltaPartitionExtractor;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
@@ -36,6 +37,7 @@ public class DeltaKernelSchemaExtractor {
       DEFAULT_TIMESTAMP_PRECISION_METADATA =
           Collections.singletonMap(
               InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
+  static final String DELTA_GENERATION_EXPRESSION = "delta.generationExpression";
 
   public static DeltaKernelSchemaExtractor getInstance() {
     return INSTANCE;

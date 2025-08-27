@@ -44,7 +44,6 @@ import io.delta.kernel.types.StructType;
 import io.delta.kernel.utils.CloseableIterator;
 import io.delta.kernel.utils.FileStatus;
 
-import org.apache.xtable.delta.*;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.*;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -77,7 +76,8 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   private final DeltaKernelTableExtractor tableExtractor =
       DeltaKernelTableExtractor.builder().build();
 
-  private Optional<DeltaKernelIncrementalChangesState> deltaKernelIncrementalChangesState = Optional.empty();
+  private Optional<DeltaKernelIncrementalChangesState> deltaKernelIncrementalChangesState =
+      Optional.empty();
 
   @Override
   public InternalTable getTable(Long version) {
@@ -187,7 +187,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
     long versionNumberAtLastSyncInstant = snapshot.getVersion();
     System.out.println("versionNumberAtLastSyncInstant: " + versionNumberAtLastSyncInstant);
-//    resetState(0, engine,table);
+    //    resetState(0, engine,table);
     return CommitsBacklog.<Long>builder()
         .commitsToProcess(getChangesState().getVersionsInSortedOrder())
         .build();
@@ -211,16 +211,16 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
     return String.valueOf(commit);
   }
 
-    private void resetState(long versionToStartFrom, Engine engine, Table table) {
-      deltaKernelIncrementalChangesState =
-              Optional.of(
-                      DeltaKernelIncrementalChangesState.builder()
-                              .engine(engine)
-                              .table(table)
-                              .versionToStartFrom(versionToStartFrom)
-                              .endVersion(table.getLatestSnapshot(engine).getVersion())
-                              .build());
-    }
+  private void resetState(long versionToStartFrom, Engine engine, Table table) {
+    deltaKernelIncrementalChangesState =
+        Optional.of(
+            DeltaKernelIncrementalChangesState.builder()
+                .engine(engine)
+                .table(table)
+                .versionToStartFrom(versionToStartFrom)
+                .endVersion(table.getLatestSnapshot(engine).getVersion())
+                .build());
+  }
 
   private List<PartitionFileGroup> getInternalDataFiles(
       io.delta.kernel.Snapshot snapshot, Table table, Engine engine, InternalSchema schema) {

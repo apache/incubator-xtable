@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.delta;
+package org.apache.xtable.kernel;
 
 import java.time.Instant;
 import java.util.List;

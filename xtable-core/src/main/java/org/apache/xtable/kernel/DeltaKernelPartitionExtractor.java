@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.delta;
+package org.apache.xtable.kernel;
 
 import static org.apache.xtable.collectors.CustomCollectors.toList;
 import static org.apache.xtable.delta.DeltaValueConverter.convertFromDeltaPartitionValue;
@@ -49,6 +49,7 @@ import com.google.common.collect.PeekingIterator;
 import io.delta.kernel.types.*;
 import io.delta.kernel.types.FieldMetadata;
 
+import org.apache.xtable.delta.ScalaUtils;
 import org.apache.xtable.exception.PartitionSpecException;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;

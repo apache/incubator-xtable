@@ -31,8 +31,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Stream;
 import java.util.Map;
+import java.util.stream.Stream;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.Row;
@@ -43,13 +44,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import io.delta.kernel.*;
-
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestSparkDeltaTable;
 import org.apache.xtable.ValidationTestHelper;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.kernel.DeltaKernelConversionSource;
+import org.apache.xtable.kernel.DeltaKernelConversionSourceProvider;
 import org.apache.xtable.model.*;
 import org.apache.xtable.model.schema.*;
 import org.apache.xtable.model.stat.ColumnStat;
@@ -381,8 +381,8 @@ public class ITDeltaKernelConversionSource {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-//        CommitsBacklog<Long> commitsBacklog =
-//                conversionSource.getCommitsBacklog(instantsForIncrementalSync);
+    //        CommitsBacklog<Long> commitsBacklog =
+    //                conversionSource.getCommitsBacklog(instantsForIncrementalSync);
     //    for (Long version : commitsBacklog.getCommitsToProcess()) {
     //      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
     //      allTableChanges.add(tableChange);
@@ -391,23 +391,23 @@ public class ITDeltaKernelConversionSource {
   }
 
   @Test
-  public void testsShowingVacuumHasNoEffectOnIncrementalSync()  {
+  public void testsShowingVacuumHasNoEffectOnIncrementalSync() {
     boolean isPartitioned = true;
     String tableName = GenericTable.getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
-            new TestSparkDeltaTable(
-                    tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
+        new TestSparkDeltaTable(
+            tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
     // Insert 50 rows to 2018 partition.
     List<Row> commit1Rows = testSparkDeltaTable.insertRowsForPartition(50, 2018);
     Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
     SourceTable tableConfig =
-            SourceTable.builder()
-                    .name(testSparkDeltaTable.getTableName())
-                    .basePath(testSparkDeltaTable.getBasePath())
-                    .formatName(TableFormat.DELTA)
-                    .build();
+        SourceTable.builder()
+            .name(testSparkDeltaTable.getTableName())
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
+            .build();
     DeltaKernelConversionSource conversionSource =
-            conversionSourceProvider.getConversionSourceInstance(tableConfig);
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
     InternalSnapshot snapshotAfterCommit1 = conversionSource.getCurrentSnapshot();
     List<String> allActivePaths = ValidationTestHelper.getAllFilePaths(snapshotAfterCommit1);
     assertEquals(1, allActivePaths.size());
@@ -419,22 +419,21 @@ public class ITDeltaKernelConversionSource {
     // Insert 50 rows to different (2020) partition.
     testSparkDeltaTable.insertRowsForPartition(50, 2020);
 
-//    // Run vacuum. This deletes all older files from commit1 of 2018 partition.
-//    testSparkDeltaTable.runVacuum();
+    //    // Run vacuum. This deletes all older files from commit1 of 2018 partition.
+    //    testSparkDeltaTable.runVacuum();
 
     InstantsForIncrementalSync instantsForIncrementalSync =
-            InstantsForIncrementalSync.builder()
-                    .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
-                    .build();
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+            .build();
     conversionSource = conversionSourceProvider.getConversionSourceInstance(tableConfig);
-//    CommitsBacklog<Long> instantCurrentCommitState =
-//            conversionSource.getCommitsBacklog(instantsForIncrementalSync);
-//    assertTrue(conversionSource.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));
-//    // Table doesn't have instant of this older commit, hence it is not safe.
-//    Instant instantAsOfHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
-//    assertFalse(conversionSource.isIncrementalSyncSafeFrom(instantAsOfHourAgo));
+    //    CommitsBacklog<Long> instantCurrentCommitState =
+    //            conversionSource.getCommitsBacklog(instantsForIncrementalSync);
+    //    assertTrue(conversionSource.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)));
+    //    // Table doesn't have instant of this older commit, hence it is not safe.
+    //    Instant instantAsOfHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
+    //    assertFalse(conversionSource.isIncrementalSyncSafeFrom(instantAsOfHourAgo));
   }
-
 
   @ParameterizedTest
   @MethodSource("testWithPartitionToggle")
@@ -475,16 +474,16 @@ public class ITDeltaKernelConversionSource {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-//    CommitsBacklog<Long> commitsBacklog =
-//        conversionSource.getCommitsBacklog(instantsForIncrementalSync);
-//    for (Long version : commitsBacklog.getCommitsToProcess()) {
-//      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
-//      allTableChanges.add(tableChange);
-//    }
-//    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
+    //    CommitsBacklog<Long> commitsBacklog =
+    //        conversionSource.getCommitsBacklog(instantsForIncrementalSync);
+    //    for (Long version : commitsBacklog.getCommitsToProcess()) {
+    //      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
+    //      allTableChanges.add(tableChange);
+    //    }
+    //    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
   }
 
-    @Test
+  @Test
   public void testDropPartition() {
     String tableName = GenericTable.getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
@@ -532,16 +531,16 @@ public class ITDeltaKernelConversionSource {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-//    CommitsBacklog<Long> commitsBacklog =
-//        conversionSource.getCommitsBacklog(instantsForIncrementalSync);
-//    for (Long version : commitsBacklog.getCommitsToProcess()) {
-//      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
-//      allTableChanges.add(tableChange);
-//    }
-//    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
+    //    CommitsBacklog<Long> commitsBacklog =
+    //        conversionSource.getCommitsBacklog(instantsForIncrementalSync);
+    //    for (Long version : commitsBacklog.getCommitsToProcess()) {
+    //      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
+    //      allTableChanges.add(tableChange);
+    //    }
+    //    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
   }
 
-    @ParameterizedTest
+  @ParameterizedTest
   @MethodSource("testWithPartitionToggle")
   public void testOptimizeAndClustering(boolean isPartitioned) {
     String tableName = GenericTable.getTableName();
@@ -592,16 +591,14 @@ public class ITDeltaKernelConversionSource {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-//    CommitsBacklog<Long> commitsBacklog =
-//        conversionSource.getCommitsBacklog(instantsForIncrementalSync);
-//    for (Long version : commitsBacklog.getCommitsToProcess()) {
-//      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
-//      allTableChanges.add(tableChange);
-//    }
-//    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
+    //    CommitsBacklog<Long> commitsBacklog =
+    //        conversionSource.getCommitsBacklog(instantsForIncrementalSync);
+    //    for (Long version : commitsBacklog.getCommitsToProcess()) {
+    //      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
+    //      allTableChanges.add(tableChange);
+    //    }
+    //    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
   }
-
-
 
   private void validateDeltaPartitioning(InternalSnapshot internalSnapshot) {
     List<InternalPartitionField> partitionFields =

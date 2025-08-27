@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.delta;
+package org.apache.xtable.kernel;
 
 import org.apache.hadoop.conf.Configuration;
 
@@ -25,14 +25,12 @@ import io.delta.kernel.engine.Engine;
 
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
-import org.apache.xtable.kernel.DeltaKernelConversionSource;
 
 public class DeltaKernelConversionSourceProvider extends ConversionSourceProvider<Long> {
   @Override
   public DeltaKernelConversionSource getConversionSourceInstance(SourceTable sourceTable) {
     Configuration hadoopConf = new Configuration();
     Engine engine = DefaultEngine.create(hadoopConf);
-    //    DeltaTable deltaTable = DeltaT/able.forPath(sourceTable.getBasePath());
     return DeltaKernelConversionSource.builder()
         .tableName(sourceTable.getName())
         .basePath(sourceTable.getBasePath())

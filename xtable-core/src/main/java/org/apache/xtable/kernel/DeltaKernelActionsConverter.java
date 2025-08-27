@@ -16,9 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.delta;
-
-import static org.apache.xtable.delta.DeltaActionsConverter.getFullPathToFile;
+package org.apache.xtable.kernel;
 
 import java.util.Collections;
 import java.util.List;
@@ -36,7 +34,6 @@ import io.delta.kernel.Table;
 import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.actions.AddFile;
-import io.delta.kernel.types.*;
 
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
