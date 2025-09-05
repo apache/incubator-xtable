@@ -287,7 +287,7 @@ public class ParquetSchemaExtractor {
               == 1) { // TODO Tuple (many subelements in a list)
             newDataType = subFieldSchema.getDataType();
             elementName = subFieldSchema.getName();
-            //subFields = subFieldSchema.getFields();
+            // subFields = subFieldSchema.getFields();
             break;
           }
           subFields.add(
