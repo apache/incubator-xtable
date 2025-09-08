@@ -19,9 +19,7 @@
 package org.apache.xtable.service;
 
 import static org.apache.xtable.GenericTable.getTableName;
-import static org.apache.xtable.model.storage.TableFormat.DELTA;
-import static org.apache.xtable.model.storage.TableFormat.HUDI;
-import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import static org.apache.xtable.model.storage.TableFormat.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -97,6 +95,15 @@ public class ITConversionService {
           .sparkContext()
           .hadoopConfiguration()
           .set("parquet.avro.write-old-list-structure", "false");
+      sparkSession
+          .sparkContext()
+          .conf()
+          .set(
+              "spark.sql.extensions",
+              "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
+          .set("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
+          .set("spark.sql.catalog.paimon.warehouse", tempDir.toUri().toString());
+
       jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -116,14 +123,18 @@ public class ITConversionService {
         new DeltaConversionSourceProvider();
     ConversionSourceProvider<org.apache.iceberg.Snapshot> icebergConversionSourceProvider =
         new IcebergConversionSourceProvider();
+    ConversionSourceProvider<org.apache.paimon.Snapshot> paimonConversionSourceProvider =
+        new org.apache.xtable.paimon.PaimonConversionSourceProvider();
 
     hudiConversionSourceProvider.init(jsc.hadoopConfiguration());
     deltaConversionSourceProvider.init(jsc.hadoopConfiguration());
     icebergConversionSourceProvider.init(jsc.hadoopConfiguration());
+    paimonConversionSourceProvider.init(jsc.hadoopConfiguration());
 
     sourceProviders.put(HUDI, hudiConversionSourceProvider);
     sourceProviders.put(DELTA, deltaConversionSourceProvider);
     sourceProviders.put(ICEBERG, icebergConversionSourceProvider);
+    sourceProviders.put(PAIMON, paimonConversionSourceProvider);
 
     this.conversionService =
         new ConversionService(
@@ -232,7 +243,7 @@ public class ITConversionService {
 
   private static Stream<Arguments> generateTestParametersFormatsAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
-    for (String sourceTableFormat : Arrays.asList(HUDI, DELTA, ICEBERG)) {
+    for (String sourceTableFormat : Arrays.asList(HUDI, DELTA, ICEBERG, PAIMON)) {
       for (boolean isPartitioned : new boolean[] {true, false}) {
         arguments.add(Arguments.of(sourceTableFormat, isPartitioned));
       }
@@ -243,6 +254,7 @@ public class ITConversionService {
   protected static List<String> getOtherFormats(String sourceTableFormat) {
     return Arrays.stream(TableFormat.values())
         .filter(format -> !format.equals(sourceTableFormat))
+        .filter(format -> !format.equals(PAIMON)) // Paimon target not supported yet
         .collect(Collectors.toList());
   }
 
