@@ -26,6 +26,7 @@ hs_err_pid*
 # Ignore java-version and idea files.
 .java-version
 .idea
+.vscode
 
 # Ignore Gradle project-specific cache directory
 .gradle
