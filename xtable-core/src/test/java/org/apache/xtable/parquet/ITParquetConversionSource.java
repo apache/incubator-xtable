@@ -76,11 +76,11 @@ import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.model.sync.SyncMode;
 
 public class ITParquetConversionSource {
+  public static final String PARTITION_FIELD_SPEC_CONFIG =
+      "xtable.parquet.source.partition_field_spec_config";
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  public static final String PARTITION_FIELD_SPEC_CONFIG =
-      "xtable.parquet.source.partition_field_spec_config";
   @TempDir public static Path tempDir;
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;
@@ -94,7 +94,7 @@ public class ITParquetConversionSource {
     sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
     sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
-
+    boolean partitionedData = true;
     String javaOpts =
         "--add-opens=java.base/java.nio=ALL-UNNAMED "
             + "--add-opens=java.base/java.lang=ALL-UNNAMED "
@@ -130,14 +130,21 @@ public class ITParquetConversionSource {
                   false,
                   new MetadataBuilder().putString("precision", "millis").build())
             });
-
-    Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-    df.withColumn("year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
-        .write()
-        .mode(SaveMode.Overwrite)
-        .partitionBy("year")
-        .parquet(tempDir.toAbsolutePath().toString());
-
+    if (partitionedData) {
+      Dataset<Row> df = sparkSession.createDataFrame(data, schema);
+      df.withColumn(
+              "year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
+          .withColumn(
+              "month",
+              functions.date_format(functions.col("timestamp").cast(DataTypes.TimestampType), "MM"))
+          .write()
+          .mode(SaveMode.Overwrite)
+          .partitionBy("year", "month")
+          .parquet(tempDir.toAbsolutePath().toString());
+    } else {
+      Dataset<Row> df = sparkSession.createDataFrame(data, schema);
+      df.write().mode(SaveMode.Overwrite).parquet(tempDir.toAbsolutePath().toString());
+    }
     // test if data was written correctly
     Dataset<Row> reloadedDf = sparkSession.read().parquet(tempDir.toAbsolutePath().toString());
     reloadedDf.show();
@@ -157,6 +164,7 @@ public class ITParquetConversionSource {
   }
 
   private static Stream<Arguments> provideArgsForFilePartitionTesting() {
+    boolean isPartitioned = true;
     String timestampFilter =
         String.format(
             "timestamp_micros_nullable_field < timestamp_millis(%s)",
@@ -165,14 +173,17 @@ public class ITParquetConversionSource {
     String nestedLevelFilter = "nested_record.level = 'INFO'";
     String severityFilter = "severity = 1";
     String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
+    String partitionConfig = isPartitioned ? "timestamp:MONTH:year=YYYY/month=MM" : null;
     return Stream.of(
         Arguments.of(
             buildArgsForPartition(
                 PARQUET,
                 Arrays.asList(ICEBERG, DELTA, HUDI),
-                "timestamp:YEAR:year=YYYY", // ts:DAY:year=YYYY/month=MM/day=DD
+                // "timestamp:YEAR:year=YYYY", // ts:DAY:year=YYYY/month=MM/day=DD
+                partitionConfig, // ts:DAY:year=YYYY/month=MM/day=DD
                 // "year=YYYY/month=MM/day=DD"
-                "timestamp:YEAR:year=YYYY",
+                // "timestamp:YEAR:year=YYYY",
+                partitionConfig,
                 levelFilter)));
   }
 

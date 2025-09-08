@@ -39,6 +39,8 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
       ParquetSchemaExtractor.getInstance();
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
+  private static final ParquetPartitionSpecExtractor partitionSpecExtractor =
+      ParquetPartitionSpecExtractor.getInstance();
 
   public ParquetPartitionValueExtractor(@NonNull Map<String, String> pathToPartitionFieldFormat) {
     super(pathToPartitionFieldFormat);
@@ -46,26 +48,29 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
 
   public List<PartitionValue> extractPartitionValues(
       List<InternalPartitionField> partitionColumns, String partitionPath) {
-    if (partitionColumns == null) {
+    if (partitionColumns.size() == 0) {
       return Collections.emptyList();
     }
-    int totalNumberOfPartitions = partitionColumns.size();
+    int totalNumberOfPartitions = partitionColumns.get(0).getPartitionFieldNames().size();
     List<PartitionValue> result = new ArrayList<>(totalNumberOfPartitions);
     String remainingPartitionPath = partitionPath;
     for (InternalPartitionField partitionField : partitionColumns) {
+      int index = 0;
       for (String partitionFieldName : partitionField.getPartitionFieldNames()) {
         if (remainingPartitionPath.startsWith(partitionFieldName + "=")) {
           remainingPartitionPath =
               remainingPartitionPath.substring(partitionFieldName.length() + 1);
         }
         PartialResult valueAndRemainingPath =
-            parsePartitionPath(partitionField, remainingPartitionPath, totalNumberOfPartitions);
+            parsePartitionPath(
+                partitionField, remainingPartitionPath, totalNumberOfPartitions, index);
 
         result.add(
             PartitionValue.builder()
                 .partitionField(partitionField)
                 .range(Range.scalar(valueAndRemainingPath.getValue()))
                 .build());
+        index++;
         remainingPartitionPath = valueAndRemainingPath.getRemainingPath();
       }
     }
@@ -73,21 +78,18 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
   }
 
   protected PartialResult parsePartitionPath(
-      InternalPartitionField field, String remainingPath, int totalNumberOfPartitions) {
+      InternalPartitionField field, String remainingPath, int totalNumberOfPartitions, int index) {
     switch (field.getTransformType()) {
       case YEAR:
-        return parseDate(
-            remainingPath,
-            pathToPartitionFieldFormat.get(field.getSourceField().getName()).split("=")[1]);
       case MONTH: // TODO split and get the value of month from pathToPartitionFieldFormat
       case DAY: // TODO split and get the value of day from pathToPartitionFieldFormat
       case HOUR:
         return parseDate(
             remainingPath,
-            pathToPartitionFieldFormat.get(
-                field
-                    .getSourceField()
-                    .getName())); // changed from getPath() TODO split and get the value of hour
+            partitionSpecExtractor
+                .getListPartitionValuesFromFormatInput(
+                    pathToPartitionFieldFormat.get(field.getSourceField().getName()))
+                .get(index)); // changed from getPath() TODO split and get the value of hour
         // from pathToPartitionFieldFormat
       case VALUE:
         // if there is only one partition field, then assume full partition path is used even if

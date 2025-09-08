@@ -43,7 +43,6 @@ public class ParquetPartitionSpecExtractor implements PathBasedPartitionSpecExtr
 
   @Override
   public List<InternalPartitionField> spec(InternalSchema tableSchema) {
-
     List<InternalPartitionField> partitionFields = new ArrayList<>(partitionFieldSpecs.size());
     for (PartitionFieldSpec fieldSpec : partitionFieldSpecs) {
       InternalField sourceField =
@@ -62,6 +61,12 @@ public class ParquetPartitionSpecExtractor implements PathBasedPartitionSpecExtr
   public List<String> getListPartitionNamesFromFormatInput(String inputFormat) {
     return Arrays.stream(inputFormat.split("/"))
         .map(s -> s.split("=")[0])
+        .collect(Collectors.toList());
+  }
+
+  public List<String> getListPartitionValuesFromFormatInput(String inputFormat) {
+    return Arrays.stream(inputFormat.split("/"))
+        .map(s -> s.split("=")[1])
         .collect(Collectors.toList());
   }
 
