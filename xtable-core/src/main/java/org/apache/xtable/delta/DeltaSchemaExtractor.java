@@ -18,11 +18,7 @@
  
 package org.apache.xtable.delta;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -41,22 +37,10 @@ import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.schema.SchemaUtils;
 
-/**
- * Converts between Delta and InternalTable schemas. Some items to be aware of:
- *
- * <ul>
- *   <li>Delta schemas are represented as Spark StructTypes which do not have enums so the enum
- *       types are lost when converting from XTable to Delta Lake representations
- *   <li>Delta does not have a fixed length byte array option so {@link InternalType#FIXED} is
- *       simply translated to a {@link org.apache.spark.sql.types.BinaryType}
- *   <li>Similarly, {@link InternalType#TIMESTAMP_NTZ} is translated to a long in Delta Lake
- * </ul>
- */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaSchemaExtractor {
   private static final String DELTA_COLUMN_MAPPING_ID = "delta.columnMapping.id";
   private static final DeltaSchemaExtractor INSTANCE = new DeltaSchemaExtractor();
-  // Timestamps in Delta are microsecond precision by default
   private static final Map<InternalSchema.MetadataKey, Object>
       DEFAULT_TIMESTAMP_PRECISION_METADATA =
           Collections.singletonMap(
