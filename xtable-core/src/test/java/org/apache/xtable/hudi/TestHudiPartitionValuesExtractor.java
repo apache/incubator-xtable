@@ -564,7 +564,7 @@ public class TestHudiPartitionValuesExtractor {
             .collect(Collectors.toList());
 
     List<PartitionValue> actual =
-        new HudiPartitionValuesExtractor(Collections.emptyMap())
+        new PathBasedPartitionValuesExtractor(Collections.emptyMap())
             .extractPartitionValues(partitionFields, partitionPath);
     Assertions.assertEquals(expected, actual);
   }
