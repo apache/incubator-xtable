@@ -26,6 +26,7 @@ import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
 import org.apache.xtable.hudi.PathBasedPartitionValuesExtractor;
+//import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -64,7 +65,18 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
         PartialResult valueAndRemainingPath =
             parsePartitionPath(
                 partitionField, remainingPartitionPath, totalNumberOfPartitions, index);
-
+        //BEGIN FIX for iceberg dubplicate partition col
+    /*    InternalField currentSourceField = partitionField.getSourceField();
+        InternalField updatedSourceField = currentSourceField.toBuilder()
+                .name(partitionFieldName)
+                .build();
+        InternalPartitionField updatedPartitionField = InternalPartitionField.builder()
+                .sourceField(updatedSourceField)
+                .partitionFieldNames(partitionField.getPartitionFieldNames())
+                .transformType(partitionField.getTransformType())
+                .transformOptions(partitionField.getTransformOptions())
+                .build();*/
+        //END FIX
         result.add(
             PartitionValue.builder()
                 .partitionField(partitionField)
