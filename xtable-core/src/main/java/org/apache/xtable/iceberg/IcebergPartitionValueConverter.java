@@ -190,17 +190,26 @@ public class IcebergPartitionValueConverter {
     if (partitionValues == null || partitionValues.isEmpty()) {
       return null;
     }
-    Map<String, PartitionValue> nameToPartitionInfo =
+    Map<String, List<PartitionValue>> nameToPartitionInfoList =
         partitionValues.stream()
             .collect(
-                Collectors.toMap(
+                Collectors.groupingBy(
                     entry -> entry.getPartitionField().getSourceField().getName(),
-                    Function.identity()));
+                    Collectors.toList()));
+    /*Map<String, PartitionValue> nameToPartitionInfo =
+    partitionValues.stream()
+        .collect(
+            Collectors.toMap(
+                entry -> entry.getPartitionField().getSourceField().getName(),
+                Function.identity()));*/
     PartitionKey partitionKey = new PartitionKey(partitionSpec, schema);
     for (int i = 0; i < partitionSpec.fields().size(); i++) {
       PartitionField icebergPartitionField = partitionSpec.fields().get(i);
       String sourceFieldName = schema.findField(icebergPartitionField.sourceId()).name();
-      PartitionValue partitionValue = nameToPartitionInfo.get(sourceFieldName);
+      PartitionValue partitionValue =
+          nameToPartitionInfoList.get(sourceFieldName).size() == 1
+              ? nameToPartitionInfoList.get(sourceFieldName).get(0)
+              : nameToPartitionInfoList.get(sourceFieldName).get(i);
       Object value = partitionValue.getRange().getMaxValue();
       switch (partitionValue.getPartitionField().getTransformType()) {
         case YEAR:
