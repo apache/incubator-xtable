@@ -18,7 +18,10 @@
  
 package org.apache.xtable;
 
-import static org.apache.xtable.model.storage.TableFormat.*;
+import static org.apache.xtable.model.storage.TableFormat.DELTA;
+import static org.apache.xtable.model.storage.TableFormat.HUDI;
+import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 
 import java.nio.file.Path;
 import java.util.Arrays;

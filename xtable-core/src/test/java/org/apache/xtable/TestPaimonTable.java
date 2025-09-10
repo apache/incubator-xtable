@@ -43,7 +43,14 @@ import org.apache.paimon.table.sink.BatchTableWrite;
 import org.apache.paimon.table.sink.BatchWriteBuilder;
 import org.apache.paimon.table.sink.CommitMessage;
 import org.apache.paimon.table.source.snapshot.SnapshotReader;
-import org.apache.paimon.types.*;
+import org.apache.paimon.types.BooleanType;
+import org.apache.paimon.types.DataField;
+import org.apache.paimon.types.DataTypes;
+import org.apache.paimon.types.DoubleType;
+import org.apache.paimon.types.IntType;
+import org.apache.paimon.types.LocalZonedTimestampType;
+import org.apache.paimon.types.RowKind;
+import org.apache.paimon.types.VarCharType;
 import org.apache.paimon.utils.ParameterUtils;
 
 public class TestPaimonTable implements GenericTable<GenericRow, String> {
