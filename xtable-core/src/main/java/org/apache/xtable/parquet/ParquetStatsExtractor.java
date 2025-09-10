@@ -150,7 +150,7 @@ public class ParquetStatsExtractor {
                       file.getPath().toString())),
               parentPath.toString());
     } catch (java.io.IOException e) {
-
+      throw e;
     }
     return InternalDataFile.builder()
         .physicalPath(parentPath.toString())

@@ -43,13 +43,6 @@ public class ReflectionUtils {
       if (constructorArgs.length == 0) {
         return clazz.newInstance();
       }
-      /*Class<?>[] constructorArgTypes =
-          Arrays.stream(constructorArgs).map(Object::getClass).toArray(Class[]::new);
-      if (hasConstructor(clazz, constructorArgTypes)) {
-        return clazz.getConstructor(constructorArgTypes).newInstance(constructorArgs);
-      } else {
-        return clazz.newInstance();
-      }*/
       for (Constructor<?> constructor : clazz.getConstructors()) {
         Class<?>[] parameterTypes = constructor.getParameterTypes();
         if (parameterTypes.length == constructorArgs.length) {

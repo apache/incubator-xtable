@@ -259,7 +259,7 @@ public class ITParquetConversionSource {
   @ParameterizedTest
   @MethodSource("provideArgsForFilePartitionTesting")
   public void testFilePartitionedData(
-      TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
+      TableFormatPartitionDataHolder tableFormatPartitionDataHolder) throws URISyntaxException {
     String tableName = getTableName();
     String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
     List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
@@ -287,14 +287,9 @@ public class ITParquetConversionSource {
       checkDatasetEquivalenceWithFilter(
           sourceTableFormat, tableToClose, targetTableFormats, filter);
     } catch (URISyntaxException e) {
-      e.printStackTrace();
+      throw e;
     }
   }
-
-  /*
-     test for Parquet file conversion
-
-  */
 
   private void checkDatasetEquivalenceWithFilter(
       String sourceFormat,
