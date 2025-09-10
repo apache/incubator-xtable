@@ -196,12 +196,6 @@ public class IcebergPartitionValueConverter {
                 Collectors.groupingBy(
                     entry -> entry.getPartitionField().getSourceField().getName(),
                     Collectors.toList()));
-    /*Map<String, PartitionValue> nameToPartitionInfo =
-    partitionValues.stream()
-        .collect(
-            Collectors.toMap(
-                entry -> entry.getPartitionField().getSourceField().getName(),
-                Function.identity()));*/
     PartitionKey partitionKey = new PartitionKey(partitionSpec, schema);
     for (int i = 0; i < partitionSpec.fields().size(); i++) {
       PartitionField icebergPartitionField = partitionSpec.fields().get(i);

@@ -63,8 +63,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.conversion.*;
 import org.apache.xtable.conversion.ConversionConfig;
@@ -80,7 +78,6 @@ public class ITParquetConversionSource {
       "xtable.parquet.source.partition_field_spec_config";
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   @TempDir public static Path tempDir;
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;
@@ -112,11 +109,15 @@ public class ITParquetConversionSource {
 
     List<Row> data =
         Arrays.asList(
-            RowFactory.create(1, "Alice",true, 30, new Timestamp(System.currentTimeMillis())),
-            RowFactory.create(2, "Bob",false, 24, new Timestamp(System.currentTimeMillis() + 1000)),
-            RowFactory.create(3, "Charlie",true, 35, new Timestamp(System.currentTimeMillis() + 2000)),
-            RowFactory.create(4, "David",false, 29, new Timestamp(System.currentTimeMillis() + 3000)),
-            RowFactory.create(5, "Eve",true, 22, new Timestamp(System.currentTimeMillis() + 4000)));
+            RowFactory.create(1, "Alice", true, 30, new Timestamp(System.currentTimeMillis())),
+            RowFactory.create(
+                2, "Bob", false, 24, new Timestamp(System.currentTimeMillis() + 1000)),
+            RowFactory.create(
+                3, "Charlie", true, 35, new Timestamp(System.currentTimeMillis() + 2000)),
+            RowFactory.create(
+                4, "David", false, 29, new Timestamp(System.currentTimeMillis() + 3000)),
+            RowFactory.create(
+                5, "Eve", true, 22, new Timestamp(System.currentTimeMillis() + 4000)));
 
     schema =
         DataTypes.createStructType(
