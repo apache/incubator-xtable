@@ -30,6 +30,7 @@ import org.apache.paimon.table.FileStoreTableFactory;
 
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.spi.extractor.ConversionSource;
 
 public class PaimonConversionSourceProvider extends ConversionSourceProvider<Snapshot> {
@@ -45,7 +46,7 @@ public class PaimonConversionSourceProvider extends ConversionSourceProvider<Sna
 
       return new PaimonConversionSource(paimonTable);
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      throw new ReadException(e);
     }
   }
 }
