@@ -258,8 +258,8 @@ public class ITParquetConversionSource {
 
   @ParameterizedTest
   @MethodSource("provideArgsForFilePartitionTesting")
-  public void testFilePartitionedData(
-      TableFormatPartitionDataHolder tableFormatPartitionDataHolder) throws URISyntaxException {
+  public void testFilePartitionedData(TableFormatPartitionDataHolder tableFormatPartitionDataHolder)
+      throws URISyntaxException {
     String tableName = getTableName();
     String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
     List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();

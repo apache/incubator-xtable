@@ -112,8 +112,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                                 parquetMetadataExtractor.readParquetMetadata(
                                     hadoopConf, file.getPath()),
                                 file.getPath().toString())),
-                        HudiPathUtils.getPartitionPath(
-                            new Path(basePath), new Path(file.getPath().toString()))))
+                        HudiPathUtils.getPartitionPath(new Path(basePath), file.getPath())))
                 .lastModified(file.getModificationTime())
                 .columnStats(
                     parquetStatsExtractor.getColumnStatsForaFile(

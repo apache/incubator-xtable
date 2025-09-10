@@ -140,7 +140,6 @@ public class ParquetStatsExtractor {
       FileSystem fs = FileSystem.get(hadoopConf);
       file = fs.getFileStatus(parentPath);
       footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
-      // MessageType schema = parquetMetadataExtractor.getSchema(footer);
       columnStatsForAFile = getColumnStatsForaFile(footer);
       partitionValues =
           partitionValueExtractor.extractPartitionValues(
