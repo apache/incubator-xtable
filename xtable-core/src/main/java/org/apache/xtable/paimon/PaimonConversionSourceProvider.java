@@ -46,7 +46,7 @@ public class PaimonConversionSourceProvider extends ConversionSourceProvider<Sna
 
       return new PaimonConversionSource(paimonTable);
     } catch (IOException e) {
-      throw new ReadException(e);
+      throw new ReadException(e.getMessage());
     }
   }
 }
