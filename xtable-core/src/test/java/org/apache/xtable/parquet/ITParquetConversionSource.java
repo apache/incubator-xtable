@@ -109,15 +109,15 @@ public class ITParquetConversionSource {
 
     List<Row> data =
         Arrays.asList(
-            RowFactory.create(1, "Alice", true, 30, new Timestamp(System.currentTimeMillis())),
+            RowFactory.create(1, "Alice", true, 30.1, new Timestamp(System.currentTimeMillis())),
             RowFactory.create(
-                2, "Bob", false, 24, new Timestamp(System.currentTimeMillis() + 1000)),
+                2, "Bob", false, 24.6, new Timestamp(System.currentTimeMillis() + 1000)),
             RowFactory.create(
-                3, "Charlie", true, 35, new Timestamp(System.currentTimeMillis() + 2000)),
+                3, "Charlie", true, 35.2, new Timestamp(System.currentTimeMillis() + 2000)),
             RowFactory.create(
-                4, "David", false, 29, new Timestamp(System.currentTimeMillis() + 3000)),
+                4, "David", false, 29.5, new Timestamp(System.currentTimeMillis() + 3000)),
             RowFactory.create(
-                5, "Eve", true, 22, new Timestamp(System.currentTimeMillis() + 4000)));
+                5, "Eve", true, 22.2, new Timestamp(System.currentTimeMillis() + 4000)));
 
     schema =
         DataTypes.createStructType(
@@ -125,7 +125,7 @@ public class ITParquetConversionSource {
               DataTypes.createStructField("id", DataTypes.IntegerType, false),
               DataTypes.createStructField("name", DataTypes.StringType, false),
               DataTypes.createStructField("hasSiblings", DataTypes.BooleanType, false),
-              DataTypes.createStructField("age", DataTypes.IntegerType, false),
+              DataTypes.createStructField("age", DataTypes.DoubleType, false),
               DataTypes.createStructField(
                   "timestamp",
                   DataTypes.TimestampType,

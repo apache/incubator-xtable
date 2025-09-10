@@ -175,6 +175,9 @@ public class ParquetSchemaExtractor {
             newDataType = InternalType.INT;
           }
           break;
+        case DOUBLE:
+          newDataType = InternalType.DOUBLE;
+          break;
         case FLOAT:
           newDataType = InternalType.FLOAT;
           break;
