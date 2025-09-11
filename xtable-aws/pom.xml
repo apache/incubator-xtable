@@ -118,11 +118,11 @@
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/LICENSE</resource>
-                                    <file>target/classes/META-INF/LICENSE-bundled</file>
+                                    <file>${project.basedir}/src/license/LICENSE-bundled</file>
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/NOTICE</resource>
-                                    <file>target/classes/META-INF/NOTICE-bundled</file>
+                                    <file>${project.basedir}/src/license/NOTICE-bundled</file>
                                 </transformer>
                             </transformers>
                         </configuration>
