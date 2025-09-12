@@ -78,13 +78,13 @@ public class ITParquetConversionSource {
       "xtable.parquet.source.partition_field_spec_config";
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
-  @TempDir public static Path tempDir;
+  @TempDir public Path tempDir;
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;
   private static StructType schema;
 
   @BeforeAll
-  public static void setupOnce() {
+  public void setupOnce() {
     SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
 
     String extraJavaOptions = "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED";
@@ -108,7 +108,7 @@ public class ITParquetConversionSource {
   }
 
   @AfterAll
-  public static void teardown() {
+  public void teardown() {
     if (jsc != null) {
       jsc.stop();
       jsc = null;
@@ -294,7 +294,7 @@ public class ITParquetConversionSource {
     }
   }
 
-  /*@ParameterizedTest
+  @ParameterizedTest
   @MethodSource("provideArgsForFilePartitionTesting")
   public void testFilePartitionedData(TableFormatPartitionDataHolder tableFormatPartitionDataHolder)
       throws URISyntaxException {
@@ -363,7 +363,7 @@ public class ITParquetConversionSource {
     } catch (URISyntaxException e) {
       throw e;
     }
-  }*/
+  }
 
   private void checkDatasetEquivalenceWithFilter(
       String sourceFormat,
