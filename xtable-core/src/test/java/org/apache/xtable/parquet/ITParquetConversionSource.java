@@ -91,7 +91,6 @@ public class ITParquetConversionSource {
     sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
     sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
-    boolean partitionedData = true;
     String javaOpts =
         "--add-opens=java.base/java.nio=ALL-UNNAMED "
             + "--add-opens=java.base/java.lang=ALL-UNNAMED "
@@ -106,51 +105,6 @@ public class ITParquetConversionSource {
 
     sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
-
-    List<Row> data =
-        Arrays.asList(
-            RowFactory.create(1, "Alice", true, 30.1, new Timestamp(System.currentTimeMillis())),
-            RowFactory.create(
-                2, "Bob", false, 24.6, new Timestamp(System.currentTimeMillis() + 1000)),
-            RowFactory.create(
-                3, "Charlie", true, 35.2, new Timestamp(System.currentTimeMillis() + 2000)),
-            RowFactory.create(
-                4, "David", false, 29.5, new Timestamp(System.currentTimeMillis() + 3000)),
-            RowFactory.create(
-                5, "Eve", true, 22.2, new Timestamp(System.currentTimeMillis() + 4000)));
-
-    schema =
-        DataTypes.createStructType(
-            new StructField[] {
-              DataTypes.createStructField("id", DataTypes.IntegerType, false),
-              DataTypes.createStructField("name", DataTypes.StringType, false),
-              DataTypes.createStructField("hasSiblings", DataTypes.BooleanType, false),
-              DataTypes.createStructField("age", DataTypes.DoubleType, false),
-              DataTypes.createStructField(
-                  "timestamp",
-                  DataTypes.TimestampType,
-                  false,
-                  new MetadataBuilder().putString("precision", "millis").build())
-            });
-    if (partitionedData) {
-      Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-      df.withColumn(
-              "year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
-          .withColumn(
-              "month",
-              functions.date_format(functions.col("timestamp").cast(DataTypes.TimestampType), "MM"))
-          .write()
-          .mode(SaveMode.Overwrite)
-          .partitionBy("year", "month")
-          .parquet(tempDir.toAbsolutePath().toString());
-    } else {
-      Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-      df.write().mode(SaveMode.Overwrite).parquet(tempDir.toAbsolutePath().toString());
-    }
-    // test if data was written correctly
-    Dataset<Row> reloadedDf = sparkSession.read().parquet(tempDir.toAbsolutePath().toString());
-    reloadedDf.show();
-    reloadedDf.printSchema();
   }
 
   @AfterAll
@@ -245,6 +199,27 @@ public class ITParquetConversionSource {
         .build();
   }
 
+  private static Stream<Arguments> provideArgsForFileNonPartitionTesting() {
+    boolean isPartitioned = false;
+    String timestampFilter =
+        String.format(
+            "timestamp_micros_nullable_field < timestamp_millis(%s)",
+            Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
+    String levelFilter = "level = 'INFO'";
+    String nestedLevelFilter = "nested_record.level = 'INFO'";
+    String severityFilter = "severity = 1";
+    String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
+    String partitionConfig = null;
+    return Stream.of(
+        Arguments.of(
+            buildArgsForPartition(
+                PARQUET,
+                Arrays.asList(ICEBERG, DELTA, HUDI),
+                partitionConfig,
+                partitionConfig,
+                levelFilter)));
+  }
+
   private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
     if (sourceTableFormat.equalsIgnoreCase(PARQUET)) {
       ConversionSourceProvider<Long> parquetConversionSourceProvider =
@@ -253,6 +228,69 @@ public class ITParquetConversionSource {
       return parquetConversionSourceProvider;
     } else {
       throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("provideArgsForFileNonPartitionTesting")
+  public void testFileNonPartitionedData(
+      TableFormatPartitionDataHolder tableFormatPartitionDataHolder) throws URISyntaxException {
+    String tableName = getTableName();
+    String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
+    List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
+    // Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
+    String xTablePartitionConfig = tableFormatPartitionDataHolder.getXTablePartitionConfig();
+    String filter = tableFormatPartitionDataHolder.getFilter();
+    ConversionSourceProvider<?> conversionSourceProvider =
+        getConversionSourceProvider(sourceTableFormat);
+
+    List<Row> data =
+        Arrays.asList(
+            RowFactory.create(1, "Alice", true, 30.1, new Timestamp(System.currentTimeMillis())),
+            RowFactory.create(
+                2, "Bob", false, 24.6, new Timestamp(System.currentTimeMillis() + 1000)),
+            RowFactory.create(
+                3, "Charlie", true, 35.2, new Timestamp(System.currentTimeMillis() + 2000)),
+            RowFactory.create(
+                4, "David", false, 29.5, new Timestamp(System.currentTimeMillis() + 3000)),
+            RowFactory.create(
+                5, "Eve", true, 22.2, new Timestamp(System.currentTimeMillis() + 4000)));
+
+    schema =
+        DataTypes.createStructType(
+            new StructField[] {
+              DataTypes.createStructField("id", DataTypes.IntegerType, false),
+              DataTypes.createStructField("name", DataTypes.StringType, false),
+              DataTypes.createStructField("hasSiblings", DataTypes.BooleanType, false),
+              DataTypes.createStructField("age", DataTypes.DoubleType, false),
+              DataTypes.createStructField(
+                  "timestamp",
+                  DataTypes.TimestampType,
+                  false,
+                  new MetadataBuilder().putString("precision", "millis").build())
+            });
+    Dataset<Row> df = sparkSession.createDataFrame(data, schema);
+    df.write().mode(SaveMode.Overwrite).parquet(tempDir.toAbsolutePath().toString());
+    GenericTable table;
+    table =
+        GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, false);
+    try (GenericTable tableToClose = table) {
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              sourceTableFormat,
+              SyncMode.FULL,
+              tableName,
+              table,
+              targetTableFormats,
+              xTablePartitionConfig,
+              null);
+      ConversionController conversionController =
+          new ConversionController(jsc.hadoopConfiguration());
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalenceWithFilter(
+          sourceTableFormat, tableToClose, targetTableFormats, filter);
+    } catch (URISyntaxException e) {
+      throw e;
     }
   }
 
@@ -268,6 +306,41 @@ public class ITParquetConversionSource {
     String filter = tableFormatPartitionDataHolder.getFilter();
     ConversionSourceProvider<?> conversionSourceProvider =
         getConversionSourceProvider(sourceTableFormat);
+    // create the data
+    List<Row> data =
+        Arrays.asList(
+            RowFactory.create(1, "Alice", true, 30.1, new Timestamp(System.currentTimeMillis())),
+            RowFactory.create(
+                2, "Bob", false, 24.6, new Timestamp(System.currentTimeMillis() + 1000)),
+            RowFactory.create(
+                3, "Charlie", true, 35.2, new Timestamp(System.currentTimeMillis() + 2000)),
+            RowFactory.create(
+                4, "David", false, 29.5, new Timestamp(System.currentTimeMillis() + 3000)),
+            RowFactory.create(
+                5, "Eve", true, 22.2, new Timestamp(System.currentTimeMillis() + 4000)));
+
+    schema =
+        DataTypes.createStructType(
+            new StructField[] {
+              DataTypes.createStructField("id", DataTypes.IntegerType, false),
+              DataTypes.createStructField("name", DataTypes.StringType, false),
+              DataTypes.createStructField("hasSiblings", DataTypes.BooleanType, false),
+              DataTypes.createStructField("age", DataTypes.DoubleType, false),
+              DataTypes.createStructField(
+                  "timestamp",
+                  DataTypes.TimestampType,
+                  false,
+                  new MetadataBuilder().putString("precision", "millis").build())
+            });
+    Dataset<Row> df = sparkSession.createDataFrame(data, schema);
+    df.withColumn("year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
+        .withColumn(
+            "month",
+            functions.date_format(functions.col("timestamp").cast(DataTypes.TimestampType), "MM"))
+        .write()
+        .mode(SaveMode.Overwrite)
+        .partitionBy("year", "month")
+        .parquet(tempDir.toAbsolutePath().toString());
     GenericTable table;
     table =
         GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, true);
