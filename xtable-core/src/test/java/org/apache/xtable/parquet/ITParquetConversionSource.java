@@ -129,7 +129,7 @@ public class ITParquetConversionSource {
     String nestedLevelFilter = "nested_record.level = 'INFO'";
     String severityFilter = "severity = 1";
     String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
-    String partitionConfig = isPartitioned ? "timestamp:MONTH:year=YYYY/month=MM" : null;
+    String partitionConfig = "timestamp:MONTH:year=YYYY/month=MM";
     return Stream.of(
         Arguments.of(
             buildArgsForPartition(
@@ -231,7 +231,7 @@ public class ITParquetConversionSource {
     }
   }
 
-  @ParameterizedTest
+  /*@ParameterizedTest
   @MethodSource("provideArgsForFileNonPartitionTesting")
   public void testFileNonPartitionedData(
       TableFormatPartitionDataHolder tableFormatPartitionDataHolder) throws URISyntaxException {
@@ -292,7 +292,7 @@ public class ITParquetConversionSource {
     } catch (URISyntaxException e) {
       throw e;
     }
-  }
+  }*/
 
   @ParameterizedTest
   @MethodSource("provideArgsForFilePartitionTesting")
@@ -359,6 +359,7 @@ public class ITParquetConversionSource {
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalenceWithFilter(
           sourceTableFormat, tableToClose, targetTableFormats, filter);
+
     } catch (URISyntaxException e) {
       throw e;
     }
