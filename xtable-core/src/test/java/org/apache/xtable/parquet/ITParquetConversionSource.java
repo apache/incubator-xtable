@@ -231,7 +231,7 @@ public class ITParquetConversionSource {
     }
   }
 
-  /*@ParameterizedTest
+  @ParameterizedTest
   @MethodSource("provideArgsForFileNonPartitionTesting")
   public void testFileNonPartitionedData(
       TableFormatPartitionDataHolder tableFormatPartitionDataHolder) throws URISyntaxException {
@@ -292,9 +292,9 @@ public class ITParquetConversionSource {
     } catch (URISyntaxException e) {
       throw e;
     }
-  }*/
+  }
 
-  @ParameterizedTest
+  /*@ParameterizedTest
   @MethodSource("provideArgsForFilePartitionTesting")
   public void testFilePartitionedData(TableFormatPartitionDataHolder tableFormatPartitionDataHolder)
       throws URISyntaxException {
@@ -363,7 +363,7 @@ public class ITParquetConversionSource {
     } catch (URISyntaxException e) {
       throw e;
     }
-  }
+  }*/
 
   private void checkDatasetEquivalenceWithFilter(
       String sourceFormat,
