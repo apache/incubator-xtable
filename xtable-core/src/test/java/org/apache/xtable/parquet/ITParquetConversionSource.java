@@ -78,13 +78,13 @@ public class ITParquetConversionSource {
       "xtable.parquet.source.partition_field_spec_config";
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
-  @TempDir public Path tempDir;
+  @TempDir public static Path tempDir;
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;
   private static StructType schema;
 
   @BeforeAll
-  public void setupOnce() {
+  public static void setupOnce() {
     SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
 
     String extraJavaOptions = "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED";
@@ -108,7 +108,7 @@ public class ITParquetConversionSource {
   }
 
   @AfterAll
-  public void teardown() {
+  public static void teardown() {
     if (jsc != null) {
       jsc.stop();
       jsc = null;
