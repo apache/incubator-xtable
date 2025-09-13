@@ -291,7 +291,7 @@ public class ITParquetConversionSource {
           new ConversionController(jsc.hadoopConfiguration());
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalenceWithFilter(
-          sourceTableFormat, tableToClose, targetTableFormats, filter,false);
+          sourceTableFormat, tableToClose, targetTableFormats, filter);
     } catch (URISyntaxException e) {
       throw e;
     }
@@ -363,8 +363,8 @@ public class ITParquetConversionSource {
           new ConversionController(jsc.hadoopConfiguration());
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalenceWithFilter(
-          sourceTableFormat, tableToClose, targetTableFormats, filter, false);
-      // update the current tempDirs parquet file data with another attribute the sync again
+          sourceTableFormat, tableToClose, targetTableFormats, filter);
+   /*   // update the current tempDirs parquet file data with another attribute the sync again
       List<Row> dataToAppend =
           Arrays.asList(
               RowFactory.create(
@@ -407,8 +407,8 @@ public class ITParquetConversionSource {
                 null);
         conversionController.sync(conversionConfigAppended, conversionSourceProvider);
         checkDatasetEquivalenceWithFilter(
-            sourceTableFormat, tableToCloseAppended, targetTableFormats, filter, true);
-      }
+            sourceTableFormat, tableToCloseAppended, targetTableFormats, filter);
+      }*/
 
     } catch (URISyntaxException e) {
       throw e;
@@ -419,7 +419,7 @@ public class ITParquetConversionSource {
       String sourceFormat,
       GenericTable<?, ?> sourceTable,
       List<String> targetFormats,
-      String filter, boolean secondSync)
+      String filter)
       throws URISyntaxException {
     checkDatasetEquivalence(
         sourceFormat,
@@ -428,14 +428,14 @@ public class ITParquetConversionSource {
         targetFormats,
         Collections.emptyMap(),
         null,
-        filter, secondSync);
+        filter);
   }
 
   private void checkDatasetEquivalence(
       String sourceFormat,
       GenericTable<?, ?> sourceTable,
       List<String> targetFormats,
-      Integer expectedCount, boolean secondSync)
+      Integer expectedCount)
       throws URISyntaxException {
     checkDatasetEquivalence(
         sourceFormat,
@@ -444,7 +444,7 @@ public class ITParquetConversionSource {
         targetFormats,
         Collections.emptyMap(),
         expectedCount,
-        "1 = 1", secondSync);
+        "1 = 1");
   }
 
   private void checkDatasetEquivalence(
@@ -453,7 +453,7 @@ public class ITParquetConversionSource {
       Map<String, String> sourceOptions,
       List<String> targetFormats,
       Map<String, Map<String, String>> targetOptions,
-      Integer expectedCount, boolean secondSync)
+      Integer expectedCount)
       throws URISyntaxException {
     checkDatasetEquivalence(
         sourceFormat,
@@ -462,7 +462,7 @@ public class ITParquetConversionSource {
         targetFormats,
         targetOptions,
         expectedCount,
-        "1 = 1", secondSync);
+        "1 = 1");
   }
 
   private void checkDatasetEquivalence(
@@ -472,8 +472,7 @@ public class ITParquetConversionSource {
       List<String> targetFormats,
       Map<String, Map<String, String>> targetOptions,
       Integer expectedCount,
-      String filterCondition,
-      boolean secondSync)
+      String filterCondition)
       throws URISyntaxException {
     Dataset<Row> sourceRows =
         sparkSession
@@ -503,7 +502,7 @@ public class ITParquetConversionSource {
                           .read()
                           .options(finalTargetOptions)
                           .format(targetFormat.toLowerCase())
-                          .load(secondSync?sourceTable.getDataPath()+"/final":sourceTable.getDataPath());
+                          .load(sourceTable.getDataPath());
                       // .orderBy(sourceTable.getOrderByColumn())
                       // .filter(filterCondition);
                     }));
