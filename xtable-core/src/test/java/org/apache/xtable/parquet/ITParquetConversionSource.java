@@ -254,7 +254,7 @@ public class ITParquetConversionSource {
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
       conversionController.sync(conversionConfig, conversionSourceProvider);
-      checkDatasetEquivalenceWithFilter(sourceTableFormat, tableToClose, targetTableFormats);
+      checkDatasetEquivalenceWithFilter(sourceTableFormat, tableToClose, targetTableFormats, false);
     }
   }
 
@@ -321,7 +321,7 @@ public class ITParquetConversionSource {
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
       conversionController.sync(conversionConfig, conversionSourceProvider);
-      checkDatasetEquivalenceWithFilter(sourceTableFormat, tableToClose, targetTableFormats);
+      checkDatasetEquivalenceWithFilter(sourceTableFormat, tableToClose, targetTableFormats, true);
       // update the current parquet file data with another attribute the sync again
       List<Row> dataToAppend =
           Arrays.asList(
@@ -365,7 +365,10 @@ public class ITParquetConversionSource {
   }
 
   private void checkDatasetEquivalenceWithFilter(
-      String sourceFormat, GenericTable<?, ?> sourceTable, List<String> targetFormats)
+      String sourceFormat,
+      GenericTable<?, ?> sourceTable,
+      List<String> targetFormats,
+      boolean isPartitioned)
       throws URISyntaxException {
     checkDatasetEquivalence(
         sourceFormat,
@@ -373,7 +376,8 @@ public class ITParquetConversionSource {
         Collections.emptyMap(),
         targetFormats,
         Collections.emptyMap(),
-        null);
+        null,
+        isPartitioned);
   }
 
   private void checkDatasetEquivalence(
@@ -382,7 +386,8 @@ public class ITParquetConversionSource {
       Map<String, String> sourceOptions,
       List<String> targetFormats,
       Map<String, Map<String, String>> targetOptions,
-      Integer expectedCount)
+      Integer expectedCount,
+      boolean isPartitioned)
       throws URISyntaxException {
     Dataset<Row> sourceRows =
         sparkSession
@@ -439,7 +444,16 @@ public class ITParquetConversionSource {
       } else {
         assertFalse(dataset1Rows.isEmpty());
       }
-      if (!format.equals("HUDI")) {
+      if (isPartitioned) { // discard Hudi case because the partitioned col values won't be equal
+        if (!format.equals("HUDI")) {
+          assertEquals(
+              dataset1Rows,
+              dataset2Rows,
+              String.format(
+                  "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
+                  sourceFormat, format));
+        }
+      } else {
         assertEquals(
             dataset1Rows,
             dataset2Rows,
