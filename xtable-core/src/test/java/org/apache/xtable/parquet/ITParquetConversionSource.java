@@ -364,6 +364,51 @@ public class ITParquetConversionSource {
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalenceWithFilter(
           sourceTableFormat, tableToClose, targetTableFormats, filter);
+      // update the current tempDirs parquet file data with another attribute the sync again
+      List<Row> dataToAppend =
+          Arrays.asList(
+              RowFactory.create(
+                  10,
+                  "BobAppended",
+                  false,
+                  70.3,
+                  new Timestamp(System.currentTimeMillis() + 1500)));
+      Dataset<Row> oldDf =
+          sparkSession
+              .read()
+              .option("recursiveFileLookup", "true")
+              .option("pathGlobFilter", "*.parquet")
+              .parquet(dataPathPart);
+      Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
+      Dataset<Row> combinedDf = oldDf.union(dfAppend);
+      combinedDf
+          .withColumn(
+              "year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
+          .withColumn(
+              "month",
+              functions.date_format(functions.col("timestamp").cast(DataTypes.TimestampType), "MM"))
+          .write()
+          .mode(SaveMode.Overwrite)
+          .partitionBy("year", "month")
+          .parquet(dataPathPart);
+      GenericTable tableAppend;
+      tableAppend =
+          GenericTable.getInstance(
+              tableName, Paths.get(dataPathPart), sparkSession, jsc, sourceTableFormat, true);
+      try (GenericTable tableToCloseAppended = tableAppend) {
+        ConversionConfig conversionConfigAppended =
+            getTableSyncConfig(
+                sourceTableFormat,
+                SyncMode.FULL,
+                tableName,
+                tableAppend,
+                targetTableFormats,
+                xTablePartitionConfig,
+                null);
+        conversionController.sync(conversionConfigAppended, conversionSourceProvider);
+        checkDatasetEquivalenceWithFilter(
+            sourceTableFormat, tableToCloseAppended, targetTableFormats, filter);
+      }
 
     } catch (URISyntaxException e) {
       throw e;
