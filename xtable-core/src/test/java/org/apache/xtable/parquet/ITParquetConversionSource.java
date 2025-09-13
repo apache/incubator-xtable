@@ -291,7 +291,7 @@ public class ITParquetConversionSource {
           new ConversionController(jsc.hadoopConfiguration());
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalenceWithFilter(
-          sourceTableFormat, tableToClose, targetTableFormats, filter);
+          sourceTableFormat, tableToClose, targetTableFormats, filter,false);
     } catch (URISyntaxException e) {
       throw e;
     }
@@ -363,7 +363,7 @@ public class ITParquetConversionSource {
           new ConversionController(jsc.hadoopConfiguration());
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalenceWithFilter(
-          sourceTableFormat, tableToClose, targetTableFormats, filter);
+          sourceTableFormat, tableToClose, targetTableFormats, filter, false);
       // update the current tempDirs parquet file data with another attribute the sync again
       List<Row> dataToAppend =
           Arrays.asList(
@@ -407,7 +407,7 @@ public class ITParquetConversionSource {
                 null);
         conversionController.sync(conversionConfigAppended, conversionSourceProvider);
         checkDatasetEquivalenceWithFilter(
-            sourceTableFormat, tableToCloseAppended, targetTableFormats, filter);
+            sourceTableFormat, tableToCloseAppended, targetTableFormats, filter, true);
       }
 
     } catch (URISyntaxException e) {
@@ -419,7 +419,7 @@ public class ITParquetConversionSource {
       String sourceFormat,
       GenericTable<?, ?> sourceTable,
       List<String> targetFormats,
-      String filter)
+      String filter, boolean secondSync)
       throws URISyntaxException {
     checkDatasetEquivalence(
         sourceFormat,
@@ -428,14 +428,14 @@ public class ITParquetConversionSource {
         targetFormats,
         Collections.emptyMap(),
         null,
-        filter);
+        filter, secondSync);
   }
 
   private void checkDatasetEquivalence(
       String sourceFormat,
       GenericTable<?, ?> sourceTable,
       List<String> targetFormats,
-      Integer expectedCount)
+      Integer expectedCount, boolean secondSync)
       throws URISyntaxException {
     checkDatasetEquivalence(
         sourceFormat,
@@ -444,7 +444,7 @@ public class ITParquetConversionSource {
         targetFormats,
         Collections.emptyMap(),
         expectedCount,
-        "1 = 1");
+        "1 = 1", secondSync);
   }
 
   private void checkDatasetEquivalence(
@@ -453,7 +453,7 @@ public class ITParquetConversionSource {
       Map<String, String> sourceOptions,
       List<String> targetFormats,
       Map<String, Map<String, String>> targetOptions,
-      Integer expectedCount)
+      Integer expectedCount, boolean secondSync)
       throws URISyntaxException {
     checkDatasetEquivalence(
         sourceFormat,
@@ -462,7 +462,7 @@ public class ITParquetConversionSource {
         targetFormats,
         targetOptions,
         expectedCount,
-        "1 = 1");
+        "1 = 1", secondSync);
   }
 
   private void checkDatasetEquivalence(
@@ -472,7 +472,8 @@ public class ITParquetConversionSource {
       List<String> targetFormats,
       Map<String, Map<String, String>> targetOptions,
       Integer expectedCount,
-      String filterCondition)
+      String filterCondition,
+      boolean secondSync)
       throws URISyntaxException {
     Dataset<Row> sourceRows =
         sparkSession
@@ -502,7 +503,7 @@ public class ITParquetConversionSource {
                           .read()
                           .options(finalTargetOptions)
                           .format(targetFormat.toLowerCase())
-                          .load(sourceTable.getDataPath());
+                          .load(secondSync?sourceTable.getDataPath()+"/final":sourceTable.getDataPath());
                       // .orderBy(sourceTable.getOrderByColumn())
                       // .filter(filterCondition);
                     }));
