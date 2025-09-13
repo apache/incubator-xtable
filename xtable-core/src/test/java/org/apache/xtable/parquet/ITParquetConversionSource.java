@@ -275,7 +275,8 @@ public class ITParquetConversionSource {
     df.write().mode(SaveMode.Overwrite).parquet(dataPath);
     GenericTable table;
     table =
-        GenericTable.getInstance(tableName, Paths.get(dataPath), sparkSession, jsc, sourceTableFormat, false);
+        GenericTable.getInstance(
+            tableName, Paths.get(dataPath), sparkSession, jsc, sourceTableFormat, false);
     try (GenericTable tableToClose = table) {
       ConversionConfig conversionConfig =
           getTableSyncConfig(
@@ -335,7 +336,7 @@ public class ITParquetConversionSource {
                   new MetadataBuilder().putString("precision", "millis").build())
             });
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-      String dataPathPart = tempDir.toAbsolutePath().toString() + "/partitioned_data";
+    String dataPathPart = tempDir.toAbsolutePath().toString() + "/partitioned_data";
     df.withColumn("year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
         .withColumn(
             "month",
@@ -346,7 +347,8 @@ public class ITParquetConversionSource {
         .parquet(dataPathPart);
     GenericTable table;
     table =
-        GenericTable.getInstance(tableName, Paths.get(dataPathPart), sparkSession, jsc, sourceTableFormat, true);
+        GenericTable.getInstance(
+            tableName, Paths.get(dataPathPart), sparkSession, jsc, sourceTableFormat, true);
     try (GenericTable tableToClose = table) {
       ConversionConfig conversionConfig =
           getTableSyncConfig(
