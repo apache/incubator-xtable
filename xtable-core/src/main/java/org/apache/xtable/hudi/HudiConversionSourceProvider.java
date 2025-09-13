@@ -43,7 +43,7 @@ public class HudiConversionSourceProvider extends ConversionSourceProvider<Hoodi
       log.warn("Source table is Merge On Read. Only base files will be synced");
     }
 
-    final HudiSourcePartitionSpecExtractor sourcePartitionSpecExtractor =
+    final PathBasedPartitionSpecExtractor sourcePartitionSpecExtractor =
         HudiSourceConfig.fromProperties(sourceTable.getAdditionalProperties())
             .loadSourcePartitionSpecExtractor();
 

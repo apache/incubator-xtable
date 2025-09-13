@@ -16,19 +16,15 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.hudi;
+package org.apache.xtable.parquet;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import lombok.AllArgsConstructor;
 
-import org.apache.xtable.model.schema.InternalField;
-import org.apache.xtable.model.schema.InternalPartitionField;
-import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.schema.PartitionFieldSpec;
+import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
+import org.apache.xtable.model.schema.*;
 import org.apache.xtable.schema.SchemaFieldFinder;
 
 /**
@@ -36,8 +32,14 @@ import org.apache.xtable.schema.SchemaFieldFinder;
  * path:type:format for date types or path:type for value types.
  */
 @AllArgsConstructor
-public class ConfigurationBasedPartitionSpecExtractor implements PathBasedPartitionSpecExtractor {
-  private final List<PartitionFieldSpec> partitionFieldSpecs;
+public class ParquetPartitionSpecExtractor implements PathBasedPartitionSpecExtractor {
+  private static final ParquetPartitionSpecExtractor INSTANCE =
+      new ParquetPartitionSpecExtractor(new ArrayList<>());
+  private List<PartitionFieldSpec> partitionFieldSpecs;
+
+  public static ParquetPartitionSpecExtractor getInstance() {
+    return INSTANCE;
+  }
 
   @Override
   public List<InternalPartitionField> spec(InternalSchema tableSchema) {
@@ -49,15 +51,29 @@ public class ConfigurationBasedPartitionSpecExtractor implements PathBasedPartit
       partitionFields.add(
           InternalPartitionField.builder()
               .sourceField(sourceField)
+              .partitionFieldNames(getListPartitionNamesFromFormatInput(fieldSpec.getFormat()))
               .transformType(fieldSpec.getTransformType())
               .build());
     }
     return partitionFields;
   }
 
+  public List<String> getListPartitionNamesFromFormatInput(String inputFormat) {
+    return Arrays.stream(inputFormat.split("/"))
+        .map(s -> s.split("=")[0])
+        .collect(Collectors.toList());
+  }
+
+  public List<String> getListPartitionValuesFromFormatInput(String inputFormat) {
+    return Arrays.stream(inputFormat.split("/"))
+        .map(s -> s.split("=")[1])
+        .collect(Collectors.toList());
+  }
+
   @Override
   public Map<String, String> getPathToPartitionFieldFormat() {
     Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
+
     partitionFieldSpecs.forEach(
         partitionFieldSpec -> {
           if (partitionFieldSpec.getFormat() != null) {
