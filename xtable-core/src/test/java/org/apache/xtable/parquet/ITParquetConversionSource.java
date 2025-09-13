@@ -54,7 +54,9 @@ import org.apache.spark.sql.types.MetadataBuilder;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -78,13 +80,13 @@ public class ITParquetConversionSource {
       "xtable.parquet.source.partition_field_spec_config";
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
-  @TempDir public static Path tempDir;
-  private static JavaSparkContext jsc;
-  private static SparkSession sparkSession;
+  @TempDir public Path tempDir;
+  private  JavaSparkContext jsc;
+  private  SparkSession sparkSession;
   private static StructType schema;
 
-  @BeforeAll
-  public static void setupOnce() {
+  @BeforeEach
+  public void setup() {
     SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
 
     String extraJavaOptions = "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED";
@@ -107,8 +109,8 @@ public class ITParquetConversionSource {
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
   }
 
-  @AfterAll
-  public static void teardown() {
+  @AfterEach
+  public void teardown() {
     if (jsc != null) {
       jsc.stop();
       jsc = null;
