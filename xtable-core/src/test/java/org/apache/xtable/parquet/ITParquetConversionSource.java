@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -54,9 +55,7 @@ import org.apache.spark.sql.types.MetadataBuilder;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -80,13 +79,13 @@ public class ITParquetConversionSource {
       "xtable.parquet.source.partition_field_spec_config";
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
-  @TempDir public Path tempDir;
-  private  JavaSparkContext jsc;
-  private  SparkSession sparkSession;
+  @TempDir public static Path tempDir;
+  private static JavaSparkContext jsc;
+  private static SparkSession sparkSession;
   private static StructType schema;
 
-  @BeforeEach
-  public void setup() {
+  @BeforeAll
+  public static void setupOnce() {
     SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
 
     String extraJavaOptions = "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED";
@@ -109,8 +108,8 @@ public class ITParquetConversionSource {
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
   }
 
-  @AfterEach
-  public void teardown() {
+  @AfterAll
+  public static void teardown() {
     if (jsc != null) {
       jsc.stop();
       jsc = null;
@@ -272,10 +271,11 @@ public class ITParquetConversionSource {
                   new MetadataBuilder().putString("precision", "millis").build())
             });
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-    df.write().mode(SaveMode.Overwrite).parquet(tempDir.toAbsolutePath().toString());
+    String dataPath = tempDir.toAbsolutePath().toString() + "/non_partitioned_data";
+    df.write().mode(SaveMode.Overwrite).parquet(dataPath);
     GenericTable table;
     table =
-        GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, false);
+        GenericTable.getInstance(tableName, Paths.get(dataPath), sparkSession, jsc, sourceTableFormat, false);
     try (GenericTable tableToClose = table) {
       ConversionConfig conversionConfig =
           getTableSyncConfig(
@@ -335,6 +335,7 @@ public class ITParquetConversionSource {
                   new MetadataBuilder().putString("precision", "millis").build())
             });
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
+      String dataPathPart = tempDir.toAbsolutePath().toString() + "/partitioned_data";
     df.withColumn("year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
         .withColumn(
             "month",
@@ -342,10 +343,10 @@ public class ITParquetConversionSource {
         .write()
         .mode(SaveMode.Overwrite)
         .partitionBy("year", "month")
-        .parquet(tempDir.toAbsolutePath().toString());
+        .parquet(dataPathPart);
     GenericTable table;
     table =
-        GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, true);
+        GenericTable.getInstance(tableName, Paths.get(dataPathPart), sparkSession, jsc, sourceTableFormat, true);
     try (GenericTable tableToClose = table) {
       ConversionConfig conversionConfig =
           getTableSyncConfig(
