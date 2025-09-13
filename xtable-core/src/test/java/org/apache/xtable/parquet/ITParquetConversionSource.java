@@ -233,6 +233,7 @@ public class ITParquetConversionSource {
       throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
     }
   }
+
   @ParameterizedTest
   @MethodSource("provideArgsForFileNonPartitionTesting")
   public void testFileNonPartitionedData(
