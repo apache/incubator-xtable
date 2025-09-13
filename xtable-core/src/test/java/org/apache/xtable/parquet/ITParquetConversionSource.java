@@ -390,7 +390,7 @@ public class ITParquetConversionSource {
           .write()
           .mode(SaveMode.Overwrite)
           .partitionBy("year", "month")
-          .parquet(dataPathPart);
+          .parquet(dataPathPart + "/final");
       GenericTable tableAppend;
       tableAppend =
           GenericTable.getInstance(
