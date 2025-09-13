@@ -103,6 +103,8 @@ public class ITParquetConversionSource {
 
     sparkConf.set("spark.driver.extraJavaOptions", javaOpts);
     sparkConf.set("spark.executor.extraJavaOptions", javaOpts);
+    sparkConf.set("spark.sql.parquet.writeLegacyFormat", "false");
+    sparkConf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS");
 
     sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
@@ -364,6 +366,46 @@ public class ITParquetConversionSource {
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalenceWithFilter(
           sourceTableFormat, tableToClose, targetTableFormats, filter);
+      // update the current parquet file data with another attribute the sync again
+      List<Row> dataToAppend =
+          Arrays.asList(
+              RowFactory.create(
+                  10,
+                  "BobAppended",
+                  false,
+                  70.3,
+                  new Timestamp(System.currentTimeMillis() + 1500)));
+
+      Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
+      String dataPathFinal = tempDir.toAbsolutePath().toString();
+      dfAppend
+          .withColumn(
+              "year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
+          .withColumn(
+              "month",
+              functions.date_format(functions.col("timestamp").cast(DataTypes.TimestampType), "MM"))
+          .write()
+          .mode(SaveMode.Append)
+          .partitionBy("year", "month")
+          .parquet(dataPathPart);
+      GenericTable tableAppend;
+      tableAppend =
+          GenericTable.getInstance(
+              tableName, Paths.get(dataPathPart), sparkSession, jsc, sourceTableFormat, true);
+      try (GenericTable tableToCloseAppended = tableAppend) {
+        ConversionConfig conversionConfigAppended =
+            getTableSyncConfig(
+                sourceTableFormat,
+                SyncMode.FULL,
+                tableName,
+                tableAppend,
+                targetTableFormats,
+                xTablePartitionConfig,
+                null);
+        ConversionController conversionControllerAppended =
+            new ConversionController(jsc.hadoopConfiguration());
+        conversionControllerAppended.sync(conversionConfigAppended, conversionSourceProvider);
+      }
 
     } catch (URISyntaxException e) {
       throw e;
