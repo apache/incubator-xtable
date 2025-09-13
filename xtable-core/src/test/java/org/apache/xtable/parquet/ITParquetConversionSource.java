@@ -394,7 +394,7 @@ public class ITParquetConversionSource {
       GenericTable tableAppend;
       tableAppend =
           GenericTable.getInstance(
-              tableName, Paths.get(dataPathPart), sparkSession, jsc, sourceTableFormat, true);
+              tableName, Paths.get(dataPathPart+"/final"), sparkSession, jsc, sourceTableFormat, true);
       try (GenericTable tableToCloseAppended = tableAppend) {
         ConversionConfig conversionConfigAppended =
             getTableSyncConfig(
