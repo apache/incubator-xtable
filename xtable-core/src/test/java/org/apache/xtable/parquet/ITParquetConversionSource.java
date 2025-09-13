@@ -28,10 +28,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.Arrays;
 import java.util.Collections;
@@ -65,7 +61,6 @@ import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 
 import org.apache.xtable.GenericTable;
-import org.apache.xtable.conversion.*;
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
@@ -77,8 +72,6 @@ import org.apache.xtable.model.sync.SyncMode;
 public class ITParquetConversionSource {
   public static final String PARTITION_FIELD_SPEC_CONFIG =
       "xtable.parquet.source.partition_field_spec_config";
-  private static final DateTimeFormatter DATE_FORMAT =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
   @TempDir public static Path tempDir;
   private static JavaSparkContext jsc;
   private static SparkSession sparkSession;
@@ -123,41 +116,25 @@ public class ITParquetConversionSource {
   }
 
   private static Stream<Arguments> provideArgsForFilePartitionTesting() {
-    boolean isPartitioned = true;
-    String timestampFilter =
-        String.format(
-            "timestamp_micros_nullable_field < timestamp_millis(%s)",
-            Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
-    String levelFilter = "level = 'INFO'";
-    String nestedLevelFilter = "nested_record.level = 'INFO'";
-    String severityFilter = "severity = 1";
-    String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
-    String partitionConfig = "timestamp:MONTH:year=YYYY/month=MM";
+    String partitionConfig =
+        "timestamp:MONTH:year=YYYY/month=MM"; // or "timestamp:YEAR:year=YYYY", or //
+    // timestamp:DAY:year=YYYY/month=MM/day=DD
     return Stream.of(
         Arguments.of(
             buildArgsForPartition(
-                PARQUET,
-                Arrays.asList(ICEBERG, DELTA, HUDI),
-                // "timestamp:YEAR:year=YYYY", // ts:DAY:year=YYYY/month=MM/day=DD
-                partitionConfig, // ts:DAY:year=YYYY/month=MM/day=DD
-                // "year=YYYY/month=MM/day=DD"
-                // "timestamp:YEAR:year=YYYY",
-                partitionConfig,
-                levelFilter)));
+                PARQUET, Arrays.asList(ICEBERG, DELTA, HUDI), partitionConfig, partitionConfig)));
   }
 
   private static TableFormatPartitionDataHolder buildArgsForPartition(
       String sourceFormat,
       List<String> targetFormats,
       String hudiPartitionConfig,
-      String xTablePartitionConfig,
-      String filter) {
+      String xTablePartitionConfig) {
     return TableFormatPartitionDataHolder.builder()
         .sourceTableFormat(sourceFormat)
         .targetTableFormats(targetFormats)
         .hudiSourceConfig(Optional.ofNullable(hudiPartitionConfig))
         .xTablePartitionConfig(xTablePartitionConfig)
-        .filter(filter)
         .build();
   }
 
@@ -203,24 +180,11 @@ public class ITParquetConversionSource {
   }
 
   private static Stream<Arguments> provideArgsForFileNonPartitionTesting() {
-    boolean isPartitioned = false;
-    String timestampFilter =
-        String.format(
-            "timestamp_micros_nullable_field < timestamp_millis(%s)",
-            Instant.now().truncatedTo(ChronoUnit.DAYS).minus(2, ChronoUnit.DAYS).toEpochMilli());
-    String levelFilter = "level = 'INFO'";
-    String nestedLevelFilter = "nested_record.level = 'INFO'";
-    String severityFilter = "severity = 1";
-    String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
     String partitionConfig = null;
     return Stream.of(
         Arguments.of(
             buildArgsForPartition(
-                PARQUET,
-                Arrays.asList(ICEBERG, DELTA, HUDI),
-                partitionConfig,
-                partitionConfig,
-                levelFilter)));
+                PARQUET, Arrays.asList(ICEBERG, DELTA, HUDI), partitionConfig, partitionConfig)));
   }
 
   private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
@@ -241,9 +205,7 @@ public class ITParquetConversionSource {
     String tableName = getTableName();
     String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
     List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
-    // Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
     String xTablePartitionConfig = tableFormatPartitionDataHolder.getXTablePartitionConfig();
-    String filter = tableFormatPartitionDataHolder.getFilter();
     ConversionSourceProvider<?> conversionSourceProvider =
         getConversionSourceProvider(sourceTableFormat);
 
@@ -292,10 +254,7 @@ public class ITParquetConversionSource {
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
       conversionController.sync(conversionConfig, conversionSourceProvider);
-      checkDatasetEquivalenceWithFilter(
-          sourceTableFormat, tableToClose, targetTableFormats, filter);
-    } catch (URISyntaxException e) {
-      throw e;
+      checkDatasetEquivalenceWithFilter(sourceTableFormat, tableToClose, targetTableFormats);
     }
   }
 
@@ -306,9 +265,7 @@ public class ITParquetConversionSource {
     String tableName = getTableName();
     String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
     List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
-    // Optional<String> hudiPartitionConfig = tableFormatPartitionDataHolder.getHudiSourceConfig();
     String xTablePartitionConfig = tableFormatPartitionDataHolder.getXTablePartitionConfig();
-    String filter = tableFormatPartitionDataHolder.getFilter();
     ConversionSourceProvider<?> conversionSourceProvider =
         getConversionSourceProvider(sourceTableFormat);
     // create the data
@@ -364,8 +321,7 @@ public class ITParquetConversionSource {
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
       conversionController.sync(conversionConfig, conversionSourceProvider);
-      checkDatasetEquivalenceWithFilter(
-          sourceTableFormat, tableToClose, targetTableFormats, filter);
+      checkDatasetEquivalenceWithFilter(sourceTableFormat, tableToClose, targetTableFormats);
       // update the current parquet file data with another attribute the sync again
       List<Row> dataToAppend =
           Arrays.asList(
@@ -377,7 +333,6 @@ public class ITParquetConversionSource {
                   new Timestamp(System.currentTimeMillis() + 1500)));
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
-      String dataPathFinal = tempDir.toAbsolutePath().toString();
       dfAppend
           .withColumn(
               "year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
@@ -406,17 +361,11 @@ public class ITParquetConversionSource {
             new ConversionController(jsc.hadoopConfiguration());
         conversionControllerAppended.sync(conversionConfigAppended, conversionSourceProvider);
       }
-
-    } catch (URISyntaxException e) {
-      throw e;
     }
   }
 
   private void checkDatasetEquivalenceWithFilter(
-      String sourceFormat,
-      GenericTable<?, ?> sourceTable,
-      List<String> targetFormats,
-      String filter)
+      String sourceFormat, GenericTable<?, ?> sourceTable, List<String> targetFormats)
       throws URISyntaxException {
     checkDatasetEquivalence(
         sourceFormat,
@@ -424,24 +373,7 @@ public class ITParquetConversionSource {
         Collections.emptyMap(),
         targetFormats,
         Collections.emptyMap(),
-        null,
-        filter);
-  }
-
-  private void checkDatasetEquivalence(
-      String sourceFormat,
-      GenericTable<?, ?> sourceTable,
-      List<String> targetFormats,
-      Integer expectedCount)
-      throws URISyntaxException {
-    checkDatasetEquivalence(
-        sourceFormat,
-        sourceTable,
-        Collections.emptyMap(),
-        targetFormats,
-        Collections.emptyMap(),
-        expectedCount,
-        "1 = 1");
+        null);
   }
 
   private void checkDatasetEquivalence(
@@ -451,25 +383,6 @@ public class ITParquetConversionSource {
       List<String> targetFormats,
       Map<String, Map<String, String>> targetOptions,
       Integer expectedCount)
-      throws URISyntaxException {
-    checkDatasetEquivalence(
-        sourceFormat,
-        sourceTable,
-        sourceOptions,
-        targetFormats,
-        targetOptions,
-        expectedCount,
-        "1 = 1");
-  }
-
-  private void checkDatasetEquivalence(
-      String sourceFormat,
-      GenericTable<?, ?> sourceTable,
-      Map<String, String> sourceOptions,
-      List<String> targetFormats,
-      Map<String, Map<String, String>> targetOptions,
-      Integer expectedCount,
-      String filterCondition)
       throws URISyntaxException {
     Dataset<Row> sourceRows =
         sparkSession
@@ -478,9 +391,7 @@ public class ITParquetConversionSource {
             .options(sourceOptions)
             .option("recursiveFileLookup", "true")
             .option("pathGlobFilter", "*.parquet")
-            .parquet(sourceTable.getDataPath()); // + "/**/*.parquet");
-    // .orderBy(sourceTable.getOrderByColumn())
-    // .filter(filterCondition);
+            .parquet(sourceTable.getDataPath());
     Map<String, Dataset<Row>> targetRowsByFormat =
         targetFormats.stream()
             .collect(
@@ -500,8 +411,6 @@ public class ITParquetConversionSource {
                           .options(finalTargetOptions)
                           .format(targetFormat.toLowerCase())
                           .load(sourceTable.getDataPath());
-                      // .orderBy(sourceTable.getOrderByColumn())
-                      // .filter(filterCondition);
                     }));
 
     String[] selectColumnsArr = schema.fieldNames();
@@ -537,20 +446,7 @@ public class ITParquetConversionSource {
             String.format(
                 "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
                 sourceFormat, format));
-      } /* else {// HUDI partitioning approach leads to partition value that are different
-          assertEquals(
-              sourceRows
-                  .selectExpr(selectColumnsArr)
-                  .withColumn(
-                      "timestamp",
-                      functions.year(functions.col("timestamp")).cast(DataTypes.StringType))
-                  .toJSON()
-                  .collectAsList(),
-              dataset2Rows,
-              String.format(
-                  "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
-                  sourceFormat, format));
-        }*/
+      }
     }
   }
 

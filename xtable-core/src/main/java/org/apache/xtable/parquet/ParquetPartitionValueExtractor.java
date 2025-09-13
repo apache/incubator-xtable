@@ -80,16 +80,15 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
       InternalPartitionField field, String remainingPath, int totalNumberOfPartitions, int index) {
     switch (field.getTransformType()) {
       case YEAR:
-      case MONTH: // TODO split and get the value of month from pathToPartitionFieldFormat
-      case DAY: // TODO split and get the value of day from pathToPartitionFieldFormat
+      case MONTH:
+      case DAY:
       case HOUR:
         return parseDate(
             remainingPath,
             partitionSpecExtractor
                 .getListPartitionValuesFromFormatInput(
                     pathToPartitionFieldFormat.get(field.getSourceField().getName()))
-                .get(index)); // changed from getPath() TODO split and get the value of hour
-        // from pathToPartitionFieldFormat
+                .get(index));
       case VALUE:
         // if there is only one partition field, then assume full partition path is used even if
         // value contains slashes

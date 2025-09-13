@@ -100,7 +100,7 @@ public class ParquetSchemaExtractor {
           // PrimitiveTypes
         case INT96: // TODO check logicaltypes of INT96
           metadata.put(
-              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
+              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.NANOS);
           newDataType = InternalType.TIMESTAMP;
           break;
         case INT64:

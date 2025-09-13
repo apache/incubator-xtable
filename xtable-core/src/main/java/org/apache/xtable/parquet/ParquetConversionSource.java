@@ -234,7 +234,6 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     LocatedFileStatus parquetFile = getMostRecentParquetFile(parquetFiles);
     Path parquetFilePath = parquetFile.getPath();
     while (parquetFile.isFile() && parquetFile.getModificationTime() > modficationTime) {
-      // check the preceeding parquetFile
       parquetFiles.filter(file -> !file.getPath().equals(parquetFilePath));
       parquetFile = getMostRecentParquetFile(parquetFiles);
     }
