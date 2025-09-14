@@ -229,15 +229,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
-    long modficationTime = instant.getEpochSecond();
-    Stream<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
-    LocatedFileStatus parquetFile = getMostRecentParquetFile(parquetFiles);
-    Path parquetFilePath = parquetFile.getPath();
-    while (parquetFile.isFile() && parquetFile.getModificationTime() > modficationTime) {
-      parquetFiles.filter(file -> !file.getPath().equals(parquetFilePath));
-      parquetFile = getMostRecentParquetFile(parquetFiles);
-    }
-    return parquetFile.isFile();
+    return false;
   }
 
   @Override

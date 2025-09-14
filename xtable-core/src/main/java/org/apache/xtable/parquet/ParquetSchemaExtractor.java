@@ -319,13 +319,7 @@ public class ParquetSchemaExtractor {
               // .recordKeyFields(subFields) // necessary for Hudi metadata
               .dataType(InternalType.RECORD)
               .fields(subFields)
-              .isNullable(isNullable) // false isNullable(schema.asGroupType()) (TODO causing
-              // metadata error in
-              // Hudi) isNullable
-              // should be set false: if all fields are required then
-              // it is
-              // NOT nullable as opposed to Parquet nature to assign repeated for a
-              // record as a collection of data
+              .isNullable(isNullable)
               .build();
         }
       }
