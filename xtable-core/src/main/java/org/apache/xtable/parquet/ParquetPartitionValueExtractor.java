@@ -81,7 +81,6 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
                     .get(index));
         index++;
       }
-
       try {
         result.add(
             PartitionValue.builder()

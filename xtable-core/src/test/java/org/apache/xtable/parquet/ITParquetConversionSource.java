@@ -116,9 +116,9 @@ public class ITParquetConversionSource {
   }
   // delimiter must be / and not - or any other one
   private static Stream<Arguments> provideArgsForFilePartitionTesting() {
-    String partitionConfig = // "timestamp:YEAR:year=YYYY";
-        "timestamp:MONTH:year=YYYY/month=MM"; // or "timestamp:YEAR:year=YYYY", or //
-    // timestamp:DAY:year=YYYY/month=MM/day=DD
+    String partitionConfig = // "timestamp:YEAR:year=yyyy";
+        "timestamp:MONTH:year=yyyy/month=mm"; // or "timestamp:YEAR:year=yyyy", or //
+    // timestamp:DAY:year=yyyy/month=mm/day=dd
     return Stream.of(
         Arguments.of(
             buildArgsForPartition(
