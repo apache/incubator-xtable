@@ -48,6 +48,8 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
 
   public List<PartitionValue> extractPartitionValues(
       List<InternalPartitionField> partitionColumns, String partitionPath) {
+    PartialResult valueAndRemainingPath = null;
+    long dateSinceEpoch = 0L;
     if (partitionColumns.size() == 0) {
       return Collections.emptyList();
     }
@@ -61,17 +63,20 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
           remainingPartitionPath =
               remainingPartitionPath.substring(partitionFieldName.length() + 1);
         }
-        PartialResult valueAndRemainingPath =
+        valueAndRemainingPath =
             parsePartitionPath(
                 partitionField, remainingPartitionPath, totalNumberOfPartitions, index);
-        result.add(
-            PartitionValue.builder()
-                .partitionField(partitionField)
-                .range(Range.scalar(valueAndRemainingPath.getValue()))
-                .build());
+
         index++;
         remainingPartitionPath = valueAndRemainingPath.getRemainingPath();
+        // add up the dateAsEpochMillis of all partition values
+        dateSinceEpoch = +(long) valueAndRemainingPath.getValue();
       }
+      result.add(
+          PartitionValue.builder()
+              .partitionField(partitionField)
+              .range(Range.scalar(/*valueAndRemainingPath.getValue()*/ (Object) dateSinceEpoch))
+              .build());
     }
     return result;
   }
