@@ -114,9 +114,9 @@ public class ITParquetConversionSource {
       sparkSession = null;
     }
   }
-
+  // delimiter must be / and not - or any other one
   private static Stream<Arguments> provideArgsForFilePartitionTesting() {
-    String partitionConfig =
+    String partitionConfig = // "timestamp:YEAR:year=YYYY";
         "timestamp:MONTH:year=YYYY/month=MM"; // or "timestamp:YEAR:year=YYYY", or //
     // timestamp:DAY:year=YYYY/month=MM/day=DD
     return Stream.of(

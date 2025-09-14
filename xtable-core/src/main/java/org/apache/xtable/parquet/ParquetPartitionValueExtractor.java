@@ -18,6 +18,8 @@
  
 package org.apache.xtable.parquet;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 import lombok.NonNull;
@@ -49,6 +51,8 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
   public List<PartitionValue> extractPartitionValues(
       List<InternalPartitionField> partitionColumns, String partitionPath) {
     PartialResult valueAndRemainingPath = null;
+    String currentDateValue = "";
+    List<String> parsedDateValues = new ArrayList<>();
     long dateSinceEpoch = 0L;
     if (partitionColumns.size() == 0) {
       return Collections.emptyList();
@@ -63,49 +67,67 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
           remainingPartitionPath =
               remainingPartitionPath.substring(partitionFieldName.length() + 1);
         }
-        valueAndRemainingPath =
-            parsePartitionPath(
-                partitionField, remainingPartitionPath, totalNumberOfPartitions, index);
+        // parsePartitionPath shouldn't do two things but only gets the remaining path
+        // to store the parsed value for the current partition field
+        currentDateValue = parsePartitionDateValue(partitionField, remainingPartitionPath, index);
+        parsedDateValues.add(currentDateValue);
 
+        remainingPartitionPath =
+            getRemainingPath(
+                remainingPartitionPath,
+                partitionSpecExtractor
+                    .getListPartitionValuesFromFormatInput(
+                        pathToPartitionFieldFormat.get(partitionField.getSourceField().getName()))
+                    .get(index));
         index++;
-        remainingPartitionPath = valueAndRemainingPath.getRemainingPath();
-        // add up the dateAsEpochMillis of all partition values
-        dateSinceEpoch = +(long) valueAndRemainingPath.getValue();
       }
-      result.add(
-          PartitionValue.builder()
-              .partitionField(partitionField)
-              .range(Range.scalar(/*valueAndRemainingPath.getValue()*/ (Object) dateSinceEpoch))
-              .build());
+
+      try {
+        result.add(
+            PartitionValue.builder()
+                .partitionField(partitionField)
+                .range(
+                    Range.scalar((Object) computeSinceEpochValue(parsedDateValues, partitionField)))
+                .build());
+      } catch (ParseException e) {
+        e.printStackTrace();
+      }
     }
     return result;
   }
 
-  protected PartialResult parsePartitionPath(
-      InternalPartitionField field, String remainingPath, int totalNumberOfPartitions, int index) {
-    switch (field.getTransformType()) {
-      case YEAR:
-      case MONTH:
-      case DAY:
-      case HOUR:
-        return parseDate(
-            remainingPath,
-            partitionSpecExtractor
-                .getListPartitionValuesFromFormatInput(
-                    pathToPartitionFieldFormat.get(field.getSourceField().getName()))
-                .get(index));
-      case VALUE:
-        // if there is only one partition field, then assume full partition path is used even if
-        // value contains slashes
-        // this case is possible if user is directly relying on directly _hoodie_partition_path due
-        // to custom partitioning logic
-        boolean isSlashDelimited = totalNumberOfPartitions > 1;
-        return parseValue(
-            remainingPath, field.getSourceField().getSchema().getDataType(), isSlashDelimited);
-      default:
-        throw new IllegalArgumentException(
-            "Unexpected partition type: " + field.getTransformType());
-    }
+  protected String parsePartitionDateValue(
+      InternalPartitionField field, String remainingPath, int index) {
+    return parseDateValue(
+        remainingPath,
+        partitionSpecExtractor
+            .getListPartitionValuesFromFormatInput(
+                pathToPartitionFieldFormat.get(field.getSourceField().getName()))
+            .get(index));
+  }
+
+  private long computeSinceEpochValue(
+      List<String> parsedDateValues, InternalPartitionField partitionField) throws ParseException {
+    // in the list of parsed values combine them using the standard way using hyphen symbol then
+    // parse the date into sinceEpoch
+    String combinedDate = String.join("-", parsedDateValues); // SimpleDateFormat works with hyphens
+    // convert to since Epoch
+    SimpleDateFormat simpleDateFormat =
+        new SimpleDateFormat(
+            String.join(
+                "-",
+                partitionSpecExtractor.getListPartitionValuesFromFormatInput(
+                    pathToPartitionFieldFormat.get(partitionField.getSourceField().getName()))));
+    simpleDateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+    return simpleDateFormat.parse(combinedDate).toInstant().toEpochMilli();
+  }
+
+  protected static String parseDateValue(String remainingPath, String format) {
+    return remainingPath.substring(0, format.length());
+  }
+
+  protected static String getRemainingPath(String remainingPath, String format) {
+    return remainingPath.substring(Math.min(remainingPath.length(), format.length() + 1));
   }
 
   public static ParquetPartitionValueExtractor getInstance() {
