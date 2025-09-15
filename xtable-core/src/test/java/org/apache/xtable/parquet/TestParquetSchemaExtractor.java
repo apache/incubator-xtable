@@ -277,7 +277,7 @@ public class TestParquetSchemaExtractor {
         InternalSchema.builder()
             .name("my_record")
             .dataType(InternalType.RECORD)
-            .isNullable(true)
+            .isNullable(false)
             .fields(
                 Arrays.asList(
                     InternalField.builder()

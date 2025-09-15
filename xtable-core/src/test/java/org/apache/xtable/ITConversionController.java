@@ -24,6 +24,7 @@ import static org.apache.xtable.hudi.HudiTestUtil.PartitionConfig;
 import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -485,7 +486,11 @@ public class ITConversionController {
 
   private static List<String> getOtherFormats(String sourceTableFormat) {
     return Arrays.stream(TableFormat.values())
-        .filter(format -> !format.equals(sourceTableFormat))
+        .filter(
+            format ->
+                !format.equals(sourceTableFormat)
+                    && !format.equals(
+                        PARQUET)) // excluded file formats because upset, insert etc. not supported
         .collect(Collectors.toList());
   }
 

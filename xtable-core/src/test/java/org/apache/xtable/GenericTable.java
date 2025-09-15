@@ -21,6 +21,7 @@ package org.apache.xtable;
 import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -31,6 +32,8 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 
 import org.apache.hudi.common.model.HoodieTableType;
+
+import org.apache.xtable.parquet.TestSparkParquetTable;
 
 public interface GenericTable<T, Q> extends AutoCloseable {
   // A list of values for the level field which serves as a basic field to partition on for tests
@@ -76,6 +79,9 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       String sourceFormat,
       boolean isPartitioned) {
     switch (sourceFormat) {
+      case PARQUET:
+        return TestSparkParquetTable.forStandardSchemaAndPartitioning(
+            tableName, tempDir, jsc, isPartitioned);
       case HUDI:
         return TestSparkHudiTable.forStandardSchemaAndPartitioning(
             tableName, tempDir, jsc, isPartitioned);

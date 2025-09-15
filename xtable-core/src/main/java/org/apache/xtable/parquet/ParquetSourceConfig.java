@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.hudi;
+package org.apache.xtable.parquet;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,36 +28,32 @@ import lombok.Value;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.schema.PartitionFieldSpec;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.reflection.ReflectionUtils;
 
-/** Configuration of Hudi source format for the sync process. */
+/** Configuration of Parquet source format for the sync process. */
 @Value
-public class HudiSourceConfig {
+public class ParquetSourceConfig {
   public static final String PARTITION_SPEC_EXTRACTOR_CLASS =
-      "xtable.hudi.source.partition_spec_extractor_class";
+      "xtable.parquet.source.partition_spec_extractor_class";
   public static final String PARTITION_FIELD_SPEC_CONFIG =
-      "xtable.hudi.source.partition_field_spec_config";
+      "xtable.parquet.source.partition_field_spec_config";
 
   String partitionSpecExtractorClass;
   List<PartitionFieldSpec> partitionFieldSpecs;
 
-  public static HudiSourceConfig fromPartitionFieldSpecConfig(String partitionFieldSpecConfig) {
-    return new HudiSourceConfig(
-        ConfigurationBasedPartitionSpecExtractor.class.getName(),
-        parsePartitionFieldSpecs(partitionFieldSpecConfig));
-  }
-
-  public static HudiSourceConfig fromProperties(Properties properties) {
+  public static ParquetSourceConfig fromProperties(Properties properties) {
     String partitionSpecExtractorClass =
         properties.getProperty(
-            PARTITION_SPEC_EXTRACTOR_CLASS,
-            ConfigurationBasedPartitionSpecExtractor.class.getName());
+            PARTITION_SPEC_EXTRACTOR_CLASS, ParquetPartitionSpecExtractor.class.getName());
+
     String partitionFieldSpecString = properties.getProperty(PARTITION_FIELD_SPEC_CONFIG);
+
     List<PartitionFieldSpec> partitionFieldSpecs =
         parsePartitionFieldSpecs(partitionFieldSpecString);
-    return new HudiSourceConfig(partitionSpecExtractorClass, partitionFieldSpecs);
+    return new ParquetSourceConfig(partitionSpecExtractorClass, partitionFieldSpecs);
   }
 
   public static List<PartitionFieldSpec> parsePartitionFieldSpecs(String input) {
@@ -80,8 +76,8 @@ public class HudiSourceConfig {
 
   public PathBasedPartitionSpecExtractor loadSourcePartitionSpecExtractor() {
     Preconditions.checkNotNull(
-        partitionSpecExtractorClass, "HudiSourcePartitionSpecExtractor class not provided");
+        this.partitionSpecExtractorClass, "PathBasedPartitionSpecExtractor class not provided");
     return ReflectionUtils.createInstanceOfClass(
-        partitionSpecExtractorClass, this.getPartitionFieldSpecs());
+        this.partitionSpecExtractorClass, this.getPartitionFieldSpecs());
   }
 }

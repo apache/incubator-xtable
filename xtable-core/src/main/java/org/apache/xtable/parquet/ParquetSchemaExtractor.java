@@ -97,6 +97,11 @@ public class ParquetSchemaExtractor {
       primitiveType = schema.asPrimitiveType();
       switch (primitiveType.getPrimitiveTypeName()) {
           // PrimitiveTypes
+        case INT96: // TODO check logicaltypes of INT96
+          metadata.put(
+              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.NANOS);
+          newDataType = InternalType.TIMESTAMP;
+          break;
         case INT64:
           logicalType = schema.getLogicalTypeAnnotation();
           if (logicalType instanceof LogicalTypeAnnotation.TimestampLogicalTypeAnnotation) {
@@ -169,6 +174,9 @@ public class ParquetSchemaExtractor {
             newDataType = InternalType.INT;
           }
           break;
+        case DOUBLE:
+          newDataType = InternalType.DOUBLE;
+          break;
         case FLOAT:
           newDataType = InternalType.FLOAT;
           break;
@@ -210,7 +218,6 @@ public class ParquetSchemaExtractor {
                 InternalSchema.MetadataKey.DECIMAL_SCALE,
                 ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getScale());
             newDataType = InternalType.DECIMAL;
-
           } else {
             newDataType = InternalType.BYTES;
           }
@@ -270,12 +277,10 @@ public class ParquetSchemaExtractor {
             .fields(valueSchema.getFields())
             .build();
       } else {
-
         subFields = new ArrayList<>(schema.asGroupType().getFields().size());
         for (Type parquetField : schema.asGroupType().getFields()) {
           String fieldName = parquetField.getName();
           Type.ID fieldId = parquetField.getId();
-          currentRepetition = parquetField.getRepetition();
           InternalSchema subFieldSchema =
               toInternalSchema(
                   parquetField, SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
@@ -284,6 +289,7 @@ public class ParquetSchemaExtractor {
               == 1) { // TODO Tuple (many subelements in a list)
             newDataType = subFieldSchema.getDataType();
             elementName = subFieldSchema.getName();
+            // subFields = subFieldSchema.getFields();
             break;
           }
           subFields.add(
@@ -295,15 +301,18 @@ public class ParquetSchemaExtractor {
                   .fieldId(fieldId == null ? null : fieldId.intValue())
                   .build());
         }
-        if (currentRepetition != Repetition.REPEATED
-            && schema.asGroupType().getName() != "list"
+        // RECORD Type (non-nullable elements)
+        if (!schema.asGroupType().getName().equals("list")
             && !Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) {
+          boolean isNullable =
+              subFields.stream().anyMatch(ele -> ele.getSchema().isNullable())
+                  && isNullable(schema.asGroupType());
           return InternalSchema.builder()
               .name(schema.getName())
               .comment(null)
               .dataType(InternalType.RECORD)
               .fields(subFields)
-              .isNullable(isNullable(schema.asGroupType()))
+              .isNullable(isNullable)
               .build();
         }
       }

@@ -16,16 +16,19 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.hudi;
+package org.apache.xtable.model.schema;
 
-import java.util.Map;
-
-import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
+import lombok.Value;
 
 /**
- * Partition spec extractor interface specifically designed for Hudi to parse partition values
- * appropriately.
+ * PartitionFieldSpec represents a schema for the partition format as specified through the user
+ * configuration for the conversion
+ *
+ * @since 0.3
  */
-public interface HudiSourcePartitionSpecExtractor extends SourcePartitionSpecExtractor {
-  Map<String, String> getPathToPartitionFieldFormat();
+@Value
+public class PartitionFieldSpec {
+  String sourceFieldPath;
+  PartitionTransformType transformType;
+  String format;
 }

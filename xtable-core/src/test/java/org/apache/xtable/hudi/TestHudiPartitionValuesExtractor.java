@@ -74,7 +74,7 @@ public class TestHudiPartitionValuesExtractor {
             PartitionValue.builder().partitionField(column).range(Range.scalar("foo")).build());
 
     List<PartitionValue> actual =
-        new HudiPartitionValuesExtractor(Collections.emptyMap())
+        new PathBasedPartitionValuesExtractor(Collections.emptyMap())
             .extractPartitionValues(Collections.singletonList(column), "foo");
     Assertions.assertEquals(expected, actual);
   }
@@ -100,7 +100,7 @@ public class TestHudiPartitionValuesExtractor {
             PartitionValue.builder().partitionField(column).range(Range.scalar("foo/bar")).build());
 
     List<PartitionValue> actual =
-        new HudiPartitionValuesExtractor(Collections.emptyMap())
+        new PathBasedPartitionValuesExtractor(Collections.emptyMap())
             .extractPartitionValues(Collections.singletonList(column), "foo/bar");
     Assertions.assertEquals(expected, actual);
   }
@@ -239,7 +239,7 @@ public class TestHudiPartitionValuesExtractor {
     Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
     pathToPartitionFieldFormat.put(column.getSourceField().getPath(), format);
     List<PartitionValue> actual =
-        new HudiPartitionValuesExtractor(pathToPartitionFieldFormat)
+        new PathBasedPartitionValuesExtractor(pathToPartitionFieldFormat)
             .extractPartitionValues(Collections.singletonList(column), partitionString);
     Assertions.assertEquals(expected, actual);
   }
@@ -298,7 +298,7 @@ public class TestHudiPartitionValuesExtractor {
     Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
     pathToPartitionFieldFormat.put(column2.getSourceField().getPath(), "yyyy/MM/dd");
     List<PartitionValue> actual =
-        new HudiPartitionValuesExtractor(pathToPartitionFieldFormat)
+        new PathBasedPartitionValuesExtractor(pathToPartitionFieldFormat)
             .extractPartitionValues(Arrays.asList(column1, column2, column3), "foo/2022/10/02/32");
     Assertions.assertEquals(expected, actual);
   }
@@ -350,7 +350,7 @@ public class TestHudiPartitionValuesExtractor {
     Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
     pathToPartitionFieldFormat.put(column2.getSourceField().getPath(), "yyyy-MM-dd");
     List<PartitionValue> actual =
-        new HudiPartitionValuesExtractor(pathToPartitionFieldFormat)
+        new PathBasedPartitionValuesExtractor(pathToPartitionFieldFormat)
             .extractPartitionValues(
                 Arrays.asList(column1, column2, column3), "foo/__HIVE_DEFAULT_PARTITION__/32");
     Assertions.assertEquals(expected, actual);
@@ -388,7 +388,7 @@ public class TestHudiPartitionValuesExtractor {
             PartitionValue.builder().partitionField(column2).range(Range.scalar(32L)).build());
 
     List<PartitionValue> actual =
-        new HudiPartitionValuesExtractor(Collections.emptyMap())
+        new PathBasedPartitionValuesExtractor(Collections.emptyMap())
             .extractPartitionValues(Arrays.asList(column1, column2), "column1=foo/column2=32");
     Assertions.assertEquals(expected, actual);
   }
@@ -425,7 +425,7 @@ public class TestHudiPartitionValuesExtractor {
             PartitionValue.builder().partitionField(column1).range(Range.scalar(null)).build());
 
     List<PartitionValue> actual =
-        new HudiPartitionValuesExtractor(Collections.emptyMap())
+        new PathBasedPartitionValuesExtractor(Collections.emptyMap())
             .extractPartitionValues(
                 Arrays.asList(column2, column1), "column2=32/column1=__HIVE_DEFAULT_PARTITION__");
     Assertions.assertEquals(expected, actual);
@@ -461,14 +461,14 @@ public class TestHudiPartitionValuesExtractor {
     Assertions.assertThrows(
         PartitionValuesExtractorException.class,
         () ->
-            new HudiPartitionValuesExtractor(Collections.emptyMap())
+            new PathBasedPartitionValuesExtractor(Collections.emptyMap())
                 .extractPartitionValues(Arrays.asList(column1, column2), "foo"));
   }
 
   @Test
   public void testNoPartitionColumnsConfigured() {
     List<PartitionValue> actual =
-        new HudiPartitionValuesExtractor(Collections.emptyMap())
+        new PathBasedPartitionValuesExtractor(Collections.emptyMap())
             .extractPartitionValues(Collections.emptyList(), "column1=foo/column2=32");
     Assertions.assertTrue(actual.isEmpty());
   }
@@ -476,7 +476,7 @@ public class TestHudiPartitionValuesExtractor {
   @Test
   public void testNullPartitionColumns() {
     List<PartitionValue> actual =
-        new HudiPartitionValuesExtractor(Collections.emptyMap())
+        new PathBasedPartitionValuesExtractor(Collections.emptyMap())
             .extractPartitionValues(null, "column1=foo/column2=32");
     Assertions.assertTrue(actual.isEmpty());
   }
@@ -503,7 +503,7 @@ public class TestHudiPartitionValuesExtractor {
     Assertions.assertThrows(
         PartitionValuesExtractorException.class,
         () ->
-            new HudiPartitionValuesExtractor(pathToPartitionFieldFormat)
+            new PathBasedPartitionValuesExtractor(pathToPartitionFieldFormat)
                 .extractPartitionValues(Collections.singletonList(column), "2022-10-02"));
   }
 
@@ -564,7 +564,7 @@ public class TestHudiPartitionValuesExtractor {
             .collect(Collectors.toList());
 
     List<PartitionValue> actual =
-        new HudiPartitionValuesExtractor(Collections.emptyMap())
+        new PathBasedPartitionValuesExtractor(Collections.emptyMap())
             .extractPartitionValues(partitionFields, partitionPath);
     Assertions.assertEquals(expected, actual);
   }
