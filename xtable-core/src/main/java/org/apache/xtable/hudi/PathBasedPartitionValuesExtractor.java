@@ -84,9 +84,7 @@ public class PathBasedPartitionValuesExtractor {
       case DAY:
       case HOUR:
         return parseDate(
-            remainingPath,
-            pathToPartitionFieldFormat.get(
-                field.getSourceField().getPath())); // changed from getPath()
+            remainingPath, pathToPartitionFieldFormat.get(field.getSourceField().getPath()));
       case VALUE:
         // if there is only one partition field, then assume full partition path is used even if
         // value contains slashes

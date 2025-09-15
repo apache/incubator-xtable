@@ -80,22 +80,8 @@ public class ITParquetConversionSource {
   @BeforeAll
   public static void setupOnce() {
     SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
-
-    String extraJavaOptions = "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED";
-    sparkConf.set("spark.driver.extraJavaOptions", extraJavaOptions);
     sparkConf = HoodieReadClient.addHoodieSupport(sparkConf);
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
-    String javaOpts =
-        "--add-opens=java.base/java.nio=ALL-UNNAMED "
-            + "--add-opens=java.base/java.lang=ALL-UNNAMED "
-            + "--add-opens=java.base/java.util=ALL-UNNAMED "
-            + "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED "
-            + "--add-opens=java.base/java.io=ALL-UNNAMED"
-            + "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED"
-            + "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED";
-
-    sparkConf.set("spark.driver.extraJavaOptions", javaOpts);
-    sparkConf.set("spark.executor.extraJavaOptions", javaOpts);
     sparkConf.set("spark.sql.parquet.writeLegacyFormat", "false");
     sparkConf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS");
 
@@ -295,7 +281,7 @@ public class ITParquetConversionSource {
                   new MetadataBuilder().putString("precision", "millis").build())
             });
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-    String dataPathPart = tempDir.toAbsolutePath().toString() + "/partitioned_data";
+    String dataPathPart = tempDir.toAbsolutePath() + "/partitioned_data";
     df.withColumn("year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)))
         .withColumn(
             "month",

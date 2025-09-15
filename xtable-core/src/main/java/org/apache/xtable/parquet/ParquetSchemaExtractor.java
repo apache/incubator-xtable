@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -303,20 +302,14 @@ public class ParquetSchemaExtractor {
                   .build());
         }
         // RECORD Type (non-nullable elements)
-        if (schema.asGroupType().getName() != "list"
+        if (!schema.asGroupType().getName().equals("list")
             && !Arrays.asList("key_value", "map").contains(schema.asGroupType().getName())) {
           boolean isNullable =
-              subFields.stream()
-                          .filter(ele -> ele.getSchema().isNullable())
-                          .collect(Collectors.toList())
-                          .size()
-                      == 0
-                  ? false
-                  : isNullable(schema.asGroupType());
+              subFields.stream().anyMatch(ele -> ele.getSchema().isNullable())
+                  && isNullable(schema.asGroupType());
           return InternalSchema.builder()
               .name(schema.getName())
               .comment(null)
-              // .recordKeyFields(subFields) // necessary for Hudi metadata
               .dataType(InternalType.RECORD)
               .fields(subFields)
               .isNullable(isNullable)

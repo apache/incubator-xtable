@@ -37,6 +37,7 @@ import org.apache.hadoop.util.functional.RemoteIterators;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.hudi.*;
 import org.apache.xtable.hudi.HudiPathUtils;
 import org.apache.xtable.model.*;
@@ -210,8 +211,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     return parquetFiles
         .filter(fileStatus -> fileStatus.getModificationTime() == modificationTime)
         .findFirst()
-        .orElseThrow(
-            () -> new IllegalStateException("No file found at " + Long.valueOf(modificationTime)));
+        .orElseThrow(() -> new IllegalStateException("No file found at " + modificationTime));
   }
 
   private Stream<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
@@ -221,9 +221,9 @@ public class ParquetConversionSource implements ConversionSource<Long> {
       String parentPath = Paths.get(uriBasePath).toString();
       RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(parentPath), true);
       return RemoteIterators.toList(iterator).stream()
-          .filter(file -> file.getPath().getName().toString().endsWith("parquet"));
+          .filter(file -> file.getPath().getName().endsWith("parquet"));
     } catch (IOException | URISyntaxException e) {
-      throw new RuntimeException(e);
+      throw new ReadException("Unable to read files from file system", e);
     }
   }
 

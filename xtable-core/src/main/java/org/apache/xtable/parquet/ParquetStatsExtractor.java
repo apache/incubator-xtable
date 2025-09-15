@@ -132,25 +132,17 @@ public class ParquetStatsExtractor {
 
   public static InternalDataFile toInternalDataFile(Configuration hadoopConf, Path parentPath)
       throws IOException {
-    FileStatus file = null;
-    List<PartitionValue> partitionValues = null;
-    ParquetMetadata footer = null;
-    List<ColumnStat> columnStatsForAFile = null;
-    try {
-      FileSystem fs = FileSystem.get(hadoopConf);
-      file = fs.getFileStatus(parentPath);
-      footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
-      columnStatsForAFile = getColumnStatsForaFile(footer);
-      partitionValues =
-          partitionValueExtractor.extractPartitionValues(
-              partitionSpecExtractor.spec(
-                  partitionValueExtractor.extractSchemaForParquetPartitions(
-                      parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
-                      file.getPath().toString())),
-              parentPath.toString());
-    } catch (java.io.IOException e) {
-      throw e;
-    }
+    FileSystem fs = FileSystem.get(hadoopConf);
+    FileStatus file = fs.getFileStatus(parentPath);
+    ParquetMetadata footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
+    List<ColumnStat> columnStatsForAFile = getColumnStatsForaFile(footer);
+    List<PartitionValue> partitionValues =
+        partitionValueExtractor.extractPartitionValues(
+            partitionSpecExtractor.spec(
+                partitionValueExtractor.extractSchemaForParquetPartitions(
+                    parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
+                    file.getPath().toString())),
+            parentPath.toString());
     return InternalDataFile.builder()
         .physicalPath(parentPath.toString())
         .fileFormat(FileFormat.APACHE_PARQUET)

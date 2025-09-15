@@ -237,7 +237,7 @@ public class TestHudiPartitionValuesExtractor {
                 .build());
 
     Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
-    pathToPartitionFieldFormat.put(column.getSourceField().getName(), format);
+    pathToPartitionFieldFormat.put(column.getSourceField().getPath(), format);
     List<PartitionValue> actual =
         new PathBasedPartitionValuesExtractor(pathToPartitionFieldFormat)
             .extractPartitionValues(Collections.singletonList(column), partitionString);

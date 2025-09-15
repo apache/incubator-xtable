@@ -27,6 +27,7 @@ import lombok.NonNull;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
+import org.apache.xtable.exception.PartitionValuesExtractorException;
 import org.apache.xtable.hudi.PathBasedPartitionValuesExtractor;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -50,10 +51,8 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
 
   public List<PartitionValue> extractPartitionValues(
       List<InternalPartitionField> partitionColumns, String partitionPath) {
-    PartialResult valueAndRemainingPath = null;
     String currentDateValue = "";
     List<String> parsedDateValues = new ArrayList<>();
-    long dateSinceEpoch = 0L;
     if (partitionColumns.size() == 0) {
       return Collections.emptyList();
     }
@@ -85,11 +84,10 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
         result.add(
             PartitionValue.builder()
                 .partitionField(partitionField)
-                .range(
-                    Range.scalar((Object) computeSinceEpochValue(parsedDateValues, partitionField)))
+                .range(Range.scalar(computeSinceEpochValue(parsedDateValues, partitionField)))
                 .build());
       } catch (ParseException e) {
-        e.printStackTrace();
+        throw new PartitionValuesExtractorException("Unable to parse date value", e);
       }
     }
     return result;
