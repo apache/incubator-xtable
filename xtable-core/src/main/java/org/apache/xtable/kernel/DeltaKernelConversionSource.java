@@ -21,31 +21,30 @@ package org.apache.xtable.kernel;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import lombok.Builder;
 
-import org.apache.hadoop.conf.Configuration;
-
 import io.delta.kernel.Snapshot;
 import io.delta.kernel.Table;
-import io.delta.kernel.data.Row;
-import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
-import io.delta.kernel.internal.DeltaLogActionUtils;
-import io.delta.kernel.internal.InternalScanFileUtils;
 import io.delta.kernel.internal.SnapshotImpl;
-import io.delta.kernel.internal.actions.*;
-import io.delta.kernel.internal.actions.SingleAction;
-import io.delta.kernel.internal.fs.Path;
-import io.delta.kernel.internal.replay.ActionsIterator;
-import io.delta.kernel.internal.util.FileNames;
-import io.delta.kernel.types.StructType;
-import io.delta.kernel.utils.CloseableIterator;
-import io.delta.kernel.utils.FileStatus;
+import io.delta.kernel.internal.actions.AddFile;
+import io.delta.kernel.internal.actions.RemoveFile;
+import io.delta.kernel.internal.actions.RowBackedAction;
+import io.delta.kernel.internal.util.VectorUtils;
 
 import org.apache.xtable.exception.ReadException;
-import org.apache.xtable.model.*;
+import org.apache.xtable.model.CommitsBacklog;
+import org.apache.xtable.model.InstantsForIncrementalSync;
+import org.apache.xtable.model.InternalSnapshot;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -69,9 +68,6 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   private final String tableName;
   private final Engine engine;
 
-  private final StructType actionSchema = SingleAction.FULL_SCHEMA;
-  //  private final DeltaKernelTableExtractor tableExtractor;
-
   @Builder.Default
   private final DeltaKernelTableExtractor tableExtractor =
       DeltaKernelTableExtractor.builder().build();
@@ -81,9 +77,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
   @Override
   public InternalTable getTable(Long version) {
-    Configuration hadoopConf = new Configuration();
     try {
-      Engine engine = DefaultEngine.create(hadoopConf);
       Table table = Table.forPath(engine, basePath);
       Snapshot snapshot = table.getSnapshotAsOfVersion(engine, version);
       return tableExtractor.table(table, snapshot, engine, tableName, basePath);
@@ -94,8 +88,6 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
   @Override
   public InternalTable getCurrentTable() {
-    Configuration hadoopConf = new Configuration();
-    Engine engine = DefaultEngine.create(hadoopConf);
     Table table = Table.forPath(engine, basePath);
     Snapshot snapshot = table.getLatestSnapshot(engine);
     return getTable(snapshot.getVersion());
@@ -103,8 +95,6 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
   @Override
   public InternalSnapshot getCurrentSnapshot() {
-    Configuration hadoopConf = new Configuration();
-    Engine engine = DefaultEngine.create(hadoopConf);
     Table table_snapshot = Table.forPath(engine, basePath);
     Snapshot snapshot = table_snapshot.getLatestSnapshot(engine);
     InternalTable table = getTable(snapshot.getVersion());
@@ -118,56 +108,57 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
   @Override
   public TableChange getTableChangeForCommit(Long versionNumber) {
-    Configuration hadoopConf = new Configuration();
-    Engine engine = DefaultEngine.create(hadoopConf);
     Table table = Table.forPath(engine, basePath);
     Snapshot snapshot = table.getSnapshotAsOfVersion(engine, versionNumber);
     InternalTable tableAtVersion =
         tableExtractor.table(table, snapshot, engine, tableName, basePath);
     Map<String, InternalDataFile> addedFiles = new HashMap<>();
+    Map<String, InternalDataFile> removedFiles = new HashMap<>();
     String provider = ((SnapshotImpl) snapshot).getMetadata().getFormat().getProvider();
     FileFormat fileFormat = actionsConverter.convertToFileFormat(provider);
-    List<FileStatus> files =
-        DeltaLogActionUtils.listDeltaLogFilesAsIter(
-                engine,
-                Collections.singleton(FileNames.DeltaLogFileType.COMMIT),
-                new Path(basePath),
-                versionNumber,
-                Optional.of(versionNumber),
-                false)
-            .toInMemoryList();
 
-    List<Row> actions = new ArrayList<>();
-    ActionsIterator actionsIterator =
-        new ActionsIterator(engine, files, actionSchema, Optional.empty());
-    while (actionsIterator.hasNext()) {
-      // Each ActionWrapper may wrap a batch of rows (actions)
-      CloseableIterator<Row> scanFileRows = actionsIterator.next().getColumnarBatch().getRows();
-      while (scanFileRows.hasNext()) {
-        Row scanFileRow = scanFileRows.next();
-        if (scanFileRow instanceof AddFile) {
-          Map<String, String> partitionValues =
-              InternalScanFileUtils.getPartitionValues(scanFileRow);
-          //    List<Action> actionsForVersion =
-          // getChangesState().getActionsForVersion(versionNumber);
-          InternalDataFile dataFile =
-              actionsConverter.convertAddActionToInternalDataFile(
-                  (AddFile) scanFileRow,
-                  table,
-                  fileFormat,
-                  tableAtVersion.getPartitioningFields(),
-                  tableAtVersion.getReadSchema().getFields(),
-                  true,
-                  DeltaKernelPartitionExtractor.getInstance(),
-                  DeltaKernelStatsExtractor.getInstance(),
-                  partitionValues);
-          addedFiles.put(dataFile.getPhysicalPath(), dataFile);
-        }
+    List<RowBackedAction> actionsForVersion = getChangesState().getActionsForVersion(versionNumber);
+
+    for (RowBackedAction action : actionsForVersion) {
+      if (action instanceof AddFile) {
+        AddFile addFile = (AddFile) action;
+        Map<String, String> partitionValues = VectorUtils.toJavaMap(addFile.getPartitionValues());
+        InternalDataFile dataFile =
+            actionsConverter.convertAddActionToInternalDataFile(
+                addFile,
+                table,
+                fileFormat,
+                tableAtVersion.getPartitioningFields(),
+                tableAtVersion.getReadSchema().getFields(),
+                true,
+                DeltaKernelPartitionExtractor.getInstance(),
+                DeltaKernelStatsExtractor.getInstance(),
+                partitionValues);
+        addedFiles.put(dataFile.getPhysicalPath(), dataFile);
+      } else if (action instanceof RemoveFile) {
+        RemoveFile removeFile = (RemoveFile) action;
+        Map<String, String> partitionValues =
+            removeFile
+                .getPartitionValues()
+                .map(VectorUtils::<String, String>toJavaMap)
+                .orElse(Collections.emptyMap());
+        InternalDataFile dataFile =
+            actionsConverter.convertRemoveActionToInternalDataFile(
+                removeFile,
+                table,
+                fileFormat,
+                tableAtVersion.getPartitioningFields(),
+                DeltaKernelPartitionExtractor.getInstance(),
+                partitionValues);
+        removedFiles.put(dataFile.getPhysicalPath(), dataFile);
       }
     }
 
     InternalFilesDiff internalFilesDiff =
-        InternalFilesDiff.builder().filesAdded(addedFiles.values()).build();
+        InternalFilesDiff.builder()
+            .filesAdded(addedFiles.values())
+            .filesRemoved(removedFiles.values())
+            .build();
     return TableChange.builder()
         .tableAsOfChange(tableAtVersion)
         .filesDiff(internalFilesDiff)
@@ -178,16 +169,13 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   @Override
   public CommitsBacklog<Long> getCommitsBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync) {
-    Configuration hadoopConf = new Configuration();
-    Engine engine = DefaultEngine.create(hadoopConf);
     Table table = Table.forPath(engine, basePath);
     Snapshot snapshot =
         table.getSnapshotAsOfTimestamp(
             engine, Timestamp.from(instantsForIncrementalSync.getLastSyncInstant()).getTime());
 
     long versionNumberAtLastSyncInstant = snapshot.getVersion();
-    System.out.println("versionNumberAtLastSyncInstant: " + versionNumberAtLastSyncInstant);
-    //    resetState(0, engine,table);
+    resetState(versionNumberAtLastSyncInstant + 1, engine, table);
     return CommitsBacklog.<Long>builder()
         .commitsToProcess(getChangesState().getVersionsInSortedOrder())
         .build();
@@ -195,8 +183,6 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
-    Configuration hadoopConf = new Configuration();
-    Engine engine = DefaultEngine.create(hadoopConf);
     Table table = Table.forPath(engine, basePath);
     Snapshot snapshot = table.getSnapshotAsOfTimestamp(engine, Timestamp.from(instant).getTime());
 
@@ -223,7 +209,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
   }
 
   private List<PartitionFileGroup> getInternalDataFiles(
-      io.delta.kernel.Snapshot snapshot, Table table, Engine engine, InternalSchema schema) {
+      Snapshot snapshot, Table table, Engine engine, InternalSchema schema) {
     try (DataFileIterator fileIterator =
         dataFileExtractor.iterator(snapshot, table, engine, schema)) {
 

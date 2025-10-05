@@ -381,13 +381,13 @@ public class ITDeltaKernelConversionSource {
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
             .build();
-    //        CommitsBacklog<Long> commitsBacklog =
-    //                conversionSource.getCommitsBacklog(instantsForIncrementalSync);
-    //    for (Long version : commitsBacklog.getCommitsToProcess()) {
-    //      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
-    //      allTableChanges.add(tableChange);
-    //    }
-    //    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
+    CommitsBacklog<Long> commitsBacklog =
+        conversionSource.getCommitsBacklog(instantsForIncrementalSync);
+    for (Long version : commitsBacklog.getCommitsToProcess()) {
+      TableChange tableChange = conversionSource.getTableChangeForCommit(version);
+      allTableChanges.add(tableChange);
+    }
+    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
   }
 
   @Test

@@ -73,7 +73,7 @@ public class DeltaKernelTableExtractor {
               : DataLayoutStrategy.FLAT;
 
       // Get the timestamp
-      long timestamp = snapshot.getTimestamp(engine) * 1000; // Convert to milliseconds
+      long timestamp = snapshot.getTimestamp(engine);
       return InternalTable.builder()
           .tableFormat(TableFormat.DELTA)
           .basePath(basePath)

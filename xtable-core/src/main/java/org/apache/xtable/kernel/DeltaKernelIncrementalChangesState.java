@@ -18,9 +18,13 @@
  
 package org.apache.xtable.kernel;
 
-import java.util.*;
-
-import javax.swing.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import lombok.Builder;
 
@@ -37,12 +41,14 @@ import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.DeltaLogActionUtils;
 import io.delta.kernel.internal.TableImpl;
 import io.delta.kernel.internal.actions.AddFile;
+import io.delta.kernel.internal.actions.RemoveFile;
+import io.delta.kernel.internal.actions.RowBackedAction;
 import io.delta.kernel.utils.CloseableIterator;
 
 /** Cache store for storing incremental table changes in the Delta table. */
 public class DeltaKernelIncrementalChangesState {
 
-  private final Map<Long, List<Action>> incrementalChangesByVersion = new HashMap<>();
+  private final Map<Long, List<RowBackedAction>> incrementalChangesByVersion = new HashMap<>();
 
   /**
    * Reloads the cache store with incremental changes. Intentionally thread safety is the
@@ -56,51 +62,38 @@ public class DeltaKernelIncrementalChangesState {
       Long versionToStartFrom, Engine engine, Table table, Long endVersion) {
     Set<DeltaLogActionUtils.DeltaAction> actionSet = new HashSet<>();
     actionSet.add(DeltaLogActionUtils.DeltaAction.ADD);
-    actionSet.add(DeltaLogActionUtils.DeltaAction.COMMITINFO);
-    List<ColumnarBatch> kernelChanges = new ArrayList<>();
+    actionSet.add(DeltaLogActionUtils.DeltaAction.REMOVE);
     TableImpl tableImpl = (TableImpl) Table.forPath(engine, table.getPath(engine));
 
     // getChanges returns CloseableIterator<ColumnarBatch>
     try (CloseableIterator<ColumnarBatch> iter =
         tableImpl.getChanges(engine, versionToStartFrom, endVersion, actionSet)) {
       while (iter.hasNext()) {
-        kernelChanges.add(iter.next());
         ColumnarBatch batch = iter.next();
+        int addFileIndex = batch.getSchema().indexOf(DeltaLogActionUtils.DeltaAction.ADD.colName);
+        int removeFileIndex =
+            batch.getSchema().indexOf(DeltaLogActionUtils.DeltaAction.REMOVE.colName);
 
-        CloseableIterator<Row> rows = batch.getRows();
-        try {
+        try (CloseableIterator<Row> rows = batch.getRows()) {
           while (rows.hasNext()) {
             Row row = rows.next();
 
             // Get version (first column)
             long version = row.getLong(0);
+            List<RowBackedAction> actions =
+                incrementalChangesByVersion.computeIfAbsent(version, k -> new ArrayList<>());
 
-            // Get commit timestamp (second column)
-            long timestamp = row.getLong(1);
-
-            // Get commit info (third column)
-            Row commitInfo = row.getStruct(2);
-
-            // Get add file (fourth column)
-            Row addFile = !row.isNullAt(3) ? row.getStruct(3) : null;
-
-            List<Action> actions = new ArrayList<>();
-
-            AddFile addAction = new AddFile(addFile);
-            //
-            //                        Integer actionIdx = null;
-            //
-            //                        for (int i = 2; i < row.getSchema().length(); i++) {
-            //                            if (!row.isNullAt(i)) {
-            //                                actionIdx = i;
-            //                                break;
-            //                            }
-            //                        }
-            //
-
+            if (!row.isNullAt(addFileIndex)) {
+              Row addFile = row.getStruct(addFileIndex);
+              AddFile addAction = new AddFile(addFile);
+              actions.add(addAction);
+            }
+            if (!row.isNullAt(removeFileIndex)) {
+              Row removeFile = row.getStruct(removeFileIndex);
+              RemoveFile removeAction = new RemoveFile(removeFile);
+              actions.add(removeAction);
+            }
           }
-        } finally {
-          rows.close();
         }
       }
     } catch (Exception e) {
@@ -121,20 +114,20 @@ public class DeltaKernelIncrementalChangesState {
     return versions;
   }
 
-  public List<Action> getActionsForVersion(Long version) {
+  public List<RowBackedAction> getActionsForVersion(Long version) {
     Preconditions.checkArgument(
         incrementalChangesByVersion.containsKey(version),
         String.format("Version %s not found in the DeltaIncrementalChangesState.", version));
     return incrementalChangesByVersion.get(version);
   }
 
-  private List<Tuple2<Long, List<Action>>> getChangesList(
-      scala.collection.Iterator<Tuple2<Object, Seq<Action>>> scalaIterator) {
-    List<Tuple2<Long, List<Action>>> changesList = new ArrayList<>();
-    Iterator<Tuple2<Object, Seq<Action>>> javaIterator =
+  private List<Tuple2<Long, List<RowBackedAction>>> getChangesList(
+      scala.collection.Iterator<Tuple2<Object, Seq<RowBackedAction>>> scalaIterator) {
+    List<Tuple2<Long, List<RowBackedAction>>> changesList = new ArrayList<>();
+    Iterator<Tuple2<Object, Seq<RowBackedAction>>> javaIterator =
         JavaConverters.asJavaIteratorConverter(scalaIterator).asJava();
     while (javaIterator.hasNext()) {
-      Tuple2<Object, Seq<Action>> currentChange = javaIterator.next();
+      Tuple2<Object, Seq<RowBackedAction>> currentChange = javaIterator.next();
       changesList.add(
           new Tuple2<>(
               (Long) currentChange._1(),

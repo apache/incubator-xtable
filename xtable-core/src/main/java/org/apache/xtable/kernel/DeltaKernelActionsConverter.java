@@ -34,6 +34,7 @@ import io.delta.kernel.Table;
 import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.actions.AddFile;
+import io.delta.kernel.internal.actions.RemoveFile;
 
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
@@ -78,6 +79,23 @@ public class DeltaKernelActionsConverter {
         .partitionValues(partitionExtractor.partitionValueExtraction(scalaMap, partitionFields))
         .columnStats(columnStats)
         .recordCount(recordCount)
+        .build();
+  }
+
+  public InternalDataFile convertRemoveActionToInternalDataFile(
+      RemoveFile removeFile,
+      Table table,
+      FileFormat fileFormat,
+      List<InternalPartitionField> partitionFields,
+      DeltaKernelPartitionExtractor partitionExtractor,
+      Map<String, String> partitionValues) {
+    scala.collection.mutable.Map<String, String> scalaMap =
+        JavaConverters.mapAsScalaMap(partitionValues);
+
+    return InternalDataFile.builder()
+        .physicalPath(getFullPathToFile(removeFile.getPath(), table))
+        .fileFormat(fileFormat)
+        .partitionValues(partitionExtractor.partitionValueExtraction(scalaMap, partitionFields))
         .build();
   }
 
