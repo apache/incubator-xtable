@@ -132,7 +132,6 @@ public class TestIcebergSync {
               Arrays.asList(
                   InternalField.builder()
                       .name("timestamp_field")
-                      .fieldId(3)
                       .schema(
                           InternalSchema.builder()
                               .name("long")
@@ -141,19 +140,16 @@ public class TestIcebergSync {
                       .build(),
                   InternalField.builder()
                       .name("date_field")
-                      .fieldId(2)
                       .schema(
                           InternalSchema.builder().name("int").dataType(InternalType.DATE).build())
                       .build(),
                   InternalField.builder()
                       .name("group_id")
-                      .fieldId(1)
                       .schema(
                           InternalSchema.builder().name("int").dataType(InternalType.INT).build())
                       .build(),
                   InternalField.builder()
                       .name("record")
-                      .fieldId(4)
                       .schema(
                           InternalSchema.builder()
                               .name("nested")
@@ -163,7 +159,6 @@ public class TestIcebergSync {
                                       InternalField.builder()
                                           .name("string_field")
                                           .parentPath("record")
-                                          .fieldId(5)
                                           .schema(
                                               InternalSchema.builder()
                                                   .name("string")
@@ -263,7 +258,7 @@ public class TestIcebergSync {
     ArgumentCaptor<PartitionSpec> partitionSpecArgumentCaptor =
         ArgumentCaptor.forClass(PartitionSpec.class);
 
-    verify(mockSchemaSync, times(2))
+    verify(mockSchemaSync, times(1))
         .sync(
             schemaArgumentCaptor.capture(),
             schemaArgumentCaptor.capture(),
@@ -281,13 +276,9 @@ public class TestIcebergSync {
     assertTrue(
         partitionSpecSchemaArgumentCaptor.getAllValues().stream()
             .allMatch(capturedSchema -> capturedSchema.sameSchema(icebergSchema)));
-    // schema sync args for first iteration
-    assertTrue(
-        schemaArgumentCaptor.getAllValues().subList(0, 2).stream()
-            .allMatch(capturedSchema -> capturedSchema.sameSchema(icebergSchema)));
     // second snapshot sync will evolve the schema
-    assertTrue(schemaArgumentCaptor.getAllValues().get(2).sameSchema(icebergSchema));
-    assertTrue(schemaArgumentCaptor.getAllValues().get(3).sameSchema(icebergSchema2));
+    assertTrue(schemaArgumentCaptor.getAllValues().get(0).sameSchema(icebergSchema));
+    assertTrue(schemaArgumentCaptor.getAllValues().get(1).sameSchema(icebergSchema2));
     // check that the correct partition spec is used in calls to the mocks
     assertTrue(
         partitionSpecArgumentCaptor.getAllValues().stream()
@@ -299,9 +290,6 @@ public class TestIcebergSync {
     assertSame(
         transactionArgumentCaptor.getAllValues().get(0),
         transactionArgumentCaptor.getAllValues().get(2));
-    assertSame(
-        transactionArgumentCaptor.getAllValues().get(1),
-        transactionArgumentCaptor.getAllValues().get(3));
     // validate that transactions are different between runs
     assertNotSame(
         transactionArgumentCaptor.getAllValues().get(1),
