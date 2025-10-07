@@ -132,6 +132,7 @@ public class TestIcebergSync {
               Arrays.asList(
                   InternalField.builder()
                       .name("timestamp_field")
+                      .fieldId(3)
                       .schema(
                           InternalSchema.builder()
                               .name("long")
@@ -140,16 +141,19 @@ public class TestIcebergSync {
                       .build(),
                   InternalField.builder()
                       .name("date_field")
+                      .fieldId(2)
                       .schema(
                           InternalSchema.builder().name("int").dataType(InternalType.DATE).build())
                       .build(),
                   InternalField.builder()
                       .name("group_id")
+                      .fieldId(1)
                       .schema(
                           InternalSchema.builder().name("int").dataType(InternalType.INT).build())
                       .build(),
                   InternalField.builder()
                       .name("record")
+                      .fieldId(4)
                       .schema(
                           InternalSchema.builder()
                               .name("nested")
@@ -159,6 +163,7 @@ public class TestIcebergSync {
                                       InternalField.builder()
                                           .name("string_field")
                                           .parentPath("record")
+                                          .fieldId(5)
                                           .schema(
                                               InternalSchema.builder()
                                                   .name("string")
@@ -170,9 +175,9 @@ public class TestIcebergSync {
           .build();
   private final Schema icebergSchema =
       new Schema(
-          Types.NestedField.required(1, "timestamp_field", Types.TimestampType.withoutZone()),
+          Types.NestedField.required(3, "timestamp_field", Types.TimestampType.withoutZone()),
           Types.NestedField.required(2, "date_field", Types.DateType.get()),
-          Types.NestedField.required(3, "group_id", Types.IntegerType.get()),
+          Types.NestedField.required(1, "group_id", Types.IntegerType.get()),
           Types.NestedField.required(
               4,
               "record",
@@ -244,11 +249,13 @@ public class TestIcebergSync {
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
-    validateIcebergTable(tableName, table1, Sets.newHashSet(dataFile1, dataFile2), null);
+    validateIcebergTable(
+        tableName, table1, Sets.newHashSet(dataFile1, dataFile2), null, icebergSchema);
 
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
-    validateIcebergTable(tableName, table2, Sets.newHashSet(dataFile2, dataFile3), null);
+    validateIcebergTable(
+        tableName, table2, Sets.newHashSet(dataFile2, dataFile3), null, icebergSchema);
 
     ArgumentCaptor<Transaction> transactionArgumentCaptor =
         ArgumentCaptor.forClass(Transaction.class);
@@ -358,7 +365,8 @@ public class TestIcebergSync {
     // get a new iceberg sync to make sure table is re-read from disk and no metadata is cached
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot3);
-    validateIcebergTable(tableName, table2, Sets.newHashSet(dataFile3, dataFile4), null);
+    validateIcebergTable(
+        tableName, table2, Sets.newHashSet(dataFile3, dataFile4), null, icebergSchema);
     // Validate Iceberg table state
     Table table = getTable(basePath);
     assertEquals(4, table.history().size());
@@ -425,7 +433,8 @@ public class TestIcebergSync {
         Expressions.and(
             Expressions.greaterThanOrEqual(
                 partitionField.getSourceField().getName(), "2022-10-01T00:00"),
-            Expressions.lessThan(partitionField.getSourceField().getName(), "2022-10-02T00:00")));
+            Expressions.lessThan(partitionField.getSourceField().getName(), "2022-10-02T00:00")),
+        icebergSchema);
   }
 
   @Test
@@ -485,7 +494,8 @@ public class TestIcebergSync {
         Sets.newHashSet(dataFile1, dataFile2),
         Expressions.and(
             Expressions.greaterThanOrEqual(partitionField.getSourceField().getName(), "2022-10-01"),
-            Expressions.lessThan(partitionField.getSourceField().getName(), "2022-10-02")));
+            Expressions.lessThan(partitionField.getSourceField().getName(), "2022-10-02")),
+        icebergSchema);
   }
 
   @Test
@@ -539,7 +549,8 @@ public class TestIcebergSync {
         Sets.newHashSet(dataFile1, dataFile2),
         Expressions.and(
             Expressions.greaterThanOrEqual(partitionField.getSourceField().getName(), 1),
-            Expressions.lessThan(partitionField.getSourceField().getName(), 2)));
+            Expressions.lessThan(partitionField.getSourceField().getName(), 2)),
+        icebergSchema);
   }
 
   @Test
@@ -619,7 +630,8 @@ public class TestIcebergSync {
                 Expressions.greaterThanOrEqual(
                     partitionField2.getSourceField().getName(), "2022-10-01T00:00"),
                 Expressions.lessThan(
-                    partitionField2.getSourceField().getName(), "2022-10-02T00:00"))));
+                    partitionField2.getSourceField().getName(), "2022-10-02T00:00"))),
+        icebergSchema);
   }
 
   @Test
@@ -678,7 +690,8 @@ public class TestIcebergSync {
         tableName,
         table,
         Sets.newHashSet(dataFile1, dataFile2),
-        Expressions.equal(partitionField.getSourceField().getPath(), "value1"));
+        Expressions.equal(partitionField.getSourceField().getPath(), "value1"),
+        icebergSchema);
   }
 
   @Test
@@ -822,13 +835,16 @@ public class TestIcebergSync {
       String tableName,
       InternalTable table,
       Set<InternalDataFile> expectedFiles,
-      Expression filterExpression)
+      Expression filterExpression,
+      Schema expectedSchema)
       throws IOException {
     Path warehouseLocation = Paths.get(table.getBasePath()).getParent();
     try (HadoopCatalog catalog = new HadoopCatalog(CONFIGURATION, warehouseLocation.toString())) {
       TableIdentifier tableId = TableIdentifier.of(Namespace.empty(), tableName);
       assertTrue(catalog.tableExists(tableId));
-      TableScan scan = catalog.loadTable(tableId).newScan();
+      Table icebergTable = catalog.loadTable(tableId);
+      assertTrue(expectedSchema.sameSchema(icebergTable.schema()));
+      TableScan scan = icebergTable.newScan();
       if (filterExpression != null) {
         scan = scan.filter(filterExpression);
       }
