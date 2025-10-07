@@ -29,12 +29,10 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
-import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
-import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateProperties;
@@ -167,7 +165,8 @@ public class IcebergConversionTarget implements ConversionTarget {
   public void syncSchema(InternalSchema schema) {
     Schema latestSchema = schemaExtractor.toIceberg(schema);
     if (!transaction.table().schema().sameSchema(latestSchema)) {
-      boolean hasFieldIds = schema.getAllFields().stream().anyMatch(field -> field.getFieldId() != null);
+      boolean hasFieldIds =
+          schema.getAllFields().stream().anyMatch(field -> field.getFieldId() != null);
       if (hasFieldIds) {
         transaction.commitTransaction();
         schemaSync.syncWithProvidedIds(latestSchema, table);

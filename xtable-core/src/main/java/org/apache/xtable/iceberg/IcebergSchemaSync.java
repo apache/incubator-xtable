@@ -64,9 +64,8 @@ public class IcebergSchemaSync {
   public void syncWithProvidedIds(Schema latest, Table table) {
     BaseTable baseTable = ((BaseTable) table);
     TableMetadata current = baseTable.operations().current();
-    TableMetadata updated = TableMetadata.buildFrom(current)
-        .setCurrentSchema(latest, latest.highestFieldId())
-        .build();
+    TableMetadata updated =
+        TableMetadata.buildFrom(current).setCurrentSchema(latest, latest.highestFieldId()).build();
     baseTable.operations().commit(current, updated);
   }
 

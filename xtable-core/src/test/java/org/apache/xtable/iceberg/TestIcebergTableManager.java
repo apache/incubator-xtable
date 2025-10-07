@@ -31,22 +31,21 @@ import java.util.Collections;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.mapreduce.ID;
-import org.apache.iceberg.BaseTable;
-import org.apache.iceberg.TableMetadata;
-import org.apache.iceberg.TableOperations;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.mapping.MappingUtil;
 import org.apache.iceberg.mapping.NameMappingParser;
-import org.mockito.MockedStatic;
 
 public class TestIcebergTableManager {
   private static final String BASE_PATH = "file:///basePath/";
@@ -118,9 +117,10 @@ public class TestIcebergTableManager {
             any(),
             eq(PartitionSpec.unpartitioned()),
             eq(BASE_PATH),
-            eq(Collections.singletonMap(
-                TableProperties.DEFAULT_NAME_MAPPING,
-                NameMappingParser.toJson(MappingUtil.create(schema))))))
+            eq(
+                Collections.singletonMap(
+                    TableProperties.DEFAULT_NAME_MAPPING,
+                    NameMappingParser.toJson(MappingUtil.create(schema))))))
         .thenReturn(mockInitialTable);
     when(mockCatalog.loadTable(IDENTIFIER)).thenReturn(loadedTable);
 
@@ -139,7 +139,8 @@ public class TestIcebergTableManager {
       IcebergTableManager tableManager = IcebergTableManager.of(CONFIGURATION);
 
       Table actual =
-          tableManager.getOrCreateTable(catalogConfig, IDENTIFIER, BASE_PATH, schema, partitionSpec);
+          tableManager.getOrCreateTable(
+              catalogConfig, IDENTIFIER, BASE_PATH, schema, partitionSpec);
       assertEquals(loadedTable, actual);
       verify(mockCatalog).initialize(catalogName, OPTIONS);
       verify(tableOperations).commit(initialMetadata, updatedMetadata);
@@ -167,9 +168,10 @@ public class TestIcebergTableManager {
             any(),
             any(),
             eq(BASE_PATH),
-            eq(Collections.singletonMap(
-                TableProperties.DEFAULT_NAME_MAPPING,
-                NameMappingParser.toJson(MappingUtil.create(schema))))))
+            eq(
+                Collections.singletonMap(
+                    TableProperties.DEFAULT_NAME_MAPPING,
+                    NameMappingParser.toJson(MappingUtil.create(schema))))))
         .thenThrow(new AlreadyExistsException("Table already exists"));
     when(mockCatalog.loadTable(IDENTIFIER)).thenReturn(mockTable);
 
