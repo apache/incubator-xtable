@@ -6,11 +6,6 @@ We have set up the following regular syncs for community users and developers to
 ## Bi-weekly Community Call
 Participate in our Community Calls by joining us on [Google Meet](https://calendar.google.com/calendar/event?action=TEMPLATE&tmeid=MjBuOWl0c21sdWIzcDQydGRubzJrb3QybHZfMjAyNTAxMjdUMTYwMDAwWiBjXzEwNDgzYzU2Yjc0ZGRjZWI5N2RjMGZhNTk2MjQ5YmU5MWVlY2RmOWQ4MjZkNzI3MmEwZjcxNTMzMWI1NzIzMTlAZw&tmsrc=c_10483c56b74ddceb97dc0fa596249be91eecdf9d826d7272a0f715331b572319%40group.calendar.google.com&scp=ALL) by adding the invite to your calendar.
 
-Here's a quick view of the upcoming community syncs:
-
-- 10th Feb 2025, 8:00 - 8:45AM PST
-- 24th Feb 2025, 8:00 - 8:45AM PST
-
 ## Join the Community on Slack
 We have a [Slack channel](https://join.slack.com/t/apachextablei-yoi8504/shared_invite/zt-2y9hqskhv-ZfSwoxzq~PTJlWGj0V1sQw) that you can join for help with any questions, issues, design choices, announcements, etc.
 

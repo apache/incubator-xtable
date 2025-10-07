@@ -36,6 +36,7 @@ import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
+import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
@@ -55,11 +56,14 @@ public class ParquetStatsExtractor {
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
-  // private static final InputPartitionFields partitions = null;
-
   public static ParquetStatsExtractor getInstance() {
     return INSTANCE;
   }
+
+  private static final ParquetPartitionValueExtractor partitionValueExtractor =
+      ParquetPartitionValueExtractor.getInstance();
+  private static PathBasedPartitionSpecExtractor partitionSpecExtractor =
+      ParquetPartitionSpecExtractor.getInstance();
 
   public static List<ColumnStat> getColumnStatsForaFile(ParquetMetadata footer) {
     return getStatsForFile(footer).values().stream()
@@ -112,39 +116,37 @@ public class ParquetStatsExtractor {
                                 .totalSize(columnMetaData.getTotalSize())
                                 .range(
                                     Range.vector(
-                                        columnMetaData.getStatistics().genericGetMin(),
-                                        columnMetaData.getStatistics().genericGetMax()))
+                                        ParquetStatsConverterUtil
+                                            .convertStatBinaryTypeToLogicalType(
+                                                columnMetaData,
+                                                true), // if stats are string convert to
+                                        // litteraly a string stat and
+                                        // store to range
+                                        ParquetStatsConverterUtil
+                                            .convertStatBinaryTypeToLogicalType(
+                                                columnMetaData, false)))
                                 .build(),
                         Collectors.toList())));
     return columnDescStats;
   }
 
-  /*  private static InputPartitionFields initPartitionInfo() {
-    return partitions;
-  }*/
-
   public static InternalDataFile toInternalDataFile(Configuration hadoopConf, Path parentPath)
       throws IOException {
-    FileStatus file = null;
-    List<PartitionValue> partitionValues = null;
-    ParquetMetadata footer = null;
-    List<ColumnStat> columnStatsForAFile = null;
-    try {
-      FileSystem fs = FileSystem.get(hadoopConf);
-      file = fs.getFileStatus(parentPath);
-      // InputPartitionFields partitionInfo = initPartitionInfo();
-      footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
-      MessageType schema = parquetMetadataExtractor.getSchema(footer);
-      columnStatsForAFile = getColumnStatsForaFile(footer);
-      // partitionValues = partitionExtractor.createPartitionValues(
-      //               partitionInfo);
-    } catch (java.io.IOException e) {
-
-    }
+    FileSystem fs = FileSystem.get(hadoopConf);
+    FileStatus file = fs.getFileStatus(parentPath);
+    ParquetMetadata footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
+    List<ColumnStat> columnStatsForAFile = getColumnStatsForaFile(footer);
+    List<PartitionValue> partitionValues =
+        partitionValueExtractor.extractPartitionValues(
+            partitionSpecExtractor.spec(
+                partitionValueExtractor.extractSchemaForParquetPartitions(
+                    parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
+                    file.getPath().toString())),
+            parentPath.toString());
     return InternalDataFile.builder()
         .physicalPath(parentPath.toString())
         .fileFormat(FileFormat.APACHE_PARQUET)
-        // .partitionValues(partitionValues)
+        .partitionValues(partitionValues)
         .fileSizeBytes(file.getLen())
         .recordCount(getMaxFromColumnStats(columnStatsForAFile).orElse(0L))
         .columnStats(columnStatsForAFile)
