@@ -183,13 +183,19 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
-    Table table = Table.forPath(engine, basePath);
-    Snapshot snapshot = table.getSnapshotAsOfTimestamp(engine, Timestamp.from(instant).getTime());
+    try {
+      Table table = Table.forPath(engine, basePath);
+      Snapshot snapshot = table.getSnapshotAsOfTimestamp(engine, Timestamp.from(instant).getTime());
 
-    // There is a chance earliest commit of the table is returned if the instant is before the
-    // earliest commit of the table, hence the additional check.
-    Instant deltaCommitInstant = Instant.ofEpochMilli(snapshot.getTimestamp(engine));
-    return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
+      // There is a chance earliest commit of the table is returned if the instant is before the
+      // earliest commit of the table, hence the additional check.
+      Instant deltaCommitInstant = Instant.ofEpochMilli(snapshot.getTimestamp(engine));
+      return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
+    } catch (Exception e) {
+      System.err.println(
+          "Error checking if incremental sync is safe from " + instant + ": " + e.getMessage());
+      return false;
+    }
   }
 
   @Override
