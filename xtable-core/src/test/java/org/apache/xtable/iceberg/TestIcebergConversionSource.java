@@ -364,7 +364,7 @@ class TestIcebergConversionSource {
             .schema(csSchema)
             .createWriterFunc(GenericParquetWriter::buildWriter)
             .overwrite()
-            .withSpec(csPartitionSpec)
+            .withSpec(table.spec())
             .withPartition(partitionInfo)
             .build();
 

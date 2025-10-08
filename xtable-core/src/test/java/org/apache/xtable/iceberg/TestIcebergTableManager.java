@@ -20,7 +20,9 @@ package org.apache.xtable.iceberg;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,10 +32,14 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -101,27 +107,46 @@ public class TestIcebergTableManager {
             .catalogName(catalogName)
             .catalogOptions(OPTIONS)
             .build();
-    Table mockTable = mock(Table.class);
+    BaseTable mockInitialTable = mock(BaseTable.class);
+    Table loadedTable = mock(Table.class);
     when(mockCatalog.tableExists(IDENTIFIER)).thenReturn(false);
     Schema schema = new Schema();
     PartitionSpec partitionSpec = PartitionSpec.unpartitioned();
     when(mockCatalog.createTable(
-            IDENTIFIER,
-            schema,
-            partitionSpec,
-            BASE_PATH,
-            Collections.singletonMap(
-                TableProperties.DEFAULT_NAME_MAPPING,
-                NameMappingParser.toJson(MappingUtil.create(schema)))))
-        .thenReturn(mockTable);
+            eq(IDENTIFIER),
+            any(),
+            eq(PartitionSpec.unpartitioned()),
+            eq(BASE_PATH),
+            eq(
+                Collections.singletonMap(
+                    TableProperties.DEFAULT_NAME_MAPPING,
+                    NameMappingParser.toJson(MappingUtil.create(schema))))))
+        .thenReturn(mockInitialTable);
+    when(mockCatalog.loadTable(IDENTIFIER)).thenReturn(loadedTable);
 
-    IcebergTableManager tableManager = IcebergTableManager.of(CONFIGURATION);
+    TableOperations tableOperations = mock(TableOperations.class);
+    when(mockInitialTable.operations()).thenReturn(tableOperations);
+    TableMetadata initialMetadata = mock(TableMetadata.class);
+    when(tableOperations.current()).thenReturn(initialMetadata);
+    try (MockedStatic<TableMetadata> tableMetadataMockedStatic = mockStatic(TableMetadata.class)) {
+      TableMetadata.Builder mockBuilder = mock(TableMetadata.Builder.class);
+      tableMetadataMockedStatic
+          .when(() -> TableMetadata.buildFrom(initialMetadata))
+          .thenReturn(mockBuilder);
+      TableMetadata updatedMetadata = mock(TableMetadata.class);
+      when(mockBuilder.build()).thenReturn(updatedMetadata);
 
-    Table actual =
-        tableManager.getOrCreateTable(catalogConfig, IDENTIFIER, BASE_PATH, schema, partitionSpec);
-    assertEquals(mockTable, actual);
-    verify(mockCatalog).initialize(catalogName, OPTIONS);
-    verify(mockCatalog, never()).loadTable(any());
+      IcebergTableManager tableManager = IcebergTableManager.of(CONFIGURATION);
+
+      Table actual =
+          tableManager.getOrCreateTable(
+              catalogConfig, IDENTIFIER, BASE_PATH, schema, partitionSpec);
+      assertEquals(loadedTable, actual);
+      verify(mockCatalog).initialize(catalogName, OPTIONS);
+      verify(tableOperations).commit(initialMetadata, updatedMetadata);
+      verify(mockBuilder).setCurrentSchema(schema, schema.highestFieldId());
+      verify(mockBuilder).setDefaultPartitionSpec(partitionSpec);
+    }
   }
 
   @Test
@@ -139,13 +164,14 @@ public class TestIcebergTableManager {
     Schema schema = new Schema();
     PartitionSpec partitionSpec = PartitionSpec.unpartitioned();
     when(mockCatalog.createTable(
-            IDENTIFIER,
-            schema,
-            partitionSpec,
-            BASE_PATH,
-            Collections.singletonMap(
-                TableProperties.DEFAULT_NAME_MAPPING,
-                NameMappingParser.toJson(MappingUtil.create(schema)))))
+            eq(IDENTIFIER),
+            any(),
+            any(),
+            eq(BASE_PATH),
+            eq(
+                Collections.singletonMap(
+                    TableProperties.DEFAULT_NAME_MAPPING,
+                    NameMappingParser.toJson(MappingUtil.create(schema))))))
         .thenThrow(new AlreadyExistsException("Table already exists"));
     when(mockCatalog.loadTable(IDENTIFIER)).thenReturn(mockTable);
 

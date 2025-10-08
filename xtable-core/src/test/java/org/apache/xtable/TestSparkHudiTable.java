@@ -271,6 +271,6 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
 
   private HoodieTableMetaClient initMetaClient(
       JavaSparkContext jsc, HoodieTableType hoodieTableType, TypedProperties keyGenProperties) {
-    return getMetaClient(keyGenProperties, hoodieTableType, jsc.hadoopConfiguration());
+    return getMetaClient(keyGenProperties, hoodieTableType, jsc.hadoopConfiguration(), true);
   }
 }
