@@ -133,7 +133,7 @@ public class ITRunCatalogSync {
     Path icebergMetadataPath = Paths.get(URI.create(basePath + "/metadata"));
     long icebergMetadataFiles =
         Files.list(icebergMetadataPath).filter(p -> p.toString().endsWith("metadata.json")).count();
-    Assertions.assertEquals(2, icebergMetadataFiles);
+    Assertions.assertEquals(3, icebergMetadataFiles);
     Path deltaMetadataPath = Paths.get(URI.create(basePath + "/_delta_log"));
     long deltaMetadataFiles =
         Files.list(deltaMetadataPath).filter(p -> p.toString().endsWith(".json")).count();

@@ -18,6 +18,7 @@
  
 package org.apache.xtable.iceberg;
 
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -26,9 +27,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.TableMetadata;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 import org.apache.iceberg.Schema;
@@ -333,6 +338,22 @@ public class TestIcebergSchemaSync {
 
     verify(mockUpdateSchema).updateColumnDoc("value_string", "doc");
     verify(mockUpdateSchema).commit();
+  }
+
+  @Test
+  void testSyncWithProvidedIds() {
+    BaseTable mockBaseTable = Mockito.mock(BaseTable.class, RETURNS_DEEP_STUBS);
+    TableMetadata mockCurrent = Mockito.mock(TableMetadata.class);
+    when(mockBaseTable.operations().current()).thenReturn(mockCurrent);
+    try (MockedStatic<TableMetadata> tableMetadataMockedStatic = Mockito.mockStatic(TableMetadata.class)) {
+      TableMetadata.Builder mockBuilder = Mockito.mock(TableMetadata.Builder.class);
+      tableMetadataMockedStatic.when(() -> TableMetadata.buildFrom(mockCurrent)).thenReturn(mockBuilder);
+      when(mockBuilder.setCurrentSchema(SCHEMA, SCHEMA.highestFieldId())).thenReturn(mockBuilder);
+      TableMetadata mockUpdated = Mockito.mock(TableMetadata.class);
+      when(mockBuilder.build()).thenReturn(mockUpdated);
+      schemaSync.syncWithProvidedIds(SCHEMA, mockBaseTable);
+      verify(mockBaseTable.operations()).commit(mockCurrent, mockUpdated);
+    }
   }
 
   private Schema addColumnToDefault(Schema schema, Types.NestedField field, Integer parentId) {
