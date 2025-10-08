@@ -27,16 +27,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.apache.iceberg.BaseTable;
-import org.apache.iceberg.Table;
-import org.apache.iceberg.TableMetadata;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.types.Type;
@@ -345,9 +344,12 @@ public class TestIcebergSchemaSync {
     BaseTable mockBaseTable = Mockito.mock(BaseTable.class, RETURNS_DEEP_STUBS);
     TableMetadata mockCurrent = Mockito.mock(TableMetadata.class);
     when(mockBaseTable.operations().current()).thenReturn(mockCurrent);
-    try (MockedStatic<TableMetadata> tableMetadataMockedStatic = Mockito.mockStatic(TableMetadata.class)) {
+    try (MockedStatic<TableMetadata> tableMetadataMockedStatic =
+        Mockito.mockStatic(TableMetadata.class)) {
       TableMetadata.Builder mockBuilder = Mockito.mock(TableMetadata.Builder.class);
-      tableMetadataMockedStatic.when(() -> TableMetadata.buildFrom(mockCurrent)).thenReturn(mockBuilder);
+      tableMetadataMockedStatic
+          .when(() -> TableMetadata.buildFrom(mockCurrent))
+          .thenReturn(mockBuilder);
       when(mockBuilder.setCurrentSchema(SCHEMA, SCHEMA.highestFieldId())).thenReturn(mockBuilder);
       TableMetadata mockUpdated = Mockito.mock(TableMetadata.class);
       when(mockBuilder.build()).thenReturn(mockUpdated);
