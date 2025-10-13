@@ -548,7 +548,7 @@ public class ITDeltaKernelConversionSource {
   }
 
   @Test
-  void testConvertFromDeltaPartitionFormat() {
+  void testConvertFromDeltaPartitionSinglePartition() {
     // Mock the partition schema
     Configuration hadoopConf = new Configuration();
     Engine engine = DefaultEngine.create(hadoopConf);
