@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
@@ -44,12 +45,21 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import io.delta.kernel.Snapshot;
+import io.delta.kernel.Table;
+import io.delta.kernel.defaults.engine.DefaultEngine;
+import io.delta.kernel.engine.Engine;
+import io.delta.kernel.types.StructField;
+import io.delta.kernel.types.StructType;
+
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestSparkDeltaTable;
 import org.apache.xtable.ValidationTestHelper;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.kernel.DeltaKernelConversionSource;
 import org.apache.xtable.kernel.DeltaKernelConversionSourceProvider;
+import org.apache.xtable.kernel.DeltaKernelPartitionExtractor;
+import org.apache.xtable.kernel.DeltaKernelSchemaExtractor;
 import org.apache.xtable.model.*;
 import org.apache.xtable.model.schema.*;
 import org.apache.xtable.model.stat.ColumnStat;
@@ -535,6 +545,79 @@ public class ITDeltaKernelConversionSource {
       allTableChanges.add(tableChange);
     }
     ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
+  }
+
+  @Test
+  void testConvertFromDeltaPartitionFormat() {
+    // Mock the partition schema
+    Configuration hadoopConf = new Configuration();
+    Engine engine = DefaultEngine.create(hadoopConf);
+    final String tableName = GenericTable.getTableName();
+    final Path basePath = tempDir.resolve(tableName);
+    // Create table with a single row using Spark
+    sparkSession.sql(
+        "CREATE TABLE `"
+            + tableName
+            + "` USING DELTA PARTITIONED BY (part_col)\n"
+            + "LOCATION '"
+            + basePath
+            + "' AS SELECT 'SingleValue' AS part_col, 1 AS col1, 2 AS col2");
+    // Create Delta source
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
+            .build();
+    DeltaKernelSchemaExtractor schemaExtractor = DeltaKernelSchemaExtractor.getInstance();
+    Table table = Table.forPath(engine, basePath.toString());
+    Snapshot snapshot = table.getLatestSnapshot(engine);
+    io.delta.kernel.types.StructType schema = snapshot.getSchema();
+    InternalSchema internalSchema = schemaExtractor.toInternalSchema(schema);
+    // Get partition columns);
+    StructType fullSchema = snapshot.getSchema(); // The full table schema
+    List<String> partitionColumns = snapshot.getPartitionColumnNames(); // List<String>
+    List<StructField> partitionFields_strfld =
+        fullSchema.fields().stream()
+            .filter(field -> partitionColumns.contains(field.getName()))
+            .collect(Collectors.toList());
+    StructType partitionSchema = new StructType(partitionFields_strfld);
+    List<InternalPartitionField> partitionFields =
+        DeltaKernelPartitionExtractor.getInstance()
+            .convertFromDeltaPartitionFormat(internalSchema, partitionSchema);
+    assertNotNull(partitionFields, "Partition fields should not be null");
+    assertEquals(1, partitionFields.size(), "Should have exactly one partition field");
+    InternalPartitionField partColPartition = partitionFields.get(0);
+    assertEquals(
+        PartitionTransformType.VALUE,
+        partColPartition.getTransformType(),
+        "Partition transform type should be VALUE");
+    List<String> expectedPartitionFieldNames = Collections.singletonList("part_col");
+    assertEquals(
+        expectedPartitionFieldNames,
+        Collections.singletonList(partitionFields.get(0).getSourceField().getName()),
+        "Partition field names should match expected");
+    InternalField expectedSourceField =
+        InternalField.builder()
+            .name("part_col")
+            .schema(
+                InternalSchema.builder()
+                    .name("string")
+                    .dataType(InternalType.STRING)
+                    .isNullable(true)
+                    .build())
+            .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+            .build();
+
+    InternalPartitionField expectedPartitionField =
+        InternalPartitionField.builder()
+            .sourceField(expectedSourceField)
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    assertEquals(
+        Collections.singletonList(expectedPartitionField),
+        partitionFields,
+        "Partition field should match expected");
   }
 
   @ParameterizedTest

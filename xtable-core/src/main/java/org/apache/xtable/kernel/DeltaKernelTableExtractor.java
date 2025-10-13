@@ -55,12 +55,10 @@ public class DeltaKernelTableExtractor {
       // Get partition columns);
       StructType fullSchema = snapshot.getSchema(); // The full table schema
       List<String> partitionColumns = snapshot.getPartitionColumnNames(); // List<String>
-
       List<StructField> partitionFields_strfld =
           fullSchema.fields().stream()
               .filter(field -> partitionColumns.contains(field.getName()))
               .collect(Collectors.toList());
-
       StructType partitionSchema = new StructType(partitionFields_strfld);
 
       List<InternalPartitionField> partitionFields =
