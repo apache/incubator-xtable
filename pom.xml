@@ -54,6 +54,7 @@
         <module>xtable-aws</module>
         <module>xtable-hive-metastore</module>
         <module>xtable-service</module>
+        <module>xtable-spark-plugin</module>
     </modules>
 
     <properties>
