@@ -42,9 +42,10 @@ public class PaimonDataFileExtractor {
 
   public List<InternalDataFile> toInternalDataFiles(FileStoreTable table, Snapshot snapshot) {
     List<InternalDataFile> result = new ArrayList<>();
-    Iterator<ManifestEntry> iterator = newSnapshotReader(table, snapshot).readFileIterator();
-    while (iterator.hasNext()) {
-      result.add(toInternalDataFile(table, iterator.next()));
+    Iterator<ManifestEntry> manifestEntryIterator =
+        newSnapshotReader(table, snapshot).readFileIterator();
+    while (manifestEntryIterator.hasNext()) {
+      result.add(toInternalDataFile(table, manifestEntryIterator.next()));
     }
     return result;
   }

@@ -517,9 +517,9 @@ public class ITConversionController {
 
   private static List<String> getOtherFormats(String sourceTableFormat) {
     return Arrays.stream(TableFormat.values())
-        .filter(format -> !format.equals(sourceTableFormat))
-        .filter(format -> !format.equals(PAIMON)) // Paimon target is not supported yet
-        .filter(format -> !format.equals(PARQUET)) // Excluded because upsert, insert etc. not supported in Parquet
+        .filter(fmt -> !fmt.equals(sourceTableFormat))
+        .filter(fmt -> !fmt.equals(PAIMON)) // Paimon target is not supported yet
+        .filter(fmt -> !fmt.equals(PARQUET)) // upserts/inserts are not supported in Parquet
         .collect(Collectors.toList());
   }
 

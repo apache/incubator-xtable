@@ -300,4 +300,8 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
   public String getFilterQuery() {
     return "id % 2 = 0";
   }
+
+  public FileStoreTable getPaimonTable() {
+    return paimonTable;
+  }
 }
