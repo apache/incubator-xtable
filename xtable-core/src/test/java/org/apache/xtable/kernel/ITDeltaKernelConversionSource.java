@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.delta;
+package org.apache.xtable.kernel;
 
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.*;
@@ -56,10 +56,6 @@ import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestSparkDeltaTable;
 import org.apache.xtable.ValidationTestHelper;
 import org.apache.xtable.conversion.SourceTable;
-import org.apache.xtable.kernel.DeltaKernelConversionSource;
-import org.apache.xtable.kernel.DeltaKernelConversionSourceProvider;
-import org.apache.xtable.kernel.DeltaKernelPartitionExtractor;
-import org.apache.xtable.kernel.DeltaKernelSchemaExtractor;
 import org.apache.xtable.model.*;
 import org.apache.xtable.model.schema.*;
 import org.apache.xtable.model.stat.ColumnStat;

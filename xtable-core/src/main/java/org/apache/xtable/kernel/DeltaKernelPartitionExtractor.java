@@ -39,8 +39,6 @@ import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
-import org.apache.spark.sql.types.Metadata;
-
 import scala.collection.JavaConverters;
 
 import com.google.common.collect.Iterators;
@@ -49,7 +47,6 @@ import com.google.common.collect.PeekingIterator;
 import io.delta.kernel.types.*;
 import io.delta.kernel.types.FieldMetadata;
 
-import org.apache.xtable.delta.ScalaUtils;
 import org.apache.xtable.exception.PartitionSpecException;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -235,10 +232,12 @@ public class DeltaKernelPartitionExtractor {
       StructField field;
 
       if (internalPartitionField.getTransformType() == PartitionTransformType.VALUE) {
+        System.out.println("if coming");
         currPartitionColumnName = internalPartitionField.getSourceField().getName();
         field = null;
       } else {
         // Since partition field of timestamp or bucket type, create new field in schema.
+        System.out.println("else coming");
         field = getGeneratedField(internalPartitionField);
         currPartitionColumnName = field.getName();
       }
@@ -387,11 +386,9 @@ public class DeltaKernelPartitionExtractor {
       default:
         throw new PartitionSpecException("Invalid transform type");
     }
-    Map<String, String> generatedExpressionMetadata =
-        Collections.singletonMap(DELTA_GENERATION_EXPRESSION, generatedExpression);
-    Metadata partitionFieldMetadata =
-        new Metadata(ScalaUtils.convertJavaMapToScala(generatedExpressionMetadata));
-    return new StructField(currPartitionColumnName, dataType, true, FieldMetadata.empty());
+    FieldMetadata partitionFieldMetadata =
+        FieldMetadata.builder().putString(DELTA_GENERATION_EXPRESSION, generatedExpression).build();
+    return new StructField(currPartitionColumnName, dataType, true, partitionFieldMetadata);
   }
 
   private void validate(
