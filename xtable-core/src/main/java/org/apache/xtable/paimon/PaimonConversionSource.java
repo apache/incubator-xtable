@@ -18,8 +18,6 @@
  
 package org.apache.xtable.paimon;
 
-import static org.apache.xtable.model.storage.DataLayoutStrategy.HIVE_STYLE_PARTITION;
-
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -69,14 +67,11 @@ public class PaimonConversionSource implements ConversionSource<Snapshot> {
     List<InternalPartitionField> partitioningFields =
         partitionSpecExtractor.toInternalPartitionFields(partitionKeys, internalSchema);
 
-    DataLayoutStrategy dataLayoutStrategy =
-        partitioningFields.isEmpty() ? DataLayoutStrategy.FLAT : HIVE_STYLE_PARTITION;
-
     return InternalTable.builder()
         .name(paimonTable.name())
         .tableFormat(TableFormat.PAIMON)
         .readSchema(internalSchema)
-        .layoutStrategy(dataLayoutStrategy)
+        .layoutStrategy(DataLayoutStrategy.HIVE_STYLE_PARTITION)
         .basePath(paimonTable.location().toString())
         .partitioningFields(partitioningFields)
         .latestCommitTime(Instant.ofEpochMilli(snapshot.timeMillis()))
@@ -86,33 +81,35 @@ public class PaimonConversionSource implements ConversionSource<Snapshot> {
 
   @Override
   public InternalTable getCurrentTable() {
-    SnapshotManager snapshotManager = paimonTable.snapshotManager();
-    Snapshot snapshot = snapshotManager.latestSnapshot();
-    if (snapshot == null) {
-      throw new ReadException("No snapshots found for table " + paimonTable.name());
-    }
+    Snapshot snapshot = getLastSnapshot();
     return getTable(snapshot);
   }
 
   @Override
   public InternalSnapshot getCurrentSnapshot() {
+    Snapshot snapshot = getLastSnapshot();
+    InternalTable internalTable = getTable(snapshot);
+    InternalSchema internalSchema = internalTable.getReadSchema();
+    List<InternalDataFile> dataFiles =
+        dataFileExtractor.toInternalDataFiles(paimonTable, snapshot, internalSchema);
+
+    return InternalSnapshot.builder()
+        .table(internalTable)
+        .version(Long.toString(snapshot.timeMillis()))
+        .partitionedDataFiles(PartitionFileGroup.fromFiles(dataFiles))
+        // TODO : Implement pending commits extraction, required for incremental sync
+        // https://github.com/apache/incubator-xtable/issues/754
+        .sourceIdentifier(getCommitIdentifier(snapshot))
+        .build();
+  }
+
+  private Snapshot getLastSnapshot() {
     SnapshotManager snapshotManager = paimonTable.snapshotManager();
     Snapshot snapshot = snapshotManager.latestSnapshot();
     if (snapshot == null) {
       throw new ReadException("No snapshots found for table " + paimonTable.name());
     }
-
-    InternalTable internalTable = getTable(snapshot);
-    List<InternalDataFile> internalDataFiles =
-        dataFileExtractor.toInternalDataFiles(paimonTable, snapshot);
-
-    return InternalSnapshot.builder()
-        .table(internalTable)
-        .version(Long.toString(snapshot.timeMillis()))
-        .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
-        // TODO : Implement pending commits extraction, required for incremental sync
-        .sourceIdentifier(getCommitIdentifier(snapshot))
-        .build();
+    return snapshot;
   }
 
   @Override

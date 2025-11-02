@@ -67,7 +67,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.CleanupMode;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -109,8 +108,7 @@ import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.paimon.PaimonConversionSourceProvider;
 
 public class ITConversionController {
-  @TempDir(cleanup = CleanupMode.NEVER) // TODO remove CleanupMode.NEVER after debugging
-  public static Path tempDir;
+  @TempDir public static Path tempDir;
 
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
@@ -121,21 +119,20 @@ public class ITConversionController {
 
   @BeforeAll
   public static void setupOnce() {
-    SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
+    SparkConf sparkConf =
+        HudiTestUtil.getSparkConf(tempDir)
+            .set(
+                "spark.sql.extensions",
+                "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
+            .set("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
+            .set("spark.sql.catalog.paimon.warehouse", tempDir.toUri().toString());
+
     sparkSession =
         SparkSession.builder().config(HoodieReadClient.addHoodieSupport(sparkConf)).getOrCreate();
     sparkSession
         .sparkContext()
         .hadoopConfiguration()
         .set("parquet.avro.write-old-list-structure", "false");
-    sparkSession
-        .sparkContext()
-        .conf()
-        .set(
-            "spark.sql.extensions",
-            "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
-        .set("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
-        .set("spark.sql.catalog.paimon.warehouse", tempDir.toUri().toString());
 
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
   }

@@ -39,6 +39,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.xtable.TestPaimonTable;
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -97,10 +98,9 @@ public class TestPaimonPartitionExtractor {
     InternalSchema schema = createMockSchema();
     List<String> partitionKeys = Collections.singletonList("missing_key");
 
-    IllegalArgumentException exception =
+    ReadException exception =
         assertThrows(
-            IllegalArgumentException.class,
-            () -> extractor.toInternalPartitionFields(partitionKeys, schema));
+            ReadException.class, () -> extractor.toInternalPartitionFields(partitionKeys, schema));
 
     assertTrue(exception.getMessage().contains("Partition key not found in schema: missing_key"));
   }
@@ -114,7 +114,8 @@ public class TestPaimonPartitionExtractor {
 
     BinaryRow partition = BinaryRow.singleColumn("INFO");
 
-    List<PartitionValue> result = extractor.toPartitionValues(paimonTable, partition);
+    InternalSchema schema = createMockSchema();
+    List<PartitionValue> result = extractor.toPartitionValues(paimonTable, partition, schema);
 
     assertEquals(1, result.size());
     PartitionValue partitionValue = result.get(0);

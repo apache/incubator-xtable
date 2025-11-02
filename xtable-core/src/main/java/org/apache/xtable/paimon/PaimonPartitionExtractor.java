@@ -18,7 +18,12 @@
  
 package org.apache.xtable.paimon;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
@@ -28,6 +33,7 @@ import org.apache.paimon.data.BinaryRow;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.utils.InternalRowPartitionComputer;
 
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -38,8 +44,6 @@ import org.apache.xtable.model.stat.Range;
 /** Extracts partition spec for Paimon as identity transforms on partition keys. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class PaimonPartitionExtractor {
-
-  private final PaimonSchemaExtractor paimonSchemaExtractor = PaimonSchemaExtractor.getInstance();
 
   private static final PaimonPartitionExtractor INSTANCE = new PaimonPartitionExtractor();
 
@@ -57,13 +61,17 @@ public class PaimonPartitionExtractor {
         .collect(Collectors.toList());
   }
 
-  public List<PartitionValue> toPartitionValues(FileStoreTable table, BinaryRow partition) {
+  public List<PartitionValue> toPartitionValues(
+      FileStoreTable table, BinaryRow partition, InternalSchema internalSchema) {
     InternalRowPartitionComputer partitionComputer = newPartitionComputer(table);
-    InternalSchema internalSchema = paimonSchemaExtractor.toInternalSchema(table.schema());
+    LinkedHashMap<String, String> partValues = partitionComputer.generatePartValues(partition);
 
-    List<PartitionValue> partitionValues = new ArrayList<>();
-    for (Map.Entry<String, String> entry :
-        partitionComputer.generatePartValues(partition).entrySet()) {
+    if (partValues.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<PartitionValue> partitionValues = new ArrayList<>(partValues.size());
+    for (Map.Entry<String, String> entry : partValues.entrySet()) {
       PartitionValue partitionValue =
           PartitionValue.builder()
               .partitionField(toPartitionField(entry.getKey(), internalSchema))
@@ -84,8 +92,7 @@ public class PaimonPartitionExtractor {
   private InternalPartitionField toPartitionField(String key, InternalSchema schema) {
     InternalField sourceField =
         findField(schema, key)
-            .orElseThrow(
-                () -> new IllegalArgumentException("Partition key not found in schema: " + key));
+            .orElseThrow(() -> new ReadException("Partition key not found in schema: " + key));
     return InternalPartitionField.builder()
         .sourceField(sourceField)
         .transformType(PartitionTransformType.VALUE)

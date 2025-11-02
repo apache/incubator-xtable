@@ -118,7 +118,6 @@
         <dependency>
             <groupId>org.apache.paimon</groupId>
             <artifactId>paimon-spark-${spark.version.prefix}</artifactId>
-            <version>${paimon.version}</version>
             <scope>test</scope>
         </dependency>
 

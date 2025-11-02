@@ -26,6 +26,7 @@ import org.apache.paimon.manifest.ManifestEntry;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.source.snapshot.SnapshotReader;
 
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.InternalDataFile;
 
@@ -40,23 +41,26 @@ public class PaimonDataFileExtractor {
     return INSTANCE;
   }
 
-  public List<InternalDataFile> toInternalDataFiles(FileStoreTable table, Snapshot snapshot) {
+  public List<InternalDataFile> toInternalDataFiles(
+      FileStoreTable table, Snapshot snapshot, InternalSchema internalSchema) {
     List<InternalDataFile> result = new ArrayList<>();
     Iterator<ManifestEntry> manifestEntryIterator =
         newSnapshotReader(table, snapshot).readFileIterator();
     while (manifestEntryIterator.hasNext()) {
-      result.add(toInternalDataFile(table, manifestEntryIterator.next()));
+      result.add(toInternalDataFile(table, manifestEntryIterator.next(), internalSchema));
     }
     return result;
   }
 
-  private InternalDataFile toInternalDataFile(FileStoreTable table, ManifestEntry entry) {
+  private InternalDataFile toInternalDataFile(
+      FileStoreTable table, ManifestEntry entry, InternalSchema internalSchema) {
     return InternalDataFile.builder()
         .physicalPath(toFullPhysicalPath(table, entry))
         .fileSizeBytes(entry.file().fileSize())
         .lastModified(entry.file().creationTimeEpochMillis())
         .recordCount(entry.file().rowCount())
-        .partitionValues(partitionExtractor.toPartitionValues(table, entry.partition()))
+        .partitionValues(
+            partitionExtractor.toPartitionValues(table, entry.partition(), internalSchema))
         .columnStats(toColumnStats(entry.file()))
         .build();
   }
@@ -76,6 +80,7 @@ public class PaimonDataFileExtractor {
 
   private List<ColumnStat> toColumnStats(DataFileMeta file) {
     // TODO: Implement logic to extract column stats from the file meta
+    // https://github.com/apache/incubator-xtable/issues/755
     return Collections.emptyList();
   }
 

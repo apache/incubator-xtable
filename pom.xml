@@ -340,6 +340,11 @@
                 <artifactId>paimon-bundle</artifactId>
                 <version>${paimon.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.apache.paimon</groupId>
+                <artifactId>paimon-spark-${spark.version.prefix}</artifactId>
+                <version>${paimon.version}</version>
+            </dependency>
 
             <!-- Spark -->
             <dependency>

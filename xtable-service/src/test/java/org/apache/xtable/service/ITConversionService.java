@@ -91,21 +91,20 @@ public class ITConversionService {
       Path basePath = tempDir.resolve(tableName);
       Files.createDirectories(basePath);
 
-      SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
+      SparkConf sparkConf =
+          HudiTestUtil.getSparkConf(tempDir)
+              .set(
+                  "spark.sql.extensions",
+                  "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
+              .set("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
+              .set("spark.sql.catalog.paimon.warehouse", tempDir.toUri().toString());
+
       sparkSession =
           SparkSession.builder().config(HoodieReadClient.addHoodieSupport(sparkConf)).getOrCreate();
       sparkSession
           .sparkContext()
           .hadoopConfiguration()
           .set("parquet.avro.write-old-list-structure", "false");
-      sparkSession
-          .sparkContext()
-          .conf()
-          .set(
-              "spark.sql.extensions",
-              "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
-          .set("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
-          .set("spark.sql.catalog.paimon.warehouse", tempDir.toUri().toString());
 
       jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
     } catch (IOException e) {

@@ -265,7 +265,7 @@ public class TestPaimonSchemaExtractor {
 
   @Test
   void testTimestampField() {
-    DataField paimonField = new DataField(10, "timestamp_field", new TimestampType(3));
+    DataField paimonField = new DataField(10, "timestamp_field", new TimestampType(9));
     Map<InternalSchema.MetadataKey, Object> timestampMetadata =
         Collections.singletonMap(
             InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
@@ -275,7 +275,7 @@ public class TestPaimonSchemaExtractor {
             .fieldId(10)
             .schema(
                 InternalSchema.builder()
-                    .name("TIMESTAMP(3)")
+                    .name("TIMESTAMP(9)")
                     .dataType(InternalType.TIMESTAMP)
                     .isNullable(true)
                     .metadata(timestampMetadata)
@@ -314,8 +314,12 @@ public class TestPaimonSchemaExtractor {
             12,
             "struct_field",
             RowType.of(
-                new DataType[] {new IntType(), new VarCharType(255)},
-                new String[] {"nested_int", "nested_varchar"}));
+                new DataType[] {
+                  new IntType(),
+                  new VarCharType(255),
+                  RowType.of(new DataType[] {new DoubleType()}, new String[] {"very_nested_double"})
+                },
+                new String[] {"nested_int", "nested_varchar", "nested_struct"}));
     InternalField nestedIntField =
         InternalField.builder()
             .name("nested_int")
@@ -342,16 +346,44 @@ public class TestPaimonSchemaExtractor {
                     .build())
             .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
             .build();
+    InternalField veryNestedDoubleField =
+        InternalField.builder()
+            .name("very_nested_double")
+            .fieldId(0)
+            .parentPath("struct_field.nested_struct")
+            .schema(
+                InternalSchema.builder()
+                    .name("DOUBLE")
+                    .dataType(InternalType.DOUBLE)
+                    .isNullable(true)
+                    .build())
+            .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+            .build();
+    InternalField nestedStructField =
+        InternalField.builder()
+            .name("nested_struct")
+            .fieldId(2)
+            .parentPath("struct_field")
+            .schema(
+                InternalSchema.builder()
+                    .name("ROW<`very_nested_double` DOUBLE>")
+                    .dataType(InternalType.RECORD)
+                    .isNullable(true)
+                    .fields(Collections.singletonList(veryNestedDoubleField))
+                    .build())
+            .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+            .build();
     InternalField expectedField =
         InternalField.builder()
             .name("struct_field")
             .fieldId(12)
             .schema(
                 InternalSchema.builder()
-                    .name("ROW<`nested_int` INT, `nested_varchar` VARCHAR(255)>")
+                    .name(
+                        "ROW<`nested_int` INT, `nested_varchar` VARCHAR(255), `nested_struct` ROW<`very_nested_double` DOUBLE>>")
                     .dataType(InternalType.RECORD)
                     .isNullable(true)
-                    .fields(Arrays.asList(nestedIntField, nestedVarcharField))
+                    .fields(Arrays.asList(nestedIntField, nestedVarcharField, nestedStructField))
                     .build())
             .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
             .build();
