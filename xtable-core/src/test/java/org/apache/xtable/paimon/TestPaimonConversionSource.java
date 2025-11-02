@@ -101,7 +101,7 @@ public class TestPaimonConversionSource {
     assertEquals("test_table", result.getName());
     assertEquals(TableFormat.PAIMON, result.getTableFormat());
     assertNotNull(result.getReadSchema());
-    assertEquals(DataLayoutStrategy.FLAT, result.getLayoutStrategy());
+    assertEquals(DataLayoutStrategy.HIVE_STYLE_PARTITION, result.getLayoutStrategy());
     assertTrue(result.getBasePath().contains("unpartitioned_table"));
     assertEquals(0, result.getPartitioningFields().size());
     assertEquals(Instant.ofEpochMilli(snapshot.timeMillis()), result.getLatestCommitTime());
