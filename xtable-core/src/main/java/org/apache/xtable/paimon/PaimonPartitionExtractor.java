@@ -20,7 +20,6 @@ package org.apache.xtable.paimon;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -64,7 +63,7 @@ public class PaimonPartitionExtractor {
   public List<PartitionValue> toPartitionValues(
       FileStoreTable table, BinaryRow partition, InternalSchema internalSchema) {
     InternalRowPartitionComputer partitionComputer = newPartitionComputer(table);
-    LinkedHashMap<String, String> partValues = partitionComputer.generatePartValues(partition);
+    Map<String, String> partValues = partitionComputer.generatePartValues(partition);
 
     if (partValues.isEmpty()) {
       return Collections.emptyList();

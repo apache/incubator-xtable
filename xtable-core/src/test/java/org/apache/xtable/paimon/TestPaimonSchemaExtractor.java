@@ -19,6 +19,7 @@
 package org.apache.xtable.paimon;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -45,6 +46,8 @@ import org.apache.paimon.types.TimestampType;
 import org.apache.paimon.types.TinyIntType;
 import org.apache.paimon.types.VarCharType;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -263,9 +266,10 @@ public class TestPaimonSchemaExtractor {
     assertField(paimonField, expectedField);
   }
 
-  @Test
-  void testTimestampField() {
-    DataField paimonField = new DataField(10, "timestamp_field", new TimestampType(9));
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
+  void testTimestampField(int precision) {
+    DataField paimonField = new DataField(10, "timestamp_field", new TimestampType(precision));
     Map<InternalSchema.MetadataKey, Object> timestampMetadata =
         Collections.singletonMap(
             InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
@@ -275,7 +279,7 @@ public class TestPaimonSchemaExtractor {
             .fieldId(10)
             .schema(
                 InternalSchema.builder()
-                    .name("TIMESTAMP(9)")
+                    .name("TIMESTAMP(" + precision + ")")
                     .dataType(InternalType.TIMESTAMP)
                     .isNullable(true)
                     .metadata(timestampMetadata)
@@ -283,6 +287,12 @@ public class TestPaimonSchemaExtractor {
             .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
             .build();
     assertField(paimonField, expectedField);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 10})
+  void testInvalidTimestampPrecisionField(int invalidPrecision) {
+    assertThrows(IllegalArgumentException.class, () -> new TimestampType(invalidPrecision));
   }
 
   @Test
