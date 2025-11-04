@@ -108,7 +108,8 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   @Override
   public InternalTable getTable(Snapshot snapshot) {
     Table iceTable = getSourceTable();
-    Schema iceSchema = iceTable.schemas().get(snapshot.schemaId());
+    Schema iceSchema =
+            (snapshot != null) ? iceTable.schemas().get(snapshot.schemaId()) : iceTable.schema();
     TableOperations iceOps = ((BaseTable) iceTable).operations();
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     InternalSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
@@ -123,12 +124,19 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         irPartitionFields.size() > 0
             ? DataLayoutStrategy.HIVE_STYLE_PARTITION
             : DataLayoutStrategy.FLAT;
+
+    Instant latestCommitTime =
+            (snapshot != null)
+                    ? Instant.ofEpochMilli(snapshot.timestampMillis())
+                    : Instant.ofEpochMilli(
+                    ((BaseTable) iceTable).operations().current().lastUpdatedMillis());
+
     return InternalTable.builder()
         .tableFormat(TableFormat.ICEBERG)
         .basePath(iceTable.location())
         .name(iceTable.name())
         .partitioningFields(irPartitionFields)
-        .latestCommitTime(Instant.ofEpochMilli(snapshot.timestampMillis()))
+        .latestCommitTime(latestCommitTime)
         .readSchema(irSchema)
         .layoutStrategy(dataLayoutStrategy)
         .latestMetadataPath(iceOps.current().metadataFileLocation())
@@ -147,6 +155,18 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
     Table iceTable = getSourceTable();
 
     Snapshot currentSnapshot = iceTable.currentSnapshot();
+
+    if (currentSnapshot == null) {
+      // Handle empty table case - return snapshot with schema but no data files
+      InternalTable irTable = getTable(null);
+      return InternalSnapshot.builder()
+              .version("0")
+              .table(irTable)
+              .partitionedDataFiles(Collections.emptyList())
+              .sourceIdentifier("0")
+              .build();
+    }
+
     InternalTable irTable = getTable(currentSnapshot);
 
     TableScan scan =

@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -117,6 +118,37 @@ class TestIcebergConversionSource {
   }
 
   @Test
+  void testGetTableWithoutSnapshot(@TempDir Path workingDir) throws IOException {
+    Table emptyTable = createTestCatalogTable(workingDir.toString());
+    assertNull(emptyTable.currentSnapshot());
+
+    SourceTable sourceTableConfig = getPerTableConfig(emptyTable);
+
+    IcebergConversionSource conversionSource =
+        sourceProvider.getConversionSourceInstance(sourceTableConfig);
+
+    InternalTable internalTable = conversionSource.getTable(null);
+    assertNotNull(internalTable);
+    assertEquals(TableFormat.ICEBERG, internalTable.getTableFormat());
+    assertEquals(emptyTable.location(), internalTable.getBasePath());
+    assertEquals(
+        ((BaseTable) emptyTable).operations().current().lastUpdatedMillis(),
+        internalTable.getLatestCommitTime().toEpochMilli());
+
+    assertEquals(
+        emptyTable.schema().columns().size(), internalTable.getReadSchema().getFields().size());
+    validateSchema(internalTable.getReadSchema(), emptyTable.schema());
+
+    assertEquals(1, internalTable.getPartitioningFields().size());
+    InternalField partitionField = internalTable.getPartitioningFields().get(0).getSourceField();
+    assertEquals("cs_sold_date_sk", partitionField.getName());
+    assertEquals(7, partitionField.getFieldId());
+    assertEquals(
+        PartitionTransformType.VALUE,
+        internalTable.getPartitioningFields().get(0).getTransformType());
+  }
+
+  @Test
   public void testGetCurrentSnapshot(@TempDir Path workingDir) throws IOException {
     Table catalogSales = createTestTableWithData(workingDir.toString());
     Snapshot iceCurrentSnapshot = catalogSales.currentSnapshot();
@@ -162,6 +194,44 @@ class TestIcebergConversionSource {
           "cs_sold_date_sk", partitionEntry.getPartitionField().getSourceField().getName());
       assertEquals(7, internalDataFile.getColumnStats().size());
     }
+  }
+
+  @Test
+  void testGetCurrentSnapshotForEmptyTable(@TempDir Path workingDir) throws IOException {
+    Table emptyTable = createTestCatalogTable(workingDir.toString());
+    assertNull(emptyTable.currentSnapshot());
+
+    SourceTable sourceTableConfig = getPerTableConfig(emptyTable);
+
+    IcebergDataFileExtractor spyDataFileExtractor = spy(IcebergDataFileExtractor.builder().build());
+    IcebergPartitionValueConverter spyPartitionConverter =
+        spy(IcebergPartitionValueConverter.getInstance());
+
+    IcebergConversionSource conversionSource =
+        IcebergConversionSource.builder()
+            .hadoopConf(hadoopConf)
+            .sourceTableConfig(sourceTableConfig)
+            .dataFileExtractor(spyDataFileExtractor)
+            .partitionConverter(spyPartitionConverter)
+            .build();
+
+    InternalSnapshot internalSnapshot = conversionSource.getCurrentSnapshot();
+    assertNotNull(internalSnapshot);
+    assertEquals("0", internalSnapshot.getVersion());
+    assertEquals("0", internalSnapshot.getSourceIdentifier());
+    assertTrue(internalSnapshot.getPartitionedDataFiles().isEmpty());
+
+    InternalTable internalTable = internalSnapshot.getTable();
+    assertNotNull(internalTable);
+    assertEquals(emptyTable.location(), internalTable.getBasePath());
+    assertEquals(
+        ((BaseTable) emptyTable).operations().current().lastUpdatedMillis(),
+        internalTable.getLatestCommitTime().toEpochMilli());
+
+    assertEquals(emptyTable.schema().columns().size(), internalTable.getReadSchema().getFields().size());
+
+    verify(spyPartitionConverter, never()).toXTable(any(), any(), any());
+    verify(spyDataFileExtractor, never()).fromIceberg(any(), any(), any());
   }
 
   @Test
