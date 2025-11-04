@@ -131,6 +131,7 @@ public class ITIcebergConversionSource {
           internalSchema,
           DataLayoutStrategy.FLAT,
           testIcebergTable.getBasePath(),
+          testIcebergTable.getMetadataPath(),
           Collections.emptyList());
     }
   }

@@ -16,16 +16,33 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.hudi;
+package org.apache.xtable.service.models;
 
-import java.util.Map;
+import lombok.Builder;
+import lombok.Getter;
 
-import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-/**
- * Partition spec extractor interface specifically designed for Hudi to parse partition values
- * appropriately.
- */
-public interface HudiSourcePartitionSpecExtractor extends SourcePartitionSpecExtractor {
-  Map<String, String> getPathToPartitionFieldFormat();
+@Getter
+@Builder
+public class ConvertedTable {
+  @JsonProperty("target-format")
+  private String targetFormat;
+
+  @JsonProperty("target-metadata-path")
+  private String targetMetadataPath;
+
+  @JsonProperty("target-schema")
+  private String targetSchema;
+
+  @JsonCreator
+  public ConvertedTable(
+      @JsonProperty String targetFormat,
+      @JsonProperty String targetMetadataPath,
+      @JsonProperty String targetSchema) {
+    this.targetFormat = targetFormat;
+    this.targetMetadataPath = targetMetadataPath;
+    this.targetSchema = targetSchema;
+  }
 }

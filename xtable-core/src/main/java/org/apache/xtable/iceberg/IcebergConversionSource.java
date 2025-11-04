@@ -35,12 +35,14 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -107,6 +109,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   public InternalTable getTable(Snapshot snapshot) {
     Table iceTable = getSourceTable();
     Schema iceSchema = iceTable.schemas().get(snapshot.schemaId());
+    TableOperations iceOps = ((BaseTable) iceTable).operations();
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     InternalSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
 
@@ -128,6 +131,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
         .latestCommitTime(Instant.ofEpochMilli(snapshot.timestampMillis()))
         .readSchema(irSchema)
         .layoutStrategy(dataLayoutStrategy)
+        .latestMetadataPath(iceOps.current().metadataFileLocation())
         .build();
   }
 

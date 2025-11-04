@@ -87,6 +87,7 @@ public class HudiTableExtractor {
         .partitioningFields(partitionFields)
         .readSchema(canonicalSchema)
         .latestCommitTime(HudiInstantUtils.parseFromInstantTime(commit.getTimestamp()))
+        .latestMetadataPath(metaClient.getMetaPath().toString())
         .build();
   }
 

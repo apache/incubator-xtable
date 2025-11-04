@@ -214,7 +214,7 @@
                                 </transformer>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
                                     <resource>META-INF/NOTICE</resource>
-                                    <file>target/classes/META-INF/NOTICE</file>
+                                    <file>target/classes/META-INF/NOTICE-bundled</file>
                                 </transformer>
                             </transformers>
                         </configuration>

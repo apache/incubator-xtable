@@ -219,6 +219,7 @@ public class ITHudiConversionSource {
           internalSchema,
           DataLayoutStrategy.FLAT,
           "file:" + basePath + "_v1",
+          internalTable.getLatestMetadataPath(),
           Collections.emptyList());
     }
   }
@@ -692,9 +693,9 @@ public class ITHudiConversionSource {
             .setBasePath(basePath)
             .setLoadActiveTimelineOnLoad(true)
             .build();
-    HudiSourcePartitionSpecExtractor partitionSpecExtractor =
+    PathBasedPartitionSpecExtractor partitionSpecExtractor =
         new ConfigurationBasedPartitionSpecExtractor(
-            HudiSourceConfig.fromPartitionFieldSpecConfig(xTablePartitionConfig));
+            HudiSourceConfig.parsePartitionFieldSpecs(xTablePartitionConfig));
     return new HudiConversionSource(hoodieTableMetaClient, partitionSpecExtractor);
   }
 

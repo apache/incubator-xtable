@@ -22,11 +22,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.TimeZone;
+import java.util.*;
 
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
@@ -38,11 +34,11 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 
-/** Extracts Partition Values for Hudi from Partition Path. */
+/** Extracts Partition Values for Hudi/Parquet from Partition Path. */
 @AllArgsConstructor
-public class HudiPartitionValuesExtractor {
+public class PathBasedPartitionValuesExtractor {
   private static final String HIVE_DEFAULT_PARTITION = "__HIVE_DEFAULT_PARTITION__";
-  @NonNull private final Map<String, String> pathToPartitionFieldFormat;
+  @NonNull protected final Map<String, String> pathToPartitionFieldFormat;
 
   public List<PartitionValue> extractPartitionValues(
       List<InternalPartitionField> partitionColumns, String partitionPath) {
@@ -53,7 +49,7 @@ public class HudiPartitionValuesExtractor {
     List<PartitionValue> result = new ArrayList<>(totalNumberOfPartitions);
     String remainingPartitionPath = partitionPath;
     for (InternalPartitionField partitionField : partitionColumns) {
-      String sourceFieldName = partitionField.getSourceField().getName();
+      String sourceFieldName = partitionField.getSourceField().getPath();
       if (remainingPartitionPath.startsWith(sourceFieldName + "=")) {
         // Strip off hive style partitioning
         remainingPartitionPath = remainingPartitionPath.substring(sourceFieldName.length() + 1);
@@ -103,7 +99,7 @@ public class HudiPartitionValuesExtractor {
     }
   }
 
-  private static PartialResult parseDate(String remainingPath, String format) {
+  protected static PartialResult parseDate(String remainingPath, String format) {
     try {
       String dateString = remainingPath.substring(0, format.length());
       SimpleDateFormat simpleDateFormat = new SimpleDateFormat(format);
@@ -118,7 +114,7 @@ public class HudiPartitionValuesExtractor {
     }
   }
 
-  private static PartialResult parseValue(
+  protected static PartialResult parseValue(
       String remainingPath, InternalType sourceFieldType, boolean isSlashDelimited) {
     if (remainingPath.isEmpty()) {
       throw new PartitionValuesExtractorException("Missing partition value");
@@ -173,7 +169,7 @@ public class HudiPartitionValuesExtractor {
   }
 
   @Value
-  private static class PartialResult {
+  protected static class PartialResult {
     Object value;
     String remainingPath;
   }

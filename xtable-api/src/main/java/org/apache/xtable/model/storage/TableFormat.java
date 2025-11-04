@@ -27,6 +27,7 @@ public class TableFormat {
   public static final String HUDI = "HUDI";
   public static final String ICEBERG = "ICEBERG";
   public static final String DELTA = "DELTA";
+  public static final String PARQUET = "PARQUET";
 
   public static String[] values() {
     return new String[] {"HUDI", "ICEBERG", "DELTA"};

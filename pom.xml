@@ -53,6 +53,7 @@
         <module>xtable-utilities</module>
         <module>xtable-aws</module>
         <module>xtable-hive-metastore</module>
+        <module>xtable-service</module>
     </modules>
 
     <properties>
@@ -60,9 +61,11 @@
         <!-- To ensure build content is re-producible -->
         <project.build.outputTimestamp>2025-01-01T00:00:00Z</project.build.outputTimestamp>
         <maven.compiler.target>8</maven.compiler.target>
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <avro.version>1.11.4</avro.version>
         <log4j.version>2.22.0</log4j.version>
         <junit.version>5.11.4</junit.version>
+        <junit.platform.runner.version>1.11.4</junit.platform.runner.version>
         <lombok.version>1.18.36</lombok.version>
         <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
         <hadoop.version>3.4.1</hadoop.version>
@@ -75,7 +78,7 @@
         <maven-deploy-plugin.version>3.1.1</maven-deploy-plugin.version>
         <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
         <mockito.version>5.15.2</mockito.version>
-        <parquet.version>1.15.1</parquet.version>
+        <parquet.version>1.15.2</parquet.version>
         <protobuf.version>3.25.5</protobuf.version>
         <scala12.version>2.12.20</scala12.version>
         <scala13.version>2.13.15</scala13.version>
@@ -88,7 +91,7 @@
         <jackson.version>2.18.2</jackson.version>
         <spotless.version>2.43.0</spotless.version>
         <apache.rat.version>0.16.1</apache.rat.version>
-        <google.java.format.version>1.8</google.java.format.version>
+        <google.java.format.version>1.10.0</google.java.format.version>
         <delta.standalone.version>3.3.0</delta.standalone.version>
         <delta.hive.version>3.0.0</delta.hive.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -97,6 +100,11 @@
         <apache-jar-resource-bundle.version>1.7</apache-jar-resource-bundle.version>
         <apache-incubator-disclaimer-resource-bundle.version>1.7</apache-incubator-disclaimer-resource-bundle.version>
         <scala-collection-compat.version>2.12.0</scala-collection-compat.version>
+        <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
+        <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+        <quarkus.platform.version>3.2.12.Final</quarkus.platform.version> <!-- compatible with Java 11 -->
+        <antlr4.version>4.9.3</antlr4.version>
+        <jol.core.version>0.16</jol.core.version>
         
         <!-- Test properties -->
         <skipTests>false</skipTests>
@@ -457,7 +465,7 @@
             <dependency>
                 <groupId>org.openjdk.jol</groupId>
                 <artifactId>jol-core</artifactId>
-                <version>0.16</version>
+                <version>${jol.core.version}</version>
                 <scope>test</scope>
             </dependency>
 
@@ -483,7 +491,7 @@
             <dependency>
                 <groupId>org.junit.platform</groupId>
                 <artifactId>junit-platform-runner</artifactId>
-                <version>1.11.4</version>
+                <version>${junit.platform.runner.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
@@ -650,23 +658,19 @@
                 </executions>
             </plugin>
             <plugin>
-                <groupId>org.projectlombok</groupId>
-                <artifactId>lombok-maven-plugin</artifactId>
-                <version>${lombok-maven-plugin.version}</version>
-                <configuration>
-                    <sourceDirectory>${project.basedir}/src/main/java</sourceDirectory>
-                    <addOutputDirectory>false</addOutputDirectory>
-                    <outputDirectory>${delombok.output.dir}</outputDirectory>
-                    <encoding>UTF-8</encoding>
-                </configuration>
-                <executions>
-                    <execution>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>delombok</goal>
-                        </goals>
-                    </execution>
-                </executions>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version> <configuration>
+                <source>${maven.compiler.source}</source>
+                <target>${maven.compiler.target}</target>
+                <annotationProcessorPaths>
+                    <path>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok</artifactId>
+                        <version>${lombok.version}</version>
+                    </path>
+                </annotationProcessorPaths>
+            </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -697,6 +701,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.22.2</version>
                 <executions>
                     <execution>
                         <goals>

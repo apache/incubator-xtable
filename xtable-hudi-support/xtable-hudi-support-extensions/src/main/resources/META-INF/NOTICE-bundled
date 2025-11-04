@@ -1,0 +1,131 @@
+Apache XTable (incubating)
+Copyright 2024-2025 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (https://www.apache.org/).
+
+--------------------------------------------------------------------------------
+
+This binary artifact bundles the following projects with NOTICE:
+
+--------------------------------------------------------------------------------
+
+Group: com.fasterxml.jackson.core Name: jackson-annotations Version: 2.18.2
+Group: com.fasterxml.jackson.core Name: jackson-databind Version: 2.18.2
+Group: com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.2
+Group: com.fasterxml.jackson.module:jackson-module-scala_2.12:2.18.2
+
+NOTICE:
+| # Jackson JSON processor
+|
+| Jackson is a high-performance, Free/Open Source JSON processing library.
+| It was originally written by Tatu Saloranta (tatu.saloranta@iki.fi), and has
+| been in development since 2007.
+| It is currently developed by a community of developers.
+|
+| ## Copyright
+|
+| Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
+|
+| ## Licensing
+|
+| Jackson 2.x core and extension components are licensed under Apache License 2.0
+| To find the details that apply to this artifact see the accompanying LICENSE file.
+|
+| ## Credits
+|
+| A list of contributors may be found from CREDITS(-2.x) file, which is included
+| in some artifacts (usually source distributions); but is always available
+| from the source code management (SCM) system project uses.
+
+--------------------------------------------------------------------------------
+
+Group: com.fasterxml.jackson.core Name: jackson-core Version: 2.18.2
+
+NOTICE:
+| # Jackson JSON processor
+|
+| Jackson is a high-performance, Free/Open Source JSON processing library.
+| It was originally written by Tatu Saloranta (tatu.saloranta@iki.fi), and has
+| been in development since 2007.
+| It is currently developed by a community of developers.
+|
+| ## Copyright
+|
+| Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
+|
+| ## Licensing
+|
+| Jackson 2.x core and extension components are licensed under Apache License 2.0
+| To find the details that apply to this artifact see the accompanying LICENSE file.
+|
+| ## Credits
+|
+| A list of contributors may be found from CREDITS(-2.x) file, which is included
+| in some artifacts (usually source distributions); but is always available
+| from the source code management (SCM) system project uses.
+|
+| ## FastDoubleParser
+|
+| jackson-core bundles a shaded copy of FastDoubleParser <https://github.com/wrandelshofer/FastDoubleParser>.
+| That code is available under an MIT license <https://github.com/wrandelshofer/FastDoubleParser/blob/main/LICENSE>
+| under the following copyright.
+|
+| Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
+|
+| See FastDoubleParser-NOTICE for details of other source code included in FastDoubleParser
+| and the licenses and copyrights that apply to that code.
+
+--------------------------------------------------------------------------------
+
+Group: io.delta:delta-core_2.12:2.4.0
+Group: io.delta:delta-storage:2.4.0
+
+NOTICE:
+| Delta Lake
+| Copyright (2021) The Delta Lake Project Authors.
+|
+| Licensed under the Apache License, Version 2.0 (the "License");
+| you may not use this file except in compliance with the License.
+| You may obtain a copy of the License at
+|
+| http://www.apache.org/licenses/LICENSE-2.0
+|
+| Unless required by applicable law or agreed to in writing, software
+| distributed under the License is distributed on an "AS IS" BASIS,
+| WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+| See the License for the specific language governing permissions and
+| limitations under the License.
+|
+| This project includes software licensed by the Apache Software Foundation (Apache 2.0)
+| from the Apache Spark project (www.github.com/apache/spark)
+|
+| ----------------------------------------------------------
+| Apache Spark
+| Copyright 2014 and onwards The Apache Software Foundation.
+|
+| This product includes software developed at
+| The Apache Software Foundation (http://www.apache.org/).
+
+--------------------------------------------------------------------------------
+
+Group: io.prometheus:simpleclient:0.8.0
+Group: io.prometheus:simpleclient_common:0.8.0
+Group: io.prometheus:simpleclient_dropwizard:0.8.0
+Group: io.prometheus:simpleclient_httpserver:0.8.0
+Group: io.prometheus:simpleclient_pushgateway:0.8.0
+
+--------------------------------------------------------------------------------
+
+NOTICE:
+| Prometheus instrumentation library for JVM applications
+| Copyright 2012-2015 The Prometheus Authors
+|
+| This product includes software developed at
+| Boxever Ltd. (http://www.boxever.com/).
+|
+| This product includes software developed at
+| SoundCloud Ltd. (http://soundcloud.com/).
+|
+| This product includes software developed as part of the
+| Ocelli project by Netflix Inc. (https://github.com/Netflix/ocelli/).

@@ -28,6 +28,7 @@ import lombok.AllArgsConstructor;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.PartitionFieldSpec;
 import org.apache.xtable.schema.SchemaFieldFinder;
 
 /**
@@ -35,14 +36,13 @@ import org.apache.xtable.schema.SchemaFieldFinder;
  * path:type:format for date types or path:type for value types.
  */
 @AllArgsConstructor
-public class ConfigurationBasedPartitionSpecExtractor implements HudiSourcePartitionSpecExtractor {
-  private final HudiSourceConfig config;
+public class ConfigurationBasedPartitionSpecExtractor implements PathBasedPartitionSpecExtractor {
+  private final List<PartitionFieldSpec> partitionFieldSpecs;
 
   @Override
   public List<InternalPartitionField> spec(InternalSchema tableSchema) {
-    List<InternalPartitionField> partitionFields =
-        new ArrayList<>(config.getPartitionFieldSpecs().size());
-    for (HudiSourceConfig.PartitionFieldSpec fieldSpec : config.getPartitionFieldSpecs()) {
+    List<InternalPartitionField> partitionFields = new ArrayList<>(partitionFieldSpecs.size());
+    for (PartitionFieldSpec fieldSpec : partitionFieldSpecs) {
       InternalField sourceField =
           SchemaFieldFinder.getInstance()
               .findFieldByPath(tableSchema, fieldSpec.getSourceFieldPath());
@@ -58,15 +58,13 @@ public class ConfigurationBasedPartitionSpecExtractor implements HudiSourceParti
   @Override
   public Map<String, String> getPathToPartitionFieldFormat() {
     Map<String, String> pathToPartitionFieldFormat = new HashMap<>();
-    config
-        .getPartitionFieldSpecs()
-        .forEach(
-            partitionFieldSpec -> {
-              if (partitionFieldSpec.getFormat() != null) {
-                pathToPartitionFieldFormat.put(
-                    partitionFieldSpec.getSourceFieldPath(), partitionFieldSpec.getFormat());
-              }
-            });
+    partitionFieldSpecs.forEach(
+        partitionFieldSpec -> {
+          if (partitionFieldSpec.getFormat() != null) {
+            pathToPartitionFieldFormat.put(
+                partitionFieldSpec.getSourceFieldPath(), partitionFieldSpec.getFormat());
+          }
+        });
     return pathToPartitionFieldFormat;
   }
 }

@@ -62,6 +62,7 @@ public class DeltaTableExtractor {
         .partitioningFields(partitionFields)
         .readSchema(schema)
         .latestCommitTime(Instant.ofEpochMilli(snapshot.timestamp()))
+        .latestMetadataPath(snapshot.deltaLog().logPath().toString())
         .build();
   }
 }

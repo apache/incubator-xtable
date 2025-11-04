@@ -42,6 +42,7 @@ public class ThreePartHierarchicalTableIdentifier implements HierarchicalTableId
    * name varies depending on the catalogType.
    */
   String catalogName;
+
   /**
    * Catalogs have the ability to group tables logically, databaseName is the identifier for such
    * logical classification. The alternate names for this field include namespace, schemaName etc.

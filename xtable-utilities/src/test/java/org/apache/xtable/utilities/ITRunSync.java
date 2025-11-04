@@ -55,7 +55,7 @@ class ITRunSync {
       String[] args = new String[] {"--datasetConfig", configFile.getPath()};
       RunSync.main(args);
       Path icebergMetadataPath = Paths.get(URI.create(table.getBasePath() + "/metadata"));
-      waitForNumIcebergCommits(icebergMetadataPath, 2);
+      waitForNumIcebergCommits(icebergMetadataPath, 3);
     }
   }
 
@@ -64,7 +64,7 @@ class ITRunSync {
     ExecutorService runner = Executors.newSingleThreadExecutor();
     String tableName = "test-table";
     try (GenericTable table =
-        TestJavaHudiTable.forStandardSchema(
+        TestJavaHudiTable.forStandardSchemaWithFieldIds(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
       table.insertRows(20);
       File configFile = writeConfigFile(tempDir, table, tableName);
@@ -78,11 +78,16 @@ class ITRunSync {
             }
           });
       Path icebergMetadataPath = Paths.get(URI.create(table.getBasePath() + "/metadata"));
-      waitForNumIcebergCommits(icebergMetadataPath, 2);
+      waitForNumIcebergCommits(icebergMetadataPath, 3);
+    }
+    try (GenericTable table =
+        TestJavaHudiTable.withAdditionalColumnsAndFieldIds(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
       // write more data now that table is initialized and data is synced
       table.insertRows(20);
-      waitForNumIcebergCommits(icebergMetadataPath, 3);
-      assertEquals(3, numIcebergMetadataJsonFiles(icebergMetadataPath));
+      Path icebergMetadataPath = Paths.get(URI.create(table.getBasePath() + "/metadata"));
+      waitForNumIcebergCommits(icebergMetadataPath, 6);
+      assertEquals(6, numIcebergMetadataJsonFiles(icebergMetadataPath));
     } finally {
       runner.shutdownNow();
     }
