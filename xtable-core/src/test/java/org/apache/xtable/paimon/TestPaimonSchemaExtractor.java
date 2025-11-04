@@ -270,9 +270,19 @@ public class TestPaimonSchemaExtractor {
   @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
   void testTimestampField(int precision) {
     DataField paimonField = new DataField(10, "timestamp_field", new TimestampType(precision));
+    
+    InternalSchema.MetadataValue expectedPrecision;
+    if (precision <= 3) {
+      expectedPrecision = InternalSchema.MetadataValue.MILLIS;
+    } else if (precision <= 6) {
+      expectedPrecision = InternalSchema.MetadataValue.MICROS;
+    } else {
+      expectedPrecision = InternalSchema.MetadataValue.NANOS;
+    }
+    
     Map<InternalSchema.MetadataKey, Object> timestampMetadata =
         Collections.singletonMap(
-            InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
+            InternalSchema.MetadataKey.TIMESTAMP_PRECISION, expectedPrecision);
     InternalField expectedField =
         InternalField.builder()
             .name("timestamp_field")

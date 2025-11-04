@@ -128,9 +128,25 @@ public class PaimonSchemaExtractor {
       internalType = InternalType.DATE;
     } else if (type instanceof TimestampType || type instanceof LocalZonedTimestampType) {
       internalType = InternalType.TIMESTAMP;
+      int precision;
+      if (type instanceof TimestampType) {
+        precision = ((TimestampType) type).getPrecision();
+      } else {
+        precision = ((LocalZonedTimestampType) type).getPrecision();
+      }
+      
+      InternalSchema.MetadataValue precisionValue;
+      if (precision <= 3) {
+        precisionValue = InternalSchema.MetadataValue.MILLIS;
+      } else if (precision <= 6) {
+        precisionValue = InternalSchema.MetadataValue.MICROS;
+      } else {
+        precisionValue = InternalSchema.MetadataValue.NANOS;
+      }
+      
       metadata =
           Collections.singletonMap(
-              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
+              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, precisionValue);
     } else if (type instanceof DecimalType) {
       DecimalType d = (DecimalType) type;
       metadata = new HashMap<>(2, 1.0f);
