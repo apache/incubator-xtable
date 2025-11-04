@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -228,7 +227,8 @@ class TestIcebergConversionSource {
         ((BaseTable) emptyTable).operations().current().lastUpdatedMillis(),
         internalTable.getLatestCommitTime().toEpochMilli());
 
-    assertEquals(emptyTable.schema().columns().size(), internalTable.getReadSchema().getFields().size());
+    assertEquals(
+        emptyTable.schema().columns().size(), internalTable.getReadSchema().getFields().size());
 
     verify(spyPartitionConverter, never()).toXTable(any(), any(), any());
     verify(spyDataFileExtractor, never()).fromIceberg(any(), any(), any());

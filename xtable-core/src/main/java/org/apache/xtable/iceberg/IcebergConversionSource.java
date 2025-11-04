@@ -109,7 +109,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   public InternalTable getTable(Snapshot snapshot) {
     Table iceTable = getSourceTable();
     Schema iceSchema =
-            (snapshot != null) ? iceTable.schemas().get(snapshot.schemaId()) : iceTable.schema();
+        (snapshot != null) ? iceTable.schemas().get(snapshot.schemaId()) : iceTable.schema();
     TableOperations iceOps = ((BaseTable) iceTable).operations();
     IcebergSchemaExtractor schemaExtractor = IcebergSchemaExtractor.getInstance();
     InternalSchema irSchema = schemaExtractor.fromIceberg(iceSchema);
@@ -126,10 +126,10 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
             : DataLayoutStrategy.FLAT;
 
     Instant latestCommitTime =
-            (snapshot != null)
-                    ? Instant.ofEpochMilli(snapshot.timestampMillis())
-                    : Instant.ofEpochMilli(
-                    ((BaseTable) iceTable).operations().current().lastUpdatedMillis());
+        (snapshot != null)
+            ? Instant.ofEpochMilli(snapshot.timestampMillis())
+            : Instant.ofEpochMilli(
+                ((BaseTable) iceTable).operations().current().lastUpdatedMillis());
 
     return InternalTable.builder()
         .tableFormat(TableFormat.ICEBERG)
@@ -160,11 +160,11 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
       // Handle empty table case - return snapshot with schema but no data files
       InternalTable irTable = getTable(null);
       return InternalSnapshot.builder()
-              .version("0")
-              .table(irTable)
-              .partitionedDataFiles(Collections.emptyList())
-              .sourceIdentifier("0")
-              .build();
+          .version("0")
+          .table(irTable)
+          .partitionedDataFiles(Collections.emptyList())
+          .sourceIdentifier("0")
+          .build();
     }
 
     InternalTable irTable = getTable(currentSnapshot);
