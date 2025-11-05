@@ -119,13 +119,7 @@ public class ITConversionController {
 
   @BeforeAll
   public static void setupOnce() {
-    SparkConf sparkConf =
-        HudiTestUtil.getSparkConf(tempDir)
-            .set(
-                "spark.sql.extensions",
-                "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
-            .set("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
-            .set("spark.sql.catalog.paimon.warehouse", tempDir.toUri().toString());
+    SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
 
     sparkSession =
         SparkSession.builder().config(HoodieReadClient.addHoodieSupport(sparkConf)).getOrCreate();

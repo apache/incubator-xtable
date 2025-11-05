@@ -134,7 +134,7 @@ public class PaimonSchemaExtractor {
       } else {
         precision = ((LocalZonedTimestampType) type).getPrecision();
       }
-      
+
       InternalSchema.MetadataValue precisionValue;
       if (precision <= 3) {
         precisionValue = InternalSchema.MetadataValue.MILLIS;
@@ -143,10 +143,9 @@ public class PaimonSchemaExtractor {
       } else {
         precisionValue = InternalSchema.MetadataValue.NANOS;
       }
-      
+
       metadata =
-          Collections.singletonMap(
-              InternalSchema.MetadataKey.TIMESTAMP_PRECISION, precisionValue);
+          Collections.singletonMap(InternalSchema.MetadataKey.TIMESTAMP_PRECISION, precisionValue);
     } else if (type instanceof DecimalType) {
       DecimalType d = (DecimalType) type;
       metadata = new HashMap<>(2, 1.0f);
