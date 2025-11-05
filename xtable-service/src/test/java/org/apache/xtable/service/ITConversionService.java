@@ -22,6 +22,7 @@ import static org.apache.xtable.GenericTable.getTableName;
 import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -91,12 +92,14 @@ public class ITConversionService {
       Files.createDirectories(basePath);
 
       SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
+
       sparkSession =
           SparkSession.builder().config(HoodieReadClient.addHoodieSupport(sparkConf)).getOrCreate();
       sparkSession
           .sparkContext()
           .hadoopConfiguration()
           .set("parquet.avro.write-old-list-structure", "false");
+
       jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -116,14 +119,18 @@ public class ITConversionService {
         new DeltaConversionSourceProvider();
     ConversionSourceProvider<org.apache.iceberg.Snapshot> icebergConversionSourceProvider =
         new IcebergConversionSourceProvider();
+    ConversionSourceProvider<org.apache.paimon.Snapshot> paimonConversionSourceProvider =
+        new org.apache.xtable.paimon.PaimonConversionSourceProvider();
 
     hudiConversionSourceProvider.init(jsc.hadoopConfiguration());
     deltaConversionSourceProvider.init(jsc.hadoopConfiguration());
     icebergConversionSourceProvider.init(jsc.hadoopConfiguration());
+    paimonConversionSourceProvider.init(jsc.hadoopConfiguration());
 
     sourceProviders.put(HUDI, hudiConversionSourceProvider);
     sourceProviders.put(DELTA, deltaConversionSourceProvider);
     sourceProviders.put(ICEBERG, icebergConversionSourceProvider);
+    sourceProviders.put(PAIMON, paimonConversionSourceProvider);
 
     this.conversionService =
         new ConversionService(
@@ -232,7 +239,7 @@ public class ITConversionService {
 
   private static Stream<Arguments> generateTestParametersFormatsAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
-    for (String sourceTableFormat : Arrays.asList(HUDI, DELTA, ICEBERG)) {
+    for (String sourceTableFormat : Arrays.asList(HUDI, DELTA, ICEBERG, PAIMON)) {
       for (boolean isPartitioned : new boolean[] {true, false}) {
         arguments.add(Arguments.of(sourceTableFormat, isPartitioned));
       }
@@ -243,6 +250,7 @@ public class ITConversionService {
   protected static List<String> getOtherFormats(String sourceTableFormat) {
     return Arrays.stream(TableFormat.values())
         .filter(format -> !format.equals(sourceTableFormat))
+        .filter(format -> !format.equals(PAIMON)) // Paimon target not supported yet
         .collect(Collectors.toList());
   }
 

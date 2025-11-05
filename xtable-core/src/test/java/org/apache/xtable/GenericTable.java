@@ -21,6 +21,7 @@ package org.apache.xtable;
 import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 
 import java.nio.file.Path;
@@ -91,6 +92,9 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       case ICEBERG:
         return TestIcebergTable.forStandardSchemaAndPartitioning(
             tableName, isPartitioned ? "level" : null, tempDir, jsc.hadoopConfiguration());
+      case PAIMON:
+        return TestPaimonTable.createTable(
+            tableName, isPartitioned ? "level" : null, tempDir, jsc.hadoopConfiguration(), false);
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
     }
@@ -113,6 +117,9 @@ public interface GenericTable<T, Q> extends AutoCloseable {
       case ICEBERG:
         return TestIcebergTable.forSchemaWithAdditionalColumnsAndPartitioning(
             tableName, isPartitioned ? "level" : null, tempDir, jsc.hadoopConfiguration());
+      case PAIMON:
+        return TestPaimonTable.createTable(
+            tableName, isPartitioned ? "level" : null, tempDir, jsc.hadoopConfiguration(), true);
       default:
         throw new IllegalArgumentException("Unsupported source format: " + sourceFormat);
     }
