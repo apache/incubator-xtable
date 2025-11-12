@@ -85,16 +85,15 @@ public class DeltaConversionSource implements ConversionSource<Long> {
 
   @Override
   public InternalTable getCurrentTable() {
-    DeltaLog deltaLog = DeltaLog.forTable(sparkSession, basePath);
     Snapshot snapshot = deltaLog.snapshot();
-    return getTable(snapshot.version());
+    return tableExtractor.table(snapshot, tableName);
   }
 
   @Override
   public InternalSnapshot getCurrentSnapshot() {
     DeltaLog deltaLog = DeltaLog.forTable(sparkSession, basePath);
     Snapshot snapshot = deltaLog.snapshot();
-    InternalTable table = getTable(snapshot.version());
+    InternalTable table = tableExtractor.table(snapshot, tableName);
     return InternalSnapshot.builder()
         .table(table)
         .partitionedDataFiles(getInternalDataFiles(snapshot, table.getReadSchema()))
@@ -104,9 +103,9 @@ public class DeltaConversionSource implements ConversionSource<Long> {
 
   @Override
   public TableChange getTableChangeForCommit(Long versionNumber) {
-    InternalTable tableAtVersion = tableExtractor.table(deltaLog, tableName, versionNumber);
     List<Action> actionsForVersion = getChangesState().getActionsForVersion(versionNumber);
     Snapshot snapshotAtVersion = deltaLog.getSnapshotAt(versionNumber, Option.empty());
+    InternalTable tableAtVersion = tableExtractor.table(snapshotAtVersion, tableName);
     FileFormat fileFormat =
         actionsConverter.convertToFileFormat(snapshotAtVersion.metadata().format().provider());
 
