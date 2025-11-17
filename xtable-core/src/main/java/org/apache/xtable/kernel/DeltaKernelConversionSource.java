@@ -39,6 +39,7 @@ import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
 import io.delta.kernel.internal.util.VectorUtils;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
@@ -53,6 +54,7 @@ import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.spi.extractor.ConversionSource;
 import org.apache.xtable.spi.extractor.DataFileIterator;
 
+@Slf4j
 @Builder
 public class DeltaKernelConversionSource implements ConversionSource<Long> {
 
@@ -192,7 +194,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
       Instant deltaCommitInstant = Instant.ofEpochMilli(snapshot.getTimestamp(engine));
       return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
     } catch (Exception e) {
-      System.err.println(
+      log.error(
           "Error checking if incremental sync is safe from " + instant + ": " + e.getMessage());
       return false;
     }

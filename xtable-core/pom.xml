@@ -113,14 +113,15 @@
         <dependency>
             <groupId>io.delta</groupId>
             <artifactId>delta-kernel-api</artifactId>
-            <version>4.0.0</version>
+            <version>${delta.kernel.version}</version>
         </dependency>
 
         <dependency>
             <groupId>io.delta</groupId>
             <artifactId>delta-kernel-defaults</artifactId>
-            <version>4.0.0</version>
+            <version>${delta.kernel.version}</version>
         </dependency>
+
 
 
         <!-- Hadoop dependencies -->

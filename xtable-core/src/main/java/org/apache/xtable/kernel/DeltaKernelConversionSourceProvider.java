@@ -18,18 +18,14 @@
  
 package org.apache.xtable.kernel;
 
-import org.apache.hadoop.conf.Configuration;
-
 import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
-
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 
 public class DeltaKernelConversionSourceProvider extends ConversionSourceProvider<Long> {
   @Override
   public DeltaKernelConversionSource getConversionSourceInstance(SourceTable sourceTable) {
-    Configuration hadoopConf = new Configuration();
     Engine engine = DefaultEngine.create(hadoopConf);
     return DeltaKernelConversionSource.builder()
         .tableName(sourceTable.getName())

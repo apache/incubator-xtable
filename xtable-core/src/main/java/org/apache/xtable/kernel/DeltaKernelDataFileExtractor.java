@@ -91,14 +91,14 @@ public class DeltaKernelDataFileExtractor {
       this.fields = schema.getFields();
 
       StructType fullSchema = snapshot.getSchema(); // The full table schema
-      List<String> partitionColumns = snapshot.getPartitionColumnNames(); // List<String>
+      List<String> partitionColumns = snapshot.getPartitionColumnNames();
 
-      List<StructField> partitionFields_strfld =
+      List<StructField> partitionFieldsStr =
           fullSchema.fields().stream()
               .filter(field -> partitionColumns.contains(field.getName()))
               .collect(Collectors.toList());
 
-      StructType partitionSchema = new StructType(partitionFields_strfld);
+      StructType partitionSchema = new StructType(partitionFieldsStr);
 
       this.partitionFields =
           partitionExtractor.convertFromDeltaPartitionFormat(schema, partitionSchema);
@@ -108,9 +108,6 @@ public class DeltaKernelDataFileExtractor {
           myScan.getScanFiles(engine, includeColumnStats);
 
       List<InternalDataFile> dataFiles = new ArrayList<>();
-      this.dataFilesIterator =
-          Collections
-              .emptyIterator(); // Initialize the dataFilesIterator by iterating over the scan files
       while (scanFiles.hasNext()) {
         FilteredColumnarBatch scanFileColumnarBatch = scanFiles.next();
         CloseableIterator<Row> scanFileRows = scanFileColumnarBatch.getRows();

@@ -113,8 +113,6 @@ public class DeltaKernelActionsConverter {
     Configuration hadoopConf = new Configuration();
     Engine myEngine = DefaultEngine.create(hadoopConf);
     String tableBasePath = table.getPath(myEngine);
-    ;
-    //            String tableBasePath = snapshot.dataPath().toUri().toString();
     if (dataFilePath.startsWith(tableBasePath)) {
       return dataFilePath;
     }
