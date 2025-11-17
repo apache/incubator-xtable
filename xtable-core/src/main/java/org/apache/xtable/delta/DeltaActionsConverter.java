@@ -57,7 +57,7 @@ public class DeltaActionsConverter {
       boolean includeColumnStats,
       DeltaPartitionExtractor partitionExtractor,
       DeltaStatsExtractor fileStatsExtractor) {
-    FileStats fileStats = fileStatsExtractor.getColumnStatsForFile(addFile, fields);
+    FileStats fileStats = fileStatsExtractor.getColumnStatsForFile(addFile, deltaSnapshot, fields);
     List<ColumnStat> columnStats =
         includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
     long recordCount = fileStats.getNumRecords();
