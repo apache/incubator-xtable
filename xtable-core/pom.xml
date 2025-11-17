@@ -124,6 +124,17 @@
 
 
 
+        <!-- Paimon dependencies -->
+        <dependency>
+            <groupId>org.apache.paimon</groupId>
+            <artifactId>paimon-bundle</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.paimon</groupId>
+            <artifactId>paimon-spark-${spark.version.prefix}</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Hadoop dependencies -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>

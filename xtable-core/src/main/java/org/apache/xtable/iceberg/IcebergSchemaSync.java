@@ -28,7 +28,10 @@ import java.util.function.Supplier;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.types.Types;
@@ -56,6 +59,14 @@ public class IcebergSchemaSync {
           .forEach(entry -> entry.getValue().get());
       updateSchema.commit();
     }
+  }
+
+  public void syncWithProvidedIds(Schema latest, Table table) {
+    BaseTable baseTable = ((BaseTable) table);
+    TableMetadata current = baseTable.operations().current();
+    TableMetadata updated =
+        TableMetadata.buildFrom(current).setCurrentSchema(latest, latest.highestFieldId()).build();
+    baseTable.operations().commit(current, updated);
   }
 
   /**

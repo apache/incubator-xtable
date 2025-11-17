@@ -24,6 +24,7 @@ import static org.apache.xtable.hudi.HudiTestUtil.PartitionConfig;
 import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -104,9 +105,11 @@ import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.TestIcebergDataHelper;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
+import org.apache.xtable.paimon.PaimonConversionSourceProvider;
 
 public class ITConversionController {
   @TempDir public static Path tempDir;
+
   private static final DateTimeFormatter DATE_FORMAT =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.of("UTC"));
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -117,12 +120,14 @@ public class ITConversionController {
   @BeforeAll
   public static void setupOnce() {
     SparkConf sparkConf = HudiTestUtil.getSparkConf(tempDir);
+
     sparkSession =
         SparkSession.builder().config(HoodieReadClient.addHoodieSupport(sparkConf)).getOrCreate();
     sparkSession
         .sparkContext()
         .hadoopConfiguration()
         .set("parquet.avro.write-old-list-structure", "false");
+
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
   }
 
@@ -142,10 +147,13 @@ public class ITConversionController {
 
   private static Stream<Arguments> generateTestParametersForFormatsSyncModesAndPartitioning() {
     List<Arguments> arguments = new ArrayList<>();
-    for (String sourceTableFormat : Arrays.asList(HUDI, DELTA, ICEBERG)) {
+    for (String sourceFormat : Arrays.asList(HUDI, DELTA, ICEBERG, PAIMON)) {
       for (SyncMode syncMode : SyncMode.values()) {
+        if (sourceFormat.equals(PAIMON) && syncMode == SyncMode.INCREMENTAL)
+          continue; // Paimon does not support incremental sync yet
+
         for (boolean isPartitioned : new boolean[] {true, false}) {
-          arguments.add(Arguments.of(sourceTableFormat, syncMode, isPartitioned));
+          arguments.add(Arguments.of(sourceFormat, syncMode, isPartitioned));
         }
       }
     }
@@ -170,23 +178,37 @@ public class ITConversionController {
   }
 
   private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
-    if (sourceTableFormat.equalsIgnoreCase(HUDI)) {
-      ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
-          new HudiConversionSourceProvider();
-      hudiConversionSourceProvider.init(jsc.hadoopConfiguration());
-      return hudiConversionSourceProvider;
-    } else if (sourceTableFormat.equalsIgnoreCase(DELTA)) {
-      ConversionSourceProvider<Long> deltaConversionSourceProvider =
-          new DeltaConversionSourceProvider();
-      deltaConversionSourceProvider.init(jsc.hadoopConfiguration());
-      return deltaConversionSourceProvider;
-    } else if (sourceTableFormat.equalsIgnoreCase(ICEBERG)) {
-      ConversionSourceProvider<Snapshot> icebergConversionSourceProvider =
-          new IcebergConversionSourceProvider();
-      icebergConversionSourceProvider.init(jsc.hadoopConfiguration());
-      return icebergConversionSourceProvider;
-    } else {
-      throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
+    switch (sourceTableFormat.toUpperCase()) {
+      case HUDI:
+        {
+          ConversionSourceProvider<HoodieInstant> hudiConversionSourceProvider =
+              new HudiConversionSourceProvider();
+          hudiConversionSourceProvider.init(jsc.hadoopConfiguration());
+          return hudiConversionSourceProvider;
+        }
+      case DELTA:
+        {
+          ConversionSourceProvider<Long> deltaConversionSourceProvider =
+              new DeltaConversionSourceProvider();
+          deltaConversionSourceProvider.init(jsc.hadoopConfiguration());
+          return deltaConversionSourceProvider;
+        }
+      case ICEBERG:
+        {
+          ConversionSourceProvider<Snapshot> icebergConversionSourceProvider =
+              new IcebergConversionSourceProvider();
+          icebergConversionSourceProvider.init(jsc.hadoopConfiguration());
+          return icebergConversionSourceProvider;
+        }
+      case PAIMON:
+        {
+          ConversionSourceProvider<org.apache.paimon.Snapshot> paimonConversionSourceProvider =
+              new PaimonConversionSourceProvider();
+          paimonConversionSourceProvider.init(jsc.hadoopConfiguration());
+          return paimonConversionSourceProvider;
+        }
+      default:
+        throw new IllegalArgumentException("Unsupported source format: " + sourceTableFormat);
     }
   }
 
@@ -486,11 +508,9 @@ public class ITConversionController {
 
   private static List<String> getOtherFormats(String sourceTableFormat) {
     return Arrays.stream(TableFormat.values())
-        .filter(
-            format ->
-                !format.equals(sourceTableFormat)
-                    && !format.equals(
-                        PARQUET)) // excluded file formats because upset, insert etc. not supported
+        .filter(fmt -> !fmt.equals(sourceTableFormat))
+        .filter(fmt -> !fmt.equals(PAIMON)) // Paimon target is not supported yet
+        .filter(fmt -> !fmt.equals(PARQUET)) // upserts/inserts are not supported in Parquet
         .collect(Collectors.toList());
   }
 
@@ -911,34 +931,34 @@ public class ITConversionController {
                     }));
 
     String[] selectColumnsArr = sourceTable.getColumnsToSelect().toArray(new String[] {});
-    List<String> dataset1Rows = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
+    List<String> sourceRowsList = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
     targetRowsByFormat.forEach(
-        (format, targetRows) -> {
-          List<String> dataset2Rows =
+        (targetFormat, targetRows) -> {
+          List<String> targetRowsList =
               targetRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
           assertEquals(
-              dataset1Rows.size(),
-              dataset2Rows.size(),
+              sourceRowsList.size(),
+              targetRowsList.size(),
               String.format(
                   "Datasets have different row counts when reading from Spark. Source: %s, Target: %s",
-                  sourceFormat, format));
+                  sourceFormat, targetFormat));
           // sanity check the count to ensure test is set up properly
           if (expectedCount != null) {
-            assertEquals(expectedCount, dataset1Rows.size());
+            assertEquals(expectedCount, sourceRowsList.size());
           } else {
             // if count is not known ahead of time, ensure datasets are non-empty
-            assertFalse(dataset1Rows.isEmpty());
+            assertFalse(sourceRowsList.isEmpty());
           }
 
-          if (containsUUIDFields(dataset1Rows) && containsUUIDFields(dataset2Rows)) {
-            compareDatasetWithUUID(dataset1Rows, dataset2Rows);
+          if (containsUUIDFields(sourceRowsList) && containsUUIDFields(targetRowsList)) {
+            compareDatasetWithUUID(sourceRowsList, targetRowsList);
           } else {
             assertEquals(
-                dataset1Rows,
-                dataset2Rows,
+                sourceRowsList,
+                targetRowsList,
                 String.format(
                     "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
-                    sourceFormat, format));
+                    sourceFormat, targetFormat));
           }
         });
   }

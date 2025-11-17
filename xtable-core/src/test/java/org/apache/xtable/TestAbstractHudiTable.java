@@ -590,7 +590,10 @@ public abstract class TestAbstractHudiTable
 
   @SneakyThrows
   protected HoodieTableMetaClient getMetaClient(
-      TypedProperties keyGenProperties, HoodieTableType hoodieTableType, Configuration conf) {
+      TypedProperties keyGenProperties,
+      HoodieTableType hoodieTableType,
+      Configuration conf,
+      boolean populateMetaFields) {
     LocalFileSystem fs = (LocalFileSystem) FSUtils.getFs(basePath, conf);
     // Enforce checksum such that fs.open() is consistent to DFS
     fs.setVerifyChecksum(true);
@@ -614,6 +617,7 @@ public abstract class TestAbstractHudiTable
             .setPayloadClass(OverwriteWithLatestAvroPayload.class)
             .setCommitTimezone(HoodieTimelineTimeZone.UTC)
             .setBaseFileFormat(HoodieFileFormat.PARQUET.toString())
+            .setPopulateMetaFields(populateMetaFields)
             .build();
     return HoodieTableMetaClient.initTableAndGetMetaClient(conf, this.basePath, properties);
   }

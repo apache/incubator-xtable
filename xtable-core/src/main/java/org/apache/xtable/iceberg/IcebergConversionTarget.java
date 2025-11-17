@@ -164,7 +164,22 @@ public class IcebergConversionTarget implements ConversionTarget {
   @Override
   public void syncSchema(InternalSchema schema) {
     Schema latestSchema = schemaExtractor.toIceberg(schema);
-    schemaSync.sync(transaction.table().schema(), latestSchema, transaction);
+    if (!transaction.table().schema().sameSchema(latestSchema)) {
+      boolean hasFieldIds =
+          schema.getAllFields().stream().anyMatch(field -> field.getFieldId() != null);
+      if (hasFieldIds) {
+        // There is no clean way to sync the schema with the provided field IDs using the
+        // transaction API so we commit the current transaction and interact directly with
+        // the operations API.
+        transaction.commitTransaction();
+        schemaSync.syncWithProvidedIds(latestSchema, table);
+        // Start a new transaction for remaining operations
+        table.refresh();
+        transaction = table.newTransaction();
+      } else {
+        schemaSync.sync(transaction.table().schema(), latestSchema, transaction);
+      }
+    }
   }
 
   @Override
