@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 package org.apache.xtable.kernel;
 
 import java.util.Arrays;
@@ -229,7 +229,7 @@ public class TestDeltaKernelSchemaExtractor {
                 "requiredBoolean",
                 BooleanType.BOOLEAN,
                 false,
-                FieldMetadata.builder().putString("comment","requiredBooleanComment").build())
+                FieldMetadata.builder().putString("comment", "requiredBooleanComment").build())
             .add("optionalBoolean", BooleanType.BOOLEAN, true)
             .add("requiredInt", IntegerType.INTEGER, false)
             .add("optionalInt", IntegerType.INTEGER, true)
@@ -289,7 +289,7 @@ public class TestDeltaKernelSchemaExtractor {
                 "requiredFixed",
                 BinaryType.BINARY,
                 false,
-                FieldMetadata.builder().putString("comment","comment").build())
+                FieldMetadata.builder().putString("comment", "comment").build())
             .add("optionalFixed", BinaryType.BINARY, true);
 
     Assertions.assertEquals(
@@ -360,503 +360,505 @@ public class TestDeltaKernelSchemaExtractor {
             .add("requiredTimestampNtz", TimestampNTZType.TIMESTAMP_NTZ, false)
             .add("optionalTimestampNtz", TimestampNTZType.TIMESTAMP_NTZ, true);
 
-        Assertions.assertEquals(
-                internalSchemaTimestamp,
-                DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentationTimestamp));
-    }
-    @Test
+    Assertions.assertEquals(
+        internalSchemaTimestamp,
+        DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentationTimestamp));
+  }
+
+  @Test
   public void testMaps() {
-      InternalSchema recordMapElementSchema =
-              InternalSchema.builder()
-                      .name("struct")
-                      .isNullable(true)
-                      .fields(
-                              Arrays.asList(
-                                      InternalField.builder()
-                                              .name("requiredDouble")
-                                              .parentPath("recordMap._one_field_value")
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("double")
-                                                              .dataType(InternalType.DOUBLE)
-                                                              .isNullable(false)
-                                                              .build())
-                                              .build(),
-                                      InternalField.builder()
-                                              .name("optionalString")
-                                              .parentPath("recordMap._one_field_value")
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("string")
-                                                              .dataType(InternalType.STRING)
-                                                              .isNullable(true)
-                                                              .build())
-                                              .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                                              .build()))
-                      .dataType(InternalType.RECORD)
-                      .build();
-      InternalSchema internalSchema =
-              InternalSchema.builder()
-                      .name("struct")
-                      .dataType(InternalType.RECORD)
-                      .isNullable(false)
-                      .fields(
-                              Arrays.asList(
-                                      InternalField.builder()
-                                              .name("intMap")
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("map")
-                                                              .isNullable(false)
-                                                              .dataType(InternalType.MAP)
-                                                              .fields(
-                                                                      Arrays.asList(
-                                                                              InternalField.builder()
-                                                                                      .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
-                                                                                      .parentPath("intMap")
-                                                                                      .schema(
-                                                                                              InternalSchema.builder()
-                                                                                                      .name("string")
-                                                                                                      .dataType(InternalType.STRING)
-                                                                                                      .isNullable(false)
-                                                                                                      .build())
-                                                                                      .build(),
-                                                                              InternalField.builder()
-                                                                                      .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
-                                                                                      .parentPath("intMap")
-                                                                                      .schema(
-                                                                                              InternalSchema.builder()
-                                                                                                      .name("integer")
-                                                                                                      .dataType(InternalType.INT)
-                                                                                                      .isNullable(false)
-                                                                                                      .build())
-                                                                                      .build()))
-                                                              .build())
-                                              .build(),
-                                      InternalField.builder()
-                                              .name("recordMap")
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("map")
-                                                              .isNullable(true)
-                                                              .dataType(InternalType.MAP)
-                                                              .fields(
-                                                                      Arrays.asList(
-                                                                              InternalField.builder()
-                                                                                      .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
-                                                                                      .parentPath("recordMap")
-                                                                                      .schema(
-                                                                                              InternalSchema.builder()
-                                                                                                      .name("integer")
-                                                                                                      .dataType(InternalType.INT)
-                                                                                                      .isNullable(false)
-                                                                                                      .build())
-                                                                                      .build(),
-                                                                              InternalField.builder()
-                                                                                      .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
-                                                                                      .parentPath("recordMap")
-                                                                                      .schema(recordMapElementSchema)
-                                                                                      .build()))
-                                                              .build())
-                                              .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                                              .build()))
-                      .build();
+    InternalSchema recordMapElementSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .isNullable(true)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("requiredDouble")
+                        .parentPath("recordMap._one_field_value")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("double")
+                                .dataType(InternalType.DOUBLE)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("optionalString")
+                        .parentPath("recordMap._one_field_value")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .dataType(InternalType.RECORD)
+            .build();
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("intMap")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .isNullable(false)
+                                .dataType(InternalType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("intMap")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("string")
+                                                    .dataType(InternalType.STRING)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                                            .parentPath("intMap")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(InternalType.INT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("recordMap")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .isNullable(true)
+                                .dataType(InternalType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("recordMap")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(InternalType.INT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                                            .parentPath("recordMap")
+                                            .schema(recordMapElementSchema)
+                                            .build()))
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
 
-        io.delta.kernel.types.StructType mapElement =
-                new StructType()
-                        .add("requiredDouble", DoubleType.DOUBLE, false)
-                        .add("optionalString", StringType.STRING, true);
-        io.delta.kernel.types.StructType structRepresentation =
-                new StructType()
-                        .add(
-                                "intMap",
-                                new MapType(StringType.STRING, IntegerType.INTEGER, false),
-                                false)
-                        .add("recordMap", new MapType(IntegerType.INTEGER, mapElement, true));
+    io.delta.kernel.types.StructType mapElement =
+        new StructType()
+            .add("requiredDouble", DoubleType.DOUBLE, false)
+            .add("optionalString", StringType.STRING, true);
+    io.delta.kernel.types.StructType structRepresentation =
+        new StructType()
+            .add("intMap", new MapType(StringType.STRING, IntegerType.INTEGER, false), false)
+            .add("recordMap", new MapType(IntegerType.INTEGER, mapElement, true));
 
-        Assertions.assertEquals(
-                internalSchema,
- DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
-    }
+    Assertions.assertEquals(
+        internalSchema,
+        DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+  }
 
   @Test
   public void testLists() {
-      InternalSchema recordListElementSchema =
-              InternalSchema.builder()
-                      .name("struct")
-                      .isNullable(true)
-                      .fields(
-                              Arrays.asList(
-                                      InternalField.builder()
-                                              .name("requiredDouble")
-                                              .parentPath("recordList._one_field_element")
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("double")
-                                                              .dataType(InternalType.DOUBLE)
-                                                              .isNullable(false)
-                                                              .build())
-                                              .build(),
-                                      InternalField.builder()
-                                              .name("optionalString")
-                                              .parentPath("recordList._one_field_element")
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("string")
-                                                              .dataType(InternalType.STRING)
-                                                              .isNullable(true)
-                                                              .build())
-                                              .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                                              .build()))
-                      .dataType(InternalType.RECORD)
-                      .build();
-      InternalSchema internalSchema =
-              InternalSchema.builder()
-                      .name("struct")
-                      .dataType(InternalType.RECORD)
-                      .isNullable(false)
-                      .fields(
-                              Arrays.asList(
-                                      InternalField.builder()
-                                              .name("intList")
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("array")
-                                                              .isNullable(false)
-                                                              .dataType(InternalType.LIST)
-                                                              .fields(
-                                                                      Collections.singletonList(
-                                                                              InternalField.builder()
-                                                                                      .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                                                                      .parentPath("intList")
-                                                                                      .schema(
-                                                                                              InternalSchema.builder()
-                                                                                                      .name("integer")
-                                                                                                      .dataType(InternalType.INT)
-                                                                                                      .isNullable(false)
-                                                                                                      .build())
-                                                                                      .build()))
-                                                              .build())
-                                              .build(),
-                                      InternalField.builder()
-                                              .name("recordList")
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("array")
-                                                              .isNullable(true)
-                                                              .dataType(InternalType.LIST)
-                                                              .fields(
-                                                                      Collections.singletonList(
-                                                                              InternalField.builder()
-                                                                                      .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                                                                      .parentPath("recordList")
-                                                                                      .schema(recordListElementSchema)
-                                                                                      .build()))
-                                                              .build())
-                                              .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                                              .build()))
-                      .build();
-      io.delta.kernel.types.StructType elementSchema =
-              new StructType()
-                      .add("requiredDouble", DoubleType.DOUBLE, false)
-                      .add("optionalString", StringType.STRING, true);
-      io.delta.kernel.types.StructType structRepresentation =
-              new StructType()
-                      .add("intList", new ArrayType(IntegerType.INTEGER, false), false)
-                      .add("recordList", new ArrayType(elementSchema, true), true);
+    InternalSchema recordListElementSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .isNullable(true)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("requiredDouble")
+                        .parentPath("recordList._one_field_element")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("double")
+                                .dataType(InternalType.DOUBLE)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("optionalString")
+                        .parentPath("recordList._one_field_element")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .dataType(InternalType.RECORD)
+            .build();
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("intList")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("array")
+                                .isNullable(false)
+                                .dataType(InternalType.LIST)
+                                .fields(
+                                    Collections.singletonList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                            .parentPath("intList")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(InternalType.INT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("recordList")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("array")
+                                .isNullable(true)
+                                .dataType(InternalType.LIST)
+                                .fields(
+                                    Collections.singletonList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                            .parentPath("recordList")
+                                            .schema(recordListElementSchema)
+                                            .build()))
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+    io.delta.kernel.types.StructType elementSchema =
+        new StructType()
+            .add("requiredDouble", DoubleType.DOUBLE, false)
+            .add("optionalString", StringType.STRING, true);
+    io.delta.kernel.types.StructType structRepresentation =
+        new StructType()
+            .add("intList", new ArrayType(IntegerType.INTEGER, false), false)
+            .add("recordList", new ArrayType(elementSchema, true), true);
 
-        Assertions.assertEquals(
-                internalSchema,
- DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
-    }
+    Assertions.assertEquals(
+        internalSchema,
+        DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+  }
 
   @Test
   public void testNestedRecords() {
-      InternalSchema internalSchema =
-              InternalSchema.builder()
-                      .name("struct")
-                      .dataType(InternalType.RECORD)
-                      .isNullable(false)
-                      .fields(
-                              Arrays.asList(
-                                      InternalField.builder()
-                                              .name("nestedOne")
-                                              .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("struct")
-                                                              .dataType(InternalType.RECORD)
-                                                              .isNullable(true)
-                                                              .comment("comment")
-                                                              .fields(
-                                                                      Arrays.asList(
-                                                                              InternalField.builder()
-                                                                                      .name("nestedOptionalInt")
-                                                                                      .parentPath("nestedOne")
-                                                                                      .schema(
-                                                                                              InternalSchema.builder()
-                                                                                                      .name("integer")
-                                                                                                      .dataType(InternalType.INT)
-                                                                                                      .isNullable(true)
-                                                                                                      .comment("nestedOptionalIntComment")
-                                                                                                      .build())
-                                                                                      .defaultValue(
-                                                                                              InternalField.Constants.NULL_DEFAULT_VALUE)
-                                                                                      .build(),
-                                                                              InternalField.builder()
-                                                                                      .name("nestedRequiredDouble")
-                                                                                      .parentPath("nestedOne")
-                                                                                      .schema(
-                                                                                              InternalSchema.builder()
-                                                                                                      .name("double")
-                                                                                                      .dataType(InternalType.DOUBLE)
-                                                                                                      .isNullable(false)
-                                                                                                      .build())
-                                                                                      .build(),
-                                                                              InternalField.builder()
-                                                                                      .name("nestedTwo")
-                                                                                      .parentPath("nestedOne")
-                                                                                      .schema(
-                                                                                              InternalSchema.builder()
-                                                                                                      .name("struct")
-                                                                                                      .dataType(InternalType.RECORD)
-                                                                                                      .isNullable(false)
-                                                                                                      .fields(
-                                                                                                              Arrays.asList(
-                                                                                                                      InternalField.builder()
-                                                                                                                              .name("doublyNestedString")
-                                                                                                                              .parentPath("nestedOne.nestedTwo")
-                                                                                                                              .schema(
-                                                                                                                                      InternalSchema.builder()
-                                                                                                                                              .name("string")
-                                                                                                                                              .dataType(
-                                                                                                                                                      InternalType.STRING)
-                                                                                                                                              .isNullable(true)
-                                                                                                                                              .build())
-                                                                                                                              .defaultValue(
-                                                                                                                                      InternalField.Constants
-                                                                                                                                              .NULL_DEFAULT_VALUE)
-                                                                                                                              .build()))
-                                                                                                      .build())
-                                                                                      .build()))
-                                                              .build())
-                                              .build()))
-                      .build();
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("nestedOne")
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .schema(
+                            InternalSchema.builder()
+                                .name("struct")
+                                .dataType(InternalType.RECORD)
+                                .isNullable(true)
+                                .comment("comment")
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name("nestedOptionalInt")
+                                            .parentPath("nestedOne")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(InternalType.INT)
+                                                    .isNullable(true)
+                                                    .comment("nestedOptionalIntComment")
+                                                    .build())
+                                            .defaultValue(
+                                                InternalField.Constants.NULL_DEFAULT_VALUE)
+                                            .build(),
+                                        InternalField.builder()
+                                            .name("nestedRequiredDouble")
+                                            .parentPath("nestedOne")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("double")
+                                                    .dataType(InternalType.DOUBLE)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        InternalField.builder()
+                                            .name("nestedTwo")
+                                            .parentPath("nestedOne")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("struct")
+                                                    .dataType(InternalType.RECORD)
+                                                    .isNullable(false)
+                                                    .fields(
+                                                        Arrays.asList(
+                                                            InternalField.builder()
+                                                                .name("doublyNestedString")
+                                                                .parentPath("nestedOne.nestedTwo")
+                                                                .schema(
+                                                                    InternalSchema.builder()
+                                                                        .name("string")
+                                                                        .dataType(
+                                                                            InternalType.STRING)
+                                                                        .isNullable(true)
+                                                                        .build())
+                                                                .defaultValue(
+                                                                    InternalField.Constants
+                                                                        .NULL_DEFAULT_VALUE)
+                                                                .build()))
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build()))
+            .build();
 
-      io.delta.kernel.types.StructType  structRepresentation =
-              new StructType()
-                      .add(
-                              "nestedOne",
-                              new StructType()
-                                      .add(
-                                              "nestedOptionalInt",
-                                              IntegerType.INTEGER,
-                                              true,
-                                              FieldMetadata.builder().putString("comment","nestedOptionalIntComment").build())
-                                      .add("nestedRequiredDouble", DoubleType.DOUBLE, false)
-                                      .add(
-                                              "nestedTwo",
-                                              new StructType().add("doublyNestedString", StringType.STRING, true),
-                                              false),
-                              true,
-                              FieldMetadata.builder().putString("comment","comment").build());
-      Assertions.assertEquals(
-              internalSchema, DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+    io.delta.kernel.types.StructType structRepresentation =
+        new StructType()
+            .add(
+                "nestedOne",
+                new StructType()
+                    .add(
+                        "nestedOptionalInt",
+                        IntegerType.INTEGER,
+                        true,
+                        FieldMetadata.builder()
+                            .putString("comment", "nestedOptionalIntComment")
+                            .build())
+                    .add("nestedRequiredDouble", DoubleType.DOUBLE, false)
+                    .add(
+                        "nestedTwo",
+                        new StructType().add("doublyNestedString", StringType.STRING, true),
+                        false),
+                true,
+                FieldMetadata.builder().putString("comment", "comment").build());
+    Assertions.assertEquals(
+        internalSchema,
+        DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
+
   @Test
   public void testFieldIdsInDeltaSchema() {
-      io.delta.kernel.types.StructType structRepresentation =
-              new StructType()
-                      .add(
-                              "nestedOne",
-                              new StructType()
-                                      .add(
-                                              "nestedOptionalInt",
-                                              IntegerType.INTEGER,
-                                              true,
-                                              FieldMetadata.builder()
-                                                      .putLong("delta.columnMapping.id", 3)
-                                                      .build())
+    io.delta.kernel.types.StructType structRepresentation =
+        new StructType()
+            .add(
+                "nestedOne",
+                new StructType()
+                    .add(
+                        "nestedOptionalInt",
+                        IntegerType.INTEGER,
+                        true,
+                        FieldMetadata.builder().putLong("delta.columnMapping.id", 3).build())
+                    .add(
+                        "nestedRequiredDouble",
+                        DoubleType.DOUBLE,
+                        false,
+                        FieldMetadata.builder().putLong("delta.columnMapping.id", 5).build())
+                    .add(
+                        "nestedTwo",
+                        new StructType()
+                            .add(
+                                "doublyNestedString",
+                                StringType.STRING,
+                                true,
+                                FieldMetadata.builder()
+                                    .putLong("delta.columnMapping.id", 12)
+                                    .build()),
+                        false,
+                        FieldMetadata.builder().putLong("delta.columnMapping.id", 10).build()),
+                true,
+                FieldMetadata.builder().putLong("delta.columnMapping.id", 2).build());
 
-                                      .add(
-                                              "nestedRequiredDouble",
-                                              DoubleType.DOUBLE,
-                                              false,
-                                              FieldMetadata.builder()
-                                                      .putLong("delta.columnMapping.id", 5)
-                                                      .build())
-                                      .add(
-                                              "nestedTwo",
-                                              new StructType()
-                                                      .add(
-                                                              "doublyNestedString",
-                                                              StringType.STRING,
-                                                              true,
-                                                              FieldMetadata.builder()
-                                                                      .putLong("delta.columnMapping.id", 12)
-                                                                      .build()),
-                                              false,
-                                              FieldMetadata.builder()
-                                                      .putLong("delta.columnMapping.id", 10)
-                                                      .build()
-                                           ),
-                              true,
-                              FieldMetadata.builder()
-                                      .putLong("delta.columnMapping.id", 2)
-                                      .build());
-
-      InternalSchema internalSchema =
-              InternalSchema.builder()
-                      .name("struct")
-                      .dataType(InternalType.RECORD)
-                      .isNullable(false)
-                      .fields(
-                              Collections.singletonList(
-                                      InternalField.builder()
-                                              .name("nestedOne")
-                                              .fieldId(2)
-                                              .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("struct")
-                                                              .dataType(InternalType.RECORD)
-                                                              .isNullable(true)
-                                                              .fields(
-                                                                      Arrays.asList(
-                                                                              InternalField.builder()
-                                                                                      .name("nestedOptionalInt")
-                                                                                      .fieldId(3)
-                                                                                      .parentPath("nestedOne")
-                                                                                      .schema(
-                                                                                              InternalSchema.builder()
-                                                                                                      .name("integer")
-                                                                                                      .dataType(InternalType.INT)
-                                                                                                      .isNullable(true)
-                                                                                                      .build())
-                                                                                      .defaultValue(
-                                                                                              InternalField.Constants.NULL_DEFAULT_VALUE)
-                                                                                      .build(),
-                                                                              InternalField.builder()
-                                                                                      .name("nestedRequiredDouble")
-                                                                                      .fieldId(5)
-                                                                                      .parentPath("nestedOne")
-                                                                                      .schema(
-                                                                                              InternalSchema.builder()
-                                                                                                      .name("double")
-                                                                                                      .dataType(InternalType.DOUBLE)
-                                                                                                      .isNullable(false)
-                                                                                                      .build())
-                                                                                      .build(),
-                                                                              InternalField.builder()
-                                                                                      .name("nestedTwo")
-                                                                                      .fieldId(10)
-                                                                                      .parentPath("nestedOne")
-                                                                                      .schema(
-                                                                                              InternalSchema.builder()
-                                                                                                      .name("struct")
-                                                                                                      .dataType(InternalType.RECORD)
-                                                                                                      .isNullable(false)
-                                                                                                      .fields(
-                                                                                                              Collections.singletonList(
-                                                                                                                      InternalField.builder()
-                                                                                                                              .name("doublyNestedString")
-                                                                                                                              .fieldId(12)
-                                                                                                                              .parentPath("nestedOne.nestedTwo")
-                                                                                                                              .schema(
-                                                                                                                                      InternalSchema.builder()
-                                                                                                                                              .name("string")
-                                                                                                                                              .dataType(
-                                                                                                                                                      InternalType.STRING)
-                                                                                                                                              .isNullable(true)
-                                                                                                                                              .build())
-                                                                                                                              .defaultValue(
-                                                                                                                                      InternalField.Constants
-                                                                                                                                              .NULL_DEFAULT_VALUE)
-                                                                                                                              .build()))
-                                                                                                      .build())
-                                                                                      .build()))
-                                                              .build())
-                                              .build()))
-                      .build();
-      Assertions.assertEquals(
-              internalSchema, DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Collections.singletonList(
+                    InternalField.builder()
+                        .name("nestedOne")
+                        .fieldId(2)
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .schema(
+                            InternalSchema.builder()
+                                .name("struct")
+                                .dataType(InternalType.RECORD)
+                                .isNullable(true)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name("nestedOptionalInt")
+                                            .fieldId(3)
+                                            .parentPath("nestedOne")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(InternalType.INT)
+                                                    .isNullable(true)
+                                                    .build())
+                                            .defaultValue(
+                                                InternalField.Constants.NULL_DEFAULT_VALUE)
+                                            .build(),
+                                        InternalField.builder()
+                                            .name("nestedRequiredDouble")
+                                            .fieldId(5)
+                                            .parentPath("nestedOne")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("double")
+                                                    .dataType(InternalType.DOUBLE)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        InternalField.builder()
+                                            .name("nestedTwo")
+                                            .fieldId(10)
+                                            .parentPath("nestedOne")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("struct")
+                                                    .dataType(InternalType.RECORD)
+                                                    .isNullable(false)
+                                                    .fields(
+                                                        Collections.singletonList(
+                                                            InternalField.builder()
+                                                                .name("doublyNestedString")
+                                                                .fieldId(12)
+                                                                .parentPath("nestedOne.nestedTwo")
+                                                                .schema(
+                                                                    InternalSchema.builder()
+                                                                        .name("string")
+                                                                        .dataType(
+                                                                            InternalType.STRING)
+                                                                        .isNullable(true)
+                                                                        .build())
+                                                                .defaultValue(
+                                                                    InternalField.Constants
+                                                                        .NULL_DEFAULT_VALUE)
+                                                                .build()))
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build()))
+            .build();
+    Assertions.assertEquals(
+        internalSchema,
+        DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
 
   @Test
   void generateColumnsAreNotTranslatedToInternalSchema() {
-      io.delta.kernel.types.StructType structRepresentation =
-              new StructType()
-                      .add("birthDate", TimestampType.TIMESTAMP, false)
-                      .add(
-                              "birthYear",
-                              TimestampType.TIMESTAMP,
-                              true,
-                              FieldMetadata.builder()
-                                      .putString("delta.generationExpression", "YEAR(birthDate)")
-                                      .build());
-      InternalSchema internalSchema =
-              InternalSchema.builder()
-                      .dataType(InternalType.RECORD)
-                      .name("struct")
-                      .fields(
-                              Collections.singletonList(
-                                      InternalField.builder()
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("timestamp")
-                                                              .dataType(InternalType.TIMESTAMP)
-                                                              .metadata(
-                                                                      Collections.singletonMap(
-                                                                              InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
-                                                                              InternalSchema.MetadataValue.MICROS))
-                                                              .build())
-                                              .name("birthDate")
-                                              .build()))
-                      .build();
-      Assertions.assertEquals(
-              internalSchema, DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+    io.delta.kernel.types.StructType structRepresentation =
+        new StructType()
+            .add("birthDate", TimestampType.TIMESTAMP, false)
+            .add(
+                "birthYear",
+                TimestampType.TIMESTAMP,
+                true,
+                FieldMetadata.builder()
+                    .putString("delta.generationExpression", "YEAR(birthDate)")
+                    .build());
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .dataType(InternalType.RECORD)
+            .name("struct")
+            .fields(
+                Collections.singletonList(
+                    InternalField.builder()
+                        .schema(
+                            InternalSchema.builder()
+                                .name("timestamp")
+                                .dataType(InternalType.TIMESTAMP)
+                                .metadata(
+                                    Collections.singletonMap(
+                                        InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
+                                        InternalSchema.MetadataValue.MICROS))
+                                .build())
+                        .name("birthDate")
+                        .build()))
+            .build();
+    Assertions.assertEquals(
+        internalSchema,
+        DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
 
   @Test
   public void testIcebergToDeltaUUIDSupport() {
 
-      io.delta.kernel.types.StructType structRepresentation =
-              new StructType()
-                      .add("requiredUUID", BinaryType.BINARY, false,  FieldMetadata.builder()
-                              .putString(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid")
-                              .build())
-                      .add("optionalUUID",  BinaryType.BINARY, true, FieldMetadata.builder()
-                              .putString(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid")
-                              .build());
-      InternalSchema internalSchema =
-              InternalSchema.builder()
-                      .name("struct")
-                      .dataType(InternalType.RECORD)
-                      .isNullable(false)
-                      .fields(
-                              Arrays.asList(
-                                      InternalField.builder()
-                                              .name("requiredUUID")
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("binary")
-                                                              .dataType(InternalType.UUID)
-                                                              .isNullable(false)
-                                                              .build())
-                                              .build(),
-                                      InternalField.builder()
-                                              .name("optionalUUID")
-                                              .schema(
-                                                      InternalSchema.builder()
-                                                              .name("binary")
-                                                              .dataType(InternalType.UUID)
-                                                              .isNullable(true)
-                                                              .build())
-                                              .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
-                                              .build()))
-                      .build();
-      Assertions.assertEquals(
-              internalSchema, DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+    io.delta.kernel.types.StructType structRepresentation =
+        new StructType()
+            .add(
+                "requiredUUID",
+                BinaryType.BINARY,
+                false,
+                FieldMetadata.builder()
+                    .putString(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid")
+                    .build())
+            .add(
+                "optionalUUID",
+                BinaryType.BINARY,
+                true,
+                FieldMetadata.builder()
+                    .putString(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid")
+                    .build());
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("requiredUUID")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("binary")
+                                .dataType(InternalType.UUID)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("optionalUUID")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("binary")
+                                .dataType(InternalType.UUID)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+    Assertions.assertEquals(
+        internalSchema,
+        DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
-
 }

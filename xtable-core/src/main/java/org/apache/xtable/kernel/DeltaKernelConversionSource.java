@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import lombok.Builder;
+import lombok.extern.slf4j.Slf4j;
 
 import io.delta.kernel.Snapshot;
 import io.delta.kernel.Table;
@@ -39,7 +40,6 @@ import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
 import io.delta.kernel.internal.util.VectorUtils;
 
-import lombok.extern.slf4j.Slf4j;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
