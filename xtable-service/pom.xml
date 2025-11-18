@@ -60,7 +60,10 @@
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-aws</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+        </dependency>
         <!-- Spark -->
         <dependency>
             <groupId>org.apache.spark</groupId>
