@@ -292,8 +292,7 @@ public class DeltaKernelPartitionExtractor {
                   partitionTransformType.isTimeBased()
                       ? getDateFormat(partitionTransformType)
                       : null;
-              String serializedValue =
-                  getSerializedPartitionValue(values, partitionField);
+              String serializedValue = getSerializedPartitionValue(values, partitionField);
               Object partitionValue =
                   convertFromDeltaPartitionValue(
                       serializedValue,
