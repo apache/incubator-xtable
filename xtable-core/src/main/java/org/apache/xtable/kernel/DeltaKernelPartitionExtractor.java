@@ -232,12 +232,10 @@ public class DeltaKernelPartitionExtractor {
       StructField field;
 
       if (internalPartitionField.getTransformType() == PartitionTransformType.VALUE) {
-        System.out.println("if coming");
         currPartitionColumnName = internalPartitionField.getSourceField().getName();
         field = null;
       } else {
         // Since partition field of timestamp or bucket type, create new field in schema.
-        System.out.println("else coming");
         field = getGeneratedField(internalPartitionField);
         currPartitionColumnName = field.getName();
       }
@@ -285,7 +283,7 @@ public class DeltaKernelPartitionExtractor {
   }
 
   public List<PartitionValue> partitionValueExtraction(
-      scala.collection.Map<String, String> values, List<InternalPartitionField> partitionFields) {
+      java.util.Map<String, String> values, List<InternalPartitionField> partitionFields) {
     return partitionFields.stream()
         .map(
             partitionField -> {
@@ -295,7 +293,7 @@ public class DeltaKernelPartitionExtractor {
                       ? getDateFormat(partitionTransformType)
                       : null;
               String serializedValue =
-                  getSerializedPartitionValue(convertScalaMapToJavaMap(values), partitionField);
+                  getSerializedPartitionValue(values, partitionField);
               Object partitionValue =
                   convertFromDeltaPartitionValue(
                       serializedValue,

@@ -66,10 +66,8 @@ public class DeltaKernelActionsConverter {
     List<ColumnStat> columnStats =
         includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
     long recordCount = fileStats.getNumRecords();
-    // The immutable map from Java to Scala is not working, need to
 
-    scala.collection.mutable.Map<String, String> scalaMap =
-        JavaConverters.mapAsScalaMap(partitionValues);
+    java.util.Map<String, String> scalaMap = partitionValues;
 
     return InternalDataFile.builder()
         .physicalPath(getFullPathToFile(addFile.getPath(), table))
@@ -89,8 +87,7 @@ public class DeltaKernelActionsConverter {
       List<InternalPartitionField> partitionFields,
       DeltaKernelPartitionExtractor partitionExtractor,
       Map<String, String> partitionValues) {
-    scala.collection.mutable.Map<String, String> scalaMap =
-        JavaConverters.mapAsScalaMap(partitionValues);
+    java.util.Map<String, String> scalaMap = partitionValues;
 
     return InternalDataFile.builder()
         .physicalPath(getFullPathToFile(removeFile.getPath(), table))

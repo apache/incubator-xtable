@@ -223,7 +223,7 @@ public class TestDeltaKernelSchemaExtractor {
                         .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
                         .build()))
             .build();
-    io.delta.kernel.types.StructType structRepresentation =
+    StructType structRepresentation =
         new StructType()
             .add(
                 "requiredBoolean",

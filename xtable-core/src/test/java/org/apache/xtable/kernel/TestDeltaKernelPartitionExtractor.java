@@ -347,8 +347,7 @@ public class TestDeltaKernelPartitionExtractor {
             put("date_partition_column", "2013-08-20-10");
           }
         };
-    scala.collection.mutable.Map<String, String> scalaMap =
-        convertJavaMapToScalaMap(partitionValuesMap);
+    java.util.Map<String, String> scalaMap = partitionValuesMap;
     InternalPartitionField internalPartitionField1 =
         InternalPartitionField.builder()
             .sourceField(
@@ -403,8 +402,7 @@ public class TestDeltaKernelPartitionExtractor {
             put("partition_column2", "partition_value2");
           }
         };
-    scala.collection.mutable.Map<String, String> scalaMap =
-        convertJavaMapToScalaMap(partitionValuesMap);
+    java.util.Map<String, String> scalaMap = partitionValuesMap;
     InternalPartitionField internalPartitionField1 =
         InternalPartitionField.builder()
             .sourceField(
@@ -462,8 +460,7 @@ public class TestDeltaKernelPartitionExtractor {
             put("day_partition_column", "20");
           }
         };
-    scala.collection.mutable.Map<String, String> scalaMap =
-        convertJavaMapToScalaMap(partitionValuesMap);
+    java.util.Map<String, String> scalaMap = partitionValuesMap;
     InternalPartitionField internalPartitionField1 =
         InternalPartitionField.builder()
             .sourceField(
@@ -527,11 +524,9 @@ public class TestDeltaKernelPartitionExtractor {
             .transformType(PartitionTransformType.BUCKET)
             .transformOptions(Collections.singletonMap(InternalPartitionField.NUM_BUCKETS, 5))
             .build();
-    System.out.println("internalPartitionField" + internalPartitionField);
     Map<String, StructField> actual =
         deltaKernelPartitionExtractor.convertToDeltaPartitionFormat(
             Collections.singletonList(internalPartitionField));
-    System.out.println("actual1" + actual);
     FieldMetadata expectedPartitionFieldMetadata =
         FieldMetadata.builder()
             .putString(
@@ -545,7 +540,6 @@ public class TestDeltaKernelPartitionExtractor {
                 IntegerType.INTEGER,
                 true,
                 expectedPartitionFieldMetadata));
-    System.out.println("expected1" + expected);
     assertEquals(expected, actual);
   }
 

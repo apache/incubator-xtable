@@ -123,7 +123,6 @@ public class TestDeltaKernelStatsExtractor {
   }
 
   private Literal convertToLiteral(JsonNode valueNode) {
-    System.out.println("ValueNode: " + valueNode);
     if (valueNode.isNull()) {
       return Literal.ofNull(StringType.STRING);
     } else if (valueNode.isTextual()) {

@@ -348,7 +348,6 @@ public class ITDeltaKernelConversionSource {
     TestSparkDeltaTable testSparkDeltaTable =
         new TestSparkDeltaTable(
             tableName, tempDir, sparkSession, isPartitioned ? "yearOfBirth" : null, false);
-    //    System.out.println("testSparkDeltaTable" + testSparkDeltaTable.getColumnsToSelect());
     List<List<String>> allActiveFiles = new ArrayList<>();
     List<TableChange> allTableChanges = new ArrayList<>();
     List<Row> rows = testSparkDeltaTable.insertRows(50);
