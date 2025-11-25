@@ -283,7 +283,7 @@ public class DeltaKernelPartitionExtractor {
   }
 
   public List<PartitionValue> partitionValueExtraction(
-      java.util.Map<String, String> values, List<InternalPartitionField> partitionFields) {
+      Map<String, String> values, List<InternalPartitionField> partitionFields) {
     return partitionFields.stream()
         .map(
             partitionField -> {

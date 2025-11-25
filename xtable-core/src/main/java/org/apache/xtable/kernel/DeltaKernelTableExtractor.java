@@ -24,11 +24,13 @@ import java.util.stream.Collectors;
 
 import lombok.Builder;
 
-import io.delta.kernel.*;
+import io.delta.kernel.Snapshot;
+import io.delta.kernel.Table;
 import io.delta.kernel.engine.Engine;
 import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
 
+import org.apache.xtable.exception.SchemaExtractorException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -50,16 +52,16 @@ public class DeltaKernelTableExtractor {
       Table deltaKernelTable, Snapshot snapshot, Engine engine, String tableName, String basePath) {
     try {
       // Get schema from Delta Kernel's snapshot
-      io.delta.kernel.types.StructType schema = snapshot.getSchema();
+      StructType schema = snapshot.getSchema();
       InternalSchema internalSchema = schemaExtractor.toInternalSchema(schema);
-      // Get partition columns);
+      // Get partition columns
       StructType fullSchema = snapshot.getSchema(); // The full table schema
-      List<String> partitionColumns = snapshot.getPartitionColumnNames(); // List<String>
-      List<StructField> partitionFields_strfld =
+      List<String> partitionColumns = snapshot.getPartitionColumnNames();
+      List<StructField> partitionFieldSchemas =
           fullSchema.fields().stream()
               .filter(field -> partitionColumns.contains(field.getName()))
               .collect(Collectors.toList());
-      StructType partitionSchema = new StructType(partitionFields_strfld);
+      StructType partitionSchema = new StructType(partitionFieldSchemas);
 
       List<InternalPartitionField> partitionFields =
           DeltaKernelPartitionExtractor.getInstance()
@@ -83,7 +85,8 @@ public class DeltaKernelTableExtractor {
           .latestMetadataPath(basePath + "/_delta_log")
           .build();
     } catch (Exception e) {
-      throw new RuntimeException("Failed to extract table information using Delta Kernel", e);
+      throw new SchemaExtractorException(
+          "Failed to extract table information using Delta Kernel", e);
     }
   }
 }

@@ -18,9 +18,10 @@
  
 package org.apache.xtable.kernel;
 
-// import scala.collection.Map;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import lombok.Builder;
@@ -77,7 +78,7 @@ public class DeltaKernelDataFileExtractor {
     private final FileFormat fileFormat;
     private final List<InternalField> fields;
     private final List<InternalPartitionField> partitionFields;
-    private Iterator<InternalDataFile> dataFilesIterator = Collections.emptyIterator();
+    private final Iterator<InternalDataFile> dataFilesIterator;
 
     private DeltaDataFileIterator(
         Snapshot snapshot,

@@ -65,7 +65,7 @@ public class DeltaKernelActionsConverter {
         includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
     long recordCount = fileStats.getNumRecords();
 
-    java.util.Map<String, String> scalaMap = partitionValues;
+    Map<String, String> scalaMap = partitionValues;
 
     return InternalDataFile.builder()
         .physicalPath(getFullPathToFile(addFile.getPath(), table))
@@ -85,7 +85,7 @@ public class DeltaKernelActionsConverter {
       List<InternalPartitionField> partitionFields,
       DeltaKernelPartitionExtractor partitionExtractor,
       Map<String, String> partitionValues) {
-    java.util.Map<String, String> scalaMap = partitionValues;
+    Map<String, String> scalaMap = partitionValues;
 
     return InternalDataFile.builder()
         .physicalPath(getFullPathToFile(removeFile.getPath(), table))

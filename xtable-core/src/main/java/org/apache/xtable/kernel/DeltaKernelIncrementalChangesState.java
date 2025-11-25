@@ -18,19 +18,15 @@
  
 package org.apache.xtable.kernel;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import lombok.Builder;
-
-import scala.Tuple2;
-import scala.collection.JavaConverters;
-import scala.collection.Seq;
 
 import com.google.common.base.Preconditions;
 
@@ -44,6 +40,8 @@ import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
 import io.delta.kernel.utils.CloseableIterator;
+
+import org.apache.xtable.exception.ReadException;
 
 /** Cache store for storing incremental table changes in the Delta table. */
 public class DeltaKernelIncrementalChangesState {
@@ -59,7 +57,7 @@ public class DeltaKernelIncrementalChangesState {
    */
   @Builder
   public DeltaKernelIncrementalChangesState(
-      Long versionToStartFrom, Engine engine, Table table, Long endVersion) {
+      long versionToStartFrom, Engine engine, Table table, long endVersion) {
     Set<DeltaLogActionUtils.DeltaAction> actionSet = new HashSet<>();
     actionSet.add(DeltaLogActionUtils.DeltaAction.ADD);
     actionSet.add(DeltaLogActionUtils.DeltaAction.REMOVE);
@@ -96,8 +94,8 @@ public class DeltaKernelIncrementalChangesState {
           }
         }
       }
-    } catch (Exception e) {
-      throw new RuntimeException("Error reading kernel changes", e);
+    } catch (IOException ioException) {
+      throw new ReadException("Error reading kernel changes", ioException);
     }
   }
 
@@ -119,20 +117,5 @@ public class DeltaKernelIncrementalChangesState {
         incrementalChangesByVersion.containsKey(version),
         String.format("Version %s not found in the DeltaIncrementalChangesState.", version));
     return incrementalChangesByVersion.get(version);
-  }
-
-  private List<Tuple2<Long, List<RowBackedAction>>> getChangesList(
-      scala.collection.Iterator<Tuple2<Object, Seq<RowBackedAction>>> scalaIterator) {
-    List<Tuple2<Long, List<RowBackedAction>>> changesList = new ArrayList<>();
-    Iterator<Tuple2<Object, Seq<RowBackedAction>>> javaIterator =
-        JavaConverters.asJavaIteratorConverter(scalaIterator).asJava();
-    while (javaIterator.hasNext()) {
-      Tuple2<Object, Seq<RowBackedAction>> currentChange = javaIterator.next();
-      changesList.add(
-          new Tuple2<>(
-              (Long) currentChange._1(),
-              JavaConverters.seqAsJavaListConverter(currentChange._2()).asJava()));
-    }
-    return changesList;
   }
 }

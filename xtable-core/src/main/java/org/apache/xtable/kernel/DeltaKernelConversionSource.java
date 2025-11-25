@@ -194,8 +194,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
       Instant deltaCommitInstant = Instant.ofEpochMilli(snapshot.getTimestamp(engine));
       return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
     } catch (Exception e) {
-      log.error(
-          "Error checking if incremental sync is safe from " + instant + ": " + e.getMessage());
+      log.error("Error checking if incremental sync is safe from " + instant + ": " + e);
       return false;
     }
   }
