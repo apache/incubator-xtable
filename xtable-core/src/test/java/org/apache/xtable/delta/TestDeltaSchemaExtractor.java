@@ -834,4 +834,43 @@ public class TestDeltaSchemaExtractor {
     Assertions.assertEquals(
         internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
+
+  @Test
+  public void testShortTypeConversion() {
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("requiredShort")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("short")
+                                .dataType(InternalType.INT)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("optionalShort")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("short")
+                                .dataType(InternalType.INT)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    StructType structRepresentation =
+        new StructType()
+            .add("requiredShort", DataTypes.ShortType, false)
+            .add("optionalShort", DataTypes.ShortType, true);
+
+    Assertions.assertEquals(
+        internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+  }
 }
