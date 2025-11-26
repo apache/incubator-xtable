@@ -30,7 +30,6 @@ import io.delta.kernel.engine.Engine;
 import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
 
-import org.apache.xtable.exception.SchemaExtractorException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -50,43 +49,38 @@ public class DeltaKernelTableExtractor {
 
   public InternalTable table(
       Table deltaKernelTable, Snapshot snapshot, Engine engine, String tableName, String basePath) {
-    try {
-      // Get schema from Delta Kernel's snapshot
-      StructType schema = snapshot.getSchema();
-      InternalSchema internalSchema = schemaExtractor.toInternalSchema(schema);
-      // Get partition columns
-      StructType fullSchema = snapshot.getSchema(); // The full table schema
-      List<String> partitionColumns = snapshot.getPartitionColumnNames();
-      List<StructField> partitionFieldSchemas =
-          fullSchema.fields().stream()
-              .filter(field -> partitionColumns.contains(field.getName()))
-              .collect(Collectors.toList());
-      StructType partitionSchema = new StructType(partitionFieldSchemas);
+    // Get schema from Delta Kernel's snapshot
+    StructType schema = snapshot.getSchema();
+    InternalSchema internalSchema = schemaExtractor.toInternalSchema(schema);
+    // Get partition columns
+    StructType fullSchema = snapshot.getSchema(); // The full table schema
+    List<String> partitionColumns = snapshot.getPartitionColumnNames();
+    List<StructField> partitionFieldSchemas =
+        fullSchema.fields().stream()
+            .filter(field -> partitionColumns.contains(field.getName()))
+            .collect(Collectors.toList());
+    StructType partitionSchema = new StructType(partitionFieldSchemas);
 
-      List<InternalPartitionField> partitionFields =
-          DeltaKernelPartitionExtractor.getInstance()
-              .convertFromDeltaPartitionFormat(internalSchema, partitionSchema);
+    List<InternalPartitionField> partitionFields =
+        DeltaKernelPartitionExtractor.getInstance()
+            .convertFromDeltaPartitionFormat(internalSchema, partitionSchema);
 
-      DataLayoutStrategy dataLayoutStrategy =
-          !partitionFields.isEmpty()
-              ? DataLayoutStrategy.HIVE_STYLE_PARTITION
-              : DataLayoutStrategy.FLAT;
+    DataLayoutStrategy dataLayoutStrategy =
+        !partitionFields.isEmpty()
+            ? DataLayoutStrategy.HIVE_STYLE_PARTITION
+            : DataLayoutStrategy.FLAT;
 
-      // Get the timestamp
-      long timestamp = snapshot.getTimestamp(engine);
-      return InternalTable.builder()
-          .tableFormat(TableFormat.DELTA)
-          .basePath(basePath)
-          .name(tableName)
-          .layoutStrategy(dataLayoutStrategy)
-          .partitioningFields(partitionFields)
-          .readSchema(internalSchema)
-          .latestCommitTime(Instant.ofEpochMilli(timestamp))
-          .latestMetadataPath(basePath + "/_delta_log")
-          .build();
-    } catch (Exception e) {
-      throw new SchemaExtractorException(
-          "Failed to extract table information using Delta Kernel", e);
-    }
+    // Get the timestamp
+    long timestamp = snapshot.getTimestamp(engine);
+    return InternalTable.builder()
+        .tableFormat(TableFormat.DELTA)
+        .basePath(basePath)
+        .name(tableName)
+        .layoutStrategy(dataLayoutStrategy)
+        .partitioningFields(partitionFields)
+        .readSchema(internalSchema)
+        .latestCommitTime(Instant.ofEpochMilli(timestamp))
+        .latestMetadataPath(basePath + "/_delta_log")
+        .build();
   }
 }

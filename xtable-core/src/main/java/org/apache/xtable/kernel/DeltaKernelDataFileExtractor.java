@@ -18,8 +18,6 @@
  
 package org.apache.xtable.kernel;
 
-import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -75,10 +73,15 @@ public class DeltaKernelDataFileExtractor {
   }
 
   public class DeltaDataFileIterator implements DataFileIterator {
+    private final CloseableIterator<FilteredColumnarBatch> scanFiles;
     private final FileFormat fileFormat;
+    private final Table table;
     private final List<InternalField> fields;
     private final List<InternalPartitionField> partitionFields;
-    private final Iterator<InternalDataFile> dataFilesIterator;
+    private final boolean includeColumnStats;
+
+    private CloseableIterator<Row> currentFileRows;
+    private InternalDataFile nextFile;
 
     private DeltaDataFileIterator(
         Snapshot snapshot,
@@ -86,10 +89,11 @@ public class DeltaKernelDataFileExtractor {
         Engine engine,
         InternalSchema schema,
         boolean includeColumnStats) {
+      this.includeColumnStats = includeColumnStats;
+      this.table = table;
+      this.fields = schema.getFields();
       String provider = ((SnapshotImpl) snapshot).getMetadata().getFormat().getProvider();
       this.fileFormat = actionsConverter.convertToFileFormat(provider);
-
-      this.fields = schema.getFields();
 
       StructType fullSchema = snapshot.getSchema(); // The full table schema
       List<String> partitionColumns = snapshot.getPartitionColumnNames();
@@ -105,49 +109,82 @@ public class DeltaKernelDataFileExtractor {
           partitionExtractor.convertFromDeltaPartitionFormat(schema, partitionSchema);
 
       ScanImpl myScan = (ScanImpl) snapshot.getScanBuilder().build();
-      CloseableIterator<FilteredColumnarBatch> scanFiles =
-          myScan.getScanFiles(engine, includeColumnStats);
+      this.scanFiles = myScan.getScanFiles(engine, includeColumnStats);
 
-      List<InternalDataFile> dataFiles = new ArrayList<>();
-      while (scanFiles.hasNext()) {
-        FilteredColumnarBatch scanFileColumnarBatch = scanFiles.next();
-        CloseableIterator<Row> scanFileRows = scanFileColumnarBatch.getRows();
-        while (scanFileRows.hasNext()) {
-          Row scanFileRow = scanFileRows.next();
-          // From the scan file row, extract the file path, size and modification time metadata
-          // needed to read the file.
-          AddFile addFile =
-              new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
-          Map<String, String> partitionValues =
-              InternalScanFileUtils.getPartitionValues(scanFileRow);
-          // Convert the FileStatus to InternalDataFile using the actionsConverter
-          dataFiles.add(
-              actionsConverter.convertAddActionToInternalDataFile(
-                  addFile,
-                  table,
-                  fileFormat,
-                  partitionFields,
-                  fields,
-                  includeColumnStats,
-                  partitionExtractor,
-                  fileStatsExtractor,
-                  partitionValues));
-        }
-      }
-      this.dataFilesIterator = dataFiles.iterator();
+      // Initialize first element
+      this.nextFile = computeNext();
     }
 
     @Override
-    public void close() throws Exception {}
+    public void close() throws Exception {
+      try {
+        if (currentFileRows != null) {
+          currentFileRows.close();
+        }
+      } finally {
+        scanFiles.close();
+      }
+    }
 
     @Override
     public boolean hasNext() {
-      return this.dataFilesIterator.hasNext();
+      return nextFile != null;
     }
 
     @Override
     public InternalDataFile next() {
-      return dataFilesIterator.next();
+      InternalDataFile current = nextFile;
+      nextFile = computeNext();
+      return current;
+    }
+
+    private InternalDataFile computeNext() {
+      try {
+        while (true) {
+          // If we have a current file with rows, process the next row
+          if (currentFileRows != null && currentFileRows.hasNext()) {
+            Row scanFileRow = currentFileRows.next();
+            AddFile addFile =
+                new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
+            Map<String, String> partitionValues =
+                InternalScanFileUtils.getPartitionValues(scanFileRow);
+
+            return actionsConverter.convertAddActionToInternalDataFile(
+                addFile,
+                table,
+                fileFormat,
+                partitionFields,
+                fields,
+                includeColumnStats,
+                partitionExtractor,
+                fileStatsExtractor,
+                partitionValues);
+          }
+
+          // Close current file rows if any
+          if (currentFileRows != null) {
+            currentFileRows.close();
+            currentFileRows = null;
+          }
+
+          // Get next batch of files if available
+          if (!scanFiles.hasNext()) {
+            return null; // No more files to process
+          }
+
+          // Get next batch of files
+          FilteredColumnarBatch scanFileColumnarBatch = scanFiles.next();
+          currentFileRows = scanFileColumnarBatch.getRows();
+        }
+      } catch (Exception e) {
+        // Close resources in case of error
+        try {
+          close();
+        } catch (Exception closeEx) {
+          e.addSuppressed(closeEx);
+        }
+        throw new RuntimeException("Error while computing next data file", e);
+      }
     }
   }
 }
