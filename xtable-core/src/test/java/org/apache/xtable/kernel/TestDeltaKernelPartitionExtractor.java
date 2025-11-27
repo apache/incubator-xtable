@@ -1,0 +1,554 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+ 
+package org.apache.xtable.kernel;
+
+import static org.apache.xtable.kernel.DeltaKernelPartitionExtractor.DELTA_GENERATION_EXPRESSION;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+import org.junit.jupiter.api.Test;
+
+import scala.collection.JavaConverters;
+
+import io.delta.kernel.types.*;
+import io.delta.kernel.types.FieldMetadata;
+import io.delta.kernel.types.StructField;
+import io.delta.kernel.types.StructType;
+
+import org.apache.xtable.model.schema.*;
+import org.apache.xtable.model.stat.PartitionValue;
+import org.apache.xtable.model.stat.Range;
+
+public class TestDeltaKernelPartitionExtractor {
+  private static final Map<String, StructField> STRUCT_FIELD_MAP =
+      new HashMap<String, StructField>() {
+        {
+          put("id", new StructField("id", IntegerType.INTEGER, false));
+          put("firstName", new StructField("firstName", StringType.STRING, false));
+          put("gender", new StructField("gender", StringType.STRING, false));
+          put("birthDate", new StructField("birthDate", TimestampType.TIMESTAMP, false));
+          put(
+              "dateOfBirth",
+              new StructField(
+                  "dateOfBirth",
+                  DateType.DATE,
+                  false,
+                  FieldMetadata.builder()
+                      .putString("delta.generationExpression", "CAST(birthDate AS DATE)")
+                      .build()));
+
+          put(
+              "dateFmt",
+              new StructField(
+                  "dateFmt",
+                  StringType.STRING,
+                  false,
+                  FieldMetadata.builder()
+                      .putString(
+                          "delta.generationExpression", "DATE_FORMAT(birthDate, 'yyyy-MM-dd-HH')")
+                      .build()));
+
+          put(
+              "yearOfBirth",
+              new StructField(
+                  "yearOfBirth",
+                  IntegerType.INTEGER,
+                  false,
+                  FieldMetadata.builder()
+                      .putString("delta.generationExpression", "YEAR(birthDate)")
+                      .build()));
+          put(
+              "monthOfBirth",
+              new StructField(
+                  "monthOfBirth",
+                  IntegerType.INTEGER,
+                  false,
+                  FieldMetadata.builder()
+                      .putString("delta.generationExpression", "MONTH(birthDate)")
+                      .build()));
+
+          put(
+              "dayOfBirth",
+              new StructField(
+                  "dayOfBirth",
+                  IntegerType.INTEGER,
+                  false,
+                  FieldMetadata.builder()
+                      .putString("delta.generationExpression", "DAY(birthDate)")
+                      .build()));
+
+          put(
+              "hourOfBirth",
+              new StructField(
+                  "hourOfBirth",
+                  IntegerType.INTEGER,
+                  false,
+                  FieldMetadata.builder()
+                      .putString("delta.generationExpression", "HOUR(birthDate)")
+                      .build()));
+        }
+      };
+  private static final InternalSchema TIMESTAMP_SCHEMA =
+      InternalSchema.builder()
+          .name("timestamp")
+          .dataType(InternalType.TIMESTAMP)
+          .metadata(
+              Collections.singletonMap(
+                  InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
+                  InternalSchema.MetadataValue.MICROS))
+          .build();
+  private final DeltaKernelPartitionExtractor deltaKernelPartitionExtractor =
+      DeltaKernelPartitionExtractor.getInstance();
+  private final DeltaKernelSchemaExtractor deltaKernelSchemaExtractor =
+      DeltaKernelSchemaExtractor.getInstance();
+
+  @Test
+  public void testUnpartitionedTable() {
+    StructType tableSchema =
+        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate"));
+    InternalSchema internalSchema = deltaKernelSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> internalPartitionFields =
+        deltaKernelPartitionExtractor.convertFromDeltaPartitionFormat(
+            internalSchema, new StructType());
+    assertTrue(internalPartitionFields.isEmpty());
+  }
+
+  @Test
+  public void testSimplePartitionedTable() {
+    StructType tableSchema =
+        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate"));
+    StructType partitionSchema = getSchemaWithFields(Arrays.asList("gender"));
+    InternalSchema internalSchema = deltaKernelSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
+        Arrays.asList(
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder()
+                        .name("gender")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .build())
+                        .build())
+                .transformType(PartitionTransformType.VALUE)
+                .build());
+    List<InternalPartitionField> internalPartitionFields =
+        deltaKernelPartitionExtractor.convertFromDeltaPartitionFormat(
+            internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
+  }
+
+  @Test
+  public void testDatePartitionedGeneratedColumnsTable() {
+    StructType tableSchema =
+        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateOfBirth"));
+    StructType partitionSchema = getSchemaWithFields(Arrays.asList("dateOfBirth"));
+
+    InternalSchema internalSchema = deltaKernelSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
+        Arrays.asList(
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+                .transformType(PartitionTransformType.DAY)
+                .partitionFieldNames(Collections.singletonList("dateOfBirth"))
+                .build());
+    List<InternalPartitionField> internalPartitionFields =
+        deltaKernelPartitionExtractor.convertFromDeltaPartitionFormat(
+            internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
+  }
+
+  @Test
+  public void testDateFormatPartitionedGeneratedColumnsTable() {
+    StructType tableSchema =
+        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateFmt"));
+    StructType partitionSchema = getSchemaWithFields(Arrays.asList("dateFmt"));
+    InternalSchema internalSchema = deltaKernelSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
+        Arrays.asList(
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+                .transformType(PartitionTransformType.HOUR)
+                .partitionFieldNames(Collections.singletonList("dateFmt"))
+                .build());
+    List<InternalPartitionField> internalPartitionFields =
+        deltaKernelPartitionExtractor.convertFromDeltaPartitionFormat(
+            internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
+  }
+
+  @Test
+  public void yearPartitionedGeneratedColumnsTable() {
+    StructType tableSchema =
+        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "yearOfBirth"));
+    StructType partitionSchema = getSchemaWithFields(Arrays.asList("yearOfBirth"));
+    InternalSchema internalSchema = deltaKernelSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
+        Arrays.asList(
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+                .transformType(PartitionTransformType.YEAR)
+                .partitionFieldNames(Collections.singletonList("yearOfBirth"))
+                .build());
+    List<InternalPartitionField> internalPartitionFields =
+        deltaKernelPartitionExtractor.convertFromDeltaPartitionFormat(
+            internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
+  }
+
+  @Test
+  public void yearAndSimpleCombinedPartitionedGeneratedColumnsTable() {
+    StructType tableSchema =
+        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "yearOfBirth"));
+    StructType partitionSchema = getSchemaWithFields(Arrays.asList("yearOfBirth", "id"));
+    InternalSchema internalSchema = deltaKernelSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
+        Arrays.asList(
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+                .transformType(PartitionTransformType.YEAR)
+                .partitionFieldNames(Collections.singletonList("yearOfBirth"))
+                .build(),
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder()
+                        .name("id")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("integer")
+                                .dataType(InternalType.INT)
+                                .build())
+                        .build())
+                .transformType(PartitionTransformType.VALUE)
+                .build());
+    List<InternalPartitionField> internalPartitionFields =
+        deltaKernelPartitionExtractor.convertFromDeltaPartitionFormat(
+            internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
+  }
+
+  @Test
+  public void yearMonthDayHourPartitionedGeneratedColumnsTable() {
+    StructType tableSchema =
+        getSchemaWithFields(
+            Arrays.asList(
+                "id",
+                "firstName",
+                "gender",
+                "birthDate",
+                "yearOfBirth",
+                "monthOfBirth",
+                "dayOfBirth",
+                "hourOfBirth"));
+    StructType partitionSchema =
+        getSchemaWithFields(
+            Arrays.asList("yearOfBirth", "monthOfBirth", "dayOfBirth", "hourOfBirth"));
+    InternalSchema internalSchema = deltaKernelSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
+        Arrays.asList(
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+                .partitionFieldNames(
+                    Arrays.asList("yearOfBirth", "monthOfBirth", "dayOfBirth", "hourOfBirth"))
+                .transformType(PartitionTransformType.HOUR)
+                .build());
+    List<InternalPartitionField> internalPartitionFields =
+        deltaKernelPartitionExtractor.convertFromDeltaPartitionFormat(
+            internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
+  }
+
+  // Test for preserving order of partition columns.
+  @Test
+  public void testCombinationOfPlainAndGeneratedColumns() {
+    StructType tableSchema =
+        getSchemaWithFields(Arrays.asList("id", "firstName", "gender", "birthDate", "dateFmt"));
+    StructType partitionSchema =
+        getSchemaWithFields(Arrays.asList("id", "dateFmt", "gender", "dateOfBirth"));
+    InternalSchema internalSchema = deltaKernelSchemaExtractor.toInternalSchema(tableSchema);
+    List<InternalPartitionField> expectedInternalPartitionFields =
+        Arrays.asList(
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder()
+                        .name("id")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("integer")
+                                .dataType(InternalType.INT)
+                                .build())
+                        .build())
+                .transformType(PartitionTransformType.VALUE)
+                .build(),
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+                .transformType(PartitionTransformType.HOUR)
+                .partitionFieldNames(Collections.singletonList("dateFmt"))
+                .build(),
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder()
+                        .name("gender")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .build())
+                        .build())
+                .transformType(PartitionTransformType.VALUE)
+                .build(),
+            InternalPartitionField.builder()
+                .sourceField(
+                    InternalField.builder().name("birthDate").schema(TIMESTAMP_SCHEMA).build())
+                .transformType(PartitionTransformType.DAY)
+                .partitionFieldNames(Collections.singletonList("dateOfBirth"))
+                .build());
+    List<InternalPartitionField> internalPartitionFields =
+        deltaKernelPartitionExtractor.convertFromDeltaPartitionFormat(
+            internalSchema, partitionSchema);
+    assertEquals(expectedInternalPartitionFields, internalPartitionFields);
+  }
+
+  @Test
+  public void testDateFormatGeneratedPartitionValueExtraction() {
+    // date_partition_column is generated in the table as DATE_FORMAT(some_date_column,
+    // 'yyyy-MM-dd-HH')
+    // where some_date_column is of timestamp type.
+    Map<String, String> partitionValuesMap =
+        new HashMap<String, String>() {
+          {
+            put("partition_column1", "partition_value1");
+            put("date_partition_column", "2013-08-20-10");
+          }
+        };
+    java.util.Map<String, String> scalaMap = partitionValuesMap;
+    InternalPartitionField internalPartitionField1 =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("partition_column1")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    InternalPartitionField internalPartitionField2 =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("some_date_column")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("timestamp")
+                            .dataType(InternalType.TIMESTAMP)
+                            .build())
+                    .build())
+            .partitionFieldNames(Collections.singletonList("date_partition_column"))
+            .transformType(PartitionTransformType.HOUR)
+            .build();
+    Range rangeForPartitionField1 = Range.scalar("partition_value1");
+    Range rangeForPartitionField2 = Range.scalar(1376992800000L);
+    List<PartitionValue> expectedPartitionValues =
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(internalPartitionField1)
+                .range(rangeForPartitionField1)
+                .build(),
+            PartitionValue.builder()
+                .partitionField(internalPartitionField2)
+                .range(rangeForPartitionField2)
+                .build());
+    List<PartitionValue> partitionValues =
+        deltaKernelPartitionExtractor.partitionValueExtraction(
+            scalaMap, Arrays.asList(internalPartitionField1, internalPartitionField2));
+    assertEquals(expectedPartitionValues, partitionValues);
+  }
+
+  @Test
+  public void testSimplePartitionValueExtraction() {
+    Map<String, String> partitionValuesMap =
+        new HashMap<String, String>() {
+          {
+            put("partition_column1", "partition_value1");
+            put("partition_column2", "partition_value2");
+          }
+        };
+    java.util.Map<String, String> scalaMap = partitionValuesMap;
+    InternalPartitionField internalPartitionField1 =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("partition_column1")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    InternalPartitionField internalPartitionField2 =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("partition_column2")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    Range rangeForPartitionField1 = Range.scalar("partition_value1");
+    Range rangeForPartitionField2 = Range.scalar("partition_value2");
+    List<PartitionValue> expectedPartitionValues =
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(internalPartitionField1)
+                .range(rangeForPartitionField1)
+                .build(),
+            PartitionValue.builder()
+                .partitionField(internalPartitionField2)
+                .range(rangeForPartitionField2)
+                .build());
+    List<PartitionValue> partitionValues =
+        deltaKernelPartitionExtractor.partitionValueExtraction(
+            scalaMap, Arrays.asList(internalPartitionField1, internalPartitionField2));
+    assertEquals(expectedPartitionValues, partitionValues);
+  }
+
+  @Test
+  public void testYearMonthDayHourGeneratedPartitionValueExtraction() {
+    // year, month and day are generated in the table as based on some_date_column which is of
+    // timestamp type.
+    Map<String, String> partitionValuesMap =
+        new HashMap<String, String>() {
+          {
+            put("partition_column1", "partition_value1");
+            put("year_partition_column", "2013");
+            put("month_partition_column", "8");
+            put("day_partition_column", "20");
+          }
+        };
+    java.util.Map<String, String> scalaMap = partitionValuesMap;
+    InternalPartitionField internalPartitionField1 =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("partition_column1")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    InternalPartitionField internalPartitionField2 =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("some_date_column")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("timestamp")
+                            .dataType(InternalType.TIMESTAMP)
+                            .build())
+                    .build())
+            .partitionFieldNames(
+                Arrays.asList(
+                    "year_partition_column", "month_partition_column", "day_partition_column"))
+            .transformType(PartitionTransformType.DAY)
+            .build();
+    Range rangeForPartitionField1 = Range.scalar("partition_value1");
+    Range rangeForPartitionField2 = Range.scalar(1376956800000L);
+    List<PartitionValue> expectedPartitionValues =
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(internalPartitionField1)
+                .range(rangeForPartitionField1)
+                .build(),
+            PartitionValue.builder()
+                .partitionField(internalPartitionField2)
+                .range(rangeForPartitionField2)
+                .build());
+    List<PartitionValue> partitionValues =
+        deltaKernelPartitionExtractor.partitionValueExtraction(
+            scalaMap, Arrays.asList(internalPartitionField1, internalPartitionField2));
+    assertEquals(expectedPartitionValues, partitionValues);
+  }
+
+  @Test
+  void convertBucketPartition() {
+    InternalPartitionField internalPartitionField =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("partition_column1")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
+                    .build())
+            .transformType(PartitionTransformType.BUCKET)
+            .transformOptions(Collections.singletonMap(InternalPartitionField.NUM_BUCKETS, 5))
+            .build();
+    Map<String, StructField> actual =
+        deltaKernelPartitionExtractor.convertToDeltaPartitionFormat(
+            Collections.singletonList(internalPartitionField));
+    FieldMetadata expectedPartitionFieldMetadata =
+        FieldMetadata.builder()
+            .putString(
+                DELTA_GENERATION_EXPRESSION, "MOD((HASH(partition_column1) & 2147483647), 5)")
+            .build();
+    Map<String, StructField> expected =
+        Collections.singletonMap(
+            "xtable_partition_col_BUCKET_partition_column1",
+            new StructField(
+                "xtable_partition_col_BUCKET_partition_column1",
+                IntegerType.INTEGER,
+                true,
+                expectedPartitionFieldMetadata));
+    assertEquals(expected, actual);
+  }
+
+  private scala.collection.mutable.Map<String, String> convertJavaMapToScalaMap(
+      Map<String, String> javaMap) {
+    return JavaConverters.mapAsScalaMapConverter(javaMap).asScala();
+  }
+
+  private StructType getSchemaWithFields(List<String> fields) {
+    return new StructType(fields.stream().map(STRUCT_FIELD_MAP::get).collect(Collectors.toList()));
+  }
+}

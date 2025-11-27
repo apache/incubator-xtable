@@ -109,6 +109,15 @@
             <artifactId>delta-standalone_${scala.binary.version}</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-kernel-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-kernel-defaults</artifactId>
+        </dependency>
 
         <!-- Paimon dependencies -->
         <dependency>
