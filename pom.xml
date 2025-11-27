@@ -620,14 +620,20 @@
                 <groupId>io.delta</groupId>
                 <artifactId>delta-kernel-api</artifactId>
                 <version>${delta.kernel.version}</version>
-                <scope>provided</scope>
+                <scope>compile</scope>
             </dependency>
 
             <dependency>
                 <groupId>io.delta</groupId>
                 <artifactId>delta-kernel-defaults</artifactId>
                 <version>${delta.kernel.version}</version>
-                <scope>provided</scope>
+                <scope>compile</scope>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-runtime</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
         </dependencies>
