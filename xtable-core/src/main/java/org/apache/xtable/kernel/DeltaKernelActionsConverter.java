@@ -95,9 +95,9 @@ public class DeltaKernelActionsConverter {
   }
 
   public FileFormat convertToFileFormat(String provider) {
-    if (provider.equals("parquet")) {
+    if (provider.equalsIgnoreCase("parquet")) {
       return FileFormat.APACHE_PARQUET;
-    } else if (provider.equals("orc")) {
+    } else if (provider.equalsIgnoreCase("orc")) {
       return FileFormat.APACHE_ORC;
     }
     throw new NotSupportedException(

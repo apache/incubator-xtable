@@ -39,8 +39,6 @@ import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
-import scala.collection.JavaConverters;
-
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
@@ -415,11 +413,6 @@ public class DeltaKernelPartitionExtractor {
               + ", Found: "
               + actualTypesPresent);
     }
-  }
-
-  private Map<String, String> convertScalaMapToJavaMap(
-      scala.collection.Map<String, String> scalaMap) {
-    return JavaConverters.mapAsJavaMapConverter(scalaMap).asJava();
   }
 
   @Builder
