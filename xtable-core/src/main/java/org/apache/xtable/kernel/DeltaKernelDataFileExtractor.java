@@ -140,42 +140,37 @@ public class DeltaKernelDataFileExtractor {
 
     private InternalDataFile computeNext() {
       try {
-        while (true) {
-          // If we have a current file with rows, process the next row
-          if (currentFileRows != null && currentFileRows.hasNext()) {
-            Row scanFileRow = currentFileRows.next();
-            AddFile addFile =
-                new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
-            Map<String, String> partitionValues =
-                InternalScanFileUtils.getPartitionValues(scanFileRow);
-
-            return actionsConverter.convertAddActionToInternalDataFile(
-                addFile,
-                table,
-                fileFormat,
-                partitionFields,
-                fields,
-                includeColumnStats,
-                partitionExtractor,
-                fileStatsExtractor,
-                partitionValues);
-          }
-
-          // Close current file rows if any
+        // Try to get the next row from the current batch
+        while ((currentFileRows == null || !currentFileRows.hasNext()) && scanFiles.hasNext()) {
           if (currentFileRows != null) {
             currentFileRows.close();
             currentFileRows = null;
           }
-
-          // Get next batch of files if available
-          if (!scanFiles.hasNext()) {
-            return null; // No more files to process
-          }
-
-          // Get next batch of files
           FilteredColumnarBatch scanFileColumnarBatch = scanFiles.next();
           currentFileRows = scanFileColumnarBatch.getRows();
         }
+
+        if (currentFileRows != null && currentFileRows.hasNext()) {
+          Row scanFileRow = currentFileRows.next();
+          AddFile addFile =
+              new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
+          Map<String, String> partitionValues =
+              InternalScanFileUtils.getPartitionValues(scanFileRow);
+
+          return actionsConverter.convertAddActionToInternalDataFile(
+              addFile,
+              table,
+              fileFormat,
+              partitionFields,
+              fields,
+              includeColumnStats,
+              partitionExtractor,
+              fileStatsExtractor,
+              partitionValues);
+        }
+
+        // No more files to process
+        return null;
       } catch (Exception e) {
         // Close resources in case of error
         try {
