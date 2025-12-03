@@ -57,6 +57,7 @@
     </modules>
 
     <properties>
+        <delta.kernel.version>4.0.0</delta.kernel.version>
         <project.version>0.2.0-SNAPSHOT</project.version>
         <!-- To ensure build content is re-producible -->
         <project.build.outputTimestamp>2025-01-01T00:00:00Z</project.build.outputTimestamp>
@@ -615,6 +616,26 @@
                 <artifactId>jettison</artifactId>
                 <version>1.5.4</version>
             </dependency>
+            <dependency>
+                <groupId>io.delta</groupId>
+                <artifactId>delta-kernel-api</artifactId>
+                <version>${delta.kernel.version}</version>
+                <scope>compile</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>io.delta</groupId>
+                <artifactId>delta-kernel-defaults</artifactId>
+                <version>${delta.kernel.version}</version>
+                <scope>compile</scope>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-runtime</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
