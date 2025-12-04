@@ -18,16 +18,24 @@
  
 package org.apache.xtable.paimon;
 
+import java.nio.ByteBuffer;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import org.apache.paimon.Snapshot;
+import org.apache.paimon.data.BinaryArray;
+import org.apache.paimon.data.BinaryRow;
 import org.apache.paimon.io.DataFileMeta;
 import org.apache.paimon.manifest.ManifestEntry;
+import org.apache.paimon.stats.SimpleStats;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.source.snapshot.SnapshotReader;
 
+import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.InternalDataFile;
 
 public class PaimonDataFileExtractor {
@@ -61,7 +69,7 @@ public class PaimonDataFileExtractor {
         .recordCount(entry.file().rowCount())
         .partitionValues(
             partitionExtractor.toPartitionValues(table, entry.partition(), internalSchema))
-        .columnStats(toColumnStats(entry.file()))
+        .columnStats(toColumnStats(entry.file(), internalSchema))
         .build();
   }
 
@@ -78,10 +86,82 @@ public class PaimonDataFileExtractor {
     }
   }
 
-  private List<ColumnStat> toColumnStats(DataFileMeta file) {
-    // TODO: Implement logic to extract column stats from the file meta
-    // https://github.com/apache/incubator-xtable/issues/755
-    return Collections.emptyList();
+  private List<ColumnStat> toColumnStats(DataFileMeta file, InternalSchema internalSchema) {
+    SimpleStats stats = file.valueStats();
+    if (stats == null) {
+      return Collections.emptyList();
+    }
+    List<String> colNames = file.valueStatsCols();
+    if (colNames == null || colNames.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    Map<String, InternalField> fieldMap =
+        internalSchema.getAllFields().stream()
+            .collect(Collectors.toMap(InternalField::getPath, f -> f));
+
+    List<ColumnStat> columnStats = new ArrayList<>();
+    BinaryRow minValues = stats.minValues();
+    BinaryRow maxValues = stats.maxValues();
+    BinaryArray nullCounts = stats.nullCounts();
+
+    for (int i = 0; i < colNames.size(); i++) {
+      String colName = colNames.get(i);
+      InternalField field = fieldMap.get(colName);
+      if (field == null) {
+        continue;
+      }
+
+      InternalType type = field.getSchema().getDataType();
+      Object min = getValue(minValues, i, type, field.getSchema());
+      Object max = getValue(maxValues, i, type, field.getSchema());
+      Long nullCount = nullCounts.getLong(i);
+
+      columnStats.add(
+          ColumnStat.builder()
+              .field(field)
+              .range(Range.vector(min, max))
+              .numNulls(nullCount)
+              .numValues(file.rowCount())
+              .build());
+    }
+    return columnStats;
+  }
+
+  private Object getValue(
+      BinaryRow row, int index, InternalType type, InternalSchema fieldSchema) {
+    if (row.isNullAt(index)) {
+      return null;
+    }
+    switch (type) {
+      case BOOLEAN:
+        return row.getBoolean(index);
+      case INT:
+      case DATE:
+        return row.getInt(index);
+      case LONG:
+      case TIMESTAMP:
+      case TIMESTAMP_NTZ:
+        return row.getLong(index);
+      case FLOAT:
+        return row.getFloat(index);
+      case DOUBLE:
+        return row.getDouble(index);
+      case STRING:
+      case ENUM:
+        return row.getString(index).toString();
+      case DECIMAL:
+        int precision =
+            (int) fieldSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+        int scale = (int) fieldSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
+        return row.getDecimal(index, precision, scale).toBigDecimal();
+      case FIXED:
+      case BYTES:
+        byte[] bytes = row.getBinary(index);
+        return bytes != null ? ByteBuffer.wrap(bytes) : null;
+      default:
+        return null;
+    }
   }
 
   private SnapshotReader newSnapshotReader(FileStoreTable table, Snapshot snapshot) {

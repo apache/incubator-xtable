@@ -24,10 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.table.FileStoreTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,6 +38,8 @@ import org.apache.xtable.TestPaimonTable;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.stat.ColumnStat;
+import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.InternalDataFile;
 
 public class TestPaimonDataFileExtractor {
@@ -132,19 +136,35 @@ public class TestPaimonDataFileExtractor {
   }
 
   @Test
-  void testColumnStatsAreEmpty() {
-    createUnpartitionedTable();
+  void testColumnStats() {
+    createTableWithFullSchema();
 
-    testTable.insertRows(1);
+    List<GenericRow> rows = testTable.insertRows(10);
 
     List<InternalDataFile> result =
         extractor.toInternalDataFiles(
             paimonTable, paimonTable.snapshotManager().latestSnapshot(), testSchema);
 
     assertFalse(result.isEmpty());
-    for (InternalDataFile dataFile : result) {
-      assertEquals(0, dataFile.getColumnStats().size());
-    }
+    InternalDataFile dataFile = result.get(0);
+    List<ColumnStat> stats = dataFile.getColumnStats();
+    assertFalse(stats.isEmpty());
+
+    // Verify "id" stats (INT)
+    int minId = rows.stream().map(r -> r.getInt(0)).min(Integer::compareTo).get();
+    int maxId = rows.stream().map(r -> r.getInt(0)).max(Integer::compareTo).get();
+    ColumnStat idStat =
+        stats.stream().filter(s -> s.getField().getName().equals("id")).findFirst().get();
+    assertEquals(Range.vector(minId, maxId), idStat.getRange());
+    assertEquals(0, idStat.getNumNulls());
+
+    // Verify "value" stats (DOUBLE)
+    double minValue = rows.stream().map(r -> r.getDouble(2)).min(Double::compareTo).get();
+    double maxValue = rows.stream().map(r -> r.getDouble(2)).max(Double::compareTo).get();
+    ColumnStat valueStat =
+        stats.stream().filter(s -> s.getField().getName().equals("value")).findFirst().get();
+    assertEquals(Range.vector(minValue, maxValue), valueStat.getRange());
+    assertEquals(0, valueStat.getNumNulls());
   }
 
   private void createUnpartitionedTable() {
@@ -170,6 +190,32 @@ public class TestPaimonDataFileExtractor {
             .build();
 
     testSchema = InternalSchema.builder().fields(Collections.singletonList(partitionField)).build();
+  }
+
+  private void createTableWithFullSchema() {
+    testTable =
+        (TestPaimonTable)
+            TestPaimonTable.createTable("test_table", null, tempDir, new Configuration(), false);
+    paimonTable = testTable.getPaimonTable();
+
+    List<InternalField> fields = new ArrayList<>();
+    fields.add(
+        InternalField.builder()
+            .name("id")
+            .schema(InternalSchema.builder().dataType(InternalType.INT).build())
+            .build());
+    fields.add(
+        InternalField.builder()
+            .name("name")
+            .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
+            .build());
+    fields.add(
+        InternalField.builder()
+            .name("value")
+            .schema(InternalSchema.builder().dataType(InternalType.DOUBLE).build())
+            .build());
+
+    testSchema = InternalSchema.builder().fields(fields).build();
   }
 
   private void createTableWithPrimaryKeys() {
