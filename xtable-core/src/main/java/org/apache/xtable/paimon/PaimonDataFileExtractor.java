@@ -69,7 +69,7 @@ public class PaimonDataFileExtractor {
         .recordCount(entry.file().rowCount())
         .partitionValues(
             partitionExtractor.toPartitionValues(table, entry.partition(), internalSchema))
-        .columnStats(toColumnStats(entry.file(), internalSchema))
+        .columnStats(toColumnStats(entry.file(), internalSchema, table.partitionKeys()))
         .build();
   }
 
@@ -86,7 +86,8 @@ public class PaimonDataFileExtractor {
     }
   }
 
-  private List<ColumnStat> toColumnStats(DataFileMeta file, InternalSchema internalSchema) {
+  private List<ColumnStat> toColumnStats(
+      DataFileMeta file, InternalSchema internalSchema, List<String> partitionKeys) {
     List<ColumnStat> columnStats = new ArrayList<>();
     Map<String, InternalField> fieldMap =
         internalSchema.getAllFields().stream()
@@ -95,13 +96,14 @@ public class PaimonDataFileExtractor {
     // Handle key stats if available (for primary keys)
     SimpleStats keyStats = file.keyStats();
     if (keyStats != null) {
-        List<String> keyColNames =
-                internalSchema.getRecordKeyFields().stream()
-                        .map(InternalField::getPath)
-                        .collect(Collectors.toList());
-        if (!keyColNames.isEmpty()) {
-            extractStats(columnStats, keyStats, keyColNames, fieldMap, file.rowCount());
-        }
+      List<String> keyColNames =
+          internalSchema.getRecordKeyFields().stream()
+              .map(InternalField::getPath)
+              .filter(name -> !partitionKeys.contains(name))
+              .collect(Collectors.toList());
+      if (!keyColNames.isEmpty()) {
+        extractStats(columnStats, keyStats, keyColNames, fieldMap, file.rowCount());
+      }
     }
 
     // Handle value stats
