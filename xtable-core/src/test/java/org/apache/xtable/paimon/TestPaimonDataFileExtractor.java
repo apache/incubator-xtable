@@ -172,8 +172,25 @@ public class TestPaimonDataFileExtractor {
         (TestPaimonTable)
             TestPaimonTable.createTable("test_table", null, tempDir, new Configuration(), false);
     paimonTable = testTable.getPaimonTable();
-    testSchema =
-        InternalSchema.builder().build(); // empty schema won't matter for non-partitioned tables
+
+    List<InternalField> fields = new ArrayList<>();
+    fields.add(
+        InternalField.builder()
+            .name("id")
+            .schema(InternalSchema.builder().dataType(InternalType.INT).build())
+            .build());
+    fields.add(
+        InternalField.builder()
+            .name("name")
+            .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
+            .build());
+    fields.add(
+        InternalField.builder()
+            .name("value")
+            .schema(InternalSchema.builder().dataType(InternalType.DOUBLE).build())
+            .build());
+
+    testSchema = InternalSchema.builder().fields(fields).build();
   }
 
   private void createPartitionedTable() {
@@ -183,13 +200,29 @@ public class TestPaimonDataFileExtractor {
     paimonTable = testTable.getPaimonTable();
 
     // just the partition field matters for this test
-    InternalField partitionField =
+    List<InternalField> fields = new ArrayList<>();
+    fields.add(
+            InternalField.builder()
+                    .name("id")
+                    .schema(InternalSchema.builder().dataType(InternalType.INT).build())
+                    .build());
+    fields.add(
+            InternalField.builder()
+                    .name("name")
+                    .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
+                    .build());
+    fields.add(
+            InternalField.builder()
+                    .name("value")
+                    .schema(InternalSchema.builder().dataType(InternalType.DOUBLE).build())
+                    .build());
+    fields.add(
         InternalField.builder()
             .name("level")
             .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
-            .build();
+            .build());
 
-    testSchema = InternalSchema.builder().fields(Collections.singletonList(partitionField)).build();
+    testSchema = InternalSchema.builder().fields(fields).build();
   }
 
   private void createTableWithFullSchema() {
@@ -223,7 +256,24 @@ public class TestPaimonDataFileExtractor {
         (TestPaimonTable)
             TestPaimonTable.createTable("test_table", null, tempDir, new Configuration(), false);
     paimonTable = testTable.getPaimonTable();
-    testSchema =
-        InternalSchema.builder().build(); // empty schema won't matter for non-partitioned tables
+
+    List<InternalField> fields = new ArrayList<>();
+    fields.add(
+        InternalField.builder()
+            .name("id")
+            .schema(InternalSchema.builder().dataType(InternalType.INT).build())
+            .build());
+    fields.add(
+        InternalField.builder()
+            .name("name")
+            .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
+            .build());
+    fields.add(
+        InternalField.builder()
+            .name("value")
+            .schema(InternalSchema.builder().dataType(InternalType.DOUBLE).build())
+            .build());
+
+    testSchema = InternalSchema.builder().fields(fields).build();
   }
 }
