@@ -87,20 +87,45 @@ public class PaimonDataFileExtractor {
   }
 
   private List<ColumnStat> toColumnStats(DataFileMeta file, InternalSchema internalSchema) {
-    SimpleStats stats = file.valueStats();
-    if (stats == null) {
-      return Collections.emptyList();
-    }
-    List<String> colNames = file.valueStatsCols();
-    if (colNames == null || colNames.isEmpty()) {
-      return Collections.emptyList();
-    }
-
+    List<ColumnStat> columnStats = new ArrayList<>();
     Map<String, InternalField> fieldMap =
         internalSchema.getAllFields().stream()
             .collect(Collectors.toMap(InternalField::getPath, f -> f));
 
-    List<ColumnStat> columnStats = new ArrayList<>();
+    // Handle key stats if available (for primary keys)
+    SimpleStats keyStats = file.keyStats();
+    if (keyStats != null) {
+        List<String> keyColNames =
+                internalSchema.getRecordKeyFields().stream()
+                        .map(InternalField::getPath)
+                        .collect(Collectors.toList());
+        if (!keyColNames.isEmpty()) {
+            extractStats(columnStats, keyStats, keyColNames, fieldMap, file.rowCount());
+        }
+    }
+
+    // Handle value stats
+    SimpleStats valueStats = file.valueStats();
+    if (valueStats != null) {
+      List<String> colNames = file.valueStatsCols();
+      if (colNames == null || colNames.isEmpty()) {
+        colNames =
+            internalSchema.getAllFields().stream()
+                .map(InternalField::getPath)
+                .collect(Collectors.toList());
+      }
+      extractStats(columnStats, valueStats, colNames, fieldMap, file.rowCount());
+    }
+
+    return columnStats;
+  }
+
+  private void extractStats(
+      List<ColumnStat> columnStats,
+      SimpleStats stats,
+      List<String> colNames,
+      Map<String, InternalField> fieldMap,
+      long rowCount) {
     BinaryRow minValues = stats.minValues();
     BinaryRow maxValues = stats.maxValues();
     BinaryArray nullCounts = stats.nullCounts();
@@ -112,20 +137,26 @@ public class PaimonDataFileExtractor {
         continue;
       }
 
+      // Check if we already have stats for this field
+      boolean alreadyExists =
+          columnStats.stream().anyMatch(cs -> cs.getField().getPath().equals(colName));
+      if (alreadyExists) {
+        continue;
+      }
+
       InternalType type = field.getSchema().getDataType();
       Object min = getValue(minValues, i, type, field.getSchema());
       Object max = getValue(maxValues, i, type, field.getSchema());
-      Long nullCount = nullCounts.getLong(i);
+      Long nullCount = (nullCounts != null && i < nullCounts.size()) ? nullCounts.getLong(i) : 0L;
 
       columnStats.add(
           ColumnStat.builder()
               .field(field)
               .range(Range.vector(min, max))
               .numNulls(nullCount)
-              .numValues(file.rowCount())
+              .numValues(rowCount)
               .build());
     }
-    return columnStats;
   }
 
   private Object getValue(

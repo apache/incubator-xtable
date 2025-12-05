@@ -116,7 +116,8 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
             .column("description", DataTypes.VARCHAR(255))
             .option("bucket", "1")
             .option("bucket-key", "id")
-            .option("full-compaction.delta-commits", "1");
+            .option("full-compaction.delta-commits", "1")
+            .option("metadata.stats-mode", "full");
 
     if (partitionField != null) {
       builder
