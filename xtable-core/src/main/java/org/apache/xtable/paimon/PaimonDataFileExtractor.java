@@ -19,6 +19,7 @@
 package org.apache.xtable.paimon;
 
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -32,6 +33,7 @@ import org.apache.paimon.stats.SimpleStats;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.source.snapshot.SnapshotReader;
 
+import org.apache.paimon.types.TimestampType;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -101,9 +103,9 @@ public class PaimonDataFileExtractor {
     // all columns are present in valueStats
     SimpleStats valueStats = file.valueStats();
     if (valueStats != null) {
-      //log.info("Processing valueStats: {}", valueStats.toRow());
+//      log.info("Processing valueStats: {}", valueStats.toRow());
       List<String> colNames = file.valueStatsCols();
-      //log.info("valueStatsCols: {}", colNames);
+//      log.info("valueStatsCols: {}", colNames);
       if (colNames == null || colNames.isEmpty()) {
         colNames =
             internalSchema.getAllFields().stream()
@@ -134,10 +136,10 @@ public class PaimonDataFileExtractor {
     BinaryRow maxValues = stats.maxValues();
     BinaryArray nullCounts = stats.nullCounts();
 
-    //log.info("Extracting stats for columns: {}", colNames);
-    //log.info("minValues: arity={}, {}", minValues.getFieldCount(), minValues);
-    //log.info("maxValues: arity={}, {}", maxValues.getFieldCount(), maxValues);
-    //log.info("fieldMap: {}", fieldMap.toString());
+//    log.info("Extracting stats for columns: {}", colNames);
+//    log.info("minValues: arity={}, {}", minValues.getFieldCount(), minValues);
+//    log.info("maxValues: arity={}, {}", maxValues.getFieldCount(), maxValues);
+//    log.info("fieldMap: {}", fieldMap.toString());
 
     for (int i = 0; i < colNames.size(); i++) {
       String colName = colNames.get(i);
@@ -158,15 +160,13 @@ public class PaimonDataFileExtractor {
       Object max = getValue(maxValues, i, type, field.getSchema());
       Long nullCount = (nullCounts != null && i < nullCounts.size()) ? nullCounts.getLong(i) : 0L;
 
-      /*
-      log.info(
-          "Column: {}, Index: {}, Min: {}, Max: {}, NullCount: {}",
-          colName,
-          i,
-          min,
-          max,
-          nullCount);
-      */
+//      log.info(
+//          "Column: {}, Index: {}, Min: {}, Max: {}, NullCount: {}",
+//          colName,
+//          i,
+//          min,
+//          max,
+//          nullCount);
 
       columnStats.add(
           ColumnStat.builder()
@@ -190,9 +190,35 @@ public class PaimonDataFileExtractor {
       case DATE:
         return row.getInt(index);
       case LONG:
+        return row.getLong(index);
       case TIMESTAMP:
       case TIMESTAMP_NTZ:
-        return row.getLong(index);
+        int tsPrecision;
+        InternalSchema.MetadataValue tsPrecisionEnum =
+            (InternalSchema.MetadataValue) fieldSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION);
+        if (tsPrecisionEnum == InternalSchema.MetadataValue.MILLIS) {
+          tsPrecision = 3;
+        } else if (tsPrecisionEnum == InternalSchema.MetadataValue.MICROS) {
+          tsPrecision = 6;
+        } else if (tsPrecisionEnum == InternalSchema.MetadataValue.NANOS) {
+          tsPrecision = 9;
+        } else {
+          log.warn(
+              "Field idx={}, name={} does not have MetadataKey.TIMESTAMP_PRECISION set, defaulting to default precision",
+              index,
+              fieldSchema.getName());
+          tsPrecision = TimestampType.DEFAULT_PRECISION;
+        }
+        Instant timestamp = row.getTimestamp(index, tsPrecision).toInstant();
+        long tsMillis = timestamp.toEpochMilli();
+
+        // according to docs for org.apache.xtable.model.stat.Range, timestamp is stored as millis or micros
+        // even if precision is higher than micros, return micros
+        if (tsPrecisionEnum == InternalSchema.MetadataValue.MILLIS) {
+          return tsMillis;
+        } else {
+          return tsMillis * 1000 + timestamp.getNano() / 1000L;
+        }
       case FLOAT:
         return row.getFloat(index);
       case DOUBLE:
@@ -205,11 +231,12 @@ public class PaimonDataFileExtractor {
             (int) fieldSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
         int scale = (int) fieldSchema.getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
         return row.getDecimal(index, precision, scale).toBigDecimal();
-      case FIXED:
-      case BYTES:
-        byte[] bytes = row.getBinary(index);
-        return bytes != null ? ByteBuffer.wrap(bytes) : null;
       default:
+        log.warn(
+            "Handling of {}-type stats for column idx={}, name={} is not yet implemented, skipping stats for this column",
+            type,
+            index,
+            fieldSchema.getName());
         return null;
     }
   }
