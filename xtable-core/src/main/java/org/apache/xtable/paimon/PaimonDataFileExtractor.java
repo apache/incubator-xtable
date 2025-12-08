@@ -27,10 +27,12 @@ import org.apache.paimon.data.BinaryArray;
 import org.apache.paimon.data.BinaryRow;
 import org.apache.paimon.io.DataFileMeta;
 import org.apache.paimon.manifest.ManifestEntry;
+import org.apache.paimon.schema.TableSchema;
 import org.apache.paimon.stats.SimpleStats;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.source.snapshot.SnapshotReader;
 
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
@@ -38,6 +40,9 @@ import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.InternalDataFile;
 
+import lombok.extern.log4j.Log4j2;
+
+@Log4j2
 public class PaimonDataFileExtractor {
 
   private final PaimonPartitionExtractor partitionExtractor =
@@ -69,7 +74,7 @@ public class PaimonDataFileExtractor {
         .recordCount(entry.file().rowCount())
         .partitionValues(
             partitionExtractor.toPartitionValues(table, entry.partition(), internalSchema))
-        .columnStats(toColumnStats(entry.file(), internalSchema, table.partitionKeys()))
+        .columnStats(toColumnStats(entry.file(), internalSchema))
         .build();
   }
 
@@ -87,35 +92,32 @@ public class PaimonDataFileExtractor {
   }
 
   private List<ColumnStat> toColumnStats(
-      DataFileMeta file, InternalSchema internalSchema, List<String> partitionKeys) {
+      DataFileMeta file, InternalSchema internalSchema) {
     List<ColumnStat> columnStats = new ArrayList<>();
     Map<String, InternalField> fieldMap =
         internalSchema.getAllFields().stream()
             .collect(Collectors.toMap(InternalField::getPath, f -> f));
 
-    // Handle key stats if available (for primary keys)
-    SimpleStats keyStats = file.keyStats();
-    if (keyStats != null) {
-      List<String> keyColNames =
-          internalSchema.getRecordKeyFields().stream()
-              .map(InternalField::getPath)
-              .filter(name -> !partitionKeys.contains(name))
-              .collect(Collectors.toList());
-      if (!keyColNames.isEmpty()) {
-        extractStats(columnStats, keyStats, keyColNames, fieldMap, file.rowCount());
-      }
-    }
-
-    // Handle value stats
+    // all columns are present in valueStats
     SimpleStats valueStats = file.valueStats();
     if (valueStats != null) {
+      //log.info("Processing valueStats: {}", valueStats.toRow());
       List<String> colNames = file.valueStatsCols();
+      //log.info("valueStatsCols: {}", colNames);
       if (colNames == null || colNames.isEmpty()) {
         colNames =
             internalSchema.getAllFields().stream()
                 .map(InternalField::getPath)
                 .collect(Collectors.toList());
       }
+
+      if (colNames.size() != valueStats.minValues().getFieldCount()) {
+          throw new ReadException(
+              String.format(
+                  "Mismatch between column stats names and values arity: names=%d, values=%d",
+                  colNames.size(), valueStats.minValues().getFieldCount()));
+      }
+
       extractStats(columnStats, valueStats, colNames, fieldMap, file.rowCount());
     }
 
@@ -131,6 +133,11 @@ public class PaimonDataFileExtractor {
     BinaryRow minValues = stats.minValues();
     BinaryRow maxValues = stats.maxValues();
     BinaryArray nullCounts = stats.nullCounts();
+
+    //log.info("Extracting stats for columns: {}", colNames);
+    //log.info("minValues: arity={}, {}", minValues.getFieldCount(), minValues);
+    //log.info("maxValues: arity={}, {}", maxValues.getFieldCount(), maxValues);
+    //log.info("fieldMap: {}", fieldMap.toString());
 
     for (int i = 0; i < colNames.size(); i++) {
       String colName = colNames.get(i);
@@ -150,6 +157,16 @@ public class PaimonDataFileExtractor {
       Object min = getValue(minValues, i, type, field.getSchema());
       Object max = getValue(maxValues, i, type, field.getSchema());
       Long nullCount = (nullCounts != null && i < nullCounts.size()) ? nullCounts.getLong(i) : 0L;
+
+      /*
+      log.info(
+          "Column: {}, Index: {}, Min: {}, Max: {}, NullCount: {}",
+          colName,
+          i,
+          min,
+          max,
+          nullCount);
+      */
 
       columnStats.add(
           ColumnStat.builder()

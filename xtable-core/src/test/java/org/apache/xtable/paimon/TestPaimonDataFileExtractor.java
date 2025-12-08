@@ -44,6 +44,7 @@ import org.apache.xtable.model.storage.InternalDataFile;
 
 public class TestPaimonDataFileExtractor {
   private static final PaimonDataFileExtractor extractor = PaimonDataFileExtractor.getInstance();
+  private static final PaimonSchemaExtractor schemaExtractor = PaimonSchemaExtractor.getInstance();
 
   @TempDir private Path tempDir;
   private TestPaimonTable testTable;
@@ -53,13 +54,15 @@ public class TestPaimonDataFileExtractor {
   @Test
   void testToInternalDataFilesWithUnpartitionedTable() {
     createUnpartitionedTable();
+    InternalSchema schema = schemaExtractor.toInternalSchema(testTable.getPaimonTable().schema());
+    assertEquals(1, schema.getRecordKeyFields().size());
 
     // Insert some data to create files
     testTable.insertRows(5);
 
     List<InternalDataFile> result =
         extractor.toInternalDataFiles(
-            paimonTable, paimonTable.snapshotManager().latestSnapshot(), testSchema);
+            paimonTable, paimonTable.snapshotManager().latestSnapshot(), schema);
 
     assertNotNull(result);
     assertFalse(result.isEmpty());
@@ -75,13 +78,14 @@ public class TestPaimonDataFileExtractor {
   @Test
   void testToInternalDataFilesWithPartitionedTable() {
     createPartitionedTable();
+    InternalSchema schema = schemaExtractor.toInternalSchema(testTable.getPaimonTable().schema());
 
     // Insert some data to create files
     testTable.insertRows(5);
 
     List<InternalDataFile> result =
         extractor.toInternalDataFiles(
-            paimonTable, paimonTable.snapshotManager().latestSnapshot(), testSchema);
+            paimonTable, paimonTable.snapshotManager().latestSnapshot(), schema);
 
     assertNotNull(result);
     assertFalse(result.isEmpty());
@@ -97,6 +101,7 @@ public class TestPaimonDataFileExtractor {
   @Test
   void testToInternalDataFilesWithTableWithPrimaryKeys() {
     createTableWithPrimaryKeys();
+    InternalSchema schema = schemaExtractor.toInternalSchema(testTable.getPaimonTable().schema());
 
     // Insert some data to create files
     testTable.insertRows(5);
@@ -104,7 +109,7 @@ public class TestPaimonDataFileExtractor {
     // Get the latest snapshot
     List<InternalDataFile> result =
         extractor.toInternalDataFiles(
-            paimonTable, paimonTable.snapshotManager().latestSnapshot(), testSchema);
+            paimonTable, paimonTable.snapshotManager().latestSnapshot(), schema);
 
     assertNotNull(result);
     assertFalse(result.isEmpty());
@@ -118,13 +123,14 @@ public class TestPaimonDataFileExtractor {
   @Test
   void testPhysicalPathFormat() {
     createUnpartitionedTable();
+    InternalSchema schema = schemaExtractor.toInternalSchema(testTable.getPaimonTable().schema());
 
     // Insert data
     testTable.insertRows(2);
 
     List<InternalDataFile> result =
         extractor.toInternalDataFiles(
-            paimonTable, paimonTable.snapshotManager().latestSnapshot(), testSchema);
+            paimonTable, paimonTable.snapshotManager().latestSnapshot(), schema);
 
     assertFalse(result.isEmpty());
 
@@ -136,14 +142,15 @@ public class TestPaimonDataFileExtractor {
   }
 
   @Test
-  void testColumnStats() {
-    createTableWithFullSchema();
+  void testColumnStatsUnpartitioned() {
+    createUnpartitionedTable();
+    InternalSchema schema = schemaExtractor.toInternalSchema(testTable.getPaimonTable().schema());
 
     List<GenericRow> rows = testTable.insertRows(10);
 
     List<InternalDataFile> result =
         extractor.toInternalDataFiles(
-            paimonTable, paimonTable.snapshotManager().latestSnapshot(), testSchema);
+            paimonTable, paimonTable.snapshotManager().latestSnapshot(), schema);
 
     assertFalse(result.isEmpty());
     InternalDataFile dataFile = result.get(0);
@@ -165,6 +172,13 @@ public class TestPaimonDataFileExtractor {
         stats.stream().filter(s -> s.getField().getName().equals("value")).findFirst().get();
     assertEquals(Range.vector(minValue, maxValue), valueStat.getRange());
     assertEquals(0, valueStat.getNumNulls());
+
+    // Verify "name" stats (STRING)
+    // Verify "created_at" stats (TIMESTAMP)
+    // Verify "updated_at" stats (TIMESTAMP)
+    // Verify "is_active" stats (BOOLEAN)
+    // Verify "description" stats (VARCHAR(255))
+
   }
 
   private void createUnpartitionedTable() {
@@ -172,25 +186,6 @@ public class TestPaimonDataFileExtractor {
         (TestPaimonTable)
             TestPaimonTable.createTable("test_table", null, tempDir, new Configuration(), false);
     paimonTable = testTable.getPaimonTable();
-
-    List<InternalField> fields = new ArrayList<>();
-    fields.add(
-        InternalField.builder()
-            .name("id")
-            .schema(InternalSchema.builder().dataType(InternalType.INT).build())
-            .build());
-    fields.add(
-        InternalField.builder()
-            .name("name")
-            .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
-            .build());
-    fields.add(
-        InternalField.builder()
-            .name("value")
-            .schema(InternalSchema.builder().dataType(InternalType.DOUBLE).build())
-            .build());
-
-    testSchema = InternalSchema.builder().fields(fields).build();
   }
 
   private void createPartitionedTable() {
@@ -198,57 +193,6 @@ public class TestPaimonDataFileExtractor {
         (TestPaimonTable)
             TestPaimonTable.createTable("test_table", "level", tempDir, new Configuration(), false);
     paimonTable = testTable.getPaimonTable();
-
-    // just the partition field matters for this test
-    List<InternalField> fields = new ArrayList<>();
-    fields.add(
-            InternalField.builder()
-                    .name("id")
-                    .schema(InternalSchema.builder().dataType(InternalType.INT).build())
-                    .build());
-    fields.add(
-            InternalField.builder()
-                    .name("name")
-                    .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
-                    .build());
-    fields.add(
-            InternalField.builder()
-                    .name("value")
-                    .schema(InternalSchema.builder().dataType(InternalType.DOUBLE).build())
-                    .build());
-    fields.add(
-        InternalField.builder()
-            .name("level")
-            .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
-            .build());
-
-    testSchema = InternalSchema.builder().fields(fields).build();
-  }
-
-  private void createTableWithFullSchema() {
-    testTable =
-        (TestPaimonTable)
-            TestPaimonTable.createTable("test_table", null, tempDir, new Configuration(), false);
-    paimonTable = testTable.getPaimonTable();
-
-    List<InternalField> fields = new ArrayList<>();
-    fields.add(
-        InternalField.builder()
-            .name("id")
-            .schema(InternalSchema.builder().dataType(InternalType.INT).build())
-            .build());
-    fields.add(
-        InternalField.builder()
-            .name("name")
-            .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
-            .build());
-    fields.add(
-        InternalField.builder()
-            .name("value")
-            .schema(InternalSchema.builder().dataType(InternalType.DOUBLE).build())
-            .build());
-
-    testSchema = InternalSchema.builder().fields(fields).build();
   }
 
   private void createTableWithPrimaryKeys() {
@@ -256,24 +200,5 @@ public class TestPaimonDataFileExtractor {
         (TestPaimonTable)
             TestPaimonTable.createTable("test_table", null, tempDir, new Configuration(), false);
     paimonTable = testTable.getPaimonTable();
-
-    List<InternalField> fields = new ArrayList<>();
-    fields.add(
-        InternalField.builder()
-            .name("id")
-            .schema(InternalSchema.builder().dataType(InternalType.INT).build())
-            .build());
-    fields.add(
-        InternalField.builder()
-            .name("name")
-            .schema(InternalSchema.builder().dataType(InternalType.STRING).build())
-            .build());
-    fields.add(
-        InternalField.builder()
-            .name("value")
-            .schema(InternalSchema.builder().dataType(InternalType.DOUBLE).build())
-            .build());
-
-    testSchema = InternalSchema.builder().fields(fields).build();
   }
 }
