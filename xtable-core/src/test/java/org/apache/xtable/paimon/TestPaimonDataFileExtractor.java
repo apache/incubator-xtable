@@ -25,22 +25,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.table.FileStoreTable;
-import org.apache.xtable.GenericTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestPaimonTable;
-import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.schema.InternalType;
-
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -52,7 +47,6 @@ public class TestPaimonDataFileExtractor {
   @TempDir private Path tempDir;
   private TestPaimonTable testTable;
   private FileStoreTable paimonTable;
-
 
   @Test
   void testToInternalDataFilesWithUnpartitionedTable() {
@@ -169,10 +163,8 @@ public class TestPaimonDataFileExtractor {
     assertEquals(0, idStat.getNumNulls());
 
     // Verify "name" stats (STRING)
-    String minName =
-        rows.stream().map(r -> r.getString(1).toString()).min(String::compareTo).get();
-    String maxName =
-        rows.stream().map(r -> r.getString(1).toString()).max(String::compareTo).get();
+    String minName = rows.stream().map(r -> r.getString(1).toString()).min(String::compareTo).get();
+    String maxName = rows.stream().map(r -> r.getString(1).toString()).max(String::compareTo).get();
     ColumnStat nameStat =
         stats.stream().filter(s -> s.getField().getName().equals("name")).findFirst().get();
     assertEquals(Range.vector(minName, maxName), nameStat.getRange());
@@ -188,15 +180,9 @@ public class TestPaimonDataFileExtractor {
 
     // Verify "created_at" stats (TIMESTAMP)
     Instant minCreatedAt =
-        rows.stream()
-            .map(r -> r.getTimestamp(3, 9).toInstant())
-            .min(Instant::compareTo)
-            .get();
+        rows.stream().map(r -> r.getTimestamp(3, 9).toInstant()).min(Instant::compareTo).get();
     Instant maxCreatedAt =
-        rows.stream()
-            .map(r -> r.getTimestamp(3, 9).toInstant())
-            .max(Instant::compareTo)
-            .get();
+        rows.stream().map(r -> r.getTimestamp(3, 9).toInstant()).max(Instant::compareTo).get();
     ColumnStat createdAtStat =
         stats.stream().filter(s -> s.getField().getName().equals("created_at")).findFirst().get();
     assertEquals(
@@ -208,15 +194,9 @@ public class TestPaimonDataFileExtractor {
 
     // Verify "updated_at" stats (TIMESTAMP)
     Instant minUpdatedAt =
-        rows.stream()
-            .map(r -> r.getTimestamp(4, 9).toInstant())
-            .min(Instant::compareTo)
-            .get();
+        rows.stream().map(r -> r.getTimestamp(4, 9).toInstant()).min(Instant::compareTo).get();
     Instant maxUpdatedAt =
-        rows.stream()
-            .map(r -> r.getTimestamp(4, 9).toInstant())
-            .max(Instant::compareTo)
-            .get();
+        rows.stream().map(r -> r.getTimestamp(4, 9).toInstant()).max(Instant::compareTo).get();
     ColumnStat updatedAtStat =
         stats.stream().filter(s -> s.getField().getName().equals("updated_at")).findFirst().get();
     assertEquals(
@@ -276,7 +256,6 @@ public class TestPaimonDataFileExtractor {
   // TODO: test long string field truncation
   // TODO: test with date field
   // TODO: test null counts & value counts
-
 
   private void createUnpartitionedTable() {
     testTable =

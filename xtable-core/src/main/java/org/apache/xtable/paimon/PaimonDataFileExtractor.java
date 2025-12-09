@@ -18,22 +18,22 @@
  
 package org.apache.xtable.paimon;
 
-import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.paimon.Snapshot;
 import org.apache.paimon.data.BinaryArray;
 import org.apache.paimon.data.BinaryRow;
 import org.apache.paimon.io.DataFileMeta;
 import org.apache.paimon.manifest.ManifestEntry;
-import org.apache.paimon.schema.TableSchema;
 import org.apache.paimon.stats.SimpleStats;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.source.snapshot.SnapshotReader;
-
 import org.apache.paimon.types.TimestampType;
+
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -41,8 +41,6 @@ import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.InternalDataFile;
-
-import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 public class PaimonDataFileExtractor {
@@ -64,11 +62,13 @@ public class PaimonDataFileExtractor {
     while (manifestEntryIterator.hasNext()) {
       result.add(toInternalDataFile(table, manifestEntryIterator.next(), internalSchema));
     }
+    log.info("Returning " + result.size() + " data files");
     return result;
   }
 
   private InternalDataFile toInternalDataFile(
       FileStoreTable table, ManifestEntry entry, InternalSchema internalSchema) {
+    log.info("Adding manifest entry {}", entry.fileName());
     return InternalDataFile.builder()
         .physicalPath(toFullPhysicalPath(table, entry))
         .fileSizeBytes(entry.file().fileSize())
@@ -93,8 +93,7 @@ public class PaimonDataFileExtractor {
     }
   }
 
-  private List<ColumnStat> toColumnStats(
-      DataFileMeta file, InternalSchema internalSchema) {
+  private List<ColumnStat> toColumnStats(DataFileMeta file, InternalSchema internalSchema) {
     List<ColumnStat> columnStats = new ArrayList<>();
     Map<String, InternalField> fieldMap =
         internalSchema.getAllFields().stream()
@@ -103,9 +102,9 @@ public class PaimonDataFileExtractor {
     // all columns are present in valueStats
     SimpleStats valueStats = file.valueStats();
     if (valueStats != null) {
-//      log.info("Processing valueStats: {}", valueStats.toRow());
+      //      log.info("Processing valueStats: {}", valueStats.toRow());
       List<String> colNames = file.valueStatsCols();
-//      log.info("valueStatsCols: {}", colNames);
+      //      log.info("valueStatsCols: {}", colNames);
       if (colNames == null || colNames.isEmpty()) {
         colNames =
             internalSchema.getAllFields().stream()
@@ -114,10 +113,10 @@ public class PaimonDataFileExtractor {
       }
 
       if (colNames.size() != valueStats.minValues().getFieldCount()) {
-          throw new ReadException(
-              String.format(
-                  "Mismatch between column stats names and values arity: names=%d, values=%d",
-                  colNames.size(), valueStats.minValues().getFieldCount()));
+        throw new ReadException(
+            String.format(
+                "Mismatch between column stats names and values arity: names=%d, values=%d",
+                colNames.size(), valueStats.minValues().getFieldCount()));
       }
 
       extractStats(columnStats, valueStats, colNames, fieldMap, file.rowCount());
@@ -136,10 +135,10 @@ public class PaimonDataFileExtractor {
     BinaryRow maxValues = stats.maxValues();
     BinaryArray nullCounts = stats.nullCounts();
 
-//    log.info("Extracting stats for columns: {}", colNames);
-//    log.info("minValues: arity={}, {}", minValues.getFieldCount(), minValues);
-//    log.info("maxValues: arity={}, {}", maxValues.getFieldCount(), maxValues);
-//    log.info("fieldMap: {}", fieldMap.toString());
+    //    log.info("Extracting stats for columns: {}", colNames);
+    //    log.info("minValues: arity={}, {}", minValues.getFieldCount(), minValues);
+    //    log.info("maxValues: arity={}, {}", maxValues.getFieldCount(), maxValues);
+    //    log.info("fieldMap: {}", fieldMap.toString());
 
     for (int i = 0; i < colNames.size(); i++) {
       String colName = colNames.get(i);
@@ -160,13 +159,13 @@ public class PaimonDataFileExtractor {
       Object max = getValue(maxValues, i, type, field.getSchema());
       Long nullCount = (nullCounts != null && i < nullCounts.size()) ? nullCounts.getLong(i) : 0L;
 
-//      log.info(
-//          "Column: {}, Index: {}, Min: {}, Max: {}, NullCount: {}",
-//          colName,
-//          i,
-//          min,
-//          max,
-//          nullCount);
+      //      log.info(
+      //          "Column: {}, Index: {}, Min: {}, Max: {}, NullCount: {}",
+      //          colName,
+      //          i,
+      //          min,
+      //          max,
+      //          nullCount);
 
       columnStats.add(
           ColumnStat.builder()
@@ -178,8 +177,7 @@ public class PaimonDataFileExtractor {
     }
   }
 
-  private Object getValue(
-      BinaryRow row, int index, InternalType type, InternalSchema fieldSchema) {
+  private Object getValue(BinaryRow row, int index, InternalType type, InternalSchema fieldSchema) {
     if (row.isNullAt(index)) {
       return null;
     }
@@ -195,7 +193,8 @@ public class PaimonDataFileExtractor {
       case TIMESTAMP_NTZ:
         int tsPrecision;
         InternalSchema.MetadataValue tsPrecisionEnum =
-            (InternalSchema.MetadataValue) fieldSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION);
+            (InternalSchema.MetadataValue)
+                fieldSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION);
         if (tsPrecisionEnum == InternalSchema.MetadataValue.MILLIS) {
           tsPrecision = 3;
         } else if (tsPrecisionEnum == InternalSchema.MetadataValue.MICROS) {
@@ -212,7 +211,8 @@ public class PaimonDataFileExtractor {
         Instant timestamp = row.getTimestamp(index, tsPrecision).toInstant();
         long tsMillis = timestamp.toEpochMilli();
 
-        // according to docs for org.apache.xtable.model.stat.Range, timestamp is stored as millis or micros
+        // according to docs for org.apache.xtable.model.stat.Range, timestamp is stored as millis
+        // or micros
         // even if precision is higher than micros, return micros
         if (tsPrecisionEnum == InternalSchema.MetadataValue.MILLIS) {
           return tsMillis;
