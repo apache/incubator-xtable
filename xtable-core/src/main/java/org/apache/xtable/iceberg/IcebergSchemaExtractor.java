@@ -146,10 +146,14 @@ public class IcebergSchemaExtractor {
     List<Integer> ids =
         schema.getFields().stream()
             .map(
-                field ->
-                    field.getFieldId() == null
-                        ? fieldIdTracker.incrementAndGet()
-                        : field.getFieldId())
+                field -> {
+                  int id =
+                      field.getFieldId() == null
+                          ? fieldIdTracker.incrementAndGet()
+                          : field.getFieldId();
+                  fieldIdTracker.accumulateAndGet(id, Math::max);
+                  return id;
+                })
             .collect(CustomCollectors.toList(schema.getFields().size()));
     List<Types.NestedField> nestedFields = new ArrayList<>(schema.getFields().size());
     for (int i = 0; i < schema.getFields().size(); i++) {
@@ -218,8 +222,10 @@ public class IcebergSchemaExtractor {
                 .findFirst()
                 .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
         int keyId = key.getFieldId() == null ? fieldIdTracker.incrementAndGet() : key.getFieldId();
+        fieldIdTracker.accumulateAndGet(keyId, Math::max);
         int valueId =
             value.getFieldId() == null ? fieldIdTracker.incrementAndGet() : value.getFieldId();
+        fieldIdTracker.accumulateAndGet(valueId, Math::max);
         if (field.getSchema().isNullable()) {
           return Types.MapType.ofOptional(
               keyId,
@@ -244,6 +250,7 @@ public class IcebergSchemaExtractor {
                 .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
         int elementId =
             element.getFieldId() == null ? fieldIdTracker.incrementAndGet() : element.getFieldId();
+        fieldIdTracker.accumulateAndGet(elementId, Math::max);
         if (field.getSchema().isNullable()) {
           return Types.ListType.ofOptional(elementId, toIcebergType(element, fieldIdTracker));
         } else {

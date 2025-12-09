@@ -1044,4 +1044,55 @@ public class TestIcebergSchemaExtractor {
     Assertions.assertTrue(
         icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(internalSchema)));
   }
+
+  @Test
+  public void testToIcebergWithPartialFieldIdsSet() {
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("testRecord")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("name")
+                        .fieldId(1)
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .isNullable(true)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("scores")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("array")
+                                .dataType(InternalType.LIST)
+                                .isNullable(true)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name("_one_field_element")
+                                            .parentPath("scores")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("long")
+                                                    .dataType(InternalType.LONG)
+                                                    .isNullable(true)
+                                                    .build())
+                                            .fieldId(null)
+                                            .build()))
+                                .build())
+                        .fieldId(2)
+                        .build()))
+            .build();
+    Schema icebergRepresentation =
+        new Schema(
+            Types.NestedField.optional(1, "name", Types.StringType.get()),
+            Types.NestedField.optional(
+                2, "scores", Types.ListType.ofOptional(3, Types.LongType.get())));
+    assertTrue(icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(internalSchema)));
+  }
 }
