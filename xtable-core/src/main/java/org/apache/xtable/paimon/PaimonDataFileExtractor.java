@@ -99,13 +99,14 @@ public class PaimonDataFileExtractor {
         internalSchema.getAllFields().stream()
             .collect(Collectors.toMap(InternalField::getPath, f -> f));
 
-    // all columns are present in valueStats
+    // stats for all columns are present in valueStats, we can safely ignore file.keyStats() - TODO: validate this assumption
     SimpleStats valueStats = file.valueStats();
     if (valueStats != null) {
       //      log.info("Processing valueStats: {}", valueStats.toRow());
       List<String> colNames = file.valueStatsCols();
       //      log.info("valueStatsCols: {}", colNames);
       if (colNames == null || colNames.isEmpty()) {
+        // if column names are not present, we assume all columns in the schema are present in the same order as the schema - TODO: validate this assumption
         colNames =
             internalSchema.getAllFields().stream()
                 .map(InternalField::getPath)
@@ -113,6 +114,7 @@ public class PaimonDataFileExtractor {
       }
 
       if (colNames.size() != valueStats.minValues().getFieldCount()) {
+        // paranoia check - this should never happen, but if the code reaches here, then there is a bug! Please file a bug report
         throw new ReadException(
             String.format(
                 "Mismatch between column stats names and values arity: names=%d, values=%d",
@@ -208,12 +210,12 @@ public class PaimonDataFileExtractor {
               fieldSchema.getName());
           tsPrecision = TimestampType.DEFAULT_PRECISION;
         }
+        // TODO: BinaryRow.getTimestamp().toInstant() is deprecated (use LocalZoneTimestamp), but BinaryRow does not have a method to get LocalZoneTimestamp?
         Instant timestamp = row.getTimestamp(index, tsPrecision).toInstant();
         long tsMillis = timestamp.toEpochMilli();
 
         // according to docs for org.apache.xtable.model.stat.Range, timestamp is stored as millis
-        // or micros
-        // even if precision is higher than micros, return micros
+        // or micros - even if precision is higher than micros, return micros
         if (tsPrecisionEnum == InternalSchema.MetadataValue.MILLIS) {
           return tsMillis;
         } else {
