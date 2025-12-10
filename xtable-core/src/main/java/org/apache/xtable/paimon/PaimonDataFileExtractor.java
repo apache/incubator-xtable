@@ -62,13 +62,13 @@ public class PaimonDataFileExtractor {
     while (manifestEntryIterator.hasNext()) {
       result.add(toInternalDataFile(table, manifestEntryIterator.next(), internalSchema));
     }
-    log.info("Returning " + result.size() + " data files");
+    log.info("PaimonPartitionExtractor: Returning " + result.size() + " data files for " + table.name());
     return result;
   }
 
   private InternalDataFile toInternalDataFile(
       FileStoreTable table, ManifestEntry entry, InternalSchema internalSchema) {
-    log.info("Adding manifest entry {}", entry.fileName());
+//    log.info("Adding manifest entry {}", entry.fileName());
     return InternalDataFile.builder()
         .physicalPath(toFullPhysicalPath(table, entry))
         .fileSizeBytes(entry.file().fileSize())
