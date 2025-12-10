@@ -98,7 +98,7 @@ public class TestPaimonConversionSource {
     InternalTable result = unpartitionedSource.getTable(snapshot);
 
     assertNotNull(result);
-    assertEquals("test_table", result.getName());
+    assertEquals("unpartitioned_table", result.getName());
     assertEquals(TableFormat.PAIMON, result.getTableFormat());
     assertNotNull(result.getReadSchema());
     assertEquals(DataLayoutStrategy.HIVE_STYLE_PARTITION, result.getLayoutStrategy());

@@ -27,6 +27,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.paimon.Snapshot;
 import org.apache.paimon.data.BinaryArray;
 import org.apache.paimon.data.BinaryRow;
+import org.apache.paimon.data.Timestamp;
 import org.apache.paimon.io.DataFileMeta;
 import org.apache.paimon.manifest.ManifestEntry;
 import org.apache.paimon.stats.SimpleStats;
@@ -62,13 +63,11 @@ public class PaimonDataFileExtractor {
     while (manifestEntryIterator.hasNext()) {
       result.add(toInternalDataFile(table, manifestEntryIterator.next(), internalSchema));
     }
-    log.info("PaimonPartitionExtractor: Returning " + result.size() + " data files for " + table.name());
     return result;
   }
 
   private InternalDataFile toInternalDataFile(
       FileStoreTable table, ManifestEntry entry, InternalSchema internalSchema) {
-//    log.info("Adding manifest entry {}", entry.fileName());
     return InternalDataFile.builder()
         .physicalPath(toFullPhysicalPath(table, entry))
         .fileSizeBytes(entry.file().fileSize())
@@ -102,9 +101,7 @@ public class PaimonDataFileExtractor {
     // stats for all columns are present in valueStats, we can safely ignore file.keyStats() - TODO: validate this assumption
     SimpleStats valueStats = file.valueStats();
     if (valueStats != null) {
-      //      log.info("Processing valueStats: {}", valueStats.toRow());
       List<String> colNames = file.valueStatsCols();
-      //      log.info("valueStatsCols: {}", colNames);
       if (colNames == null || colNames.isEmpty()) {
         // if column names are not present, we assume all columns in the schema are present in the same order as the schema - TODO: validate this assumption
         colNames =
@@ -137,11 +134,6 @@ public class PaimonDataFileExtractor {
     BinaryRow maxValues = stats.maxValues();
     BinaryArray nullCounts = stats.nullCounts();
 
-    //    log.info("Extracting stats for columns: {}", colNames);
-    //    log.info("minValues: arity={}, {}", minValues.getFieldCount(), minValues);
-    //    log.info("maxValues: arity={}, {}", maxValues.getFieldCount(), maxValues);
-    //    log.info("fieldMap: {}", fieldMap.toString());
-
     for (int i = 0; i < colNames.size(); i++) {
       String colName = colNames.get(i);
       InternalField field = fieldMap.get(colName);
@@ -160,14 +152,6 @@ public class PaimonDataFileExtractor {
       Object min = getValue(minValues, i, type, field.getSchema());
       Object max = getValue(maxValues, i, type, field.getSchema());
       Long nullCount = (nullCounts != null && i < nullCounts.size()) ? nullCounts.getLong(i) : 0L;
-
-      //      log.info(
-      //          "Column: {}, Index: {}, Min: {}, Max: {}, NullCount: {}",
-      //          colName,
-      //          i,
-      //          min,
-      //          max,
-      //          nullCount);
 
       columnStats.add(
           ColumnStat.builder()
@@ -210,16 +194,14 @@ public class PaimonDataFileExtractor {
               fieldSchema.getName());
           tsPrecision = TimestampType.DEFAULT_PRECISION;
         }
-        // TODO: BinaryRow.getTimestamp().toInstant() is deprecated (use LocalZoneTimestamp), but BinaryRow does not have a method to get LocalZoneTimestamp?
-        Instant timestamp = row.getTimestamp(index, tsPrecision).toInstant();
-        long tsMillis = timestamp.toEpochMilli();
+        Timestamp ts = row.getTimestamp(index, tsPrecision);
 
         // according to docs for org.apache.xtable.model.stat.Range, timestamp is stored as millis
         // or micros - even if precision is higher than micros, return micros
         if (tsPrecisionEnum == InternalSchema.MetadataValue.MILLIS) {
-          return tsMillis;
+          return ts.getMillisecond();
         } else {
-          return tsMillis * 1000 + timestamp.getNano() / 1000L;
+          return ts.toMicros();
         }
       case FLOAT:
         return row.getFloat(index);
