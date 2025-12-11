@@ -69,12 +69,27 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
     return new TestSparkDeltaTable(tableName, tempDir, sparkSession, partitionField, true);
   }
 
+  public static TestSparkDeltaTable forColumnMappingEnabled(
+      String tableName, Path tempDir, SparkSession sparkSession, String partitionField) {
+    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, partitionField, false, true);
+  }
+
   public TestSparkDeltaTable(
       String name,
       Path tempDir,
       SparkSession sparkSession,
       String partitionField,
       boolean includeAdditionalColumns) {
+    this(name, tempDir, sparkSession, partitionField, includeAdditionalColumns, false);
+  }
+
+  public TestSparkDeltaTable(
+      String name,
+      Path tempDir,
+      SparkSession sparkSession,
+      String partitionField,
+      boolean includeAdditionalColumns,
+      boolean enableColumnMapping) {
     try {
       this.tableName = name;
       this.basePath = initBasePath(tempDir, tableName);
@@ -82,7 +97,8 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
       this.partitionField = partitionField;
       this.includeAdditionalColumns = includeAdditionalColumns;
       this.testDeltaHelper =
-          TestDeltaHelper.createTestDataHelper(partitionField, includeAdditionalColumns);
+          TestDeltaHelper.createTestDataHelper(
+              partitionField, includeAdditionalColumns, enableColumnMapping);
       testDeltaHelper.createTable(sparkSession, tableName, basePath);
       this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
       this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
