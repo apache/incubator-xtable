@@ -22,7 +22,9 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import lombok.Builder;
 
@@ -33,6 +35,11 @@ import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.example.GroupReadSupport;
 import org.apache.parquet.hadoop.example.GroupWriteSupport;
+
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.stat.PartitionValue;
+import org.apache.xtable.model.stat.Range;
+import org.apache.xtable.model.storage.InternalDataFile;
 
 @Builder
 public class ParquetDataManager {
@@ -49,18 +56,37 @@ public class ParquetDataManager {
     return reader;
   }
 
+  // partition fields are already computed, given a parquet file InternalDataFile must be derived
+  // (e.g., using createInternalDataFileFromParquetFile())
   private Path appendNewParquetFile(
       Configuration conf,
       String rootPath,
-      Path fileToAppend,
-      String partitionColumn,
-      Instant modifTime) {
+      InternalDataFile internalParquetFile,
+      List<InternalPartitionField> partitionFields) {
     Path finalFile = null;
+    String partitionDir = "";
+    List<PartitionValue> partitionValues = internalParquetFile.getPartitionValues();
+    Instant modifTime = Instant.ofEpochMilli(internalParquetFile.getLastModified());
+    Path fileToAppend = new Path(internalParquetFile.toString());
     // construct the file path to inject into the existing partitioned file
-    String partitionValue =
-        DateTimeFormatter.ISO_LOCAL_DATE.format(
-            modifTime.atZone(ZoneId.systemDefault()).toLocalDate());
-    String partitionDir = partitionColumn + partitionValue;
+    if (partitionValues == null || partitionValues.isEmpty()) {
+      String partitionValue =
+          DateTimeFormatter.ISO_LOCAL_DATE.format(
+              modifTime.atZone(ZoneId.systemDefault()).toLocalDate());
+      partitionDir = partitionFields.get(0).getSourceField().getName() + partitionValue;
+    } else {
+      // handle multiple partitioning case (year and month etc.)
+      partitionDir =
+          partitionValues.stream()
+              .map(
+                  pv -> {
+                    Range epochValueObject = pv.getRange();
+                    // epochValueObject is always sure to be long
+                    String valueStr = String.valueOf(epochValueObject.getMaxValue());
+                    return pv.getPartitionField() + "=" + valueStr;
+                  })
+              .collect(Collectors.joining("/"));
+    }
     String fileName = "part-" + System.currentTimeMillis() + "-" + UUID.randomUUID() + ".parquet";
     Path outputFile = new Path(new Path(rootPath, partitionDir), fileName);
     // return its reader for convenience of writing
