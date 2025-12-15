@@ -71,7 +71,7 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
 
   public static TestSparkDeltaTable forColumnMappingEnabled(
       String tableName, Path tempDir, SparkSession sparkSession, String partitionField) {
-    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, partitionField, false, true);
+    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, partitionField, true, true);
   }
 
   public TestSparkDeltaTable(

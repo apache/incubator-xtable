@@ -43,6 +43,7 @@ public class InternalField {
   // The id field for the field. This is used to identify the field in the schema even after
   // renames.
   Integer fieldId;
+  @Getter String storageName;
 
   // represents the fully qualified path to the field (dot separated)
   @Getter(lazy = true)

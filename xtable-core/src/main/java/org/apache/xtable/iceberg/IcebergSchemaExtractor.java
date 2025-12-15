@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
@@ -57,6 +58,7 @@ public class IcebergSchemaExtractor {
   private static final String MAP_KEY_FIELD_NAME = "key";
   private static final String MAP_VALUE_FIELD_NAME = "value";
   private static final String LIST_ELEMENT_FIELD_NAME = "element";
+  @Getter private final Map<Integer, String> idToStorageName = new HashMap<>();
 
   public static IcebergSchemaExtractor getInstance() {
     return INSTANCE;
@@ -199,6 +201,9 @@ public class IcebergSchemaExtractor {
     List<Types.NestedField> nestedFields = new ArrayList<>(schema.getFields().size());
     for (int i = 0; i < schema.getFields().size(); i++) {
       InternalField field = schema.getFields().get(i);
+      if (field.getStorageName() != null) {
+        idToStorageName.put(ids.get(i), field.getStorageName());
+      }
       nestedFields.add(
           Types.NestedField.of(
               ids.get(i),

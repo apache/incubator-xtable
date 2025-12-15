@@ -20,9 +20,12 @@ package org.apache.xtable.iceberg;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -39,6 +42,11 @@ import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NotFoundException;
+import org.apache.iceberg.mapping.MappedField;
+import org.apache.iceberg.mapping.MappedFields;
+import org.apache.iceberg.mapping.MappingUtil;
+import org.apache.iceberg.mapping.NameMapping;
+import org.apache.iceberg.mapping.NameMappingParser;
 
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
@@ -161,9 +169,35 @@ public class IcebergConversionTarget implements ConversionTarget {
     }
   }
 
+  private MappedFields updateNameMapping(MappedFields mapping, Map<Integer, String> updates) {
+    if (mapping == null) {
+      return null;
+    }
+    List<MappedField> fieldResults = new ArrayList<>();
+    for (MappedField field : mapping.fields()) {
+      Set<String> fieldNames = new HashSet<>(field.names());
+      if (updates.containsKey(field.id())) {
+        fieldNames.add(updates.get(field.id()));
+      }
+      MappedFields nestedMapping = updateNameMapping(field.nestedMapping(), updates);
+      fieldResults.add(MappedField.of(field.id(), fieldNames, nestedMapping));
+    }
+    return MappedFields.of(fieldResults);
+  }
+
   @Override
   public void syncSchema(InternalSchema schema) {
     Schema latestSchema = schemaExtractor.toIceberg(schema);
+    if (!schemaExtractor.getIdToStorageName().isEmpty()) {
+      NameMapping mapping = MappingUtil.create(latestSchema);
+      NameMapping updatedMapping =
+          NameMapping.of(
+              updateNameMapping(mapping.asMappedFields(), schemaExtractor.getIdToStorageName()));
+      transaction
+          .updateProperties()
+          .set(TableProperties.DEFAULT_NAME_MAPPING, NameMappingParser.toJson(updatedMapping))
+          .commit();
+    }
     if (!transaction.table().schema().sameSchema(latestSchema)) {
       boolean hasFieldIds =
           schema.getAllFields().stream().anyMatch(field -> field.getFieldId() != null);
