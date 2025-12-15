@@ -56,6 +56,12 @@ public class ParquetDataManager {
     return reader;
   }
 
+  // check required before appending the file
+  private boolean checkSchemaIsSame(Configuration conf, Path fileToAppend, Path fileFromTable) {
+    ParquetFileConfig schemaFileAppend = getParquetFileConfig(conf, fileToAppend);
+    ParquetFileConfig schemaFileFromTable = getParquetFileConfig(conf, fileFromTable);
+    return schemaFileAppend.getSchema().equals(schemaFileFromTable.getSchema());
+  }
   // partition fields are already computed, given a parquet file InternalDataFile must be derived
   // (e.g., using createInternalDataFileFromParquetFile())
   private Path appendNewParquetFile(
