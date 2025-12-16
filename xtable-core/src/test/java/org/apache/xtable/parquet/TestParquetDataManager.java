@@ -18,8 +18,8 @@
  
 package org.apache.xtable.parquet;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
@@ -32,10 +32,8 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 public class TestParquetDataManager {
-  @TempDir static java.nio.file.Path tempDir = Paths.get("./");
 
   @Test
   public void testAppendParquetFile() throws IOException {
@@ -59,9 +57,8 @@ public class TestParquetDataManager {
             RowFactory.create(301, "D", 2024, 7));
 
     Dataset<Row> df = spark.createDataFrame(data, schema);
-    java.nio.file.Path path = tempDir.resolve("parquet-partitioned_table_test");
-    File file = path.toFile();
-    String outputPath = file.getPath();
+    Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet-partitioned_table_test");
+    String outputPath = fixedPath.toFile().getName();
 
     df.write().partitionBy("year", "month").mode("overwrite").parquet(outputPath);
 

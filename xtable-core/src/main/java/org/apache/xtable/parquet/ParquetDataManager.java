@@ -19,16 +19,18 @@
 package org.apache.xtable.parquet;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.UUID;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.Builder;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.hadoop.ParquetReader;
@@ -36,10 +38,7 @@ import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.example.GroupReadSupport;
 import org.apache.parquet.hadoop.example.GroupWriteSupport;
 
-import org.apache.xtable.model.schema.InternalPartitionField;
-import org.apache.xtable.model.stat.PartitionValue;
-import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.iceberg.PartitionField;
 
 @Builder
 public class ParquetDataManager {
@@ -56,48 +55,170 @@ public class ParquetDataManager {
     return reader;
   }
 
+  // TODO check if footer of added file can cause problems (catalog) when reading the full table
+  // after appending
   // check required before appending the file
   private boolean checkSchemaIsSame(Configuration conf, Path fileToAppend, Path fileFromTable) {
     ParquetFileConfig schemaFileAppend = getParquetFileConfig(conf, fileToAppend);
     ParquetFileConfig schemaFileFromTable = getParquetFileConfig(conf, fileFromTable);
     return schemaFileAppend.getSchema().equals(schemaFileFromTable.getSchema());
   }
+
+  Instant parsePartitionDirToStartTime(String partitionDir, List<PartitionField> partitionFields) {
+    Map<String, String> partitionValues = new HashMap<>();
+    String[] parts = partitionDir.split("/");
+    for (String part : parts) {
+      String[] keyValue = part.split("=");
+      if (keyValue.length == 2) {
+        partitionValues.put(keyValue[0].toLowerCase(), keyValue[1]);
+      }
+    }
+    int year = 1970;
+    int month = 1;
+    int day = 1;
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
+
+    for (PartitionField field : partitionFields) {
+      String fieldName = field.name().toLowerCase();
+      String value = partitionValues.get(fieldName);
+
+      if (value != null) {
+        try {
+          int intValue = Integer.parseInt(value);
+
+          switch (fieldName) {
+            case "year":
+              year = intValue;
+              break;
+            case "month":
+              month = intValue;
+              break;
+            case "day":
+              day = intValue;
+              break;
+            case "hour":
+              hour = intValue;
+              break;
+            case "minute":
+              minute = intValue;
+              break;
+            case "second":
+              second = intValue;
+              break;
+            default:
+              break;
+          }
+        } catch (NumberFormatException e) {
+          System.err.println(
+              "Warning: Invalid number format for partition field '" + fieldName + "': " + value);
+        }
+      }
+    }
+
+    try {
+      LocalDateTime localDateTime = LocalDateTime.of(year, month, day, hour, minute, second);
+      return localDateTime.toInstant(ZoneOffset.UTC);
+    } catch (java.time.DateTimeException e) {
+      throw new IllegalArgumentException(
+          "Invalid partition directory date components: " + partitionDir, e);
+    }
+  }
+
+  private ChronoUnit getGranularityUnit(List<PartitionField> partitionFields) {
+    if (partitionFields == null || partitionFields.isEmpty()) {
+      return ChronoUnit.DAYS;
+    }
+    // get the most granular field (the last one in the list, e.g., 'hour' after 'year' and 'month')
+    String lastFieldName = partitionFields.get(partitionFields.size() - 1).name();
+
+    if (lastFieldName.equalsIgnoreCase("year")) {
+      return ChronoUnit.YEARS;
+    } else if (lastFieldName.equalsIgnoreCase("month")) {
+      return ChronoUnit.MONTHS;
+    } else if (lastFieldName.equalsIgnoreCase("day") || lastFieldName.equalsIgnoreCase("date")) {
+      return ChronoUnit.DAYS;
+    } else if (lastFieldName.equalsIgnoreCase("hour")) {
+      return ChronoUnit.HOURS;
+    } else if (lastFieldName.equalsIgnoreCase("minute")) {
+      return ChronoUnit.MINUTES;
+    } else {
+      return ChronoUnit.DAYS;
+    }
+  }
+
+  private String findTargetPartitionFolder(
+      Instant modifTime,
+      List<PartitionField> partitionFields,
+      // could be retrieved from getParquetFiles() of ParquetConversionSource
+      Stream<LocatedFileStatus> parquetFiles)
+      throws IOException {
+
+    long modifTimeMillis = modifTime.toEpochMilli();
+    final ZoneId ZONE = ZoneId.systemDefault();
+    ChronoUnit partitionUnit = getGranularityUnit(partitionFields);
+    List<String> allFolders =
+        parquetFiles.map(status -> status.getPath().toString()).collect(Collectors.toList());
+
+    // sort the folders by their start time
+    allFolders.sort(Comparator.comparing(f -> parsePartitionDirToStartTime(f, partitionFields)));
+
+    for (int i = 0; i < allFolders.size(); i++) {
+      String currentFolder = allFolders.get(i);
+
+      // start time of the current folder
+      Instant currentStartTime = parsePartitionDirToStartTime(currentFolder, partitionFields);
+      long currentStartMillis = currentStartTime.toEpochMilli();
+
+      // determine the end time (which is the start time of the next logical partition)
+      long nextStartMillis;
+      if (i + 1 < allFolders.size()) {
+        nextStartMillis =
+            parsePartitionDirToStartTime(allFolders.get(i + 1), partitionFields).toEpochMilli();
+      } else {
+        ZonedDateTime currentStartZDT = currentStartTime.atZone(ZONE);
+        ZonedDateTime nextStartZDT = currentStartZDT.plus(1, partitionUnit);
+        nextStartMillis = nextStartZDT.toInstant().toEpochMilli();
+      }
+      if (modifTimeMillis >= currentStartMillis && modifTimeMillis < nextStartMillis) {
+        return currentFolder;
+      }
+    }
+    return "";
+  }
   // partition fields are already computed, given a parquet file InternalDataFile must be derived
   // (e.g., using createInternalDataFileFromParquetFile())
   private Path appendNewParquetFile(
       Configuration conf,
       String rootPath,
-      InternalDataFile internalParquetFile,
-      List<InternalPartitionField> partitionFields) {
+      FileStatus parquetFile,
+      Stream<LocatedFileStatus> parquetFiles,
+      List<PartitionField> partitionFields) {
     Path finalFile = null;
     String partitionDir = "";
-    List<PartitionValue> partitionValues = internalParquetFile.getPartitionValues();
-    Instant modifTime = Instant.ofEpochMilli(internalParquetFile.getLastModified());
-    Path fileToAppend = new Path(internalParquetFile.toString());
+    Instant modifTime = Instant.ofEpochMilli(parquetFile.getModificationTime());
+    Path fileToAppend = parquetFile.getPath();
     // construct the file path to inject into the existing partitioned file
-    if (partitionValues == null || partitionValues.isEmpty()) {
+    if (partitionFields == null || partitionFields.isEmpty()) {
       String partitionValue =
           DateTimeFormatter.ISO_LOCAL_DATE.format(
               modifTime.atZone(ZoneId.systemDefault()).toLocalDate());
-      partitionDir = partitionFields.get(0).getSourceField().getName() + partitionValue;
+      partitionDir = partitionFields.get(0).name() + partitionValue;
     } else {
-      // handle multiple partitioning case (year and month etc.)
-      partitionDir =
-          partitionValues.stream()
-              .map(
-                  pv -> {
-                    Range epochValueObject = pv.getRange();
-                    // epochValueObject is always sure to be long
-                    String valueStr = String.valueOf(epochValueObject.getMaxValue());
-                    return pv.getPartitionField() + "=" + valueStr;
-                  })
-              .collect(Collectors.joining("/"));
+      // handle multiple partitioning case (year and month etc.), find the target partition dir
+      try {
+        partitionDir = findTargetPartitionFolder(modifTime, partitionFields, parquetFiles);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
+    // construct the path
     String fileName = "part-" + System.currentTimeMillis() + "-" + UUID.randomUUID() + ".parquet";
     Path outputFile = new Path(new Path(rootPath, partitionDir), fileName);
     // return its reader for convenience of writing
     ParquetReader reader = readParquetDataAsReader(fileToAppend.getName(), conf);
-    // append/write it in the right partition
+    // then inject/append/write it in the right partition
     finalFile = writeNewParquetFile(conf, reader, fileToAppend, outputFile);
     return finalFile;
   }
