@@ -19,10 +19,18 @@
 package org.apache.xtable.parquet;
 
 import java.io.IOException;
-import java.time.*;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -38,7 +46,7 @@ import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.example.GroupReadSupport;
 import org.apache.parquet.hadoop.example.GroupWriteSupport;
 
-import org.apache.iceberg.PartitionField;
+import org.apache.xtable.model.schema.InternalPartitionField;
 
 @Builder
 public class ParquetDataManager {
@@ -64,7 +72,8 @@ public class ParquetDataManager {
     return schemaFileAppend.getSchema().equals(schemaFileFromTable.getSchema());
   }
 
-  Instant parsePartitionDirToStartTime(String partitionDir, List<PartitionField> partitionFields) {
+  Instant parsePartitionDirToStartTime(
+      String partitionDir, List<InternalPartitionField> partitionFields) {
     Map<String, String> partitionValues = new HashMap<>();
     String[] parts = partitionDir.split("/");
     for (String part : parts) {
@@ -80,8 +89,8 @@ public class ParquetDataManager {
     int minute = 0;
     int second = 0;
 
-    for (PartitionField field : partitionFields) {
-      String fieldName = field.name().toLowerCase();
+    for (InternalPartitionField field : partitionFields) {
+      String fieldName = field.getSourceField().getName().toLowerCase();
       String value = partitionValues.get(fieldName);
 
       if (value != null) {
@@ -126,12 +135,13 @@ public class ParquetDataManager {
     }
   }
 
-  private ChronoUnit getGranularityUnit(List<PartitionField> partitionFields) {
+  private ChronoUnit getGranularityUnit(List<InternalPartitionField> partitionFields) {
     if (partitionFields == null || partitionFields.isEmpty()) {
       return ChronoUnit.DAYS;
     }
     // get the most granular field (the last one in the list, e.g., 'hour' after 'year' and 'month')
-    String lastFieldName = partitionFields.get(partitionFields.size() - 1).name();
+    String lastFieldName =
+        partitionFields.get(partitionFields.size() - 1).getSourceField().getName();
 
     if (lastFieldName.equalsIgnoreCase("year")) {
       return ChronoUnit.YEARS;
@@ -150,7 +160,7 @@ public class ParquetDataManager {
 
   private String findTargetPartitionFolder(
       Instant modifTime,
-      List<PartitionField> partitionFields,
+      List<InternalPartitionField> partitionFields,
       // could be retrieved from getParquetFiles() of ParquetConversionSource
       Stream<LocatedFileStatus> parquetFiles)
       throws IOException {
@@ -194,7 +204,7 @@ public class ParquetDataManager {
       String rootPath,
       FileStatus parquetFile,
       Stream<LocatedFileStatus> parquetFiles,
-      List<PartitionField> partitionFields) {
+      List<InternalPartitionField> partitionFields) {
     Path finalFile = null;
     String partitionDir = "";
     Instant modifTime = Instant.ofEpochMilli(parquetFile.getModificationTime());
@@ -204,7 +214,7 @@ public class ParquetDataManager {
       String partitionValue =
           DateTimeFormatter.ISO_LOCAL_DATE.format(
               modifTime.atZone(ZoneId.systemDefault()).toLocalDate());
-      partitionDir = partitionFields.get(0).name() + partitionValue;
+      partitionDir = partitionFields.get(0).getSourceField().getName() + partitionValue;
     } else {
       // handle multiple partitioning case (year and month etc.), find the target partition dir
       try {

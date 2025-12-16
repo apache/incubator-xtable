@@ -33,7 +33,7 @@ import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
 
-public class TestParquetDataManager {
+public class ITParquetDataManager {
 
   @Test
   public void testAppendParquetFile() throws IOException {
