@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import lombok.Builder;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -48,17 +49,27 @@ import org.apache.parquet.hadoop.example.GroupWriteSupport;
 
 import org.apache.xtable.model.schema.InternalPartitionField;
 
+/**
+ * Manages Parquet file operations including reading, writing, and partition discovery and path
+ * construction.
+ *
+ * <p>This class provides functions to handle Parquet metadata, validate schemas during appends, and
+ * calculate target partition directories based on file modification times and defined partition
+ * fields.
+ */
+@Log4j2
 @Builder
 public class ParquetDataManager {
   private ParquetMetadataExtractor metadataExtractor = ParquetMetadataExtractor.getInstance();
 
-  public ParquetReader readParquetDataAsReader(String filePath, Configuration conf) {
+  public ParquetReader getParquetReader(String filePath, Configuration conf) throws IOException {
     ParquetReader reader = null;
     Path file = new Path(filePath);
     try {
       reader = ParquetReader.builder(new GroupReadSupport(), file).withConf(conf).build();
     } catch (IOException e) {
-      e.printStackTrace();
+      log.error("Unexpected error during Parquet read: {}", filePath, e);
+      throw new IOException("Unexpected error reading Parquet file", e);
     }
     return reader;
   }
@@ -158,6 +169,9 @@ public class ParquetDataManager {
     }
   }
 
+  // find the target partition by comparing the modficationTime of the file to add with the current
+  // tables
+  // if the modifTime falls between two partitions then we know it belongs to the first
   private String findTargetPartitionFolder(
       Instant modifTime,
       List<InternalPartitionField> partitionFields,
@@ -167,6 +181,7 @@ public class ParquetDataManager {
 
     long modifTimeMillis = modifTime.toEpochMilli();
     final ZoneId ZONE = ZoneId.systemDefault();
+    // find the partition granularity (days, hours...)
     ChronoUnit partitionUnit = getGranularityUnit(partitionFields);
     List<String> allFolders =
         parquetFiles.map(status -> status.getPath().toString()).collect(Collectors.toList());
@@ -189,6 +204,7 @@ public class ParquetDataManager {
       } else {
         ZonedDateTime currentStartZDT = currentStartTime.atZone(ZONE);
         ZonedDateTime nextStartZDT = currentStartZDT.plus(1, partitionUnit);
+        // to evaluate the partition date value and make comparable with the modifTime in Instant
         nextStartMillis = nextStartZDT.toInstant().toEpochMilli();
       }
       if (modifTimeMillis >= currentStartMillis && modifTimeMillis < nextStartMillis) {
@@ -204,7 +220,8 @@ public class ParquetDataManager {
       String rootPath,
       FileStatus parquetFile,
       Stream<LocatedFileStatus> parquetFiles,
-      List<InternalPartitionField> partitionFields) {
+      List<InternalPartitionField> partitionFields)
+      throws IOException {
     Path finalFile = null;
     String partitionDir = "";
     Instant modifTime = Instant.ofEpochMilli(parquetFile.getModificationTime());
@@ -227,7 +244,7 @@ public class ParquetDataManager {
     String fileName = "part-" + System.currentTimeMillis() + "-" + UUID.randomUUID() + ".parquet";
     Path outputFile = new Path(new Path(rootPath, partitionDir), fileName);
     // return its reader for convenience of writing
-    ParquetReader reader = readParquetDataAsReader(fileToAppend.getName(), conf);
+    ParquetReader reader = getParquetReader(fileToAppend.getName(), conf);
     // then inject/append/write it in the right partition
     finalFile = writeNewParquetFile(conf, reader, fileToAppend, outputFile);
     return finalFile;
@@ -239,7 +256,8 @@ public class ParquetDataManager {
   }
 
   private Path writeNewParquetFile(
-      Configuration conf, ParquetReader reader, Path fileToAppend, Path outputFile) {
+      Configuration conf, ParquetReader reader, Path fileToAppend, Path outputFile)
+      throws IOException {
     ParquetFileConfig parquetFileConfig = getParquetFileConfig(conf, fileToAppend);
     int pageSize = ParquetWriter.DEFAULT_PAGE_SIZE;
     try (ParquetWriter<Group> writer =
@@ -259,8 +277,8 @@ public class ParquetDataManager {
         writer.write(currentGroup);
       }
     } catch (Exception e) {
-
-      e.printStackTrace();
+      log.error("Unexpected error during Parquet write: {}", outputFile, e);
+      throw new IOException("Failed to complete Parquet write operation", e);
     }
     return outputFile;
   }
