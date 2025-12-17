@@ -1066,6 +1066,7 @@ public class TestIcebergSchemaExtractor {
                         .build(),
                     InternalField.builder()
                         .name("scores")
+                        .fieldId(2)
                         .schema(
                             InternalSchema.builder()
                                 .name("array")
@@ -1085,14 +1086,106 @@ public class TestIcebergSchemaExtractor {
                                             .fieldId(null)
                                             .build()))
                                 .build())
-                        .fieldId(2)
+                        .build(),
+                    InternalField.builder()
+                        .name("record_map")
+                        .fieldId(3)
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .dataType(InternalType.MAP)
+                                .isNullable(true)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name("_one_field_key")
+                                            .parentPath("record_map")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("string")
+                                                    .dataType(InternalType.STRING)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        InternalField.builder()
+                                            .name("_one_field_value")
+                                            .parentPath("record_map")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("struct")
+                                                    .dataType(InternalType.RECORD)
+                                                    .isNullable(true)
+                                                    .fields(
+                                                        Arrays.asList(
+                                                            InternalField.builder()
+                                                                .name("nested_int")
+                                                                .fieldId(5)
+                                                                .parentPath(
+                                                                    "record_map._one_field_value")
+                                                                .schema(
+                                                                    InternalSchema.builder()
+                                                                        .name("integer")
+                                                                        .dataType(InternalType.INT)
+                                                                        .isNullable(true)
+                                                                        .build())
+                                                                .build()))
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("primitive_map")
+                        .fieldId(4)
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .dataType(InternalType.MAP)
+                                .isNullable(false)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name("_one_field_key")
+                                            .parentPath("primitive_map")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("string")
+                                                    .dataType(InternalType.STRING)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        InternalField.builder()
+                                            .name("_one_field_value")
+                                            .parentPath("primitive_map")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(InternalType.INT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
                         .build()))
             .build();
     Schema icebergRepresentation =
         new Schema(
             Types.NestedField.optional(1, "name", Types.StringType.get()),
             Types.NestedField.optional(
-                2, "scores", Types.ListType.ofOptional(3, Types.LongType.get())));
+                2, "scores", Types.ListType.ofOptional(6, Types.LongType.get())),
+            Types.NestedField.optional(
+                3,
+                "record_map",
+                Types.MapType.ofOptional(
+                    7,
+                    8,
+                    Types.StringType.get(),
+                    Types.StructType.of(
+                        Arrays.asList(
+                            Types.NestedField.optional(
+                                5, "nested_int", Types.IntegerType.get()))))),
+            Types.NestedField.required(
+                4,
+                "primitive_map",
+                Types.MapType.ofRequired(9, 10, Types.StringType.get(), Types.IntegerType.get())));
     assertTrue(icebergRepresentation.sameSchema(SCHEMA_EXTRACTOR.toIceberg(internalSchema)));
   }
 }
