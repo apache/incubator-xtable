@@ -760,7 +760,7 @@ public class ITHudiConversionTarget {
             .metadataRetention(Duration.of(4, ChronoUnit.HOURS))
             .additionalProperties(new TypedProperties())
             .build(),
-        (Configuration) CONFIGURATION.unwrapCopy(),
+      gi  (Configuration) CONFIGURATION.unwrapCopy(),
         3);
   }
 }
