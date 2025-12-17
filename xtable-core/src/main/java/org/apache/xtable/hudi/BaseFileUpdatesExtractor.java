@@ -18,6 +18,8 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_COLUMN_STATS;
+import static org.apache.hudi.metadata.HoodieTableMetadataUtil.existingIndexVersionOrDefault;
 import static org.apache.xtable.hudi.HudiSchemaExtractor.convertFromXTablePath;
 
 import java.util.ArrayList;
@@ -53,8 +55,11 @@ import org.apache.hudi.common.table.view.FileSystemViewStorageType;
 import org.apache.hudi.common.table.view.SyncableFileSystemView;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.hadoop.fs.CachingPath;
+import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 import org.apache.hudi.stats.HoodieColumnRangeMetadata;
+import org.apache.hudi.stats.ValueMetadata;
+import org.apache.hudi.stats.XTableValueMetadata;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.schema.InternalType;
@@ -128,6 +133,8 @@ public class BaseFileUpdatesExtractor {
     boolean isTableInitialized = metaClient.isTimelineNonEmpty();
     // Track the partitions that are not present in the snapshot, so the files for those partitions
     // can be dropped
+    HoodieIndexVersion indexVersion =
+        existingIndexVersionOrDefault(PARTITION_NAME_COLUMN_STATS, metaClient);
     Set<String> partitionPathsToDrop =
         new HashSet<>(FSUtils.getAllPartitionPaths(engineContext, metaClient, metadataConfig));
     ReplaceMetadata replaceMetadata =
@@ -171,7 +178,8 @@ public class BaseFileUpdatesExtractor {
                                       tableBasePath,
                                       commit,
                                       snapshotFile,
-                                      Optional.of(partitionPath)))
+                                      Optional.of(partitionPath),
+                                      indexVersion))
                           .collect(Collectors.toList());
                   return ReplaceMetadata.of(
                       fileIdsToRemove.isEmpty()
@@ -205,10 +213,13 @@ public class BaseFileUpdatesExtractor {
    *
    * @param internalFilesDiff the diff to apply to the Hudi table
    * @param commit The current commit started by the Hudi client
+   * @param indexVersion the Hudi index version
    * @return The information needed to create a "replace" commit for the Hudi table
    */
   ReplaceMetadata convertDiff(
-      @NonNull InternalFilesDiff internalFilesDiff, @NonNull String commit) {
+      @NonNull InternalFilesDiff internalFilesDiff,
+      @NonNull String commit,
+      HoodieIndexVersion indexVersion) {
     // For all removed files, group by partition and extract the file id
     Map<String, List<String>> partitionToReplacedFileIds =
         internalFilesDiff.dataFilesRemoved().stream()
@@ -220,7 +231,7 @@ public class BaseFileUpdatesExtractor {
     // For all added files, group by partition and extract the file id
     List<WriteStatus> writeStatuses =
         internalFilesDiff.dataFilesAdded().stream()
-            .map(file -> toWriteStatus(tableBasePath, commit, file, Optional.empty()))
+            .map(file -> toWriteStatus(tableBasePath, commit, file, Optional.empty(), indexVersion))
             .collect(CustomCollectors.toList(internalFilesDiff.dataFilesAdded().size()));
     return ReplaceMetadata.of(partitionToReplacedFileIds, writeStatuses);
   }
@@ -249,7 +260,8 @@ public class BaseFileUpdatesExtractor {
       Path tableBasePath,
       String commitTime,
       InternalDataFile file,
-      Optional<String> partitionPathOptional) {
+      Optional<String> partitionPathOptional,
+      HoodieIndexVersion indexVersion) {
     WriteStatus writeStatus = new WriteStatus();
     Path path = new CachingPath(file.getPhysicalPath());
     String partitionPath =
@@ -268,30 +280,36 @@ public class BaseFileUpdatesExtractor {
     writeStat.setNumWrites(file.getRecordCount());
     writeStat.setTotalWriteBytes(file.getFileSizeBytes());
     writeStat.setFileSizeInBytes(file.getFileSizeBytes());
-    writeStat.putRecordsStats(convertColStats(fileName, file.getColumnStats()));
+    writeStat.setNumInserts(file.getRecordCount());
+    // TODO: Fix this populating last instant.
+    writeStat.setPrevCommit("");
+    writeStat.putRecordsStats(convertColStats(fileName, file.getColumnStats(), indexVersion));
     writeStatus.setStat(writeStat);
     return writeStatus;
   }
 
   private Map<String, HoodieColumnRangeMetadata<Comparable>> convertColStats(
-      String fileName, List<ColumnStat> columnStatMap) {
+      String fileName, List<ColumnStat> columnStatMap, HoodieIndexVersion indexVersion) {
     return columnStatMap.stream()
         .filter(
             entry ->
                 !InternalType.NON_SCALAR_TYPES.contains(entry.getField().getSchema().getDataType()))
         .map(
-            columnStat ->
-                HoodieColumnRangeMetadata.<Comparable>create(
-                    fileName,
-                    convertFromXTablePath(columnStat.getField().getPath()),
-                    (Comparable) columnStat.getRange().getMinValue(),
-                    (Comparable) columnStat.getRange().getMaxValue(),
-                    columnStat.getNumNulls(),
-                    columnStat.getNumValues(),
-                    columnStat.getTotalSize(),
-                    -1L,
-                    null))
-        .collect(Collectors.toMap(HoodieColumnRangeMetadata::getColumnName, metadata -> metadata));
+            columnStat -> {
+              ValueMetadata valueMetadata =
+                  XTableValueMetadata.getValueMetadata(columnStat, indexVersion);
+              return HoodieColumnRangeMetadata.<Comparable>create(
+                  fileName,
+                  convertFromXTablePath(columnStat.getField().getPath()),
+                  valueMetadata.standardizeJavaTypeAndPromote(columnStat.getRange().getMinValue()),
+                  valueMetadata.standardizeJavaTypeAndPromote(columnStat.getRange().getMaxValue()),
+                  columnStat.getNumNulls(),
+                  columnStat.getNumValues(),
+                  columnStat.getTotalSize(),
+                  -1L,
+                  valueMetadata);
+            })
+        .collect(Collectors.toMap(HoodieColumnRangeMetadata::getColumnName, Function.identity()));
   }
 
   /** Holds the information needed to create a "replace" commit in the Hudi table. */

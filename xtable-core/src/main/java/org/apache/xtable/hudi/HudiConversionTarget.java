@@ -20,6 +20,8 @@ package org.apache.xtable.hudi;
 
 import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
+import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_COLUMN_STATS;
+import static org.apache.hudi.metadata.HoodieTableMetadataUtil.existingIndexVersionOrDefault;
 
 import java.io.IOException;
 import java.time.temporal.ChronoUnit;
@@ -73,6 +75,7 @@ import org.apache.hudi.config.HoodieCleanConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.hadoop.fs.CachingPath;
+import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.metadata.HoodieTableMetadataWriter;
 import org.apache.hudi.table.HoodieJavaTable;
 import org.apache.hudi.table.action.clean.CleanPlanner;
@@ -256,8 +259,14 @@ public class HudiConversionTarget implements ConversionTarget {
 
   @Override
   public void syncFilesForDiff(InternalFilesDiff internalFilesDiff) {
+    if (!metaClient.isPresent()) {
+      throw new IllegalStateException("Meta client is not initialized");
+    }
+    HoodieIndexVersion indexVersion =
+        existingIndexVersionOrDefault(PARTITION_NAME_COLUMN_STATS, metaClient.get());
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
-        baseFileUpdatesExtractor.convertDiff(internalFilesDiff, commitState.getInstantTime());
+        baseFileUpdatesExtractor.convertDiff(
+            internalFilesDiff, commitState.getInstantTime(), indexVersion);
     commitState.setReplaceMetadata(replaceMetadata);
   }
 

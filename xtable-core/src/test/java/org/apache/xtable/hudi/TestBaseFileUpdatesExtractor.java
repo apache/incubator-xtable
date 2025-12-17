@@ -52,6 +52,7 @@ import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.hadoop.fs.CachingPath;
+import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 
 import org.apache.xtable.model.schema.InternalField;
@@ -131,7 +132,7 @@ public class TestBaseFileUpdatesExtractor {
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
-        extractor.convertDiff(diff, COMMIT_TIME);
+        extractor.convertDiff(diff, COMMIT_TIME, HoodieIndexVersion.V1);
 
     // validate removed files
     Map<String, List<String>> expectedPartitionToReplacedFileIds = new HashMap<>();
