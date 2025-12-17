@@ -34,22 +34,27 @@ import java.util.stream.Collectors;
 
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
+import lombok.SneakyThrows;
 import lombok.Value;
 
 import org.apache.hadoop.fs.Path;
 
 import org.apache.hudi.client.WriteStatus;
+import org.apache.hudi.common.config.HoodieCommonConfig;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieBaseFile;
-import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
 import org.apache.hudi.common.model.HoodieDeltaWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
-import org.apache.hudi.common.table.view.HoodieTableFileSystemView;
+import org.apache.hudi.common.table.view.FileSystemViewManager;
+import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
+import org.apache.hudi.common.table.view.FileSystemViewStorageType;
+import org.apache.hudi.common.table.view.SyncableFileSystemView;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
-import org.apache.hudi.hadoop.CachingPath;
-import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
+import org.apache.hudi.hadoop.fs.CachingPath;
+import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.schema.InternalType;
@@ -74,6 +79,7 @@ public class BaseFileUpdatesExtractor {
    * @param commit The current commit started by the Hudi client
    * @return The information needed to create a "replace" commit for the Hudi table
    */
+  @SneakyThrows
   ReplaceMetadata extractSnapshotChanges(
       List<PartitionFileGroup> partitionedDataFiles,
       HoodieTableMetaClient metaClient,
@@ -82,16 +88,48 @@ public class BaseFileUpdatesExtractor {
         HoodieMetadataConfig.newBuilder()
             .enable(metaClient.getTableConfig().isMetadataTableAvailable())
             .build();
-    HoodieTableFileSystemView fsView =
-        new HoodieMetadataFileSystemView(
-            engineContext, metaClient, metaClient.getActiveTimeline(), metadataConfig);
+    HoodieTableMetadata tableMetadata =
+        metadataConfig.isEnabled()
+            ? metaClient
+                .getTableFormat()
+                .getMetadataFactory()
+                .create(
+                    engineContext,
+                    metaClient.getStorage(),
+                    metadataConfig,
+                    tableBasePath.toString(),
+                    true)
+            : null;
+    FileSystemViewManager fileSystemViewManager =
+        FileSystemViewManager.createViewManager(
+            engineContext,
+            metadataConfig,
+            FileSystemViewStorageConfig.newBuilder()
+                .withStorageType(FileSystemViewStorageType.MEMORY)
+                .build(),
+            HoodieCommonConfig.newBuilder().build(),
+            meta -> tableMetadata);
+    try (SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient)) {
+      return extractFromFsView(partitionedDataFiles, commit, fsView, metaClient, metadataConfig);
+    } finally {
+      fileSystemViewManager.close();
+      if (tableMetadata != null) {
+        tableMetadata.close();
+      }
+    }
+  }
+
+  ReplaceMetadata extractFromFsView(
+      List<PartitionFileGroup> partitionedDataFiles,
+      String commit,
+      SyncableFileSystemView fsView,
+      HoodieTableMetaClient metaClient,
+      HoodieMetadataConfig metadataConfig) {
     boolean isTableInitialized = metaClient.isTimelineNonEmpty();
     // Track the partitions that are not present in the snapshot, so the files for those partitions
     // can be dropped
     Set<String> partitionPathsToDrop =
-        new HashSet<>(
-            FSUtils.getAllPartitionPaths(
-                engineContext, metadataConfig, metaClient.getBasePathV2().toString()));
+        new HashSet<>(FSUtils.getAllPartitionPaths(engineContext, metaClient, metadataConfig));
     ReplaceMetadata replaceMetadata =
         partitionedDataFiles.stream()
             .map(
@@ -251,7 +289,8 @@ public class BaseFileUpdatesExtractor {
                     columnStat.getNumNulls(),
                     columnStat.getNumValues(),
                     columnStat.getTotalSize(),
-                    -1L))
+                    -1L,
+                    null))
         .collect(Collectors.toMap(HoodieColumnRangeMetadata::getColumnName, metadata -> metadata));
   }
 

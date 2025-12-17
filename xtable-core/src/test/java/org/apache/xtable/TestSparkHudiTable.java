@@ -36,7 +36,6 @@ import org.apache.spark.api.java.JavaSparkContext;
 
 import org.apache.hudi.client.HoodieWriteResult;
 import org.apache.hudi.client.SparkRDDWriteClient;
-import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieSparkEngineContext;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
@@ -164,10 +163,7 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
       String commitInstant,
       boolean checkForNoErrors) {
     JavaRDD<HoodieRecord<HoodieAvroPayload>> writeRecords = jsc.parallelize(inserts, 1);
-    List<WriteStatus> result = writeClient.bulkInsert(writeRecords, commitInstant).collect();
-    if (checkForNoErrors) {
-      assertNoWriteErrors(result);
-    }
+    assert writeClient.commit(commitInstant, writeClient.bulkInsert(writeRecords, commitInstant));
     return inserts;
   }
 
@@ -177,10 +173,7 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
       boolean checkForNoErrors) {
     List<HoodieRecord<HoodieAvroPayload>> updates = generateUpdatesForRecords(records);
     JavaRDD<HoodieRecord<HoodieAvroPayload>> writeRecords = jsc.parallelize(updates, 1);
-    List<WriteStatus> result = writeClient.upsert(writeRecords, commitInstant).collect();
-    if (checkForNoErrors) {
-      assertNoWriteErrors(result);
-    }
+    assert writeClient.commit(commitInstant, writeClient.upsert(writeRecords, commitInstant));
     return updates;
   }
 
@@ -190,10 +183,7 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
         records.stream().map(HoodieRecord::getKey).collect(Collectors.toList());
     JavaRDD<HoodieKey> deleteKeys = jsc.parallelize(deletes, 1);
     String instant = getStartCommitInstant();
-    List<WriteStatus> result = writeClient.delete(deleteKeys, instant).collect();
-    if (checkForNoErrors) {
-      assertNoWriteErrors(result);
-    }
+    assert writeClient.commit(instant, writeClient.delete(deleteKeys, instant));
     return deletes;
   }
 
@@ -216,8 +206,12 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
     String instant = getStartCommitOfActionType(actionType);
     HoodieWriteResult writeResult =
         writeClient.deletePartitions(Collections.singletonList(partition), instant);
-    List<WriteStatus> result = writeResult.getWriteStatuses().collect();
-    assertNoWriteErrors(result);
+    assert writeClient.commit(
+        instant,
+        writeResult.getWriteStatuses(),
+        Option.empty(),
+        actionType,
+        writeResult.getPartitionToReplaceFileIds());
   }
 
   public void cluster() {

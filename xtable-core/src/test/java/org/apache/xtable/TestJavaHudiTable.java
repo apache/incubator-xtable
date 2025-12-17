@@ -18,6 +18,8 @@
  
 package org.apache.xtable;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -193,6 +195,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       String commitInstant,
       boolean checkForNoErrors) {
     List<WriteStatus> result = writeClient.bulkInsert(copyRecords(inserts), commitInstant);
+    writeClient.commit(commitInstant, result);
     if (checkForNoErrors) {
       assertNoWriteErrors(result);
     }
@@ -205,6 +208,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       boolean checkForNoErrors) {
     List<HoodieRecord<HoodieAvroPayload>> updates = generateUpdatesForRecords(records);
     List<WriteStatus> result = writeClient.upsert(copyRecords(updates), commitInstant);
+    writeClient.commit(commitInstant, result);
     if (checkForNoErrors) {
       assertNoWriteErrors(result);
     }
@@ -217,6 +221,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         records.stream().map(HoodieRecord::getKey).collect(Collectors.toList());
     String instant = getStartCommitInstant();
     List<WriteStatus> result = writeClient.delete(deletes, instant);
+    writeClient.commit(instant, result);
     if (checkForNoErrors) {
       assertNoWriteErrors(result);
     }
@@ -363,7 +368,7 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
               "hoodie.client.init.callback.classes",
               "org.apache.xtable.hudi.extensions.AddFieldIdsClientInitCallback");
     }
-    HoodieEngineContext context = new HoodieJavaEngineContext(conf);
+    HoodieEngineContext context = new HoodieJavaEngineContext(getStorageConf(conf));
     return new HoodieJavaWriteClient<>(context, writeConfig);
   }
 }

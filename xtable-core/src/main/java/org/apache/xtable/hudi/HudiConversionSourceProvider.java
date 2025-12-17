@@ -18,6 +18,8 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
+
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hudi.common.model.HoodieTableType;
@@ -26,16 +28,17 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.spi.extractor.ConversionSource;
 
 /** A concrete implementation of {@link ConversionSourceProvider} for Hudi table format. */
 @Log4j2
 public class HudiConversionSourceProvider extends ConversionSourceProvider<HoodieInstant> {
 
   @Override
-  public HudiConversionSource getConversionSourceInstance(SourceTable sourceTable) {
+  public ConversionSource<HoodieInstant> getConversionSourceInstance(SourceTable sourceTable) {
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder()
-            .setConf(hadoopConf)
+            .setConf(getStorageConf(hadoopConf))
             .setBasePath(sourceTable.getBasePath())
             .setLoadActiveTimelineOnLoad(true)
             .build();

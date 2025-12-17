@@ -18,6 +18,7 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.xtable.hudi.HudiTestUtil.createWriteStatus;
 import static org.apache.xtable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.apache.xtable.hudi.HudiTestUtil.initTableAndGetMetaClient;
@@ -43,14 +44,15 @@ import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieAvroPayload;
-import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
-import org.apache.hudi.hadoop.CachingPath;
+import org.apache.hudi.hadoop.fs.CachingPath;
+import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -73,7 +75,7 @@ public class TestBaseFileUpdatesExtractor {
   private static final long RECORD_COUNT = 200L;
   private static final long LAST_MODIFIED = System.currentTimeMillis();
   private static final HoodieEngineContext CONTEXT =
-      new HoodieJavaEngineContext(new Configuration());
+      new HoodieJavaEngineContext(getStorageConf(new Configuration()));
   private static final InternalPartitionField PARTITION_FIELD =
       InternalPartitionField.builder()
           .sourceField(
@@ -161,12 +163,12 @@ public class TestBaseFileUpdatesExtractor {
   void extractSnapshotChanges_emptyTargetTable() throws IOException {
     String tableBasePath = tempDir.resolve(UUID.randomUUID().toString()).toString();
     HoodieTableMetaClient metaClient =
-        HoodieTableMetaClient.withPropertyBuilder()
+        HoodieTableMetaClient.newTableBuilder()
             .setTableType(HoodieTableType.COPY_ON_WRITE)
             .setTableName("test_table")
             .setPayloadClass(HoodieAvroPayload.class)
             .setPartitionFields("partition_field")
-            .initTable(new Configuration(), tableBasePath);
+            .initTable(getStorageConf(new Configuration()), tableBasePath);
 
     String partitionPath1 = "partition1";
     String fileName1 = "file1.parquet";
@@ -253,7 +255,8 @@ public class TestBaseFileUpdatesExtractor {
               new HoodieInstant(
                   HoodieInstant.State.REQUESTED,
                   HoodieTimeline.REPLACE_COMMIT_ACTION,
-                  initialInstant),
+                  initialInstant,
+                  InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR),
               Option.empty());
       writeClient.commit(
           initialInstant,
@@ -347,7 +350,8 @@ public class TestBaseFileUpdatesExtractor {
               new HoodieInstant(
                   HoodieInstant.State.REQUESTED,
                   HoodieTimeline.REPLACE_COMMIT_ACTION,
-                  initialInstant),
+                  initialInstant,
+                  InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR),
               Option.empty());
       writeClient.commit(
           initialInstant,
@@ -429,19 +433,27 @@ public class TestBaseFileUpdatesExtractor {
     columnStats.put(
         "long_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "long_field", 10L, 20L, 4, 5, 123L, -1L));
+            fileName, "long_field", 10L, 20L, 4, 5, 123L, -1L, null));
     columnStats.put(
         "string_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "string_field", "a", "c", 1, 6, 500L, -1L));
+            fileName, "string_field", "a", "c", 1, 6, 500L, -1L, null));
     columnStats.put(
         "null_string_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "null_string_field", (String) null, (String) null, 3, 3, 0L, -1L));
+            fileName, "null_string_field", (String) null, (String) null, 3, 3, 0L, -1L, null));
     columnStats.put(
         "timestamp_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "timestamp_field", 1665263297000L, 1665436097000L, 105, 145, 999L, -1L));
+            fileName,
+            "timestamp_field",
+            1665263297000L,
+            1665436097000L,
+            105,
+            145,
+            999L,
+            -1L,
+            null));
     columnStats.put(
         "timestamp_micros_field",
         HoodieColumnRangeMetadata.<Comparable>create(
@@ -452,27 +464,44 @@ public class TestBaseFileUpdatesExtractor {
             1,
             20,
             400,
-            -1L));
+            -1L,
+            null));
     columnStats.put(
         "local_timestamp_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "local_timestamp_field", 1665263297000L, 1665436097000L, 1, 20, 400, -1L));
+            fileName,
+            "local_timestamp_field",
+            1665263297000L,
+            1665436097000L,
+            1,
+            20,
+            400,
+            -1L,
+            null));
     columnStats.put(
         "date_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "date_field", 18181, 18547, 250, 300, 12345, -1L));
+            fileName, "date_field", 18181, 18547, 250, 300, 12345, -1L, null));
     columnStats.put(
         "array_long_field.array",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "array_long_field.element", 50L, 100L, 2, 5, 1234, -1L));
+            fileName, "array_long_field.element", 50L, 100L, 2, 5, 1234, -1L, null));
     columnStats.put(
         "map_string_long_field.key_value.key",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "map_string_long_field.key_value.key", "key1", "key2", 3, 5, 1234, -1L));
+            fileName,
+            "map_string_long_field.key_value.key",
+            "key1",
+            "key2",
+            3,
+            5,
+            1234,
+            -1L,
+            null));
     columnStats.put(
         "map_string_long_field.key_value.value",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "map_string_long_field.key_value.value", 200L, 300L, 3, 5, 1234, -1L));
+            fileName, "map_string_long_field.key_value.value", 200L, 300L, 3, 5, 1234, -1L, null));
     columnStats.put(
         "nested_struct_field.array_string_field.array",
         HoodieColumnRangeMetadata.<Comparable>create(
@@ -483,11 +512,12 @@ public class TestBaseFileUpdatesExtractor {
             7,
             15,
             1234,
-            -1L));
+            -1L,
+            null));
     columnStats.put(
         "nested_struct_field.nested_long_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "nested_struct_field.nested_long_field", 500L, 600L, 4, 5, 1234, -1L));
+            fileName, "nested_struct_field.nested_long_field", 500L, 600L, 4, 5, 1234, -1L, null));
     return columnStats;
   }
 }
