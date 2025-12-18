@@ -198,7 +198,7 @@ public class HudiCatalogPartitionSyncTool implements CatalogPartitionSyncTool {
             .getInstantsOrderedByCompletionTime()
             .skip(activeTimeline.countInstants() - 1L)
             .findFirst()
-            .map(i -> Option.of(i.requestedTime()))
+            .map(i -> Option.of(i.getCompletionTime()))
             .orElse(Option.empty());
 
     if (lastCommitSynced.isPresent()) {

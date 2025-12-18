@@ -49,8 +49,6 @@ import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.stats.HoodieColumnRangeMetadata;
 
-import org.apache.xtable.model.storage.TableFormat;
-
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class HudiTestUtil {
 
@@ -63,7 +61,6 @@ public class HudiTestUtil {
         .setTableName("test_table")
         .setPayloadClass(HoodieAvroPayload.class)
         .setPartitionFields(partitionFields)
-        .setTableFormat(TableFormat.ICEBERG)
         .initTable(getStorageConf(new Configuration()), tableBasePath);
   }
 
@@ -83,7 +80,7 @@ public class HudiTestUtil {
         .withMetadataConfig(
             HoodieMetadataConfig.newBuilder()
                 .withMaxNumDeltaCommitsBeforeCompaction(2)
-                .enable(false)
+                .enable(true)
                 .withMetadataIndexColumnStats(false)
                 .withProperties(properties)
                 .build())

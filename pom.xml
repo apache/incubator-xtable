@@ -757,7 +757,6 @@
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <trimStackTrace>false</trimStackTrace>
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
-                    <argLine>@{argLine} -Xmx1024m</argLine>
                 </configuration>
             </plugin>
             <plugin>

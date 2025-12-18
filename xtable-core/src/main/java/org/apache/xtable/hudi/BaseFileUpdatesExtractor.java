@@ -281,8 +281,6 @@ public class BaseFileUpdatesExtractor {
     writeStat.setTotalWriteBytes(file.getFileSizeBytes());
     writeStat.setFileSizeInBytes(file.getFileSizeBytes());
     writeStat.setNumInserts(file.getRecordCount());
-    // TODO: Fix this populating last instant.
-    writeStat.setPrevCommit("");
     writeStat.putRecordsStats(convertColStats(fileName, file.getColumnStats(), indexVersion));
     writeStatus.setStat(writeStat);
     return writeStatus;
