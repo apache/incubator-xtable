@@ -409,7 +409,10 @@ public class HudiConversionTarget implements ConversionTarget {
       HoodieEngineContext engineContext = new HoodieJavaEngineContext(metaClient.getStorageConf());
       try (HoodieJavaWriteClient<?> writeClient =
           new HoodieJavaWriteClient<>(engineContext, writeConfig)) {
-        String instantTime = writeClient.startCommit(HoodieTimeline.REPLACE_COMMIT_ACTION);
+        metaClient
+            .getActiveTimeline()
+            .createRequestedCommitWithReplaceMetadata(
+                instantTime, HoodieTimeline.REPLACE_COMMIT_ACTION);
         metaClient
             .getActiveTimeline()
             .transitionReplaceRequestedToInflight(

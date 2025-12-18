@@ -1021,12 +1021,18 @@ public class ITConversionController {
                           .filter(filterCondition);
                     }));
 
-    String[] selectColumnsArr = sourceTable.getColumnsToSelect().toArray(new String[] {});
-    List<String> sourceRowsList = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
+    List<String> sourceRowsList =
+        sourceRows
+            .selectExpr(getSelectColumnsArr(sourceTable.getColumnsToSelect(), sourceFormat))
+            .toJSON()
+            .collectAsList();
     targetRowsByFormat.forEach(
         (targetFormat, targetRows) -> {
           List<String> targetRowsList =
-              targetRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
+              targetRows
+                  .selectExpr(getSelectColumnsArr(sourceTable.getColumnsToSelect(), targetFormat))
+                  .toJSON()
+                  .collectAsList();
           assertEquals(
               sourceRowsList.size(),
               targetRowsList.size(),
@@ -1109,6 +1115,31 @@ public class ITConversionController {
                 row1, row2));
       }
     }
+  }
+
+  private static String[] getSelectColumnsArr(List<String> columnsToSelect, String format) {
+    boolean isHudi = format.equals(HUDI);
+    boolean isIceberg = format.equals(ICEBERG);
+    return columnsToSelect.stream()
+        .map(
+            colName -> {
+              if (colName.startsWith("timestamp_local_millis")) {
+                if (isHudi) {
+                  return String.format(
+                      "unix_millis(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
+                } else if (isIceberg) {
+                  // iceberg is showing up as micros, so we need to divide by 1000 to get millis
+                  return String.format("%s div 1000 AS %s", colName, colName);
+                } else {
+                  return colName;
+                }
+              } else if (isHudi && colName.startsWith("timestamp_local_micros")) {
+                return String.format("unix_micros(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
+              } else {
+                return colName;
+              }
+            })
+        .toArray(String[]::new);
   }
 
   private boolean containsUUIDFields(List<String> rows) {
