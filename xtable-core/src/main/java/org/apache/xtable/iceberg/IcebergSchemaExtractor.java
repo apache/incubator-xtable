@@ -112,6 +112,10 @@ public class IcebergSchemaExtractor {
     // traverse the schema before converting it to make sure fieldIdTracker won't return any
     // fieldIds used in the schema
     initializeFieldIdTracker(internalSchema, fieldIdTracker);
+    // since IcebergSchemaExtractor is used as a singleton, idToStorageName may contain the results
+    // extracted in the last run. To reflect the latest schema, it should be reset before the schema
+    // extraction.
+    idToStorageName.clear();
     List<Types.NestedField> nestedFields = convertFields(internalSchema, fieldIdTracker);
     List<InternalField> recordKeyFields = internalSchema.getRecordKeyFields();
     boolean recordKeyFieldsAreNotRequired =
