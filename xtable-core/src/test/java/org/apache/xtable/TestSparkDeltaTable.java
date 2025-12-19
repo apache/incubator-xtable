@@ -288,4 +288,8 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
         String.format(
             "ALTER TABLE delta.`%s` RENAME COLUMN %s TO %s", basePath, colName, newColName));
   }
+
+  public void addColumn() {
+    testDeltaHelper.addColumn();
+  }
 }

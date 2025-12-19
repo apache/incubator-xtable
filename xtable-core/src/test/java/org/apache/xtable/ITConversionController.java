@@ -780,6 +780,11 @@ public class ITConversionController {
       table.insertRows(10);
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 60);
+
+      table.addColumn();
+      table.insertRows(10);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 70);
     }
   }
 

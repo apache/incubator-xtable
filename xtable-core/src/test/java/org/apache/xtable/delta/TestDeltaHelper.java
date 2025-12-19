@@ -336,4 +336,8 @@ public class TestDeltaHelper {
                             : field)
                 .toArray(StructField[]::new));
   }
+
+  public void addColumn() {
+    this.tableStructSchema = tableStructSchema.add("city", StringType, true);
+  }
 }
