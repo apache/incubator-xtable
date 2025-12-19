@@ -21,7 +21,6 @@ package org.apache.xtable.hudi.extensions;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.avro.Schema;
-import org.apache.hadoop.fs.FileSystem;
 
 import org.apache.hudi.callback.HoodieClientInitCallback;
 import org.apache.hudi.client.BaseHoodieClient;
@@ -31,7 +30,6 @@ import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieException;
-import org.apache.hudi.hadoop.fs.HadoopFSUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -63,13 +61,11 @@ public class AddFieldIdsClientInitCallback implements HoodieClientInitCallback {
       try {
         Option<Schema> currentSchema = Option.empty();
         try {
-          String tableBasePath = config.getBasePath();
           HoodieTableMetaClient metaClient =
               HoodieTableMetaClient.builder()
                   .setConf(hoodieClient.getEngineContext().getStorageConf())
                   .setBasePath(config.getBasePath())
                   .build();
-          FileSystem fs = HadoopFSUtils.getFs(tableBasePath, metaClient.getStorageConf());
           if (FSUtils.isTableExists(config.getBasePath(), metaClient.getStorage())) {
             currentSchema =
                 new TableSchemaResolver(metaClient).getTableAvroSchemaFromLatestCommit(true);

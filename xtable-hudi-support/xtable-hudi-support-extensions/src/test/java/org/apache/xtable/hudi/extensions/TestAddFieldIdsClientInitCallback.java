@@ -140,7 +140,8 @@ public class TestAddFieldIdsClientInitCallback {
       HoodieRecord<HoodieAvroPayload> record =
           new HoodieAvroRecord<>(
               new HoodieKey("1", ""), new HoodieAvroPayload(Option.of(genericRecord)));
-      hoodieJavaWriteClient.insert(Collections.singletonList(record), commit);
+      hoodieJavaWriteClient.commit(
+          commit, hoodieJavaWriteClient.insert(Collections.singletonList(record), commit));
     }
 
     HoodieWriteConfig config =
