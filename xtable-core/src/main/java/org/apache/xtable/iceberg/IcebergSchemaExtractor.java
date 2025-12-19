@@ -109,8 +109,8 @@ public class IcebergSchemaExtractor {
   public Schema toIceberg(InternalSchema internalSchema) {
     // if field IDs are not assigned in the source, just use an incrementing integer
     AtomicInteger fieldIdTracker = new AtomicInteger(0);
-    // traverse the schema before converting it to make sure fieldIdTracker won't return any
-    // fieldIds used in the schema
+    // traverse the schema before conversion to ensure fieldIdTracker won't return any
+    // fieldIds that are already present in the schema
     initializeFieldIdTracker(internalSchema, fieldIdTracker);
     // since IcebergSchemaExtractor is used as a singleton, idToStorageName may contain the results
     // extracted in the last run. To reflect the latest schema, it should be reset before the schema
