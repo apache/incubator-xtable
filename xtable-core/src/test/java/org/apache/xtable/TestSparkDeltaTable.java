@@ -276,4 +276,16 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
         .filter(columnName -> !columnName.equals("yearOfBirth"))
         .collect(Collectors.toList());
   }
+
+  public void dropColumn(String colName) {
+    testDeltaHelper.dropColumn(colName);
+    sparkSession.sql(String.format("ALTER TABLE delta.`%s` DROP COLUMN %s", basePath, colName));
+  }
+
+  public void renameColumn(String colName, String newColName) {
+    testDeltaHelper.renameColumn(colName, newColName);
+    sparkSession.sql(
+        String.format(
+            "ALTER TABLE delta.`%s` RENAME COLUMN %s TO %s", basePath, colName, newColName));
+  }
 }

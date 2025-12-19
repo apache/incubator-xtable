@@ -315,4 +315,25 @@ public class TestDeltaHelper {
         .mapToObj(i -> generateRandomRowForGivenYearAndLevel(partitionValue, level))
         .collect(Collectors.toList());
   }
+
+  public void dropColumn(String colName) {
+    this.tableStructSchema =
+        new StructType(
+            Arrays.stream(tableStructSchema.fields())
+                .filter(field -> field.name() != colName)
+                .toArray(StructField[]::new));
+  }
+
+  public void renameColumn(String colName, String newColName) {
+    this.tableStructSchema =
+        new StructType(
+            Arrays.stream(tableStructSchema.fields())
+                .map(
+                    field ->
+                        field.name().equals(colName)
+                            ? new StructField(
+                                newColName, field.dataType(), field.nullable(), field.metadata())
+                            : field)
+                .toArray(StructField[]::new));
+  }
 }

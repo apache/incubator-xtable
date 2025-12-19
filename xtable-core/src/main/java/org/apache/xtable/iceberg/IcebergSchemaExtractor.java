@@ -54,14 +54,13 @@ import org.apache.xtable.model.schema.InternalType;
 @Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class IcebergSchemaExtractor {
-  private static final IcebergSchemaExtractor INSTANCE = new IcebergSchemaExtractor();
   private static final String MAP_KEY_FIELD_NAME = "key";
   private static final String MAP_VALUE_FIELD_NAME = "value";
   private static final String LIST_ELEMENT_FIELD_NAME = "element";
   @Getter private final Map<Integer, String> idToStorageName = new HashMap<>();
 
   public static IcebergSchemaExtractor getInstance() {
-    return INSTANCE;
+    return new IcebergSchemaExtractor();
   }
 
   private void initializeFieldIdTracker(InternalSchema schema, AtomicInteger fieldIdTracker) {
@@ -112,10 +111,6 @@ public class IcebergSchemaExtractor {
     // traverse the schema before conversion to ensure fieldIdTracker won't return any
     // fieldIds that are already present in the schema
     initializeFieldIdTracker(internalSchema, fieldIdTracker);
-    // since IcebergSchemaExtractor is used as a singleton, idToStorageName may contain the results
-    // extracted in the last run. To reflect the latest schema, it should be reset before the schema
-    // extraction.
-    idToStorageName.clear();
     List<Types.NestedField> nestedFields = convertFields(internalSchema, fieldIdTracker);
     List<InternalField> recordKeyFields = internalSchema.getRecordKeyFields();
     boolean recordKeyFieldsAreNotRequired =

@@ -765,7 +765,21 @@ public class ITConversionController {
               null,
               null);
       conversionController.sync(conversionConfig, conversionSourceProvider);
-      checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 20);
+      table.insertRows(10);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      table.insertRows(10);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 40);
+
+      table.dropColumn("long_field");
+      table.insertRows(10);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 50);
+
+      table.renameColumn("double_field", "scores");
+      table.insertRows(10);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 60);
     }
   }
 
