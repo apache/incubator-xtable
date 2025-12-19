@@ -232,6 +232,11 @@ public class ITConversionController {
       String sourceTableFormat, SyncMode syncMode, boolean isPartitioned) {
     String tableName = getTableName();
     List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
+    if (sourceTableFormat.equals(PAIMON)) {
+      // TODO: Hudi 1.x target is not supported for un-partitioned Paimon source.
+      targetTableFormats =
+          targetTableFormats.stream().filter(fmt -> !fmt.equals(HUDI)).collect(Collectors.toList());
+    }
     String partitionConfig = null;
     if (isPartitioned) {
       partitionConfig = "level:VALUE";
