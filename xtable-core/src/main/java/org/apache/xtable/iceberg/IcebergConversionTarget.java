@@ -188,16 +188,20 @@ public class IcebergConversionTarget implements ConversionTarget {
   @Override
   public void syncSchema(InternalSchema schema) {
     Schema latestSchema = schemaExtractor.toIceberg(schema);
+    String mappingJson = transaction.table().properties().get(TableProperties.DEFAULT_NAME_MAPPING);
+    NameMapping mapping =
+        mappingJson == null
+            ? MappingUtil.create(latestSchema)
+            : NameMappingParser.fromJson(mappingJson);
     if (!schemaExtractor.getIdToStorageName().isEmpty()) {
-      NameMapping mapping = MappingUtil.create(latestSchema);
-      NameMapping updatedMapping =
+      mapping =
           NameMapping.of(
               updateNameMapping(mapping.asMappedFields(), schemaExtractor.getIdToStorageName()));
-      transaction
-          .updateProperties()
-          .set(TableProperties.DEFAULT_NAME_MAPPING, NameMappingParser.toJson(updatedMapping))
-          .commit();
     }
+    transaction
+        .updateProperties()
+        .set(TableProperties.DEFAULT_NAME_MAPPING, NameMappingParser.toJson(mapping))
+        .commit();
     if (!transaction.table().schema().sameSchema(latestSchema)) {
       boolean hasFieldIds =
           schema.getAllFields().stream().anyMatch(field -> field.getFieldId() != null);
