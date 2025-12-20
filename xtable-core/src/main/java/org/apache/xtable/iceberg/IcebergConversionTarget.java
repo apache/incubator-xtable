@@ -189,8 +189,12 @@ public class IcebergConversionTarget implements ConversionTarget {
   public void syncSchema(InternalSchema schema) {
     Schema latestSchema = schemaExtractor.toIceberg(schema);
     String mappingJson = transaction.table().properties().get(TableProperties.DEFAULT_NAME_MAPPING);
+    boolean hasFieldIds =
+        schema.getAllFields().stream().anyMatch(field -> field.getFieldId() != null);
+    // Recreate name mapping when field IDs were provided in the source schema to ensure every
+    // field in the mapping was assigned the same ID as what is in the source schema
     NameMapping mapping =
-        mappingJson == null || !schemaExtractor.getIdToStorageName().isEmpty()
+        mappingJson == null || hasFieldIds
             ? MappingUtil.create(latestSchema)
             : NameMappingParser.fromJson(mappingJson);
     mapping =
@@ -201,8 +205,6 @@ public class IcebergConversionTarget implements ConversionTarget {
         .set(TableProperties.DEFAULT_NAME_MAPPING, NameMappingParser.toJson(mapping))
         .commit();
     if (!transaction.table().schema().sameSchema(latestSchema)) {
-      boolean hasFieldIds =
-          schema.getAllFields().stream().anyMatch(field -> field.getFieldId() != null);
       if (hasFieldIds) {
         // There is no clean way to sync the schema with the provided field IDs using the
         // transaction API so we commit the current transaction and interact directly with
