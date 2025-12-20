@@ -157,6 +157,11 @@ public class ITConversionService {
   public void testVariousOperations(String sourceTableFormat, boolean isPartitioned) {
     String tableName = getTableName();
     List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
+    if (sourceTableFormat.equals(PAIMON)) {
+      // TODO: Hudi 1.x target is not supported for un-partitioned Paimon source.
+      targetTableFormats =
+          targetTableFormats.stream().filter(fmt -> !fmt.equals(HUDI)).collect(Collectors.toList());
+    }
     String partitionConfig = isPartitioned ? "level:VALUE" : null;
 
     try (GenericTable table =
@@ -323,18 +328,24 @@ public class ITConversionService {
                           .filter(filterCondition);
                     }));
 
-    String[] selectColumnsArr = sourceTable.getColumnsToSelect().toArray(new String[] {});
-    List<String> dataset1Rows = sourceRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
+    List<String> dataset1Rows =
+        sourceRows
+            .selectExpr(getSelectColumnsArr(sourceTable.getColumnsToSelect(), sourceFormat))
+            .toJSON()
+            .collectAsList();
     targetRowsByFormat.forEach(
-        (format, targetRows) -> {
+        (targetFormat, targetRows) -> {
           List<String> dataset2Rows =
-              targetRows.selectExpr(selectColumnsArr).toJSON().collectAsList();
+              targetRows
+                  .selectExpr(getSelectColumnsArr(sourceTable.getColumnsToSelect(), targetFormat))
+                  .toJSON()
+                  .collectAsList();
           assertEquals(
               dataset1Rows.size(),
               dataset2Rows.size(),
               String.format(
                   "Datasets have different row counts when reading from Spark. Source: %s, Target: %s",
-                  sourceFormat, format));
+                  sourceFormat, targetFormat));
           // sanity check the count to ensure test is set up properly
           if (expectedCount != null) {
             assertEquals(expectedCount, dataset1Rows.size());
@@ -347,7 +358,7 @@ public class ITConversionService {
               dataset2Rows,
               String.format(
                   "Datasets are not equivalent when reading from Spark. Source: %s, Target: %s",
-                  sourceFormat, format));
+                  sourceFormat, targetFormat));
         });
   }
 
@@ -388,5 +399,30 @@ public class ITConversionService {
       assertNotNull(convertedTable.getTargetSchema(), "Schema should not be null");
       assertNotNull(convertedTable.getTargetMetadataPath(), "Metadata path should not be null");
     }
+  }
+
+  private static String[] getSelectColumnsArr(List<String> columnsToSelect, String format) {
+    boolean isHudi = format.equals(HUDI);
+    boolean isIceberg = format.equals(ICEBERG);
+    return columnsToSelect.stream()
+        .map(
+            colName -> {
+              if (colName.startsWith("timestamp_local_millis")) {
+                if (isHudi) {
+                  return String.format(
+                      "unix_millis(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
+                } else if (isIceberg) {
+                  // iceberg is showing up as micros, so we need to divide by 1000 to get millis
+                  return String.format("%s div 1000 AS %s", colName, colName);
+                } else {
+                  return colName;
+                }
+              } else if (isHudi && colName.startsWith("timestamp_local_micros")) {
+                return String.format("unix_micros(CAST(%s AS TIMESTAMP)) AS %s", colName, colName);
+              } else {
+                return colName;
+              }
+            })
+        .toArray(String[]::new);
   }
 }
