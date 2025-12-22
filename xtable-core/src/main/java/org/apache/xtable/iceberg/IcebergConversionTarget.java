@@ -207,8 +207,8 @@ public class IcebergConversionTarget implements ConversionTarget {
       boolean hasFieldIds =
           schema.getAllFields().stream().anyMatch(field -> field.getFieldId() != null);
       if (hasFieldIds) {
-        // Recreate name mapping when field IDs were provided in the source schema to ensure every
-        // field in the mapping was assigned the same ID as what is in the source schema
+        // If field IDs are provided in the source schema, manually update the name mapping to
+        // ensure the IDs match the correct fields.
         setNameMapping(MappingUtil.create(latestSchema));
         // There is no clean way to sync the schema with the provided field IDs using the
         // transaction API so we commit the current transaction and interact directly with
