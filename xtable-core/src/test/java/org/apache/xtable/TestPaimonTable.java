@@ -72,8 +72,7 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
       boolean additionalColumns) {
 
     Schema schema = buildGenericSchema(partitionField, additionalColumns);
-    return createTable(
-        tableName, partitionField, tempDir, hadoopConf, additionalColumns, schema);
+    return createTable(tableName, partitionField, tempDir, hadoopConf, additionalColumns, schema);
   }
 
   public static GenericTable<GenericRow, String> createTable(
@@ -85,8 +84,7 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
       Schema schema) {
     String basePath = initBasePath(tempDir, tableName);
     Catalog catalog = createFilesystemCatalog(basePath, hadoopConf);
-    FileStoreTable paimonTable =
-        createTable(catalog, tableName, schema);
+    FileStoreTable paimonTable = createTable(catalog, tableName, schema);
 
     System.out.println(
         "Initialized Paimon test table at base path: "
@@ -104,10 +102,7 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
     return CatalogFactory.createCatalog(context);
   }
 
-  public static FileStoreTable createTable(
-      Catalog catalog,
-      String tableName,
-      Schema schema) {
+  public static FileStoreTable createTable(Catalog catalog, String tableName, Schema schema) {
     try {
       catalog.createDatabase("test_db", true);
       Identifier identifier = Identifier.create("test_db", tableName);
