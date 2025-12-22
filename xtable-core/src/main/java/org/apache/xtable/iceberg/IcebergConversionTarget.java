@@ -169,17 +169,29 @@ public class IcebergConversionTarget implements ConversionTarget {
     }
   }
 
-  private MappedFields updateNameMapping(MappedFields mapping, Map<Integer, String> updates) {
+  private void setNameMapping(NameMapping mapping) {
+    MappedFields updatedMappedFields =
+        updateNameMapping(mapping.asMappedFields(), schemaExtractor.getIdToStorageName());
+    transaction
+        .updateProperties()
+        .set(
+            TableProperties.DEFAULT_NAME_MAPPING,
+            NameMappingParser.toJson(NameMapping.of(updatedMappedFields)))
+        .commit();
+  }
+
+  private MappedFields updateNameMapping(
+      MappedFields mapping, Map<Integer, String> idToStorageName) {
     if (mapping == null) {
       return null;
     }
     List<MappedField> fieldResults = new ArrayList<>();
     for (MappedField field : mapping.fields()) {
       Set<String> fieldNames = new HashSet<>(field.names());
-      if (updates.containsKey(field.id())) {
-        fieldNames.add(updates.get(field.id()));
+      if (idToStorageName.containsKey(field.id())) {
+        fieldNames.add(idToStorageName.get(field.id()));
       }
-      MappedFields nestedMapping = updateNameMapping(field.nestedMapping(), updates);
+      MappedFields nestedMapping = updateNameMapping(field.nestedMapping(), idToStorageName);
       fieldResults.add(MappedField.of(field.id(), fieldNames, nestedMapping));
     }
     return MappedFields.of(fieldResults);
@@ -188,24 +200,16 @@ public class IcebergConversionTarget implements ConversionTarget {
   @Override
   public void syncSchema(InternalSchema schema) {
     Schema latestSchema = schemaExtractor.toIceberg(schema);
-    String mappingJson = transaction.table().properties().get(TableProperties.DEFAULT_NAME_MAPPING);
-    boolean hasFieldIds =
-        schema.getAllFields().stream().anyMatch(field -> field.getFieldId() != null);
-    // Recreate name mapping when field IDs were provided in the source schema to ensure every
-    // field in the mapping was assigned the same ID as what is in the source schema
-    NameMapping mapping =
-        mappingJson == null || hasFieldIds
-            ? MappingUtil.create(latestSchema)
-            : NameMappingParser.fromJson(mappingJson);
-    mapping =
-        NameMapping.of(
-            updateNameMapping(mapping.asMappedFields(), schemaExtractor.getIdToStorageName()));
-    transaction
-        .updateProperties()
-        .set(TableProperties.DEFAULT_NAME_MAPPING, NameMappingParser.toJson(mapping))
-        .commit();
+    if (!transaction.table().properties().containsKey(TableProperties.DEFAULT_NAME_MAPPING)) {
+      setNameMapping(MappingUtil.create(latestSchema));
+    }
     if (!transaction.table().schema().sameSchema(latestSchema)) {
+      boolean hasFieldIds =
+          schema.getAllFields().stream().anyMatch(field -> field.getFieldId() != null);
       if (hasFieldIds) {
+        // Recreate name mapping when field IDs were provided in the source schema to ensure every
+        // field in the mapping was assigned the same ID as what is in the source schema
+        setNameMapping(MappingUtil.create(latestSchema));
         // There is no clean way to sync the schema with the provided field IDs using the
         // transaction API so we commit the current transaction and interact directly with
         // the operations API.

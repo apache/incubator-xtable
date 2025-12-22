@@ -67,8 +67,9 @@ public class IcebergSchemaExtractor {
     schema.getFields().stream()
         .forEach(
             field -> {
-              if (field.getFieldId() != null)
+              if (field.getFieldId() != null) {
                 fieldIdTracker.accumulateAndGet(field.getFieldId(), Math::max);
+              }
               initializeFieldIdTracker(field, fieldIdTracker);
             });
   }
@@ -86,8 +87,9 @@ public class IcebergSchemaExtractor {
                         || InternalField.Constants.MAP_VALUE_FIELD_NAME.equals(mapField.getName()))
             .forEach(
                 mapField -> {
-                  if (mapField.getFieldId() != null)
+                  if (mapField.getFieldId() != null) {
                     fieldIdTracker.accumulateAndGet(mapField.getFieldId(), Math::max);
+                  }
                   initializeFieldIdTracker(mapField, fieldIdTracker);
                 });
         return;
@@ -98,10 +100,14 @@ public class IcebergSchemaExtractor {
                     InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(arrayField.getName()))
             .forEach(
                 arrayField -> {
-                  if (arrayField.getFieldId() != null)
+                  if (arrayField.getFieldId() != null) {
                     fieldIdTracker.accumulateAndGet(arrayField.getFieldId(), Math::max);
+                  }
                   initializeFieldIdTracker(arrayField, fieldIdTracker);
                 });
+        return;
+      default:
+        return;
     }
   }
 
