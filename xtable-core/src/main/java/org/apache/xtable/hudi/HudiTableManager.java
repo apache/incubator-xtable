@@ -58,7 +58,7 @@ public class HudiTableManager {
   private static final String SIMPLE_KEY_GENERATOR = "org.apache.hudi.keygen.SimpleKeyGenerator";
   // Hudi 1.x spark query defaults to "default" database and spark read query picks up delta
   // instead, 0.x doesn't have the same problem.
-  // TODO: https://app.clickup.com/t/18029943/ENG-23339
+  // TODO: https://github.com/apache/incubator-xtable/issues/774
   private static final String DEFAULT_DATABASE_NAME = "default_hudi";
 
   private final Configuration configuration;

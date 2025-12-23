@@ -215,6 +215,11 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
   }
 
   private CommitsPair getCompletedAndPendingCommitsAfterInstant(HoodieInstant commitInstant) {
+    // Get all instants after the provided commitInstant and instants that are yet to be completed.
+    // We use completionTime (not requestedTime) for filtering completed commits because we need
+    // commits that actually finished after the last sync, not just ones that were initiated after.
+    // This handles out-of-order completion scenarios where a later-requested commit may complete
+    // before an earlier-requested one.
     List<HoodieInstant> allInstants =
         metaClient
             .getActiveTimeline()
@@ -233,7 +238,10 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
     if (completedInstants.isEmpty()) {
       return CommitsPair.builder().completedCommits(completedInstants).build();
     }
-    // remove from pending instants that are larger than the last completed instant.
+    // Remove pending instants that were requested after the last completed instant finished.
+    // We compare requestedTime of pending instants against completionTime of the last completed
+    // instant because pending instants don't have a completionTime yet. This captures pending
+    // commits that were initiated before or during the last completed commit's execution.
     HoodieInstant lastCompletedInstant = completedInstants.get(completedInstants.size() - 1);
     List<Instant> pendingInstants =
         allInstants.stream()

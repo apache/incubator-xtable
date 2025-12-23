@@ -34,7 +34,7 @@ import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
 
 import org.apache.xtable.model.exception.ParseException;
 
-public class HudiInstantUtils {
+class HudiInstantUtils {
   private static final ZoneId ZONE_ID = ZoneId.of("UTC");
 
   // Unfortunately millisecond format is not parsable as is
@@ -54,7 +54,7 @@ public class HudiInstantUtils {
    * @param timestamp input commit timestamp
    * @return timestamp parsed as Instant
    */
-  public static Instant parseFromInstantTime(String timestamp) {
+  static Instant parseFromInstantTime(String timestamp) {
     try {
       String timestampInMillis = timestamp;
       if (isSecondGranularity(timestamp)) {
@@ -70,7 +70,7 @@ public class HudiInstantUtils {
     }
   }
 
-  public static String convertInstantToCommit(Instant instant) {
+  static String convertInstantToCommit(Instant instant) {
     LocalDateTime instantTime = instant.atZone(ZONE_ID).toLocalDateTime();
     return HoodieInstantTimeGenerator.getInstantFromTemporalAccessor(instantTime);
   }

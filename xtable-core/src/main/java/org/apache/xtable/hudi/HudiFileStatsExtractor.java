@@ -23,11 +23,14 @@ import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.nio.ByteBuffer;
 import java.sql.Date;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -38,18 +41,22 @@ import lombok.NonNull;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.io.api.Binary;
 
-import org.apache.hudi.avro.HoodieAvroWrapperUtils;
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ParquetUtils;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.hadoop.fs.CachingPath;
 import org.apache.hudi.hadoop.fs.HadoopFSUtils;
 import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.metadata.HoodieTableMetadataUtil;
 import org.apache.hudi.metadata.MetadataPartitionType;
 import org.apache.hudi.stats.HoodieColumnRangeMetadata;
+import org.apache.hudi.stats.ValueMetadata;
+import org.apache.hudi.stats.XTableValueMetadata;
 
+import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -181,12 +188,26 @@ public class HudiFileStatsExtractor {
 
   private HudiFileStats computeColumnStatsForFile(
       Path filePath, Map<String, InternalField> nameFieldMap) {
+    AvroSchemaConverter schemaConverter = AvroSchemaConverter.getInstance();
+    HoodieIndexVersion indexVersion =
+        HoodieTableMetadataUtil.existingIndexVersionOrDefault(
+            HoodieTableMetadataUtil.PARTITION_NAME_COLUMN_STATS, metaClient);
+    List<String> columnNames =
+        nameFieldMap.entrySet().stream()
+            .filter(
+                e ->
+                    HoodieTableMetadataUtil.isColumnTypeSupported(
+                        schemaConverter.fromInternalSchema(e.getValue().getSchema()),
+                        Option.empty(),
+                        indexVersion))
+            .map(Map.Entry::getKey)
+            .collect(Collectors.toList());
     List<HoodieColumnRangeMetadata<Comparable>> columnRanges =
         UTILS.readColumnStatsFromMetadata(
             metaClient.getStorage(),
             HadoopFSUtils.convertToStoragePath(filePath),
-            new ArrayList<>(nameFieldMap.keySet()),
-            HoodieIndexVersion.V1);
+            columnNames,
+            indexVersion);
     List<ColumnStat> columnStats =
         columnRanges.stream()
             .map(
@@ -206,21 +227,26 @@ public class HudiFileStatsExtractor {
     if (columnStats == null) {
       return ColumnStat.builder().build();
     }
-    Comparable<?> minValue =
-        HoodieAvroWrapperUtils.unwrapAvroValueWrapper(columnStats.getMinValue());
-    Comparable<?> maxValue =
-        HoodieAvroWrapperUtils.unwrapAvroValueWrapper(columnStats.getMaxValue());
-    if (field.getSchema().getDataType() == InternalType.DECIMAL) {
-      int scale =
-          (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
-      minValue =
-          minValue instanceof ByteBuffer
-              ? convertBytesToBigDecimal((ByteBuffer) minValue, scale)
-              : ((BigDecimal) minValue).setScale(scale, RoundingMode.UNNECESSARY);
-      maxValue =
-          maxValue instanceof ByteBuffer
-              ? convertBytesToBigDecimal((ByteBuffer) maxValue, scale)
-              : ((BigDecimal) maxValue).setScale(scale, RoundingMode.UNNECESSARY);
+
+    ValueMetadata valueMetadata = ValueMetadata.getValueMetadata(columnStats.getValueType());
+    Comparable<?> minValue = valueMetadata.unwrapValue(columnStats.getMinValue());
+    Comparable<?> maxValue = valueMetadata.unwrapValue(columnStats.getMaxValue());
+    if (valueMetadata.isV1()) {
+      if (field.getSchema().getDataType() == InternalType.DECIMAL) {
+        int scale =
+            (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
+        minValue =
+            minValue instanceof ByteBuffer
+                ? convertBytesToBigDecimal((ByteBuffer) minValue, scale)
+                : ((BigDecimal) minValue).setScale(scale, RoundingMode.UNNECESSARY);
+        maxValue =
+            maxValue instanceof ByteBuffer
+                ? convertBytesToBigDecimal((ByteBuffer) maxValue, scale)
+                : ((BigDecimal) maxValue).setScale(scale, RoundingMode.UNNECESSARY);
+      }
+    } else {
+      minValue = XTableValueMetadata.convertHoodieTypeToRangeType(minValue, valueMetadata);
+      maxValue = XTableValueMetadata.convertHoodieTypeToRangeType(maxValue, valueMetadata);
     }
     return getColumnStatFromValues(
         minValue,
@@ -244,9 +270,23 @@ public class HudiFileStatsExtractor {
     if (colRange == null) {
       return ColumnStat.builder().build();
     }
+    Comparable<?> minValue;
+    Comparable<?> maxValue;
+    if (colRange.getValueMetadata().isV1()) {
+      minValue = colRange.getMinValue();
+      maxValue = colRange.getMaxValue();
+    } else {
+      minValue =
+          XTableValueMetadata.convertHoodieTypeToRangeType(
+              colRange.getMinValue(), colRange.getValueMetadata());
+      maxValue =
+          XTableValueMetadata.convertHoodieTypeToRangeType(
+              colRange.getMaxValue(), colRange.getValueMetadata());
+    }
+
     return getColumnStatFromValues(
-        colRange.getMinValue(),
-        colRange.getMaxValue(),
+        minValue,
+        maxValue,
         field,
         colRange.getNullCount(),
         colRange.getValueCount(),
@@ -260,8 +300,8 @@ public class HudiFileStatsExtractor {
       long nullCount,
       long valueCount,
       long totalSize) {
-    Comparable convertedMinValue = convertValue(minValue, field.getSchema().getDataType());
-    Comparable convertedMaxValue = convertValue(maxValue, field.getSchema().getDataType());
+    Comparable convertedMinValue = convertValue(minValue, field.getSchema());
+    Comparable convertedMaxValue = convertValue(maxValue, field.getSchema());
     boolean isScalar =
         convertedMinValue == null || convertedMinValue.compareTo(convertedMaxValue) == 0;
     Range range =
@@ -277,18 +317,32 @@ public class HudiFileStatsExtractor {
         .build();
   }
 
-  private static Comparable convertValue(Comparable value, InternalType type) {
+  private static Comparable convertValue(Comparable value, InternalSchema fieldSchema) {
     // Special type handling
     if (value == null) {
       return value;
     }
+    InternalType type = fieldSchema.getDataType();
     Comparable result = value;
     if (value instanceof Date) {
       result = dateToDaysSinceEpoch(value);
+    } else if (value instanceof LocalDate) {
+      result = (int) ((LocalDate) value).toEpochDay();
     } else if (type == InternalType.ENUM && (value instanceof ByteBuffer)) {
       result = new String(((ByteBuffer) value).array());
     } else if (type == InternalType.FIXED && (value instanceof Binary)) {
       result = ByteBuffer.wrap(((Binary) value).getBytes());
+    } else if (value instanceof Instant) {
+      Instant instant = (Instant) value;
+      if (fieldSchema.getMetadata() != null
+          && fieldSchema.getMetadata().get(InternalSchema.MetadataKey.TIMESTAMP_PRECISION)
+              == InternalSchema.MetadataValue.MICROS) {
+        result =
+            TimeUnit.SECONDS.toMicros(instant.getEpochSecond())
+                + TimeUnit.NANOSECONDS.toMicros(instant.getNano());
+      } else {
+        result = instant.toEpochMilli();
+      }
     }
     return result;
   }

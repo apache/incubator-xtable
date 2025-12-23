@@ -102,8 +102,7 @@ public class BaseFileUpdatesExtractor {
                     engineContext,
                     metaClient.getStorage(),
                     metadataConfig,
-                    tableBasePath.toString(),
-                    true)
+                    tableBasePath.toString())
             : null;
     FileSystemViewManager fileSystemViewManager =
         FileSystemViewManager.createViewManager(
@@ -219,7 +218,7 @@ public class BaseFileUpdatesExtractor {
   ReplaceMetadata convertDiff(
       @NonNull InternalFilesDiff internalFilesDiff,
       @NonNull String commit,
-      HoodieIndexVersion indexVersion) {
+      @NonNull HoodieIndexVersion indexVersion) {
     // For all removed files, group by partition and extract the file id
     Map<String, List<String>> partitionToReplacedFileIds =
         internalFilesDiff.dataFilesRemoved().stream()

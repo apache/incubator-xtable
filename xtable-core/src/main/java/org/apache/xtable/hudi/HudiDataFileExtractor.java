@@ -96,12 +96,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
             ? metaClient
                 .getTableFormat()
                 .getMetadataFactory()
-                .create(
-                    engineContext,
-                    metaClient.getStorage(),
-                    metadataConfig,
-                    basePath.toString(),
-                    true)
+                .create(engineContext, metaClient.getStorage(), metadataConfig, basePath.toString())
             : null;
     this.fileSystemViewManager =
         FileSystemViewManager.createViewManager(

@@ -627,6 +627,8 @@ public class HudiConversionTarget implements ConversionTarget {
               HoodieMetadataConfig.newBuilder()
                   .enable(true)
                   .withProperties(properties)
+                  // TODO: Hudi 1.1 MDT col-stats generation fails for array and map types.
+                  // https://github.com/apache/incubator-xtable/issues/773
                   .withMetadataIndexColumnStats(false)
                   .withMaxNumDeltaCommitsBeforeCompaction(maxNumDeltaCommitsBeforeCompaction)
                   .build())

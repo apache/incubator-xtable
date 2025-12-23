@@ -31,8 +31,31 @@ import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
 
+/**
+ * Utility class for creating and converting Hudi {@link ValueMetadata} instances from XTable's
+ * internal schema representation.
+ *
+ * <p>This class bridges XTable's {@link InternalSchema} types to Hudi's {@link ValueType} and
+ * {@link ValueMetadata} used for column statistics. It handles the conversion of various data types
+ * including timestamps, decimals, and dates.
+ *
+ * <p>Note: This class uses reflection to create {@link ValueMetadata} instances because XTable
+ * classes may be loaded by a different classloader than Hudi classes in Spark environments, making
+ * direct constructor access illegal.
+ */
 public class XTableValueMetadata {
 
+  /**
+   * Creates a {@link ValueMetadata} instance from a {@link ColumnStat} for the specified Hudi index
+   * version.
+   *
+   * @param columnStat the column statistics containing schema information
+   * @param indexVersion the Hudi index version to use for metadata creation
+   * @return the appropriate {@link ValueMetadata} for the column's data type
+   * @throws IllegalArgumentException if columnStat is null (for V2+ index), or if decimal metadata
+   *     is missing required precision/scale
+   * @throws IllegalStateException if an unsupported internal type is encountered
+   */
   public static ValueMetadata getValueMetadata(
       ColumnStat columnStat, HoodieIndexVersion indexVersion) {
     if (indexVersion.lowerThan(HoodieIndexVersion.V2)) {
@@ -67,6 +90,13 @@ public class XTableValueMetadata {
     }
   }
 
+  /**
+   * Maps an XTable {@link InternalSchema} to the corresponding Hudi {@link ValueType}.
+   *
+   * @param internalSchema the internal schema to convert
+   * @return the corresponding Hudi value type
+   * @throws UnsupportedOperationException if the internal data type is not supported
+   */
   static ValueType fromInternalSchema(InternalSchema internalSchema) {
     switch (internalSchema.getDataType()) {
       case NULL:
@@ -113,7 +143,14 @@ public class XTableValueMetadata {
     }
   }
 
-  // only for testing
+  /**
+   * Creates a {@link ValueMetadata} instance from a {@link ValueType} for the specified Hudi index
+   * version. This method is primarily intended for testing purposes.
+   *
+   * @param valueType the Hudi value type
+   * @param indexVersion the Hudi index version to use for metadata creation
+   * @return the appropriate {@link ValueMetadata} for the value type
+   */
   public static ValueMetadata getValueMetadata(
       ValueType valueType, HoodieIndexVersion indexVersion) {
     if (indexVersion.lowerThan(HoodieIndexVersion.V2)) {
@@ -139,6 +176,19 @@ public class XTableValueMetadata {
     }
   }
 
+  /**
+   * Converts a value from its XTable representation to the appropriate Hudi range type for column
+   * statistics.
+   *
+   * <p>This method handles the conversion of temporal types ({@link Instant}, {@link
+   * LocalDateTime}, {@link LocalDate}) to their corresponding Hudi representations based on the
+   * value metadata.
+   *
+   * @param val the value to convert
+   * @param valueMetadata the metadata describing the target value type
+   * @return the converted value suitable for Hudi range statistics
+   * @throws IllegalArgumentException if the value type doesn't match the expected metadata type
+   */
   public static Comparable<?> convertHoodieTypeToRangeType(
       Comparable<?> val, ValueMetadata valueMetadata) {
     if (val instanceof Instant) {

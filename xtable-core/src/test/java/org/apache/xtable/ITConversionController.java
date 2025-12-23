@@ -66,7 +66,6 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -77,7 +76,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
-import org.apache.hudi.common.config.HoodieReaderConfig;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
@@ -105,6 +103,7 @@ import org.apache.xtable.delta.DeltaConversionSourceProvider;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
+import org.apache.xtable.iceberg.TestIcebergDataHelper;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.paimon.PaimonConversionSourceProvider;
@@ -400,8 +399,6 @@ public class ITConversionController {
 
   @ParameterizedTest
   @MethodSource("testCasesWithPartitioningAndSyncModes")
-  @Disabled(
-      "This is a major blocker for hudi 1.x spark reader, https://app.clickup.com/t/18029943/ENG-23338")
   public void testConcurrentInsertsAndTableServiceWrites(
       SyncMode syncMode, PartitionConfig partitionConfig) {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
@@ -536,7 +533,8 @@ public class ITConversionController {
         Arguments.of(
             buildArgsForPartition(
                 ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter)),
-        // Different issue, didn't investigate this much at all
+        // TODO: Hudi 1.1 and ICEBERG nested partitioned filter data validation fails
+        // https://github.com/apache/incubator-xtable/issues/775
         //        Arguments.of(
         //            // Delta Lake does not currently support nested partition columns
         //            buildArgsForPartition(
@@ -552,8 +550,9 @@ public class ITConversionController {
                 "severity:SIMPLE",
                 "severity:VALUE",
                 severityFilter)));
-    // [ENG-6555] addresses this
-    //                severityFilter)),
+    // TODO: Hudi 1.1 partitioned data query with timestamp and simple partition key values fails
+    // with parsing exception
+    // https://github.com/apache/incubator-xtable/issues/776
     //        Arguments.of(
     //            buildArgsForPartition(
     //                HUDI,
@@ -680,6 +679,35 @@ public class ITConversionController {
   }
 
   @Test
+  public void testIncrementalSyncsWithNoChangesDoesNotThrowError() {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
+      ConversionConfig dualTableConfig =
+          getTableSyncConfig(
+              HUDI,
+              SyncMode.INCREMENTAL,
+              tableName,
+              table,
+              Arrays.asList(ICEBERG, DELTA),
+              null,
+              null);
+
+      table.insertRecords(50, true);
+      ConversionController conversionController =
+          new ConversionController(jsc.hadoopConfiguration());
+      // sync once
+      conversionController.sync(dualTableConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, Arrays.asList(DELTA, ICEBERG), 50);
+      // sync again
+      conversionController.sync(dualTableConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, Arrays.asList(DELTA, ICEBERG), 50);
+    }
+  }
+
+  @Test
   public void testIcebergCorruptedSnapshotRecovery() throws Exception {
     String tableName = getTableName();
     ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
@@ -762,6 +790,34 @@ public class ITConversionController {
       // assert that proper settings are enabled for delta log
       DeltaLog deltaLog = DeltaLog.forTable(sparkSession, table.getBasePath());
       Assertions.assertTrue(deltaLog.enableExpiredLogCleanup(deltaLog.snapshot().metadata()));
+    }
+  }
+
+  @Test
+  void otherIcebergPartitionTypes() {
+    String tableName = getTableName();
+    ConversionController conversionController = new ConversionController(jsc.hadoopConfiguration());
+    List<String> targetTableFormats = Collections.singletonList(DELTA);
+
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(ICEBERG);
+    try (TestIcebergTable table =
+        new TestIcebergTable(
+            tableName,
+            tempDir,
+            jsc.hadoopConfiguration(),
+            "id",
+            Arrays.asList("level", "string_field"),
+            TestIcebergDataHelper.SchemaType.COMMON)) {
+      table.insertRows(100);
+
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              ICEBERG, SyncMode.FULL, tableName, table, targetTableFormats, null, null);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(ICEBERG, table, targetTableFormats, 100);
+      // Query with filter to assert partition does not impact ability to query
+      checkDatasetEquivalenceWithFilter(
+          ICEBERG, table, targetTableFormats, "level == 'INFO' AND string_field > 'abc'");
     }
   }
 
@@ -859,9 +915,6 @@ public class ITConversionController {
                         finalTargetOptions.put(HoodieMetadataConfig.ENABLE.key(), "true");
                         finalTargetOptions.put(
                             "hoodie.datasource.read.extract.partition.values.from.path", "true");
-                        // TODO: https://app.clickup.com/t/18029943/ENG-23336
-                        finalTargetOptions.put(
-                            HoodieReaderConfig.FILE_GROUP_READER_ENABLED.key(), "false");
                       }
                       return sparkSession
                           .read()
@@ -1022,6 +1075,22 @@ public class ITConversionController {
       String hudiPartitionConfig,
       String xTablePartitionConfig,
       String filter) {
+    return buildArgsForPartition(
+        sourceFormat,
+        Collections.emptyMap(),
+        targetFormats,
+        hudiPartitionConfig,
+        xTablePartitionConfig,
+        filter);
+  }
+
+  private static TableFormatPartitionDataHolder buildArgsForPartition(
+      String sourceFormat,
+      Map<String, String> sourceFormatOptions,
+      List<String> targetFormats,
+      String hudiPartitionConfig,
+      String xTablePartitionConfig,
+      String filter) {
     return TableFormatPartitionDataHolder.builder()
         .sourceTableFormat(sourceFormat)
         .targetTableFormats(targetFormats)
@@ -1035,6 +1104,7 @@ public class ITConversionController {
   @Value
   private static class TableFormatPartitionDataHolder {
     String sourceTableFormat;
+    Map<String, String> sourceTableOptions;
     List<String> targetTableFormats;
     String xTablePartitionConfig;
     Optional<String> hudiSourceConfig;
