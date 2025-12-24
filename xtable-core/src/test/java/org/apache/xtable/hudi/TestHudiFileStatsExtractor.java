@@ -53,7 +53,6 @@ import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.util.HadoopOutputFile;
 import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -134,8 +133,6 @@ public class TestHudiFileStatsExtractor {
           .build();
 
   @Test
-  @Disabled(
-      "Hudi 1.1 MDT col-stats generation fails for array and map types - https://github.com/apache/incubator-xtable/issues/773")
   void columnStatsWithMetadataTable(@TempDir Path tempDir) throws Exception {
     String tableName = GenericTable.getTableName();
     String basePath;
@@ -148,6 +145,7 @@ public class TestHudiFileStatsExtractor {
       table.insertRecords(true, records);
       basePath = table.getBasePath();
       metaClient = table.getMetaClient();
+      metaClient.reloadTableConfig();
     }
     HoodieTableMetadata tableMetadata =
         new HoodieBackedTableMetadata(
