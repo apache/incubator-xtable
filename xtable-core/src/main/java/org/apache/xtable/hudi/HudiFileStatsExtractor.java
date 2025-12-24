@@ -42,6 +42,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.parquet.io.api.Binary;
 
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
+import org.apache.hudi.common.schema.HoodieSchema;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ParquetUtils;
@@ -197,7 +198,8 @@ public class HudiFileStatsExtractor {
             .filter(
                 e ->
                     HoodieTableMetadataUtil.isColumnTypeSupported(
-                        schemaConverter.fromInternalSchema(e.getValue().getSchema()),
+                        HoodieSchema.fromAvroSchema(
+                            schemaConverter.fromInternalSchema(e.getValue().getSchema())),
                         Option.empty(),
                         indexVersion))
             .map(Map.Entry::getKey)

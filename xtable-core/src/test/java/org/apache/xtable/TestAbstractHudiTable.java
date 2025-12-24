@@ -443,9 +443,7 @@ public abstract class TestAbstractHudiTable
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(true)
-            // TODO: Hudi 1.1 MDT col-stats generation fails for array and map types.
-            // https://github.com/apache/incubator-xtable/issues/773
-            .withMetadataIndexColumnStats(false)
+            .withMetadataIndexColumnStats(true)
             .withColumnStatsIndexForColumns(getColumnsFromSchema(schema))
             .build();
     Properties lockProperties = new Properties();
