@@ -747,6 +747,48 @@ public class ITConversionController {
   }
 
   @Test
+  public void testColumnMappingEnabledDeltaToIceberg() {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(DELTA);
+    try (TestSparkDeltaTable table =
+        TestSparkDeltaTable.forColumnMappingEnabled(tableName, tempDir, sparkSession, null)) {
+      table.insertRows(20);
+      ConversionController conversionController =
+          new ConversionController(jsc.hadoopConfiguration());
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              DELTA,
+              SyncMode.INCREMENTAL,
+              tableName,
+              table,
+              Collections.singletonList(ICEBERG),
+              null,
+              null);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      table.insertRows(10);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      table.insertRows(10);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 40);
+
+      table.dropColumn("long_field");
+      table.insertRows(10);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 50);
+
+      table.renameColumn("double_field", "scores");
+      table.insertRows(10);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 60);
+
+      table.addColumn();
+      table.insertRows(10);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(DELTA, table, Collections.singletonList(ICEBERG), 70);
+    }
+  }
+
+  @Test
   public void testMetadataRetention() throws Exception {
     String tableName = getTableName();
     ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
