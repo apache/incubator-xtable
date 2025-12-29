@@ -18,8 +18,8 @@
  
 package org.apache.xtable;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.hudi.keygen.constant.KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME;
-import static org.apache.xtable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Queue;
 import java.util.Random;
@@ -48,6 +49,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import lombok.Getter;
 import lombok.SneakyThrows;
 
 import org.apache.avro.LogicalType;
@@ -94,13 +96,15 @@ import org.apache.hudi.config.HoodieClusteringConfig;
 import org.apache.hudi.config.HoodieCompactionConfig;
 import org.apache.hudi.config.HoodieLockConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.hadoop.fs.HadoopFSUtils;
 import org.apache.hudi.keygen.CustomKeyGenerator;
 import org.apache.hudi.keygen.KeyGenerator;
 import org.apache.hudi.keygen.NonpartitionedKeyGenerator;
 import org.apache.hudi.keygen.SimpleKeyGenerator;
 import org.apache.hudi.keygen.TimestampBasedKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
-import org.apache.hudi.metadata.HoodieMetadataFileSystemView;
+import org.apache.hudi.metadata.FileSystemBackedTableMetadata;
+import org.apache.hudi.table.action.HoodieWriteMetadata;
 
 import com.google.common.base.Preconditions;
 
@@ -132,7 +136,7 @@ public abstract class TestAbstractHudiTable
   protected String tableName;
   // Base path for the table
   protected String basePath;
-  protected HoodieTableMetaClient metaClient;
+  @Getter protected HoodieTableMetaClient metaClient;
   protected TypedProperties typedProperties;
   protected KeyGenerator keyGenerator;
   protected Schema schema;
@@ -147,6 +151,7 @@ public abstract class TestAbstractHudiTable
       // Add key generator
       this.typedProperties = new TypedProperties();
       typedProperties.put(KeyGeneratorOptions.RECORDKEY_FIELD_NAME.key(), RECORD_KEY_FIELD_NAME);
+      typedProperties.put(HoodieMetadataConfig.ENABLE.key(), "true");
       if (partitionConfig == null) {
         this.keyGenerator = new NonpartitionedKeyGenerator(typedProperties);
         this.partitionFieldNames = Collections.emptyList();
@@ -292,11 +297,14 @@ public abstract class TestAbstractHudiTable
 
   public List<String> getAllLatestBaseFilePaths() {
     HoodieTableFileSystemView fsView =
-        new HoodieMetadataFileSystemView(
-            getWriteClient().getEngineContext(),
+        new HoodieTableFileSystemView(
+            new FileSystemBackedTableMetadata(
+                getWriteClient().getEngineContext(),
+                metaClient.getTableConfig(),
+                metaClient.getStorage(),
+                getBasePath()),
             metaClient,
-            metaClient.reloadActiveTimeline(),
-            getHoodieWriteConfig(metaClient).getMetadataConfig());
+            metaClient.reloadActiveTimeline());
     return getAllLatestBaseFiles(fsView).stream()
         .map(HoodieBaseFile::getPath)
         .collect(Collectors.toList());
@@ -304,7 +312,8 @@ public abstract class TestAbstractHudiTable
 
   public void compact() {
     String instant = onlyScheduleCompaction();
-    getWriteClient().compact(instant);
+    HoodieWriteMetadata compactionMetadata = getWriteClient().compact(instant);
+    getWriteClient().commitCompaction(instant, compactionMetadata, Option.empty());
   }
 
   public String onlyScheduleCompaction() {
@@ -312,7 +321,8 @@ public abstract class TestAbstractHudiTable
   }
 
   public void completeScheduledCompaction(String instant) {
-    getWriteClient().compact(instant);
+    HoodieWriteMetadata compactionMetadata = getWriteClient().compact(instant);
+    getWriteClient().commitCompaction(instant, compactionMetadata, Option.empty());
   }
 
   public void clean() {
@@ -336,8 +346,8 @@ public abstract class TestAbstractHudiTable
     List<HoodieInstant> commitInstants =
         metaClient.getActiveTimeline().reload().getCommitsTimeline().getInstants();
     HoodieInstant instantToRestore = commitInstants.get(commitInstants.size() - 1 - n);
-    getWriteClient().savepoint(instantToRestore.getTimestamp(), "user", "savepoint-test");
-    getWriteClient().restoreToSavepoint(instantToRestore.getTimestamp());
+    getWriteClient().savepoint(instantToRestore.requestedTime(), "user", "savepoint-test");
+    getWriteClient().restoreToSavepoint(instantToRestore.requestedTime());
     assertMergeOnReadRestoreContainsLogFiles();
   }
 
@@ -357,7 +367,7 @@ public abstract class TestAbstractHudiTable
       Option<byte[]> instantDetails = activeTimeline.getInstantDetails(restoreInstant);
       try {
         HoodieRestoreMetadata instantMetadata =
-            TimelineMetadataUtils.deserializeAvroMetadata(
+            TimelineMetadataUtils.deserializeAvroMetadataLegacy(
                 instantDetails.get(), HoodieRestoreMetadata.class);
         assertTrue(
             instantMetadata.getHoodieRestoreMetadata().values().stream()
@@ -433,10 +443,9 @@ public abstract class TestAbstractHudiTable
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(true)
-            // enable col stats only on un-partitioned data due to bug in Hudi
-            // https://issues.apache.org/jira/browse/HUDI-6954
-            .withMetadataIndexColumnStats(
-                !keyGenProperties.getString(PARTITIONPATH_FIELD_NAME.key(), "").isEmpty())
+            // TODO: Hudi 1.1 MDT col-stats generation fails for array and map types.
+            // https://github.com/apache/incubator-xtable/issues/773
+            .withMetadataIndexColumnStats(false)
             .withColumnStatsIndexForColumns(getColumnsFromSchema(schema))
             .build();
     Properties lockProperties = new Properties();
@@ -594,32 +603,32 @@ public abstract class TestAbstractHudiTable
       HoodieTableType hoodieTableType,
       Configuration conf,
       boolean populateMetaFields) {
-    LocalFileSystem fs = (LocalFileSystem) FSUtils.getFs(basePath, conf);
+    LocalFileSystem fs = (LocalFileSystem) HadoopFSUtils.getFs(basePath, conf);
     // Enforce checksum such that fs.open() is consistent to DFS
     fs.setVerifyChecksum(true);
     fs.mkdirs(new org.apache.hadoop.fs.Path(basePath));
 
     if (fs.exists(new org.apache.hadoop.fs.Path(basePath + "/.hoodie"))) {
       return HoodieTableMetaClient.builder()
-          .setConf(conf)
+          .setConf(getStorageConf(conf))
           .setBasePath(basePath)
           .setLoadActiveTimelineOnLoad(true)
           .build();
     }
-    Properties properties =
-        HoodieTableMetaClient.withPropertyBuilder()
-            .fromProperties(keyGenProperties)
-            .setTableName(tableName)
-            .setTableType(hoodieTableType)
-            .setKeyGeneratorClassProp(keyGenerator.getClass().getCanonicalName())
-            .setPartitionFields(String.join(",", partitionFieldNames))
-            .setRecordKeyFields(RECORD_KEY_FIELD_NAME)
-            .setPayloadClass(OverwriteWithLatestAvroPayload.class)
-            .setCommitTimezone(HoodieTimelineTimeZone.UTC)
-            .setBaseFileFormat(HoodieFileFormat.PARQUET.toString())
-            .setPopulateMetaFields(populateMetaFields)
-            .build();
-    return HoodieTableMetaClient.initTableAndGetMetaClient(conf, this.basePath, properties);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> keyGenPropsMap = (Map) keyGenProperties;
+    return HoodieTableMetaClient.newTableBuilder()
+        .set(keyGenPropsMap)
+        .setTableName(tableName)
+        .setTableType(hoodieTableType)
+        .setKeyGeneratorClassProp(keyGenerator.getClass().getCanonicalName())
+        .setPartitionFields(String.join(",", partitionFieldNames))
+        .setRecordKeyFields(RECORD_KEY_FIELD_NAME)
+        .setPayloadClass(OverwriteWithLatestAvroPayload.class)
+        .setCommitTimezone(HoodieTimelineTimeZone.UTC)
+        .setBaseFileFormat(HoodieFileFormat.PARQUET.toString())
+        .setPopulateMetaFields(populateMetaFields)
+        .initTable(getStorageConf(conf), this.basePath);
   }
 
   private static Schema.Field copyField(Schema.Field input) {
