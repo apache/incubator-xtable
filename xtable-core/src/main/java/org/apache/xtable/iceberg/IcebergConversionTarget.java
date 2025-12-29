@@ -170,12 +170,17 @@ public class IcebergConversionTarget implements ConversionTarget {
   }
 
   /**
-   * Add storage names in {@link IcebergSchemaExtractor#getIdToStorageName()}, if any exist, to the
-   * given name mapping and apply the updated mapping to the table
+   * Create a name mapping from the given schema, add storage names in {@link
+   * IcebergSchemaExtractor#getIdToStorageName()}, if any exist, to the name mapping, and apply the
+   * updated mapping to the table.
    *
-   * @param mapping the new {@link NameMapping} to be updated and applied to the table
+   * <p>This method should only be called when the name mapping is not set, or when field IDs are
+   * provided in the source schema
+   *
+   * @param schema the {@link Schema} from which to create the name mapping
    */
-  private void setNameMapping(NameMapping mapping) {
+  private void createAndSetNameMapping(Schema schema) {
+    NameMapping mapping = MappingUtil.create(schema);
     MappedFields updatedMappedFields =
         updateNameMapping(mapping.asMappedFields(), schemaExtractor.getIdToStorageName());
     transaction
@@ -207,7 +212,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   public void syncSchema(InternalSchema schema) {
     Schema latestSchema = schemaExtractor.toIceberg(schema);
     if (!transaction.table().properties().containsKey(TableProperties.DEFAULT_NAME_MAPPING)) {
-      setNameMapping(MappingUtil.create(latestSchema));
+      createAndSetNameMapping(latestSchema);
     }
     if (!transaction.table().schema().sameSchema(latestSchema)) {
       boolean hasFieldIds =
@@ -215,7 +220,7 @@ public class IcebergConversionTarget implements ConversionTarget {
       if (hasFieldIds) {
         // If field IDs are provided in the source schema, manually update the name mapping to
         // ensure the IDs match the correct fields.
-        setNameMapping(MappingUtil.create(latestSchema));
+        createAndSetNameMapping(latestSchema);
         // There is no clean way to sync the schema with the provided field IDs using the
         // transaction API so we commit the current transaction and interact directly with
         // the operations API.
