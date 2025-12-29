@@ -169,6 +169,12 @@ public class IcebergConversionTarget implements ConversionTarget {
     }
   }
 
+  /**
+   * Add storage names in {@link IcebergSchemaExtractor#getIdToStorageName()}, if any exist, to the
+   * given name mapping and apply the updated mapping to the table
+   *
+   * @param mapping the new {@link NameMapping} to be updated and applied to the table
+   */
   private void setNameMapping(NameMapping mapping) {
     MappedFields updatedMappedFields =
         updateNameMapping(mapping.asMappedFields(), schemaExtractor.getIdToStorageName());
