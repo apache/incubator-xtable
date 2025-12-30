@@ -162,8 +162,7 @@ public class TestPaimonDataFileExtractor {
     assertNotNull(secondSnapshot);
 
     org.apache.xtable.model.storage.InternalFilesDiff filesDiff =
-        extractor.extractFilesDiff(
-            paimonTable, secondSnapshot, testSchema);
+        extractor.extractFilesDiff(paimonTable, secondSnapshot, testSchema);
 
     // Verify we have added files
     assertNotNull(filesDiff);
@@ -189,8 +188,7 @@ public class TestPaimonDataFileExtractor {
     assertNotNull(secondSnapshot);
 
     org.apache.xtable.model.storage.InternalFilesDiff filesDiff =
-        extractor.extractFilesDiff(
-            paimonTable, secondSnapshot, testSchema);
+        extractor.extractFilesDiff(paimonTable, secondSnapshot, testSchema);
 
     // Verify we have added files with partition values
     assertNotNull(filesDiff);
@@ -216,8 +214,7 @@ public class TestPaimonDataFileExtractor {
     assertNotNull(secondSnapshot);
 
     org.apache.xtable.model.storage.InternalFilesDiff filesDiff =
-        extractor.extractFilesDiff(
-            paimonTable, secondSnapshot, testSchema);
+        extractor.extractFilesDiff(paimonTable, secondSnapshot, testSchema);
 
     // Verify the diff is returned (size may vary based on compaction)
     assertNotNull(filesDiff);
@@ -235,8 +232,7 @@ public class TestPaimonDataFileExtractor {
     assertNotNull(firstSnapshot);
 
     org.apache.xtable.model.storage.InternalFilesDiff filesDiff =
-        extractor.extractFilesDiff(
-            paimonTable, firstSnapshot, testSchema);
+        extractor.extractFilesDiff(paimonTable, firstSnapshot, testSchema);
 
     // First snapshot should only have added files
     assertNotNull(filesDiff);

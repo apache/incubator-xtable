@@ -120,8 +120,7 @@ public class PaimonConversionSource implements ConversionSource<Snapshot> {
     InternalSchema internalSchema = tableAtSnapshot.getReadSchema();
 
     InternalFilesDiff filesDiff =
-        dataFileExtractor.extractFilesDiff(
-            paimonTable, snapshot, internalSchema);
+        dataFileExtractor.extractFilesDiff(paimonTable, snapshot, internalSchema);
 
     return TableChange.builder()
         .tableAsOfChange(tableAtSnapshot)

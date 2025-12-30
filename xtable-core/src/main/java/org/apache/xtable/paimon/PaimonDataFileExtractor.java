@@ -112,9 +112,7 @@ public class PaimonDataFileExtractor {
    * @return InternalFilesDiff containing added and removed files
    */
   public InternalFilesDiff extractFilesDiff(
-      FileStoreTable table,
-      Snapshot snapshot,
-      InternalSchema internalSchema) {
+      FileStoreTable table, Snapshot snapshot, InternalSchema internalSchema) {
 
     ManifestList manifestList = table.store().manifestListFactory().create();
     ManifestFile manifestFile = table.store().manifestFileFactory().create();
