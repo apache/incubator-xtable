@@ -147,6 +147,103 @@ public class TestPaimonDataFileExtractor {
     }
   }
 
+  @Test
+  void testExtractFilesDiffWithNewFiles() {
+    createUnpartitionedTable();
+
+    // Insert initial data
+    testTable.insertRows(5);
+    org.apache.paimon.Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(firstSnapshot);
+
+    // Insert more data to create a second snapshot
+    testTable.insertRows(3);
+    org.apache.paimon.Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(secondSnapshot);
+
+    org.apache.xtable.model.storage.InternalFilesDiff filesDiff =
+        extractor.extractFilesDiff(
+            paimonTable, secondSnapshot, testSchema);
+
+    // Verify we have added files
+    assertNotNull(filesDiff);
+    assertNotNull(filesDiff.getFilesAdded());
+    assertTrue(filesDiff.getFilesAdded().size() > 0);
+
+    // Verify removed files collection exists (size may vary based on compaction behavior)
+    assertNotNull(filesDiff.getFilesRemoved());
+  }
+
+  @Test
+  void testExtractFilesDiffWithPartitionedTable() {
+    createPartitionedTable();
+
+    // Insert initial data
+    testTable.insertRows(5);
+    org.apache.paimon.Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(firstSnapshot);
+
+    // Insert more data
+    testTable.insertRows(3);
+    org.apache.paimon.Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(secondSnapshot);
+
+    org.apache.xtable.model.storage.InternalFilesDiff filesDiff =
+        extractor.extractFilesDiff(
+            paimonTable, secondSnapshot, testSchema);
+
+    // Verify we have added files with partition values
+    assertNotNull(filesDiff);
+    assertTrue(filesDiff.getFilesAdded().size() > 0);
+
+    for (org.apache.xtable.model.storage.InternalDataFile file : filesDiff.dataFilesAdded()) {
+      assertNotNull(file.getPartitionValues());
+    }
+  }
+
+  @Test
+  void testExtractFilesDiffWithTableWithPrimaryKeys() {
+    createTableWithPrimaryKeys();
+
+    // Insert initial data
+    testTable.insertRows(5);
+    org.apache.paimon.Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(firstSnapshot);
+
+    // Insert more data to create compaction
+    testTable.insertRows(3);
+    org.apache.paimon.Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(secondSnapshot);
+
+    org.apache.xtable.model.storage.InternalFilesDiff filesDiff =
+        extractor.extractFilesDiff(
+            paimonTable, secondSnapshot, testSchema);
+
+    // Verify the diff is returned (size may vary based on compaction)
+    assertNotNull(filesDiff);
+    assertNotNull(filesDiff.getFilesAdded());
+    assertNotNull(filesDiff.getFilesRemoved());
+  }
+
+  @Test
+  void testExtractFilesDiffForFirstSnapshot() {
+    createUnpartitionedTable();
+
+    // Insert data to create first snapshot
+    testTable.insertRows(5);
+    org.apache.paimon.Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(firstSnapshot);
+
+    org.apache.xtable.model.storage.InternalFilesDiff filesDiff =
+        extractor.extractFilesDiff(
+            paimonTable, firstSnapshot, testSchema);
+
+    // First snapshot should only have added files
+    assertNotNull(filesDiff);
+    assertTrue(filesDiff.getFilesAdded().size() > 0);
+    assertEquals(0, filesDiff.getFilesRemoved().size());
+  }
+
   private void createUnpartitionedTable() {
     testTable =
         (TestPaimonTable)

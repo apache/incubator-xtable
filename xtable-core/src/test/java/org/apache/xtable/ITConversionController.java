@@ -149,9 +149,6 @@ public class ITConversionController {
     List<Arguments> arguments = new ArrayList<>();
     for (String sourceFormat : Arrays.asList(HUDI, DELTA, ICEBERG, PAIMON)) {
       for (SyncMode syncMode : SyncMode.values()) {
-        if (sourceFormat.equals(PAIMON) && syncMode == SyncMode.INCREMENTAL)
-          continue; // Paimon does not support incremental sync yet
-
         for (boolean isPartitioned : new boolean[] {true, false}) {
           arguments.add(Arguments.of(sourceFormat, syncMode, isPartitioned));
         }
