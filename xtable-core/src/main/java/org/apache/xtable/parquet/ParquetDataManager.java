@@ -34,10 +34,7 @@ import lombok.Builder;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetFileWriter;
@@ -257,7 +254,15 @@ public class ParquetDataManager {
     Path outputFile = new Path(new Path(rootPath, partitionDir), fileName);
     // then inject/append/write it in the right partition
     MessageType schema = getParquetFileConfig(conf, new Path(rootPath)).getSchema();
-    AppendNewParquetFiles(outputFile, new Path(rootPath), fileToAppend, schema);
+    appendNewParquetFiles(outputFile, new Path(rootPath), fileToAppend, schema);
+
+    // OR
+    /*FileSystem fs = outputFile.getFileSystem(conf);
+    if (!fs.exists(outputFile.getParent())) {
+      fs.mkdirs(outputFile.getParent());
+    }
+    // copy a seperate file into the target partition folder
+    FileUtil.copy(fs, fileToAppend, fs, outputFile, false, conf);*/
   }
 
   /* Use Parquet API to append to a file */
@@ -275,7 +280,7 @@ public class ParquetDataManager {
   }
 
   // append a file into a table
-  public void AppendNewParquetFiles(
+  public void appendNewParquetFiles(
       Path outputPath, Path filePath, Path fileToAppend, MessageType schema) throws IOException {
     Configuration conf = new Configuration();
     ParquetFileWriter writer =
@@ -335,11 +340,17 @@ public class ParquetDataManager {
         } else if (Long.parseLong(meta.get("append_date_" + totalAppends)) < targetModifTime) {
           continue;
         }
+        // OR
+        /*if (status.getPath().getName().endsWith(".parquet") &&
+                status.getModificationTime() > targetModifTime) {
+          results.add(status.getPath());
+        }*/
       } catch (Exception e) {
         log.error("Could not read metadata for: {}", filePath, e);
         throw new IOException("Could not read metadata for", e);
       }
     }
+
     return results;
   }
 }
