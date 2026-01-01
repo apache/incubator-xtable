@@ -39,13 +39,20 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.example.data.Group;
+import org.apache.parquet.hadoop.ParquetFileReader;
+import org.apache.parquet.hadoop.ParquetFileWriter;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.example.GroupReadSupport;
 import org.apache.parquet.hadoop.example.GroupWriteSupport;
+import org.apache.parquet.hadoop.util.HadoopInputFile;
+import org.apache.parquet.hadoop.util.HadoopOutputFile;
+import org.apache.parquet.io.InputFile;
+import org.apache.parquet.schema.MessageType;
 
 import org.apache.xtable.model.schema.InternalPartitionField;
 
@@ -61,27 +68,8 @@ import org.apache.xtable.model.schema.InternalPartitionField;
 @Builder
 public class ParquetDataManager {
   private ParquetMetadataExtractor metadataExtractor = ParquetMetadataExtractor.getInstance();
-
-  public ParquetReader getParquetReader(String filePath, Configuration conf) throws IOException {
-    ParquetReader reader = null;
-    Path file = new Path(filePath);
-    try {
-      reader = ParquetReader.builder(new GroupReadSupport(), file).withConf(conf).build();
-    } catch (IOException e) {
-      log.error("Unexpected error during Parquet read: {}", filePath, e);
-      throw new IOException("Unexpected error reading Parquet file", e);
-    }
-    return reader;
-  }
-
-  // TODO check if footer of added file can cause problems (catalog) when reading the full table
-  // after appending
-  // check required before appending the file
-  private boolean checkSchemaIsSame(Configuration conf, Path fileToAppend, Path fileFromTable) {
-    ParquetFileConfig schemaFileAppend = getParquetFileConfig(conf, fileToAppend);
-    ParquetFileConfig schemaFileFromTable = getParquetFileConfig(conf, fileFromTable);
-    return schemaFileAppend.getSchema().equals(schemaFileFromTable.getSchema());
-  }
+  private static final long DEFAULT_BLOCK_SIZE = 128 * 1024 * 1024; // 128MB
+  private static final int DEFAULT_PAGE_SIZE = 1 * 1024 * 1024; // 1MB
 
   Instant parsePartitionDirToStartTime(
       String partitionDir, List<InternalPartitionField> partitionFields) {
@@ -213,6 +201,34 @@ public class ParquetDataManager {
     }
     return "";
   }
+
+  private Path writeNewParquetFile(
+      Configuration conf, ParquetReader reader, Path fileToAppend, Path outputFile)
+      throws IOException {
+    ParquetFileConfig parquetFileConfig = getParquetFileConfig(conf, fileToAppend);
+    int pageSize = ParquetWriter.DEFAULT_PAGE_SIZE;
+    try (ParquetWriter<Group> writer =
+        new ParquetWriter<Group>(
+            outputFile,
+            new GroupWriteSupport(),
+            parquetFileConfig.getCodec(),
+            (int) parquetFileConfig.getRowGroupSize(),
+            pageSize,
+            pageSize, // dictionaryPageSize
+            true, // enableDictionary
+            false, // enableValidation
+            ParquetWriter.DEFAULT_WRITER_VERSION,
+            conf)) {
+      Group currentGroup = null;
+      while ((currentGroup = (Group) reader.read()) != null) {
+        writer.write(currentGroup);
+      }
+    } catch (Exception e) {
+      log.error("Unexpected error during Parquet write: {}", outputFile, e);
+      throw new IOException("Failed to complete Parquet write operation", e);
+    }
+    return outputFile;
+  }
   // partition fields are already computed, given a parquet file InternalDataFile must be derived
   // (e.g., using createInternalDataFileFromParquetFile())
   private Path appendNewParquetFile(
@@ -250,36 +266,67 @@ public class ParquetDataManager {
     return finalFile;
   }
 
+  public ParquetReader getParquetReader(String filePath, Configuration conf) throws IOException {
+    ParquetReader reader = null;
+    Path file = new Path(filePath);
+    try {
+      reader = ParquetReader.builder(new GroupReadSupport(), file).withConf(conf).build();
+    } catch (IOException e) {
+      log.error("Unexpected error during Parquet read: {}", filePath, e);
+      throw new IOException("Unexpected error reading Parquet file", e);
+    }
+    return reader;
+  }
+
+  /* Alternative Approach (without path construction) using Parquet API to append a file */
+
+  // after appending check required before appending the file
+  private boolean checkIfSchemaIsSame(Configuration conf, Path fileToAppend, Path fileFromTable) {
+    ParquetFileConfig schemaFileAppend = getParquetFileConfig(conf, fileToAppend);
+    ParquetFileConfig schemaFileFromTable = getParquetFileConfig(conf, fileFromTable);
+    return schemaFileAppend.getSchema().equals(schemaFileFromTable.getSchema());
+  }
+
   private ParquetFileConfig getParquetFileConfig(Configuration conf, Path fileToAppend) {
     ParquetFileConfig parquetFileConfig = new ParquetFileConfig(conf, fileToAppend);
     return parquetFileConfig;
   }
 
-  private Path writeNewParquetFile(
-      Configuration conf, ParquetReader reader, Path fileToAppend, Path outputFile)
-      throws IOException {
-    ParquetFileConfig parquetFileConfig = getParquetFileConfig(conf, fileToAppend);
-    int pageSize = ParquetWriter.DEFAULT_PAGE_SIZE;
-    try (ParquetWriter<Group> writer =
-        new ParquetWriter<Group>(
-            outputFile,
-            new GroupWriteSupport(),
-            parquetFileConfig.getCodec(),
-            (int) parquetFileConfig.getRowGroupSize(),
-            pageSize,
-            pageSize, // dictionaryPageSize
-            true, // enableDictionary
-            false, // enableValidation
-            ParquetWriter.DEFAULT_WRITER_VERSION,
-            conf)) {
-      Group currentGroup = null;
-      while ((currentGroup = (Group) reader.read()) != null) {
-        writer.write(currentGroup);
-      }
-    } catch (Exception e) {
-      log.error("Unexpected error during Parquet write: {}", outputFile, e);
-      throw new IOException("Failed to complete Parquet write operation", e);
+  // Method2 to append a file into a table
+  public void mergeParquetFiles(
+      Path outputPath, Path filePath, Path fileToAppend, MessageType schema) throws IOException {
+    Configuration conf = new Configuration();
+    ParquetFileWriter writer =
+        new ParquetFileWriter(
+            HadoopOutputFile.fromPath(outputPath, conf),
+            schema,
+            ParquetFileWriter.Mode.CREATE,
+            DEFAULT_BLOCK_SIZE,
+            0);
+    // write the initial table with the appended file to add into the outputPath
+    writer.start();
+    HadoopInputFile inputFile = HadoopInputFile.fromPath(filePath, conf);
+    InputFile inputFileToAppend = HadoopInputFile.fromPath(fileToAppend, conf);
+    if (checkIfSchemaIsSame(conf, fileToAppend, filePath)) {
+      writer.appendFile(inputFile);
+      writer.appendFile(inputFileToAppend);
     }
-    return outputFile;
+    Map<String, String> combinedMeta = new HashMap<>();
+    // track the append date and save it in the footer
+    int appendCount =
+        Integer.parseInt(
+            ParquetFileReader.readFooter(conf, filePath)
+                .getFileMetaData()
+                .getKeyValueMetaData()
+                .getOrDefault("total_appends", "0"));
+    String newKey = "append_date_" + (appendCount + 1);
+    // get the equivalent fileStatus from the file-to-append Path
+    FileSystem fs = FileSystem.get(conf);
+    FileStatus fileStatus = fs.getFileStatus(fileToAppend);
+    // save its modification time (for later sync related retrieval) in the metadata of the output
+    // table
+    combinedMeta.put(newKey, String.valueOf(fileStatus.getModificationTime()));
+    combinedMeta.put("total_appends", String.valueOf(appendCount + 1));
+    writer.end(combinedMeta);
   }
 }
