@@ -26,11 +26,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -47,8 +43,8 @@ import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetFileWriter;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.ParquetWriter;
-import org.apache.parquet.hadoop.example.GroupReadSupport;
 import org.apache.parquet.hadoop.example.GroupWriteSupport;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.parquet.hadoop.util.HadoopOutputFile;
 import org.apache.parquet.io.InputFile;
@@ -231,7 +227,7 @@ public class ParquetDataManager {
   }
   // partition fields are already computed, given a parquet file InternalDataFile must be derived
   // (e.g., using createInternalDataFileFromParquetFile())
-  private Path appendNewParquetFile(
+  private void appendNewParquetFile(
       Configuration conf,
       String rootPath,
       FileStatus parquetFile,
@@ -259,26 +255,12 @@ public class ParquetDataManager {
     // construct the path
     String fileName = "part-" + System.currentTimeMillis() + "-" + UUID.randomUUID() + ".parquet";
     Path outputFile = new Path(new Path(rootPath, partitionDir), fileName);
-    // return its reader for convenience of writing
-    ParquetReader reader = getParquetReader(fileToAppend.getName(), conf);
     // then inject/append/write it in the right partition
-    finalFile = writeNewParquetFile(conf, reader, fileToAppend, outputFile);
-    return finalFile;
+    MessageType schema = getParquetFileConfig(conf, new Path(rootPath)).getSchema();
+    AppendNewParquetFiles(outputFile, new Path(rootPath), fileToAppend, schema);
   }
 
-  public ParquetReader getParquetReader(String filePath, Configuration conf) throws IOException {
-    ParquetReader reader = null;
-    Path file = new Path(filePath);
-    try {
-      reader = ParquetReader.builder(new GroupReadSupport(), file).withConf(conf).build();
-    } catch (IOException e) {
-      log.error("Unexpected error during Parquet read: {}", filePath, e);
-      throw new IOException("Unexpected error reading Parquet file", e);
-    }
-    return reader;
-  }
-
-  /* Alternative Approach (without path construction) using Parquet API to append a file */
+  /* Use Parquet API to append to a file */
 
   // after appending check required before appending the file
   private boolean checkIfSchemaIsSame(Configuration conf, Path fileToAppend, Path fileFromTable) {
@@ -292,8 +274,8 @@ public class ParquetDataManager {
     return parquetFileConfig;
   }
 
-  // Method2 to append a file into a table
-  public void mergeParquetFiles(
+  // append a file into a table
+  public void AppendNewParquetFiles(
       Path outputPath, Path filePath, Path fileToAppend, MessageType schema) throws IOException {
     Configuration conf = new Configuration();
     ParquetFileWriter writer =
@@ -328,5 +310,36 @@ public class ParquetDataManager {
     combinedMeta.put(newKey, String.valueOf(fileStatus.getModificationTime()));
     combinedMeta.put("total_appends", String.valueOf(appendCount + 1));
     writer.end(combinedMeta);
+  }
+  // Find and retrieve the file paths that satisfy the time condition
+  // Each partition folder contains one merged_file in turn containing many appends
+  public List<Path> findFilesAfterModifTime(
+      Configuration conf, Path directoryPath, long targetModifTime) throws IOException {
+    List<Path> results = new ArrayList<>();
+    FileSystem fs = directoryPath.getFileSystem(conf);
+
+    FileStatus[] statuses =
+        fs.listStatus(directoryPath, path -> path.getName().endsWith(".parquet"));
+
+    for (FileStatus status : statuses) {
+      Path filePath = status.getPath();
+
+      try {
+        ParquetMetadata footer = ParquetFileReader.readFooter(conf, filePath);
+        Map<String, String> meta = footer.getFileMetaData().getKeyValueMetaData();
+
+        int totalAppends = Integer.parseInt(meta.getOrDefault("total_appends", "0"));
+        if (Long.parseLong(meta.get("append_date_0")) > targetModifTime) {
+          results.add(filePath);
+          break;
+        } else if (Long.parseLong(meta.get("append_date_" + totalAppends)) < targetModifTime) {
+          continue;
+        }
+      } catch (Exception e) {
+        log.error("Could not read metadata for: {}", filePath, e);
+        throw new IOException("Could not read metadata for", e);
+      }
+    }
+    return results;
   }
 }
