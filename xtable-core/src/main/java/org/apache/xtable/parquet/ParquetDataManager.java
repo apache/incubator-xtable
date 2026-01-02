@@ -109,8 +109,8 @@ public class ParquetDataManager {
     writer.end(combinedMeta);
   }
   // selective compaction of parquet blocks
-  public List<Path> formNewTargetFiles(Configuration conf, Path directoryPath, long targetModifTime)
-      throws IOException {
+  public static List<Path> formNewTargetFiles(
+      Configuration conf, Path directoryPath, long targetModifTime) throws IOException {
     List<Path> finalPaths = new ArrayList<>();
     FileSystem fs = directoryPath.getFileSystem(conf);
 
@@ -164,42 +164,5 @@ public class ParquetDataManager {
       }
     }
     return finalPaths;
-  }
-  // Find and retrieve the file paths that satisfy the time condition
-  // Each partition folder contains one merged_file in turn containing many appends
-  public List<Path> findFilesAfterModifTime(
-      Configuration conf, Path directoryPath, long targetModifTime) throws IOException {
-    List<Path> results = new ArrayList<>();
-    FileSystem fs = directoryPath.getFileSystem(conf);
-
-    FileStatus[] statuses =
-        fs.listStatus(directoryPath, path -> path.getName().endsWith(".parquet"));
-
-    for (FileStatus status : statuses) {
-      Path filePath = status.getPath();
-
-      try {
-        ParquetMetadata footer = ParquetFileReader.readFooter(conf, filePath);
-        Map<String, String> meta = footer.getFileMetaData().getKeyValueMetaData();
-
-        int totalAppends = Integer.parseInt(meta.getOrDefault("total_appends", "0"));
-        if (Long.parseLong(meta.get("append_date_0")) > targetModifTime) {
-          results.add(filePath);
-          break;
-        } else if (Long.parseLong(meta.get("append_date_" + totalAppends)) < targetModifTime) {
-          continue;
-        }
-        // OR
-        /*if (status.getPath().getName().endsWith(".parquet") &&
-                status.getModificationTime() > targetModifTime) {
-          results.add(status.getPath());
-        }*/
-      } catch (Exception e) {
-        log.error("Could not read metadata for: {}", filePath, e);
-        throw new IOException("Could not read metadata for", e);
-      }
-    }
-
-    return results;
   }
 }

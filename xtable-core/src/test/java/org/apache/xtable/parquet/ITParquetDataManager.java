@@ -18,12 +18,17 @@
  
 package org.apache.xtable.parquet;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
@@ -39,7 +44,7 @@ public class ITParquetDataManager {
   public void testAppendParquetFile() throws IOException {
     SparkSession spark =
         SparkSession.builder().appName("TestAppendFunctionnality").master("local[*]").getOrCreate();
-
+    Configuration conf = spark.sparkContext().hadoopConfiguration();
     StructType schema =
         DataTypes.createStructType(
             new StructField[] {
@@ -62,11 +67,56 @@ public class ITParquetDataManager {
 
     df.write().partitionBy("year", "month").mode("overwrite").parquet(outputPath);
 
-    // TODO create an InternalDataFile and Partition Fields for testing purposes
+    // test find files to sync
+    long targetModifTime = System.currentTimeMillis() - 360000;
+    org.apache.hadoop.fs.Path hdfsPath =
+        new org.apache.hadoop.fs.Path("target/fixed-parquet-data/parquet-partitioned_table_test");
+    FileSystem fs = FileSystem.get(hdfsPath.toUri(), conf);
+    // set the modification time to the file
+    updateModificationTimeRecursive(fs, hdfsPath, targetModifTime);
+    // create new file to append using Spark
+    List<Row> futureDataToSync =
+        Arrays.asList(RowFactory.create(101, "A", 2026, 12), RowFactory.create(301, "D", 2027, 7));
+    Dataset<Row> dfToSync = spark.createDataFrame(futureDataToSync, schema);
+    dfToSync.write().partitionBy("year", "month").mode("append").parquet(outputPath);
+    long newModifTime = System.currentTimeMillis() - 5000;
+    List<String> newPartitions = Arrays.asList("year=2026/month=12", "year=2027/month=7");
 
-    // TODO test appendNewParquetFile()
+    for (String partition : newPartitions) {
+      org.apache.hadoop.fs.Path partitionPath = new org.apache.hadoop.fs.Path(hdfsPath, partition);
+      if (fs.exists(partitionPath)) {
+        updateModificationTimeRecursive(fs, partitionPath, newModifTime);
+      }
+    }
+    List<org.apache.hadoop.fs.Path> resultingFiles =
+        ParquetDataManager.formNewTargetFiles(
+            conf, new org.apache.hadoop.fs.Path(fixedPath.toUri()), newModifTime);
+    // check if resultingFiles contains the append data only (through the partition names)
+    for (org.apache.hadoop.fs.Path p : resultingFiles) {
+      String pathString = p.toString();
+      //  should be TRUE
+      boolean isNewData = pathString.contains("year=2026") || pathString.contains("year=2027");
 
-    // TODO validate the final table
+      // should be FALSE
+      boolean isOldData = pathString.contains("year=2024") || pathString.contains("year=2025");
+
+      assertTrue(isNewData, "Path should belong to appended data: " + pathString);
+      assertFalse(isOldData, "Path should NOT belong to old data: " + pathString);
+    }
+    // TODO test appendNewParquetFile() (using a non-Spark approach to append a parquet file)
+
     spark.stop();
+  }
+
+  private void updateModificationTimeRecursive(
+      FileSystem fs, org.apache.hadoop.fs.Path path, long time) throws IOException {
+    org.apache.hadoop.fs.RemoteIterator<org.apache.hadoop.fs.LocatedFileStatus> it =
+        fs.listFiles(path, true);
+    while (it.hasNext()) {
+      org.apache.hadoop.fs.LocatedFileStatus status = it.next();
+      if (status.getPath().getName().endsWith(".parquet")) {
+        fs.setTimes(status.getPath(), time, -1);
+      }
+    }
   }
 }
