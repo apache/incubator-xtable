@@ -44,7 +44,7 @@ class ParquetFileConfig {
     }
 
     this.schema = metadata.getFileMetaData().getSchema();
-    this.rowGroupSize = metadata.getBlocks().get(0).getTotalByteSize();
+    this.rowGroupSize = metadata.getBlocks().size(); // .get(0).getTotalByteSize()
     this.codec = metadata.getBlocks().get(0).getColumns().get(0).getCodec();
   }
 }
