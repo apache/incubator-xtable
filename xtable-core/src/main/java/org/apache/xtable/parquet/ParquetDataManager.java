@@ -122,11 +122,16 @@ public class ParquetDataManager {
     // save block indexes and modification time (for later sync related retrieval) in the metadata
     // of the output
     // table
-    combinedMeta.put(newKey, String.valueOf(fileStatus.getModificationTime()));
-    combinedMeta.put("total_appends", String.valueOf(appendCount + 1));
+    int currentAppendIdx = appendCount + 1;
+    long startBlock = firstBlockIndex;
+    long blocksAdded = ParquetFileReader.readFooter(conf, fileToAppend).getBlocks().size();
+    long endBlock = startBlock + blocksAdded;
+
+    combinedMeta.put("total_appends", String.valueOf(currentAppendIdx));
+    combinedMeta.put("index_start_block_of_append_" + currentAppendIdx, String.valueOf(startBlock));
+    combinedMeta.put("index_end_block_of_append_" + currentAppendIdx, String.valueOf(endBlock));
     combinedMeta.put(
-        "index_start_block_of_append_" + String.valueOf(appendCount + 1),
-        String.valueOf(firstBlockIndex + 1));
+        "append_date_" + currentAppendIdx, String.valueOf(fileStatus.getModificationTime()));
     writer.end(combinedMeta);
   }
   // selective compaction of parquet blocks
@@ -156,13 +161,13 @@ public class ParquetDataManager {
                 bigFileFooter
                     .getFileMetaData()
                     .getKeyValueMetaData()
-                    .get("index_start_block_of_append_" + totalAppends));
+                    .get("index_start_block_of_append_" + i));
         int endBlock =
             Integer.valueOf(
                 bigFileFooter
                     .getFileMetaData()
                     .getKeyValueMetaData()
-                    .get("index_end_block_of_append_" + (totalAppends + 1)));
+                    .get("index_end_block_of_append_" + i));
         Path targetSyncFilePath =
             new Path(
                 status.getPath().getName() + String.valueOf(startBlock) + String.valueOf(endBlock));
