@@ -60,7 +60,8 @@ public class ITParquetDataManager {
 
     Dataset<Row> df = spark.createDataFrame(data, schema);
     Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet-partitioned_table_test");
-    String outputPath = fixedPath.toFile().getName();
+    String outputPath = fixedPath.toString();
+    ;
 
     df.write().partitionBy("year", "month").mode("overwrite").parquet(outputPath);
 
@@ -79,25 +80,30 @@ public class ITParquetDataManager {
     // the same partition value
 
     long newModifTime = System.currentTimeMillis() - 5000;
-    List<String> newPartitions = Arrays.asList("year=2026/month=12"); // , "year=2027/month=7");
-
-    for (String partition : newPartitions) {
+    // TODO many partitions case
+    // List<String> newPartitions = Arrays.asList("year=2026/month=12"); // , "year=2027/month=7");
+    /* for (String partition : newPartitions) {
       org.apache.hadoop.fs.Path partitionPath = new org.apache.hadoop.fs.Path(hdfsPath, partition);
       if (fs.exists(partitionPath)) {
         updateModificationTimeRecursive(fs, partitionPath, newModifTime);
       }
-    }
+    }*/
+    org.apache.hadoop.fs.Path partitionPath =
+        new org.apache.hadoop.fs.Path(hdfsPath, "year=2026/month=12");
+    updateModificationTimeRecursive(fs, partitionPath, newModifTime);
     List<org.apache.hadoop.fs.Path> resultingFiles =
         ParquetDataManager.formNewTargetFiles(conf, hdfsPath, newModifTime);
     // check if resultingFiles contains the append data only (through the partition names)
     for (org.apache.hadoop.fs.Path p : resultingFiles) {
       String pathString = p.toString();
-      //  should be TRUE
+      //  should be TRUE (test for many partitions)
       boolean isNewData = pathString.contains("year=2026"); // || pathString.contains("year=2027");
 
-      // should be FALSE
+      // should be FALSE (test for many partitions)
       boolean isOldData = pathString.contains("year=2024") || pathString.contains("year=2025");
-
+      long modTime = fs.getFileStatus(p).getModificationTime();
+      // test for one partition value
+      assertTrue(modTime > newModifTime, "File discovered was actually old data: " + pathString);
       assertTrue(isNewData, "Path should belong to appended data: " + pathString);
       //  assertFalse(isOldData, "Path should NOT belong to old data: " + pathString);
     }
