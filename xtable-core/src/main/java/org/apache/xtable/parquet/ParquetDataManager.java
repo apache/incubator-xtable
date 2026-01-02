@@ -65,7 +65,8 @@ public class ParquetDataManager {
     return parquetFileConfig;
   }
 
-  public void appendWithPartitionCheck(Path targetPath, Path sourcePath, MessageType schema) throws IOException {
+  public void appendWithPartitionCheck(Path targetPath, Path sourcePath, MessageType schema)
+      throws IOException {
     Configuration conf = new Configuration();
 
     // e.g., "year=2024/month=12"
@@ -73,8 +74,8 @@ public class ParquetDataManager {
     String sourcePartition = getPartitionPath(sourcePath);
 
     if (!targetPartition.equals(sourcePartition)) {
-      throw new IllegalArgumentException("Partition Mismatch! Cannot merge " +
-              sourcePartition + " into " + targetPartition);
+      throw new IllegalArgumentException(
+          "Partition Mismatch! Cannot merge " + sourcePartition + " into " + targetPartition);
     }
 
     // append files within the same partition foldr
@@ -125,7 +126,7 @@ public class ParquetDataManager {
     combinedMeta.put("total_appends", String.valueOf(appendCount + 1));
     combinedMeta.put(
         "index_start_block_of_append_" + String.valueOf(appendCount + 1),
-        String.valueOf(firstBlockIndex+1));
+        String.valueOf(firstBlockIndex + 1));
     writer.end(combinedMeta);
   }
   // selective compaction of parquet blocks
