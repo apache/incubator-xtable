@@ -65,25 +65,45 @@ public class ParquetDataManager {
     return parquetFileConfig;
   }
 
+  public void appendWithPartitionCheck(Path targetPath, Path sourcePath, MessageType schema) throws IOException {
+    Configuration conf = new Configuration();
+
+    // e.g., "year=2024/month=12"
+    String targetPartition = getPartitionPath(targetPath);
+    String sourcePartition = getPartitionPath(sourcePath);
+
+    if (!targetPartition.equals(sourcePartition)) {
+      throw new IllegalArgumentException("Partition Mismatch! Cannot merge " +
+              sourcePartition + " into " + targetPartition);
+    }
+
+    // append files within the same partition foldr
+    appendNewParquetFiles(targetPath, sourcePath, schema);
+  }
+
+  private String getPartitionPath(Path path) {
+    // Returns the parent directory name (e.g., country=US)
+    // For nested partitions, you might need path.getParent().getParent()...
+    return path.getParent().getName();
+  }
   // append a file into a table (merges two files into one .parquet under a partition folder)
   public void appendNewParquetFiles(Path filePath, Path fileToAppend, MessageType schema)
       throws IOException {
     Configuration conf = new Configuration();
-    long firstBlockIndex = getParquetFileConfig(conf, fileToAppend).getRowGroupSize();
+    long firstBlockIndex = getParquetFileConfig(conf, filePath).getRowGroupIndex();
     ParquetFileWriter writer =
         new ParquetFileWriter(
             HadoopOutputFile.fromPath(filePath, conf),
-            // HadoopOutputFile.fromPath(outputPath, conf),
             schema,
             ParquetFileWriter.Mode.CREATE,
             DEFAULT_BLOCK_SIZE,
             0);
     // write the initial table with the appended file to add into the outputPath
     writer.start();
-    // HadoopInputFile inputFile = HadoopInputFile.fromPath(filePath, conf);
+    HadoopInputFile inputFile = HadoopInputFile.fromPath(filePath, conf);
     InputFile inputFileToAppend = HadoopInputFile.fromPath(fileToAppend, conf);
     if (checkIfSchemaIsSame(conf, fileToAppend, filePath)) {
-      // writer.appendFile(inputFile);
+      writer.appendFile(inputFile);
       writer.appendFile(inputFileToAppend);
     }
     Map<String, String> combinedMeta = new HashMap<>();
@@ -105,7 +125,7 @@ public class ParquetDataManager {
     combinedMeta.put("total_appends", String.valueOf(appendCount + 1));
     combinedMeta.put(
         "index_start_block_of_append_" + String.valueOf(appendCount + 1),
-        String.valueOf(firstBlockIndex));
+        String.valueOf(firstBlockIndex+1));
     writer.end(combinedMeta);
   }
   // selective compaction of parquet blocks

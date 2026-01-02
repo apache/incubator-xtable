@@ -79,6 +79,8 @@ public class ITParquetDataManager {
         Arrays.asList(RowFactory.create(101, "A", 2026, 12), RowFactory.create(301, "D", 2027, 7));
     Dataset<Row> dfToSync = spark.createDataFrame(futureDataToSync, schema);
     dfToSync.write().partitionBy("year", "month").mode("append").parquet(outputPath);
+    // TODO create the folders manually for a new partition value as appendFile works only within the same partition value
+
     long newModifTime = System.currentTimeMillis() - 5000;
     List<String> newPartitions = Arrays.asList("year=2026/month=12", "year=2027/month=7");
 

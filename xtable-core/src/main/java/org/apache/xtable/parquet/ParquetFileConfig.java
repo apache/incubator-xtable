@@ -32,7 +32,7 @@ import org.apache.parquet.schema.MessageType;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 class ParquetFileConfig {
   MessageType schema;
-  long rowGroupSize;
+  long rowGroupIndex;
   CompressionCodecName codec;
 
   public ParquetFileConfig(Configuration conf, Path file) {
@@ -44,7 +44,7 @@ class ParquetFileConfig {
     }
 
     this.schema = metadata.getFileMetaData().getSchema();
-    this.rowGroupSize = metadata.getBlocks().size(); // .get(0).getTotalByteSize()
+    this.rowGroupIndex = metadata.getBlocks().size();
     this.codec = metadata.getBlocks().get(0).getColumns().get(0).getCodec();
   }
 }
