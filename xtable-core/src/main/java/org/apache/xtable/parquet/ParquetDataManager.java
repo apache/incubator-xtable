@@ -226,14 +226,18 @@ public class ParquetDataManager {
 
   private static List<Path> collectParquetFiles(FileSystem fs, Path root) throws IOException {
     List<Path> parquetFiles = new ArrayList<>();
+    Configuration conf = fs.getConf();
     if (!fs.exists(root)) return parquetFiles;
 
     if (fs.getFileStatus(root).isDirectory()) {
       RemoteIterator<LocatedFileStatus> it = fs.listFiles(root, true);
       while (it.hasNext()) {
         Path p = it.next().getPath();
-        if (p.getName().endsWith(".parquet")) {
-          parquetFiles.add(p);
+        if (p.getName().endsWith(".parquet") && !p.getName().startsWith(".")) {
+          ParquetMetadata footer = ParquetFileReader.readFooter(conf, p);
+          if (!footer.getBlocks().isEmpty()) {
+            parquetFiles.add(p);
+          }
         }
       }
     } else {
