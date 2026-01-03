@@ -172,9 +172,10 @@ public class ParquetDataManager {
                     .getFileMetaData()
                     .getKeyValueMetaData()
                     .get("index_end_block_of_append_" + i));
-        Path targetSyncFilePath =
-            new Path(
-                status.getPath().getName() + String.valueOf(startBlock) + String.valueOf(endBlock));
+        String newFileName =
+            String.format(
+                "%s_block%d_%d.parquet", status.getPath().getName(), startBlock, endBlock);
+        Path targetSyncFilePath = new Path(status.getPath().getParent(), newFileName);
         try (ParquetFileWriter writer = new ParquetFileWriter(conf, schema, targetSyncFilePath)) {
           writer.start();
           for (int j = 0; j < bigFileFooter.getBlocks().size(); j++) {
