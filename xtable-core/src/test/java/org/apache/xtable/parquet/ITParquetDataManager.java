@@ -159,7 +159,12 @@ public class ITParquetDataManager {
     List<Row> futureDataToSync =
         Arrays.asList(RowFactory.create(101, "A", 2026, 12), RowFactory.create(301, "D", 2026, 12));
     Dataset<Row> dfToSync = spark.createDataFrame(futureDataToSync, schema);
-    dfToSync.write().partitionBy("year", "month").mode("overwrite").parquet(finalAppendFilePath);
+    dfToSync
+        .coalesce(1)
+        .write()
+        .partitionBy("year", "month")
+        .mode("overwrite")
+        .parquet(finalAppendFilePath);
     long newModifTime = System.currentTimeMillis() - 50000;
     // update modifTime for file to append
     updateModificationTimeRecursive(

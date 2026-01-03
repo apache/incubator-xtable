@@ -212,7 +212,18 @@ public class ParquetDataManager {
     if (sourceFiles.isEmpty()) {
       return targetPath;
     }
-    Path masterTargetFile = targetFiles.get(0);
+    Path masterTargetFile = null;
+    for (Path p : targetFiles) {
+      ParquetMetadata metadata = ParquetFileReader.readFooter(conf, p);
+      if (!metadata.getBlocks().isEmpty()) {
+        masterTargetFile = p;
+        break;
+      }
+    }
+
+    if (masterTargetFile == null) {
+      throw new IOException("Target directory contains no files with valid data blocks.");
+    }
 
     for (int i = 1; i < targetFiles.size(); i++) {
       long len = fs.getFileStatus(targetFiles.get(i)).getLen();
