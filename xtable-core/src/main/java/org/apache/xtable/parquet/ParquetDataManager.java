@@ -88,7 +88,7 @@ public class ParquetDataManager {
     // For nested partitions, you might need path.getParent().getParent()...
     return path.getParent().getName();
   }
-  // append a file into a table (merges two files into one .parquet under a partition folder)
+  // append a file (merges two files into one .parquet under a partition folder)
   public static Path appendNewParquetFiles(Path filePath, Path fileToAppend, MessageType schema)
       throws IOException {
     Configuration conf = new Configuration();
@@ -192,5 +192,50 @@ public class ParquetDataManager {
       }
     }
     return finalPaths;
+  }
+
+  public static Path appendPartitionedData(Path targetPath, Path sourcePath, MessageType schema)
+      throws IOException {
+    Configuration conf = new Configuration();
+    FileSystem fs = sourcePath.getFileSystem(conf);
+
+    List<Path> targetFiles = collectParquetFiles(fs, targetPath);
+
+    List<Path> sourceFiles = collectParquetFiles(fs, sourcePath);
+
+    if (targetFiles.isEmpty()) {
+      throw new IOException("Target directory contains no parquet files to append to.");
+    }
+    if (sourceFiles.isEmpty()) {
+      return targetPath;
+    }
+    Path masterTargetFile = targetFiles.get(0);
+
+    for (int i = 1; i < targetFiles.size(); i++) {
+      appendNewParquetFiles(masterTargetFile, targetFiles.get(i), schema);
+    }
+    for (Path sourceFile : sourceFiles) {
+      appendNewParquetFiles(masterTargetFile, sourceFile, schema);
+    }
+
+    return masterTargetFile;
+  }
+
+  private static List<Path> collectParquetFiles(FileSystem fs, Path root) throws IOException {
+    List<Path> parquetFiles = new ArrayList<>();
+    if (!fs.exists(root)) return parquetFiles;
+
+    if (fs.getFileStatus(root).isDirectory()) {
+      RemoteIterator<LocatedFileStatus> it = fs.listFiles(root, true);
+      while (it.hasNext()) {
+        Path p = it.next().getPath();
+        if (p.getName().endsWith(".parquet")) {
+          parquetFiles.add(p);
+        }
+      }
+    } else {
+      parquetFiles.add(root);
+    }
+    return parquetFiles;
   }
 }

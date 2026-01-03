@@ -167,11 +167,14 @@ public class ITParquetDataManager {
     // update modifTime for file to append
     updateModificationTimeRecursive(
         fs, new org.apache.hadoop.fs.Path(finalAppendFilePath), newModifTime);
+    // recursively append all files under a specific partition path (e.g. "year=2026/month=12")
+    // (assuming that outputPath and finalAppendFilePath are same partitions for different files)
     org.apache.hadoop.fs.Path outputFile =
-        ParquetDataManager.appendNewParquetFiles(
+        ParquetDataManager.appendPartitionedData(
             new org.apache.hadoop.fs.Path(outputPath),
             new org.apache.hadoop.fs.Path(finalAppendFilePath),
             schemaParquet);
+    // can create big file which can be split if reaches a certain threshold size
 
     // TODO many partitions case
     // List<String> newPartitions = Arrays.asList("year=2026/month=12"); // , "year=2027/month=7");
