@@ -97,7 +97,7 @@ public class ParquetDataManager {
         new ParquetFileWriter(
             HadoopOutputFile.fromPath(filePath, conf),
             schema,
-            ParquetFileWriter.Mode.CREATE,
+            ParquetFileWriter.Mode.OVERWRITE,
             DEFAULT_BLOCK_SIZE,
             0);
     // write the initial table with the appended file to add into the outputPath
