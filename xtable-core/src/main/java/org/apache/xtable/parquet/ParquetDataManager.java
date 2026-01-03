@@ -215,9 +215,18 @@ public class ParquetDataManager {
     Path masterTargetFile = targetFiles.get(0);
 
     for (int i = 1; i < targetFiles.size(); i++) {
+      long len = fs.getFileStatus(targetFiles.get(i)).getLen();
+      System.out.println("DEBUG: Attempting to append " + targetFiles.get(i) + " Size: " + len);
       appendNewParquetFiles(masterTargetFile, targetFiles.get(i), schema);
     }
     for (Path sourceFile : sourceFiles) {
+      ParquetMetadata sourceFooter = ParquetFileReader.readFooter(conf, sourceFile);
+      if (sourceFooter.getBlocks().isEmpty()) {
+        System.out.println("SKIPPING: " + sourceFile + " has no data.");
+        continue;
+      }
+      long len = fs.getFileStatus(sourceFile).getLen();
+      System.out.println("DEBUG: Attempting to append " + sourceFile + " Size: " + len);
       appendNewParquetFiles(masterTargetFile, sourceFile, schema);
     }
 
