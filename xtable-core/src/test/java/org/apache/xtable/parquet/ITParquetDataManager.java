@@ -79,7 +79,7 @@ public class ITParquetDataManager {
     // TODO create the folders manually for a new partition value as appendFile works only within
     // the same partition value
 
-    long newModifTime = System.currentTimeMillis() - 5000;
+    long newModifTime = System.currentTimeMillis() - 50000;
     // TODO many partitions case
     // List<String> newPartitions = Arrays.asList("year=2026/month=12"); // , "year=2027/month=7");
     /* for (String partition : newPartitions) {
@@ -90,7 +90,7 @@ public class ITParquetDataManager {
     }*/
     org.apache.hadoop.fs.Path partitionPath =
         new org.apache.hadoop.fs.Path(hdfsPath, "year=2026/month=12");
-    updateModificationTimeRecursive(fs, partitionPath, newModifTime);
+    // updateModificationTimeRecursive(fs, partitionPath, newModifTime);
     List<org.apache.hadoop.fs.Path> resultingFiles =
         ParquetDataManager.formNewTargetFiles(conf, hdfsPath, newModifTime);
     // check if resultingFiles contains the append data only (through the partition names)
