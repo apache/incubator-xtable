@@ -233,9 +233,11 @@ public class ParquetDataManager {
       RemoteIterator<LocatedFileStatus> it = fs.listFiles(root, true);
       while (it.hasNext()) {
         Path p = it.next().getPath();
-        if (p.getName().endsWith(".parquet") && !p.getName().startsWith(".")) {
+        if (p.getName().endsWith(".parquet")
+            && !p.toString().contains("/.")
+            && !p.toString().contains("/_")) {
           ParquetMetadata footer = ParquetFileReader.readFooter(conf, p);
-          if (!footer.getBlocks().isEmpty()) {
+          if (footer.getBlocks() != null && !footer.getBlocks().isEmpty()) {
             parquetFiles.add(p);
           }
         }
