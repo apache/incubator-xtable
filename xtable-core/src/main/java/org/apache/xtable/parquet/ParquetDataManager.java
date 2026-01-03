@@ -65,10 +65,10 @@ public class ParquetDataManager {
     ParquetFileConfig parquetFileConfig = new ParquetFileConfig(conf, fileToAppend);
     return parquetFileConfig;
   }
-
+  // TODO use this method to match the partition folders and merge them one by one (if one exists
+  // but not in other file then create it)
   public void appendWithPartitionCheck(Path targetPath, Path sourcePath, MessageType schema)
       throws IOException {
-    Configuration conf = new Configuration();
 
     // e.g., "year=2024/month=12"
     String targetPartition = getPartitionPath(targetPath);
@@ -84,8 +84,6 @@ public class ParquetDataManager {
   }
 
   private String getPartitionPath(Path path) {
-    // Returns the parent directory name (e.g., country=US)
-    // For nested partitions, you might need path.getParent().getParent()...
     return path.getParent().getName();
   }
   // append a file (merges two files into one .parquet under a partition folder)

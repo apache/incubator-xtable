@@ -53,8 +53,6 @@ public class ITParquetDataManager {
 
   @Test
   public void testFormParquetFileSinglePartition() throws IOException {
-    /*SparkSession spark =
-    SparkSession.builder().appName("TestCreateFunctionnality").master("local[*]").getOrCreate();*/
     Configuration conf = spark.sparkContext().hadoopConfiguration();
     StructType schema =
         DataTypes.createStructType(
@@ -67,9 +65,6 @@ public class ITParquetDataManager {
 
     List<Row> data =
         Arrays.asList(RowFactory.create(101, "A", 2026, 12), RowFactory.create(102, "B", 2026, 12));
-    /* RowFactory.create(201, "C", 2025, 11),
-    RowFactory.create(301, "D", 2024, 7));*/
-
     Dataset<Row> df = spark.createDataFrame(data, schema);
     Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet-partitioned_table_test");
     String outputPath = fixedPath.toString();
@@ -119,13 +114,10 @@ public class ITParquetDataManager {
       assertTrue(isNewData, "Path should belong to appended data: " + pathString);
       //  assertFalse(isOldData, "Path should NOT belong to old data: " + pathString);
     }
-    // spark.stop();
   }
 
   @Test
   public void testAppendParquetFileSinglePartition() throws IOException {
-    /*SparkSession spark =
-    SparkSession.builder().appName("TestAppendFunctionnality").master("local[*]").getOrCreate();*/
     Configuration conf = spark.sparkContext().hadoopConfiguration();
     // In testAppendParquetFileSinglePartition
     MessageType schemaParquet =
@@ -146,8 +138,6 @@ public class ITParquetDataManager {
             });
     List<Row> data =
         Arrays.asList(RowFactory.create(101, "A", 2026, 12), RowFactory.create(102, "B", 2026, 12));
-    /* RowFactory.create(201, "C", 2025, 11),
-    RowFactory.create(301, "D", 2024, 7));*/
 
     Dataset<Row> df = spark.createDataFrame(data, schema);
     Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet_table_test");
@@ -216,8 +206,6 @@ public class ITParquetDataManager {
       assertTrue(isNewData, "Path should belong to appended data: " + pathString);
       //  assertFalse(isOldData, "Path should NOT belong to old data: " + pathString);
     }
-
-    // spark.stop();
   }
 
   private void updateModificationTimeRecursive(
