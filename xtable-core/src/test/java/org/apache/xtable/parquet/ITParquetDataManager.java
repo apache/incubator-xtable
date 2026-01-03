@@ -119,6 +119,7 @@ public class ITParquetDataManager {
     SparkSession spark =
         SparkSession.builder().appName("TestAppendFunctionnality").master("local[*]").getOrCreate();
     Configuration conf = spark.sparkContext().hadoopConfiguration();
+    // In testAppendParquetFileSinglePartition
     MessageType schemaParquet =
         Types.buildMessage()
             .required(PrimitiveType.PrimitiveTypeName.INT32)
@@ -126,10 +127,6 @@ public class ITParquetDataManager {
             .required(PrimitiveType.PrimitiveTypeName.BINARY)
             .as(LogicalTypeAnnotation.stringType())
             .named("value")
-            .required(PrimitiveType.PrimitiveTypeName.INT32)
-            .named("year")
-            .required(PrimitiveType.PrimitiveTypeName.INT32)
-            .named("month")
             .named("parquet_schema");
     StructType schema =
         DataTypes.createStructType(
