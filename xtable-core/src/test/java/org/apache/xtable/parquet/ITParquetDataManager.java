@@ -28,6 +28,10 @@ import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
+import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.PrimitiveType;
+import org.apache.parquet.schema.Types;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
@@ -40,9 +44,9 @@ import org.junit.jupiter.api.Test;
 public class ITParquetDataManager {
 
   @Test
-  public void testAppendParquetFile() throws IOException {
+  public void testFormParquetFileSinglePartition() throws IOException {
     SparkSession spark =
-        SparkSession.builder().appName("TestAppendFunctionnality").master("local[*]").getOrCreate();
+        SparkSession.builder().appName("TestCreateFunctionnality").master("local[*]").getOrCreate();
     Configuration conf = spark.sparkContext().hadoopConfiguration();
     StructType schema =
         DataTypes.createStructType(
@@ -107,7 +111,98 @@ public class ITParquetDataManager {
       assertTrue(isNewData, "Path should belong to appended data: " + pathString);
       //  assertFalse(isOldData, "Path should NOT belong to old data: " + pathString);
     }
-    // TODO test appendNewParquetFile() (using a non-Spark approach to append a parquet file)
+    spark.stop();
+  }
+
+  @Test
+  public void testAppendParquetFileSinglePartition() throws IOException {
+    SparkSession spark =
+        SparkSession.builder().appName("TestAppendFunctionnality").master("local[*]").getOrCreate();
+    Configuration conf = spark.sparkContext().hadoopConfiguration();
+    MessageType schemaParquet =
+        Types.buildMessage()
+            .required(PrimitiveType.PrimitiveTypeName.INT32)
+            .named("id")
+            .required(PrimitiveType.PrimitiveTypeName.BINARY)
+            .as(LogicalTypeAnnotation.stringType())
+            .named("value")
+            .required(PrimitiveType.PrimitiveTypeName.INT32)
+            .named("year")
+            .required(PrimitiveType.PrimitiveTypeName.INT32)
+            .named("month")
+            .named("parquet_schema");
+    StructType schema =
+        DataTypes.createStructType(
+            new StructField[] {
+              DataTypes.createStructField("id", DataTypes.IntegerType, false),
+              DataTypes.createStructField("value", DataTypes.StringType, false),
+              DataTypes.createStructField("year", DataTypes.IntegerType, false),
+              DataTypes.createStructField("month", DataTypes.IntegerType, false)
+            });
+    List<Row> data =
+        Arrays.asList(RowFactory.create(101, "A", 2026, 12), RowFactory.create(102, "B", 2026, 12));
+    /* RowFactory.create(201, "C", 2025, 11),
+    RowFactory.create(301, "D", 2024, 7));*/
+
+    Dataset<Row> df = spark.createDataFrame(data, schema);
+    Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet_table_test");
+    Path appendFilePath = Paths.get("target", "fixed-parquet-data", "parquet_file_test");
+    String outputPath = fixedPath.toString();
+    String finalAppendFilePath = appendFilePath.toString();
+
+    df.write().partitionBy("year", "month").mode("overwrite").parquet(outputPath);
+
+    // test find files to sync
+    long targetModifTime = System.currentTimeMillis() - 360000;
+    org.apache.hadoop.fs.Path hdfsPath = new org.apache.hadoop.fs.Path(outputPath);
+    FileSystem fs = FileSystem.get(hdfsPath.toUri(), conf);
+    // set the modification time to the table file
+    updateModificationTimeRecursive(fs, hdfsPath, targetModifTime);
+    // create new file to append using Spark
+    List<Row> futureDataToSync =
+        Arrays.asList(RowFactory.create(101, "A", 2026, 12), RowFactory.create(301, "D", 2026, 12));
+    Dataset<Row> dfToSync = spark.createDataFrame(futureDataToSync, schema);
+    dfToSync.write().partitionBy("year", "month").mode("overwrite").parquet(finalAppendFilePath);
+    long newModifTime = System.currentTimeMillis() - 50000;
+    // update modifTime for file to append
+    updateModificationTimeRecursive(
+        fs, new org.apache.hadoop.fs.Path(finalAppendFilePath), newModifTime);
+    org.apache.hadoop.fs.Path outputFile =
+        ParquetDataManager.appendNewParquetFiles(
+            new org.apache.hadoop.fs.Path(outputPath),
+            new org.apache.hadoop.fs.Path(finalAppendFilePath),
+            schemaParquet);
+
+    // TODO many partitions case
+    // List<String> newPartitions = Arrays.asList("year=2026/month=12"); // , "year=2027/month=7");
+    /* for (String partition : newPartitions) {
+      org.apache.hadoop.fs.Path partitionPath = new org.apache.hadoop.fs.Path(hdfsPath, partition);
+      if (fs.exists(partitionPath)) {
+        updateModificationTimeRecursive(fs, partitionPath, newModifTime);
+      }
+    }*/
+    org.apache.hadoop.fs.Path partitionPath =
+        new org.apache.hadoop.fs.Path(hdfsPath, "year=2026/month=12");
+    // updateModificationTimeRecursive(fs, partitionPath, newModifTime);
+
+    // test whether the appended data can be selectively filtered for incr sync (e.g. get me the
+    // data to sync only)
+    List<org.apache.hadoop.fs.Path> resultingFiles =
+        ParquetDataManager.formNewTargetFiles(conf, outputFile, newModifTime);
+    // check if resultingFiles contains the append data only (through the partition names)
+    for (org.apache.hadoop.fs.Path p : resultingFiles) {
+      String pathString = p.toString();
+      //  should be TRUE (test for many partitions)
+      boolean isNewData = pathString.contains("year=2026"); // || pathString.contains("year=2027");
+
+      // should be FALSE (test for many partitions)
+      boolean isOldData = pathString.contains("year=2024") || pathString.contains("year=2025");
+      long modTime = fs.getFileStatus(p).getModificationTime();
+      // test for one partition value
+      assertTrue(modTime > newModifTime, "File discovered was actually old data: " + pathString);
+      assertTrue(isNewData, "Path should belong to appended data: " + pathString);
+      //  assertFalse(isOldData, "Path should NOT belong to old data: " + pathString);
+    }
 
     spark.stop();
   }

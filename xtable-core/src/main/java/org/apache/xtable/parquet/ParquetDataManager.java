@@ -54,13 +54,14 @@ public class ParquetDataManager {
   /* Use Parquet API to append to a file */
 
   // after appending check required before appending the file
-  private boolean checkIfSchemaIsSame(Configuration conf, Path fileToAppend, Path fileFromTable) {
+  private static boolean checkIfSchemaIsSame(
+      Configuration conf, Path fileToAppend, Path fileFromTable) {
     ParquetFileConfig schemaFileAppend = getParquetFileConfig(conf, fileToAppend);
     ParquetFileConfig schemaFileFromTable = getParquetFileConfig(conf, fileFromTable);
     return schemaFileAppend.getSchema().equals(schemaFileFromTable.getSchema());
   }
 
-  private ParquetFileConfig getParquetFileConfig(Configuration conf, Path fileToAppend) {
+  private static ParquetFileConfig getParquetFileConfig(Configuration conf, Path fileToAppend) {
     ParquetFileConfig parquetFileConfig = new ParquetFileConfig(conf, fileToAppend);
     return parquetFileConfig;
   }
@@ -88,7 +89,7 @@ public class ParquetDataManager {
     return path.getParent().getName();
   }
   // append a file into a table (merges two files into one .parquet under a partition folder)
-  public void appendNewParquetFiles(Path filePath, Path fileToAppend, MessageType schema)
+  public static Path appendNewParquetFiles(Path filePath, Path fileToAppend, MessageType schema)
       throws IOException {
     Configuration conf = new Configuration();
     long firstBlockIndex = getParquetFileConfig(conf, filePath).getRowGroupIndex();
@@ -133,15 +134,16 @@ public class ParquetDataManager {
     combinedMeta.put(
         "append_date_" + currentAppendIdx, String.valueOf(fileStatus.getModificationTime()));
     writer.end(combinedMeta);
+    return filePath;
   }
   // selective compaction of parquet blocks
   public static List<Path> formNewTargetFiles(
-      Configuration conf, Path directoryPath, long targetModifTime) throws IOException {
+      Configuration conf, Path partitionPath, long targetModifTime) throws IOException {
     List<Path> finalPaths = new ArrayList<>();
-    FileSystem fs = directoryPath.getFileSystem(conf);
+    FileSystem fs = partitionPath.getFileSystem(conf);
 
     FileStatus[] statuses =
-        fs.listStatus(directoryPath, path -> path.getName().endsWith(".parquet"));
+        fs.listStatus(partitionPath, path -> path.getName().endsWith(".parquet"));
 
     for (FileStatus status : statuses) {
 
