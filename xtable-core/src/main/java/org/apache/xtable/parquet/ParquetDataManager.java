@@ -93,9 +93,10 @@ public class ParquetDataManager {
       throws IOException {
     Configuration conf = new Configuration();
     long firstBlockIndex = getParquetFileConfig(conf, filePath).getRowGroupIndex();
+    Path tempPath = new Path(filePath.getParent(), "." + filePath.getName() + ".tmp");
     ParquetFileWriter writer =
         new ParquetFileWriter(
-            HadoopOutputFile.fromPath(filePath, conf),
+            HadoopOutputFile.fromPath(tempPath, conf),
             schema,
             ParquetFileWriter.Mode.OVERWRITE,
             DEFAULT_BLOCK_SIZE,
@@ -134,6 +135,8 @@ public class ParquetDataManager {
     combinedMeta.put(
         "append_date_" + currentAppendIdx, String.valueOf(fileStatus.getModificationTime()));
     writer.end(combinedMeta);
+    fs.delete(filePath, false);
+    fs.rename(tempPath, filePath);
     return filePath;
   }
   // selective compaction of parquet blocks
