@@ -93,6 +93,8 @@ public class ParquetDataManager {
       throws IOException {
     Configuration conf = new Configuration();
     long firstBlockIndex = getParquetFileConfig(conf, filePath).getRowGroupIndex();
+    ParquetMetadata existingFooter = ParquetFileReader.readFooter(conf, filePath);
+    Map<String, String> existingMeta = existingFooter.getFileMetaData().getKeyValueMetaData();
     Path tempPath = new Path(filePath.getParent(), "." + filePath.getName() + ".tmp");
     ParquetFileWriter writer =
         new ParquetFileWriter(
@@ -110,14 +112,11 @@ public class ParquetDataManager {
       writer.appendFile(inputFileToAppend);
     }
     Map<String, String> combinedMeta = new HashMap<>();
+    if (existingMeta != null) {
+      combinedMeta.putAll(existingMeta);
+    }
     // track the append date and save it in the footer
-    int appendCount =
-        Integer.parseInt(
-            ParquetFileReader.readFooter(conf, filePath)
-                .getFileMetaData()
-                .getKeyValueMetaData()
-                .getOrDefault("total_appends", "0"));
-    String newKey = "append_date_" + (appendCount + 1);
+    int appendCount = Integer.parseInt(combinedMeta.getOrDefault("total_appends", "0"));
     // get the equivalent fileStatus from the file-to-append Path
     FileSystem fs = FileSystem.get(conf);
     FileStatus fileStatus = fs.getFileStatus(fileToAppend);
@@ -127,7 +126,7 @@ public class ParquetDataManager {
     int currentAppendIdx = appendCount + 1;
     long startBlock = firstBlockIndex;
     long blocksAdded = ParquetFileReader.readFooter(conf, fileToAppend).getBlocks().size();
-    long endBlock = startBlock + blocksAdded;
+    long endBlock = startBlock + blocksAdded - 1;
 
     combinedMeta.put("total_appends", String.valueOf(currentAppendIdx));
     combinedMeta.put("index_start_block_of_append_" + currentAppendIdx, String.valueOf(startBlock));
@@ -160,7 +159,7 @@ public class ParquetDataManager {
                   .getFileMetaData()
                   .getKeyValueMetaData()
                   .getOrDefault("total_appends", "0"));
-      for (int i = 1; i < totalAppends; i++) {
+      for (int i = 1; i <= totalAppends; i++) {
         int startBlock =
             Integer.valueOf(
                 bigFileFooter
