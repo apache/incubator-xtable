@@ -39,14 +39,22 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 public class ITParquetDataManager {
+  private static SparkSession spark;
+
+  @BeforeAll
+  public static void setup() {
+    spark = SparkSession.builder().appName("ParquetTest").master("local[*]").getOrCreate();
+  }
 
   @Test
   public void testFormParquetFileSinglePartition() throws IOException {
-    SparkSession spark =
-        SparkSession.builder().appName("TestCreateFunctionnality").master("local[*]").getOrCreate();
+    /*SparkSession spark =
+    SparkSession.builder().appName("TestCreateFunctionnality").master("local[*]").getOrCreate();*/
     Configuration conf = spark.sparkContext().hadoopConfiguration();
     StructType schema =
         DataTypes.createStructType(
@@ -111,13 +119,13 @@ public class ITParquetDataManager {
       assertTrue(isNewData, "Path should belong to appended data: " + pathString);
       //  assertFalse(isOldData, "Path should NOT belong to old data: " + pathString);
     }
-    spark.stop();
+    // spark.stop();
   }
 
   @Test
   public void testAppendParquetFileSinglePartition() throws IOException {
-    SparkSession spark =
-        SparkSession.builder().appName("TestAppendFunctionnality").master("local[*]").getOrCreate();
+    /*SparkSession spark =
+    SparkSession.builder().appName("TestAppendFunctionnality").master("local[*]").getOrCreate();*/
     Configuration conf = spark.sparkContext().hadoopConfiguration();
     // In testAppendParquetFileSinglePartition
     MessageType schemaParquet =
@@ -209,7 +217,7 @@ public class ITParquetDataManager {
       //  assertFalse(isOldData, "Path should NOT belong to old data: " + pathString);
     }
 
-    spark.stop();
+    // spark.stop();
   }
 
   private void updateModificationTimeRecursive(
@@ -221,6 +229,13 @@ public class ITParquetDataManager {
       if (status.getPath().getName().endsWith(".parquet")) {
         fs.setTimes(status.getPath(), time, -1);
       }
+    }
+  }
+
+  @AfterAll
+  public static void tearDown() {
+    if (spark != null) {
+      spark.stop();
     }
   }
 }
