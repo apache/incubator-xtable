@@ -69,7 +69,7 @@ public class ITParquetDataManager {
     List<Row> data =
         Arrays.asList(RowFactory.create(101, "A", 2026, 12), RowFactory.create(102, "B", 2026, 12));
     Dataset<Row> df = spark.createDataFrame(data, schema);
-    Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet-partitioned_table_test");
+    Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet-partitioned_table_test_0");
     String outputPath = fixedPath.toString();
     df.write().partitionBy("year", "month").mode("overwrite").parquet(outputPath);
 
@@ -126,8 +126,8 @@ public class ITParquetDataManager {
         Arrays.asList(RowFactory.create(101, "A", 2026, 12), RowFactory.create(102, "B", 2026, 12));
 
     Dataset<Row> df = spark.createDataFrame(data, schema);
-    Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet_table_test");
-    Path appendFilePath = Paths.get("target", "fixed-parquet-data", "parquet_file_test");
+    Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet_table_test_1");
+    Path appendFilePath = Paths.get("target", "fixed-parquet-data", "parquet_file_test_1");
     String outputPath = fixedPath.toString();
     String finalAppendFilePath = appendFilePath.toString();
 
@@ -201,8 +201,8 @@ public class ITParquetDataManager {
         Arrays.asList(RowFactory.create(101, "A", 2026, 12), RowFactory.create(102, "B", 2027, 11));
 
     Dataset<Row> df = spark.createDataFrame(data, schema);
-    Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet_table_test");
-    Path appendFilePath = Paths.get("target", "fixed-parquet-data", "parquet_file_test");
+    Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet_table_test_2");
+    Path appendFilePath = Paths.get("target", "fixed-parquet-data", "parquet_file_test_2");
     String outputPath = fixedPath.toString();
     String finalAppendFilePath = appendFilePath.toString();
 
