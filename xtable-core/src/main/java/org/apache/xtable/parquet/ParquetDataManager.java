@@ -265,4 +265,50 @@ public class ParquetDataManager {
     }
     return parquetFiles;
   }
+
+  public static List<Path> mergeDatasetsByPartition(
+      Path targetRoot, Path sourceRoot, MessageType schema) throws IOException {
+    List<Path> finalPartitionPaths = new ArrayList<>();
+    Configuration conf = new Configuration();
+    FileSystem fs = targetRoot.getFileSystem(conf);
+
+    Map<String, Path> sourcePartitions = mapPartitions(fs, sourceRoot);
+
+    Map<String, Path> targetPartitions = mapPartitions(fs, targetRoot);
+
+    for (Map.Entry<String, Path> entry : sourcePartitions.entrySet()) {
+      String partitionKey = entry.getKey();
+      Path sourcePartitionPath = entry.getValue();
+
+      if (targetPartitions.containsKey(partitionKey)) {
+        Path targetPartitionPath = targetPartitions.get(partitionKey);
+
+        finalPartitionPaths.add(
+            appendPartitionedData(targetPartitionPath, sourcePartitionPath, schema));
+      } else {
+        // TODO logic for when a partition exists in source but not in target
+        // simply merge the files in the respective partitions using appendPartitionedData() that
+        // takes only one Path/dir
+
+      }
+    }
+    return finalPartitionPaths;
+  }
+
+  private static Map<String, Path> mapPartitions(FileSystem fs, Path root) throws IOException {
+    Map<String, Path> partitionMap = new HashMap<>();
+    RemoteIterator<LocatedFileStatus> it = fs.listFiles(root, true);
+
+    while (it.hasNext()) {
+      Path filePath = it.next().getPath();
+      if (filePath.getName().endsWith(".parquet") && !filePath.toString().contains("/_")) {
+        Path parent = filePath.getParent();
+        String relative = parent.toString().replace(root.toString(), "");
+        if (relative.startsWith("/")) relative = relative.substring(1);
+
+        partitionMap.put(relative, parent);
+      }
+    }
+    return partitionMap;
+  }
 }
