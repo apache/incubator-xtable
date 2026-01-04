@@ -65,27 +65,7 @@ public class ParquetDataManager {
     ParquetFileConfig parquetFileConfig = new ParquetFileConfig(conf, fileToAppend);
     return parquetFileConfig;
   }
-  // TODO use this method to match the partition folders and merge them one by one (if one exists
-  // but not in other file then create it)
-  public void appendWithPartitionCheck(Path targetPath, Path sourcePath, MessageType schema)
-      throws IOException {
-
-    // e.g., "year=2024/month=12"
-    String targetPartition = getPartitionPath(targetPath);
-    String sourcePartition = getPartitionPath(sourcePath);
-
-    if (!targetPartition.equals(sourcePartition)) {
-      throw new IllegalArgumentException(
-          "Partition Mismatch! Cannot merge " + sourcePartition + " into " + targetPartition);
-    }
-
-    // append files within the same partition foldr
-    appendNewParquetFiles(targetPath, sourcePath, schema);
-  }
-
-  private String getPartitionPath(Path path) {
-    return path.getParent().getName();
-  }
+  // TODO add safe guards for possible empty parquet files
   // append a file (merges two files into one .parquet under a partition folder)
   public static Path appendNewParquetFiles(Path filePath, Path fileToAppend, MessageType schema)
       throws IOException {
@@ -105,6 +85,12 @@ public class ParquetDataManager {
     writer.start();
     HadoopInputFile inputFile = HadoopInputFile.fromPath(filePath, conf);
     InputFile inputFileToAppend = HadoopInputFile.fromPath(fileToAppend, conf);
+    // get the equivalent fileStatus from the file-to-append Path
+    FileSystem fs = FileSystem.get(conf);
+    FileStatus fileStatus = fs.getFileStatus(fileToAppend);
+    // save modif Time (not needed for real case scenario)
+    // long prevModifTime = fileStatus.getModificationTime();
+
     if (checkIfSchemaIsSame(conf, fileToAppend, filePath)) {
       writer.appendFile(inputFile);
       writer.appendFile(inputFileToAppend);
@@ -115,9 +101,7 @@ public class ParquetDataManager {
     }
     // track the append date and save it in the footer
     int appendCount = Integer.parseInt(combinedMeta.getOrDefault("total_appends", "0"));
-    // get the equivalent fileStatus from the file-to-append Path
-    FileSystem fs = FileSystem.get(conf);
-    FileStatus fileStatus = fs.getFileStatus(fileToAppend);
+
     // save block indexes and modification time (for later sync related retrieval) in the metadata
     // of the output
     // table
@@ -133,9 +117,13 @@ public class ParquetDataManager {
         "append_date_" + currentAppendIdx, String.valueOf(fileStatus.getModificationTime()));
     writer.end(combinedMeta);
     fs.delete(filePath, false);
+    // restore modifTime not needed actually (only for test purposes)
+    // the append happens here so the time must NOT updated manually
+    // fs.setTimes(tempPath, prevModifTime, -1);
     fs.rename(tempPath, filePath);
     return filePath;
   }
+  // TODO add safe guards for possible empty parquet files
   // selective compaction of parquet blocks
   public static List<Path> formNewTargetFiles(
       Configuration conf, Path partitionPath, long targetModifTime) throws IOException {
@@ -178,6 +166,7 @@ public class ParquetDataManager {
                 "%s_block%d_%d.parquet", status.getPath().getName(), startBlock, endBlock);
         Path targetSyncFilePath = new Path(status.getPath().getParent(), newFileName);
         try (ParquetFileWriter writer = new ParquetFileWriter(conf, schema, targetSyncFilePath)) {
+          boolean wasDataAppended = false;
           writer.start();
           for (int j = 0; j < bigFileFooter.getBlocks().size(); j++) {
             BlockMetaData blockMetadata = bigFileFooter.getBlocks().get(j);
@@ -186,10 +175,17 @@ public class ParquetDataManager {
                   Collections.<BlockMetaData>singletonList(blockMetadata);
               FSDataInputStream targetInputStream = fs.open(status.getPath());
               writer.appendRowGroups(targetInputStream, blockList, false);
+              wasDataAppended = true;
             }
           }
+          // manually restore the modifTime after using appendRowGroups()
           writer.end(new HashMap<>());
-          finalPaths.add(targetSyncFilePath);
+          if (wasDataAppended) {
+            fs.setTimes(targetSyncFilePath, modifTime, -1);
+            finalPaths.add(targetSyncFilePath);
+          } else {
+            fs.delete(targetSyncFilePath, false);
+          }
         }
       }
     }
@@ -236,7 +232,9 @@ public class ParquetDataManager {
         continue;
       }
       long len = fs.getFileStatus(sourceFile).getLen();
+      long len_2 = fs.getFileStatus(masterTargetFile).getLen();
       System.out.println("DEBUG: Attempting to append " + sourceFile + " Size: " + len);
+      System.out.println("DEBUG: Attempting to append " + masterTargetFile + " Size: " + len_2);
       appendNewParquetFiles(masterTargetFile, sourceFile, schema);
     }
 
