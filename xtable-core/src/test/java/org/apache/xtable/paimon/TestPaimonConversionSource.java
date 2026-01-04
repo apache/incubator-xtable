@@ -279,8 +279,9 @@ public class TestPaimonConversionSource {
   void testIsIncrementalSyncSafeFromReturnsFalseForInstantBeforeFirstSnapshot() {
     testTable.insertRows(5);
     Snapshot snapshot = paimonTable.snapshotManager().latestSnapshot();
-    
-    Instant instantBeforeFirstSnapshot = Instant.ofEpochMilli(snapshot.timeMillis()).minusSeconds(3600);
+
+    Instant instantBeforeFirstSnapshot =
+        Instant.ofEpochMilli(snapshot.timeMillis()).minusSeconds(3600);
 
     assertFalse(conversionSource.isIncrementalSyncSafeFrom(instantBeforeFirstSnapshot));
   }

@@ -209,10 +209,10 @@ public class PaimonConversionSource implements ConversionSource<Snapshot> {
 
     // Check 3: Verify a snapshot exists at or before the instant
     if (earliestSnapshot.timeMillis() <= timeInMillis) {
-      log.info("Incremental sync is safe from instant {} for table {}", instant, paimonTable.name());
+      log.info(
+          "Incremental sync is safe from instant {} for table {}", instant, paimonTable.name());
       return true;
     }
-
 
     log.warn("No snapshot found at or before instant {} for table {}", instant, paimonTable.name());
     return false;

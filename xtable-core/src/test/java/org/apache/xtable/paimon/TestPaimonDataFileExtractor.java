@@ -30,7 +30,6 @@ import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.Snapshot;
 import org.apache.paimon.table.FileStoreTable;
-import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -39,6 +38,7 @@ import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 
 public class TestPaimonDataFileExtractor {
   private static final PaimonDataFileExtractor extractor = PaimonDataFileExtractor.getInstance();
@@ -171,7 +171,8 @@ public class TestPaimonDataFileExtractor {
     assertNotNull(filesDiff.getFilesAdded());
     assertEquals(1, filesDiff.getFilesAdded().size());
     // Note: Even for inserts, Paimon tables with primary keys (which all test tables have)
-    // may have removed files due to compaction. The compaction merges files, so old files are removed
+    // may have removed files due to compaction. The compaction merges files, so old files are
+    // removed
     // and new compacted files are added. This is expected behavior.
     assertNotNull(filesDiff.getFilesRemoved());
     assertEquals(1, filesDiff.getFilesRemoved().size());
