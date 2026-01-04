@@ -18,7 +18,13 @@
  
 package org.apache.xtable.paimon;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 import lombok.extern.log4j.Log4j2;
 

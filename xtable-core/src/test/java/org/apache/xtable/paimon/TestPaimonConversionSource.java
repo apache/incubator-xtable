@@ -190,10 +190,17 @@ public class TestPaimonConversionSource {
     // Verify we get at least the second snapshot (may get more if insertRows creates multiple)
     assertNotNull(backlog);
     assertTrue(backlog.getCommitsToProcess().size() >= 1);
+
     // Verify the last snapshot in the backlog is the second snapshot
     assertEquals(
         secondSnapshot.id(),
         backlog.getCommitsToProcess().get(backlog.getCommitsToProcess().size() - 1).id());
+
+    // Verify the first snapshot is NOT in the list of commits to process
+    assertFalse(
+        backlog.getCommitsToProcess().stream()
+            .anyMatch(snapshot -> snapshot.id() == firstSnapshot.id()),
+        "First snapshot should not be in the backlog since we're syncing from that instant");
     assertTrue(backlog.getInFlightInstants().isEmpty());
   }
 
@@ -266,6 +273,16 @@ public class TestPaimonConversionSource {
     Instant someInstant = Instant.now();
 
     assertFalse(conversionSource.isIncrementalSyncSafeFrom(someInstant));
+  }
+
+  @Test
+  void testIsIncrementalSyncSafeFromReturnsFalseForInstantBeforeFirstSnapshot() {
+    testTable.insertRows(5);
+    Snapshot snapshot = paimonTable.snapshotManager().latestSnapshot();
+    
+    Instant instantBeforeFirstSnapshot = Instant.ofEpochMilli(snapshot.timeMillis()).minusSeconds(3600);
+
+    assertFalse(conversionSource.isIncrementalSyncSafeFrom(instantBeforeFirstSnapshot));
   }
 
   @Test

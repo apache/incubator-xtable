@@ -28,7 +28,9 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.paimon.Snapshot;
 import org.apache.paimon.table.FileStoreTable;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -153,24 +155,26 @@ public class TestPaimonDataFileExtractor {
 
     // Insert initial data
     testTable.insertRows(5);
-    org.apache.paimon.Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
     assertNotNull(firstSnapshot);
 
     // Insert more data to create a second snapshot
     testTable.insertRows(3);
-    org.apache.paimon.Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
     assertNotNull(secondSnapshot);
 
-    org.apache.xtable.model.storage.InternalFilesDiff filesDiff =
+    InternalFilesDiff filesDiff =
         extractor.extractFilesDiff(paimonTable, secondSnapshot, testSchema);
 
-    // Verify we have added files
+    // Verify we have replaced the single file on this setup
     assertNotNull(filesDiff);
     assertNotNull(filesDiff.getFilesAdded());
-    assertTrue(filesDiff.getFilesAdded().size() > 0);
-
-    // Verify removed files collection exists (size may vary based on compaction behavior)
+    assertEquals(1, filesDiff.getFilesAdded().size());
+    // Note: Even for inserts, Paimon tables with primary keys (which all test tables have)
+    // may have removed files due to compaction. The compaction merges files, so old files are removed
+    // and new compacted files are added. This is expected behavior.
     assertNotNull(filesDiff.getFilesRemoved());
+    assertEquals(1, filesDiff.getFilesRemoved().size());
   }
 
   @Test
@@ -179,22 +183,22 @@ public class TestPaimonDataFileExtractor {
 
     // Insert initial data
     testTable.insertRows(5);
-    org.apache.paimon.Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
     assertNotNull(firstSnapshot);
 
     // Insert more data
     testTable.insertRows(3);
-    org.apache.paimon.Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
     assertNotNull(secondSnapshot);
 
-    org.apache.xtable.model.storage.InternalFilesDiff filesDiff =
+    InternalFilesDiff filesDiff =
         extractor.extractFilesDiff(paimonTable, secondSnapshot, testSchema);
 
     // Verify we have added files with partition values
     assertNotNull(filesDiff);
     assertTrue(filesDiff.getFilesAdded().size() > 0);
 
-    for (org.apache.xtable.model.storage.InternalDataFile file : filesDiff.dataFilesAdded()) {
+    for (InternalDataFile file : filesDiff.dataFilesAdded()) {
       assertNotNull(file.getPartitionValues());
     }
   }
@@ -205,15 +209,15 @@ public class TestPaimonDataFileExtractor {
 
     // Insert initial data
     testTable.insertRows(5);
-    org.apache.paimon.Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
     assertNotNull(firstSnapshot);
 
     // Insert more data to create compaction
     testTable.insertRows(3);
-    org.apache.paimon.Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
     assertNotNull(secondSnapshot);
 
-    org.apache.xtable.model.storage.InternalFilesDiff filesDiff =
+    InternalFilesDiff filesDiff =
         extractor.extractFilesDiff(paimonTable, secondSnapshot, testSchema);
 
     // Verify the diff is returned (size may vary based on compaction)
@@ -228,10 +232,10 @@ public class TestPaimonDataFileExtractor {
 
     // Insert data to create first snapshot
     testTable.insertRows(5);
-    org.apache.paimon.Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
     assertNotNull(firstSnapshot);
 
-    org.apache.xtable.model.storage.InternalFilesDiff filesDiff =
+    InternalFilesDiff filesDiff =
         extractor.extractFilesDiff(paimonTable, firstSnapshot, testSchema);
 
     // First snapshot should only have added files

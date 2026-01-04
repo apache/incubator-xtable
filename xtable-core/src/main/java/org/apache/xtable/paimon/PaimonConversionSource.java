@@ -194,7 +194,7 @@ public class PaimonConversionSource implements ConversionSource<Snapshot> {
     }
 
     // Check 2: Has snapshot expiration affected this instant?
-    // If the earliest snapshot is newer than the requested instant,
+    // If the earliest snapshot is after the requested instant,
     // then snapshots have been expired and we can't do incremental sync
     if (earliestSnapshot.timeMillis() > timeInMillis) {
       log.warn(
@@ -208,33 +208,14 @@ public class PaimonConversionSource implements ConversionSource<Snapshot> {
     }
 
     // Check 3: Verify a snapshot exists at or before the instant
-    boolean snapshotFoundBeforeOrAtInstant = false;
-    for (long snapshotId = latestSnapshotId; snapshotId >= earliestSnapshotId; snapshotId--) {
-      if (!snapshotManager.snapshotExists(snapshotId)) {
-        continue;
-      }
-
-      Snapshot snapshot = snapshotManager.snapshot(snapshotId);
-      if (snapshot.timeMillis() <= timeInMillis) {
-        snapshotFoundBeforeOrAtInstant = true;
-        log.debug(
-            "Found snapshot {} at time {} before or at instant {}",
-            snapshot.id(),
-            snapshot.timeMillis(),
-            timeInMillis);
-        break;
-      }
+    if (earliestSnapshot.timeMillis() <= timeInMillis) {
+      log.info("Incremental sync is safe from instant {} for table {}", instant, paimonTable.name());
+      return true;
     }
 
-    if (!snapshotFoundBeforeOrAtInstant) {
-      log.warn(
-          "No snapshot found at or before instant {} for table {}", instant, paimonTable.name());
-      return false;
-    }
 
-    log.info("Incremental sync is safe from instant {} for table {}", instant, paimonTable.name());
-
-    return true;
+    log.warn("No snapshot found at or before instant {} for table {}", instant, paimonTable.name());
+    return false;
   }
 
   @Override
