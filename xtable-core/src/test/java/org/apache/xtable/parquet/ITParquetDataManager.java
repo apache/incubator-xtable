@@ -55,7 +55,6 @@ public class ITParquetDataManager {
   }
 
   @Test
-  @Disabled("This test already passed CI")
   public void testFormParquetFileSinglePartition() throws IOException {
     Configuration conf = spark.sparkContext().hadoopConfiguration();
     StructType schema =
@@ -104,7 +103,6 @@ public class ITParquetDataManager {
   }
 
   @Test
-  @Disabled("This test already passed CI")
   public void testAppendParquetFileSinglePartition() throws IOException {
     Configuration conf = spark.sparkContext().hadoopConfiguration();
     // In testAppendParquetFileSinglePartition
