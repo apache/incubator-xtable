@@ -170,6 +170,9 @@ public class ParquetDataManager {
                     .getFileMetaData()
                     .getKeyValueMetaData()
                     .get("index_end_block_of_append_" + i));
+        long modifTime =
+            Long.parseLong(
+                bigFileFooter.getFileMetaData().getKeyValueMetaData().get("append_date_" + i));
         String newFileName =
             String.format(
                 "%s_block%d_%d.parquet", status.getPath().getName(), startBlock, endBlock);
@@ -178,9 +181,7 @@ public class ParquetDataManager {
           writer.start();
           for (int j = 0; j < bigFileFooter.getBlocks().size(); j++) {
             BlockMetaData blockMetadata = bigFileFooter.getBlocks().get(j);
-            if (j >= startBlock
-                && j <= endBlock
-                && status.getModificationTime() >= targetModifTime) {
+            if (j >= startBlock && j <= endBlock && modifTime >= targetModifTime) {
               List<BlockMetaData> blockList =
                   Collections.<BlockMetaData>singletonList(blockMetadata);
               FSDataInputStream targetInputStream = fs.open(status.getPath());
