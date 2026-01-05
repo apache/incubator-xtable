@@ -61,7 +61,7 @@ public class PaimonStatsExtractor {
     SimpleStats valueStats = file.valueStats();
     if (valueStats != null) {
       List<String> colNames = file.valueStatsCols();
-      if (colNames == null || colNames.isEmpty()) {
+      if (colNames == null) {
         // if column names are not present, we assume all columns in the schema are present in the
         // same order as the schema - TODO: validate this assumption
         colNames =

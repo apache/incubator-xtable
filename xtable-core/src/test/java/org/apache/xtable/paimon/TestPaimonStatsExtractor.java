@@ -26,16 +26,31 @@ import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
+import lombok.extern.log4j.Log4j2;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.paimon.Snapshot;
+import org.apache.paimon.catalog.Catalog;
+import org.apache.paimon.catalog.CatalogContext;
+import org.apache.paimon.catalog.CatalogFactory;
+import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.BinaryString;
 import org.apache.paimon.data.Decimal;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.data.Timestamp;
+import org.apache.paimon.fs.FileIO;
+import org.apache.paimon.fs.local.LocalFileIO;
+import org.apache.paimon.manifest.ManifestEntry;
+import org.apache.paimon.manifest.ManifestFileMeta;
+import org.apache.paimon.operation.FileStoreScan;
+import org.apache.paimon.operation.ManifestsReader;
+import org.apache.paimon.options.CatalogOptions;
+import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.Schema;
+import org.apache.paimon.stats.SimpleStats;
 import org.apache.paimon.table.FileStoreTable;
+import org.apache.paimon.table.source.snapshot.SnapshotReader;
 import org.apache.paimon.types.DataTypes;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -47,6 +62,7 @@ import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.InternalDataFile;
 
+@Log4j2
 public class TestPaimonStatsExtractor {
   private static final PaimonDataFileExtractor extractor = PaimonDataFileExtractor.getInstance();
   private static final PaimonSchemaExtractor schemaExtractor = PaimonSchemaExtractor.getInstance();
@@ -343,6 +359,116 @@ public class TestPaimonStatsExtractor {
 
     ColumnStat idStat = getColumnStat(stats, "id");
     assertEquals(Range.vector(1, 3), idStat.getRange());
+  }
+
+
+  @Test
+  void testPaimonNoStats() {
+    Schema schema =
+        Schema.newBuilder()
+            .primaryKey("id")
+            .column("id", DataTypes.INT())
+            .column("foo", DataTypes.STRING())
+            .column("bar", DataTypes.STRING())
+            .column("boo", DataTypes.STRING())
+            .option("bucket", "1")
+            .option("bucket-key", "id")
+            .option("full-compaction.delta-commits", "1")
+            .option("metadata.stats-mode", "none")
+            .build();
+
+    FileStoreTable table =
+        ((TestPaimonTable)
+            TestPaimonTable.createTable(
+                "field_level_stats", null, tempDir, new Configuration(), false, schema))
+            .getPaimonTable();
+
+    GenericRow row1 =
+        GenericRow.of(
+            1,
+            BinaryString.fromString("foo1"),
+            BinaryString.fromString("bar1"),
+            BinaryString.fromString("boo1"));
+    GenericRow row2 =
+        GenericRow.of(
+            2,
+            BinaryString.fromString("foo2"),
+            BinaryString.fromString("bar2"),
+            BinaryString.fromString("boo2"));
+    GenericRow row3 =
+        GenericRow.of(
+            3,
+            BinaryString.fromString("foo3"),
+            BinaryString.fromString("bar3"),
+            BinaryString.fromString("boo3"));
+
+    TestPaimonTable.writeRows(table, Arrays.asList(row1, row2, row3));
+
+    InternalSchema internalSchema = schemaExtractor.toInternalSchema(table.schema());
+    List<ColumnStat> stats =
+        extractor
+            .toInternalDataFiles(table, table.snapshotManager().latestSnapshot(), internalSchema)
+            .get(0)
+            .getColumnStats();
+
+    assertEquals(0, stats.size());
+  }
+
+  @Test
+  void testPaimonDropStats() {
+    Schema schema =
+        Schema.newBuilder()
+            .primaryKey("id")
+            .column("id", DataTypes.INT())
+            .column("foo", DataTypes.STRING())
+            .column("bar", DataTypes.STRING())
+            .column("boo", DataTypes.STRING())
+            .option("bucket", "1")
+            .option("bucket-key", "id")
+            .option("full-compaction.delta-commits", "1")
+            .option("metadata.stats-mode", "full")
+            .option("manifest.delete-file-drop-stats", "true")
+            .build();
+
+    FileStoreTable table =
+        ((TestPaimonTable)
+            TestPaimonTable.createTable(
+                "field_level_stats", null, tempDir, new Configuration(), false, schema))
+            .getPaimonTable();
+
+    GenericRow row1 =
+        GenericRow.of(
+            1,
+            BinaryString.fromString("foo1"),
+            BinaryString.fromString("bar1"),
+            BinaryString.fromString("boo1"));
+    GenericRow row2 =
+        GenericRow.of(
+            2,
+            BinaryString.fromString("foo2"),
+            BinaryString.fromString("bar2"),
+            BinaryString.fromString("boo2"));
+    GenericRow row3 =
+        GenericRow.of(
+            3,
+            BinaryString.fromString("foo3"),
+            BinaryString.fromString("bar3"),
+            BinaryString.fromString("boo3"));
+
+    TestPaimonTable.writeRows(table, Arrays.asList(row1, row2, row3));
+
+    InternalSchema internalSchema = schemaExtractor.toInternalSchema(table.schema());
+    List<ColumnStat> stats =
+        extractor
+            .toInternalDataFiles(table, table.snapshotManager().latestSnapshot(), internalSchema)
+            .get(0)
+            .getColumnStats();
+
+    // compaction create commits that are DELETE and ADD on the same file
+    // with `manifest.delete-file-drop-stats` enabled, this means stats are empty after compaction
+    // this is a smoke test to ensure exceptions aren't raised for this scenario
+    // TODO: Question for Paimon experts - is this the expected behaviour?
+    assertEquals(0, stats.size());
   }
 
   private void createUnpartitionedTable() {
