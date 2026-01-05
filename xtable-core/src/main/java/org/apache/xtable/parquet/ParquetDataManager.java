@@ -88,9 +88,6 @@ public class ParquetDataManager {
     // get the equivalent fileStatus from the file-to-append Path
     FileSystem fs = FileSystem.get(conf);
     FileStatus fileStatus = fs.getFileStatus(fileToAppend);
-    // save modif Time (not needed for real case scenario)
-    // long prevModifTime = fileStatus.getModificationTime();
-
     if (checkIfSchemaIsSame(conf, fileToAppend, filePath)) {
       writer.appendFile(inputFile);
       writer.appendFile(inputFileToAppend);
@@ -106,9 +103,23 @@ public class ParquetDataManager {
     // of the output
     // table
     int currentAppendIdx = appendCount + 1;
-    long startBlock = firstBlockIndex;
-    long blocksAdded = ParquetFileReader.readFooter(conf, fileToAppend).getBlocks().size();
-    long endBlock = startBlock + blocksAdded - 1;
+    List<BlockMetaData> initialBlocks = existingFooter.getBlocks();
+    long totalInitialCompressedSize = 0;
+    // first the blocks start at 0
+    for (BlockMetaData block : initialBlocks) {
+      totalInitialCompressedSize += block.getCompressedSize();
+    }
+    long startBlock = 0;
+    if (appendCount > 0) {
+      startBlock = totalInitialCompressedSize;
+    }
+
+    List<BlockMetaData> addedBlocks = ParquetFileReader.readFooter(conf, fileToAppend).getBlocks();
+    long totalAddedCompressedSize = 0;
+    for (BlockMetaData block : addedBlocks) {
+      totalAddedCompressedSize += block.getCompressedSize();
+    }
+    long endBlock = totalInitialCompressedSize + totalAddedCompressedSize;
 
     combinedMeta.put("total_appends", String.valueOf(currentAppendIdx));
     combinedMeta.put("index_start_block_of_append_" + currentAppendIdx, String.valueOf(startBlock));
@@ -117,9 +128,6 @@ public class ParquetDataManager {
         "append_date_" + currentAppendIdx, String.valueOf(fileStatus.getModificationTime()));
     writer.end(combinedMeta);
     fs.delete(filePath, false);
-    // restore modifTime not needed actually (only for test purposes)
-    // the append happens here so the time must NOT updated manually
-    // fs.setTimes(tempPath, prevModifTime, -1);
     fs.rename(tempPath, filePath);
     return filePath;
   }
@@ -170,7 +178,11 @@ public class ParquetDataManager {
           writer.start();
           for (int j = 0; j < bigFileFooter.getBlocks().size(); j++) {
             BlockMetaData blockMetadata = bigFileFooter.getBlocks().get(j);
-            if (j >= startBlock && j <= endBlock && modifTime >= targetModifTime) {
+            long currentBlockStart = blockMetadata.getStartingPos();
+            long currentBlockEnd = currentBlockStart + blockMetadata.getCompressedSize();
+            if (currentBlockStart >= startBlock
+                && currentBlockEnd <= endBlock
+                && modifTime >= targetModifTime) {
               List<BlockMetaData> blockList =
                   Collections.<BlockMetaData>singletonList(blockMetadata);
               FSDataInputStream targetInputStream = fs.open(status.getPath());
