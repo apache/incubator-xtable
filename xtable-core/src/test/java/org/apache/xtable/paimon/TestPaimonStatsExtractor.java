@@ -29,28 +29,14 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 import lombok.extern.log4j.Log4j2;
+
 import org.apache.hadoop.conf.Configuration;
-import org.apache.paimon.Snapshot;
-import org.apache.paimon.catalog.Catalog;
-import org.apache.paimon.catalog.CatalogContext;
-import org.apache.paimon.catalog.CatalogFactory;
-import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.BinaryString;
 import org.apache.paimon.data.Decimal;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.data.Timestamp;
-import org.apache.paimon.fs.FileIO;
-import org.apache.paimon.fs.local.LocalFileIO;
-import org.apache.paimon.manifest.ManifestEntry;
-import org.apache.paimon.manifest.ManifestFileMeta;
-import org.apache.paimon.operation.FileStoreScan;
-import org.apache.paimon.operation.ManifestsReader;
-import org.apache.paimon.options.CatalogOptions;
-import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.Schema;
-import org.apache.paimon.stats.SimpleStats;
 import org.apache.paimon.table.FileStoreTable;
-import org.apache.paimon.table.source.snapshot.SnapshotReader;
 import org.apache.paimon.types.DataTypes;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -361,7 +347,6 @@ public class TestPaimonStatsExtractor {
     assertEquals(Range.vector(1, 3), idStat.getRange());
   }
 
-
   @Test
   void testPaimonNoStats() {
     Schema schema =
@@ -379,8 +364,8 @@ public class TestPaimonStatsExtractor {
 
     FileStoreTable table =
         ((TestPaimonTable)
-            TestPaimonTable.createTable(
-                "field_level_stats", null, tempDir, new Configuration(), false, schema))
+                TestPaimonTable.createTable(
+                    "field_level_stats", null, tempDir, new Configuration(), false, schema))
             .getPaimonTable();
 
     GenericRow row1 =
@@ -432,8 +417,8 @@ public class TestPaimonStatsExtractor {
 
     FileStoreTable table =
         ((TestPaimonTable)
-            TestPaimonTable.createTable(
-                "field_level_stats", null, tempDir, new Configuration(), false, schema))
+                TestPaimonTable.createTable(
+                    "field_level_stats", null, tempDir, new Configuration(), false, schema))
             .getPaimonTable();
 
     GenericRow row1 =
