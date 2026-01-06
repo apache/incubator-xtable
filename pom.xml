@@ -29,7 +29,7 @@
     <artifactId>xtable</artifactId>
     <name>XTable Project Parent POM</name>
     <inceptionYear>2024</inceptionYear>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.4.0-atlassian-4</version>
     <packaging>pom</packaging>
     <url>https://xtable.apache.org/</url>
 
@@ -58,7 +58,7 @@
 
     <properties>
         <delta.kernel.version>4.0.0</delta.kernel.version>
-        <project.version>0.2.0-SNAPSHOT</project.version>
+        <project.version>0.4.0-atlassian-4</project.version>
         <!-- To ensure build content is re-producible -->
         <project.build.outputTimestamp>2025-01-01T00:00:00Z</project.build.outputTimestamp>
         <maven.compiler.target>8</maven.compiler.target>
@@ -113,6 +113,17 @@
         <skipUTs>${skipTests}</skipUTs>
         <skipITs>${skipTests}</skipITs>
     </properties>
+
+    <distributionManagement>
+        <repository>
+            <id>atlassian-3rdparty</id>
+            <url>https://packages.atlassian.com/maven/3rdparty</url>
+        </repository>
+        <snapshotRepository>
+            <id>atlassian-3rdparty</id>
+            <url>https://packages.atlassian.com/maven/3rdparty</url>
+        </snapshotRepository>
+    </distributionManagement>
 
     <dependencies>
         <dependency>
@@ -797,6 +808,20 @@
                 </executions>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>${maven-source-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.rat</groupId>
                 <artifactId>apache-rat-plugin</artifactId>
                 <version>${apache.rat.version}</version>
@@ -969,19 +994,19 @@
         </plugins>
     </build>
 
-    <repositories>
-        <repository>
-            <id>Maven Central</id>
-            <name>Maven Repository</name>
-            <url>https://repo.maven.apache.org/maven2</url>
-            <releases>
-                <enabled>true</enabled>
-            </releases>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </repository>
-    </repositories>
+<!--    <repositories>-->
+<!--        <repository>-->
+<!--            <id>Maven Central</id>-->
+<!--            <name>Maven Repository</name>-->
+<!--            <url>https://repo.maven.apache.org/maven2</url>-->
+<!--            <releases>-->
+<!--                <enabled>true</enabled>-->
+<!--            </releases>-->
+<!--            <snapshots>-->
+<!--                <enabled>false</enabled>-->
+<!--            </snapshots>-->
+<!--        </repository>-->
+<!--    </repositories>-->
 
     <profiles>
         <!--Scala 2.12 Profile -->

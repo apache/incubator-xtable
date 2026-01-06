@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.apache.xtable</groupId>
         <artifactId>xtable</artifactId>
-        <version>0.2.0-SNAPSHOT</version>
+        <version>0.4.0-atlassian-4</version>
     </parent>
 
     <artifactId>xtable-api</artifactId>
