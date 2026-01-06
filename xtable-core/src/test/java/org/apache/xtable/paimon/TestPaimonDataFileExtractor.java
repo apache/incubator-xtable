@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.paimon.Snapshot;
 import org.apache.paimon.table.FileStoreTable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,6 +38,7 @@ import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 
 public class TestPaimonDataFileExtractor {
   private static final PaimonDataFileExtractor extractor = PaimonDataFileExtractor.getInstance();
@@ -145,6 +147,102 @@ public class TestPaimonDataFileExtractor {
     for (InternalDataFile dataFile : result) {
       assertEquals(0, dataFile.getColumnStats().size());
     }
+  }
+
+  @Test
+  void testExtractFilesDiffWithNewFiles() {
+    createUnpartitionedTable();
+
+    // Insert initial data
+    testTable.insertRows(5);
+    Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(firstSnapshot);
+
+    // Insert more data to create a second snapshot
+    testTable.insertRows(3);
+    Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(secondSnapshot);
+
+    InternalFilesDiff filesDiff =
+        extractor.extractFilesDiff(paimonTable, secondSnapshot, testSchema);
+
+    // Verify we have replaced the single file on this setup
+    assertNotNull(filesDiff);
+    assertNotNull(filesDiff.getFilesAdded());
+    assertEquals(1, filesDiff.getFilesAdded().size());
+    // Note: Even for inserts, Paimon tables with primary keys (which all test tables have)
+    // may have removed files due to compaction. The compaction merges files, so old files are
+    // removed
+    // and new compacted files are added. This is expected behavior.
+    assertNotNull(filesDiff.getFilesRemoved());
+    assertEquals(1, filesDiff.getFilesRemoved().size());
+  }
+
+  @Test
+  void testExtractFilesDiffWithPartitionedTable() {
+    createPartitionedTable();
+
+    // Insert initial data
+    testTable.insertRows(5);
+    Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(firstSnapshot);
+
+    // Insert more data
+    testTable.insertRows(3);
+    Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(secondSnapshot);
+
+    InternalFilesDiff filesDiff =
+        extractor.extractFilesDiff(paimonTable, secondSnapshot, testSchema);
+
+    // Verify we have added files with partition values
+    assertNotNull(filesDiff);
+    assertTrue(filesDiff.getFilesAdded().size() > 0);
+
+    for (InternalDataFile file : filesDiff.dataFilesAdded()) {
+      assertNotNull(file.getPartitionValues());
+    }
+  }
+
+  @Test
+  void testExtractFilesDiffWithTableWithPrimaryKeys() {
+    createTableWithPrimaryKeys();
+
+    // Insert initial data
+    testTable.insertRows(5);
+    Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(firstSnapshot);
+
+    // Insert more data to create compaction
+    testTable.insertRows(3);
+    Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(secondSnapshot);
+
+    InternalFilesDiff filesDiff =
+        extractor.extractFilesDiff(paimonTable, secondSnapshot, testSchema);
+
+    // Verify the diff is returned (size may vary based on compaction)
+    assertNotNull(filesDiff);
+    assertNotNull(filesDiff.getFilesAdded());
+    assertNotNull(filesDiff.getFilesRemoved());
+  }
+
+  @Test
+  void testExtractFilesDiffForFirstSnapshot() {
+    createUnpartitionedTable();
+
+    // Insert data to create first snapshot
+    testTable.insertRows(5);
+    Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(firstSnapshot);
+
+    InternalFilesDiff filesDiff =
+        extractor.extractFilesDiff(paimonTable, firstSnapshot, testSchema);
+
+    // First snapshot should only have added files
+    assertNotNull(filesDiff);
+    assertTrue(filesDiff.getFilesAdded().size() > 0);
+    assertEquals(0, filesDiff.getFilesRemoved().size());
   }
 
   private void createUnpartitionedTable() {
