@@ -16,7 +16,7 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.delta;
+package org.apache.xtable.kernel;
 
 import static org.apache.xtable.collectors.CustomCollectors.toList;
 import static org.apache.xtable.delta.DeltaValueConverter.convertFromDeltaPartitionValue;
@@ -39,16 +39,11 @@ import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
-import org.apache.spark.sql.types.DataType;
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.Metadata;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
-
-import scala.collection.JavaConverters;
-
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
+
+import io.delta.kernel.types.*;
+import io.delta.kernel.types.FieldMetadata;
 
 import org.apache.xtable.exception.PartitionSpecException;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -59,15 +54,10 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.schema.SchemaFieldFinder;
 
-/**
- * DeltaPartitionExtractor handles extracting partition columns, also creating generated columns in
- * the certain cases. It is also responsible for PartitionValue Serialization leveraging {@link
- * DeltaValueConverter}.
- */
 @Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class DeltaPartitionExtractor {
-  private static final DeltaPartitionExtractor INSTANCE = new DeltaPartitionExtractor();
+public class DeltaKernelPartitionExtractor {
+  private static final DeltaKernelPartitionExtractor INSTANCE = new DeltaKernelPartitionExtractor();
   private static final String CAST_FUNCTION = "CAST(%s as DATE)";
   private static final String DATE_FORMAT_FUNCTION = "DATE_FORMAT(%s, '%s')";
   private static final String YEAR_FUNCTION = "YEAR(%s)";
@@ -79,7 +69,7 @@ public class DeltaPartitionExtractor {
   // For timestamp partition fields, actual partition column names in delta format will be of type
   // generated & and with a name like `delta_partition_col_{transform_type}_{source_field_name}`.
   private static final String DELTA_PARTITION_COL_NAME_FORMAT = "xtable_partition_col_%s_%s";
-  public static final String DELTA_GENERATION_EXPRESSION = "delta.generationExpression";
+  static final String DELTA_GENERATION_EXPRESSION = "delta.generationExpression";
   private static final List<ParsedGeneratedExpr.GeneratedExprType> GRANULARITIES =
       Arrays.asList(
           ParsedGeneratedExpr.GeneratedExprType.YEAR,
@@ -87,7 +77,7 @@ public class DeltaPartitionExtractor {
           ParsedGeneratedExpr.GeneratedExprType.DAY,
           ParsedGeneratedExpr.GeneratedExprType.HOUR);
 
-  public static DeltaPartitionExtractor getInstance() {
+  public static DeltaKernelPartitionExtractor getInstance() {
     return INSTANCE;
   }
 
@@ -104,7 +94,7 @@ public class DeltaPartitionExtractor {
    */
   public List<InternalPartitionField> convertFromDeltaPartitionFormat(
       InternalSchema internalSchema, StructType partitionSchema) {
-    if (partitionSchema.isEmpty()) {
+    if (partitionSchema.fields().size() == 0) {
       return Collections.emptyList();
     }
     return getInternalPartitionFields(partitionSchema, internalSchema);
@@ -119,16 +109,16 @@ public class DeltaPartitionExtractor {
   private List<InternalPartitionField> getInternalPartitionFields(
       StructType partitionSchema, InternalSchema internalSchema) {
     PeekingIterator<StructField> itr =
-        Iterators.peekingIterator(Arrays.stream(partitionSchema.fields()).iterator());
-    List<InternalPartitionField> partitionFields = new ArrayList<>(partitionSchema.fields().length);
+        Iterators.peekingIterator(partitionSchema.fields().iterator());
+    List<InternalPartitionField> partitionFields = new ArrayList<>(partitionSchema.fields().size());
     while (itr.hasNext()) {
       StructField currPartitionField = itr.peek();
-      if (!currPartitionField.metadata().contains(DELTA_GENERATION_EXPRESSION)) {
+      if (!currPartitionField.getMetadata().contains(DELTA_GENERATION_EXPRESSION)) {
         partitionFields.add(
             InternalPartitionField.builder()
                 .sourceField(
                     SchemaFieldFinder.getInstance()
-                        .findFieldByPath(internalSchema, currPartitionField.name()))
+                        .findFieldByPath(internalSchema, currPartitionField.getName()))
                 .transformType(PartitionTransformType.VALUE)
                 .build());
         itr.next(); // consume the field.
@@ -136,29 +126,29 @@ public class DeltaPartitionExtractor {
         // Partition contains generated expression.
         // if it starts with year we should consume until we hit field with no generated expression
         // or we hit a field with generated expression that is of cast or date format.
-        String expr = currPartitionField.metadata().getString(DELTA_GENERATION_EXPRESSION);
+        String expr = currPartitionField.getMetadata().getString(DELTA_GENERATION_EXPRESSION);
         ParsedGeneratedExpr parsedGeneratedExpr =
-            ParsedGeneratedExpr.buildFromString(currPartitionField.name(), expr);
+            ParsedGeneratedExpr.buildFromString(currPartitionField.getName(), expr);
         if (ParsedGeneratedExpr.GeneratedExprType.CAST == parsedGeneratedExpr.generatedExprType) {
           partitionFields.add(
               getPartitionWithDateTransform(
-                  currPartitionField.name(), parsedGeneratedExpr, internalSchema));
+                  currPartitionField.getName(), parsedGeneratedExpr, internalSchema));
           itr.next(); // consume the field.
         } else if (ParsedGeneratedExpr.GeneratedExprType.DATE_FORMAT
             == parsedGeneratedExpr.generatedExprType) {
           partitionFields.add(
               getPartitionWithDateFormatTransform(
-                  currPartitionField.name(), parsedGeneratedExpr, internalSchema));
+                  currPartitionField.getName(), parsedGeneratedExpr, internalSchema));
           itr.next(); // consume the field.
         } else {
           // consume until we hit field with no generated expression or generated expression
           // that is not of type cast or date format.
           List<ParsedGeneratedExpr> parsedGeneratedExprs = new ArrayList<>();
           while (itr.hasNext()
-              && currPartitionField.metadata().contains(DELTA_GENERATION_EXPRESSION)) {
-            expr = currPartitionField.metadata().getString(DELTA_GENERATION_EXPRESSION);
+              && currPartitionField.getMetadata().contains(DELTA_GENERATION_EXPRESSION)) {
+            expr = currPartitionField.getMetadata().getString(DELTA_GENERATION_EXPRESSION);
             parsedGeneratedExpr =
-                ParsedGeneratedExpr.buildFromString(currPartitionField.name(), expr);
+                ParsedGeneratedExpr.buildFromString(currPartitionField.getName(), expr);
 
             if (ParsedGeneratedExpr.GeneratedExprType.CAST == parsedGeneratedExpr.generatedExprType
                 || ParsedGeneratedExpr.GeneratedExprType.DATE_FORMAT
@@ -245,7 +235,7 @@ public class DeltaPartitionExtractor {
       } else {
         // Since partition field of timestamp or bucket type, create new field in schema.
         field = getGeneratedField(internalPartitionField);
-        currPartitionColumnName = field.name();
+        currPartitionColumnName = field.getName();
       }
       nameToStructFieldMap.put(currPartitionColumnName, field);
     }
@@ -291,7 +281,7 @@ public class DeltaPartitionExtractor {
   }
 
   public List<PartitionValue> partitionValueExtraction(
-      scala.collection.Map<String, String> values, List<InternalPartitionField> partitionFields) {
+      Map<String, String> values, List<InternalPartitionField> partitionFields) {
     return partitionFields.stream()
         .map(
             partitionField -> {
@@ -300,8 +290,7 @@ public class DeltaPartitionExtractor {
                   partitionTransformType.isTimeBased()
                       ? getDateFormat(partitionTransformType)
                       : null;
-              String serializedValue =
-                  getSerializedPartitionValue(convertScalaMapToJavaMap(values), partitionField);
+              String serializedValue = getSerializedPartitionValue(values, partitionField);
               Object partitionValue =
                   convertFromDeltaPartitionValue(
                       serializedValue,
@@ -361,7 +350,7 @@ public class DeltaPartitionExtractor {
       case YEAR:
         generatedExpression =
             String.format(YEAR_FUNCTION, internalPartitionField.getSourceField().getPath());
-        dataType = DataTypes.IntegerType;
+        dataType = IntegerType.INTEGER;
         break;
       case MONTH:
       case HOUR:
@@ -370,12 +359,12 @@ public class DeltaPartitionExtractor {
                 DATE_FORMAT_FUNCTION,
                 internalPartitionField.getSourceField().getPath(),
                 getDateFormat(internalPartitionField.getTransformType()));
-        dataType = DataTypes.StringType;
+        dataType = IntegerType.INTEGER;
         break;
       case DAY:
         generatedExpression =
             String.format(CAST_FUNCTION, internalPartitionField.getSourceField().getPath());
-        dataType = DataTypes.DateType;
+        dataType = DateType.DATE;
         break;
       case BUCKET:
         generatedExpression =
@@ -387,15 +376,13 @@ public class DeltaPartitionExtractor {
                     internalPartitionField
                         .getTransformOptions()
                         .get(InternalPartitionField.NUM_BUCKETS));
-        dataType = DataTypes.IntegerType;
+        dataType = IntegerType.INTEGER;
         break;
       default:
         throw new PartitionSpecException("Invalid transform type");
     }
-    Map<String, String> generatedExpressionMetadata =
-        Collections.singletonMap(DELTA_GENERATION_EXPRESSION, generatedExpression);
-    Metadata partitionFieldMetadata =
-        new Metadata(ScalaUtils.convertJavaMapToScala(generatedExpressionMetadata));
+    FieldMetadata partitionFieldMetadata =
+        FieldMetadata.builder().putString(DELTA_GENERATION_EXPRESSION, generatedExpression).build();
     return new StructField(currPartitionColumnName, dataType, true, partitionFieldMetadata);
   }
 
@@ -426,11 +413,6 @@ public class DeltaPartitionExtractor {
               + ", Found: "
               + actualTypesPresent);
     }
-  }
-
-  private Map<String, String> convertScalaMapToJavaMap(
-      scala.collection.Map<String, String> scalaMap) {
-    return JavaConverters.mapAsJavaMapConverter(scalaMap).asJava();
   }
 
   @Builder
