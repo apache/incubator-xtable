@@ -124,7 +124,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
                 snapshotAtVersion,
                 fileFormat,
                 tableAtVersion.getPartitioningFields(),
-                tableAtVersion.getReadSchema().getFields(),
+                tableAtVersion.getReadSchema().getAllFields(),
                 true,
                 DeltaPartitionExtractor.getInstance(),
                 DeltaStatsExtractor.getInstance());
