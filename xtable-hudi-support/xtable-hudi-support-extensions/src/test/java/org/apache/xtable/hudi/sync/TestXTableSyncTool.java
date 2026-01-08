@@ -39,7 +39,6 @@ import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.catalyst.encoders.RowEncoder;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,6 +48,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.DataSourceWriteOptions;
+import org.apache.hudi.SparkAdapterSupport$;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 import org.apache.hudi.sync.common.HoodieSyncConfig;
 
@@ -83,7 +83,7 @@ public class TestXTableSyncTool {
     String tableName = "table-" + UUID.randomUUID();
     String path = tempDir.toUri() + "/" + tableName;
     Map<String, String> options = new HashMap<>();
-    options.put(DataSourceWriteOptions.PRECOMBINE_FIELD().key(), "key");
+    options.put(DataSourceWriteOptions.ORDERING_FIELDS().key(), "key");
     options.put(DataSourceWriteOptions.RECORDKEY_FIELD().key(), "key");
     options.put(DataSourceWriteOptions.PARTITIONPATH_FIELD().key(), partitionPath);
     options.put("hoodie.table.name", tableName);
@@ -124,7 +124,12 @@ public class TestXTableSyncTool {
     Row row2 = RowFactory.create("key2", partition, timestamp, "value2");
     Row row3 = RowFactory.create("key3", partition, timestamp, "value3");
     spark
-        .createDataset(Arrays.asList(row1, row2, row3), RowEncoder.apply(schema))
+        .createDataset(
+            Arrays.asList(row1, row2, row3),
+            SparkAdapterSupport$.MODULE$
+                .sparkAdapter()
+                .getCatalystExpressionUtils()
+                .getEncoder(schema))
         .write()
         .format("hudi")
         .options(options)

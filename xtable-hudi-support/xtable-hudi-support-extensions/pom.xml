@@ -26,7 +26,7 @@
         <version>0.2.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>xtable-hudi-support-extensions_${scala.binary.version}</artifactId>
+    <artifactId>xtable-hudi-support-extensions_2.12</artifactId>
     <name>XTable Project Hudi Support Extensions</name>
 
     <dependencies>
@@ -38,7 +38,7 @@
 
         <dependency>
             <groupId>org.apache.xtable</groupId>
-            <artifactId>xtable-core_${scala.binary.version}</artifactId>
+            <artifactId>xtable-core_2.12</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -143,6 +143,19 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_${scala.binary.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.xtable</groupId>
+            <artifactId>xtable-core_2.12</artifactId>
+            <version>${project.version}</version>
+            <classifier>tests</classifier>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-spark-runtime-${spark.version.prefix}_${scala.binary.version}</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

@@ -102,7 +102,7 @@
         <!-- Delta dependencies -->
         <dependency>
             <groupId>io.delta</groupId>
-            <artifactId>delta-core_${scala.binary.version}</artifactId>
+            <artifactId>delta-spark_${scala.binary.version}</artifactId>
         </dependency>
         <dependency>
             <groupId>io.delta</groupId>
