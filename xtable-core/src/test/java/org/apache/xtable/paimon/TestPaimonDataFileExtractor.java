@@ -135,6 +135,7 @@ public class TestPaimonDataFileExtractor {
   @Test
   void testExtractFilesDiffWithNewFiles() {
     createUnpartitionedTable();
+    InternalSchema schema = schemaExtractor.toInternalSchema(testTable.getPaimonTable().schema());
 
     // Insert initial data
     testTable.insertRows(5);
@@ -146,8 +147,7 @@ public class TestPaimonDataFileExtractor {
     Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
     assertNotNull(secondSnapshot);
 
-    InternalFilesDiff filesDiff =
-        extractor.extractFilesDiff(paimonTable, secondSnapshot, testSchema);
+    InternalFilesDiff filesDiff = extractor.extractFilesDiff(paimonTable, secondSnapshot, schema);
 
     // Verify we have replaced the single file on this setup
     assertNotNull(filesDiff);
@@ -164,6 +164,7 @@ public class TestPaimonDataFileExtractor {
   @Test
   void testExtractFilesDiffWithPartitionedTable() {
     createPartitionedTable();
+    InternalSchema schema = schemaExtractor.toInternalSchema(testTable.getPaimonTable().schema());
 
     // Insert initial data
     testTable.insertRows(5);
@@ -175,8 +176,7 @@ public class TestPaimonDataFileExtractor {
     Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
     assertNotNull(secondSnapshot);
 
-    InternalFilesDiff filesDiff =
-        extractor.extractFilesDiff(paimonTable, secondSnapshot, testSchema);
+    InternalFilesDiff filesDiff = extractor.extractFilesDiff(paimonTable, secondSnapshot, schema);
 
     // Verify we have added files with partition values
     assertNotNull(filesDiff);
@@ -190,6 +190,7 @@ public class TestPaimonDataFileExtractor {
   @Test
   void testExtractFilesDiffWithTableWithPrimaryKeys() {
     createTableWithPrimaryKeys();
+    InternalSchema schema = schemaExtractor.toInternalSchema(testTable.getPaimonTable().schema());
 
     // Insert initial data
     testTable.insertRows(5);
@@ -201,8 +202,7 @@ public class TestPaimonDataFileExtractor {
     Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
     assertNotNull(secondSnapshot);
 
-    InternalFilesDiff filesDiff =
-        extractor.extractFilesDiff(paimonTable, secondSnapshot, testSchema);
+    InternalFilesDiff filesDiff = extractor.extractFilesDiff(paimonTable, secondSnapshot, schema);
 
     // Verify the diff is returned (size may vary based on compaction)
     assertNotNull(filesDiff);
@@ -213,14 +213,14 @@ public class TestPaimonDataFileExtractor {
   @Test
   void testExtractFilesDiffForFirstSnapshot() {
     createUnpartitionedTable();
+    InternalSchema schema = schemaExtractor.toInternalSchema(testTable.getPaimonTable().schema());
 
     // Insert data to create first snapshot
     testTable.insertRows(5);
     Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
     assertNotNull(firstSnapshot);
 
-    InternalFilesDiff filesDiff =
-        extractor.extractFilesDiff(paimonTable, firstSnapshot, testSchema);
+    InternalFilesDiff filesDiff = extractor.extractFilesDiff(paimonTable, firstSnapshot, schema);
 
     // First snapshot should only have added files
     assertNotNull(filesDiff);
