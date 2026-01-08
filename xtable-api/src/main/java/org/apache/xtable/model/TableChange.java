@@ -30,7 +30,7 @@ import org.apache.xtable.model.storage.InternalFilesDiff;
  * @since 0.1
  */
 @Value
-@Builder(toBuilder = true)
+@Builder(toBuilder = true, builderClassName = "Builder")
 public class TableChange {
   // Change in files at the specified instant
   InternalFilesDiff filesDiff;
