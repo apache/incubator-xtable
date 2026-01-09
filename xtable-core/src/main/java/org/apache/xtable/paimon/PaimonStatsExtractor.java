@@ -56,14 +56,12 @@ public class PaimonStatsExtractor {
         internalSchema.getAllFields().stream()
             .collect(Collectors.toMap(InternalField::getPath, f -> f));
 
-    // stats for all columns are present in valueStats, we can safely ignore file.keyStats() - TODO:
-    // validate this assumption
+    // stats for all columns are present in valueStats, we can safely ignore file.keyStats()
     SimpleStats valueStats = file.valueStats();
     if (valueStats != null) {
       List<String> colNames = file.valueStatsCols();
       if (colNames == null) {
-        // if column names are not present, we assume all columns in the schema are present in the
-        // same order as the schema - TODO: validate this assumption
+        // if column names are not present, then stats are being collected for all columns
         colNames =
             internalSchema.getAllFields().stream()
                 .map(InternalField::getPath)
