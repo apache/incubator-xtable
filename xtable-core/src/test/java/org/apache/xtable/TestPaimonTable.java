@@ -70,9 +70,21 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
       Path tempDir,
       Configuration hadoopConf,
       boolean additionalColumns) {
+
+    Schema schema = buildGenericSchema(partitionField, additionalColumns);
+    return createTable(tableName, partitionField, tempDir, hadoopConf, additionalColumns, schema);
+  }
+
+  public static GenericTable<GenericRow, String> createTable(
+      String tableName,
+      String partitionField,
+      Path tempDir,
+      Configuration hadoopConf,
+      boolean additionalColumns,
+      Schema schema) {
     String basePath = initBasePath(tempDir, tableName);
     Catalog catalog = createFilesystemCatalog(basePath, hadoopConf);
-    FileStoreTable paimonTable = createTable(catalog, partitionField, additionalColumns);
+    FileStoreTable paimonTable = createTable(catalog, tableName, schema);
 
     System.out.println(
         "Initialized Paimon test table at base path: "
@@ -90,12 +102,10 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
     return CatalogFactory.createCatalog(context);
   }
 
-  public static FileStoreTable createTable(
-      Catalog catalog, String partitionField, boolean additionalColumns) {
+  public static FileStoreTable createTable(Catalog catalog, String tableName, Schema schema) {
     try {
       catalog.createDatabase("test_db", true);
-      Identifier identifier = Identifier.create("test_db", "test_table");
-      Schema schema = buildSchema(partitionField, additionalColumns);
+      Identifier identifier = Identifier.create("test_db", tableName);
       catalog.createTable(identifier, schema, true);
       return (FileStoreTable) catalog.getTable(identifier);
     } catch (Exception e) {
@@ -103,7 +113,7 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
     }
   }
 
-  private static Schema buildSchema(String partitionField, boolean additionalColumns) {
+  private static Schema buildGenericSchema(String partitionField, boolean additionalColumns) {
     Schema.Builder builder =
         Schema.newBuilder()
             .primaryKey("id")
@@ -116,7 +126,8 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
             .column("description", DataTypes.VARCHAR(255))
             .option("bucket", "1")
             .option("bucket-key", "id")
-            .option("full-compaction.delta-commits", "1");
+            .option("full-compaction.delta-commits", "1")
+            .option("metadata.stats-mode", "full");
 
     if (partitionField != null) {
       builder
@@ -178,20 +189,12 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
   }
 
   private List<GenericRow> insertRecordsToPartition(int numRows, String partitionValue) {
-    BatchWriteBuilder batchWriteBuilder = paimonTable.newBatchWriteBuilder();
-    try (BatchTableWrite writer = batchWriteBuilder.newWrite()) {
-      List<GenericRow> rows = new ArrayList<>(numRows);
-      for (int i = 0; i < numRows; i++) {
-        GenericRow row = buildGenericRow(i, paimonTable.schema(), partitionValue);
-        writer.write(row);
-        rows.add(row);
-      }
-      commitWrites(batchWriteBuilder, writer);
-      compactTable();
-      return rows;
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to insert rows into Paimon table", e);
+    List<GenericRow> rows = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      rows.add(buildGenericRow(i, paimonTable.schema(), partitionValue));
     }
+    writeRows(paimonTable, rows);
+    return rows;
   }
 
   @Override
@@ -224,8 +227,12 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
   }
 
   private void compactTable() {
-    BatchWriteBuilder batchWriteBuilder = paimonTable.newBatchWriteBuilder();
-    SnapshotReader snapshotReader = paimonTable.newSnapshotReader();
+    compactTable(paimonTable);
+  }
+
+  public static void compactTable(FileStoreTable table) {
+    BatchWriteBuilder batchWriteBuilder = table.newBatchWriteBuilder();
+    SnapshotReader snapshotReader = table.newSnapshotReader();
     try (BatchTableWrite writer = batchWriteBuilder.newWrite()) {
       for (BucketEntry bucketEntry : snapshotReader.bucketEntries()) {
         writer.compact(bucketEntry.partition(), bucketEntry.bucket(), true);
@@ -233,6 +240,19 @@ public class TestPaimonTable implements GenericTable<GenericRow, String> {
       commitWrites(batchWriteBuilder, writer);
     } catch (Exception e) {
       throw new RuntimeException("Failed to compact writes in Paimon table", e);
+    }
+  }
+
+  public static void writeRows(FileStoreTable table, List<GenericRow> rows) {
+    BatchWriteBuilder batchWriteBuilder = table.newBatchWriteBuilder();
+    try (BatchTableWrite writer = batchWriteBuilder.newWrite()) {
+      for (GenericRow row : rows) {
+        writer.write(row);
+      }
+      commitWrites(batchWriteBuilder, writer);
+      compactTable(table);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to write rows into Paimon table", e);
     }
   }
 
