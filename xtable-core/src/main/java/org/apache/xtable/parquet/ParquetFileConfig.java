@@ -21,6 +21,7 @@ package org.apache.xtable.parquet;
 import java.io.IOException;
 
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.experimental.FieldDefaults;
@@ -35,6 +36,7 @@ import org.apache.parquet.schema.MessageType;
 @Getter
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Builder
+@AllArgsConstructor
 class ParquetFileConfig {
   MessageType schema;
   ParquetMetadata metadata;
