@@ -127,8 +127,8 @@ public class ITParquetDataManager {
     conversionSource =
         ParquetConversionSource.builder()
             .tableName("parquet_table_test_2")
-            .basePath(fixedPath.toString())
-            .hadoopConf(new Configuration()) // Required due to @NonNull
+            .basePath(fixedPath.toAbsolutePath().toUri().toString())
+            .hadoopConf(new Configuration())
             .partitionValueExtractor(null)
             .partitionSpecExtractor(null)
             .build();
