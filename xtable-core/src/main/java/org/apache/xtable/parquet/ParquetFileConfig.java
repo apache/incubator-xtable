@@ -18,31 +18,49 @@
  
 package org.apache.xtable.parquet;
 
+import java.io.IOException;
+
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.experimental.FieldDefaults;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
 @Getter
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@Builder
 class ParquetFileConfig {
   MessageType schema;
+  ParquetMetadata metadata;
   long rowGroupIndex;
+  long modifTime;
+  long size;
   CompressionCodecName codec;
+  Path path;
 
   public ParquetFileConfig(Configuration conf, Path file) {
+    long modifTime = -1L;
     ParquetMetadata metadata =
         ParquetMetadataExtractor.getInstance().readParquetMetadata(conf, file);
 
     if (metadata.getBlocks().isEmpty()) {
       throw new IllegalStateException("Parquet file contains no row groups.");
     }
-
+    try {
+      modifTime = file.getFileSystem(conf).getFileStatus(file).getModificationTime();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    this.path = file;
+    this.modifTime = modifTime;
+    this.size = metadata.getBlocks().stream().mapToLong(BlockMetaData::getTotalByteSize).sum();
+    this.metadata = metadata;
     this.schema = metadata.getFileMetaData().getSchema();
     this.rowGroupIndex = metadata.getBlocks().size();
     this.codec = metadata.getBlocks().get(0).getColumns().get(0).getCodec();
