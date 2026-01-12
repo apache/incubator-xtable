@@ -124,6 +124,14 @@ public class ITParquetDataManager {
         .parquet(outputPath);
     fs.delete(new org.apache.hadoop.fs.Path(finalAppendFilePath), true);
     // conversionSource operations
+    conversionSource =
+        ParquetConversionSource.builder()
+            .tableName("parquet_table_test_2")
+            .basePath(fixedPath.toString())
+            .hadoopConf(new Configuration()) // Required due to @NonNull
+            .partitionValueExtractor(null)
+            .partitionSpecExtractor(null)
+            .build();
     InternalTable result = conversionSource.getTable(newModifTime);
     assertEquals(newModifTime, result.getLatestCommitTime());
     assertNotNull(result);
