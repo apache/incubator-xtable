@@ -24,21 +24,27 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
 import io.delta.kernel.Snapshot;
 import io.delta.kernel.Table;
+import io.delta.kernel.data.ColumnarBatch;
 import io.delta.kernel.engine.Engine;
+import io.delta.kernel.internal.DeltaLogActionUtils;
 import io.delta.kernel.internal.SnapshotImpl;
+import io.delta.kernel.internal.TableImpl;
 import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
 import io.delta.kernel.internal.util.VectorUtils;
+import io.delta.kernel.utils.CloseableIterator;
 
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.CommitsBacklog;
@@ -192,9 +198,42 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
       // There is a chance earliest commit of the table is returned if the instant is before the
       // earliest commit of the table, hence the additional check.
       Instant deltaCommitInstant = Instant.ofEpochMilli(snapshot.getTimestamp(engine));
-      return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
+      if (deltaCommitInstant.isAfter(instant)) {
+        log.info(
+            "No commit found at or before instant {}. Earliest available commit is at {}",
+            instant,
+            deltaCommitInstant);
+        return false;
+      }
+
+      long versionAtInstant = snapshot.getVersion();
+      long currentVersion = table.getLatestSnapshot(engine).getVersion();
+
+      // Verify that we can actually access commit files from this version to current version.
+      // This will fail if VACUUM has removed the necessary commit files.
+      Set<DeltaLogActionUtils.DeltaAction> actionSet = new HashSet<>();
+      actionSet.add(DeltaLogActionUtils.DeltaAction.ADD);
+      actionSet.add(DeltaLogActionUtils.DeltaAction.REMOVE);
+
+      TableImpl tableImpl = (TableImpl) table;
+      // Attempt to get changes - this will throw if commit files are missing
+      try (CloseableIterator<ColumnarBatch> changesIterator =
+          tableImpl.getChanges(engine, versionAtInstant, currentVersion, actionSet)) {
+        // Test if we can access at least the first batch
+        if (changesIterator.hasNext()) {
+          // Successfully verified we can access commit files
+          return true;
+        } else {
+          // No changes available (edge case: versionAtInstant == currentVersion)
+          return true;
+        }
+      }
     } catch (Exception e) {
-      log.error("Error checking if incremental sync is safe from " + instant, e);
+      // Commit files have been vacuumed or are otherwise inaccessible
+      log.info(
+          "Cannot perform incremental sync from instant {} due to missing or inaccessible commit files: {}",
+          instant,
+          e.getMessage());
       return false;
     }
   }
