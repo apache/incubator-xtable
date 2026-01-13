@@ -32,6 +32,7 @@ import java.util.List;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.paimon.data.GenericArray;
 import org.apache.paimon.data.BinaryString;
 import org.apache.paimon.data.Decimal;
 import org.apache.paimon.data.GenericRow;
@@ -455,6 +456,54 @@ public class TestPaimonStatsExtractor {
     // this is a smoke test to ensure exceptions aren't raised for this scenario
     // TODO: Question for Paimon experts - is this the expected behaviour?
     assertEquals(0, stats.size());
+  }
+
+  @Test
+  void testComplexFieldStats() {
+    // Paimon does not collect stats on nested fields or array fields
+    Schema schema =
+        Schema.newBuilder()
+            .primaryKey("id")
+            .column("id", DataTypes.INT())
+            .column(
+                "nested",
+                DataTypes.ROW(
+                    DataTypes.FIELD(1, "f1", DataTypes.STRING()),
+                    DataTypes.FIELD(2, "f2", DataTypes.INT())))
+            .column(
+                "array",
+                DataTypes.ARRAY(DataTypes.INT()))
+            .option("bucket", "1")
+            .option("bucket-key", "id")
+            .option("full-compaction.delta-commits", "1")
+            .option("metadata.stats-mode", "full")
+            .build();
+
+    FileStoreTable table =
+        ((TestPaimonTable)
+                TestPaimonTable.createTable(
+                    "nested_field_stats", null, tempDir, new Configuration(), false, schema))
+            .getPaimonTable();
+
+    GenericRow row1 = GenericRow.of(1, GenericRow.of(BinaryString.fromString("a"), 10), new GenericArray(new int[] {1, 2}));
+    GenericRow row2 = GenericRow.of(2, GenericRow.of(BinaryString.fromString("b"), 20), new GenericArray(new int[] {3, 4}));
+    GenericRow row3 = GenericRow.of(3, GenericRow.of(BinaryString.fromString("c"), 30), new GenericArray(new int[] {}));
+
+    TestPaimonTable.writeRows(table, Arrays.asList(row1, row2, row3));
+
+    InternalSchema internalSchema = schemaExtractor.toInternalSchema(table.schema());
+    List<ColumnStat> stats =
+        extractor
+            .toInternalDataFiles(table, table.snapshotManager().latestSnapshot(), internalSchema)
+            .get(0)
+            .getColumnStats();
+
+    // only the id column has stats, nested fields and array fields do not have stats
+    assertEquals(1, stats.size());
+    ColumnStat idStat = getColumnStat(stats, "id");
+    assertEquals(Range.vector(1, 3), idStat.getRange());
+    assertEquals(0, idStat.getNumNulls());
+    assertEquals(3, idStat.getNumValues());
   }
 
   private void createUnpartitionedTable() {
