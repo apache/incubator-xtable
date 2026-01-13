@@ -23,11 +23,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
@@ -39,16 +43,24 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.storage.TableFormat;
 
 public class ITParquetDataManager {
   private static SparkSession spark;
-  private ParquetConversionSource conversionSource;
+  private static ParquetConversionSourceProvider conversionSourceProvider;
+  public static final String PARTITION_FIELD_SPEC_CONFIG =
+      "xtable.parquet.source.partition_field_spec_config";
 
   @BeforeAll
   public static void setup() {
     spark = SparkSession.builder().appName("ParquetTest").master("local[*]").getOrCreate();
+    conversionSourceProvider = new ParquetConversionSourceProvider();
+    Configuration hadoopConf = new Configuration();
+    hadoopConf.set("fs.defaultFS", "file:///");
+    conversionSourceProvider.init(hadoopConf);
   }
 
   @Test
@@ -80,13 +92,14 @@ public class ITParquetDataManager {
     df.coalesce(1).write().partitionBy("year", "month").mode("overwrite").parquet(outputPath);
 
     // test find files to sync
-    long targetModifTime = System.currentTimeMillis() - 360000;
+
     org.apache.hadoop.fs.Path hdfsPath = new org.apache.hadoop.fs.Path(outputPath);
     FileSystem fs = FileSystem.get(hdfsPath.toUri(), conf);
     // set the modification time to the table file
     // update modifTime for file to append
     // many partitions case
     List<String> newPartitions = Arrays.asList("year=2026/month=12", "year=2027/month=11");
+    long targetModifTime = System.currentTimeMillis() - 360000;
     for (String partition : newPartitions) {
       org.apache.hadoop.fs.Path partitionPath =
           new org.apache.hadoop.fs.Path(outputPath, partition);
@@ -107,14 +120,14 @@ public class ITParquetDataManager {
         .partitionBy("year", "month")
         .mode("overwrite")
         .parquet(finalAppendFilePath);
-    long newModifTime = System.currentTimeMillis() - 50000;
+    /*long newModifTime = System.currentTimeMillis() - 50000;
     for (String partition : newPartitions) {
       org.apache.hadoop.fs.Path partitionPath =
           new org.apache.hadoop.fs.Path(finalAppendFilePath, partition);
       if (fs.exists(partitionPath)) {
         updateModificationTimeRecursive(fs, partitionPath, newModifTime);
       }
-    }
+    }*/
     Dataset<Row> dfWithNewTimes = spark.read().parquet(finalAppendFilePath);
     dfWithNewTimes
         .coalesce(1)
@@ -124,20 +137,52 @@ public class ITParquetDataManager {
         .parquet(outputPath);
     fs.delete(new org.apache.hadoop.fs.Path(finalAppendFilePath), true);
     // conversionSource operations
-    conversionSource =
-        ParquetConversionSource.builder()
-            .tableName("parquet_table_test_2")
+    Properties sourceProperties = new Properties();
+    String partitionConfig = "id:MONTH:year=yyyy/month=MM";
+    sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name("parquet_table_test_2")
             .basePath(fixedPath.toAbsolutePath().toUri().toString())
-            .hadoopConf(new Configuration())
-            .partitionValueExtractor(null)
-            .partitionSpecExtractor(null)
+            .additionalProperties(sourceProperties)
+            .formatName(TableFormat.PARQUET)
             .build();
+
+    ParquetConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+
+    long newModifTime = System.currentTimeMillis() - 50000;
+
+    for (String partition : newPartitions) {
+      org.apache.hadoop.fs.Path partitionPath =
+          new org.apache.hadoop.fs.Path(outputPath, partition);
+
+      RemoteIterator<LocatedFileStatus> it = fs.listFiles(partitionPath, false);
+      while (it.hasNext()) {
+        LocatedFileStatus fileStatus = it.next();
+
+        if (fileStatus.getModificationTime() > newModifTime) {
+          fs.setTimes(fileStatus.getPath(), newModifTime, -1);
+        } else {
+
+          fs.setTimes(fileStatus.getPath(), targetModifTime, -1);
+        }
+      }
+
+      fs.setTimes(partitionPath, newModifTime, -1);
+    }
+
     InternalTable result = conversionSource.getTable(newModifTime);
-    assertEquals(newModifTime, result.getLatestCommitTime());
+    assertEquals(
+        Instant.ofEpochMilli(newModifTime).toString(), result.getLatestCommitTime().toString());
     assertNotNull(result);
     assertEquals("parquet_table_test_2", result.getName());
     assertEquals(TableFormat.PARQUET, result.getTableFormat());
     assertNotNull(result.getReadSchema());
+    // TableChange changes = conversionSource.getTableChangeForCommit(newModifTime);
+    InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
+    // assertNotNull(changes);
+    assertNotNull(snapshot);
   }
 
   private void updateModificationTimeRecursive(

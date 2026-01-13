@@ -159,15 +159,11 @@ public class ParquetConversionSource implements ConversionSource<Long> {
             partitionValueExtractor.extractPartitionValues(
                 partitionSpecExtractor.spec(
                     partitionValueExtractor.extractSchemaForParquetPartitions(
-                        parquetMetadataExtractor.readParquetMetadata(
-                            hadoopConf, parquetFile.getPath()),
-                        parquetFile.getPath().toString())),
+                        parquetFile.getMetadata(), parquetFile.getPath().toString())),
                 basePath))
         .lastModified(parquetFile.getModifTime())
         .fileSizeBytes(parquetFile.getSize())
-        .columnStats(
-            parquetStatsExtractor.getColumnStatsForaFile(
-                parquetMetadataExtractor.readParquetMetadata(hadoopConf, parquetFile.getPath())))
+        .columnStats(parquetStatsExtractor.getColumnStatsForaFile(parquetFile.getMetadata()))
         .build();
   }
 
@@ -180,15 +176,14 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   @Override
   public TableChange getTableChangeForCommit(Long modificationTime) {
-    Stream<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
     Set<InternalDataFile> addedInternalDataFiles = new HashSet<>();
 
     List<ParquetFileConfig> filesMetadata =
         parquetDataManagerExtractor.getParquetFilesMetadataAfterTime(
-            hadoopConf, parquetFiles, modificationTime);
+            hadoopConf, getParquetFiles(hadoopConf, basePath), modificationTime);
     List<ParquetFileConfig> tableChangesAfterMetadata =
         parquetDataManagerExtractor.getParquetFilesMetadataAfterTime(
-            hadoopConf, parquetFiles, modificationTime);
+            hadoopConf, getParquetFiles(hadoopConf, basePath), modificationTime);
     InternalTable internalTable = getMostRecentTable(tableChangesAfterMetadata.stream());
     for (ParquetFileConfig fileMetadata : filesMetadata) {
       InternalDataFile currentDataFile = createInternalDataFileFromParquetFile(fileMetadata);
