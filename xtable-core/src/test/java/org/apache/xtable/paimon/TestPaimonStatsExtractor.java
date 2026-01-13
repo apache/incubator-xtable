@@ -218,8 +218,7 @@ public class TestPaimonStatsExtractor {
     Range nanosRange = getColumnStat(stats, "ts_nanos").getRange();
     // TODO: Paimon does not fully support stats at nanos precision - this is null for parquet
     // format in 1.3.1
-    assertNull(nanosRange.getMinValue());
-    assertNull(nanosRange.getMaxValue());
+    assertNull(nanosRange);
   }
 
   @Test
