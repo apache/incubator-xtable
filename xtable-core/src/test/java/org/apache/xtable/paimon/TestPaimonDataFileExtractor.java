@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.Snapshot;
@@ -67,6 +68,13 @@ public class TestPaimonDataFileExtractor {
     assertTrue(dataFile.getFileSizeBytes() > 0);
     assertEquals(5, dataFile.getRecordCount());
     assertEquals(0, dataFile.getPartitionValues().size());
+    // check all fields have stats, and stats values (min->max range) are not null
+    assertEquals(
+        schema.getFields().size(),
+        dataFile.getColumnStats().stream()
+            .filter(stat -> stat.getRange() != null)
+            .collect(Collectors.toList())
+            .size());
   }
 
   @Test
@@ -90,6 +98,13 @@ public class TestPaimonDataFileExtractor {
     assertTrue(dataFile.getFileSizeBytes() > 0);
     assertEquals(5, dataFile.getRecordCount());
     assertNotNull(dataFile.getPartitionValues());
+    // check all fields have stats, and stats values (min->max range) are not null
+    assertEquals(
+        schema.getFields().size(),
+        dataFile.getColumnStats().stream()
+            .filter(stat -> stat.getRange() != null)
+            .collect(Collectors.toList())
+            .size());
   }
 
   @Test
@@ -112,6 +127,13 @@ public class TestPaimonDataFileExtractor {
     assertNotNull(dataFile.getPhysicalPath());
     assertTrue(dataFile.getFileSizeBytes() > 0);
     assertEquals(5, dataFile.getRecordCount());
+    // check all fields have stats, and stats values (min->max range) are not null
+    assertEquals(
+        schema.getFields().size(),
+        dataFile.getColumnStats().stream()
+            .filter(stat -> stat.getRange() != null)
+            .collect(Collectors.toList())
+            .size());
   }
 
   @Test
