@@ -160,7 +160,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                 partitionSpecExtractor.spec(
                     partitionValueExtractor.extractSchemaForParquetPartitions(
                         parquetFile.getMetadata(), parquetFile.getPath().toString())),
-                basePath))
+                HudiPathUtils.getPartitionPath(new Path(basePath), parquetFile.getPath())))
         .lastModified(parquetFile.getModifTime())
         .fileSizeBytes(parquetFile.getSize())
         .columnStats(parquetStatsExtractor.getColumnStatsForaFile(parquetFile.getMetadata()))
@@ -191,6 +191,11 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     }
 
     return TableChange.builder()
+        .sourceIdentifier(
+            getCommitIdentifier(
+                getMostRecentParquetFile(
+                        getConfigsFromStream(getParquetFiles(hadoopConf, basePath), hadoopConf))
+                    .getModifTime()))
         .tableAsOfChange(internalTable)
         .filesDiff(InternalFilesDiff.builder().filesAdded(addedInternalDataFiles).build())
         .build();

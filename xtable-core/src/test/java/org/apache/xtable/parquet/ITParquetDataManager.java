@@ -46,6 +46,7 @@ import org.junit.jupiter.api.Test;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.storage.TableFormat;
 
 public class ITParquetDataManager {
@@ -179,10 +180,10 @@ public class ITParquetDataManager {
     assertEquals("parquet_table_test_2", result.getName());
     assertEquals(TableFormat.PARQUET, result.getTableFormat());
     assertNotNull(result.getReadSchema());
-    // TableChange changes = conversionSource.getTableChangeForCommit(newModifTime);
     InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
-    // assertNotNull(changes);
     assertNotNull(snapshot);
+    TableChange changes = conversionSource.getTableChangeForCommit(newModifTime);
+    assertNotNull(changes);
   }
 
   private void updateModificationTimeRecursive(
