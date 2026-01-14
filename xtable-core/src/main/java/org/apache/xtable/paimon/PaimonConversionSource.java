@@ -20,6 +20,9 @@ package org.apache.xtable.paimon;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 import lombok.extern.log4j.Log4j2;
@@ -36,6 +39,7 @@ import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.extractor.ConversionSource;
@@ -97,8 +101,6 @@ public class PaimonConversionSource implements ConversionSource<Snapshot> {
         .table(internalTable)
         .version(Long.toString(snapshot.timeMillis()))
         .partitionedDataFiles(PartitionFileGroup.fromFiles(dataFiles))
-        // TODO : Implement pending commits extraction, required for incremental sync
-        // https://github.com/apache/incubator-xtable/issues/754
         .sourceIdentifier(getCommitIdentifier(snapshot))
         .build();
   }
@@ -114,18 +116,106 @@ public class PaimonConversionSource implements ConversionSource<Snapshot> {
 
   @Override
   public TableChange getTableChangeForCommit(Snapshot snapshot) {
-    throw new UnsupportedOperationException("Incremental Sync is not supported yet.");
+    InternalTable tableAtSnapshot = getTable(snapshot);
+    InternalSchema internalSchema = tableAtSnapshot.getReadSchema();
+
+    InternalFilesDiff filesDiff =
+        dataFileExtractor.extractFilesDiff(paimonTable, snapshot, internalSchema);
+
+    return TableChange.builder()
+        .tableAsOfChange(tableAtSnapshot)
+        .filesDiff(filesDiff)
+        .sourceIdentifier(getCommitIdentifier(snapshot))
+        .build();
   }
 
   @Override
   public CommitsBacklog<Snapshot> getCommitsBacklog(
       InstantsForIncrementalSync instantsForIncrementalSync) {
-    throw new UnsupportedOperationException("Incremental Sync is not supported yet.");
+    Instant lastSyncInstant = instantsForIncrementalSync.getLastSyncInstant();
+    long lastSyncTimeMillis = lastSyncInstant.toEpochMilli();
+
+    log.info(
+        "Getting commits backlog for Paimon table {} from instant {}",
+        paimonTable.name(),
+        lastSyncInstant);
+
+    Iterator<Snapshot> snapshotIterator;
+    try {
+      snapshotIterator = snapshotManager.snapshots();
+    } catch (IOException e) {
+      throw new ReadException("Could not iterate over the Paimon snapshot list", e);
+    }
+
+    List<Snapshot> snapshotsToProcess = new ArrayList<>();
+    while (snapshotIterator.hasNext()) {
+      Snapshot snapshot = snapshotIterator.next();
+      // Only include snapshots committed after the last sync
+      if (snapshot.timeMillis() > lastSyncTimeMillis) {
+        snapshotsToProcess.add(snapshot);
+        log.debug(
+            "Including snapshot {} (time={}, commitId={}) in backlog",
+            snapshot.id(),
+            snapshot.timeMillis(),
+            snapshot.commitIdentifier());
+      }
+    }
+
+    log.info("Found {} snapshots to process for incremental sync", snapshotsToProcess.size());
+
+    return CommitsBacklog.<Snapshot>builder()
+        .commitsToProcess(snapshotsToProcess)
+        .inFlightInstants(Collections.emptyList())
+        .build();
   }
 
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
-    return false; // Incremental sync is not supported yet
+    long timeInMillis = instant.toEpochMilli();
+
+    Long earliestSnapshotId = snapshotManager.earliestSnapshotId();
+    Long latestSnapshotId = snapshotManager.latestSnapshotId();
+    if (earliestSnapshotId == null || latestSnapshotId == null) {
+      log.warn("No snapshots found in table {}", paimonTable.name());
+      return false;
+    }
+
+    Snapshot earliestSnapshot = snapshotManager.snapshot(earliestSnapshotId);
+    Snapshot latestSnapshot = snapshotManager.snapshot(latestSnapshotId);
+
+    // Check 1: If instant is in the future (after latest snapshot), return false
+    if (timeInMillis > latestSnapshot.timeMillis()) {
+      log.warn(
+          "Instant {} is in the future. Latest snapshot {} has time {}",
+          instant,
+          latestSnapshot.id(),
+          latestSnapshot.timeMillis());
+      return false;
+    }
+
+    // Check 2: Has snapshot expiration affected this instant?
+    // If the earliest snapshot is after the requested instant,
+    // then snapshots have been expired and we can't do incremental sync
+    if (earliestSnapshot.timeMillis() > timeInMillis) {
+      log.warn(
+          "Incremental sync is not safe from instant {}. "
+              + "Earliest available snapshot {} (time={}) is newer than the requested instant. "
+              + "Snapshots may have been expired.",
+          instant,
+          earliestSnapshot.id(),
+          earliestSnapshot.timeMillis());
+      return false;
+    }
+
+    // Check 3: Verify a snapshot exists at or before the instant
+    if (earliestSnapshot.timeMillis() <= timeInMillis) {
+      log.info(
+          "Incremental sync is safe from instant {} for table {}", instant, paimonTable.name());
+      return true;
+    }
+
+    log.warn("No snapshot found at or before instant {} for table {}", instant, paimonTable.name());
+    return false;
   }
 
   @Override

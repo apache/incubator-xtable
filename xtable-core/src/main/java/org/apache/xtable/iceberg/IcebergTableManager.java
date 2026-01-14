@@ -36,13 +36,10 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
-import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.hadoop.HadoopTables;
-import org.apache.iceberg.mapping.MappingUtil;
-import org.apache.iceberg.mapping.NameMappingParser;
 
 @AllArgsConstructor(staticName = "of")
 @Log4j2
@@ -88,14 +85,14 @@ class IcebergTableManager {
                             new Schema(),
                             PartitionSpec.unpartitioned(),
                             basePath,
-                            getDefaultMappingProperties(schema)))
+                            Collections.emptyMap()))
                 .orElseGet(
                     () ->
                         getHadoopTables()
                             .create(
                                 new Schema(),
                                 PartitionSpec.unpartitioned(),
-                                getDefaultMappingProperties(schema),
+                                Collections.emptyMap(),
                                 basePath));
         // set the schema with the provided field IDs
         TableOperations operations = ((BaseTable) tableWithEmptySchema).operations();
@@ -110,11 +107,6 @@ class IcebergTableManager {
         return getTable(catalogConfig, tableIdentifier, basePath);
       }
     }
-  }
-
-  private Map<String, String> getDefaultMappingProperties(Schema schema) {
-    return Collections.singletonMap(
-        TableProperties.DEFAULT_NAME_MAPPING, NameMappingParser.toJson(MappingUtil.create(schema)));
   }
 
   private Optional<Catalog> getCatalog(IcebergCatalogConfig catalogConfig) {

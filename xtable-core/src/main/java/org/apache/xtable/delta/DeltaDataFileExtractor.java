@@ -64,7 +64,7 @@ public class DeltaDataFileExtractor {
         Snapshot snapshot, InternalSchema schema, boolean includeColumnStats) {
       this.fileFormat =
           actionsConverter.convertToFileFormat(snapshot.metadata().format().provider());
-      this.fields = schema.getFields();
+      this.fields = schema.getAllFields();
       this.partitionFields =
           partitionExtractor.convertFromDeltaPartitionFormat(
               schema, snapshot.metadata().partitionSchema());
