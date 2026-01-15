@@ -117,14 +117,21 @@ public class TestDeltaHelper {
   StructType tableStructSchema;
   String partitionField;
   boolean includeAdditionalColumns;
+  boolean enableColumnMapping;
 
   public static TestDeltaHelper createTestDataHelper(
       String partitionField, boolean includeAdditionalColumns) {
+    return createTestDataHelper(partitionField, includeAdditionalColumns, false);
+  }
+
+  public static TestDeltaHelper createTestDataHelper(
+      String partitionField, boolean includeAdditionalColumns, boolean enableColumnMapping) {
     StructType tableSchema = generateDynamicSchema(partitionField, includeAdditionalColumns);
     return TestDeltaHelper.builder()
         .tableStructSchema(tableSchema)
         .partitionField(partitionField)
         .includeAdditionalColumns(includeAdditionalColumns)
+        .enableColumnMapping(enableColumnMapping)
         .build();
   }
 
@@ -159,6 +166,11 @@ public class TestDeltaHelper {
     }
     if (includeAdditionalColumns) {
       tableBuilder.addColumn("street", StringType);
+    }
+    if (enableColumnMapping) {
+      tableBuilder.property("delta.minReaderVersion", "2");
+      tableBuilder.property("delta.minWriterVersion", "5");
+      tableBuilder.property("delta.columnMapping.mode", "name");
     }
     tableBuilder.execute();
   }
@@ -302,5 +314,30 @@ public class TestDeltaHelper {
     return IntStream.range(0, numRows)
         .mapToObj(i -> generateRandomRowForGivenYearAndLevel(partitionValue, level))
         .collect(Collectors.toList());
+  }
+
+  public void dropColumn(String colName) {
+    this.tableStructSchema =
+        new StructType(
+            Arrays.stream(tableStructSchema.fields())
+                .filter(field -> field.name() != colName)
+                .toArray(StructField[]::new));
+  }
+
+  public void renameColumn(String colName, String newColName) {
+    this.tableStructSchema =
+        new StructType(
+            Arrays.stream(tableStructSchema.fields())
+                .map(
+                    field ->
+                        field.name().equals(colName)
+                            ? new StructField(
+                                newColName, field.dataType(), field.nullable(), field.metadata())
+                            : field)
+                .toArray(StructField[]::new));
+  }
+
+  public void addColumn() {
+    this.tableStructSchema = tableStructSchema.add("city", StringType, true);
   }
 }

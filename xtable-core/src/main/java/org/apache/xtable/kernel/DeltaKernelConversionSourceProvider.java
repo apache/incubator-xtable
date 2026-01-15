@@ -16,21 +16,22 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.storage;
+package org.apache.xtable.kernel;
 
-/**
- * Default constants for supported Table Formats
- *
- * @since 0.1
- */
-public class TableFormat {
-  public static final String HUDI = "HUDI";
-  public static final String ICEBERG = "ICEBERG";
-  public static final String DELTA = "DELTA";
-  public static final String PAIMON = "PAIMON";
-  public static final String PARQUET = "PARQUET";
+import io.delta.kernel.defaults.engine.DefaultEngine;
+import io.delta.kernel.engine.Engine;
 
-  public static String[] values() {
-    return new String[] {"HUDI", "ICEBERG", "DELTA", "PAIMON"};
+import org.apache.xtable.conversion.ConversionSourceProvider;
+import org.apache.xtable.conversion.SourceTable;
+
+public class DeltaKernelConversionSourceProvider extends ConversionSourceProvider<Long> {
+  @Override
+  public DeltaKernelConversionSource getConversionSourceInstance(SourceTable sourceTable) {
+    Engine engine = DefaultEngine.create(hadoopConf);
+    return DeltaKernelConversionSource.builder()
+        .tableName(sourceTable.getName())
+        .basePath(sourceTable.getBasePath())
+        .engine(engine)
+        .build();
   }
 }

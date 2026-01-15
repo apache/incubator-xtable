@@ -57,6 +57,7 @@
     </modules>
 
     <properties>
+        <delta.kernel.version>4.0.0</delta.kernel.version>
         <project.version>0.2.0-SNAPSHOT</project.version>
         <!-- To ensure build content is re-producible -->
         <project.build.outputTimestamp>2025-01-01T00:00:00Z</project.build.outputTimestamp>
@@ -88,6 +89,7 @@
         <spark.version.prefix>3.4</spark.version.prefix>
         <iceberg.version>1.4.2</iceberg.version>
         <delta.version>2.4.0</delta.version>
+        <paimon.version>1.2.0</paimon.version>
         <jackson.version>2.18.2</jackson.version>
         <spotless.version>2.43.0</spotless.version>
         <apache.rat.version>0.16.1</apache.rat.version>
@@ -331,6 +333,18 @@
                 <groupId>io.delta</groupId>
                 <artifactId>delta-hive_${scala.binary.version}</artifactId>
                 <version>${delta.hive.version}</version>
+            </dependency>
+
+            <!-- Paimon -->
+            <dependency>
+                <groupId>org.apache.paimon</groupId>
+                <artifactId>paimon-bundle</artifactId>
+                <version>${paimon.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.paimon</groupId>
+                <artifactId>paimon-spark-${spark.version.prefix}</artifactId>
+                <version>${paimon.version}</version>
             </dependency>
 
             <!-- Spark -->
@@ -602,6 +616,26 @@
                 <artifactId>jettison</artifactId>
                 <version>1.5.4</version>
             </dependency>
+            <dependency>
+                <groupId>io.delta</groupId>
+                <artifactId>delta-kernel-api</artifactId>
+                <version>${delta.kernel.version}</version>
+                <scope>compile</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>io.delta</groupId>
+                <artifactId>delta-kernel-defaults</artifactId>
+                <version>${delta.kernel.version}</version>
+                <scope>compile</scope>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-runtime</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
