@@ -72,8 +72,8 @@
     },
     {
       "name": "bytes_field",
-      "type": "bytes",
-      "default": ""
+      "type": ["null", "bytes"],
+      "default": null
     },
     {
       "name": "decimal_field",
