@@ -432,7 +432,7 @@ class TestIcebergConversionSource {
     DataWriter<GenericRecord> dataWriter =
         Parquet.writeData(table.io().newOutputFile(filePath))
             .schema(csSchema)
-            .createWriterFunc(GenericParquetWriter::buildWriter)
+            .createWriterFunc(GenericParquetWriter::create)
             .overwrite()
             .withSpec(table.spec())
             .withPartition(partitionInfo)
