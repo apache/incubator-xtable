@@ -194,7 +194,8 @@ public class TestIcebergSchemaSync {
 
     verify(mockUpdateSchema).deleteColumn("map_field.value.value_string");
     verify(mockUpdateSchema)
-        .addRequiredColumn("map_field.value", "value_double", Types.DoubleType.get(), (String) null);
+        .addRequiredColumn(
+            "map_field.value", "value_double", Types.DoubleType.get(), (String) null);
     verify(mockUpdateSchema).commit();
   }
 
