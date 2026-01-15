@@ -371,7 +371,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     DataWriter<Record> dataWriter =
         Parquet.writeData(file)
             .schema(icebergTable.schema())
-            .createWriterFunc(GenericParquetWriter::buildWriter)
+            .createWriterFunc(GenericParquetWriter::create)
             .overwrite()
             .withSpec(icebergTable.spec())
             .withPartition(partitionKey)
