@@ -44,4 +44,4 @@ jobs:
           cache: maven
 
       - name: Build all module with Maven
-        run: mvn clean install -ntp -B
+        run: ./mvnw clean install -ntp -B

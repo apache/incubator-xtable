@@ -17,7 +17,7 @@
 #
 ## Variables with defaults (if not overwritten by environment)
 ##
-MVN=${MVN:-mvn}
+MVN=${MVN:-./mvnw}
 # fail immediately
 set -o errexit
 set -o nounset
