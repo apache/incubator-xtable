@@ -48,7 +48,7 @@ class HudiInstantUtils {
 
   /**
    * Copied mostly from {@link
-   * org.apache.hudi.common.table.timeline.HoodieActiveTimeline#parseDateFromInstantTime(String)}
+   * org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator#parseDateFromInstantTime(String)}
    * but forces the timestamp to use UTC unlike the Hudi code.
    *
    * @param timestamp input commit timestamp

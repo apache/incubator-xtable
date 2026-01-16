@@ -18,6 +18,8 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
+import static org.apache.hudi.stats.XTableValueMetadata.getValueMetadata;
 import static org.apache.xtable.hudi.HudiTestUtil.createWriteStatus;
 import static org.apache.xtable.hudi.HudiTestUtil.getHoodieWriteConfig;
 import static org.apache.xtable.hudi.HudiTestUtil.initTableAndGetMetaClient;
@@ -43,14 +45,18 @@ import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieAvroPayload;
-import org.apache.hudi.common.model.HoodieColumnRangeMetadata;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
-import org.apache.hudi.hadoop.CachingPath;
+import org.apache.hudi.hadoop.fs.CachingPath;
+import org.apache.hudi.metadata.HoodieIndexVersion;
+import org.apache.hudi.stats.HoodieColumnRangeMetadata;
+import org.apache.hudi.stats.ValueMetadata;
+import org.apache.hudi.stats.ValueType;
 
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -73,7 +79,7 @@ public class TestBaseFileUpdatesExtractor {
   private static final long RECORD_COUNT = 200L;
   private static final long LAST_MODIFIED = System.currentTimeMillis();
   private static final HoodieEngineContext CONTEXT =
-      new HoodieJavaEngineContext(new Configuration());
+      new HoodieJavaEngineContext(getStorageConf(new Configuration()));
   private static final InternalPartitionField PARTITION_FIELD =
       InternalPartitionField.builder()
           .sourceField(
@@ -129,7 +135,7 @@ public class TestBaseFileUpdatesExtractor {
     BaseFileUpdatesExtractor extractor =
         BaseFileUpdatesExtractor.of(CONTEXT, new CachingPath(tableBasePath));
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
-        extractor.convertDiff(diff, COMMIT_TIME);
+        extractor.convertDiff(diff, COMMIT_TIME, HoodieIndexVersion.V2);
 
     // validate removed files
     Map<String, List<String>> expectedPartitionToReplacedFileIds = new HashMap<>();
@@ -143,7 +149,10 @@ public class TestBaseFileUpdatesExtractor {
     List<WriteStatus> expectedWriteStatuses =
         Arrays.asList(
             getExpectedWriteStatus(fileName1, partitionPath1, Collections.emptyMap()),
-            getExpectedWriteStatus(fileName2, partitionPath2, getExpectedColumnStats(fileName2)));
+            getExpectedWriteStatus(
+                fileName2,
+                partitionPath2,
+                getExpectedColumnStats(fileName2, HoodieIndexVersion.V2)));
     assertWriteStatusesEquivalent(expectedWriteStatuses, replaceMetadata.getWriteStatuses());
   }
 
@@ -161,12 +170,12 @@ public class TestBaseFileUpdatesExtractor {
   void extractSnapshotChanges_emptyTargetTable() throws IOException {
     String tableBasePath = tempDir.resolve(UUID.randomUUID().toString()).toString();
     HoodieTableMetaClient metaClient =
-        HoodieTableMetaClient.withPropertyBuilder()
+        HoodieTableMetaClient.newTableBuilder()
             .setTableType(HoodieTableType.COPY_ON_WRITE)
             .setTableName("test_table")
             .setPayloadClass(HoodieAvroPayload.class)
             .setPartitionFields("partition_field")
-            .initTable(new Configuration(), tableBasePath);
+            .initTable(getStorageConf(new Configuration()), tableBasePath);
 
     String partitionPath1 = "partition1";
     String fileName1 = "file1.parquet";
@@ -219,8 +228,14 @@ public class TestBaseFileUpdatesExtractor {
     List<WriteStatus> expectedWriteStatuses =
         Arrays.asList(
             getExpectedWriteStatus(fileName1, partitionPath1, Collections.emptyMap()),
-            getExpectedWriteStatus(fileName2, partitionPath1, getExpectedColumnStats(fileName2)),
-            getExpectedWriteStatus(fileName3, partitionPath2, getExpectedColumnStats(fileName3)));
+            getExpectedWriteStatus(
+                fileName2,
+                partitionPath1,
+                getExpectedColumnStats(fileName2, HoodieIndexVersion.V2)),
+            getExpectedWriteStatus(
+                fileName3,
+                partitionPath2,
+                getExpectedColumnStats(fileName3, HoodieIndexVersion.V2)));
     assertWriteStatusesEquivalent(expectedWriteStatuses, replaceMetadata.getWriteStatuses());
   }
 
@@ -253,7 +268,8 @@ public class TestBaseFileUpdatesExtractor {
               new HoodieInstant(
                   HoodieInstant.State.REQUESTED,
                   HoodieTimeline.REPLACE_COMMIT_ACTION,
-                  initialInstant),
+                  initialInstant,
+                  InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR),
               Option.empty());
       writeClient.commit(
           initialInstant,
@@ -319,7 +335,9 @@ public class TestBaseFileUpdatesExtractor {
     List<WriteStatus> expectedWriteStatuses =
         Arrays.asList(
             getExpectedWriteStatus(
-                newFileName1, partitionPath2, getExpectedColumnStats(newFileName1)),
+                newFileName1,
+                partitionPath2,
+                getExpectedColumnStats(newFileName1, HoodieIndexVersion.V2)),
             getExpectedWriteStatus(newFileName2, partitionPath3, Collections.emptyMap()));
     assertWriteStatusesEquivalent(expectedWriteStatuses, replaceMetadata.getWriteStatuses());
   }
@@ -347,7 +365,8 @@ public class TestBaseFileUpdatesExtractor {
               new HoodieInstant(
                   HoodieInstant.State.REQUESTED,
                   HoodieTimeline.REPLACE_COMMIT_ACTION,
-                  initialInstant),
+                  initialInstant,
+                  InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR),
               Option.empty());
       writeClient.commit(
           initialInstant,
@@ -386,7 +405,8 @@ public class TestBaseFileUpdatesExtractor {
     // validate added files
     List<WriteStatus> expectedWriteStatuses =
         Collections.singletonList(
-            getExpectedWriteStatus(newFileName1, "", getExpectedColumnStats(newFileName1)));
+            getExpectedWriteStatus(
+                newFileName1, "", getExpectedColumnStats(newFileName1, HoodieIndexVersion.V2)));
     assertWriteStatusesEquivalent(expectedWriteStatuses, replaceMetadata.getWriteStatuses());
   }
 
@@ -421,58 +441,140 @@ public class TestBaseFileUpdatesExtractor {
    * Get expected col stats for a file.
    *
    * @param fileName name of the file
+   * @param indexVersion the Hudi index version
    * @return stats matching the column stats in {@link ColumnStatMapUtil#getColumnStats()}
    */
   private Map<String, HoodieColumnRangeMetadata<Comparable>> getExpectedColumnStats(
-      String fileName) {
+      String fileName, HoodieIndexVersion indexVersion) {
     Map<String, HoodieColumnRangeMetadata<Comparable>> columnStats = new HashMap<>();
     columnStats.put(
         "long_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "long_field", 10L, 20L, 4, 5, 123L, -1L));
+            fileName,
+            "long_field",
+            10L,
+            20L,
+            4,
+            5,
+            123L,
+            -1L,
+            getValueMetadata(ValueType.LONG, indexVersion)));
     columnStats.put(
         "string_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "string_field", "a", "c", 1, 6, 500L, -1L));
+            fileName,
+            "string_field",
+            "a",
+            "c",
+            1,
+            6,
+            500L,
+            -1L,
+            getValueMetadata(ValueType.STRING, indexVersion)));
     columnStats.put(
         "null_string_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "null_string_field", (String) null, (String) null, 3, 3, 0L, -1L));
+            fileName,
+            "null_string_field",
+            (String) null,
+            (String) null,
+            3,
+            3,
+            0L,
+            -1L,
+            getValueMetadata(ValueType.STRING, indexVersion)));
+    ValueMetadata timestampValueMetadata =
+        getValueMetadata(ValueType.TIMESTAMP_MILLIS, indexVersion);
     columnStats.put(
         "timestamp_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "timestamp_field", 1665263297000L, 1665436097000L, 105, 145, 999L, -1L));
+            fileName,
+            "timestamp_field",
+            timestampValueMetadata.standardizeJavaTypeAndPromote(1665263297000L),
+            timestampValueMetadata.standardizeJavaTypeAndPromote(1665436097000L),
+            105,
+            145,
+            999L,
+            -1L,
+            timestampValueMetadata));
+
+    ValueMetadata timestampMicrosValueMetadata =
+        getValueMetadata(ValueType.TIMESTAMP_MICROS, indexVersion);
     columnStats.put(
         "timestamp_micros_field",
         HoodieColumnRangeMetadata.<Comparable>create(
             fileName,
             "timestamp_micros_field",
-            1665263297000000L,
-            1665436097000000L,
+            timestampMicrosValueMetadata.standardizeJavaTypeAndPromote(1665263297000000L),
+            timestampMicrosValueMetadata.standardizeJavaTypeAndPromote(1665436097000000L),
             1,
             20,
             400,
-            -1L));
+            -1L,
+            timestampMicrosValueMetadata));
+    ValueMetadata localTimestampValueMetadata =
+        getValueMetadata(ValueType.LOCAL_TIMESTAMP_MILLIS, indexVersion);
     columnStats.put(
         "local_timestamp_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "local_timestamp_field", 1665263297000L, 1665436097000L, 1, 20, 400, -1L));
+            fileName,
+            "local_timestamp_field",
+            localTimestampValueMetadata.standardizeJavaTypeAndPromote(1665263297000L),
+            localTimestampValueMetadata.standardizeJavaTypeAndPromote(1665436097000L),
+            1,
+            20,
+            400,
+            -1L,
+            localTimestampValueMetadata));
+    ValueMetadata dateValueMetadata = getValueMetadata(ValueType.DATE, indexVersion);
     columnStats.put(
         "date_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "date_field", 18181, 18547, 250, 300, 12345, -1L));
+            fileName,
+            "date_field",
+            dateValueMetadata.standardizeJavaTypeAndPromote(18181),
+            dateValueMetadata.standardizeJavaTypeAndPromote(18547),
+            250,
+            300,
+            12345,
+            -1L,
+            dateValueMetadata));
     columnStats.put(
         "array_long_field.array",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "array_long_field.element", 50L, 100L, 2, 5, 1234, -1L));
+            fileName,
+            "array_long_field.element",
+            50L,
+            100L,
+            2,
+            5,
+            1234,
+            -1L,
+            ValueMetadata.V1EmptyMetadata.get()));
     columnStats.put(
         "map_string_long_field.key_value.key",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "map_string_long_field.key_value.key", "key1", "key2", 3, 5, 1234, -1L));
+            fileName,
+            "map_string_long_field.key_value.key",
+            "key1",
+            "key2",
+            3,
+            5,
+            1234,
+            -1L,
+            ValueMetadata.V1EmptyMetadata.get()));
     columnStats.put(
         "map_string_long_field.key_value.value",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "map_string_long_field.key_value.value", 200L, 300L, 3, 5, 1234, -1L));
+            fileName,
+            "map_string_long_field.key_value.value",
+            200L,
+            300L,
+            3,
+            5,
+            1234,
+            -1L,
+            ValueMetadata.V1EmptyMetadata.get()));
     columnStats.put(
         "nested_struct_field.array_string_field.array",
         HoodieColumnRangeMetadata.<Comparable>create(
@@ -483,11 +585,20 @@ public class TestBaseFileUpdatesExtractor {
             7,
             15,
             1234,
-            -1L));
+            -1L,
+            ValueMetadata.V1EmptyMetadata.get()));
     columnStats.put(
         "nested_struct_field.nested_long_field",
         HoodieColumnRangeMetadata.<Comparable>create(
-            fileName, "nested_struct_field.nested_long_field", 500L, 600L, 4, 5, 1234, -1L));
+            fileName,
+            "nested_struct_field.nested_long_field",
+            500L,
+            600L,
+            4,
+            5,
+            1234,
+            -1L,
+            getValueMetadata(ValueType.LONG, indexVersion)));
     return columnStats;
   }
 }
