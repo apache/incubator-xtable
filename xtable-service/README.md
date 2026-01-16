@@ -28,13 +28,13 @@ See XTable's `spec` module for more details: https://github.com/apache/incubator
 
 To run the service locally, first ensure you have built the project with 
 ```sh
-mvn clean install -DskipTests
+./mvnw clean install -DskipTests
 ```
 
 
 Then you can run start the quarkus service using the following command:
 ```sh
-mvn quarkus:dev -pl xtable-service
+./mvnw quarkus:dev -pl xtable-service
 ```
 This will start the service on `http://localhost:8080`.
 
