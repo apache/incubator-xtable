@@ -41,6 +41,8 @@ import org.apache.spark.sql.delta.actions.AddFile;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import scala.Option;
+import scala.Tuple2;
+import scala.collection.Seq;
 
 import io.delta.tables.DeltaTable;
 
@@ -191,18 +193,58 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   }
 
   /*
-   * In Delta Lake, each commit is a self-describing one i.e. it contains list of new files while
-   * also containing list of files that were deleted. So, vacuum has no special effect on the
-   * incremental sync. Hence, existence of commit is the only check required.
+   * Following checks are performed:
+   * 1. Check if a commit exists at or before the provided instant.
+   * 2. Verify that commit files needed for incremental sync are still accessible.
+   *
+   * Delta Lake's VACUUM operation removes old JSON commit files from _delta_log/, which can
+   * break incremental sync even though commits are self-describing. This method attempts to
+   * access the commit chain to ensure files haven't been vacuumed.
    */
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant instant) {
-    DeltaHistoryManager.Commit deltaCommitAtOrBeforeInstant =
-        deltaLog.history().getActiveCommitAtTime(Timestamp.from(instant), true, false, true);
-    // There is a chance earliest commit of the table is returned if the instant is before the
-    // earliest commit of the table, hence the additional check.
-    Instant deltaCommitInstant = Instant.ofEpochMilli(deltaCommitAtOrBeforeInstant.getTimestamp());
-    return deltaCommitInstant.equals(instant) || deltaCommitInstant.isBefore(instant);
+    try {
+      DeltaHistoryManager.Commit deltaCommitAtOrBeforeInstant =
+          deltaLog.history().getActiveCommitAtTime(Timestamp.from(instant), true, false, true);
+
+      // There is a chance earliest commit of the table is returned if the instant is before the
+      // earliest commit of the table, hence the additional check.
+      Instant deltaCommitInstant = Instant.ofEpochMilli(deltaCommitAtOrBeforeInstant.getTimestamp());
+      if (deltaCommitInstant.isAfter(instant)) {
+        log.info(
+            "No commit found at or before instant {}. Earliest available commit is at {}",
+            instant,
+            deltaCommitInstant);
+        return false;
+      }
+
+      long versionAtInstant = deltaCommitAtOrBeforeInstant.version();
+
+      // Verify that we can actually access commit files from this version onward by attempting
+      // to read the changes. This will fail if VACUUM has removed the necessary commit files.
+      // We only need to verify we can start iterating - we don't need to consume all changes.
+      scala.collection.Iterator<Tuple2<Object, Seq<Action>>> changesIterator =
+          deltaLog.getChanges(versionAtInstant, true);
+
+      // Test if we can access at least the first commit. If commit files are missing due to
+      // VACUUM, this will throw an exception (typically FileNotFoundException or similar).
+      if (changesIterator.hasNext()) {
+        // Successfully verified we can access commit files
+        return true;
+      } else {
+        // No changes available from this version (shouldn't happen for valid commits)
+        log.warn(
+            "No changes available starting from version {} (instant: {})", versionAtInstant, instant);
+        return false;
+      }
+    } catch (Exception e) {
+      // Commit files have been vacuumed or are otherwise inaccessible
+      log.info(
+          "Cannot perform incremental sync from instant {} due to missing or inaccessible commit files: {}",
+          instant,
+          e.getMessage());
+      return false;
+    }
   }
 
   @Override
