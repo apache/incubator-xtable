@@ -21,6 +21,7 @@ package org.apache.xtable.utilities;
 import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 
 import java.io.IOException;
 import java.net.URL;
@@ -104,10 +105,11 @@ class TestRunSync {
   public void testTableFormatConverterConfigDefault() throws IOException {
     TableFormatConverters converters = RunSync.loadTableFormatConversionConfigs(null);
     Map<String, ConversionConfig> tfConverters = converters.getTableFormatConverters();
-    Assertions.assertEquals(3, tfConverters.size());
+    Assertions.assertEquals(4, tfConverters.size());
     Assertions.assertNotNull(tfConverters.get(DELTA));
     Assertions.assertNotNull(tfConverters.get(HUDI));
     Assertions.assertNotNull(tfConverters.get(ICEBERG));
+    Assertions.assertNotNull(tfConverters.get(PAIMON));
 
     Assertions.assertEquals(
         "org.apache.xtable.hudi.HudiConversionSourceProvider",
@@ -127,6 +129,9 @@ class TestRunSync {
     Assertions.assertEquals(
         "org.apache.xtable.delta.DeltaConversionSourceProvider",
         tfConverters.get(DELTA).getConversionSourceProviderClass());
+    Assertions.assertEquals(
+        "org.apache.xtable.paimon.PaimonConversionSourceProvider",
+        tfConverters.get(PAIMON).getConversionSourceProviderClass());
   }
 
   @Test
@@ -144,7 +149,7 @@ class TestRunSync {
     TableFormatConverters converters =
         RunSync.loadTableFormatConversionConfigs(customConverters.getBytes());
     Map<String, ConversionConfig> tfConverters = converters.getTableFormatConverters();
-    Assertions.assertEquals(4, tfConverters.size());
+    Assertions.assertEquals(5, tfConverters.size());
 
     Assertions.assertNotNull(tfConverters.get("NEW_FORMAT"));
     Assertions.assertEquals(
