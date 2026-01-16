@@ -121,14 +121,7 @@ public class ITParquetDataManager {
         .partitionBy("year", "month")
         .mode("overwrite")
         .parquet(finalAppendFilePath);
-    /*long newModifTime = System.currentTimeMillis() - 50000;
-    for (String partition : newPartitions) {
-      org.apache.hadoop.fs.Path partitionPath =
-          new org.apache.hadoop.fs.Path(finalAppendFilePath, partition);
-      if (fs.exists(partitionPath)) {
-        updateModificationTimeRecursive(fs, partitionPath, newModifTime);
-      }
-    }*/
+
     Dataset<Row> dfWithNewTimes = spark.read().parquet(finalAppendFilePath);
     dfWithNewTimes
         .coalesce(1)
@@ -139,6 +132,7 @@ public class ITParquetDataManager {
     fs.delete(new org.apache.hadoop.fs.Path(finalAppendFilePath), true);
     // conversionSource operations
     Properties sourceProperties = new Properties();
+    // TODO use timestamp col instead (as done in ITParquetConversionSource)
     String partitionConfig = "id:MONTH:year=yyyy/month=MM";
     sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
     SourceTable tableConfig =

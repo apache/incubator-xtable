@@ -18,6 +18,10 @@
  
 package org.apache.xtable.parquet;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -26,6 +30,10 @@ import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
+import org.apache.hadoop.util.functional.RemoteIterators;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+
+import org.apache.xtable.exception.ReadException;
 
 /**
  * Manages Parquet file operations including reading, writing, and partition discovery and path
@@ -41,6 +49,59 @@ public class ParquetDataManager {
 
   public static ParquetDataManager getInstance() {
     return INSTANCE;
+  }
+
+  public ParquetFileConfig getMostRecentParquetFile(Stream<ParquetFileConfig> parquetFiles) {
+    return parquetFiles
+        .max(Comparator.comparing(ParquetFileConfig::getModifTime))
+        .orElseThrow(() -> new IllegalStateException("No files found"));
+  }
+
+  public ParquetFileConfig getParquetFileAt(
+      Stream<ParquetFileConfig> parquetConfigs, long targetTime) {
+
+    return parquetConfigs
+        .filter(config -> config.getModifTime() >= targetTime)
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("No file found at or after " + targetTime));
+  }
+
+  public Stream<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
+    try {
+      FileSystem fs = FileSystem.get(hadoopConf);
+      URI uriBasePath = new URI(basePath);
+      String parentPath = Paths.get(uriBasePath).toString();
+      RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(parentPath), true);
+      return RemoteIterators.toList(iterator).stream()
+          .filter(file -> file.getPath().getName().endsWith("parquet"));
+    } catch (IOException | URISyntaxException e) {
+      throw new ReadException("Unable to read files from file system", e);
+    }
+  }
+
+  public Stream<ParquetFileConfig> getConfigsFromStream(
+      Stream<LocatedFileStatus> fileStream, Configuration conf) {
+
+    return fileStream.map(
+        fileStatus -> {
+          Path path = fileStatus.getPath();
+
+          ParquetMetadata metadata =
+              ParquetMetadataExtractor.getInstance().readParquetMetadata(conf, path);
+
+          return ParquetFileConfig.builder()
+              .schema(metadata.getFileMetaData().getSchema())
+              .metadata(metadata)
+              .path(path)
+              .size(fileStatus.getLen())
+              .modifTime(fileStatus.getModificationTime())
+              .rowGroupIndex(metadata.getBlocks().size())
+              .codec(
+                  metadata.getBlocks().isEmpty()
+                      ? null
+                      : metadata.getBlocks().get(0).getColumns().get(0).getCodec())
+              .build();
+        });
   }
 
   public List<ParquetFileConfig> getParquetFilesMetadataInRange(
