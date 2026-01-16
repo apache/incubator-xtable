@@ -63,7 +63,7 @@
         <project.build.outputTimestamp>2025-01-01T00:00:00Z</project.build.outputTimestamp>
         <maven.compiler.target>8</maven.compiler.target>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
-        <avro.version>1.11.4</avro.version>
+        <avro.version>1.12.0</avro.version>
         <log4j.version>2.22.0</log4j.version>
         <junit.version>5.11.4</junit.version>
         <junit.platform.runner.version>1.11.4</junit.platform.runner.version>
@@ -87,7 +87,8 @@
         <scala.binary.version>2.12</scala.binary.version>
         <spark.version>3.4.2</spark.version>
         <spark.version.prefix>3.4</spark.version.prefix>
-        <iceberg.version>1.4.2</iceberg.version>
+        <iceberg.version>1.9.2</iceberg.version>
+        <iceberg.hive.runtime.version>1.7.2</iceberg.hive.runtime.version>
         <delta.version>2.4.0</delta.version>
         <paimon.version>1.2.0</paimon.version>
         <jackson.version>2.18.2</jackson.version>
@@ -243,6 +244,11 @@
                         <groupId>org.openjdk.jol</groupId>
                         <artifactId>jol-core</artifactId>
                     </exclusion>
+                    <!-- Exclude Parquet to enforce version 1.15+ required by Iceberg 1.10.1 -->
+                    <exclusion>
+                        <groupId>org.apache.parquet</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
             <dependency>
@@ -262,6 +268,11 @@
                         <groupId>org.apache.zookeeper</groupId>
                         <artifactId>zookeeper</artifactId>
                     </exclusion>
+                    <!-- Exclude Parquet to enforce version 1.15+ required by Iceberg 1.10.1 -->
+                    <exclusion>
+                        <groupId>org.apache.parquet</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
                 </exclusions>
             </dependency>
             <dependency>
@@ -269,12 +280,26 @@
                 <artifactId>hudi-sync-common</artifactId>
                 <version>${hudi.version}</version>
                 <scope>provided</scope>
+                <exclusions>
+                    <!-- Exclude Parquet to enforce version 1.15+ required by Iceberg 1.10.1 -->
+                    <exclusion>
+                        <groupId>org.apache.parquet</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.apache.hudi</groupId>
                 <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.binary.version}</artifactId>
                 <version>${hudi.version}</version>
                 <scope>test</scope>
+                <exclusions>
+                    <!-- Exclude Parquet to enforce version 1.15+ required by Iceberg 1.10.1 -->
+                    <exclusion>
+                        <groupId>org.apache.parquet</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.apache.hudi</groupId>
@@ -283,11 +308,25 @@
                 <classifier>tests</classifier>
                 <type>test-jar</type>
                 <scope>test</scope>
+                <exclusions>
+                    <!-- Exclude Parquet to enforce version 1.15+ required by Iceberg 1.10.1 -->
+                    <exclusion>
+                        <groupId>org.apache.parquet</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <groupId>org.apache.hudi</groupId>
                 <artifactId>hudi-java-client</artifactId>
                 <version>${hudi.version}</version>
+                <exclusions>
+                    <!-- Exclude Parquet to enforce version 1.15+ required by Iceberg 1.10.1 -->
+                    <exclusion>
+                        <groupId>org.apache.parquet</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
 
             <!-- Iceberg -->
@@ -315,7 +354,7 @@
             <dependency>
                 <groupId>org.apache.iceberg</groupId>
                 <artifactId>iceberg-hive-runtime</artifactId>
-                <version>${iceberg.version}</version>
+                <version>${iceberg.hive.runtime.version}</version>
             </dependency>
 
             <!-- Delta -->
@@ -748,6 +787,22 @@
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <trimStackTrace>false</trimStackTrace>
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
+                    <argLine>
+                        --add-opens=java.base/java.lang=ALL-UNNAMED
+                        --add-opens=java.base/java.lang.invoke=ALL-UNNAMED
+                        --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+                        --add-opens=java.base/java.io=ALL-UNNAMED
+                        --add-opens=java.base/java.net=ALL-UNNAMED
+                        --add-opens=java.base/java.nio=ALL-UNNAMED
+                        --add-opens=java.base/java.util=ALL-UNNAMED
+                        --add-opens=java.base/java.util.concurrent=ALL-UNNAMED
+                        --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED
+                        --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+                        --add-opens=java.base/sun.nio.cs=ALL-UNNAMED
+                        --add-opens=java.base/sun.security.action=ALL-UNNAMED
+                        --add-opens=java.base/sun.util.calendar=ALL-UNNAMED
+                        --add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED
+                    </argLine>
                 </configuration>
             </plugin>
             <plugin>
@@ -767,7 +822,23 @@
                     <reuseForks>false</reuseForks>
                     <forkCount>6</forkCount>
                     <trimStackTrace>false</trimStackTrace>
-                    <argLine>-Xmx1500m</argLine>
+                    <argLine>
+                        -Xmx1500m
+                        --add-opens=java.base/java.lang=ALL-UNNAMED
+                        --add-opens=java.base/java.lang.invoke=ALL-UNNAMED
+                        --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+                        --add-opens=java.base/java.io=ALL-UNNAMED
+                        --add-opens=java.base/java.net=ALL-UNNAMED
+                        --add-opens=java.base/java.nio=ALL-UNNAMED
+                        --add-opens=java.base/java.util=ALL-UNNAMED
+                        --add-opens=java.base/java.util.concurrent=ALL-UNNAMED
+                        --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED
+                        --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+                        --add-opens=java.base/sun.nio.cs=ALL-UNNAMED
+                        --add-opens=java.base/sun.security.action=ALL-UNNAMED
+                        --add-opens=java.base/sun.util.calendar=ALL-UNNAMED
+                        --add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED
+                    </argLine>
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
                 </configuration>
             </plugin>
