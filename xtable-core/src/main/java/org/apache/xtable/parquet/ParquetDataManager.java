@@ -36,12 +36,10 @@ import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.xtable.exception.ReadException;
 
 /**
- * Manages Parquet file operations including reading, writing, and partition discovery and path
- * construction.
+ * Manages Parquet File's Metadata
  *
- * <p>This class provides functions to handle Parquet metadata, validate schemas during appends, and
- * calculate target partition directories based on file modification times and defined partition
- * fields.
+ * <p>This class provides functions to handle Parquet metadata, creating metadata objects from
+ * parquet files and filtering the files based on the modification times.
  */
 @Log4j2
 public class ParquetDataManager {

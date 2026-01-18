@@ -18,6 +18,7 @@
  
 package org.apache.xtable.parquet;
 
+import static org.apache.spark.sql.functions.expr;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
@@ -84,12 +85,12 @@ public class ITParquetDataManager {
             RowFactory.create(102, "CB", 2027, 11),
             RowFactory.create(103, "BA", 2027, 11));
 
-    Dataset<Row> df = spark.createDataFrame(data, schema);
+    Dataset<Row> dfInit = spark.createDataFrame(data, schema);
     Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet_table_test_2");
     Path appendFilePath = Paths.get("target", "fixed-parquet-data", "parquet_file_test_2");
     String outputPath = fixedPath.toString();
     String finalAppendFilePath = appendFilePath.toString();
-
+    Dataset<Row> df = dfInit.withColumn("full_date", expr("make_date(year, month, 1)"));
     df.coalesce(1).write().partitionBy("year", "month").mode("overwrite").parquet(outputPath);
 
     // test find files to sync
@@ -101,6 +102,8 @@ public class ITParquetDataManager {
     // many partitions case
     List<String> newPartitions = Arrays.asList("year=2026/month=12", "year=2027/month=11");
     long targetModifTime = System.currentTimeMillis() - 360000;
+    long newModifTime = System.currentTimeMillis() - 50000;
+    long testTime = System.currentTimeMillis() - 90000; // between two prev times
     for (String partition : newPartitions) {
       org.apache.hadoop.fs.Path partitionPath =
           new org.apache.hadoop.fs.Path(outputPath, partition);
@@ -114,7 +117,8 @@ public class ITParquetDataManager {
             RowFactory.create(101, "A", 2026, 12),
             RowFactory.create(301, "D", 2027, 11),
             RowFactory.create(302, "DA", 2027, 11));
-    Dataset<Row> dfToSync = spark.createDataFrame(futureDataToSync, schema);
+    Dataset<Row> dfToSyncInit = spark.createDataFrame(futureDataToSync, schema);
+    Dataset<Row> dfToSync = dfToSyncInit.withColumn("full_date", expr("make_date(year, month, 1)"));
     dfToSync
         .coalesce(1)
         .write()
@@ -132,8 +136,7 @@ public class ITParquetDataManager {
     fs.delete(new org.apache.hadoop.fs.Path(finalAppendFilePath), true);
     // conversionSource operations
     Properties sourceProperties = new Properties();
-    // TODO use timestamp col instead (as done in ITParquetConversionSource)
-    String partitionConfig = "id:MONTH:year=yyyy/month=MM";
+    String partitionConfig = "full_date:MONTH:year=yyyy/month=MM";
     sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
     SourceTable tableConfig =
         SourceTable.builder()
@@ -146,7 +149,7 @@ public class ITParquetDataManager {
     ParquetConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
 
-    long newModifTime = System.currentTimeMillis() - 50000;
+    // long newModifTime = System.currentTimeMillis() - 50000;
 
     for (String partition : newPartitions) {
       org.apache.hadoop.fs.Path partitionPath =
@@ -178,6 +181,10 @@ public class ITParquetDataManager {
     assertNotNull(snapshot);
     TableChange changes = conversionSource.getTableChangeForCommit(newModifTime);
     assertNotNull(changes);
+    Instant instantBeforeFirstSnapshot =
+        Instant.ofEpochMilli(snapshot.getTable().getLatestCommitTime().toEpochMilli());
+    assertTrue(instantBeforeFirstSnapshot.toEpochMilli() == newModifTime);
+    assertTrue(conversionSource.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(testTime)));
   }
 
   private void updateModificationTimeRecursive(
