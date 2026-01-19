@@ -18,21 +18,24 @@
  
 package org.apache.xtable.parquet;
 
-import java.io.IOException;
-
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
+import org.apache.xtable.exception.ReadException;
+
+@Log4j2
 @Getter
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Builder
@@ -41,26 +44,26 @@ class ParquetFileConfig {
   MessageType schema;
   ParquetMetadata metadata;
   long rowGroupIndex;
-  long modifTime;
+  long modificationTime;
   long size;
   CompressionCodecName codec;
   Path path;
 
-  public ParquetFileConfig(Configuration conf, Path file) {
-    long modifTime = -1L;
+  public ParquetFileConfig(Configuration conf, FileStatus file) {
+    long modificationTime = -1L;
     ParquetMetadata metadata =
-        ParquetMetadataExtractor.getInstance().readParquetMetadata(conf, file);
+        ParquetMetadataExtractor.getInstance().readParquetMetadata(conf, file.getPath());
 
     if (metadata.getBlocks().isEmpty()) {
       throw new IllegalStateException("Parquet file contains no row groups.");
     }
     try {
-      modifTime = file.getFileSystem(conf).getFileStatus(file).getModificationTime();
-    } catch (IOException e) {
-      e.printStackTrace();
+      modificationTime = file.getModificationTime();
+    } catch (ReadException e) {
+      log.warn("File reading error: " + e.getMessage());
     }
-    this.path = file;
-    this.modifTime = modifTime;
+    this.path = file.getPath();
+    this.modificationTime = modificationTime;
     this.size = metadata.getBlocks().stream().mapToLong(BlockMetaData::getTotalByteSize).sum();
     this.metadata = metadata;
     this.schema = metadata.getFileMetaData().getSchema();

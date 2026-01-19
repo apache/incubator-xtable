@@ -183,7 +183,7 @@ public class ITParquetDataManager {
     assertNotNull(changes);
     Instant instantBeforeFirstSnapshot =
         Instant.ofEpochMilli(snapshot.getTable().getLatestCommitTime().toEpochMilli());
-    assertTrue(instantBeforeFirstSnapshot.toEpochMilli() == newModifTime);
+    assertEquals(instantBeforeFirstSnapshot.toEpochMilli(), newModifTime);
     assertTrue(conversionSource.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(testTime)));
   }
 
