@@ -62,6 +62,10 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.TableFormat;
 
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+
+@Execution(ExecutionMode.SAME_THREAD)
 public class ITIcebergConversionSource {
   private static final Configuration hadoopConf = new Configuration();
 
