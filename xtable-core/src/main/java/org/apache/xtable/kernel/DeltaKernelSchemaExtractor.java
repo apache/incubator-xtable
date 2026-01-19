@@ -66,6 +66,9 @@ public class DeltaKernelSchemaExtractor {
     return toInternalSchema(structType, null, false, null, null);
   }
 
+  String trimmedTypeName = "";
+  InternalType type = null;
+
   private InternalSchema toInternalSchema(
       DataType dataType,
       String parentPath,
@@ -73,8 +76,6 @@ public class DeltaKernelSchemaExtractor {
       String comment,
       FieldMetadata originalMetadata) {
 
-    String trimmedTypeName = "";
-    InternalType type = null;
     Map<InternalSchema.MetadataKey, Object> metadata = null;
     List<InternalField> fields = null;
 
