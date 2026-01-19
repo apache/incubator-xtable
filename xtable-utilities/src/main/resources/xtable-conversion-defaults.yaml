@@ -39,3 +39,5 @@ tableFormatConverters:
     ICEBERG:
       conversionSourceProviderClass: org.apache.xtable.iceberg.IcebergConversionSourceProvider
       conversionTargetProviderClass: org.apache.xtable.iceberg.IcebergConversionTarget
+    PAIMON:
+      conversionSourceProviderClass: org.apache.xtable.paimon.PaimonConversionSourceProvider
