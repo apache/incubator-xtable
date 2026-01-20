@@ -39,6 +39,7 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.functions;
 
 import org.apache.spark.sql.delta.DeltaLog;
+import org.apache.spark.sql.delta.actions.AddFile;
 
 import com.google.common.base.Preconditions;
 
@@ -228,9 +229,13 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
   }
 
   public List<String> getAllActiveFiles() {
-    return deltaLog.snapshot().allFiles().collectAsList().stream()
+    return getAllActiveFilesInfo().stream()
         .map(addFile -> addSlashToBasePath(basePath) + addFile.path())
         .collect(Collectors.toList());
+  }
+
+  public List<AddFile> getAllActiveFilesInfo() {
+    return deltaLog.snapshot().allFiles().collectAsList();
   }
 
   private String addSlashToBasePath(String basePath) {
