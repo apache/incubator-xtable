@@ -29,8 +29,10 @@ import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.TargetCatalogConfig;
 import org.apache.xtable.model.catalog.ThreePartHierarchicalTableIdentifier;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
+import org.apache.xtable.spi.sync.CatalogAccessControlPolicySyncClient;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 import org.apache.xtable.testutil.ITTestUtils;
+import org.apache.xtable.testutil.ITTestUtils.TestCatalogAccessControlPolicySyncClientImpl;
 import org.apache.xtable.testutil.ITTestUtils.TestCatalogConversionSourceImpl;
 import org.apache.xtable.testutil.ITTestUtils.TestCatalogSyncImpl;
 
@@ -104,5 +106,22 @@ class TestCatalogConversionFactory {
             .createCatalogSyncClient(
                 targetCatalogConfig.getCatalogConfig(), "TABLE_FORMAT", new Configuration());
     assertEquals(catalogSyncClient.getClass().getName(), TestCatalogSyncImpl.class.getName());
+  }
+
+  @Test
+  void createCatalogPolicySyncClient() {
+    ExternalCatalogConfig externalCatalogConfig =
+        ExternalCatalogConfig.builder()
+            .catalogId("catalogId")
+            .catalogPolicySyncClientImpl(
+                TestCatalogAccessControlPolicySyncClientImpl.class.getName())
+            .catalogProperties(Collections.emptyMap())
+            .build();
+    CatalogAccessControlPolicySyncClient catalogSyncClient =
+        CatalogConversionFactory.getInstance()
+            .createCatalogPolicySyncClient(externalCatalogConfig, new Configuration());
+    assertEquals(
+        catalogSyncClient.getClass().getName(),
+        TestCatalogAccessControlPolicySyncClientImpl.class.getName());
   }
 }

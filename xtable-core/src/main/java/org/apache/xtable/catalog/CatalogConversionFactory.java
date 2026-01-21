@@ -31,6 +31,7 @@ import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.reflection.ReflectionUtils;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
+import org.apache.xtable.spi.sync.CatalogAccessControlPolicySyncClient;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -86,6 +87,19 @@ public class CatalogConversionFactory {
         targetCatalogConfig,
         tableFormat,
         configuration);
+  }
+
+  /**
+   * Returns an implementation class for {@link CatalogAccessControlPolicySyncClient} that'll be
+   * used for fetching / syncing policies from / to catalog
+   *
+   * @param catalogConfig configuration for the catalog
+   * @param configuration hadoop configuration
+   */
+  public CatalogAccessControlPolicySyncClient createCatalogPolicySyncClient(
+      ExternalCatalogConfig catalogConfig, Configuration configuration) {
+    return ReflectionUtils.createInstanceOfClass(
+        catalogConfig.getCatalogPolicySyncClientImpl(), catalogConfig, configuration);
   }
 
   private static <T> T findInstanceByCatalogType(
