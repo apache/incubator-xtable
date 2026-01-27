@@ -21,12 +21,14 @@ package org.apache.xtable.hudi;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.inject.Singleton;
 
 import org.apache.avro.Schema;
 
+import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
@@ -47,14 +49,20 @@ import org.apache.xtable.spi.extractor.SourcePartitionSpecExtractor;
  */
 @Singleton
 public class HudiTableExtractor {
+  private static final Set<String> HUDI_METADATA_FIELDS =
+      HoodieRecord.HOODIE_META_COLUMNS.stream().collect(Collectors.toSet());
+
   private final HudiSchemaExtractor schemaExtractor;
   private final SourcePartitionSpecExtractor partitionSpecExtractor;
+  private final boolean omitMetadataFields;
 
   public HudiTableExtractor(
       HudiSchemaExtractor schemaExtractor,
-      SourcePartitionSpecExtractor sourcePartitionSpecExtractor) {
+      SourcePartitionSpecExtractor sourcePartitionSpecExtractor,
+      boolean omitMetadataFields) {
     this.schemaExtractor = schemaExtractor;
     this.partitionSpecExtractor = sourcePartitionSpecExtractor;
+    this.omitMetadataFields = omitMetadataFields;
   }
 
   public InternalTable table(HoodieTableMetaClient metaClient, HoodieInstant commit) {
@@ -70,6 +78,7 @@ public class HudiTableExtractor {
               "Failed to convert table %s schema", metaClient.getTableConfig().getTableName()),
           e);
     }
+    canonicalSchema = omitMetadataFieldsIfEnabled(canonicalSchema, omitMetadataFields);
     List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(canonicalSchema);
     List<InternalField> recordKeyFields = getRecordKeyFields(metaClient, canonicalSchema);
     if (!recordKeyFields.isEmpty()) {
@@ -89,6 +98,21 @@ public class HudiTableExtractor {
         .latestCommitTime(HudiInstantUtils.parseFromInstantTime(commit.getTimestamp()))
         .latestMetdataPath(metaClient.getMetaPath().toString())
         .build();
+  }
+
+  static InternalSchema omitMetadataFieldsIfEnabled(
+      InternalSchema schema, boolean omitMetadataFields) {
+    if (!omitMetadataFields || schema.getFields() == null || schema.getFields().isEmpty()) {
+      return schema;
+    }
+    List<InternalField> filteredFields =
+        schema.getFields().stream()
+            .filter(field -> !HUDI_METADATA_FIELDS.contains(field.getName()))
+            .collect(Collectors.toList());
+    if (filteredFields.size() == schema.getFields().size()) {
+      return schema;
+    }
+    return schema.toBuilder().fields(filteredFields).build();
   }
 
   private List<InternalField> getRecordKeyFields(

@@ -36,6 +36,11 @@ public class XTableSyncConfig extends HoodieSyncConfig implements Serializable {
           .defaultValue(24 * 7)
           .withDocumentation("Retention in hours for metadata in target table.");
 
+  public static final ConfigProperty<Boolean> XTABLE_OMIT_METADATA_FIELDS =
+      ConfigProperty.key("hoodie.xtable.sync.omit_metadata_fields")
+          .defaultValue(false)
+          .withDocumentation("Whether to omit the hudi metadata fields in the target table.");
+
   public XTableSyncConfig(Properties props) {
     super(props);
   }
