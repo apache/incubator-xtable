@@ -225,7 +225,7 @@ io.prometheus:simpleclient_common:0.8.0
 io.prometheus:simpleclient_dropwizard:0.8.0
 io.prometheus:simpleclient_httpserver:0.8.0
 io.prometheus:simpleclient_pushgateway:0.8.0
-org.apache.avro:avro:1.11.4
+org.apache.avro:avro:1.12.0
 org.apache.curator:curator-client:2.7.1
 org.apache.curator:curator-framework:2.7.1
 org.apache.curator:curator-recipes:2.7.1
@@ -233,9 +233,9 @@ org.apache.hudi:hudi-client-common:0.14.0
 org.apache.hudi:hudi-common:0.14.0
 org.apache.hudi:hudi-timeline-service:0.14.0
 org.apache.hudi:hudi-sync-common:0.14.0
-org.apache.iceberg:iceberg-api:1.4.2
-org.apache.iceberg:iceberg-core:1.4.2
-org.apache.iceberg:iceberg-parquet:1.4.2
+org.apache.iceberg:iceberg-api:1.9.2
+org.apache.iceberg:iceberg-core:1.9.2
+org.apache.iceberg:iceberg-parquet:1.9.2
 org.apache.logging.log4j:log4j-api:2.22.0
 org.apache.logging.log4j:log4j-1.2-api:2.22.0
 org.roaringbitmap:RoaringBitmap:0.9.47

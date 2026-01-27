@@ -72,20 +72,23 @@
     },
     {
       "name": "bytes_field",
-      "type": "bytes",
-      "default": ""
+      "type": ["null", "bytes"],
+      "default": null
     },
     {
       "name": "decimal_field",
-      "type": {
-        "type": "fixed",
-        "name": "decimal_field_testing",
-        "size": 10,
-        "logicalType": "decimal",
-        "precision": 20,
-        "scale": 2
-      },
-      "default": "\u0000"
+      "type": [
+        "null",
+        {
+          "type": "fixed",
+          "name": "decimal_field_testing",
+          "size": 10,
+          "logicalType": "decimal",
+          "precision": 20,
+          "scale": 2
+        }
+      ],
+      "default": null
     },
     {
       "name": "nested_record",

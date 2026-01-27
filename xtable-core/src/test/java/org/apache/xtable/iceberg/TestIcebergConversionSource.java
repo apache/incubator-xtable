@@ -37,6 +37,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import org.apache.iceberg.*;
 import org.apache.iceberg.data.GenericRecord;
@@ -61,6 +63,7 @@ import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 
+@Execution(ExecutionMode.SAME_THREAD)
 class TestIcebergConversionSource {
 
   private IcebergTableManager tableManager;
@@ -432,7 +435,7 @@ class TestIcebergConversionSource {
     DataWriter<GenericRecord> dataWriter =
         Parquet.writeData(table.io().newOutputFile(filePath))
             .schema(csSchema)
-            .createWriterFunc(GenericParquetWriter::buildWriter)
+            .createWriterFunc(GenericParquetWriter::create)
             .overwrite()
             .withSpec(table.spec())
             .withPartition(partitionInfo)
