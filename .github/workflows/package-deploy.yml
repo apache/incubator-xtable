@@ -33,8 +33,8 @@ jobs:
       - name: Parse Version Number
         run: echo "VERSION=$(echo ${{ github.event.release.tag_name }} | sed -e s/v//)" >> $GITHUB_ENV
       - name: Set Version
-        run: mvn versions:set -DnewVersion="$VERSION"
+        run: ./mvnw versions:set -DnewVersion="$VERSION"
       - name: Publish package
-        run: mvn -ntp --batch-mode deploy -DskipTests
+        run: ./mvnw -ntp --batch-mode deploy -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

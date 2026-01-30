@@ -21,7 +21,7 @@ CURRENT_DIR="$( cd "$(dirname "$0")" ; pwd -P )"
 XTABLE_HOME="$( cd "$(dirname "$CURRENT_DIR")" ; pwd -P )"
 cd $XTABLE_HOME
 
-mvn install -am -pl xtable-core -DskipTests -T 2
+./mvnw install -am -pl xtable-core -DskipTests -T 2
 mkdir -p demo/jars
 cp xtable-hudi-support/xtable-hudi-support-utils/target/xtable-hudi-support-utils-0.2.0-SNAPSHOT.jar demo/jars
 cp xtable-api/target/xtable-api-0.2.0-SNAPSHOT.jar demo/jars
