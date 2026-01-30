@@ -16,14 +16,14 @@
 
 # syntax=docker/dockerfile:1
 
-FROM maven:3.9.8-eclipse-temurin-11-focal as package
+FROM eclipse-temurin:17-jdk-jammy as package
 
 WORKDIR /build
 
 COPY ./ ./
 RUN --mount=type=cache,target=/root/.m2 \
-    MAVEN_OPTS=-Dorg.slf4j.simpleLogger.defaultLogLevel=warn mvn  -B  package -DskipTests 
-RUN mv xtable-utilities/target/xtable-utilities_2.12-$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)-bundled.jar target/app.jar
+    MAVEN_OPTS=-Dorg.slf4j.simpleLogger.defaultLogLevel=warn ./mvnw -B -am -pl xtable-utilities package -DskipTests
+RUN mv xtable-utilities/target/xtable-utilities_2.12-$(./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout)-bundled.jar target/app.jar
 
 FROM eclipse-temurin:17-jre-jammy AS final
 
@@ -48,7 +48,7 @@ COPY --from=package build/target/app.jar ./app.jar
 ENTRYPOINT [ \
             "java", \
             "--add-opens=java.base/sun.nio.hb=ALL-UNNAMED", \
-            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED", \      
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED", \
             "--add-opens=java.base/java.nio=ALL-UNNAMED", \     
             "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED", \
             "--add-opens=java.base/java.util=ALL-UNNAMED", \
