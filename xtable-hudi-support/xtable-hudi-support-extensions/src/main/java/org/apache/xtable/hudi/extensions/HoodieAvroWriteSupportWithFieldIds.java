@@ -33,7 +33,6 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.iceberg.mapping.MappedField;
 import org.apache.iceberg.mapping.MappedFields;
 import org.apache.iceberg.mapping.NameMapping;
-import org.apache.iceberg.parquet.ParquetSchemaUtil;
 
 import org.apache.xtable.hudi.idtracking.IdTracker;
 import org.apache.xtable.hudi.idtracking.models.IdMapping;
@@ -88,7 +87,7 @@ public class HoodieAvroWriteSupportWithFieldIds extends HoodieAvroWriteSupport {
                       idMappings.stream()
                           .map(HoodieAvroWriteSupportWithFieldIds::toMappedField)
                           .collect(Collectors.toList()));
-              return ParquetSchemaUtil.applyNameMapping(messageType, nameMapping);
+              return ApplyNameMappingForParquet.applyNameMapping(messageType, nameMapping);
             })
         .orElse(messageType);
   }
