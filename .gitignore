@@ -47,3 +47,6 @@ my_config_catalog.yaml
 
 # REST generated models
 spec/generated
+
+# SDKMan
+.sdkmanrc
