@@ -206,7 +206,9 @@ public class TestIcebergSync {
         mockPartitionSpecExtractor,
         mockPartitionSpecSync,
         IcebergDataFileUpdatesSync.of(
-            mockColumnStatsConverter, IcebergPartitionValueConverter.getInstance()),
+            mockColumnStatsConverter,
+            IcebergPartitionValueConverter.getInstance(),
+            CONFIGURATION),
         IcebergTableManager.of(CONFIGURATION));
   }
 
