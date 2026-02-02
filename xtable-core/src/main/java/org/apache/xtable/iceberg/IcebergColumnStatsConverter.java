@@ -67,13 +67,13 @@ public class IcebergColumnStatsConverter {
           valueCounts.put(fieldId, columnStats.getNumValues());
           nullValueCounts.put(fieldId, columnStats.getNumNulls());
           Type fieldType = icebergField.type();
-          if (columnStats.getRange().getMinValue() != null) {
-            lowerBounds.put(
-                fieldId, Conversions.toByteBuffer(fieldType, columnStats.getRange().getMinValue()));
+          Object minValue = normalizeStatValue(fieldType, columnStats.getRange().getMinValue());
+          if (minValue != null) {
+            lowerBounds.put(fieldId, Conversions.toByteBuffer(fieldType, minValue));
           }
-          if (columnStats.getRange().getMaxValue() != null) {
-            upperBounds.put(
-                fieldId, Conversions.toByteBuffer(fieldType, columnStats.getRange().getMaxValue()));
+          Object maxValue = normalizeStatValue(fieldType, columnStats.getRange().getMaxValue());
+          if (maxValue != null) {
+            upperBounds.put(fieldId, Conversions.toByteBuffer(fieldType, maxValue));
           }
         });
     return new Metrics(
@@ -129,5 +129,19 @@ public class IcebergColumnStatsConverter {
       return convertedValue.toString();
     }
     return convertedValue;
+  }
+
+  private Object normalizeStatValue(Type fieldType, Object value) {
+    if (value == null || !(value instanceof Number)) {
+      return value;
+    }
+    switch (fieldType.typeId()) {
+      case FLOAT:
+        return ((Number) value).floatValue();
+      case DOUBLE:
+        return ((Number) value).doubleValue();
+      default:
+        return value;
+    }
   }
 }
