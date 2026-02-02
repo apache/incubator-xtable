@@ -45,16 +45,11 @@ import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.spi.extractor.ConversionSource;
 
-@Builder
 @Log4j2
 public class ParquetConversionSource implements ConversionSource<Long> {
 
   private static final ParquetSchemaExtractor schemaExtractor =
       ParquetSchemaExtractor.getInstance();
-  private static final ParquetMetadataExtractor metadataExtractor =
-      ParquetMetadataExtractor.getInstance();
-  private static final ParquetDataManager parquetDataManagerExtractor =
-      ParquetDataManager.getInstance();
 
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
@@ -67,18 +62,24 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   private final String tableName;
   private final String basePath;
   @NonNull private final Configuration hadoopConf;
+  private final ParquetDataManager parquetDataManager;
 
-  private List<LocatedFileStatus> parquetFiles;
-
-  // helper method to ensure files are loaded once
-  private List<LocatedFileStatus> getOrLoadParquetFiles() {
-    if (this.parquetFiles == null) {
-      this.parquetFiles = parquetDataManagerExtractor.getParquetFiles(hadoopConf, basePath);
-    }
-    return this.parquetFiles;
+  @Builder
+  ParquetConversionSource(
+      String tableName,
+      String basePath,
+      @NonNull Configuration hadoopConf,
+      ParquetPartitionValueExtractor partitionValueExtractor,
+      PathBasedPartitionSpecExtractor partitionSpecExtractor) {
+    this.tableName = tableName;
+    this.basePath = basePath;
+    this.hadoopConf = hadoopConf;
+    this.partitionValueExtractor = partitionValueExtractor;
+    this.partitionSpecExtractor = partitionSpecExtractor;
+    this.parquetDataManager = new ParquetDataManager(hadoopConf, basePath);
   }
 
-  private InternalTable createInternalTableFromFile(ParquetFileConfig latestFile) {
+  private InternalTable createInternalTableFromFile(ParquetFileInfo latestFile) {
     ParquetMetadata parquetMetadata =
         parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.getPath());
     MessageType parquetSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
@@ -103,13 +104,12 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   @Override
   public InternalTable getTable(Long modificationTime) {
     // get parquetFile at specific time modificationTime
-    LocatedFileStatus parquetFile =
-        parquetDataManagerExtractor.getParquetDataFileAt(getOrLoadParquetFiles(), modificationTime);
-    ParquetFileConfig file = parquetDataManagerExtractor.getConfigFromFile(parquetFile, hadoopConf);
+    LocatedFileStatus parquetFile = parquetDataManager.getParquetDataFileAt(modificationTime);
+    ParquetFileInfo file = new ParquetFileInfo(hadoopConf, parquetFile);
     return createInternalTableFromFile(file);
   }
 
-  private Stream<InternalDataFile> getInternalDataFiles(Stream<ParquetFileConfig> parquetFiles) {
+  private Stream<InternalDataFile> getInternalDataFiles(Stream<ParquetFileInfo> parquetFiles) {
     return parquetFiles.map(
         file -> {
           ParquetMetadata metadata =
@@ -130,7 +130,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         });
   }
 
-  private InternalDataFile createInternalDataFileFromParquetFile(ParquetFileConfig parquetFile) {
+  private InternalDataFile createInternalDataFileFromParquetFile(ParquetFileInfo parquetFile) {
     return InternalDataFile.builder()
         .physicalPath(parquetFile.getPath().toString())
         .partitionValues(
@@ -155,15 +155,11 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   @Override
   public TableChange getTableChangeForCommit(Long modificationTime) {
     Set<InternalDataFile> addedInternalDataFiles = new HashSet<>();
-
-    List<ParquetFileConfig> filesMetadata =
-        parquetDataManagerExtractor.getParquetFilesMetadataAfterTime(
-            hadoopConf, getOrLoadParquetFiles(), modificationTime);
-    List<ParquetFileConfig> tableChangesAfterMetadata =
-        parquetDataManagerExtractor.getParquetFilesMetadataAfterTime(
-            hadoopConf, getOrLoadParquetFiles(), modificationTime);
-    InternalTable internalTable = getMostRecentTableConfig(tableChangesAfterMetadata.stream());
-    for (ParquetFileConfig fileMetadata : filesMetadata) {
+    List<ParquetFileInfo> tableChangesAfterModificationTime =
+        parquetDataManager.getParquetFilesMetadataAfterTime(hadoopConf, modificationTime);
+    InternalTable internalTable =
+        getMostRecentTableConfig(tableChangesAfterModificationTime.stream());
+    for (ParquetFileInfo fileMetadata : tableChangesAfterModificationTime) {
       InternalDataFile currentDataFile = createInternalDataFileFromParquetFile(fileMetadata);
       addedInternalDataFiles.add(currentDataFile);
     }
@@ -171,55 +167,46 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     return TableChange.builder()
         .sourceIdentifier(
             getCommitIdentifier(
-                parquetDataManagerExtractor
-                    .getMostRecentParquetFile(getOrLoadParquetFiles(), hadoopConf)
-                    .getModificationTime()))
+                parquetDataManager.getMostRecentParquetFile().getModificationTime()))
         .tableAsOfChange(internalTable)
         .filesDiff(InternalFilesDiff.builder().filesAdded(addedInternalDataFiles).build())
         .build();
   }
 
-  private InternalTable getMostRecentTable(
-      List<LocatedFileStatus> parquetFiles, Configuration conf) {
-    ParquetFileConfig latestFile =
-        parquetDataManagerExtractor.getMostRecentParquetFile(parquetFiles, conf);
+  private InternalTable getMostRecentTable() {
+    ParquetFileInfo latestFile = parquetDataManager.getMostRecentParquetFile();
     return createInternalTableFromFile(latestFile);
   }
 
-  private InternalTable getMostRecentTableConfig(Stream<ParquetFileConfig> parquetFiles) {
-    ParquetFileConfig latestFile =
-        parquetDataManagerExtractor.getMostRecentParquetFileConfig(parquetFiles);
+  private InternalTable getMostRecentTableConfig(Stream<ParquetFileInfo> parquetFiles) {
+    ParquetFileInfo latestFile = parquetDataManager.getMostRecentParquetFileConfig(parquetFiles);
     return createInternalTableFromFile(latestFile);
   }
 
   @Override
   public InternalTable getCurrentTable() {
-    return getMostRecentTable(getOrLoadParquetFiles(), hadoopConf);
+    return getMostRecentTable();
   }
 
   @Override
   public InternalSnapshot getCurrentSnapshot() {
     Stream<InternalDataFile> internalDataFiles =
-        getInternalDataFiles(
-            parquetDataManagerExtractor.getConfigsFromStream(getOrLoadParquetFiles(), hadoopConf));
-    InternalTable table = getMostRecentTable(getOrLoadParquetFiles(), hadoopConf);
+        getInternalDataFiles(parquetDataManager.getCurrentFileInfo());
+    InternalTable table = getMostRecentTable();
     return InternalSnapshot.builder()
         .table(table)
         .sourceIdentifier(
             getCommitIdentifier(
-                parquetDataManagerExtractor
-                    .getMostRecentParquetFile(getOrLoadParquetFiles(), hadoopConf)
-                    .getModificationTime()))
+                parquetDataManager.getMostRecentParquetFile().getModificationTime()))
         .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
         .build();
   }
 
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant timeInMillis) {
-    Stream<ParquetFileConfig> parquetFilesMetadata =
-        parquetDataManagerExtractor.getConfigsFromStream(getOrLoadParquetFiles(), hadoopConf);
+    Stream<ParquetFileInfo> parquetFilesMetadata = parquetDataManager.getCurrentFileInfo();
     LongSummaryStatistics stats =
-        parquetFilesMetadata.mapToLong(ParquetFileConfig::getModificationTime).summaryStatistics();
+        parquetFilesMetadata.mapToLong(ParquetFileInfo::getModificationTime).summaryStatistics();
 
     if (stats.getCount() == 0) {
       log.warn("No parquet files found in table {}. Incremental sync is not possible.", tableName);

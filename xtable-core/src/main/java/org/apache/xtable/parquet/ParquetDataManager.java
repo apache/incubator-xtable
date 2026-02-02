@@ -26,12 +26,13 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.hadoop.util.functional.RemoteIterators;
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 
 import org.apache.xtable.exception.ReadException;
 
@@ -42,59 +43,37 @@ import org.apache.xtable.exception.ReadException;
  * parquet files and filtering the files based on the modification times.
  */
 @Log4j2
+@RequiredArgsConstructor
 public class ParquetDataManager {
-  public static final ParquetDataManager INSTANCE = new ParquetDataManager();
+  private final Configuration hadoopConf;
+  private final String basePath;
 
-  public static ParquetDataManager getInstance() {
-    return INSTANCE;
-  }
+  @Getter(lazy = true)
+  private final List<LocatedFileStatus> parquetFiles = loadParquetFiles(hadoopConf, basePath);
 
-  public ParquetFileConfig getMostRecentParquetFile(
-      List<LocatedFileStatus> parquetFiles, Configuration conf) {
+  ParquetFileInfo getMostRecentParquetFile() {
     LocatedFileStatus file =
-        parquetFiles.stream()
+        getParquetFiles().stream()
             .max(Comparator.comparing(LocatedFileStatus::getModificationTime))
             .orElseThrow(() -> new IllegalStateException("No files found"));
-    return getConfigFromFile(file, conf);
+    return new ParquetFileInfo(hadoopConf, file);
   }
 
-  public ParquetFileConfig getMostRecentParquetFileConfig(Stream<ParquetFileConfig> parquetFiles) {
+  ParquetFileInfo getMostRecentParquetFileConfig(Stream<ParquetFileInfo> parquetFiles) {
     return parquetFiles
-        .max(Comparator.comparing(ParquetFileConfig::getModificationTime))
+        .max(Comparator.comparing(ParquetFileInfo::getModificationTime))
         .orElseThrow(() -> new IllegalStateException("No files found"));
   }
 
-  public LocatedFileStatus getParquetDataFileAt(
-      List<LocatedFileStatus> parquetFiles, long targetTime) {
+  public LocatedFileStatus getParquetDataFileAt(long targetTime) {
 
-    return parquetFiles.stream()
+    return getParquetFiles().stream()
         .filter(file -> file.getModificationTime() >= targetTime)
         .findFirst()
         .orElseThrow(() -> new IllegalStateException("No file found at or after " + targetTime));
   }
 
-  public ParquetFileConfig getConfigFromFile(LocatedFileStatus file, Configuration conf) {
-
-    Path path = file.getPath();
-
-    ParquetMetadata metadata =
-        ParquetMetadataExtractor.getInstance().readParquetMetadata(conf, path);
-
-    return ParquetFileConfig.builder()
-        .schema(metadata.getFileMetaData().getSchema())
-        .metadata(metadata)
-        .path(path)
-        .size(file.getLen())
-        .modificationTime(file.getModificationTime())
-        .rowGroupIndex(metadata.getBlocks().size())
-        .codec(
-            metadata.getBlocks().isEmpty()
-                ? null
-                : metadata.getBlocks().get(0).getColumns().get(0).getCodec())
-        .build();
-  }
-
-  public List<LocatedFileStatus> getParquetFiles(Configuration hadoopConf, String basePath) {
+  private List<LocatedFileStatus> loadParquetFiles(Configuration hadoopConf, String basePath) {
     try {
       FileSystem fs = FileSystem.get(hadoopConf);
       URI uriBasePath = new URI(basePath);
@@ -108,49 +87,15 @@ public class ParquetDataManager {
     }
   }
 
-  public Stream<ParquetFileConfig> getConfigsFromStream(
-      List<LocatedFileStatus> fileStream, Configuration conf) {
-
-    return fileStream.stream()
-        .map(
-            fileStatus -> {
-              Path path = fileStatus.getPath();
-
-              ParquetMetadata metadata =
-                  ParquetMetadataExtractor.getInstance().readParquetMetadata(conf, path);
-
-              return ParquetFileConfig.builder()
-                  .schema(metadata.getFileMetaData().getSchema())
-                  .metadata(metadata)
-                  .path(path)
-                  .size(fileStatus.getLen())
-                  .modificationTime(fileStatus.getModificationTime())
-                  .rowGroupIndex(metadata.getBlocks().size())
-                  .codec(
-                      metadata.getBlocks().isEmpty()
-                          ? null
-                          : metadata.getBlocks().get(0).getColumns().get(0).getCodec())
-                  .build();
-            });
+  Stream<ParquetFileInfo> getCurrentFileInfo() {
+    return getParquetFiles().stream()
+        .map(fileStatus -> new ParquetFileInfo(hadoopConf, fileStatus));
   }
 
-  public List<ParquetFileConfig> getParquetFilesMetadataInRange(
-      Configuration conf, Stream<LocatedFileStatus> parquetFiles, long startTime, long endTime) {
-
-    return parquetFiles
-        .filter(
-            file ->
-                file.getModificationTime() >= startTime && file.getModificationTime() <= endTime)
-        .map(file -> new ParquetFileConfig(conf, file))
-        .collect(Collectors.toList());
-  }
-
-  public List<ParquetFileConfig> getParquetFilesMetadataAfterTime(
-      Configuration conf, List<LocatedFileStatus> parquetFiles, long syncTime) {
-
-    return parquetFiles.stream()
+  List<ParquetFileInfo> getParquetFilesMetadataAfterTime(Configuration conf, long syncTime) {
+    return getParquetFiles().stream()
         .filter(file -> file.getModificationTime() >= syncTime)
-        .map(file -> new ParquetFileConfig(conf, file))
+        .map(file -> new ParquetFileInfo(conf, file))
         .collect(Collectors.toList());
   }
 }

@@ -149,8 +149,6 @@ public class ITParquetDataManager {
     ParquetConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
 
-    // long newModifTime = System.currentTimeMillis() - 50000;
-
     for (String partition : newPartitions) {
       org.apache.hadoop.fs.Path partitionPath =
           new org.apache.hadoop.fs.Path(outputPath, partition);
@@ -162,11 +160,9 @@ public class ITParquetDataManager {
         if (fileStatus.getModificationTime() > newModifTime) {
           fs.setTimes(fileStatus.getPath(), newModifTime, -1);
         } else {
-
           fs.setTimes(fileStatus.getPath(), targetModifTime, -1);
         }
       }
-
       fs.setTimes(partitionPath, newModifTime, -1);
     }
 
@@ -189,10 +185,9 @@ public class ITParquetDataManager {
 
   private void updateModificationTimeRecursive(
       FileSystem fs, org.apache.hadoop.fs.Path path, long time) throws IOException {
-    org.apache.hadoop.fs.RemoteIterator<org.apache.hadoop.fs.LocatedFileStatus> it =
-        fs.listFiles(path, true);
+    RemoteIterator<LocatedFileStatus> it = fs.listFiles(path, true);
     while (it.hasNext()) {
-      org.apache.hadoop.fs.LocatedFileStatus status = it.next();
+      LocatedFileStatus status = it.next();
       if (status.getPath().getName().endsWith(".parquet")) {
         fs.setTimes(status.getPath(), time, -1);
       }
