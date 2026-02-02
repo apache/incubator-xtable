@@ -203,14 +203,18 @@ public class HudiFileStatsExtractor {
     if (field.getSchema().getDataType() == InternalType.DECIMAL) {
       int scale =
           (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
-      minValue =
-          minValue instanceof ByteBuffer
-              ? convertBytesToBigDecimal((ByteBuffer) minValue, scale)
-              : ((BigDecimal) minValue).setScale(scale, RoundingMode.UNNECESSARY);
-      maxValue =
-          maxValue instanceof ByteBuffer
-              ? convertBytesToBigDecimal((ByteBuffer) maxValue, scale)
-              : ((BigDecimal) maxValue).setScale(scale, RoundingMode.UNNECESSARY);
+      if (minValue != null) {
+        minValue =
+            minValue instanceof ByteBuffer
+                ? convertBytesToBigDecimal((ByteBuffer) minValue, scale)
+                : ((BigDecimal) minValue).setScale(scale, RoundingMode.UNNECESSARY);
+      }
+      if (maxValue != null) {
+        maxValue =
+            maxValue instanceof ByteBuffer
+                ? convertBytesToBigDecimal((ByteBuffer) maxValue, scale)
+                : ((BigDecimal) maxValue).setScale(scale, RoundingMode.UNNECESSARY);
+      }
     }
     return getColumnStatFromValues(
         minValue,
