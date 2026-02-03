@@ -696,7 +696,7 @@ public class ITHudiConversionSource {
     PathBasedPartitionSpecExtractor partitionSpecExtractor =
         new ConfigurationBasedPartitionSpecExtractor(
             HudiSourceConfig.parsePartitionFieldSpecs(xTablePartitionConfig));
-    return new HudiConversionSource(hoodieTableMetaClient, partitionSpecExtractor);
+    return new HudiConversionSource(hoodieTableMetaClient, partitionSpecExtractor, false);
   }
 
   private boolean checkIfNewFileGroupIsAdded(String activePath, TableChange tableChange) {
