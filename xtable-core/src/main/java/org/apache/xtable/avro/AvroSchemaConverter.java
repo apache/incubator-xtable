@@ -186,12 +186,19 @@ public class AvroSchemaConverter {
         List<InternalField> subFields = new ArrayList<>(schema.getFields().size());
         for (Schema.Field avroField : schema.getFields()) {
           IdMapping idMapping = fieldNameToIdMapping.get(avroField.name());
+          String fieldDoc = avroField.doc();
+          if (fieldDoc == null) {
+            fieldDoc = avroField.getProp("comment");
+          }
           InternalSchema subFieldSchema =
               toInternalSchema(
                   avroField.schema(),
                   SchemaUtils.getFullyQualifiedPath(parentPath, avroField.name()),
                   getChildIdMap(idMapping));
           Object defaultValue = getDefaultValue(avroField);
+          if (fieldDoc != null && subFieldSchema.getComment() == null) {
+            subFieldSchema = InternalSchema.builderFrom(subFieldSchema).comment(fieldDoc).build();
+          }
           subFields.add(
               InternalField.builder()
                   .parentPath(parentPath)
