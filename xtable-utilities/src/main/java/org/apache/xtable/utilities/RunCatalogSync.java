@@ -186,12 +186,13 @@ public class RunCatalogSync {
                     .catalogConfig(catalogsById.get(targetCatalogTableIdentifier.getCatalogId()))
                     .build());
       }
+      SyncMode syncMode = getSyncMode();
       ConversionConfig conversionConfig =
           ConversionConfig.builder()
               .sourceTable(sourceTable)
               .targetTables(targetTables)
               .targetCatalogs(targetCatalogs)
-              .syncMode(SyncMode.INCREMENTAL)
+              .syncMode(syncMode)
               .build();
       List<String> tableFormats =
           Stream.concat(
@@ -214,6 +215,22 @@ public class RunCatalogSync {
         }
       }
     }
+  }
+
+  private static SyncMode getSyncMode() {
+    String value = System.getenv("SYNC_MODE");
+    if (value == null || value.trim().isEmpty()) {
+      return SyncMode.INCREMENTAL;
+    }
+    String normalized = value.trim().toUpperCase();
+    if ("FULL".equals(normalized)) {
+      return SyncMode.FULL;
+    }
+    if ("INCREMENTAL".equals(normalized)) {
+      return SyncMode.INCREMENTAL;
+    }
+    log.warn("Unsupported SYNC_MODE '{}', defaulting to INCREMENTAL.", value);
+    return SyncMode.INCREMENTAL;
   }
 
   private static boolean hasSyncFailures(Map<String, SyncResult> syncResults) {
