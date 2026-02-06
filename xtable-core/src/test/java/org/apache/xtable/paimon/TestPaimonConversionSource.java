@@ -18,7 +18,13 @@
  
 package org.apache.xtable.paimon;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -34,9 +40,11 @@ import org.junit.jupiter.api.io.TempDir;
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestPaimonTable;
 import org.apache.xtable.exception.ReadException;
+import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
@@ -98,7 +106,7 @@ public class TestPaimonConversionSource {
     InternalTable result = unpartitionedSource.getTable(snapshot);
 
     assertNotNull(result);
-    assertEquals("test_table", result.getName());
+    assertEquals("unpartitioned_table", result.getName());
     assertEquals(TableFormat.PAIMON, result.getTableFormat());
     assertNotNull(result.getReadSchema());
     assertEquals(DataLayoutStrategy.HIVE_STYLE_PARTITION, result.getLayoutStrategy());
@@ -165,38 +173,123 @@ public class TestPaimonConversionSource {
   }
 
   @Test
-  void testGetTableChangeForCommitThrowsUnsupportedOperationException() {
+  void testGetCommitsBacklogReturnsCommitsAfterLastSync() {
+    // Insert initial data to create first snapshot
+    testTable.insertRows(5);
+    Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(firstSnapshot);
+
+    // Insert more data to create second snapshot
     testTable.insertRows(3);
+    Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(secondSnapshot);
+    assertNotEquals(firstSnapshot.id(), secondSnapshot.id());
+
+    // Get commits backlog from first snapshot time
+    InstantsForIncrementalSync instantsForSync =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(firstSnapshot.timeMillis()))
+            .build();
+
+    CommitsBacklog<Snapshot> backlog = conversionSource.getCommitsBacklog(instantsForSync);
+
+    // Verify we get at least the second snapshot (may get more if insertRows creates multiple)
+    assertNotNull(backlog);
+    assertTrue(backlog.getCommitsToProcess().size() >= 1);
+
+    // Verify the last snapshot in the backlog is the second snapshot
+    assertEquals(
+        secondSnapshot.id(),
+        backlog.getCommitsToProcess().get(backlog.getCommitsToProcess().size() - 1).id());
+
+    // Verify the first snapshot is NOT in the list of commits to process
+    assertFalse(
+        backlog.getCommitsToProcess().stream()
+            .anyMatch(snapshot -> snapshot.id() == firstSnapshot.id()),
+        "First snapshot should not be in the backlog since we're syncing from that instant");
+    assertTrue(backlog.getInFlightInstants().isEmpty());
+  }
+
+  @Test
+  void testGetCommitsBacklogReturnsEmptyForFutureInstant() {
+    testTable.insertRows(5);
+
+    // Use a future instant
+    InstantsForIncrementalSync instantsForSync =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.now().plusSeconds(3600))
+            .build();
+
+    CommitsBacklog<Snapshot> backlog = conversionSource.getCommitsBacklog(instantsForSync);
+
+    // Verify no snapshots are returned
+    assertNotNull(backlog);
+    assertTrue(backlog.getCommitsToProcess().isEmpty());
+  }
+
+  @Test
+  void testGetTableChangeForCommitReturnsCorrectFilesDiff() {
+    // Insert initial data
+    testTable.insertRows(5);
+    Snapshot firstSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(firstSnapshot);
+
+    // Insert more data to create second snapshot
+    testTable.insertRows(3);
+    Snapshot secondSnapshot = paimonTable.snapshotManager().latestSnapshot();
+    assertNotNull(secondSnapshot);
+
+    // Get table change for second snapshot
+    TableChange tableChange = conversionSource.getTableChangeForCommit(secondSnapshot);
+
+    // Verify table change structure
+    assertNotNull(tableChange);
+    assertNotNull(tableChange.getFilesDiff());
+    assertNotNull(tableChange.getTableAsOfChange());
+    assertEquals(
+        Long.toString(secondSnapshot.commitIdentifier()), tableChange.getSourceIdentifier());
+
+    // For append-only table, we should have added files and no removed files
+    assertTrue(tableChange.getFilesDiff().getFilesAdded().size() > 0);
+  }
+
+  @Test
+  void testIsIncrementalSyncSafeFromReturnsTrueForValidInstant() {
+    testTable.insertRows(5);
+    Snapshot snapshot = paimonTable.snapshotManager().latestSnapshot();
+    Instant snapshotTime = Instant.ofEpochMilli(snapshot.timeMillis());
+
+    assertTrue(conversionSource.isIncrementalSyncSafeFrom(snapshotTime));
+  }
+
+  @Test
+  void testIsIncrementalSyncSafeFromReturnsFalseForFutureInstant() {
+    testTable.insertRows(5);
     Snapshot snapshot = paimonTable.snapshotManager().latestSnapshot();
 
-    UnsupportedOperationException exception =
-        assertThrows(
-            UnsupportedOperationException.class,
-            () -> conversionSource.getTableChangeForCommit(snapshot));
+    // Use an instant way in the future (well after the snapshot)
+    Instant futureInstant = Instant.ofEpochMilli(snapshot.timeMillis()).plusSeconds(3600);
 
-    assertEquals("Incremental Sync is not supported yet.", exception.getMessage());
+    assertFalse(conversionSource.isIncrementalSyncSafeFrom(futureInstant));
   }
 
   @Test
-  void testGetCommitsBacklogThrowsUnsupportedOperationException() {
-    InstantsForIncrementalSync mockInstants =
-        InstantsForIncrementalSync.builder().lastSyncInstant(Instant.now()).build();
+  void testIsIncrementalSyncSafeFromReturnsFalseForEmptyTable() {
+    // Don't insert any data
+    Instant someInstant = Instant.now();
 
-    UnsupportedOperationException exception =
-        assertThrows(
-            UnsupportedOperationException.class,
-            () -> conversionSource.getCommitsBacklog(mockInstants));
-
-    assertEquals("Incremental Sync is not supported yet.", exception.getMessage());
+    assertFalse(conversionSource.isIncrementalSyncSafeFrom(someInstant));
   }
 
   @Test
-  void testIsIncrementalSyncSafeFromReturnsFalse() {
-    Instant testInstant = Instant.now();
+  void testIsIncrementalSyncSafeFromReturnsFalseForInstantBeforeFirstSnapshot() {
+    testTable.insertRows(5);
+    Snapshot snapshot = paimonTable.snapshotManager().latestSnapshot();
 
-    boolean result = conversionSource.isIncrementalSyncSafeFrom(testInstant);
+    Instant instantBeforeFirstSnapshot =
+        Instant.ofEpochMilli(snapshot.timeMillis()).minusSeconds(3600);
 
-    assertFalse(result);
+    assertFalse(conversionSource.isIncrementalSyncSafeFrom(instantBeforeFirstSnapshot));
   }
 
   @Test

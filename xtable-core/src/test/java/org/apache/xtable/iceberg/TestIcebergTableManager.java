@@ -40,12 +40,9 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableOperations;
-import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
-import org.apache.iceberg.mapping.MappingUtil;
-import org.apache.iceberg.mapping.NameMappingParser;
 
 public class TestIcebergTableManager {
   private static final String BASE_PATH = "file:///basePath/";
@@ -117,10 +114,7 @@ public class TestIcebergTableManager {
             any(),
             eq(PartitionSpec.unpartitioned()),
             eq(BASE_PATH),
-            eq(
-                Collections.singletonMap(
-                    TableProperties.DEFAULT_NAME_MAPPING,
-                    NameMappingParser.toJson(MappingUtil.create(schema))))))
+            eq(Collections.emptyMap())))
         .thenReturn(mockInitialTable);
     when(mockCatalog.loadTable(IDENTIFIER)).thenReturn(loadedTable);
 
@@ -164,14 +158,7 @@ public class TestIcebergTableManager {
     Schema schema = new Schema();
     PartitionSpec partitionSpec = PartitionSpec.unpartitioned();
     when(mockCatalog.createTable(
-            eq(IDENTIFIER),
-            any(),
-            any(),
-            eq(BASE_PATH),
-            eq(
-                Collections.singletonMap(
-                    TableProperties.DEFAULT_NAME_MAPPING,
-                    NameMappingParser.toJson(MappingUtil.create(schema))))))
+            eq(IDENTIFIER), any(), any(), eq(BASE_PATH), eq(Collections.emptyMap())))
         .thenThrow(new AlreadyExistsException("Table already exists"));
     when(mockCatalog.loadTable(IDENTIFIER)).thenReturn(mockTable);
 

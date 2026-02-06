@@ -43,4 +43,4 @@ jobs:
           cache: maven
 
       - name: Apache License Check
-        run: mvn apache-rat:check -B
+        run: ./mvnw apache-rat:check -B
