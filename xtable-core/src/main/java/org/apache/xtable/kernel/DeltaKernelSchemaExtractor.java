@@ -37,12 +37,14 @@ import io.delta.kernel.types.IntegerType;
 import io.delta.kernel.types.LongType;
 import io.delta.kernel.types.MapType;
 import io.delta.kernel.types.StringType;
+import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
 import io.delta.kernel.types.TimestampNTZType;
 import io.delta.kernel.types.TimestampType;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.delta.DeltaPartitionExtractor;
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
@@ -228,5 +230,123 @@ public class DeltaKernelSchemaExtractor {
         .metadata(metadata)
         .fields(fields)
         .build();
+  }
+
+  /**
+   * Converts an InternalSchema to Delta Kernel StructType.
+   *
+   * @param internalSchema the internal schema representation
+   * @return Delta Kernel StructType
+   */
+  public StructType fromInternalSchema(InternalSchema internalSchema) {
+    StructField[] fields =
+        internalSchema.getFields().stream()
+            .map(
+                field ->
+                    new StructField(
+                        field.getName(),
+                        convertFieldType(field),
+                        field.getSchema().isNullable(),
+                        getFieldMetadata(field.getSchema())))
+            .toArray(StructField[]::new);
+    return new StructType(Arrays.asList(fields));
+  }
+
+  /**
+   * Converts an InternalField to Delta Kernel DataType.
+   *
+   * @param field the internal field
+   * @return Delta Kernel DataType
+   */
+  private DataType convertFieldType(InternalField field) {
+    switch (field.getSchema().getDataType()) {
+      case STRING:
+      case ENUM:
+        return StringType.STRING;
+      case INT:
+        return IntegerType.INTEGER;
+      case LONG:
+        return LongType.LONG;
+      case BYTES:
+      case FIXED:
+      case UUID:
+        return BinaryType.BINARY;
+      case BOOLEAN:
+        return BooleanType.BOOLEAN;
+      case FLOAT:
+        return FloatType.FLOAT;
+      case DATE:
+        return DateType.DATE;
+      case TIMESTAMP:
+        return TimestampType.TIMESTAMP;
+      case TIMESTAMP_NTZ:
+        return TimestampNTZType.TIMESTAMP_NTZ;
+      case DOUBLE:
+        return DoubleType.DOUBLE;
+      case DECIMAL:
+        int precision =
+            (int)
+                field
+                    .getSchema()
+                    .getMetadata()
+                    .get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+        int scale =
+            (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
+        return new DecimalType(precision, scale);
+      case RECORD:
+        return fromInternalSchema(field.getSchema());
+      case MAP:
+        InternalField key =
+            field.getSchema().getFields().stream()
+                .filter(
+                    mapField ->
+                        InternalField.Constants.MAP_KEY_FIELD_NAME.equals(mapField.getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Invalid map schema"));
+        InternalField value =
+            field.getSchema().getFields().stream()
+                .filter(
+                    mapField ->
+                        InternalField.Constants.MAP_VALUE_FIELD_NAME.equals(mapField.getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Invalid map schema"));
+        return new MapType(
+            convertFieldType(key), convertFieldType(value), value.getSchema().isNullable());
+      case LIST:
+        InternalField element =
+            field.getSchema().getFields().stream()
+                .filter(
+                    arrayField ->
+                        InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(
+                            arrayField.getName()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Invalid array schema"));
+        return new ArrayType(convertFieldType(element), element.getSchema().isNullable());
+      default:
+        throw new NotSupportedException("Unsupported type: " + field.getSchema().getDataType());
+    }
+  }
+
+  /**
+   * Creates Delta Kernel FieldMetadata from InternalSchema.
+   *
+   * @param schema the internal schema
+   * @return Delta Kernel FieldMetadata
+   */
+  private FieldMetadata getFieldMetadata(InternalSchema schema) {
+    FieldMetadata.Builder metadataBuilder = FieldMetadata.builder();
+
+    // Handle UUID type
+    InternalType type = schema.getDataType();
+    if (type == InternalType.UUID) {
+      metadataBuilder.putString(InternalSchema.XTABLE_LOGICAL_TYPE, "uuid");
+    }
+
+    // Handle comment
+    if (schema.getComment() != null) {
+      metadataBuilder.putString("comment", schema.getComment());
+    }
+
+    return metadataBuilder.build();
   }
 }

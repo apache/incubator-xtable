@@ -18,6 +18,10 @@
  
 package org.apache.xtable.kernel;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,6 +39,11 @@ import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 
 public class TestDeltaKernelSchemaExtractor {
+
+  private final DeltaKernelSchemaExtractor extractor = DeltaKernelSchemaExtractor.getInstance();
+
+  // ========== Tests for toInternalSchema() ==========
+
   @Test
   public void testPrimitiveTypes() {
     Map<InternalSchema.MetadataKey, Object> decimalMetadata = new HashMap<>();
@@ -860,5 +869,146 @@ public class TestDeltaKernelSchemaExtractor {
     Assertions.assertEquals(
         internalSchema,
         DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+  }
+
+  // ========== Tests for fromInternalSchema() - New Tests ==========
+
+  @Test
+  public void testFromInternalSchemaSimpleTypes() {
+    // Create an InternalSchema with simple types
+    InternalField idField =
+        InternalField.builder()
+            .name("id")
+            .schema(
+                InternalSchema.builder()
+                    .name("integer")
+                    .dataType(InternalType.INT)
+                    .isNullable(false)
+                    .build())
+            .build();
+
+    InternalField nameField =
+        InternalField.builder()
+            .name("name")
+            .schema(
+                InternalSchema.builder()
+                    .name("string")
+                    .dataType(InternalType.STRING)
+                    .isNullable(true)
+                    .build())
+            .build();
+
+    InternalField activeField =
+        InternalField.builder()
+            .name("active")
+            .schema(
+                InternalSchema.builder()
+                    .name("boolean")
+                    .dataType(InternalType.BOOLEAN)
+                    .isNullable(false)
+                    .build())
+            .build();
+
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("record")
+            .dataType(InternalType.RECORD)
+            .fields(Arrays.asList(idField, nameField, activeField))
+            .build();
+
+    // Convert to Delta Kernel StructType
+    StructType deltaSchema = extractor.fromInternalSchema(internalSchema);
+
+    // Verify
+    assertNotNull(deltaSchema);
+    assertEquals(3, deltaSchema.fields().size());
+
+    // Check id field
+    StructField idDeltaField = deltaSchema.fields().get(0);
+    assertEquals("id", idDeltaField.getName());
+    assertTrue(idDeltaField.getDataType() instanceof IntegerType);
+    assertEquals(false, idDeltaField.isNullable());
+
+    // Check name field
+    StructField nameDeltaField = deltaSchema.fields().get(1);
+    assertEquals("name", nameDeltaField.getName());
+    assertTrue(nameDeltaField.getDataType() instanceof StringType);
+    assertEquals(true, nameDeltaField.isNullable());
+
+    // Check active field
+    StructField activeDeltaField = deltaSchema.fields().get(2);
+    assertEquals("active", activeDeltaField.getName());
+    assertTrue(activeDeltaField.getDataType() instanceof BooleanType);
+    assertEquals(false, activeDeltaField.isNullable());
+  }
+
+  @Test
+  public void testFromInternalSchemaWithUUID() {
+    // Create an InternalSchema with UUID type
+    InternalField uuidField =
+        InternalField.builder()
+            .name("userId")
+            .schema(
+                InternalSchema.builder()
+                    .name("binary")
+                    .dataType(InternalType.UUID)
+                    .isNullable(false)
+                    .build())
+            .build();
+
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("record")
+            .dataType(InternalType.RECORD)
+            .fields(Collections.singletonList(uuidField))
+            .build();
+
+    // Convert to Delta Kernel StructType
+    StructType deltaSchema = extractor.fromInternalSchema(internalSchema);
+
+    // Verify
+    assertNotNull(deltaSchema);
+    assertEquals(1, deltaSchema.fields().size());
+
+    StructField uuidDeltaField = deltaSchema.fields().get(0);
+    assertEquals("userId", uuidDeltaField.getName());
+    assertTrue(uuidDeltaField.getDataType() instanceof BinaryType);
+    assertEquals(false, uuidDeltaField.isNullable());
+
+    // Check metadata contains UUID marker
+    FieldMetadata metadata = uuidDeltaField.getMetadata();
+    assertTrue(metadata.contains(InternalSchema.XTABLE_LOGICAL_TYPE));
+    assertEquals("uuid", metadata.getString(InternalSchema.XTABLE_LOGICAL_TYPE));
+  }
+
+  @Test
+  public void testRoundTripConversion() {
+    // Create a Delta Kernel StructType
+    StructType originalDeltaSchema =
+        new StructType(
+            Arrays.asList(
+                new StructField("id", IntegerType.INTEGER, false),
+                new StructField("name", StringType.STRING, true),
+                new StructField("score", DoubleType.DOUBLE, false)));
+
+    // Convert to InternalSchema
+    InternalSchema internalSchema = extractor.toInternalSchema(originalDeltaSchema);
+
+    // Convert back to Delta Kernel StructType
+    StructType convertedDeltaSchema = extractor.fromInternalSchema(internalSchema);
+
+    // Verify structure matches
+    assertEquals(originalDeltaSchema.fields().size(), convertedDeltaSchema.fields().size());
+
+    for (int i = 0; i < originalDeltaSchema.fields().size(); i++) {
+      StructField original = originalDeltaSchema.fields().get(i);
+      StructField converted = convertedDeltaSchema.fields().get(i);
+
+      assertEquals(original.getName(), converted.getName());
+      assertEquals(
+          original.getDataType().getClass().getSimpleName(),
+          converted.getDataType().getClass().getSimpleName());
+      assertEquals(original.isNullable(), converted.isNullable());
+    }
   }
 }

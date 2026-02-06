@@ -747,6 +747,8 @@
                     <skip>${skipUTs}</skip>
                     <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     <trimStackTrace>false</trimStackTrace>
+                    <!-- Security manager argument removed for Java 11 compatibility -->
+                    <!-- For Java 17+, add -Djava.security.manager=allow in IDE run configuration if needed -->
                     <forkedProcessExitTimeoutInSeconds>120</forkedProcessExitTimeoutInSeconds>
                 </configuration>
             </plugin>
