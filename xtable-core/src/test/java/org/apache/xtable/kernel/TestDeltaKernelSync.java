@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.kernel;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,10 +36,8 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import io.delta.kernel.Scan;
 import io.delta.kernel.Snapshot;
 import io.delta.kernel.Table;
-import io.delta.kernel.data.ColumnarBatch;
 import io.delta.kernel.data.FilteredColumnarBatch;
 import io.delta.kernel.data.Row;
 import io.delta.kernel.defaults.engine.DefaultEngine;
@@ -64,14 +62,14 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
-import org.apache.xtable.model.storage.InternalFile;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.TableFormatSync;
 
 /**
- * Validates that Delta Kernel tables are properly created/updated using DeltaKernelConversionTarget.
- * Tests partitioning, schema evolution, and metadata sync without Spark SQL dependencies.
+ * Validates that Delta Kernel tables are properly created/updated using
+ * DeltaKernelConversionTarget. Tests partitioning, schema evolution, and metadata sync without
+ * Spark SQL dependencies.
  */
 public class TestDeltaKernelSync {
   private static final Random RANDOM = new Random();
@@ -104,10 +102,11 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled("Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. " +
-          "The bug prevents getLatestSnapshot() from working because _last_checkpoint file is not " +
-          "properly created by PostCommitHook.threadSafeInvoke(). This test will be re-enabled " +
-          "once Delta Kernel is upgraded to a version with the fix. See: [GitHub issue link]")
+  @Disabled(
+      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
+          + "The bug prevents getLatestSnapshot() from working because _last_checkpoint file is not "
+          + "properly created by PostCommitHook.threadSafeInvoke(). This test will be re-enabled "
+          + "once Delta Kernel is upgraded to a version with the fix. See: [GitHub issue link]")
   public void testCreateSnapshotControlFlow() throws Exception {
     InternalSchema schema1 = getInternalSchema();
     List<InternalField> fields2 = new ArrayList<>(schema1.getFields());
@@ -142,9 +141,10 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled("Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. " +
-          "This test calls validateDeltaTable() which uses getLatestSnapshot(). Will be re-enabled " +
-          "once Delta Kernel is upgraded to a version with the fix.")
+  @Disabled(
+      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
+          + "This test calls validateDeltaTable() which uses getLatestSnapshot(). Will be re-enabled "
+          + "once Delta Kernel is upgraded to a version with the fix.")
   public void testFileRemovalWithCheckpoint() throws Exception {
     // This test does 11 syncs to trigger checkpoint creation (happens at 10th commit)
     // and verifies that file removal works correctly after checkpoint exists
@@ -153,12 +153,8 @@ public class TestDeltaKernelSync {
     Files.createDirectories(checkpointTestPath);
 
     InternalSchema schema = getInternalSchema();
-    InternalTable checkpointTable = getInternalTable(
-        checkpointTableName,
-        checkpointTestPath,
-        schema,
-        null,
-        LAST_COMMIT_TIME);
+    InternalTable checkpointTable =
+        getInternalTable(checkpointTableName, checkpointTestPath, schema, null, LAST_COMMIT_TIME);
 
     DeltaKernelConversionTarget checkpointTarget =
         new DeltaKernelConversionTarget(
@@ -213,9 +209,10 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled("Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. " +
-          "This test calls getLatestSnapshot() directly and through validateDeltaTable(). Will be re-enabled " +
-          "once Delta Kernel is upgraded to a version with the fix.")
+  @Disabled(
+      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
+          + "This test calls getLatestSnapshot() directly and through validateDeltaTable(). Will be re-enabled "
+          + "once Delta Kernel is upgraded to a version with the fix.")
   public void testPrimitiveFieldPartitioning() throws Exception {
     InternalSchema schema = getInternalSchema();
     InternalPartitionField internalPartitionField =
@@ -273,9 +270,10 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled("Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. " +
-          "This test calls getLatestSnapshot() directly and through validateDeltaTable(). Will be re-enabled " +
-          "once Delta Kernel is upgraded to a version with the fix.")
+  @Disabled(
+      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
+          + "This test calls getLatestSnapshot() directly and through validateDeltaTable(). Will be re-enabled "
+          + "once Delta Kernel is upgraded to a version with the fix.")
   public void testMultipleFieldPartitioning() throws Exception {
     InternalSchema schema = getInternalSchema();
     InternalPartitionField internalPartitionField1 =
@@ -359,9 +357,10 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled("Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. " +
-          "This test calls validateDeltaTable() which uses getLatestSnapshot(). Will be re-enabled " +
-          "once Delta Kernel is upgraded to a version with the fix.")
+  @Disabled(
+      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
+          + "This test calls validateDeltaTable() which uses getLatestSnapshot(). Will be re-enabled "
+          + "once Delta Kernel is upgraded to a version with the fix.")
   public void testSourceTargetIdMapping() throws Exception {
     InternalSchema baseSchema = getInternalSchema();
     InternalTable sourceTable =
@@ -380,8 +379,7 @@ public class TestDeltaKernelSync {
         .syncSnapshot(Collections.singletonList(conversionTarget), sourceSnapshot1);
     Optional<String> mappedTargetId1 =
         conversionTarget.getTargetCommitIdentifier(sourceSnapshot1.getSourceIdentifier());
-    validateDeltaTable(
-        basePath, new HashSet<>(Arrays.asList(sourceDataFile1, sourceDataFile2)));
+    validateDeltaTable(basePath, new HashSet<>(Arrays.asList(sourceDataFile1, sourceDataFile2)));
     assertTrue(mappedTargetId1.isPresent());
     assertEquals("0", mappedTargetId1.get());
 
@@ -389,8 +387,7 @@ public class TestDeltaKernelSync {
         .syncSnapshot(Collections.singletonList(conversionTarget), sourceSnapshot2);
     Optional<String> mappedTargetId2 =
         conversionTarget.getTargetCommitIdentifier(sourceSnapshot2.getSourceIdentifier());
-    validateDeltaTable(
-        basePath, new HashSet<>(Arrays.asList(sourceDataFile2, sourceDataFile3)));
+    validateDeltaTable(basePath, new HashSet<>(Arrays.asList(sourceDataFile2, sourceDataFile3)));
     assertTrue(mappedTargetId2.isPresent());
     assertEquals("1", mappedTargetId2.get());
 
@@ -410,8 +407,7 @@ public class TestDeltaKernelSync {
     conversionTarget.beginSync(internalTable);
     TableSyncMetadata tableSyncMetadata =
         TableSyncMetadata.of(
-            internalTable.getLatestCommitTime(),
-            new ArrayList<>(snapshot.getPendingCommits()));
+            internalTable.getLatestCommitTime(), new ArrayList<>(snapshot.getPendingCommits()));
     conversionTarget.syncMetadata(tableSyncMetadata);
     conversionTarget.syncSchema(internalTable.getReadSchema());
     conversionTarget.syncPartitionSpec(internalTable.getPartitioningFields());
@@ -425,9 +421,10 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled("Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. " +
-          "This test calls getLatestSnapshot() directly multiple times. Will be re-enabled " +
-          "once Delta Kernel is upgraded to a version with the fix.")
+  @Disabled(
+      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
+          + "This test calls getLatestSnapshot() directly multiple times. Will be re-enabled "
+          + "once Delta Kernel is upgraded to a version with the fix.")
   public void testSchemaEvolution() throws Exception {
     // Start with initial schema
     InternalSchema schema1 = getInternalSchema();
@@ -472,14 +469,14 @@ public class TestDeltaKernelSync {
     assertNotNull(evolvedSchema);
     assertEquals(5, evolvedSchema.fields().size());
     assertTrue(
-        evolvedSchema.fields().stream()
-            .anyMatch(field -> field.getName().equals("double_field")));
+        evolvedSchema.fields().stream().anyMatch(field -> field.getName().equals("double_field")));
   }
 
   @Test
-  @Disabled("Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. " +
-          "Disabled as a precaution since it may internally call getLatestSnapshot(). Will be re-enabled " +
-          "once Delta Kernel is upgraded to a version with the fix.")
+  @Disabled(
+      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
+          + "Disabled as a precaution since it may internally call getLatestSnapshot(). Will be re-enabled "
+          + "once Delta Kernel is upgraded to a version with the fix.")
   public void testGetTableMetadata() throws Exception {
     InternalSchema schema = getInternalSchema();
     InternalTable table = getInternalTable(tableName, basePath, schema, null, LAST_COMMIT_TIME);
@@ -495,9 +492,10 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled("Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. " +
-          "This test calls validateDeltaTable() which uses getLatestSnapshot(). Will be re-enabled " +
-          "once Delta Kernel is upgraded to a version with the fix.")
+  @Disabled(
+      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
+          + "This test calls validateDeltaTable() which uses getLatestSnapshot(). Will be re-enabled "
+          + "once Delta Kernel is upgraded to a version with the fix.")
   public void testFileRemoval() throws Exception {
     InternalSchema schema = getInternalSchema();
     InternalTable table = getInternalTable(tableName, basePath, schema, null, LAST_COMMIT_TIME);
@@ -542,7 +540,8 @@ public class TestDeltaKernelSync {
 
       while (rows.hasNext()) {
         Row scanFileRow = rows.next();
-        AddFile addFile = new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
+        AddFile addFile =
+            new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
 
         String fullPath =
             new org.apache.hadoop.fs.Path(basePath.resolve(addFile.getPath()).toUri()).toString();
@@ -590,8 +589,7 @@ public class TestDeltaKernelSync {
       Path filePath = basePath.resolve("physical" + index + ".parquet");
       Files.createFile(filePath);
 
-      String physicalPath =
-          new org.apache.hadoop.fs.Path(filePath.toUri()).toString();
+      String physicalPath = new org.apache.hadoop.fs.Path(filePath.toUri()).toString();
 
       return InternalDataFile.builder()
           .fileFormat(FileFormat.APACHE_PARQUET)

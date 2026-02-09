@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.kernel;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -35,7 +35,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import scala.collection.JavaConverters;
 
-import io.delta.kernel.Snapshot;
 import io.delta.kernel.Table;
 import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
@@ -149,8 +148,7 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
     assertFalse(actionList.isEmpty(), "Should have at least one action");
 
     // Verify we have AddFile actions
-    boolean hasAddFile =
-        actionList.stream().anyMatch(action -> action instanceof AddFile);
+    boolean hasAddFile = actionList.stream().anyMatch(action -> action instanceof AddFile);
     assertTrue(hasAddFile, "Should contain AddFile actions");
   }
 
@@ -233,8 +231,7 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
     assertFalse(actionList.isEmpty(), "Should have actions for partitioned data");
 
     // Should have AddFile actions for new files
-    long addFileCount =
-        actionList.stream().filter(action -> action instanceof AddFile).count();
+    long addFileCount = actionList.stream().filter(action -> action instanceof AddFile).count();
     assertTrue(addFileCount >= 2, "Should have at least 2 AddFile actions");
   }
 
@@ -350,8 +347,7 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
     assertFalse(actionList.isEmpty(), "Should have actions for differential sync");
 
     // Count AddFile and RemoveFile actions
-    long addFileCount =
-        actionList.stream().filter(action -> action instanceof AddFile).count();
+    long addFileCount = actionList.stream().filter(action -> action instanceof AddFile).count();
     long removeFileCount =
         actionList.stream().filter(action -> action instanceof RemoveFile).count();
 

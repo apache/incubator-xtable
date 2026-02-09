@@ -285,11 +285,7 @@ public class DeltaKernelSchemaExtractor {
         return DoubleType.DOUBLE;
       case DECIMAL:
         int precision =
-            (int)
-                field
-                    .getSchema()
-                    .getMetadata()
-                    .get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+            (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
         int scale =
             (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
         return new DecimalType(precision, scale);
