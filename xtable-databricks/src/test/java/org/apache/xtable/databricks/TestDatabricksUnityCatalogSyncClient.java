@@ -135,6 +135,76 @@ public class TestDatabricksUnityCatalogSyncClient {
   }
 
   @Test
+  void testCreateOrReplaceTableDelta() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    when(mockStatementExecution.executeStatement(any(ExecuteStatementRequest.class)))
+        .thenReturn(
+            new StatementResponse()
+                .setStatus(new StatementStatus().setState(StatementState.SUCCEEDED)));
+
+    InternalTable table = InternalTable.builder().basePath("s3://bucket/path").build();
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people");
+
+    client.createOrReplaceTable(table, tableIdentifier);
+
+    ArgumentCaptor<ExecuteStatementRequest> requestCaptor =
+        ArgumentCaptor.forClass(ExecuteStatementRequest.class);
+    verify(mockStatementExecution).executeStatement(requestCaptor.capture());
+    ExecuteStatementRequest request = requestCaptor.getValue();
+    assertEquals(
+        "CREATE OR REPLACE TABLE main.default.people USING DELTA LOCATION 's3://bucket/path'",
+        request.getStatement());
+  }
+
+  @Test
+  void testCreateOrReplaceTableRejectsNonDelta() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.ICEBERG,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    InternalTable table = InternalTable.builder().basePath("s3://bucket/path").build();
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people");
+
+    assertThrows(
+        CatalogSyncException.class, () -> client.createOrReplaceTable(table, tableIdentifier));
+  }
+
+  @Test
   void testHasDatabaseTrue() {
     Map<String, String> props = new HashMap<>();
     props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
