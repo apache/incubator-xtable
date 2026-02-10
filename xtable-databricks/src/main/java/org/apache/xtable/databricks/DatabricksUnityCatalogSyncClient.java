@@ -186,7 +186,9 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
   @Override
   public void refreshTable(
       InternalTable table, TableInfo catalogTable, CatalogTableIdentifier tableIdentifier) {
-    throw new UnsupportedOperationException("Databricks UC sync not implemented");
+    log.warn(
+        "Databricks UC refreshTable is not implemented. Skipping refresh for {}",
+        tableIdentifier.getId());
   }
 
   @Override
