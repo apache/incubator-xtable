@@ -28,7 +28,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
@@ -174,9 +173,10 @@ public class TestDatabricksUnityCatalogSyncClient {
     ArgumentCaptor<ExecuteStatementRequest> requestCaptor =
         ArgumentCaptor.forClass(ExecuteStatementRequest.class);
     verify(mockStatementExecution).executeStatement(requestCaptor.capture());
+    verify(mockTablesApi).delete("main.default.people");
     ExecuteStatementRequest request = requestCaptor.getValue();
     assertEquals(
-        "CREATE OR REPLACE TABLE main.default.people USING DELTA LOCATION 's3://bucket/path'",
+        "CREATE TABLE IF NOT EXISTS main.default.people USING DELTA LOCATION 's3://bucket/path'",
         request.getStatement());
   }
 
@@ -236,14 +236,7 @@ public class TestDatabricksUnityCatalogSyncClient {
                 .setStatus(new StatementStatus().setState(StatementState.SUCCEEDED)));
 
     InternalSchema idSchema =
-        InternalSchema.builder()
-            .name("id")
-            .dataType(InternalType.INT)
-            .isNullable(false)
-            .comment("new")
-            .build();
-    InternalSchema ageSchema =
-        InternalSchema.builder().name("age").dataType(InternalType.INT).isNullable(true).build();
+        InternalSchema.builder().name("id").dataType(InternalType.INT).isNullable(true).build();
     InternalSchema readSchema =
         InternalSchema.builder()
             .name("root")
@@ -251,21 +244,14 @@ public class TestDatabricksUnityCatalogSyncClient {
             .isNullable(true)
             .fields(
                 java.util.Arrays.asList(
-                    InternalField.builder().name("id").schema(idSchema).build(),
-                    InternalField.builder().name("age").schema(ageSchema).build()))
+                    InternalField.builder().name("id").schema(idSchema).build()))
             .build();
-
     InternalTable table =
-        InternalTable.builder().readSchema(readSchema).basePath("s3://bucket/path").build();
+        InternalTable.builder().basePath("s3://bucket/path").readSchema(readSchema).build();
     TableInfo catalogTable =
         new TableInfo()
             .setColumns(
                 java.util.Arrays.asList(
-                    new ColumnInfo()
-                        .setName("id")
-                        .setTypeText("int")
-                        .setNullable(true)
-                        .setComment("old"),
                     new ColumnInfo().setName("name").setTypeText("string").setNullable(true)));
 
     ThreePartHierarchicalTableIdentifier tableIdentifier =
@@ -275,20 +261,11 @@ public class TestDatabricksUnityCatalogSyncClient {
 
     ArgumentCaptor<ExecuteStatementRequest> requestCaptor =
         ArgumentCaptor.forClass(ExecuteStatementRequest.class);
-    verify(mockStatementExecution, org.mockito.Mockito.times(4))
-        .executeStatement(requestCaptor.capture());
-
-    List<ExecuteStatementRequest> requests = requestCaptor.getAllValues();
+    verify(mockStatementExecution).executeStatement(requestCaptor.capture());
+    verify(mockTablesApi).delete("main.default.people");
     assertEquals(
-        "ALTER TABLE main.default.people ADD COLUMNS (`age` int)", requests.get(0).getStatement());
-    assertEquals(
-        "ALTER TABLE main.default.people ALTER COLUMN `id` SET NOT NULL",
-        requests.get(1).getStatement());
-    assertEquals(
-        "ALTER TABLE main.default.people ALTER COLUMN `id` COMMENT 'new'",
-        requests.get(2).getStatement());
-    assertEquals(
-        "ALTER TABLE main.default.people DROP COLUMN `name`", requests.get(3).getStatement());
+        "CREATE TABLE IF NOT EXISTS main.default.people USING DELTA LOCATION 's3://bucket/path'",
+        requestCaptor.getValue().getStatement());
   }
 
   @Test

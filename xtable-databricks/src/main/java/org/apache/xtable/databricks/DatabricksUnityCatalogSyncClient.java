@@ -18,9 +18,7 @@
  
 package org.apache.xtable.databricks;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -188,6 +186,7 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
         String.format(
             "CREATE TABLE IF NOT EXISTS %s USING DELTA LOCATION '%s'",
             fullName, escapeSqlString(location));
+    log.info("Databricks UC create table: {}", fullName);
     executeStatement(statement);
   }
 
@@ -201,7 +200,6 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
           tableIdentifier.getId());
       return;
     }
-
     InternalSchema schema = table.getReadSchema();
     if (schema == null || schema.getFields() == null || schema.getFields().isEmpty()) {
       log.warn(
@@ -209,104 +207,26 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
           tableIdentifier.getId());
       return;
     }
-
-    String fullName = getFullName(tableIdentifier);
-    Map<String, DesiredColumn> desired = buildDesiredColumns(schema);
-    Map<String, ColumnInfo> existing = buildExistingColumns(catalogTable);
-
-    List<String> statements = new ArrayList<>();
-
-    // Add columns
-    List<String> addColumnDefs = new ArrayList<>();
-    for (DesiredColumn column : desired.values()) {
-      if (!existing.containsKey(column.normalizedName)) {
-        addColumnDefs.add(formatColumnDefinition(column));
-      }
-    }
-    if (!addColumnDefs.isEmpty()) {
-      statements.add(
-          String.format(
-              "ALTER TABLE %s ADD COLUMNS (%s)", fullName, String.join(", ", addColumnDefs)));
-    }
-
-    // Alter columns (type/comment/nullability)
-    for (DesiredColumn column : desired.values()) {
-      ColumnInfo current = existing.get(column.normalizedName);
-      if (current == null) {
-        continue;
-      }
-      String currentType = normalizeType(current.getTypeText());
-      String desiredType = normalizeType(column.typeText);
-      if (!Objects.equals(currentType, desiredType)) {
-        statements.add(
-            String.format(
-                "ALTER TABLE %s ALTER COLUMN %s TYPE %s",
-                fullName, quoteIdentifier(column.name), column.typeText));
-      }
-
-      Boolean currentNullable = current.getNullable();
-      boolean desiredNullable = column.nullable;
-      if (currentNullable != null && currentNullable.booleanValue() != desiredNullable) {
-        statements.add(
-            String.format(
-                "ALTER TABLE %s ALTER COLUMN %s %s",
-                fullName,
-                quoteIdentifier(column.name),
-                desiredNullable ? "DROP NOT NULL" : "SET NOT NULL"));
-      }
-
-      String currentComment = current.getComment();
-      String desiredComment = column.comment;
-      if (!Objects.equals(
-          StringUtils.defaultString(currentComment), StringUtils.defaultString(desiredComment))) {
-        String commentValue = StringUtils.defaultString(desiredComment);
-        statements.add(
-            String.format(
-                "ALTER TABLE %s ALTER COLUMN %s COMMENT '%s'",
-                fullName, quoteIdentifier(column.name), escapeSqlString(commentValue)));
-      }
-    }
-
-    // Drop columns
-    for (ColumnInfo current : existing.values()) {
-      String normalized = normalizeName(current.getName());
-      if (!desired.containsKey(normalized)) {
-        statements.add(
-            String.format(
-                "ALTER TABLE %s DROP COLUMN %s", fullName, quoteIdentifier(current.getName())));
-      }
-    }
-
-    if (statements.isEmpty()) {
-      log.info("Databricks UC refreshTable: no schema changes for {}", tableIdentifier.getId());
-      return;
-    }
-
-    for (String statement : statements) {
-      executeStatement(statement);
+    if (!schemasMatch(schema, catalogTable)) {
+      createOrReplaceTable(table, tableIdentifier);
+    } else {
+      log.info(
+          "Databricks UC refreshTable: schema already up to date for {}", tableIdentifier.getId());
     }
   }
 
   @Override
   public void createOrReplaceTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
     ensureDeltaOnly();
-    String fullName = getFullName(tableIdentifier);
-    String location = table.getBasePath();
-    if (StringUtils.isBlank(location)) {
-      throw new CatalogSyncException("Storage location is required for external Delta tables");
-    }
-
-    String statement =
-        String.format(
-            "CREATE OR REPLACE TABLE %s USING DELTA LOCATION '%s'",
-            fullName, escapeSqlString(location));
-    executeStatement(statement);
+    dropTable(table, tableIdentifier);
+    createTable(table, tableIdentifier);
   }
 
   @Override
   public void dropTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
     String fullName = getFullName(tableIdentifier);
     try {
+      log.info("Databricks UC drop table: {}", fullName);
       tablesApi.delete(fullName);
     } catch (Exception e) {
       throw new CatalogSyncException("Failed to drop table: " + fullName, e);
@@ -412,8 +332,80 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
     return value.replace("'", "''");
   }
 
-  private static String quoteIdentifier(String value) {
-    return "`" + value.replace("`", "``") + "`";
+  private static boolean schemasMatch(InternalSchema desired, TableInfo existing) {
+    Map<String, ColumnSignature> desiredColumns = toColumnSignatureMap(desired);
+    Map<String, ColumnSignature> existingColumns = toColumnSignatureMap(existing);
+    if (desiredColumns.size() != existingColumns.size()) {
+      return false;
+    }
+    for (Map.Entry<String, ColumnSignature> entry : desiredColumns.entrySet()) {
+      ColumnSignature existingSignature = existingColumns.get(entry.getKey());
+      if (existingSignature == null) {
+        return false;
+      }
+      if (!entry.getValue().equals(existingSignature)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static Map<String, ColumnSignature> toColumnSignatureMap(InternalSchema schema) {
+    Map<String, ColumnSignature> result = new HashMap<>();
+    for (InternalField field : schema.getFields()) {
+      String name = normalizeName(field.getName());
+      String type = normalizeType(toSparkSqlType(field));
+      boolean nullable = field.getSchema().isNullable();
+      String comment = StringUtils.defaultString(field.getSchema().getComment());
+      result.put(name, new ColumnSignature(type, nullable, comment));
+    }
+    return result;
+  }
+
+  private static Map<String, ColumnSignature> toColumnSignatureMap(TableInfo tableInfo) {
+    Map<String, ColumnSignature> result = new HashMap<>();
+    if (tableInfo == null || tableInfo.getColumns() == null) {
+      return result;
+    }
+    for (ColumnInfo column : tableInfo.getColumns()) {
+      String name = normalizeName(column.getName());
+      String type = normalizeType(column.getTypeText());
+      boolean nullable = column.getNullable() == null || column.getNullable();
+      String comment = StringUtils.defaultString(column.getComment());
+      result.put(name, new ColumnSignature(type, nullable, comment));
+    }
+    return result;
+  }
+
+  private static final class ColumnSignature {
+    private final String type;
+    private final boolean nullable;
+    private final String comment;
+
+    private ColumnSignature(String type, boolean nullable, String comment) {
+      this.type = type;
+      this.nullable = nullable;
+      this.comment = comment;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      ColumnSignature that = (ColumnSignature) o;
+      return nullable == that.nullable
+          && Objects.equals(type, that.type)
+          && Objects.equals(comment, that.comment);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(type, nullable, comment);
+    }
   }
 
   private static String normalizeName(String value) {
@@ -492,64 +484,17 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
   }
 
   private static String toStructType(InternalSchema schema) {
-    List<String> fields = new ArrayList<>();
+    StringBuilder builder = new StringBuilder("struct<");
+    boolean first = true;
     for (InternalField field : schema.getFields()) {
-      fields.add(field.getName() + ":" + toSparkSqlType(field));
+      if (!first) {
+        builder.append(",");
+      }
+      builder.append(field.getName()).append(":").append(toSparkSqlType(field));
+      first = false;
     }
-    return "struct<" + String.join(",", fields) + ">";
-  }
-
-  private static Map<String, DesiredColumn> buildDesiredColumns(InternalSchema schema) {
-    Map<String, DesiredColumn> result = new LinkedHashMap<>();
-    for (InternalField field : schema.getFields()) {
-      String name = field.getName();
-      String normalized = normalizeName(name);
-      String typeText = toSparkSqlType(field);
-      boolean nullable = field.getSchema().isNullable();
-      String comment = field.getSchema().getComment();
-      result.put(normalized, new DesiredColumn(name, normalized, typeText, nullable, comment));
-    }
-    return result;
-  }
-
-  private static Map<String, ColumnInfo> buildExistingColumns(TableInfo tableInfo) {
-    Map<String, ColumnInfo> result = new LinkedHashMap<>();
-    if (tableInfo == null || tableInfo.getColumns() == null) {
-      return result;
-    }
-    for (ColumnInfo column : tableInfo.getColumns()) {
-      result.put(normalizeName(column.getName()), column);
-    }
-    return result;
-  }
-
-  private static String formatColumnDefinition(DesiredColumn column) {
-    StringBuilder builder = new StringBuilder();
-    builder.append(quoteIdentifier(column.name)).append(" ").append(column.typeText);
-    if (!column.nullable) {
-      builder.append(" NOT NULL");
-    }
-    if (!StringUtils.isBlank(column.comment)) {
-      builder.append(" COMMENT '").append(escapeSqlString(column.comment)).append("'");
-    }
+    builder.append(">");
     return builder.toString();
-  }
-
-  private static final class DesiredColumn {
-    private final String name;
-    private final String normalizedName;
-    private final String typeText;
-    private final boolean nullable;
-    private final String comment;
-
-    private DesiredColumn(
-        String name, String normalizedName, String typeText, boolean nullable, String comment) {
-      this.name = name;
-      this.normalizedName = normalizedName;
-      this.typeText = typeText;
-      this.nullable = nullable;
-      this.comment = comment;
-    }
   }
 
   @Override
