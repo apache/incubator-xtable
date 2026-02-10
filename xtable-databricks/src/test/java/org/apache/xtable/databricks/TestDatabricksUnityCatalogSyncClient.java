@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -37,6 +38,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.databricks.sdk.core.error.platform.NotFound;
+import com.databricks.sdk.service.catalog.CreateSchema;
 import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.SchemasAPI;
 import com.databricks.sdk.service.catalog.TableInfo;
@@ -218,6 +220,68 @@ public class TestDatabricksUnityCatalogSyncClient {
     ThreePartHierarchicalTableIdentifier tableIdentifier =
         new ThreePartHierarchicalTableIdentifier("main", "default", "people");
     assertThrows(CatalogSyncException.class, () -> client.hasDatabase(tableIdentifier));
+  }
+
+  @Test
+  void testCreateDatabase() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people");
+
+    client.createDatabase(tableIdentifier);
+
+    ArgumentCaptor<CreateSchema> requestCaptor = ArgumentCaptor.forClass(CreateSchema.class);
+    verify(mockSchemasApi).create(requestCaptor.capture());
+    CreateSchema request = requestCaptor.getValue();
+    assertEquals("main", request.getCatalogName());
+    assertEquals("default", request.getName());
+  }
+
+  @Test
+  void testCreateDatabaseFailure() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people");
+
+    doThrow(new RuntimeException("boom")).when(mockSchemasApi).create(any(CreateSchema.class));
+
+    assertThrows(CatalogSyncException.class, () -> client.createDatabase(tableIdentifier));
   }
 
   @Test

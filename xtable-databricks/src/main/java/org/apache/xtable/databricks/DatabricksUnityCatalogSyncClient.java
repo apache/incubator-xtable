@@ -28,6 +28,7 @@ import org.apache.hadoop.conf.Configuration;
 import com.databricks.sdk.WorkspaceClient;
 import com.databricks.sdk.core.DatabricksConfig;
 import com.databricks.sdk.core.error.platform.NotFound;
+import com.databricks.sdk.service.catalog.CreateSchema;
 import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.SchemasAPI;
 import com.databricks.sdk.service.catalog.TableInfo;
@@ -135,7 +136,23 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
   @Override
   public void createDatabase(CatalogTableIdentifier tableIdentifier) {
-    throw new UnsupportedOperationException("Databricks UC sync not implemented");
+    HierarchicalTableIdentifier hierarchical =
+        CatalogUtils.toHierarchicalTableIdentifier(tableIdentifier);
+    String catalog = hierarchical.getCatalogName();
+    if (StringUtils.isBlank(catalog)) {
+      throw new CatalogSyncException(
+          "Databricks UC requires a catalog name (expected catalog.schema.table)");
+    }
+    String schema = hierarchical.getDatabaseName();
+    if (StringUtils.isBlank(schema)) {
+      throw new CatalogSyncException("Databricks UC requires a schema name");
+    }
+
+    try {
+      schemasApi.create(new CreateSchema().setCatalogName(catalog).setName(schema));
+    } catch (Exception e) {
+      throw new CatalogSyncException("Failed to create database: " + schema, e);
+    }
   }
 
   @Override
