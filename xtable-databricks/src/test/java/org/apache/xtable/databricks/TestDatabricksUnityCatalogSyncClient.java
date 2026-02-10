@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
@@ -38,6 +39,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.databricks.sdk.core.error.platform.NotFound;
+import com.databricks.sdk.service.catalog.ColumnInfo;
 import com.databricks.sdk.service.catalog.CreateSchema;
 import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.SchemasAPI;
@@ -53,6 +55,9 @@ import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.ThreePartHierarchicalTableIdentifier;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.storage.CatalogType;
 import org.apache.xtable.model.storage.TableFormat;
 
@@ -202,6 +207,88 @@ public class TestDatabricksUnityCatalogSyncClient {
 
     assertThrows(
         CatalogSyncException.class, () -> client.createOrReplaceTable(table, tableIdentifier));
+  }
+
+  @Test
+  void testRefreshTableSchemaEvolution() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    when(mockStatementExecution.executeStatement(any(ExecuteStatementRequest.class)))
+        .thenReturn(
+            new StatementResponse()
+                .setStatus(new StatementStatus().setState(StatementState.SUCCEEDED)));
+
+    InternalSchema idSchema =
+        InternalSchema.builder()
+            .name("id")
+            .dataType(InternalType.INT)
+            .isNullable(false)
+            .comment("new")
+            .build();
+    InternalSchema ageSchema =
+        InternalSchema.builder().name("age").dataType(InternalType.INT).isNullable(true).build();
+    InternalSchema readSchema =
+        InternalSchema.builder()
+            .name("root")
+            .dataType(InternalType.RECORD)
+            .isNullable(true)
+            .fields(
+                java.util.Arrays.asList(
+                    InternalField.builder().name("id").schema(idSchema).build(),
+                    InternalField.builder().name("age").schema(ageSchema).build()))
+            .build();
+
+    InternalTable table =
+        InternalTable.builder().readSchema(readSchema).basePath("s3://bucket/path").build();
+    TableInfo catalogTable =
+        new TableInfo()
+            .setColumns(
+                java.util.Arrays.asList(
+                    new ColumnInfo()
+                        .setName("id")
+                        .setTypeText("int")
+                        .setNullable(true)
+                        .setComment("old"),
+                    new ColumnInfo().setName("name").setTypeText("string").setNullable(true)));
+
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people");
+
+    client.refreshTable(table, catalogTable, tableIdentifier);
+
+    ArgumentCaptor<ExecuteStatementRequest> requestCaptor =
+        ArgumentCaptor.forClass(ExecuteStatementRequest.class);
+    verify(mockStatementExecution, org.mockito.Mockito.times(4))
+        .executeStatement(requestCaptor.capture());
+
+    List<ExecuteStatementRequest> requests = requestCaptor.getAllValues();
+    assertEquals(
+        "ALTER TABLE main.default.people ADD COLUMNS (`age` int)", requests.get(0).getStatement());
+    assertEquals(
+        "ALTER TABLE main.default.people ALTER COLUMN `id` SET NOT NULL",
+        requests.get(1).getStatement());
+    assertEquals(
+        "ALTER TABLE main.default.people ALTER COLUMN `id` COMMENT 'new'",
+        requests.get(2).getStatement());
+    assertEquals(
+        "ALTER TABLE main.default.people DROP COLUMN `name`", requests.get(3).getStatement());
   }
 
   @Test
