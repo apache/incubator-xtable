@@ -18,6 +18,11 @@
  
 package org.apache.xtable.databricks;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 import lombok.extern.log4j.Log4j2;
@@ -28,6 +33,7 @@ import org.apache.hadoop.conf.Configuration;
 import com.databricks.sdk.WorkspaceClient;
 import com.databricks.sdk.core.DatabricksConfig;
 import com.databricks.sdk.core.error.platform.NotFound;
+import com.databricks.sdk.service.catalog.ColumnInfo;
 import com.databricks.sdk.service.catalog.CreateSchema;
 import com.databricks.sdk.service.catalog.SchemaInfo;
 import com.databricks.sdk.service.catalog.SchemasAPI;
@@ -47,6 +53,8 @@ import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.CatalogType;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
@@ -186,9 +194,97 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
   @Override
   public void refreshTable(
       InternalTable table, TableInfo catalogTable, CatalogTableIdentifier tableIdentifier) {
-    log.warn(
-        "Databricks UC refreshTable is not implemented. Skipping refresh for {}",
-        tableIdentifier.getId());
+    ensureDeltaOnly();
+    if (catalogTable == null) {
+      log.warn(
+          "Databricks UC refreshTable called with null catalog table for {}",
+          tableIdentifier.getId());
+      return;
+    }
+
+    InternalSchema schema = table.getReadSchema();
+    if (schema == null || schema.getFields() == null || schema.getFields().isEmpty()) {
+      log.warn(
+          "Databricks UC refreshTable skipped due to missing schema for {}",
+          tableIdentifier.getId());
+      return;
+    }
+
+    String fullName = getFullName(tableIdentifier);
+    Map<String, DesiredColumn> desired = buildDesiredColumns(schema);
+    Map<String, ColumnInfo> existing = buildExistingColumns(catalogTable);
+
+    List<String> statements = new ArrayList<>();
+
+    // Add columns
+    List<String> addColumnDefs = new ArrayList<>();
+    for (DesiredColumn column : desired.values()) {
+      if (!existing.containsKey(column.normalizedName)) {
+        addColumnDefs.add(formatColumnDefinition(column));
+      }
+    }
+    if (!addColumnDefs.isEmpty()) {
+      statements.add(
+          String.format(
+              "ALTER TABLE %s ADD COLUMNS (%s)", fullName, String.join(", ", addColumnDefs)));
+    }
+
+    // Alter columns (type/comment/nullability)
+    for (DesiredColumn column : desired.values()) {
+      ColumnInfo current = existing.get(column.normalizedName);
+      if (current == null) {
+        continue;
+      }
+      String currentType = normalizeType(current.getTypeText());
+      String desiredType = normalizeType(column.typeText);
+      if (!Objects.equals(currentType, desiredType)) {
+        statements.add(
+            String.format(
+                "ALTER TABLE %s ALTER COLUMN %s TYPE %s",
+                fullName, quoteIdentifier(column.name), column.typeText));
+      }
+
+      Boolean currentNullable = current.getNullable();
+      boolean desiredNullable = column.nullable;
+      if (currentNullable != null && currentNullable.booleanValue() != desiredNullable) {
+        statements.add(
+            String.format(
+                "ALTER TABLE %s ALTER COLUMN %s %s",
+                fullName,
+                quoteIdentifier(column.name),
+                desiredNullable ? "DROP NOT NULL" : "SET NOT NULL"));
+      }
+
+      String currentComment = current.getComment();
+      String desiredComment = column.comment;
+      if (!Objects.equals(
+          StringUtils.defaultString(currentComment), StringUtils.defaultString(desiredComment))) {
+        String commentValue = StringUtils.defaultString(desiredComment);
+        statements.add(
+            String.format(
+                "ALTER TABLE %s ALTER COLUMN %s COMMENT '%s'",
+                fullName, quoteIdentifier(column.name), escapeSqlString(commentValue)));
+      }
+    }
+
+    // Drop columns
+    for (ColumnInfo current : existing.values()) {
+      String normalized = normalizeName(current.getName());
+      if (!desired.containsKey(normalized)) {
+        statements.add(
+            String.format(
+                "ALTER TABLE %s DROP COLUMN %s", fullName, quoteIdentifier(current.getName())));
+      }
+    }
+
+    if (statements.isEmpty()) {
+      log.info("Databricks UC refreshTable: no schema changes for {}", tableIdentifier.getId());
+      return;
+    }
+
+    for (String statement : statements) {
+      executeStatement(statement);
+    }
   }
 
   @Override
@@ -281,7 +377,15 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
     StatementResponse response = statementExecution.executeStatement(request);
     if (response.getStatus() != null && response.getStatus().getState() == StatementState.FAILED) {
-      throw new CatalogSyncException("Databricks UC statement failed: " + statement);
+      String errorMessage = null;
+      if (response.getStatus().getError() != null) {
+        errorMessage = response.getStatus().getError().getMessage();
+      }
+      if (StringUtils.isBlank(errorMessage)) {
+        throw new CatalogSyncException("Databricks UC statement failed: " + statement);
+      }
+      throw new CatalogSyncException(
+          "Databricks UC statement failed: " + statement + " (" + errorMessage + ")");
     }
     return response;
   }
@@ -306,6 +410,146 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
   private static String escapeSqlString(String value) {
     return value.replace("'", "''");
+  }
+
+  private static String quoteIdentifier(String value) {
+    return "`" + value.replace("`", "``") + "`";
+  }
+
+  private static String normalizeName(String value) {
+    return value == null ? "" : value.toLowerCase(Locale.ROOT);
+  }
+
+  private static String normalizeType(String value) {
+    if (value == null) {
+      return "";
+    }
+    return value.replaceAll("\\s+", "").toLowerCase(Locale.ROOT);
+  }
+
+  private static String toSparkSqlType(InternalField field) {
+    switch (field.getSchema().getDataType()) {
+      case ENUM:
+      case STRING:
+        return "string";
+      case INT:
+        return "int";
+      case LONG:
+        return "bigint";
+      case BYTES:
+      case FIXED:
+      case UUID:
+        return "binary";
+      case BOOLEAN:
+        return "boolean";
+      case FLOAT:
+        return "float";
+      case DATE:
+        return "date";
+      case TIMESTAMP:
+        return "timestamp";
+      case TIMESTAMP_NTZ:
+        return "timestamp_ntz";
+      case DOUBLE:
+        return "double";
+      case DECIMAL:
+        int precision =
+            (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+        int scale =
+            (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
+        return String.format("decimal(%d,%d)", precision, scale);
+      case RECORD:
+        return toStructType(field.getSchema());
+      case MAP:
+        InternalField key =
+            field.getSchema().getFields().stream()
+                .filter(
+                    mapField ->
+                        InternalField.Constants.MAP_KEY_FIELD_NAME.equals(mapField.getName()))
+                .findFirst()
+                .orElseThrow(() -> new CatalogSyncException("Invalid map schema"));
+        InternalField value =
+            field.getSchema().getFields().stream()
+                .filter(
+                    mapField ->
+                        InternalField.Constants.MAP_VALUE_FIELD_NAME.equals(mapField.getName()))
+                .findFirst()
+                .orElseThrow(() -> new CatalogSyncException("Invalid map schema"));
+        return String.format("map<%s,%s>", toSparkSqlType(key), toSparkSqlType(value));
+      case LIST:
+        InternalField element =
+            field.getSchema().getFields().stream()
+                .filter(
+                    arrayField ->
+                        InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(
+                            arrayField.getName()))
+                .findFirst()
+                .orElseThrow(() -> new CatalogSyncException("Invalid array schema"));
+        return String.format("array<%s>", toSparkSqlType(element));
+      default:
+        throw new CatalogSyncException("Unsupported type: " + field.getSchema().getDataType());
+    }
+  }
+
+  private static String toStructType(InternalSchema schema) {
+    List<String> fields = new ArrayList<>();
+    for (InternalField field : schema.getFields()) {
+      fields.add(field.getName() + ":" + toSparkSqlType(field));
+    }
+    return "struct<" + String.join(",", fields) + ">";
+  }
+
+  private static Map<String, DesiredColumn> buildDesiredColumns(InternalSchema schema) {
+    Map<String, DesiredColumn> result = new LinkedHashMap<>();
+    for (InternalField field : schema.getFields()) {
+      String name = field.getName();
+      String normalized = normalizeName(name);
+      String typeText = toSparkSqlType(field);
+      boolean nullable = field.getSchema().isNullable();
+      String comment = field.getSchema().getComment();
+      result.put(normalized, new DesiredColumn(name, normalized, typeText, nullable, comment));
+    }
+    return result;
+  }
+
+  private static Map<String, ColumnInfo> buildExistingColumns(TableInfo tableInfo) {
+    Map<String, ColumnInfo> result = new LinkedHashMap<>();
+    if (tableInfo == null || tableInfo.getColumns() == null) {
+      return result;
+    }
+    for (ColumnInfo column : tableInfo.getColumns()) {
+      result.put(normalizeName(column.getName()), column);
+    }
+    return result;
+  }
+
+  private static String formatColumnDefinition(DesiredColumn column) {
+    StringBuilder builder = new StringBuilder();
+    builder.append(quoteIdentifier(column.name)).append(" ").append(column.typeText);
+    if (!column.nullable) {
+      builder.append(" NOT NULL");
+    }
+    if (!StringUtils.isBlank(column.comment)) {
+      builder.append(" COMMENT '").append(escapeSqlString(column.comment)).append("'");
+    }
+    return builder.toString();
+  }
+
+  private static final class DesiredColumn {
+    private final String name;
+    private final String normalizedName;
+    private final String typeText;
+    private final boolean nullable;
+    private final String comment;
+
+    private DesiredColumn(
+        String name, String normalizedName, String typeText, boolean nullable, String comment) {
+      this.name = name;
+      this.normalizedName = normalizedName;
+      this.typeText = typeText;
+      this.nullable = nullable;
+      this.comment = comment;
+    }
   }
 
   @Override
