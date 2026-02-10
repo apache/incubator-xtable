@@ -191,7 +191,18 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
   @Override
   public void createOrReplaceTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
-    throw new UnsupportedOperationException("Databricks UC sync not implemented");
+    ensureDeltaOnly();
+    String fullName = getFullName(tableIdentifier);
+    String location = table.getBasePath();
+    if (StringUtils.isBlank(location)) {
+      throw new CatalogSyncException("Storage location is required for external Delta tables");
+    }
+
+    String statement =
+        String.format(
+            "CREATE OR REPLACE TABLE %s USING DELTA LOCATION '%s'",
+            fullName, escapeSqlString(location));
+    executeStatement(statement);
   }
 
   @Override
