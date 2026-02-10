@@ -207,7 +207,12 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
   @Override
   public void dropTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
-    throw new UnsupportedOperationException("Databricks UC sync not implemented");
+    String fullName = getFullName(tableIdentifier);
+    try {
+      tablesApi.delete(fullName);
+    } catch (Exception e) {
+      throw new CatalogSyncException("Failed to drop table: " + fullName, e);
+    }
   }
 
   @Override
