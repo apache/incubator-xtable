@@ -205,6 +205,68 @@ public class TestDatabricksUnityCatalogSyncClient {
   }
 
   @Test
+  void testDropTable() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people");
+
+    client.dropTable(InternalTable.builder().basePath("s3://bucket/path").build(), tableIdentifier);
+
+    verify(mockTablesApi).delete("main.default.people");
+  }
+
+  @Test
+  void testDropTableFailure() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people");
+
+    doThrow(new RuntimeException("boom")).when(mockTablesApi).delete("main.default.people");
+
+    assertThrows(
+        CatalogSyncException.class,
+        () ->
+            client.dropTable(
+                InternalTable.builder().basePath("s3://bucket/path").build(), tableIdentifier));
+  }
+
+  @Test
   void testHasDatabaseTrue() {
     Map<String, String> props = new HashMap<>();
     props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
