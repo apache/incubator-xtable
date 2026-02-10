@@ -27,6 +27,11 @@ import org.apache.hadoop.conf.Configuration;
 
 import com.databricks.sdk.WorkspaceClient;
 import com.databricks.sdk.core.DatabricksConfig;
+import com.databricks.sdk.core.error.platform.NotFound;
+import com.databricks.sdk.service.catalog.SchemaInfo;
+import com.databricks.sdk.service.catalog.SchemasAPI;
+import com.databricks.sdk.service.catalog.TableInfo;
+import com.databricks.sdk.service.catalog.TablesAPI;
 import com.databricks.sdk.service.sql.Disposition;
 import com.databricks.sdk.service.sql.ExecuteStatementRequest;
 import com.databricks.sdk.service.sql.ExecuteStatementRequestOnWaitTimeout;
@@ -53,7 +58,7 @@ import org.apache.xtable.spi.sync.CatalogSyncClient;
  * change.
  */
 @Log4j2
-public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Object> {
+public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<TableInfo> {
 
   private ExternalCatalogConfig catalogConfig;
   private DatabricksUnityCatalogConfig databricksConfig;
@@ -61,6 +66,8 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Objec
   private String tableFormat;
   private WorkspaceClient workspaceClient;
   private StatementExecutionAPI statementExecution;
+  private TablesAPI tablesApi;
+  private SchemasAPI schemasApi;
 
   // For loading the instance using ServiceLoader
   public DatabricksUnityCatalogSyncClient() {}
@@ -74,8 +81,12 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Objec
       ExternalCatalogConfig catalogConfig,
       String tableFormat,
       Configuration configuration,
-      StatementExecutionAPI statementExecution) {
+      StatementExecutionAPI statementExecution,
+      TablesAPI tablesApi,
+      SchemasAPI schemasApi) {
     this.statementExecution = statementExecution;
+    this.tablesApi = tablesApi;
+    this.schemasApi = schemasApi;
     init(catalogConfig, tableFormat, configuration);
   }
 
@@ -90,13 +101,36 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Objec
   }
 
   @Override
-  public String getStorageLocation(Object table) {
-    throw new UnsupportedOperationException("Databricks UC sync not implemented");
+  public String getStorageLocation(TableInfo table) {
+    if (table == null) {
+      return null;
+    }
+    return table.getStorageLocation();
   }
 
   @Override
   public boolean hasDatabase(CatalogTableIdentifier tableIdentifier) {
-    throw new UnsupportedOperationException("Databricks UC sync not implemented");
+    HierarchicalTableIdentifier hierarchical =
+        CatalogUtils.toHierarchicalTableIdentifier(tableIdentifier);
+    String catalog = hierarchical.getCatalogName();
+    if (StringUtils.isBlank(catalog)) {
+      throw new CatalogSyncException(
+          "Databricks UC requires a catalog name (expected catalog.schema.table)");
+    }
+    String schema = hierarchical.getDatabaseName();
+    if (StringUtils.isBlank(schema)) {
+      throw new CatalogSyncException("Databricks UC requires a schema name");
+    }
+
+    String fullName = catalog + "." + schema;
+    try {
+      SchemaInfo schemaInfo = schemasApi.get(fullName);
+      return schemaInfo != null;
+    } catch (NotFound e) {
+      return false;
+    } catch (Exception e) {
+      throw new CatalogSyncException("Failed to get schema: " + fullName, e);
+    }
   }
 
   @Override
@@ -105,8 +139,15 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Objec
   }
 
   @Override
-  public Object getTable(CatalogTableIdentifier tableIdentifier) {
-    throw new UnsupportedOperationException("Databricks UC sync not implemented");
+  public TableInfo getTable(CatalogTableIdentifier tableIdentifier) {
+    String fullName = getFullName(tableIdentifier);
+    try {
+      return tablesApi.get(fullName);
+    } catch (NotFound e) {
+      return null;
+    } catch (Exception e) {
+      throw new CatalogSyncException("Failed to get table: " + fullName, e);
+    }
   }
 
   @Override
@@ -127,7 +168,7 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Objec
 
   @Override
   public void refreshTable(
-      InternalTable table, Object catalogTable, CatalogTableIdentifier tableIdentifier) {
+      InternalTable table, TableInfo catalogTable, CatalogTableIdentifier tableIdentifier) {
     throw new UnsupportedOperationException("Databricks UC sync not implemented");
   }
 
@@ -157,6 +198,18 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Objec
       this.workspaceClient = new WorkspaceClient(buildConfig(databricksConfig));
       this.statementExecution = workspaceClient.statementExecution();
     }
+    if (this.tablesApi == null) {
+      if (this.workspaceClient == null) {
+        this.workspaceClient = new WorkspaceClient(buildConfig(databricksConfig));
+      }
+      this.tablesApi = this.workspaceClient.tables();
+    }
+    if (this.schemasApi == null) {
+      if (this.workspaceClient == null) {
+        this.workspaceClient = new WorkspaceClient(buildConfig(databricksConfig));
+      }
+      this.schemasApi = this.workspaceClient.schemas();
+    }
     log.info(
         "Initialized Databricks UC sync client for catalogId={} tableFormat={}",
         catalogConfig.getCatalogId(),
@@ -181,7 +234,7 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Objec
     return hierarchical.getId();
   }
 
-  private void executeStatement(String statement) {
+  private StatementResponse executeStatement(String statement) {
     ExecuteStatementRequest request =
         new ExecuteStatementRequest()
             .setStatement(statement)
@@ -192,10 +245,10 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Objec
             .setOnWaitTimeout(ExecuteStatementRequestOnWaitTimeout.CANCEL);
 
     StatementResponse response = statementExecution.executeStatement(request);
-    if (response.getStatus() != null
-        && response.getStatus().getState() == StatementState.FAILED) {
+    if (response.getStatus() != null && response.getStatus().getState() == StatementState.FAILED) {
       throw new CatalogSyncException("Databricks UC statement failed: " + statement);
     }
+    return response;
   }
 
   private DatabricksConfig buildConfig(DatabricksUnityCatalogConfig config) {
