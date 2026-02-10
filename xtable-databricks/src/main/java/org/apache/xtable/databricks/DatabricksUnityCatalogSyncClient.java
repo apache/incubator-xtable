@@ -18,15 +18,31 @@
  
 package org.apache.xtable.databricks;
 
+import java.util.Objects;
+
 import lombok.extern.log4j.Log4j2;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 
+import com.databricks.sdk.WorkspaceClient;
+import com.databricks.sdk.core.DatabricksConfig;
+import com.databricks.sdk.service.sql.Disposition;
+import com.databricks.sdk.service.sql.ExecuteStatementRequest;
+import com.databricks.sdk.service.sql.ExecuteStatementRequestOnWaitTimeout;
+import com.databricks.sdk.service.sql.Format;
+import com.databricks.sdk.service.sql.StatementExecutionAPI;
+import com.databricks.sdk.service.sql.StatementResponse;
+import com.databricks.sdk.service.sql.StatementState;
+
+import org.apache.xtable.catalog.CatalogUtils;
 import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.exception.CatalogSyncException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
+import org.apache.xtable.model.catalog.HierarchicalTableIdentifier;
 import org.apache.xtable.model.storage.CatalogType;
+import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 /**
@@ -43,12 +59,23 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Objec
   private DatabricksUnityCatalogConfig databricksConfig;
   private Configuration hadoopConf;
   private String tableFormat;
+  private WorkspaceClient workspaceClient;
+  private StatementExecutionAPI statementExecution;
 
   // For loading the instance using ServiceLoader
   public DatabricksUnityCatalogSyncClient() {}
 
   public DatabricksUnityCatalogSyncClient(
       ExternalCatalogConfig catalogConfig, String tableFormat, Configuration configuration) {
+    init(catalogConfig, tableFormat, configuration);
+  }
+
+  DatabricksUnityCatalogSyncClient(
+      ExternalCatalogConfig catalogConfig,
+      String tableFormat,
+      Configuration configuration,
+      StatementExecutionAPI statementExecution) {
+    this.statementExecution = statementExecution;
     init(catalogConfig, tableFormat, configuration);
   }
 
@@ -84,7 +111,18 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Objec
 
   @Override
   public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
-    throw new UnsupportedOperationException("Databricks UC sync not implemented");
+    ensureDeltaOnly();
+    String fullName = getFullName(tableIdentifier);
+    String location = table.getBasePath();
+    if (StringUtils.isBlank(location)) {
+      throw new CatalogSyncException("Storage location is required for external Delta tables");
+    }
+
+    String statement =
+        String.format(
+            "CREATE TABLE IF NOT EXISTS %s USING DELTA LOCATION '%s'",
+            fullName, escapeSqlString(location));
+    executeStatement(statement);
   }
 
   @Override
@@ -115,9 +153,75 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Objec
       throw new CatalogSyncException(
           "Databricks UC catalog requires host and warehouseId in catalogProperties");
     }
+    if (this.statementExecution == null) {
+      this.workspaceClient = new WorkspaceClient(buildConfig(databricksConfig));
+      this.statementExecution = workspaceClient.statementExecution();
+    }
     log.info(
         "Initialized Databricks UC sync client for catalogId={} tableFormat={}",
         catalogConfig.getCatalogId(),
         tableFormat);
+  }
+
+  private void ensureDeltaOnly() {
+    if (!Objects.equals(tableFormat, TableFormat.DELTA)) {
+      throw new CatalogSyncException(
+          "Databricks UC sync client currently supports external DELTA only");
+    }
+  }
+
+  private String getFullName(CatalogTableIdentifier tableIdentifier) {
+    HierarchicalTableIdentifier hierarchical =
+        CatalogUtils.toHierarchicalTableIdentifier(tableIdentifier);
+    String catalog = hierarchical.getCatalogName();
+    if (StringUtils.isBlank(catalog)) {
+      throw new CatalogSyncException(
+          "Databricks UC requires a catalog name (expected catalog.schema.table)");
+    }
+    return hierarchical.getId();
+  }
+
+  private void executeStatement(String statement) {
+    ExecuteStatementRequest request =
+        new ExecuteStatementRequest()
+            .setStatement(statement)
+            .setWarehouseId(databricksConfig.getWarehouseId())
+            .setFormat(Format.JSON_ARRAY)
+            .setDisposition(Disposition.INLINE)
+            .setWaitTimeout("30s")
+            .setOnWaitTimeout(ExecuteStatementRequestOnWaitTimeout.CANCEL);
+
+    StatementResponse response = statementExecution.executeStatement(request);
+    if (response.getStatus() != null
+        && response.getStatus().getState() == StatementState.FAILED) {
+      throw new CatalogSyncException("Databricks UC statement failed: " + statement);
+    }
+  }
+
+  private DatabricksConfig buildConfig(DatabricksUnityCatalogConfig config) {
+    DatabricksConfig dbConfig = new DatabricksConfig().setHost(config.getHost());
+    if (!StringUtils.isBlank(config.getAuthType())) {
+      dbConfig.setAuthType(config.getAuthType());
+    }
+    if (!StringUtils.isBlank(config.getToken())) {
+      dbConfig.setToken(config.getToken());
+    } else if (!StringUtils.isBlank(config.getClientId())
+        && !StringUtils.isBlank(config.getClientSecret())) {
+      dbConfig.setClientId(config.getClientId());
+      dbConfig.setClientSecret(config.getClientSecret());
+      if (StringUtils.isBlank(config.getAuthType())) {
+        dbConfig.setAuthType("oauth-m2m");
+      }
+    }
+    return dbConfig;
+  }
+
+  private static String escapeSqlString(String value) {
+    return value.replace("'", "''");
+  }
+
+  @Override
+  public void close() {
+    // WorkspaceClient has no explicit close hook; no-op for now.
   }
 }
