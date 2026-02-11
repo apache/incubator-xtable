@@ -173,8 +173,8 @@ datasets:
   against a SQL Warehouse.
 - The built-in sync registers **external Delta tables** only:
   - `CREATE TABLE IF NOT EXISTS <catalog>.<schema>.<table> USING DELTA LOCATION '<path>'`
-- Schema evolution currently uses **drop + recreate** of the UC table metadata (not data).
-  See the limitations section below.
+- Schema evolution currently runs `MSCK REPAIR TABLE <table> SYNC METADATA` when a schema diff is
+  detected, to refresh catalog metadata without touching the Delta log.
 
 ### Schema evolution limitations (Databricks UC)
 
@@ -185,12 +185,10 @@ transaction log. For external tables managed outside Databricks, this can be uns
 To avoid mutating the Delta log, XTable currently:
 
 1. Detects any schema differences (new columns, dropped columns, type/comment changes).
-2. Drops the UC table metadata.
-3. Recreates the table at the same location.
+2. Runs `MSCK REPAIR TABLE <table> SYNC METADATA` to refresh UC metadata.
 
-This approach **does not delete data** and typically preserves metadata such as statistics,
-usage, and lineage because Unity Catalog keeps that information even after a drop/recreate.
-However, it causes a short period (seconds) where the table is not accessible.
+This approach **does not delete data** and avoids modifying the Delta log. It refreshes
+catalog metadata in-place via `MSCK REPAIR TABLE ... SYNC METADATA`.
 Schema evolution is usually rare in production pipelines, so this trade-off is considered acceptable.
 
 ### Databricks UC limitations and requirements
