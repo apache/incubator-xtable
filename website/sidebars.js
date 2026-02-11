@@ -38,7 +38,7 @@ module.exports = {
                     items: [
                         'hms',
                         'glue-catalog',
-                        'unity-catalog',
+                        'databricks-unity-catalog',
                         'biglake-metastore',
                     ],
                 },
