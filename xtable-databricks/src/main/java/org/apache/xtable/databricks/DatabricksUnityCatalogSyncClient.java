@@ -208,7 +208,9 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
       return;
     }
     if (!schemasMatch(schema, catalogTable)) {
-      createOrReplaceTable(table, tableIdentifier);
+      String fullName = getFullName(tableIdentifier);
+      log.info("Databricks UC refresh table metadata (MSCK REPAIR TABLE): {}", fullName);
+      executeStatement(String.format("MSCK REPAIR TABLE %s SYNC METADATA", fullName));
     } else {
       log.info(
           "Databricks UC refreshTable: schema already up to date for {}", tableIdentifier.getId());

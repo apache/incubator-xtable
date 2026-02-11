@@ -262,9 +262,8 @@ public class TestDatabricksUnityCatalogSyncClient {
     ArgumentCaptor<ExecuteStatementRequest> requestCaptor =
         ArgumentCaptor.forClass(ExecuteStatementRequest.class);
     verify(mockStatementExecution).executeStatement(requestCaptor.capture());
-    verify(mockTablesApi).delete("main.default.people");
     assertEquals(
-        "CREATE TABLE IF NOT EXISTS main.default.people USING DELTA LOCATION 's3://bucket/path'",
+        "MSCK REPAIR TABLE main.default.people SYNC METADATA",
         requestCaptor.getValue().getStatement());
   }
 
