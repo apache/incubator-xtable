@@ -21,8 +21,10 @@ package org.apache.xtable.delta;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
@@ -422,7 +424,7 @@ public class ITDeltaConversionSource {
   }
 
   @Test
-  public void testsShowingVacuumHasNoEffectOnIncrementalSync() {
+  public void testVacuumAffectsIncrementalSyncSafety() {
     boolean isPartitioned = true;
     String tableName = GenericTable.getTableName();
     TestSparkDeltaTable testSparkDeltaTable =
@@ -470,6 +472,97 @@ public class ITDeltaConversionSource {
     // Table doesn't have instant of this older commit, hence it is not safe.
     Instant instantAsOfHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
     assertFalse(conversionSource.isIncrementalSyncSafeFrom(instantAsOfHourAgo));
+  }
+
+  @Test
+  public void testIncrementalSyncSafeWhenCommitFilesExist() {
+    String tableName = GenericTable.getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
+
+    // Insert initial data
+    testSparkDeltaTable.insertRows(50);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+
+    // Add more commits
+    testSparkDeltaTable.insertRows(50);
+
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
+            .build();
+    DeltaConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+
+    // Should be safe - commit files still exist
+    assertTrue(
+        conversionSource.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)),
+        "Incremental sync should be safe when commit files exist");
+  }
+
+  @Test
+  public void testIncrementalSyncUnsafeForInstantBeforeEarliestCommit() {
+    String tableName = GenericTable.getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
+
+    // Insert data
+    testSparkDeltaTable.insertRows(50);
+
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
+            .build();
+    DeltaConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+
+    // Try instant from 1 hour ago (before table existed)
+    Instant instantHourAgo = Instant.now().minus(1, ChronoUnit.HOURS);
+    assertFalse(
+        conversionSource.isIncrementalSyncSafeFrom(instantHourAgo),
+        "Incremental sync should be unsafe for instant before earliest commit");
+  }
+
+  @Test
+  public void testIncrementalSyncUnsafeAfterManualCommitFileDeletion() throws IOException {
+    String tableName = GenericTable.getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
+
+    testSparkDeltaTable.insertRows(50);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+    testSparkDeltaTable.insertRows(50);
+    testSparkDeltaTable.insertRows(50);
+
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(testSparkDeltaTable.getBasePath())
+            .formatName(TableFormat.DELTA)
+            .build();
+
+    DeltaConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+
+    assertTrue(
+        conversionSource.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)),
+        "Should be safe before deleting commit files");
+
+    // Delete commit file to simulate VACUUM or filesystem corruption
+    Path commitFile = Paths.get(testSparkDeltaTable.getBasePath(), "_delta_log", "00000000000000000000.json");
+    if (Files.exists(commitFile)) {
+      Files.delete(commitFile);
+    }
+
+    conversionSource = conversionSourceProvider.getConversionSourceInstance(tableConfig);
+
+    assertFalse(
+        conversionSource.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(timestamp1)),
+        "Should be unsafe after manually deleting commit files");
   }
 
   @ParameterizedTest
