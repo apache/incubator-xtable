@@ -889,4 +889,25 @@ public class TestAvroSchemaConverter {
     assertEquals(
         internalSchema, AvroSchemaConverter.getInstance().toInternalSchema(avroRepresentation));
   }
+
+  @Test
+  public void testExtractFieldCommentsFromAvroDocOrProp() {
+    Schema avroRepresentation =
+        new Schema.Parser()
+            .parse(
+                "{\"type\":\"record\",\"name\":\"commentRecord\",\"fields\":["
+                    + "{\"name\":\"withDoc\",\"type\":\"string\",\"doc\":\"doc comment\"},"
+                    + "{\"name\":\"withProp\",\"type\":\"int\",\"comment\":\"prop comment\"}"
+                    + "]}");
+
+    InternalSchema internalSchema =
+        AvroSchemaConverter.getInstance().toInternalSchema(avroRepresentation);
+
+    Map<String, InternalField> fieldsByName =
+        internalSchema.getFields().stream()
+            .collect(java.util.stream.Collectors.toMap(InternalField::getName, f -> f));
+
+    assertEquals("doc comment", fieldsByName.get("withDoc").getSchema().getComment());
+    assertEquals("prop comment", fieldsByName.get("withProp").getSchema().getComment());
+  }
 }
