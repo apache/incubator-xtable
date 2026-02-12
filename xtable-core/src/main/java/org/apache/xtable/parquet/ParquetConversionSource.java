@@ -32,22 +32,24 @@ import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
-import org.apache.xtable.hudi.*;
 import org.apache.xtable.hudi.HudiPathUtils;
-import org.apache.xtable.model.*;
+import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
+import org.apache.xtable.model.InternalSnapshot;
+import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.storage.*;
-import org.apache.xtable.model.storage.FileFormat;
+import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.InternalFilesDiff;
+import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.extractor.ConversionSource;
 
 @Log4j2
@@ -85,8 +87,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   }
 
   private InternalTable createInternalTableFromFile(ParquetFileInfo latestFile) {
-    ParquetMetadata parquetMetadata =
-        parquetMetadataExtractor.readParquetMetadata(hadoopConf, latestFile.getPath());
+    ParquetMetadata parquetMetadata = latestFile.getMetadata();
     MessageType parquetSchema = parquetMetadataExtractor.getSchema(parquetMetadata);
     InternalSchema schema = schemaExtractor.toInternalSchema(parquetSchema, "");
     List<InternalPartitionField> partitionFields = partitionSpecExtractor.spec(schema);
@@ -113,18 +114,14 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     return createInternalTableFromFile(file);
   }
 
-  private Stream<InternalDataFile> getInternalDataFiles(Stream<ParquetFileInfo> parquetFiles) {
-    return parquetFiles.map(this::createInternalDataFileFromParquetFile);
+  private Stream<InternalDataFile> getInternalDataFiles(Stream<ParquetFileInfo> parquetFiles, InternalSchema schema) {
+    return parquetFiles.map(file -> createInternalDataFileFromParquetFile(file, schema));
   }
 
-  private InternalDataFile createInternalDataFileFromParquetFile(ParquetFileInfo parquetFile) {
+  private InternalDataFile createInternalDataFileFromParquetFile(ParquetFileInfo parquetFile, InternalSchema schema) {
     return InternalDataFile.builder()
         .physicalPath(parquetFile.getPath().toString())
-        .partitionValues(
-            partitionValueExtractor.extractPartitionValues(
-                partitionSpecExtractor.spec(
-                    partitionValueExtractor.extractSchemaForParquetPartitions(parquetFile.getMetadata())),
-                HudiPathUtils.getPartitionPath(new Path(basePath), parquetFile.getPath())))
+        .partitionValues(partitionValueExtractor.extractPartitionValues(partitionSpecExtractor.spec(schema), HudiPathUtils.getPartitionPath(new Path(basePath), parquetFile.getPath())))
         .lastModified(parquetFile.getModificationTime())
         .fileSizeBytes(parquetFile.getSize())
         .columnStats(parquetStatsExtractor.getColumnStatsForaFile(parquetFile.getMetadata()))
@@ -147,7 +144,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         getMostRecentTableConfig(tableChangesAfterModificationTime.stream());
     Set<InternalDataFile> addedInternalDataFiles =
         tableChangesAfterModificationTime.stream()
-            .map(this::createInternalDataFileFromParquetFile)
+            .map(file -> createInternalDataFileFromParquetFile(file, internalTable.getReadSchema()))
             .collect(Collectors.toSet());
 
     return TableChange.builder()
@@ -179,9 +176,9 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   @Override
   public InternalSnapshot getCurrentSnapshot() {
-    Stream<InternalDataFile> internalDataFiles =
-        getInternalDataFiles(parquetDataManager.getCurrentFileInfo());
     InternalTable table = getMostRecentTable();
+    Stream<InternalDataFile> internalDataFiles =
+        getInternalDataFiles(parquetDataManager.getCurrentFileInfo(), table.getReadSchema());
     return InternalSnapshot.builder()
         .table(table)
         .sourceIdentifier(
