@@ -19,7 +19,12 @@
 package org.apache.xtable.parquet;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.OptionalLong;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import lombok.Builder;
@@ -104,8 +109,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   @Override
   public InternalTable getTable(Long modificationTime) {
     // get parquetFile at specific time modificationTime
-    LocatedFileStatus parquetFile = parquetDataManager.getParquetDataFileAt(modificationTime);
-    ParquetFileInfo file = new ParquetFileInfo(hadoopConf, parquetFile);
+    ParquetFileInfo file = parquetDataManager.getParquetDataFileAt(modificationTime);
     return createInternalTableFromFile(file);
   }
 
@@ -154,15 +158,15 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   @Override
   public TableChange getTableChangeForCommit(Long modificationTime) {
-    Set<InternalDataFile> addedInternalDataFiles = new HashSet<>();
+
     List<ParquetFileInfo> tableChangesAfterModificationTime =
-        parquetDataManager.getParquetFilesMetadataAfterTime(hadoopConf, modificationTime);
+        parquetDataManager.getParquetFilesMetadataAfterTime(modificationTime);
     InternalTable internalTable =
         getMostRecentTableConfig(tableChangesAfterModificationTime.stream());
-    for (ParquetFileInfo fileMetadata : tableChangesAfterModificationTime) {
-      InternalDataFile currentDataFile = createInternalDataFileFromParquetFile(fileMetadata);
-      addedInternalDataFiles.add(currentDataFile);
-    }
+    Set<InternalDataFile> addedInternalDataFiles =
+        tableChangesAfterModificationTime.stream()
+            .map(this::createInternalDataFileFromParquetFile)
+            .collect(Collectors.toSet());
 
     return TableChange.builder()
         .sourceIdentifier(
@@ -179,7 +183,10 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   }
 
   private InternalTable getMostRecentTableConfig(Stream<ParquetFileInfo> parquetFiles) {
-    ParquetFileInfo latestFile = parquetDataManager.getMostRecentParquetFileConfig(parquetFiles);
+    ParquetFileInfo latestFile =
+        parquetFiles
+            .max(Comparator.comparing(ParquetFileInfo::getModificationTime))
+            .orElseThrow(() -> new IllegalStateException("No files found"));
     return createInternalTableFromFile(latestFile);
   }
 
@@ -205,35 +212,26 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant timeInMillis) {
     Stream<ParquetFileInfo> parquetFilesMetadata = parquetDataManager.getCurrentFileInfo();
-    LongSummaryStatistics stats =
-        parquetFilesMetadata.mapToLong(ParquetFileInfo::getModificationTime).summaryStatistics();
+    OptionalLong earliestModTimeOpt =
+        parquetFilesMetadata.mapToLong(ParquetFileInfo::getModificationTime).min();
 
-    if (stats.getCount() == 0) {
+    if (!earliestModTimeOpt.isPresent()) {
       log.warn("No parquet files found in table {}. Incremental sync is not possible.", tableName);
       return false;
     }
 
-    long earliestModTime = stats.getMin();
-    long latestModTime = stats.getMax();
-
-    if (timeInMillis.toEpochMilli() > latestModTime) {
-      log.warn(
-          "Instant {} is in the future relative to the data. Latest file time: {}",
-          timeInMillis.toEpochMilli(),
-          Instant.ofEpochMilli(latestModTime));
-      return false;
-    }
+    long earliestModTime = earliestModTimeOpt.getAsLong();
 
     if (earliestModTime > timeInMillis.toEpochMilli()) {
       log.warn(
           "Incremental sync is not safe. Earliest available metadata (time={}) is newer "
-              + "than requested instant {}. Data history has been truncated.",
+              + "than requested instant {}.",
           Instant.ofEpochMilli(earliestModTime),
           timeInMillis.toEpochMilli());
       return false;
     }
 
-    log.info(
+    log.debug(
         "Incremental sync is safe from instant {} for table {}",
         timeInMillis.toEpochMilli(),
         tableName);

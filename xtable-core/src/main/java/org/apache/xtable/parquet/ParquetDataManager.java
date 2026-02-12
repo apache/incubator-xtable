@@ -20,12 +20,11 @@ package org.apache.xtable.parquet;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -47,9 +46,20 @@ import org.apache.xtable.exception.ReadException;
 public class ParquetDataManager {
   private final Configuration hadoopConf;
   private final String basePath;
+  private final FileSystem fileSystem;
 
-  @Getter(lazy = true)
-  private final List<LocatedFileStatus> parquetFiles = loadParquetFiles(hadoopConf, basePath);
+  public ParquetDataManager(Configuration hadoopConf, String basePath) {
+    this.hadoopConf = hadoopConf;
+    this.basePath = basePath;
+    try {
+      this.fileSystem = FileSystem.get(URI.create(basePath), hadoopConf);
+    } catch (IOException e) {
+      throw new ReadException("Unable to initialize file system for base path: " + basePath, e);
+    }
+  }
+
+  @Getter(value = AccessLevel.PRIVATE, lazy = true)
+  private final List<LocatedFileStatus> parquetFiles = loadParquetFiles();
 
   ParquetFileInfo getMostRecentParquetFile() {
     LocatedFileStatus file =
@@ -59,30 +69,21 @@ public class ParquetDataManager {
     return new ParquetFileInfo(hadoopConf, file);
   }
 
-  ParquetFileInfo getMostRecentParquetFileConfig(Stream<ParquetFileInfo> parquetFiles) {
-    return parquetFiles
-        .max(Comparator.comparing(ParquetFileInfo::getModificationTime))
-        .orElseThrow(() -> new IllegalStateException("No files found"));
-  }
-
-  public LocatedFileStatus getParquetDataFileAt(long targetTime) {
-
+  ParquetFileInfo getParquetDataFileAt(long targetTime) {
     return getParquetFiles().stream()
         .filter(file -> file.getModificationTime() >= targetTime)
-        .findFirst()
+        .min(Comparator.comparing(LocatedFileStatus::getModificationTime))
+        .map(file -> new ParquetFileInfo(hadoopConf, file))
         .orElseThrow(() -> new IllegalStateException("No file found at or after " + targetTime));
   }
 
-  private List<LocatedFileStatus> loadParquetFiles(Configuration hadoopConf, String basePath) {
+  private List<LocatedFileStatus> loadParquetFiles() {
     try {
-      FileSystem fs = FileSystem.get(hadoopConf);
-      URI uriBasePath = new URI(basePath);
-      String parentPath = Paths.get(uriBasePath).toString();
-      RemoteIterator<LocatedFileStatus> iterator = fs.listFiles(new Path(parentPath), true);
+      RemoteIterator<LocatedFileStatus> iterator = fileSystem.listFiles(new Path(basePath), true);
       return RemoteIterators.toList(iterator).stream()
           .filter(file -> file.getPath().getName().endsWith("parquet"))
           .collect(Collectors.toList());
-    } catch (IOException | URISyntaxException e) {
+    } catch (IOException e) {
       throw new ReadException("Unable to read files from file system", e);
     }
   }
@@ -92,10 +93,10 @@ public class ParquetDataManager {
         .map(fileStatus -> new ParquetFileInfo(hadoopConf, fileStatus));
   }
 
-  List<ParquetFileInfo> getParquetFilesMetadataAfterTime(Configuration conf, long syncTime) {
+  List<ParquetFileInfo> getParquetFilesMetadataAfterTime(long syncTime) {
     return getParquetFiles().stream()
         .filter(file -> file.getModificationTime() >= syncTime)
-        .map(file -> new ParquetFileInfo(conf, file))
+        .map(file -> new ParquetFileInfo(hadoopConf, file))
         .collect(Collectors.toList());
   }
 }
