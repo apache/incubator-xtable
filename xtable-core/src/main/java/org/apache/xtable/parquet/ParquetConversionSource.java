@@ -114,24 +114,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   }
 
   private Stream<InternalDataFile> getInternalDataFiles(Stream<ParquetFileInfo> parquetFiles) {
-    return parquetFiles.map(
-        file -> {
-          ParquetMetadata metadata =
-              parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath());
-          return InternalDataFile.builder()
-              .physicalPath(file.getPath().toString())
-              .fileFormat(FileFormat.APACHE_PARQUET)
-              .fileSizeBytes(file.getSize())
-              .partitionValues(
-                  partitionValueExtractor.extractPartitionValues(
-                      partitionSpecExtractor.spec(
-                          partitionValueExtractor.extractSchemaForParquetPartitions(
-                              metadata, file.getPath().toString())),
-                      HudiPathUtils.getPartitionPath(new Path(basePath), file.getPath())))
-              .lastModified(file.getModificationTime())
-              .columnStats(parquetStatsExtractor.getColumnStatsForaFile(metadata))
-              .build();
-        });
+    return parquetFiles.map(this::createInternalDataFileFromParquetFile);
   }
 
   private InternalDataFile createInternalDataFileFromParquetFile(ParquetFileInfo parquetFile) {
@@ -140,8 +123,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         .partitionValues(
             partitionValueExtractor.extractPartitionValues(
                 partitionSpecExtractor.spec(
-                    partitionValueExtractor.extractSchemaForParquetPartitions(
-                        parquetFile.getMetadata(), parquetFile.getPath().toString())),
+                    partitionValueExtractor.extractSchemaForParquetPartitions(parquetFile.getMetadata())),
                 HudiPathUtils.getPartitionPath(new Path(basePath), parquetFile.getPath())))
         .lastModified(parquetFile.getModificationTime())
         .fileSizeBytes(parquetFile.getSize())

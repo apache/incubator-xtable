@@ -295,7 +295,7 @@ public class ITParquetConversionSource {
   }
 
   @Test
-  public void testIncrementalSyncWithMultiplePartitions() throws IOException {
+  void testIncrementalSyncWithMultiplePartitions() throws IOException {
 
     Configuration conf = sparkSession.sparkContext().hadoopConfiguration();
 
