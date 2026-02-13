@@ -27,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
@@ -99,6 +98,7 @@ public class ITParquetConversionSource {
     sparkConf.set("spark.sql.parquet.writeLegacyFormat", "false");
     sparkConf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS");
 
+    sparkConf.set("spark.serializer", "org.apache.spark.serializer.JavaSerializer");
     sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
   }
@@ -142,11 +142,12 @@ public class ITParquetConversionSource {
     if (partitionConfig != null) {
       sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
     }
+    String absolutePath = new java.io.File(java.net.URI.create(table.getDataPath())).getPath();
     SourceTable sourceTable =
         SourceTable.builder()
             .name(tableName)
             .formatName(sourceTableFormat)
-            .basePath(table.getBasePath())
+            .basePath(absolutePath)
             .dataPath(table.getDataPath())
             .additionalProperties(sourceProperties)
             .build();
@@ -159,7 +160,7 @@ public class ITParquetConversionSource {
                         .name(tableName)
                         .formatName(formatName)
                         // set the metadata path to the data path as the default (required by Hudi)
-                        .basePath(table.getDataPath())
+                        .basePath(absolutePath)
                         .metadataRetention(metadataRetention)
                         .build())
             .collect(Collectors.toList());
@@ -173,10 +174,19 @@ public class ITParquetConversionSource {
 
   private static Stream<Arguments> provideArgsForSyncTesting() {
     List<String> partitionConfigs = Arrays.asList(null, "timestamp:MONTH:year=yyyy/month=MM");
-    return partitionConfigs.stream().flatMap(partitionConfig ->
-      Arrays.stream(SyncMode.values()).map(syncMode -> Arguments.of(
-          buildArgsForPartition(
-              PARQUET, Arrays.asList(ICEBERG, DELTA, HUDI), partitionConfig, partitionConfig, syncMode))));
+    return partitionConfigs.stream()
+        .flatMap(
+            partitionConfig ->
+                Arrays.stream(SyncMode.values())
+                    .map(
+                        syncMode ->
+                            Arguments.of(
+                                buildArgsForPartition(
+                                    PARQUET,
+                                    Arrays.asList(ICEBERG, DELTA, HUDI),
+                                    partitionConfig,
+                                    partitionConfig,
+                                    syncMode))));
   }
 
   private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
@@ -226,11 +236,23 @@ public class ITParquetConversionSource {
                   new MetadataBuilder().putString("precision", "millis").build())
             });
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-    String dataPath = tempDir.toAbsolutePath() + (xTablePartitionConfig == null ? "/non_partitioned_data_" : "/partitioned_data_") + tableFormatPartitionDataHolder.getSyncMode();
+    // String dataPath = tempDir.toAbsolutePath() + (xTablePartitionConfig == null ?
+    // "/non_partitioned_data_" : "/partitioned_data_") +
+    // tableFormatPartitionDataHolder.getSyncMode();
+    String dataPath =
+        tempDir
+            .resolve(
+                (xTablePartitionConfig == null ? "non_partitioned_data_" : "partitioned_data_")
+                    + tableFormatPartitionDataHolder.getSyncMode())
+            .toString();
+
     writeData(df, dataPath, xTablePartitionConfig);
     boolean isPartitioned = xTablePartitionConfig != null;
-    try (GenericTable table = GenericTable.getInstance(
-        tableName, Paths.get(dataPath), sparkSession, jsc, sourceTableFormat, isPartitioned)) {
+
+    java.nio.file.Path pathForXTable = java.nio.file.Paths.get(dataPath);
+    try (GenericTable table =
+        GenericTable.getInstance(
+            tableName, pathForXTable, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
       ConversionConfig conversionConfig =
           getTableSyncConfig(
               sourceTableFormat,
@@ -243,7 +265,8 @@ public class ITParquetConversionSource {
       ConversionController conversionController =
           new ConversionController(jsc.hadoopConfiguration());
       conversionController.sync(conversionConfig, conversionSourceProvider);
-      checkDatasetEquivalenceWithFilter(sourceTableFormat, table, targetTableFormats, isPartitioned);
+      checkDatasetEquivalenceWithFilter(
+          sourceTableFormat, table, targetTableFormats, isPartitioned);
 
       // update the current parquet file data with another attribute the sync again
       List<Row> dataToAppend =
@@ -270,22 +293,30 @@ public class ITParquetConversionSource {
       ConversionController conversionControllerAppended =
           new ConversionController(jsc.hadoopConfiguration());
       conversionControllerAppended.sync(conversionConfigAppended, conversionSourceProvider);
-      checkDatasetEquivalenceWithFilter(sourceTableFormat, table, targetTableFormats, isPartitioned);
+      checkDatasetEquivalenceWithFilter(
+          sourceTableFormat, table, targetTableFormats, isPartitioned);
     }
   }
 
   private void writeData(Dataset<Row> df, String dataPath, String partitionConfig) {
     if (partitionConfig != null) {
       // extract partition columns from config
-      String[] partitionCols = Arrays.stream(partitionConfig.split(":")[2].split("/")).map(s -> s.split("=")[0]).toArray(String[]::new);
+      String[] partitionCols =
+          Arrays.stream(partitionConfig.split(":")[2].split("/"))
+              .map(s -> s.split("=")[0])
+              .toArray(String[]::new);
       // add partition columns to dataframe
       for (String partitionCol : partitionCols) {
         if (partitionCol.equals("year")) {
-          df = df.withColumn("year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)));
+          df =
+              df.withColumn(
+                  "year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)));
         } else if (partitionCol.equals("month")) {
-          df = df.withColumn(
-              "month",
-              functions.date_format(functions.col("timestamp").cast(DataTypes.TimestampType), "MM"));
+          df =
+              df.withColumn(
+                  "month",
+                  functions.date_format(
+                      functions.col("timestamp").cast(DataTypes.TimestampType), "MM"));
         }
       }
       df.write().mode(SaveMode.Append).partitionBy(partitionCols).parquet(dataPath);
@@ -316,8 +347,10 @@ public class ITParquetConversionSource {
 
     Dataset<Row> dfInit = sparkSession.createDataFrame(data, schema);
     Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet_table_test_2");
-    String outputPath = fixedPath.toString();
+    // String outputPath = fixedPath.toString();
     Dataset<Row> df = dfInit.withColumn("full_date", expr("make_date(year, month, 1)"));
+    String outputPath =
+        new java.io.File("target/fixed-parquet-data/parquet_table_test_2").getAbsolutePath();
     df.coalesce(1).write().partitionBy("year", "month").mode("overwrite").parquet(outputPath);
 
     // test find files to sync
@@ -350,10 +383,11 @@ public class ITParquetConversionSource {
     Properties sourceProperties = new Properties();
     String partitionConfig = "full_date:MONTH:year=yyyy/month=MM";
     sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
+
     SourceTable tableConfig =
         SourceTable.builder()
             .name("parquet_table_test_2")
-            .basePath(fixedPath.toAbsolutePath().toUri().toString())
+            .basePath(fixedPath.toAbsolutePath().toString()) // removed toUri()
             .additionalProperties(sourceProperties)
             .formatName(TableFormat.PARQUET)
             .build();

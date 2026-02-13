@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -61,6 +60,7 @@ class TestParquetDataManager {
     when(mockPath.getName()).thenReturn(name);
     when(mockStatus.getPath()).thenReturn(mockPath);
     when(mockStatus.getModificationTime()).thenReturn(modTime);
+    when(mockStatus.getLen()).thenReturn(1024L);
     return mockStatus;
   }
 
@@ -86,7 +86,7 @@ class TestParquetDataManager {
   private static FileSystem createMockFileSystem(RemoteIterator<LocatedFileStatus> iterator)
       throws IOException {
     FileSystem mockFs = mock(FileSystem.class);
-    when(mockFs.listFiles(any(org.apache.hadoop.fs.Path.class), eq(true))).thenReturn(iterator);
+    when(mockFs.listFiles(any(org.apache.hadoop.fs.Path.class), anyBoolean())).thenReturn(iterator);
     return mockFs;
   }
 

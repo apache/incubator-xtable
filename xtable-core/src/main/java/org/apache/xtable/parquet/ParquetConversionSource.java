@@ -114,14 +114,19 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     return createInternalTableFromFile(file);
   }
 
-  private Stream<InternalDataFile> getInternalDataFiles(Stream<ParquetFileInfo> parquetFiles, InternalSchema schema) {
+  private Stream<InternalDataFile> getInternalDataFiles(
+      Stream<ParquetFileInfo> parquetFiles, InternalSchema schema) {
     return parquetFiles.map(file -> createInternalDataFileFromParquetFile(file, schema));
   }
 
-  private InternalDataFile createInternalDataFileFromParquetFile(ParquetFileInfo parquetFile, InternalSchema schema) {
+  private InternalDataFile createInternalDataFileFromParquetFile(
+      ParquetFileInfo parquetFile, InternalSchema schema) {
     return InternalDataFile.builder()
         .physicalPath(parquetFile.getPath().toString())
-        .partitionValues(partitionValueExtractor.extractPartitionValues(partitionSpecExtractor.spec(schema), HudiPathUtils.getPartitionPath(new Path(basePath), parquetFile.getPath())))
+        .partitionValues(
+            partitionValueExtractor.extractPartitionValues(
+                partitionSpecExtractor.spec(schema),
+                HudiPathUtils.getPartitionPath(new Path(basePath), parquetFile.getPath())))
         .lastModified(parquetFile.getModificationTime())
         .fileSizeBytes(parquetFile.getSize())
         .columnStats(parquetStatsExtractor.getColumnStatsForaFile(parquetFile.getMetadata()))

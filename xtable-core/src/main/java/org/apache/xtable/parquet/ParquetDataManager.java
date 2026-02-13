@@ -20,6 +20,7 @@ package org.apache.xtable.parquet;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -52,7 +53,8 @@ public class ParquetDataManager {
     this.hadoopConf = hadoopConf;
     this.basePath = basePath;
     try {
-      this.fileSystem = FileSystem.get(URI.create(basePath), hadoopConf);
+      URI uri = Paths.get(basePath).toUri();
+      this.fileSystem = FileSystem.get(uri, hadoopConf);
     } catch (IOException e) {
       throw new ReadException("Unable to initialize file system for base path: " + basePath, e);
     }
