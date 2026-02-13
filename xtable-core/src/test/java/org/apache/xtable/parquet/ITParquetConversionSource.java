@@ -200,6 +200,33 @@ public class ITParquetConversionSource {
     }
   }
 
+  private void cleanupTargetMetadata(String dataPath, List<String> formats) {
+    for (String format : formats) {
+      String metadataFolder = "";
+      switch (format.toUpperCase()) {
+        case "ICEBERG":
+          metadataFolder = "metadata";
+          break;
+        case "DELTA":
+          metadataFolder = "_delta_log";
+          break;
+        case "HUDI":
+          metadataFolder = ".hoodie";
+          break;
+      }
+      if (!metadataFolder.isEmpty()) {
+        try {
+          org.apache.hadoop.fs.Path path = new org.apache.hadoop.fs.Path(dataPath, metadataFolder);
+          org.apache.hadoop.fs.FileSystem fs = path.getFileSystem(jsc.hadoopConfiguration());
+          if (fs.exists(path)) {
+            fs.delete(path, true);
+          }
+        } catch (IOException e) {
+        }
+      }
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("provideArgsForSyncTesting")
   void testSync(TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
@@ -236,9 +263,6 @@ public class ITParquetConversionSource {
                   new MetadataBuilder().putString("precision", "millis").build())
             });
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-    // String dataPath = tempDir.toAbsolutePath() + (xTablePartitionConfig == null ?
-    // "/non_partitioned_data_" : "/partitioned_data_") +
-    // tableFormatPartitionDataHolder.getSyncMode();
     String dataPath =
         tempDir
             .resolve(
@@ -280,7 +304,7 @@ public class ITParquetConversionSource {
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
       writeData(dfAppend, dataPath, xTablePartitionConfig);
-
+      cleanupTargetMetadata(dataPath, targetTableFormats);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
               sourceTableFormat,
