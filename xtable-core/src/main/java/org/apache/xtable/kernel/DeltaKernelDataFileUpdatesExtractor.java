@@ -115,10 +115,10 @@ public class DeltaKernelDataFileUpdatesExtractor {
           if (addIndex >= 0 && !scanFileRow.isNullAt(addIndex)) {
             AddFile addFile = new AddFile(scanFileRow.getStruct(addIndex));
             RemoveFile removeFile =
-                new RemoveFile(
-                    addFile.toRemoveFileRow(false, Optional.of(snapshot.getVersion())));
+                new RemoveFile(addFile.toRemoveFileRow(false, Optional.of(snapshot.getVersion())));
             // Convert relative path to absolute path for comparison with InternalDataFile paths
-            String fullPath = DeltaKernelActionsConverter.getFullPathToFile(removeFile.getPath(), table);
+            String fullPath =
+                DeltaKernelActionsConverter.getFullPathToFile(removeFile.getPath(), table);
             previousFiles.put(fullPath, (RowBackedAction) removeFile);
             fileCount++;
           }

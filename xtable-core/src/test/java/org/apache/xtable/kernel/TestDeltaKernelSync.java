@@ -45,8 +45,6 @@ import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.ScanImpl;
 import io.delta.kernel.internal.SnapshotImpl;
 import io.delta.kernel.internal.actions.AddFile;
-import io.delta.kernel.types.StructField;
-import io.delta.kernel.types.StructType;
 import io.delta.kernel.utils.CloseableIterator;
 
 import org.apache.xtable.conversion.TargetTable;
@@ -401,7 +399,6 @@ public class TestDeltaKernelSync {
     assertFalse(unmappedTargetId.isPresent());
   }
 
-
   @Test
   public void testGetTableMetadata() throws Exception {
     InternalSchema schema = getInternalSchema();
@@ -416,7 +413,6 @@ public class TestDeltaKernelSync {
     assertTrue(metadata.isPresent());
     assertNotNull(metadata.get().getLastInstantSynced());
   }
-
 
   private void validateDeltaTable(Path basePath, Set<InternalDataFile> expectedFiles)
       throws IOException {
