@@ -91,74 +91,46 @@ public class DeltaKernelDataFileUpdatesExtractor {
       System.out.println("Reading existing Delta table snapshot to identify files to remove");
       System.out.println("Table path: " + table.getPath(engine));
 
-      Snapshot snapshot = null;
-      boolean snapshotReadFailed = false;
+      // Read existing snapshot to identify files that need to be removed
+      Snapshot snapshot = table.getLatestSnapshot(engine);
+      System.out.println("Successfully got snapshot. Version: " + snapshot.getVersion());
 
-      try {
-        snapshot = table.getLatestSnapshot(engine);
-        System.out.println("Successfully got snapshot. Version: " + snapshot.getVersion());
-      } catch (NullPointerException npe) {
-        // WORKAROUND: Delta Kernel 4.0.0 bug - NPE when reading snapshots without checkpoints
-        // This happens when:
-        // 1. Table has < 10 commits (no checkpoint created yet)
-        // 2. _last_checkpoint file doesn't exist
-        // 3. Fallback to JSON reading hits NPE in Delta Kernel internals
-        // TODO: Remove this workaround when upgrading to Delta Kernel 4.1.0+
-        System.err.println(
-            "WARNING: Delta Kernel 4.0.0 bug - NullPointerException reading snapshot without checkpoint");
-        System.err.println("This is a known issue with tables that have < 10 commits");
-        System.err.println(
-            "File removals will not be detected until first checkpoint is created (at 10th commit)");
-        snapshotReadFailed = true;
-      } catch (Exception e) {
-        System.err.println(
-            "ERROR: Failed to get snapshot: " + e.getClass().getName() + ": " + e.getMessage());
-        e.printStackTrace();
-        throw e;
-      }
+      ScanImpl myScan = (ScanImpl) snapshot.getScanBuilder().build();
+      CloseableIterator<FilteredColumnarBatch> scanFiles =
+          myScan.getScanFiles(engine, includeColumnStats);
 
-      if (snapshotReadFailed) {
-        // Treat as new table - can't read previous files due to Delta Kernel bug
-        System.err.println("Falling back: treating table as if it has no previous files");
-        DeltaKernelSchemaExtractor schemaExtractor = DeltaKernelSchemaExtractor.getInstance();
-        physicalSchema = schemaExtractor.fromInternalSchema(tableSchema);
-      } else {
-        // Successfully got snapshot - process files normally
-        ScanImpl myScan = (ScanImpl) snapshot.getScanBuilder().build();
-        CloseableIterator<FilteredColumnarBatch> scanFiles =
-            myScan.getScanFiles(engine, includeColumnStats);
+      // Process ALL batches and ALL rows
+      int fileCount = 0;
+      int batchCount = 0;
+      while (scanFiles.hasNext()) {
+        batchCount++;
+        FilteredColumnarBatch scanFileColumnarBatch = scanFiles.next();
+        CloseableIterator<Row> batchRows = scanFileColumnarBatch.getRows();
 
-        // Process ALL batches and ALL rows
-        int fileCount = 0;
-        int batchCount = 0;
-        while (scanFiles.hasNext()) {
-          batchCount++;
-          FilteredColumnarBatch scanFileColumnarBatch = scanFiles.next();
-          CloseableIterator<Row> batchRows = scanFileColumnarBatch.getRows();
+        // Process ALL rows in this batch
+        while (batchRows.hasNext()) {
+          Row scanFileRow = batchRows.next();
+          int addIndex = scanFileRow.getSchema().indexOf("add");
 
-          // Process ALL rows in this batch
-          while (batchRows.hasNext()) {
-            Row scanFileRow = batchRows.next();
-            int addIndex = scanFileRow.getSchema().indexOf("add");
-
-            if (addIndex >= 0 && !scanFileRow.isNullAt(addIndex)) {
-              AddFile addFile = new AddFile(scanFileRow.getStruct(addIndex));
-              RemoveFile removeFile =
-                  new RemoveFile(
-                      addFile.toRemoveFileRow(false, Optional.of(snapshot.getVersion())));
-              previousFiles.put(removeFile.getPath(), (RowBackedAction) removeFile);
-              fileCount++;
-            }
+          if (addIndex >= 0 && !scanFileRow.isNullAt(addIndex)) {
+            AddFile addFile = new AddFile(scanFileRow.getStruct(addIndex));
+            RemoveFile removeFile =
+                new RemoveFile(
+                    addFile.toRemoveFileRow(false, Optional.of(snapshot.getVersion())));
+            // Convert relative path to absolute path for comparison with InternalDataFile paths
+            String fullPath = DeltaKernelActionsConverter.getFullPathToFile(removeFile.getPath(), table);
+            previousFiles.put(fullPath, (RowBackedAction) removeFile);
+            fileCount++;
           }
         }
-        System.out.println(
-            "Found "
-                + fileCount
-                + " existing files in Delta table (from "
-                + batchCount
-                + " batches)");
-        physicalSchema = snapshot.getSchema();
       }
+      System.out.println(
+          "Found "
+              + fileCount
+              + " existing files in Delta table (from "
+              + batchCount
+              + " batches)");
+      physicalSchema = snapshot.getSchema();
     } else {
       // Table doesn't exist yet - no previous files to remove
       // Convert InternalSchema to StructType for physical schema

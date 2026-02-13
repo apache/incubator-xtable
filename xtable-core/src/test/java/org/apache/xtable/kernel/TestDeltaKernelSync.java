@@ -45,6 +45,7 @@ import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.ScanImpl;
 import io.delta.kernel.internal.SnapshotImpl;
 import io.delta.kernel.internal.actions.AddFile;
+import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
 import io.delta.kernel.utils.CloseableIterator;
 
@@ -102,11 +103,6 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled(
-      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
-          + "The bug prevents getLatestSnapshot() from working because _last_checkpoint file is not "
-          + "properly created by PostCommitHook.threadSafeInvoke(). This test will be re-enabled "
-          + "once Delta Kernel is upgraded to a version with the fix. See: [GitHub issue link]")
   public void testCreateSnapshotControlFlow() throws Exception {
     InternalSchema schema1 = getInternalSchema();
     List<InternalField> fields2 = new ArrayList<>(schema1.getFields());
@@ -141,10 +137,6 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled(
-      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
-          + "This test calls validateDeltaTable() which uses getLatestSnapshot(). Will be re-enabled "
-          + "once Delta Kernel is upgraded to a version with the fix.")
   public void testFileRemovalWithCheckpoint() throws Exception {
     // This test does 11 syncs to trigger checkpoint creation (happens at 10th commit)
     // and verifies that file removal works correctly after checkpoint exists
@@ -209,10 +201,6 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled(
-      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
-          + "This test calls getLatestSnapshot() directly and through validateDeltaTable(). Will be re-enabled "
-          + "once Delta Kernel is upgraded to a version with the fix.")
   public void testPrimitiveFieldPartitioning() throws Exception {
     InternalSchema schema = getInternalSchema();
     InternalPartitionField internalPartitionField =
@@ -270,10 +258,6 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled(
-      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
-          + "This test calls getLatestSnapshot() directly and through validateDeltaTable(). Will be re-enabled "
-          + "once Delta Kernel is upgraded to a version with the fix.")
   public void testMultipleFieldPartitioning() throws Exception {
     InternalSchema schema = getInternalSchema();
     InternalPartitionField internalPartitionField1 =
@@ -357,10 +341,7 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled(
-      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
-          + "This test calls validateDeltaTable() which uses getLatestSnapshot(). Will be re-enabled "
-          + "once Delta Kernel is upgraded to a version with the fix.")
+  @Disabled("Disabled due to tags not present in commitinfo")
   public void testSourceTargetIdMapping() throws Exception {
     InternalSchema baseSchema = getInternalSchema();
     InternalTable sourceTable =
@@ -420,63 +401,8 @@ public class TestDeltaKernelSync {
     assertFalse(unmappedTargetId.isPresent());
   }
 
-  @Test
-  @Disabled(
-      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
-          + "This test calls getLatestSnapshot() directly multiple times. Will be re-enabled "
-          + "once Delta Kernel is upgraded to a version with the fix.")
-  public void testSchemaEvolution() throws Exception {
-    // Start with initial schema
-    InternalSchema schema1 = getInternalSchema();
-    InternalTable table1 = getInternalTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
-    InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList(), basePath);
-    InternalSnapshot snapshot1 = buildSnapshot(table1, "0", dataFile1);
-
-    TableFormatSync.getInstance()
-        .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
-
-    // Verify initial schema
-    Table deltaTable = Table.forPath(engine, basePath.toString());
-    Snapshot snapshot = deltaTable.getLatestSnapshot(engine);
-    StructType initialSchema = snapshot.getSchema();
-    assertNotNull(initialSchema);
-    assertEquals(4, initialSchema.fields().size());
-
-    // Add new field to schema
-    List<InternalField> fields2 = new ArrayList<>(schema1.getFields());
-    fields2.add(
-        InternalField.builder()
-            .name("double_field")
-            .schema(
-                InternalSchema.builder()
-                    .name("double")
-                    .dataType(InternalType.DOUBLE)
-                    .isNullable(true)
-                    .build())
-            .build());
-    InternalSchema schema2 = schema1.toBuilder().fields(fields2).build();
-    InternalTable table2 = getInternalTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
-    InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
-    InternalSnapshot snapshot2 = buildSnapshot(table2, "1", dataFile1, dataFile2);
-
-    TableFormatSync.getInstance()
-        .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
-
-    // Verify evolved schema
-    deltaTable = Table.forPath(engine, basePath.toString());
-    snapshot = deltaTable.getLatestSnapshot(engine);
-    StructType evolvedSchema = snapshot.getSchema();
-    assertNotNull(evolvedSchema);
-    assertEquals(5, evolvedSchema.fields().size());
-    assertTrue(
-        evolvedSchema.fields().stream().anyMatch(field -> field.getName().equals("double_field")));
-  }
 
   @Test
-  @Disabled(
-      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
-          + "Disabled as a precaution since it may internally call getLatestSnapshot(). Will be re-enabled "
-          + "once Delta Kernel is upgraded to a version with the fix.")
   public void testGetTableMetadata() throws Exception {
     InternalSchema schema = getInternalSchema();
     InternalTable table = getInternalTable(tableName, basePath, schema, null, LAST_COMMIT_TIME);
@@ -491,31 +417,6 @@ public class TestDeltaKernelSync {
     assertNotNull(metadata.get().getLastInstantSynced());
   }
 
-  @Test
-  @Disabled(
-      "Disabled due to Delta Kernel 4.0.0 bug: NullPointerException when reading snapshots. "
-          + "This test calls validateDeltaTable() which uses getLatestSnapshot(). Will be re-enabled "
-          + "once Delta Kernel is upgraded to a version with the fix.")
-  public void testFileRemoval() throws Exception {
-    InternalSchema schema = getInternalSchema();
-    InternalTable table = getInternalTable(tableName, basePath, schema, null, LAST_COMMIT_TIME);
-
-    InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList(), basePath);
-    InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
-    InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList(), basePath);
-
-    // First sync with files 1 and 2
-    InternalSnapshot snapshot1 = buildSnapshot(table, "0", dataFile1, dataFile2);
-    TableFormatSync.getInstance()
-        .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
-    validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2)));
-
-    // Second sync removes file1, adds file3
-    InternalSnapshot snapshot2 = buildSnapshot(table, "1", dataFile2, dataFile3);
-    TableFormatSync.getInstance()
-        .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
-    validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile2, dataFile3)));
-  }
 
   private void validateDeltaTable(Path basePath, Set<InternalDataFile> expectedFiles)
       throws IOException {
@@ -653,5 +554,58 @@ public class TestDeltaKernelSync {
                     .build()))
         .isNullable(false)
         .build();
+  }
+
+  @Test
+  public void testTimestampNtz() throws Exception {
+    InternalSchema schema1 = getInternalSchemaWithTimestampNtz();
+    List<InternalField> fields2 = new ArrayList<>(schema1.getFields());
+    fields2.add(
+        InternalField.builder()
+            .name("float_field")
+            .schema(
+                InternalSchema.builder()
+                    .name("float")
+                    .dataType(InternalType.FLOAT)
+                    .isNullable(true)
+                    .build())
+            .build());
+    InternalSchema schema2 = getInternalSchema().toBuilder().fields(fields2).build();
+    InternalTable table1 = getInternalTable(tableName, basePath, schema1, null, LAST_COMMIT_TIME);
+    InternalTable table2 = getInternalTable(tableName, basePath, schema2, null, LAST_COMMIT_TIME);
+
+    InternalDataFile dataFile1 = getDataFile(1, Collections.emptyList(), basePath);
+    InternalDataFile dataFile2 = getDataFile(2, Collections.emptyList(), basePath);
+    InternalDataFile dataFile3 = getDataFile(3, Collections.emptyList(), basePath);
+
+    InternalSnapshot snapshot1 = buildSnapshot(table1, "0", dataFile1, dataFile2);
+    InternalSnapshot snapshot2 = buildSnapshot(table2, "1", dataFile2, dataFile3);
+
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), snapshot1);
+    validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile1, dataFile2)));
+
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), snapshot2);
+    validateDeltaTable(basePath, new HashSet<>(Arrays.asList(dataFile2, dataFile3)));
+  }
+
+  private InternalSchema getInternalSchemaWithTimestampNtz() {
+    Map<InternalSchema.MetadataKey, Object> timestampMetadata = new HashMap<>();
+    timestampMetadata.put(
+        InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
+    List<InternalField> fields = new ArrayList<>(getInternalSchema().getFields());
+    fields.add(
+        InternalField.builder()
+            .name("timestamp_ntz_field")
+            .schema(
+                InternalSchema.builder()
+                    .name("time_ntz")
+                    .dataType(InternalType.TIMESTAMP_NTZ)
+                    .isNullable(true)
+                    .metadata(timestampMetadata)
+                    .build())
+            .build());
+    return getInternalSchema().toBuilder().fields(fields).build();
   }
 }

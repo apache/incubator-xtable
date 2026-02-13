@@ -72,7 +72,11 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
         engine,
         DeltaKernelSchemaExtractor.getInstance(),
         DeltaKernelPartitionExtractor.getInstance(),
-        DeltaKernelDataFileUpdatesExtractor.builder().build());
+        DeltaKernelDataFileUpdatesExtractor.builder()
+            .engine(engine)
+            .basePath(targetTable.getBasePath())
+            .includeColumnStats(false)
+            .build());
   }
 
   @VisibleForTesting
@@ -104,7 +108,6 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
       DeltaKernelPartitionExtractor partitionExtractor,
       DeltaKernelDataFileUpdatesExtractor dataFileUpdatesExtractor) {
     this.basePath = tableDataPath;
-    Table table = Table.forPath(engine, this.basePath);
     this.schemaExtractor = schemaExtractor;
     this.partitionExtractor = partitionExtractor;
     this.dataKernelFileUpdatesExtractor = dataFileUpdatesExtractor;
@@ -397,50 +400,6 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
       // us to provide partition values via DataWriteContext, which doesn't work well
       // when different files have different partition values.
       List<io.delta.kernel.data.Row> allActionRows = new ArrayList<>();
-
-      // Check if schema has changed for existing tables - if so, add Metadata action
-      if (tableExists) {
-        io.delta.kernel.Snapshot currentSnapshot = table.getLatestSnapshot(engine);
-        io.delta.kernel.types.StructType currentSchema = currentSnapshot.getSchema();
-
-        // Compare schemas by comparing field names and types
-        // Schema changed if: different number of fields OR any field differs
-        boolean schemaChanged = (currentSchema.fields().size() != latestSchema.fields().size());
-
-        if (!schemaChanged) {
-          // Same number of fields - check if any field differs
-          // Create maps for easier comparison
-          java.util.Map<String, StructField> currentFieldsMap = new java.util.HashMap<>();
-          for (StructField field : currentSchema.fields()) {
-            currentFieldsMap.put(field.getName(), field);
-          }
-
-          for (StructField newField : latestSchema.fields()) {
-            StructField currentField = currentFieldsMap.get(newField.getName());
-            if (currentField == null
-                || !currentField.getDataType().equivalent(newField.getDataType())) {
-              schemaChanged = true;
-              break;
-            }
-          }
-        }
-
-        if (schemaChanged) {
-          // Get current metadata and create new one with updated schema
-          io.delta.kernel.internal.SnapshotImpl snapshotImpl =
-              (io.delta.kernel.internal.SnapshotImpl) currentSnapshot;
-          io.delta.kernel.internal.actions.Metadata currentMetadata = snapshotImpl.getMetadata();
-          io.delta.kernel.internal.actions.Metadata newMetadata =
-              currentMetadata.withNewSchema(latestSchema);
-
-          // Add metadata action to the BEGINNING of the actions list
-          // Metadata actions should come first in Delta log entries
-          io.delta.kernel.data.Row metadataRow =
-              io.delta.kernel.internal.actions.SingleAction.createMetadataSingleAction(
-                  newMetadata.toRow());
-          allActionRows.add(0, metadataRow);
-        }
-      }
 
       scala.collection.Iterator<RowBackedAction> actionsIterator = actions.iterator();
       while (actionsIterator.hasNext()) {
