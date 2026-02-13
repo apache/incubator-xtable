@@ -30,10 +30,13 @@ import org.apache.xtable.conversion.ExternalCatalogConfig;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
+import org.apache.xtable.model.catalog.policy.InternalAccessControlPolicySnapshot;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
+import org.apache.xtable.model.sync.policy.PolicySyncResult;
 import org.apache.xtable.spi.extractor.CatalogConversionSource;
+import org.apache.xtable.spi.sync.CatalogAccessControlPolicySyncClient;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 public class ITTestUtils {
@@ -162,5 +165,22 @@ public class ITTestUtils {
 
     @Override
     public void init(ExternalCatalogConfig catalogConfig, Configuration configuration) {}
+  }
+
+  public static class TestCatalogAccessControlPolicySyncClientImpl
+      implements CatalogAccessControlPolicySyncClient {
+
+    public TestCatalogAccessControlPolicySyncClientImpl(
+        ExternalCatalogConfig catalogConfig, Configuration hadoopConf) {}
+
+    @Override
+    public InternalAccessControlPolicySnapshot fetchPolicies() {
+      return InternalAccessControlPolicySnapshot.builder().build();
+    }
+
+    @Override
+    public PolicySyncResult pushPolicies(InternalAccessControlPolicySnapshot snapshot) {
+      return PolicySyncResult.builder().build();
+    }
   }
 }
