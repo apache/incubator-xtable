@@ -329,12 +329,18 @@ public class ITParquetConversionSource {
       }
 
       if (fs.exists(finalPath)) {
-        Dataset<Row> existingData =
-            sparkSession
-                .read()
-                .option("recursiveFileLookup", "true")
-                .option("pathGlobFilter", "*.parquet")
-                .parquet(dataPath);
+        Dataset<Row> existingData;
+        if (partitionCols != null && partitionCols.length > 0) {
+          existingData =
+              sparkSession
+                  .read()
+                  .option("basePath", dataPath)
+                  .parquet(dataPath + "/" + partitionCols[0] + "=*");
+        } else {
+          existingData =
+              sparkSession.read().option("pathGlobFilter", "*.parquet").parquet(dataPath);
+        }
+
         df = existingData.unionByName(df);
       }
 
