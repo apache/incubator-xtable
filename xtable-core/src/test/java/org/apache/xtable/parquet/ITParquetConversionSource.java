@@ -335,6 +335,8 @@ public class ITParquetConversionSource {
               sparkSession
                   .read()
                   .option("basePath", dataPath)
+                  .option("pathGlobFilter", "*.parquet")
+                  .option("recursiveFileLookup", "true")
                   .parquet(dataPath + "/*=*");
         } else {
           existingData =
