@@ -352,7 +352,9 @@ public class ITParquetConversionSource {
       } else {
         writer.parquet(tempPath);
       }
-      fs.delete(finalPath, true);
+      if (fs.exists(finalPath)) {
+        fs.delete(finalPath, true);
+      }
       fs.rename(new org.apache.hadoop.fs.Path(tempPath), finalPath);
 
     } catch (IOException ioException) {
