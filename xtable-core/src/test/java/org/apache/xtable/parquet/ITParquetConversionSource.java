@@ -335,7 +335,7 @@ public class ITParquetConversionSource {
               sparkSession
                   .read()
                   .option("basePath", dataPath)
-                  .parquet(dataPath + "/" + partitionCols[0] + "=*");
+                  .parquet(dataPath + "/*=*");
         } else {
           existingData =
               sparkSession.read().option("pathGlobFilter", "*.parquet").parquet(dataPath);
