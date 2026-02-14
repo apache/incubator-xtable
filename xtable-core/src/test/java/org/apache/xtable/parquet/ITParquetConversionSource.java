@@ -296,16 +296,16 @@ public class ITParquetConversionSource {
 
   private void writeData(Dataset<Row> df, String dataPath, String partitionConfig) {
     try {
-      org.apache.hadoop.fs.Path path = new org.apache.hadoop.fs.Path(dataPath);
-      org.apache.hadoop.fs.FileSystem fs = path.getFileSystem(jsc.hadoopConfiguration());
+      org.apache.hadoop.fs.Path finalPath = new org.apache.hadoop.fs.Path(dataPath);
+      org.apache.hadoop.fs.FileSystem fs = finalPath.getFileSystem(jsc.hadoopConfiguration());
 
+      String[] partitionCols = null;
       if (partitionConfig != null) {
-        // extract partition columns from config
-        String[] partitionCols =
+        partitionCols =
             Arrays.stream(partitionConfig.split(":")[2].split("/"))
                 .map(s -> s.split("=")[0])
                 .toArray(String[]::new);
-        // add partition columns to dataframe
+
         for (String partitionCol : partitionCols) {
           if (partitionCol.equals("year")) {
             df =
@@ -318,22 +318,34 @@ public class ITParquetConversionSource {
                     "month",
                     functions.date_format(
                         functions.col("timestamp").cast(DataTypes.TimestampType), "MM"));
+          } else if (partitionCol.equals("day")) {
+            df =
+                df.withColumn(
+                    "day",
+                    functions.date_format(
+                        functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
           }
         }
-        if (fs.exists(new org.apache.hadoop.fs.Path(dataPath))) {
-          Dataset<Row> existingData = sparkSession.read().parquet(dataPath);
-          df = existingData.unionByName(df);
-        }
-        df.write().mode(SaveMode.Overwrite).partitionBy(partitionCols).parquet(dataPath);
-      } else {
-        if (fs.exists(new org.apache.hadoop.fs.Path(dataPath))) {
-          Dataset<Row> existingData = sparkSession.read().parquet(dataPath);
-          df = existingData.unionByName(df);
-        }
-        df.write().mode(SaveMode.Overwrite).parquet(dataPath);
       }
+
+      if (fs.exists(finalPath)) {
+        Dataset<Row> existingData = sparkSession.read().parquet(dataPath);
+        df = existingData.unionByName(df);
+      }
+
+      String tempPath = dataPath + "_temp_" + System.currentTimeMillis();
+      org.apache.spark.sql.DataFrameWriter<Row> writer = df.write().mode(SaveMode.Overwrite);
+
+      if (partitionCols != null && partitionCols.length > 0) {
+        writer.partitionBy(partitionCols).parquet(tempPath);
+      } else {
+        writer.parquet(tempPath);
+      }
+      fs.delete(finalPath, true);
+      fs.rename(new org.apache.hadoop.fs.Path(tempPath), finalPath);
+
     } catch (IOException ioException) {
-      ioException.printStackTrace();
+      throw new RuntimeException("Data refresh failed for: " + dataPath, ioException);
     }
   }
 
