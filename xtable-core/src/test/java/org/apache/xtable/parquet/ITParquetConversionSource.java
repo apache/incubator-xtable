@@ -329,7 +329,7 @@ public class ITParquetConversionSource {
       }
 
       if (fs.exists(finalPath)) {
-        Dataset<Row> existingData = sparkSession.read().parquet(dataPath);
+        Dataset<Row> existingData = sparkSession.read().parquet(dataPath + "/**/*.parquet");
         df = existingData.unionByName(df);
       }
 
