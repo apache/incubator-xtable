@@ -200,6 +200,33 @@ public class ITParquetConversionSource {
     }
   }
 
+  private void cleanupTargetMetadata(String dataPath, List<String> formats) {
+    for (String format : formats) {
+      String metadataFolder = "";
+      switch (format.toUpperCase()) {
+        case "ICEBERG":
+          metadataFolder = "metadata";
+          break;
+        case "DELTA":
+          metadataFolder = "_delta_log";
+          break;
+        case "HUDI":
+          metadataFolder = ".hoodie";
+          break;
+      }
+      if (!metadataFolder.isEmpty()) {
+        try {
+          org.apache.hadoop.fs.Path path = new org.apache.hadoop.fs.Path(dataPath, metadataFolder);
+          org.apache.hadoop.fs.FileSystem fs = path.getFileSystem(jsc.hadoopConfiguration());
+          if (fs.exists(path)) {
+            fs.delete(path, true);
+          }
+        } catch (IOException e) {
+        }
+      }
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("provideArgsForSyncTesting")
   void testSync(TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
@@ -277,6 +304,7 @@ public class ITParquetConversionSource {
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
       writeData(dfAppend, dataPath, xTablePartitionConfig);
+      cleanupTargetMetadata(dataPath, targetTableFormats);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
               sourceTableFormat,
@@ -295,72 +323,35 @@ public class ITParquetConversionSource {
   }
 
   private void writeData(Dataset<Row> df, String dataPath, String partitionConfig) {
-    try {
-      org.apache.hadoop.fs.Path finalPath = new org.apache.hadoop.fs.Path(dataPath);
-      org.apache.hadoop.fs.FileSystem fs = finalPath.getFileSystem(jsc.hadoopConfiguration());
-
-      String[] partitionCols = null;
-      if (partitionConfig != null) {
-        partitionCols =
-            Arrays.stream(partitionConfig.split(":")[2].split("/"))
-                .map(s -> s.split("=")[0])
-                .toArray(String[]::new);
-
-        for (String partitionCol : partitionCols) {
-          if (partitionCol.equals("year")) {
-            df =
-                df.withColumn(
-                    "year",
-                    functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)));
-          } else if (partitionCol.equals("month")) {
-            df =
-                df.withColumn(
-                    "month",
-                    functions.date_format(
-                        functions.col("timestamp").cast(DataTypes.TimestampType), "MM"));
-          } else if (partitionCol.equals("day")) {
-            df =
-                df.withColumn(
-                    "day",
-                    functions.date_format(
-                        functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
-          }
+    if (partitionConfig != null) {
+      // extract partition columns from config
+      String[] partitionCols =
+          Arrays.stream(partitionConfig.split(":")[2].split("/"))
+              .map(s -> s.split("=")[0])
+              .toArray(String[]::new);
+      // add partition columns to dataframe
+      for (String partitionCol : partitionCols) {
+        if (partitionCol.equals("year")) {
+          df =
+              df.withColumn(
+                  "year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)));
+        } else if (partitionCol.equals("month")) {
+          df =
+              df.withColumn(
+                  "month",
+                  functions.date_format(
+                      functions.col("timestamp").cast(DataTypes.TimestampType), "MM"));
+        } else if (partitionCol.equals("day")) {
+          df =
+              df.withColumn(
+                  "day",
+                  functions.date_format(
+                      functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
         }
       }
-
-      if (fs.exists(finalPath)) {
-        Dataset<Row> existingData;
-        if (partitionCols != null && partitionCols.length > 0) {
-          existingData =
-              sparkSession
-                  .read()
-                  .option("basePath", dataPath)
-                  .option("pathGlobFilter", "*.parquet")
-                  .option("recursiveFileLookup", "true")
-                  .parquet(dataPath + "/*=*");
-        } else {
-          existingData =
-              sparkSession.read().option("pathGlobFilter", "*.parquet").parquet(dataPath);
-        }
-
-        df = existingData.unionByName(df);
-      }
-
-      String tempPath = dataPath + "_temp_" + System.currentTimeMillis();
-      org.apache.spark.sql.DataFrameWriter<Row> writer = df.write().mode(SaveMode.Overwrite);
-
-      if (partitionCols != null && partitionCols.length > 0) {
-        writer.partitionBy(partitionCols).parquet(tempPath);
-      } else {
-        writer.parquet(tempPath);
-      }
-      if (fs.exists(finalPath)) {
-        fs.delete(finalPath, true);
-      }
-      fs.rename(new org.apache.hadoop.fs.Path(tempPath), finalPath);
-
-    } catch (IOException ioException) {
-      throw new RuntimeException("Data refresh failed for: " + dataPath, ioException);
+      df.write().mode(SaveMode.Append).partitionBy(partitionCols).parquet(dataPath);
+    } else {
+      df.write().mode(SaveMode.Append).parquet(dataPath);
     }
   }
 
