@@ -359,7 +359,7 @@ public class ITParquetConversionSource {
       if (fs.exists(finalPath)) {
         Dataset<Row> existingData;
         if (partitionCols != null && partitionCols.length > 0) {
-          existingData = sparkSession.read().option("basePath", dataPath).parquet(dataPath);
+          existingData = sparkSession.read().option("basePath", dataPath).parquet(dataPath + "/*=*");
         } else {
           existingData = sparkSession.read().parquet(dataPath);
         }
