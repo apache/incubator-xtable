@@ -263,12 +263,18 @@ public class ITParquetConversionSource {
                   new MetadataBuilder().putString("precision", "millis").build())
             });
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-    String dataPath =
+
+      java.io.File baseDir = new java.io.File("target/fixed-parquet-data/parquet_table_test_1");
+      String subFolder = (xTablePartitionConfig == null ? "non_partitioned_data_" : "partitioned_data_")
+              + tableFormatPartitionDataHolder.getSyncMode();
+
+      String dataPath = new java.io.File(baseDir, subFolder).getAbsolutePath();
+    /*String dataPath =
         tempDir
             .resolve(
                 (xTablePartitionConfig == null ? "non_partitioned_data_" : "partitioned_data_")
                     + tableFormatPartitionDataHolder.getSyncMode())
-            .toString();
+            .toString();*/
 
     writeData(df, dataPath, xTablePartitionConfig);
     boolean isPartitioned = xTablePartitionConfig != null;
@@ -304,7 +310,7 @@ public class ITParquetConversionSource {
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
       writeData(dfAppend, dataPath, xTablePartitionConfig);
-      cleanupTargetMetadata(dataPath, targetTableFormats);
+      //cleanupTargetMetadata(dataPath, targetTableFormats);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
               sourceTableFormat,
