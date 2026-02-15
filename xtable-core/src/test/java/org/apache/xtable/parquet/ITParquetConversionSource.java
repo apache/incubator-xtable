@@ -267,7 +267,9 @@ public class ITParquetConversionSource {
         tempDir
             .resolve(
                 (xTablePartitionConfig == null ? "non_partitioned_data_" : "partitioned_data_")
-                    + tableFormatPartitionDataHolder.getSyncMode())
+                    + tableFormatPartitionDataHolder.getSyncMode()
+                    + "_"
+                    + UUID.randomUUID().toString())
             .toString();
 
     writeData(df, dataPath, xTablePartitionConfig, sourceTableFormat);
@@ -304,11 +306,6 @@ public class ITParquetConversionSource {
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
       writeData(dfAppend, dataPath, xTablePartitionConfig, sourceTableFormat);
-      try {
-        Thread.sleep(1000);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
       // cleanupTargetMetadata(dataPath, targetTableFormats);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
