@@ -270,7 +270,7 @@ public class ITParquetConversionSource {
                     + tableFormatPartitionDataHolder.getSyncMode())
             .toString();
 
-    writeData(df, dataPath, xTablePartitionConfig);
+    writeData(df, dataPath, xTablePartitionConfig, sourceTableFormat);
     boolean isPartitioned = xTablePartitionConfig != null;
 
     java.nio.file.Path pathForXTable = java.nio.file.Paths.get(dataPath);
@@ -303,8 +303,13 @@ public class ITParquetConversionSource {
                   new Timestamp(System.currentTimeMillis() + 1500)));
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
-      writeData(dfAppend, dataPath, xTablePartitionConfig);
-      cleanupTargetMetadata(dataPath, targetTableFormats);
+      writeData(dfAppend, dataPath, xTablePartitionConfig, sourceTableFormat);
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      // cleanupTargetMetadata(dataPath, targetTableFormats);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
               sourceTableFormat,
@@ -322,7 +327,8 @@ public class ITParquetConversionSource {
     }
   }
 
-  private void writeData(Dataset<Row> df, String dataPath, String partitionConfig) {
+  private void writeData(
+      Dataset<Row> df, String dataPath, String partitionConfig, String sourceTableFormat) {
     if (partitionConfig != null) {
       // extract partition columns from config
       String[] partitionCols =
@@ -349,9 +355,13 @@ public class ITParquetConversionSource {
                       functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
         }
       }
-      df.write().mode(SaveMode.Append).partitionBy(partitionCols).parquet(dataPath);
+      df.write()
+          .format(sourceTableFormat)
+          .mode(SaveMode.Append)
+          .partitionBy(partitionCols)
+          .save(dataPath);
     } else {
-      df.write().mode(SaveMode.Append).parquet(dataPath);
+      df.write().format(sourceTableFormat).mode(SaveMode.Append).save(dataPath);
     }
   }
 
