@@ -304,7 +304,7 @@ public class ITParquetConversionSource {
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
       writeData(dfAppend, dataPath, xTablePartitionConfig);
-      cleanupTargetMetadata(dataPath, targetTableFormats);
+      // cleanupTargetMetadata(dataPath, targetTableFormats);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
               sourceTableFormat,
@@ -323,35 +323,65 @@ public class ITParquetConversionSource {
   }
 
   private void writeData(Dataset<Row> df, String dataPath, String partitionConfig) {
-    if (partitionConfig != null) {
-      // extract partition columns from config
-      String[] partitionCols =
-          Arrays.stream(partitionConfig.split(":")[2].split("/"))
-              .map(s -> s.split("=")[0])
-              .toArray(String[]::new);
-      // add partition columns to dataframe
-      for (String partitionCol : partitionCols) {
-        if (partitionCol.equals("year")) {
-          df =
-              df.withColumn(
-                  "year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)));
-        } else if (partitionCol.equals("month")) {
-          df =
-              df.withColumn(
-                  "month",
-                  functions.date_format(
-                      functions.col("timestamp").cast(DataTypes.TimestampType), "MM"));
-        } else if (partitionCol.equals("day")) {
-          df =
-              df.withColumn(
-                  "day",
-                  functions.date_format(
-                      functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
+    try {
+      org.apache.hadoop.fs.Path finalPath = new org.apache.hadoop.fs.Path(dataPath);
+      org.apache.hadoop.fs.FileSystem fs = finalPath.getFileSystem(jsc.hadoopConfiguration());
+
+      String[] partitionCols = null;
+      if (partitionConfig != null) {
+        partitionCols =
+            Arrays.stream(partitionConfig.split(":")[2].split("/"))
+                .map(s -> s.split("=")[0])
+                .toArray(String[]::new);
+
+        for (String partitionCol : partitionCols) {
+          if (partitionCol.equals("year")) {
+            df =
+                df.withColumn(
+                    "year",
+                    functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)));
+          } else if (partitionCol.equals("month")) {
+            df =
+                df.withColumn(
+                    "month",
+                    functions.date_format(
+                        functions.col("timestamp").cast(DataTypes.TimestampType), "MM"));
+          } else if (partitionCol.equals("day")) {
+            df =
+                df.withColumn(
+                    "day",
+                    functions.date_format(
+                        functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
+          }
         }
       }
-      df.write().mode(SaveMode.Append).partitionBy(partitionCols).parquet(dataPath);
-    } else {
-      df.write().mode(SaveMode.Append).parquet(dataPath);
+
+      if (fs.exists(finalPath)) {
+        Dataset<Row> existingData;
+        if (partitionCols != null && partitionCols.length > 0) {
+          existingData = sparkSession.read().option("basePath", dataPath).parquet(dataPath);
+        } else {
+          existingData = sparkSession.read().parquet(dataPath);
+        }
+
+        df = existingData.unionByName(df);
+      }
+
+      String tempPath = dataPath + "_temp_" + System.currentTimeMillis();
+      org.apache.spark.sql.DataFrameWriter<Row> writer = df.write().mode(SaveMode.Overwrite);
+
+      if (partitionCols != null && partitionCols.length > 0) {
+        writer.partitionBy(partitionCols).parquet(tempPath);
+      } else {
+        writer.parquet(tempPath);
+      }
+      if (fs.exists(finalPath)) {
+        fs.delete(finalPath, true);
+      }
+      fs.rename(new org.apache.hadoop.fs.Path(tempPath), finalPath);
+
+    } catch (IOException ioException) {
+      throw new RuntimeException("Data refresh failed for: " + dataPath, ioException);
     }
   }
 
