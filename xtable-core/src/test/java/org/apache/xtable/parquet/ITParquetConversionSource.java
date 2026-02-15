@@ -267,12 +267,10 @@ public class ITParquetConversionSource {
         tempDir
             .resolve(
                 (xTablePartitionConfig == null ? "non_partitioned_data_" : "partitioned_data_")
-                    + tableFormatPartitionDataHolder.getSyncMode()
-                    + "_"
-                    + UUID.randomUUID().toString())
+                    + tableFormatPartitionDataHolder.getSyncMode())
             .toString();
 
-    writeData(df, dataPath, xTablePartitionConfig, sourceTableFormat);
+    writeData(df, dataPath, xTablePartitionConfig, sourceTableFormat, true);
     boolean isPartitioned = xTablePartitionConfig != null;
 
     java.nio.file.Path pathForXTable = java.nio.file.Paths.get(dataPath);
@@ -305,7 +303,7 @@ public class ITParquetConversionSource {
                   new Timestamp(System.currentTimeMillis() + 1500)));
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
-      writeData(dfAppend, dataPath, xTablePartitionConfig, sourceTableFormat);
+      writeData(dfAppend, dataPath, xTablePartitionConfig, sourceTableFormat, false);
       // cleanupTargetMetadata(dataPath, targetTableFormats);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
@@ -325,7 +323,7 @@ public class ITParquetConversionSource {
   }
 
   private void writeData(
-      Dataset<Row> df, String dataPath, String partitionConfig, String sourceTableFormat) {
+      Dataset<Row> df, String dataPath, String partitionConfig, String sourceTableFormat, boolean firstCall) {
     if (partitionConfig != null) {
       // extract partition columns from config
       String[] partitionCols =
@@ -352,13 +350,27 @@ public class ITParquetConversionSource {
                       functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
         }
       }
-      df.write()
-          .format(sourceTableFormat)
-          .mode(SaveMode.Append)
-          .partitionBy(partitionCols)
-          .save(dataPath);
+      if (firstCall) {
+        df.write()
+                .format(sourceTableFormat)
+                .mode(SaveMode.Overwrite)
+                .partitionBy(partitionCols)
+                .save(dataPath);
+      }
+      else{
+        df.write()
+                .format(sourceTableFormat)
+                .mode(SaveMode.Append)
+                .partitionBy(partitionCols)
+                .save(dataPath);
+      }
     } else {
-      df.write().format(sourceTableFormat).mode(SaveMode.Append).save(dataPath);
+      if (firstCall) {
+        df.write().format(sourceTableFormat).mode(SaveMode.Overwrite).save(dataPath);
+      }
+      else{
+        df.write().format(sourceTableFormat).mode(SaveMode.Append).save(dataPath);
+      }
     }
   }
 
