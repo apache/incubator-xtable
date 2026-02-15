@@ -263,23 +263,17 @@ public class ITParquetConversionSource {
                   new MetadataBuilder().putString("precision", "millis").build())
             });
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-
-      java.io.File baseDir = new java.io.File("target/fixed-parquet-data/parquet_table_test_1");
-      String subFolder = (xTablePartitionConfig == null ? "non_partitioned_data_" : "partitioned_data_")
-              + tableFormatPartitionDataHolder.getSyncMode();
-
-      String dataPath = new java.io.File(baseDir, subFolder).getAbsolutePath();
-    /*String dataPath =
+    String dataPath =
         tempDir
             .resolve(
                 (xTablePartitionConfig == null ? "non_partitioned_data_" : "partitioned_data_")
                     + tableFormatPartitionDataHolder.getSyncMode())
-            .toString();*/
+            .toString();
 
     writeData(df, dataPath, xTablePartitionConfig);
     boolean isPartitioned = xTablePartitionConfig != null;
 
-    java.nio.file.Path pathForXTable = java.nio.file.Paths.get(dataPath);
+    Path pathForXTable = Paths.get(dataPath);
     try (GenericTable table =
         GenericTable.getInstance(
             tableName, pathForXTable, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
@@ -310,7 +304,7 @@ public class ITParquetConversionSource {
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
       writeData(dfAppend, dataPath, xTablePartitionConfig);
-      //cleanupTargetMetadata(dataPath, targetTableFormats);
+      cleanupTargetMetadata(dataPath, targetTableFormats);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
               sourceTableFormat,
@@ -423,7 +417,7 @@ public class ITParquetConversionSource {
     SourceTable tableConfig =
         SourceTable.builder()
             .name("parquet_table_test_2")
-            .basePath(fixedPath.toAbsolutePath().toString()) // removed toUri()
+            .basePath(fixedPath.toAbsolutePath().toString())
             .additionalProperties(sourceProperties)
             .formatName(TableFormat.PARQUET)
             .build();
