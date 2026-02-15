@@ -270,7 +270,7 @@ public class ITParquetConversionSource {
                     + tableFormatPartitionDataHolder.getSyncMode())
             .toString();
 
-    writeData(df, dataPath, xTablePartitionConfig, sourceTableFormat, true);
+    writeData(df, dataPath, xTablePartitionConfig);
     boolean isPartitioned = xTablePartitionConfig != null;
 
     java.nio.file.Path pathForXTable = java.nio.file.Paths.get(dataPath);
@@ -303,8 +303,8 @@ public class ITParquetConversionSource {
                   new Timestamp(System.currentTimeMillis() + 1500)));
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
-      writeData(dfAppend, dataPath, xTablePartitionConfig, sourceTableFormat, false);
-      // cleanupTargetMetadata(dataPath, targetTableFormats);
+      writeData(dfAppend, dataPath, xTablePartitionConfig);
+      //cleanupTargetMetadata(dataPath, targetTableFormats);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
               sourceTableFormat,
@@ -322,8 +322,7 @@ public class ITParquetConversionSource {
     }
   }
 
-  private void writeData(
-      Dataset<Row> df, String dataPath, String partitionConfig, String sourceTableFormat, boolean firstCall) {
+  private void writeData(Dataset<Row> df, String dataPath, String partitionConfig) {
     if (partitionConfig != null) {
       // extract partition columns from config
       String[] partitionCols =
@@ -350,27 +349,18 @@ public class ITParquetConversionSource {
                       functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
         }
       }
-      if (firstCall) {
-        df.write()
-                .format(sourceTableFormat)
-                .mode(SaveMode.Overwrite)
-                .partitionBy(partitionCols)
-                .save(dataPath);
-      }
-      else{
-        df.write()
-                .format(sourceTableFormat)
-                .mode(SaveMode.Append)
-                .partitionBy(partitionCols)
-                .save(dataPath);
-      }
+      Dataset<Row> existingData = sparkSession.read().parquet(dataPath);
+      Dataset<Row> combinedData = existingData.unionByName(df, true);
+      combinedData.write()
+              .mode(SaveMode.Overwrite)
+              .partitionBy(partitionCols)
+              .parquet(dataPath);
+      //df.write().mode(SaveMode.Append).partitionBy(partitionCols).parquet(dataPath);
     } else {
-      if (firstCall) {
-        df.write().format(sourceTableFormat).mode(SaveMode.Overwrite).save(dataPath);
-      }
-      else{
-        df.write().format(sourceTableFormat).mode(SaveMode.Append).save(dataPath);
-      }
+      Dataset<Row> existingData = sparkSession.read().parquet(dataPath);
+      Dataset<Row> combinedData = existingData.unionByName(df, true);
+      //df.write().mode(SaveMode.Append).parquet(dataPath);
+      combinedData.write().mode(SaveMode.Overwrite).parquet(dataPath);
     }
   }
 
