@@ -349,16 +349,28 @@ public class ITParquetConversionSource {
                       functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
         }
       }
-      Dataset<Row> existingData = sparkSession.read().parquet(dataPath);
-      Dataset<Row> combinedData = existingData.unionByName(df, true);
+      Dataset<Row> combinedData;
+      try {
+        Dataset<Row> existingData = sparkSession.read().parquet(dataPath);
+        combinedData = existingData.unionByName(df, true);
+      } catch (Exception e) {
+        // If the path doesn't exist or is empty, the current DF is the "existing" data
+        combinedData = df;
+      }
       combinedData.write()
               .mode(SaveMode.Overwrite)
               .partitionBy(partitionCols)
               .parquet(dataPath);
       //df.write().mode(SaveMode.Append).partitionBy(partitionCols).parquet(dataPath);
     } else {
-      Dataset<Row> existingData = sparkSession.read().parquet(dataPath);
-      Dataset<Row> combinedData = existingData.unionByName(df, true);
+      Dataset<Row> combinedData;
+      try {
+        Dataset<Row> existingData = sparkSession.read().parquet(dataPath);
+        combinedData = existingData.unionByName(df, true);
+      } catch (Exception e) {
+        // If the path doesn't exist or is empty, the current DF is the "existing" data
+        combinedData = df;
+      }
       //df.write().mode(SaveMode.Append).parquet(dataPath);
       combinedData.write().mode(SaveMode.Overwrite).parquet(dataPath);
     }
