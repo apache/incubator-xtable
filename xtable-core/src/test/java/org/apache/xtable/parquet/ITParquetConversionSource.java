@@ -304,7 +304,7 @@ public class ITParquetConversionSource {
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
       writeData(dfAppend, dataPath, xTablePartitionConfig);
-      //cleanupTargetMetadata(dataPath, targetTableFormats);
+      cleanupTargetMetadata(dataPath, targetTableFormats);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
               sourceTableFormat,
@@ -349,30 +349,9 @@ public class ITParquetConversionSource {
                       functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
         }
       }
-      Dataset<Row> combinedData;
-      try {
-        Dataset<Row> existingData = sparkSession.read().parquet(dataPath);
-        combinedData = existingData.unionByName(df, true);
-      } catch (Exception e) {
-        // If the path doesn't exist or is empty, the current DF is the "existing" data
-        combinedData = df;
-      }
-      combinedData.write()
-              .mode(SaveMode.Overwrite)
-              .partitionBy(partitionCols)
-              .parquet(dataPath);
-      //df.write().mode(SaveMode.Append).partitionBy(partitionCols).parquet(dataPath);
+      df.write().mode(SaveMode.Append).partitionBy(partitionCols).parquet(dataPath);
     } else {
-      Dataset<Row> combinedData;
-      try {
-        Dataset<Row> existingData = sparkSession.read().parquet(dataPath);
-        combinedData = existingData.unionByName(df, true);
-      } catch (Exception e) {
-        // If the path doesn't exist or is empty, the current DF is the "existing" data
-        combinedData = df;
-      }
-      //df.write().mode(SaveMode.Append).parquet(dataPath);
-      combinedData.write().mode(SaveMode.Overwrite).parquet(dataPath);
+      df.write().mode(SaveMode.Append).parquet(dataPath);
     }
   }
 
