@@ -345,7 +345,7 @@ public class ITParquetConversionSource {
                 df.withColumn(
                     "month",
                     functions.date_format(
-                        functions.col("timestamp").cast(DataTypes.TimestampType), "MM"));
+                        functions.col("timestamp").cast(DataTypes.TimestampType), "MM").cast(DataTypes.StringType));
           } else if (partitionCol.equals("day")) {
             df =
                 df.withColumn(
