@@ -51,6 +51,7 @@
         <module>xtable-hudi-support</module>
         <module>xtable-core</module>
         <module>xtable-aws</module>
+        <module>xtable-databricks</module>
         <module>xtable-hive-metastore</module>
         <module>xtable-service</module>
     </modules>
