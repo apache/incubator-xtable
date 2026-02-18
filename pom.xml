@@ -53,6 +53,7 @@
         <module>xtable-aws</module>
         <module>xtable-databricks</module>
         <module>xtable-hive-metastore</module>
+        <module>xtable-databricks</module>
         <module>xtable-service</module>
     </modules>
 
