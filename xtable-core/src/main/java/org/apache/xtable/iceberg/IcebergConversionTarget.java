@@ -144,7 +144,8 @@ public class IcebergConversionTarget implements ConversionTarget {
         IcebergPartitionSpecSync.getInstance(),
         IcebergDataFileUpdatesSync.of(
             IcebergColumnStatsConverter.getInstance(),
-            IcebergPartitionValueConverter.getInstance()),
+            IcebergPartitionValueConverter.getInstance(),
+            configuration),
         IcebergTableManager.of(configuration));
   }
 
@@ -279,6 +280,7 @@ public class IcebergConversionTarget implements ConversionTarget {
   @Override
   public void syncFilesForDiff(InternalFilesDiff internalFilesDiff) {
     dataFileUpdatesExtractor.applyDiff(
+        table,
         transaction,
         internalFilesDiff,
         transaction.table().schema(),
