@@ -42,7 +42,7 @@ TABLE_FORMAT=ICEBERG
 ENABLED=TRUE;
 ```
 
-### Create an Iceberg table from Iceberg metadata in object storage
+### Method 1: Create an Iceberg table from Iceberg metadata in object storage
 Refer to additional [examples](https://docs.snowflake.com/LIMITEDACCESS/iceberg-2023/create-iceberg-table#examples) 
 in the Snowflake Create Iceberg Table guide for more information.
 
@@ -54,3 +54,44 @@ METADATA_FILE_PATH='path/to/metadata/<VERSION>.metadata.json';
 ```
 
 Once the table creation succeeds you can start using the Iceberg table as any other table in Snowflake.
+
+### Method 2: Using XTable APIs to sync with Snowflake Catalog directly
+
+#### Pre-requisites:
+
+* Build Apache XTable™ (Incubating) from [source](https://github.com/apache/incubator-xtable)
+* Download `iceberg-aws-X.X.X.jar` from the [Maven repository](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws)
+* Download `bundle-X.X.X.jar` from the [Maven repository](https://mvnrepository.com/artifact/software.amazon.awssdk/bundle)
+* Download `iceberg-spark-runtime-3.X_2.12/X.X.X.jar` from [here](https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.2_2.12/1.4.2/)
+* Download `snowflake-jdbc-X.X.X.jar` from the [Maven repository](https://mvnrepository.com/artifact/net.snowflake/snowflake-jdbc)
+
+Create a `snowflake-sync-config.yaml` file:
+
+```yaml md title="yaml"
+sourceFormat: DELTA
+targetFormats:
+  - ICEBERG
+datasets:
+  -
+    tableBasePath: s3://path/to/table
+    tableName: <table_name>
+    namespace: <db_name>.<schema_name>
+```
+
+Create a `snowflake-sync-catalog.yaml` file:
+
+```yaml md title="yaml"
+catalogImpl: org.apache.iceberg.snowflake.SnowflakeCatalog
+catalogName: <catalog_name>
+catalogOptions:
+  io-impl: org.apache.iceberg.aws.s3.S3FileIO
+  warehouse: s3://path/to/table
+  uri: jdbc:snowflake://<account-identifier>.snowflakecomputing.com
+  jdbc.user: <snowflake-username>
+  jdbc.password: <snowflake-password>
+```
+
+Sample command to sync the table with Snowflake:
+```shell md title="shell"
+java -cp /path/to/iceberg-spark-runtime-3.2_2.12-1.4.2.jar:/path/to/xtable-utilities-0.2.0-SNAPSHOT-bundled.jar:/path/to/snowflake-jdbc-3.13.28.jar:/path/to/iceberg-aws-1.4.2.jar:/Users/sagarl/Downloads/bundle-2.23.9.jar org.apache.xtable.utilities.RunSync  --datasetConfig snowflake-sync-config.yaml --icebergCatalogConfig snowflake-sync-catalog.yaml
+```
