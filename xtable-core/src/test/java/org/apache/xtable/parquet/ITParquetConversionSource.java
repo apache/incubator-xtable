@@ -323,6 +323,7 @@ public class ITParquetConversionSource {
   }
 
   private void writeData(Dataset<Row> df, String dataPath, String partitionConfig) {
+    Dataset<Row> newDfWithPartitions = df;
     String[] partitionCols = new String[0];
     if (partitionConfig != null) {
       partitionCols =
@@ -332,12 +333,12 @@ public class ITParquetConversionSource {
 
       for (String partitionCol : partitionCols) {
         if (partitionCol.equals("year")) {
-          df =
-              df.withColumn(
+          newDfWithPartitions =
+              newDfWithPartitions.withColumn(
                   "year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)));
         } else if (partitionCol.equals("month")) {
-          df =
-              df.withColumn(
+          newDfWithPartitions =
+              newDfWithPartitions.withColumn(
                   "month",
                   functions.date_format(
                       functions.col("timestamp").cast(DataTypes.TimestampType), "MM"));
@@ -345,25 +346,18 @@ public class ITParquetConversionSource {
       }
     }
 
-    List<Row> combinedDataList = new ArrayList<>();
-
+    Dataset<Row> combinedDf;
     try {
 
-      List<Row> existingData =
-          sparkSession
-              .read()
-              .option("recursiveFileLookup", "true")
-              .option("pathGlobFilter", "*.parquet")
-              .parquet(dataPath)
-              .collectAsList();
-      combinedDataList.addAll(existingData);
+      Dataset<Row> existingDf = sparkSession.read().parquet(dataPath);
+
+      combinedDf = existingDf.unionByName(newDfWithPartitions, true);
     } catch (Exception e) {
+      combinedDf = newDfWithPartitions;
     }
 
-    combinedDataList.addAll(df.collectAsList());
-
-    StructType finalSchema = (partitionConfig != null) ? df.schema() : schema;
-    Dataset<Row> finalDf = sparkSession.createDataFrame(combinedDataList, finalSchema);
+    List<Row> localRows = combinedDf.collectAsList();
+    Dataset<Row> finalDf = sparkSession.createDataFrame(localRows, combinedDf.schema());
 
     if (partitionCols.length > 0) {
       finalDf.write().mode(SaveMode.Overwrite).partitionBy(partitionCols).parquet(dataPath);
