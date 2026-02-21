@@ -323,13 +323,14 @@ public class ITParquetConversionSource {
   }
 
   private void writeData(Dataset<Row> df, String dataPath, String partitionConfig) {
+
+    String[] partitionCols = new String[0];
     if (partitionConfig != null) {
-      // extract partition columns from config
-      String[] partitionCols =
+      partitionCols =
           Arrays.stream(partitionConfig.split(":")[2].split("/"))
               .map(s -> s.split("=")[0])
               .toArray(String[]::new);
-      // add partition columns to dataframe
+
       for (String partitionCol : partitionCols) {
         if (partitionCol.equals("year")) {
           df =
@@ -349,9 +350,20 @@ public class ITParquetConversionSource {
                       functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
         }
       }
-      df.write().mode(SaveMode.Append).partitionBy(partitionCols).parquet(dataPath);
+    }
+
+    Dataset<Row> finalDf;
+    try {
+      Dataset<Row> existingDf = sparkSession.read().parquet(dataPath);
+      finalDf = existingDf.unionByName(df);
+    } catch (Exception e) {
+      finalDf = df;
+    }
+
+    if (partitionCols.length > 0) {
+      finalDf.write().mode(SaveMode.Overwrite).partitionBy(partitionCols).parquet(dataPath);
     } else {
-      df.write().mode(SaveMode.Append).parquet(dataPath);
+      finalDf.write().mode(SaveMode.Overwrite).parquet(dataPath);
     }
   }
 
