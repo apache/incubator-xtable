@@ -323,46 +323,35 @@ public class ITParquetConversionSource {
   }
 
   private void writeData(Dataset<Row> df, String dataPath, String partitionConfig) {
-    Dataset<Row> newDfWithPartitions = df;
-    String[] partitionCols = new String[0];
     if (partitionConfig != null) {
-      partitionCols =
+      // extract partition columns from config
+      String[] partitionCols =
           Arrays.stream(partitionConfig.split(":")[2].split("/"))
               .map(s -> s.split("=")[0])
               .toArray(String[]::new);
-
+      // add partition columns to dataframe
       for (String partitionCol : partitionCols) {
         if (partitionCol.equals("year")) {
-          newDfWithPartitions =
-              newDfWithPartitions.withColumn(
+          df =
+              df.withColumn(
                   "year", functions.year(functions.col("timestamp").cast(DataTypes.TimestampType)));
         } else if (partitionCol.equals("month")) {
-          newDfWithPartitions =
-              newDfWithPartitions.withColumn(
+          df =
+              df.withColumn(
                   "month",
                   functions.date_format(
                       functions.col("timestamp").cast(DataTypes.TimestampType), "MM"));
+        } else if (partitionCol.equals("day")) {
+          df =
+              df.withColumn(
+                  "day",
+                  functions.date_format(
+                      functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
         }
       }
-    }
-
-    Dataset<Row> combinedDf;
-    try {
-
-      Dataset<Row> existingDf = sparkSession.read().parquet(dataPath);
-
-      combinedDf = existingDf.unionByName(newDfWithPartitions, true);
-    } catch (Exception e) {
-      combinedDf = newDfWithPartitions;
-    }
-
-    List<Row> localRows = combinedDf.collectAsList();
-    Dataset<Row> finalDf = sparkSession.createDataFrame(localRows, combinedDf.schema());
-
-    if (partitionCols.length > 0) {
-      finalDf.write().mode(SaveMode.Overwrite).partitionBy(partitionCols).parquet(dataPath);
+      df.write().mode(SaveMode.Append).partitionBy(partitionCols).parquet(dataPath);
     } else {
-      finalDf.write().mode(SaveMode.Overwrite).parquet(dataPath);
+      df.write().mode(SaveMode.Append).parquet(dataPath);
     }
   }
 
