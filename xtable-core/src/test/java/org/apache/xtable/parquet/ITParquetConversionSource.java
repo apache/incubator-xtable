@@ -323,7 +323,6 @@ public class ITParquetConversionSource {
   }
 
   private void writeData(Dataset<Row> df, String dataPath, String partitionConfig) {
-
     String[] partitionCols = new String[0];
     if (partitionConfig != null) {
       partitionCols =
@@ -342,23 +341,23 @@ public class ITParquetConversionSource {
                   "month",
                   functions.date_format(
                       functions.col("timestamp").cast(DataTypes.TimestampType), "MM"));
-        } else if (partitionCol.equals("day")) {
-          df =
-              df.withColumn(
-                  "day",
-                  functions.date_format(
-                      functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
         }
       }
     }
 
-    Dataset<Row> finalDf;
+    List<Row> combinedDataList = new ArrayList<>();
+
     try {
-      Dataset<Row> existingDf = sparkSession.read().parquet(dataPath);
-      finalDf = existingDf.unionByName(df);
+
+      List<Row> existingData = sparkSession.read().parquet(dataPath).collectAsList();
+      combinedDataList.addAll(existingData);
     } catch (Exception e) {
-      finalDf = df;
     }
+
+    combinedDataList.addAll(df.collectAsList());
+
+    StructType finalSchema = (partitionConfig != null) ? df.schema() : schema;
+    Dataset<Row> finalDf = sparkSession.createDataFrame(combinedDataList, finalSchema);
 
     if (partitionCols.length > 0) {
       finalDf.write().mode(SaveMode.Overwrite).partitionBy(partitionCols).parquet(dataPath);
