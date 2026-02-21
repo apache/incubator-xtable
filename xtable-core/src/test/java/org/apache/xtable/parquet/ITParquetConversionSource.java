@@ -349,7 +349,13 @@ public class ITParquetConversionSource {
 
     try {
 
-      List<Row> existingData = sparkSession.read().parquet(dataPath).collectAsList();
+      List<Row> existingData =
+          sparkSession
+              .read()
+              .option("recursiveFileLookup", "true")
+              .option("pathGlobFilter", "*.parquet")
+              .parquet(dataPath)
+              .collectAsList();
       combinedDataList.addAll(existingData);
     } catch (Exception e) {
     }
