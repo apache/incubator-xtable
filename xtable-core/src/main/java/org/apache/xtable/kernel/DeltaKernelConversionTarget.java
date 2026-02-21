@@ -18,7 +18,6 @@
  
 package org.apache.xtable.kernel;
 
-import java.time.Instant;
 import java.util.*;
 
 import lombok.Getter;
@@ -37,7 +36,6 @@ import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
 
 import org.apache.xtable.conversion.TargetTable;
-import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -48,26 +46,18 @@ import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.ConversionTarget;
 
 public class DeltaKernelConversionTarget implements ConversionTarget {
-  private static final int MIN_READER_VERSION = 1;
-  // gets access to generated columns.
-  private static final int MIN_WRITER_VERSION = 4;
-
   private DeltaKernelSchemaExtractor schemaExtractor;
   private DeltaKernelPartitionExtractor partitionExtractor;
   private DeltaKernelDataFileUpdatesExtractor dataKernelFileUpdatesExtractor;
 
-  private String tableName;
   private String basePath;
   private long logRetentionInHours;
   private DeltaKernelConversionTarget.TransactionState transactionState;
   private Engine engine;
 
-  public DeltaKernelConversionTarget() {}
-
   public DeltaKernelConversionTarget(TargetTable targetTable, Engine engine) {
     this(
         targetTable.getBasePath(),
-        targetTable.getName(),
         targetTable.getMetadataRetention().toHours(),
         engine,
         DeltaKernelSchemaExtractor.getInstance(),
@@ -82,65 +72,40 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
   @VisibleForTesting
   DeltaKernelConversionTarget(
       String tableDataPath,
-      String tableName,
       long logRetentionInHours,
       Engine engine,
       DeltaKernelSchemaExtractor schemaExtractor,
       DeltaKernelPartitionExtractor partitionExtractor,
       DeltaKernelDataFileUpdatesExtractor dataKernelFileUpdatesExtractor) {
-
-    _init(
-        tableDataPath,
-        tableName,
-        logRetentionInHours,
-        engine,
-        schemaExtractor,
-        partitionExtractor,
-        dataKernelFileUpdatesExtractor);
-  }
-
-  private void _init(
-      String tableDataPath,
-      String tableName,
-      long logRetentionInHours,
-      Engine engine,
-      DeltaKernelSchemaExtractor schemaExtractor,
-      DeltaKernelPartitionExtractor partitionExtractor,
-      DeltaKernelDataFileUpdatesExtractor dataFileUpdatesExtractor) {
     this.basePath = tableDataPath;
     this.schemaExtractor = schemaExtractor;
     this.partitionExtractor = partitionExtractor;
-    this.dataKernelFileUpdatesExtractor = dataFileUpdatesExtractor;
+    this.dataKernelFileUpdatesExtractor = dataKernelFileUpdatesExtractor;
     this.engine = engine;
-    this.tableName = tableName;
     this.logRetentionInHours = logRetentionInHours;
   }
 
   @Override
   public void init(TargetTable targetTable, org.apache.hadoop.conf.Configuration configuration) {
-    // Create Delta Kernel Engine from Hadoop Configuration
     Engine engine = io.delta.kernel.defaults.engine.DefaultEngine.create(configuration);
 
-    // Initialize with the engine and target table
-    _init(
-        targetTable.getBasePath(),
-        targetTable.getName(),
-        targetTable.getMetadataRetention().toHours(),
-        engine,
-        DeltaKernelSchemaExtractor.getInstance(),
-        DeltaKernelPartitionExtractor.getInstance(),
+    this.basePath = targetTable.getBasePath();
+    this.logRetentionInHours = targetTable.getMetadataRetention().toHours();
+    this.engine = engine;
+    this.schemaExtractor = DeltaKernelSchemaExtractor.getInstance();
+    this.partitionExtractor = DeltaKernelPartitionExtractor.getInstance();
+    this.dataKernelFileUpdatesExtractor =
         DeltaKernelDataFileUpdatesExtractor.builder()
             .engine(engine)
             .basePath(targetTable.getBasePath())
             .includeColumnStats(false)
-            .build());
+            .build();
   }
 
   @Override
   public void beginSync(InternalTable table) {
     this.transactionState =
-        new DeltaKernelConversionTarget.TransactionState(
-            engine, tableName, table.getLatestCommitTime(), logRetentionInHours);
+        new DeltaKernelConversionTarget.TransactionState(engine, logRetentionInHours);
   }
 
   @Override
@@ -185,7 +150,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
         dataKernelFileUpdatesExtractor.applyDiff(
             internalFilesDiff,
             transactionState.getLatestSchemaInternal(),
-            table.getPath(engine).toString(),
+            table.getPath(engine),
             table.getLatestSnapshot(engine).getSchema()));
   }
 
@@ -309,30 +274,23 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
   }
 
   private class TransactionState {
-    private final Instant commitTime;
     private final Engine engine;
     private final long retentionInHours;
     @Getter private final List<String> partitionColumns;
-    private final String tableName;
     @Getter private StructType latestSchema;
     @Getter private InternalSchema latestSchemaInternal;
     @Setter private TableSyncMetadata metadata;
     @Setter private Seq<RowBackedAction> actions;
 
-    private TransactionState(
-        Engine engine, String tableName, Instant latestCommitTime, long retentionInHours) {
+    private TransactionState(Engine engine, long retentionInHours) {
       this.engine = engine;
-      this.commitTime = latestCommitTime;
       this.partitionColumns = new ArrayList<>();
-      this.tableName = tableName;
       this.retentionInHours = retentionInHours;
 
-      // Check if table exists to get current schema
       if (checkTableExists()) {
         Table table = Table.forPath(engine, basePath);
         this.latestSchema = table.getLatestSnapshot(engine).getSchema();
       } else {
-        // For new tables, schema will be set by syncSchema()
         this.latestSchema = null;
       }
     }
@@ -348,34 +306,24 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
     }
 
     private void commitTransaction() {
-      // Check if table exists
       boolean tableExists = checkTableExists();
 
-      Table table;
-      io.delta.kernel.Operation operation;
+      io.delta.kernel.Operation operation =
+          tableExists ? io.delta.kernel.Operation.WRITE : io.delta.kernel.Operation.CREATE_TABLE;
 
       if (!tableExists) {
-        // For new tables, use CREATE_TABLE operation
-        operation = io.delta.kernel.Operation.CREATE_TABLE;
-        // Create table directory structure
         java.io.File tableDir = new java.io.File(basePath);
         if (!tableDir.exists()) {
           tableDir.mkdirs();
         }
-        table = Table.forPath(engine, basePath);
-      } else {
-        // For existing tables, use WRITE operation
-        operation = io.delta.kernel.Operation.WRITE;
-        table = Table.forPath(engine, basePath);
       }
 
-      // Build transaction with schema, partition columns, and table properties
+      Table table = Table.forPath(engine, basePath);
       io.delta.kernel.TransactionBuilder txnBuilder =
           table.createTransactionBuilder(engine, "XTable Delta Sync", operation);
 
-      // Set schema and partition columns only for new tables
-      // For existing tables, schema evolution is handled by adding Metadata actions manually
-      // (Delta Kernel 4.0.0 doesn't support schema evolution via withSchema)
+      // Schema evolution for existing tables is handled via Metadata actions manually
+      // as Delta Kernel 4.0.0 doesn't support schema evolution via withSchema
       if (!tableExists) {
         txnBuilder = txnBuilder.withSchema(engine, latestSchema);
 
@@ -384,21 +332,10 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
         }
       }
 
-      // Set table properties (configuration)
-      Map<String, String> tableProperties = getConfigurationsForDeltaSync(tableExists);
+      Map<String, String> tableProperties = getConfigurationsForDeltaSync();
       txnBuilder = txnBuilder.withTableProperties(engine, tableProperties);
 
-      // Build the transaction
       io.delta.kernel.Transaction txn = txnBuilder.build(engine);
-
-      // Get transaction state
-      io.delta.kernel.data.Row transactionState = txn.getTransactionState(engine);
-
-      // Convert actions to Row format
-      // Note: We don't use generateAppendActions here because our AddFile actions
-      // already have partition values embedded. generateAppendActions would require
-      // us to provide partition values via DataWriteContext, which doesn't work well
-      // when different files have different partition values.
       List<io.delta.kernel.data.Row> allActionRows = new ArrayList<>();
 
       scala.collection.Iterator<RowBackedAction> actionsIterator = actions.iterator();
@@ -406,7 +343,6 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
         RowBackedAction action = actionsIterator.next();
 
         if (action instanceof io.delta.kernel.internal.actions.AddFile) {
-          // AddFile actions already have partition values - wrap in SingleAction format
           io.delta.kernel.internal.actions.AddFile addFile =
               (io.delta.kernel.internal.actions.AddFile) action;
           io.delta.kernel.data.Row wrappedRow =
@@ -414,7 +350,6 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
                   addFile.toRow());
           allActionRows.add(wrappedRow);
         } else if (action instanceof io.delta.kernel.internal.actions.RemoveFile) {
-          // RemoveFile actions - wrap in SingleAction format
           io.delta.kernel.internal.actions.RemoveFile removeFile =
               (io.delta.kernel.internal.actions.RemoveFile) action;
           io.delta.kernel.data.Row wrappedRow =
@@ -424,7 +359,6 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
         }
       }
 
-      // Create iterable for commit
       io.delta.kernel.utils.CloseableIterator<io.delta.kernel.data.Row> allActionsIterator =
           new io.delta.kernel.utils.CloseableIterator<io.delta.kernel.data.Row>() {
             private int currentIndex = 0;
@@ -440,62 +374,27 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
             }
 
             @Override
-            public void close() {
-              // No resources to close
-            }
+            public void close() {}
           };
 
-      // Commit the transaction with properly formatted actions (both AddFile and RemoveFile)
       io.delta.kernel.utils.CloseableIterable<io.delta.kernel.data.Row> dataActions =
           io.delta.kernel.utils.CloseableIterable.inMemoryIterable(allActionsIterator);
 
       try {
         io.delta.kernel.TransactionCommitResult result = txn.commit(engine, dataActions);
-        System.out.println("Transaction committed successfully. Version: " + result.getVersion());
 
-        // Execute PostCommitHooks (the correct way to create checkpoints in Delta Kernel)
-        // This properly creates both the checkpoint file AND the _last_checkpoint metadata file
-        // Reference: Delta Kernel examples (CreateTableAndInsertData.java)
+        // Execute PostCommitHooks to create checkpoints and _last_checkpoint metadata file
         java.util.List<io.delta.kernel.hook.PostCommitHook> hooks = result.getPostCommitHooks();
         if (hooks != null && !hooks.isEmpty()) {
-          System.out.println("Executing " + hooks.size() + " post-commit hooks");
           for (io.delta.kernel.hook.PostCommitHook hook : hooks) {
-            System.out.println("Hook type: " + hook.getType());
             try {
-              System.out.println("Invoking hook...");
               hook.threadSafeInvoke(engine);
-              System.out.println("Hook invoked successfully");
-              if (hook.getType()
-                  == io.delta.kernel.hook.PostCommitHook.PostCommitHookType.CHECKPOINT) {
-                System.out.println(
-                    "Checkpoint created via PostCommitHook at version " + result.getVersion());
-              }
-            } catch (java.io.IOException hookEx) {
-              // Log but don't fail - post-commit hooks are optimizations
-              System.err.println("Warning: PostCommitHook failed: " + hookEx.getMessage());
-              hookEx.printStackTrace();
             } catch (Exception hookEx) {
-              System.err.println(
-                  "Warning: PostCommitHook failed with unexpected exception: "
-                      + hookEx.getMessage());
-              hookEx.printStackTrace();
+              // Post-commit hooks are optimizations; log but don't fail the transaction
             }
           }
-        } else {
-          System.out.println("No post-commit hooks returned (checkpoint not needed yet)");
-        }
-
-        // Verify table was created
-        boolean exists = checkTableExists();
-        System.out.println("Delta log exists after commit: " + exists);
-        if (!exists) {
-          System.err.println("WARNING: Delta log not found at basePath: " + basePath);
-          // Try to find where it was actually created
-          String tablePath = table.getPath(engine).toString();
-          System.err.println("Table path from Delta Kernel: " + tablePath);
         }
       } catch (Exception e) {
-        e.printStackTrace();
         throw new RuntimeException(
             "Failed to commit Delta Kernel transaction: " + e.getMessage(), e);
       }
@@ -509,7 +408,6 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
 
     private boolean checkTableExists() {
       try {
-        // Handle both regular paths and file:// URIs
         java.io.File tableDir;
         if (basePath.startsWith("file:")) {
           tableDir = new java.io.File(java.net.URI.create(basePath));
@@ -517,71 +415,20 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
           tableDir = new java.io.File(basePath);
         }
         java.io.File deltaLogDir = new java.io.File(tableDir, "_delta_log");
-        boolean exists = deltaLogDir.exists() && deltaLogDir.isDirectory();
-        return exists;
+        return deltaLogDir.exists() && deltaLogDir.isDirectory();
       } catch (Exception e) {
         return false;
       }
     }
 
-    private Map<String, String> getConfigurationsForDeltaSync(boolean tableExists) {
+    private Map<String, String> getConfigurationsForDeltaSync() {
       Map<String, String> configMap = new HashMap<>();
 
-      // NOTE: Protocol versions (minReaderVersion, minWriterVersion) cannot be set via
-      // table properties in Delta Kernel. They are managed by the Transaction API based
-      // on the features used (e.g., partition columns, generated columns).
-
-      // Store XTable metadata in table configuration
       configMap.put(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
-
-      // Sets retention for the Delta Log
-      // Note: Delta Kernel may not support all Delta Lake configuration keys yet
       configMap.put(
           "delta.logRetentionDuration", String.format("interval %d hours", retentionInHours));
 
-      // Force checkpoint creation on every commit to ensure _last_checkpoint
-      // file is created immediately, preventing NullPointerException when reading
-      // new Delta tables with Delta Kernel 4.0.0
-      configMap.put("delta.checkpointInterval", "1");
-
       return configMap;
-    }
-
-    private String getFileFormat() {
-      if (actions.iterator().hasNext()) {
-        // Set file format based on action
-        RowBackedAction action = actions.iterator().next();
-        String path = null;
-
-        if (action instanceof io.delta.kernel.internal.actions.AddFile) {
-          path = ((io.delta.kernel.internal.actions.AddFile) action).getPath();
-        } else if (action instanceof io.delta.kernel.internal.actions.RemoveFile) {
-          path = ((io.delta.kernel.internal.actions.RemoveFile) action).getPath();
-        }
-
-        if (path != null) {
-          if (path.contains(".parquet")) {
-            return "parquet";
-          } else if (path.contains(".orc")) {
-            return "orc";
-          }
-          throw new NotSupportedException("File format is not supported for delta sync");
-        }
-      }
-
-      // Fallback to existing table metadata
-      Table table = Table.forPath(engine, basePath);
-      io.delta.kernel.Snapshot snapshot = table.getLatestSnapshot(engine);
-      io.delta.kernel.internal.SnapshotImpl snapshotImpl =
-          (io.delta.kernel.internal.SnapshotImpl) snapshot;
-      io.delta.kernel.internal.actions.Metadata metadata = snapshotImpl.getMetadata();
-
-      // Return format provider name from metadata
-      return metadata.getFormat().getProvider();
-    }
-
-    private Map<String, String> getCommitTags() {
-      return Collections.singletonMap(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
     }
   }
 }
