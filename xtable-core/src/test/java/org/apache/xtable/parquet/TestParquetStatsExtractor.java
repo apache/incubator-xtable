@@ -100,7 +100,10 @@ class TestParquetStatsExtractor {
   private static List<ColumnStat> readStats(Path path) {
     Configuration conf = new Configuration();
     ParquetMetadata footer = ParquetMetadataExtractor.getInstance().readParquetMetadata(conf, path);
-    return ParquetStatsExtractor.getStatsForFile(footer, ParquetSchemaExtractor.getInstance().toInternalSchema(footer.getFileMetaData().getSchema(), ""));
+    return ParquetStatsExtractor.getStatsForFile(
+        footer,
+        ParquetSchemaExtractor.getInstance()
+            .toInternalSchema(footer.getFileMetaData().getSchema(), ""));
   }
 
   private static IntStatistics intStats(int min, int max) {

@@ -88,8 +88,7 @@ public class TestParquetSchemaExtractor {
 
     // test fixed size byte array
     Map<InternalSchema.MetadataKey, Object> fixedMetadata =
-        Collections.singletonMap(
-            InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 16);
+        Collections.singletonMap(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 16);
     InternalSchema fixedType =
         InternalSchema.builder()
             .name("fixed")
@@ -98,9 +97,7 @@ public class TestParquetSchemaExtractor {
             .metadata(fixedMetadata)
             .build();
     Type fixedPrimitiveType =
-        Types.required(PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY)
-            .length(16)
-            .named("fixed");
+        Types.required(PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY).length(16).named("fixed");
     Assertions.assertEquals(fixedType, schemaExtractor.toInternalSchema(fixedPrimitiveType, null));
 
     // tests for timestamp and date
@@ -304,37 +301,39 @@ public class TestParquetSchemaExtractor {
             .fields(
                 Arrays.asList(
                     InternalField.builder()
-                            .name("map")
-                            .schema(
-                                InternalSchema.builder()
-                                    .name("map")
-                                    .isNullable(false)
-                                    .dataType(InternalType.MAP)
-                                    .fields(
-                                        Arrays.asList(
-                                            InternalField.builder()
-                                                .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
-                                                .parentPath("map")
-                                                .schema(
-                                                    InternalSchema.builder()
-                                                        .name("key")
-                                                        .dataType(InternalType.FLOAT)
-                                                        .isNullable(false)
-                                                        .build())
-                                                .defaultValue(null)
-                                                .build(),
-                                            InternalField.builder()
-                                                .name(InternalField.Constants.MAP_VALUE_FIELD_NAME) // "value")
-                                                .parentPath("map")
-                                                .schema(
-                                                    InternalSchema.builder()
-                                                        .name("value")
-                                                        .dataType(InternalType.INT)
-                                                        .isNullable(false)
-                                                        .build())
-                                                .build()))
-                                    .build())
-                              .build(),
+                        .name("map")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .isNullable(false)
+                                .dataType(InternalType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("map")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("key")
+                                                    .dataType(InternalType.FLOAT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .defaultValue(null)
+                                            .build(),
+                                        InternalField.builder()
+                                            .name(
+                                                InternalField.Constants
+                                                    .MAP_VALUE_FIELD_NAME) // "value")
+                                            .parentPath("map")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("value")
+                                                    .dataType(InternalType.INT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build(),
                     InternalField.builder()
                         .name("my_list")
                         .schema(
@@ -402,17 +401,13 @@ public class TestParquetSchemaExtractor {
         Arguments.of(
             "3-level required element",
             Types.requiredList()
-                .element(
-                    Types.required(PrimitiveTypeName.INT32)
-                        .named("element"))
+                .element(Types.required(PrimitiveTypeName.INT32).named("element"))
                 .named("my_list"),
             false),
         Arguments.of(
             "3-level optional element",
             Types.requiredList()
-                .element(
-                    Types.optional(PrimitiveTypeName.INT32)
-                        .named("element"))
+                .element(Types.optional(PrimitiveTypeName.INT32).named("element"))
                 .named("my_list"),
             true),
         Arguments.of(

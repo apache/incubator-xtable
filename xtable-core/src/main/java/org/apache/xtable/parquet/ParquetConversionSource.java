@@ -99,7 +99,8 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     return createInternalTableFromFile(file);
   }
 
-  private Stream<InternalDataFile> getInternalDataFiles(Stream<LocatedFileStatus> parquetFiles, InternalSchema schema) {
+  private Stream<InternalDataFile> getInternalDataFiles(
+      Stream<LocatedFileStatus> parquetFiles, InternalSchema schema) {
     return parquetFiles.map(
         file ->
             InternalDataFile.builder()
@@ -113,22 +114,24 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                 .lastModified(file.getModificationTime())
                 .columnStats(
                     parquetStatsExtractor.getStatsForFile(
-                        parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()), schema))
+                        parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
+                        schema))
                 .build());
   }
 
-  private InternalDataFile createInternalDataFileFromParquetFile(FileStatus parquetFile, InternalSchema schema) {
+  private InternalDataFile createInternalDataFileFromParquetFile(
+      FileStatus parquetFile, InternalSchema schema) {
     return InternalDataFile.builder()
         .physicalPath(parquetFile.getPath().toString())
         .partitionValues(
             partitionValueExtractor.extractPartitionValues(
-                partitionSpecExtractor.spec(schema),
-                basePath))
+                partitionSpecExtractor.spec(schema), basePath))
         .lastModified(parquetFile.getModificationTime())
         .fileSizeBytes(parquetFile.getLen())
         .columnStats(
             parquetStatsExtractor.getStatsForFile(
-                parquetMetadataExtractor.readParquetMetadata(hadoopConf, parquetFile.getPath()), schema))
+                parquetMetadataExtractor.readParquetMetadata(hadoopConf, parquetFile.getPath()),
+                schema))
         .build();
   }
 
@@ -150,7 +153,8 @@ public class ParquetConversionSource implements ConversionSource<Long> {
             .collect(Collectors.toList());
     InternalTable internalTable = getMostRecentTable(parquetFiles);
     for (FileStatus tableStatus : tableChangesAfter) {
-      InternalDataFile currentDataFile = createInternalDataFileFromParquetFile(tableStatus, internalTable.getReadSchema());
+      InternalDataFile currentDataFile =
+          createInternalDataFileFromParquetFile(tableStatus, internalTable.getReadSchema());
       addedInternalDataFiles.add(currentDataFile);
     }
 

@@ -24,13 +24,9 @@ import java.util.*;
 
 import lombok.NonNull;
 
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-import org.apache.parquet.schema.MessageType;
-
 import org.apache.xtable.exception.PartitionValuesExtractorException;
 import org.apache.xtable.hudi.PathBasedPartitionValuesExtractor;
 import org.apache.xtable.model.schema.InternalPartitionField;
-import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 

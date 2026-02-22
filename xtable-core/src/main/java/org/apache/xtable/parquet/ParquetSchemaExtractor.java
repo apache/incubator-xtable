@@ -263,10 +263,14 @@ public class ParquetSchemaExtractor {
             .build();
       } else if (logicalType instanceof LogicalTypeAnnotation.MapLogicalTypeAnnotation) {
         String schemaName = schema.asGroupType().getName();
-        List<Type> keyAndValueTypes = schema.asGroupType().getFields().get(0).asGroupType().getFields();
+        List<Type> keyAndValueTypes =
+            schema.asGroupType().getFields().get(0).asGroupType().getFields();
         Type keyType = keyAndValueTypes.get(0);
         InternalSchema keySchema =
-            toInternalSchema(keyType, SchemaUtils.getFullyQualifiedPath(parentPath, InternalField.Constants.MAP_KEY_FIELD_NAME));
+            toInternalSchema(
+                keyType,
+                SchemaUtils.getFullyQualifiedPath(
+                    parentPath, InternalField.Constants.MAP_KEY_FIELD_NAME));
         InternalField keyField =
             MAP_KEY_FIELD.toBuilder()
                 .parentPath(parentPath)
@@ -276,7 +280,9 @@ public class ParquetSchemaExtractor {
 
         Type valueType = keyAndValueTypes.get(1);
         InternalSchema valueSchema =
-            toInternalSchema(valueType, SchemaUtils.getFullyQualifiedPath(
+            toInternalSchema(
+                valueType,
+                SchemaUtils.getFullyQualifiedPath(
                     parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME));
         InternalField valueField =
             InternalField.builder()

@@ -18,7 +18,6 @@
  
 package org.apache.xtable.parquet;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -30,7 +29,6 @@ import java.util.stream.Collectors;
 import lombok.Builder;
 import lombok.Value;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.*;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
@@ -43,10 +41,7 @@ import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
-import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.schema.SchemaFieldFinder;
 
 @Value
@@ -82,9 +77,12 @@ public class ParquetStatsExtractor {
   private static final Comparator<Object> COMPARABLE_COMPARATOR =
       (a, b) -> ((Comparable<Object>) a).compareTo(b);
 
-  private static ColumnStat mergeColumnChunks(List<ColumnChunkMetaData> chunks, InternalSchema internalSchema) {
+  private static ColumnStat mergeColumnChunks(
+      List<ColumnChunkMetaData> chunks, InternalSchema internalSchema) {
     ColumnChunkMetaData first = chunks.get(0);
-    InternalField internalField = SchemaFieldFinder.getInstance().findFieldByPath(internalSchema, first.getPath().toDotString());
+    InternalField internalField =
+        SchemaFieldFinder.getInstance()
+            .findFieldByPath(internalSchema, first.getPath().toDotString());
     PrimitiveType primitiveType = first.getPrimitiveType();
     long totalNumValues = chunks.stream().mapToLong(ColumnChunkMetaData::getValueCount).sum();
     long totalSize = chunks.stream().mapToLong(ColumnChunkMetaData::getTotalSize).sum();
@@ -106,13 +104,13 @@ public class ParquetStatsExtractor {
         .build();
   }
 
-  public static List<ColumnStat> getStatsForFile(ParquetMetadata footer, InternalSchema internalSchema) {
+  public static List<ColumnStat> getStatsForFile(
+      ParquetMetadata footer, InternalSchema internalSchema) {
     MessageType schema = parquetMetadataExtractor.getSchema(footer);
     return footer.getBlocks().stream()
         .flatMap(block -> block.getColumns().stream())
         .collect(
-            Collectors.groupingBy(
-                chunk -> schema.getColumnDescription(chunk.getPath().toArray())))
+            Collectors.groupingBy(chunk -> schema.getColumnDescription(chunk.getPath().toArray())))
         .values()
         .stream()
         .map(columnChunks -> mergeColumnChunks(columnChunks, internalSchema))
