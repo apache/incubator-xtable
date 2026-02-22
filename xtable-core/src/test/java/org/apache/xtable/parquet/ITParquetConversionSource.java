@@ -207,6 +207,12 @@ public class ITParquetConversionSource {
         case "ICEBERG":
           metadataFolder = "metadata";
           break;
+//        case "DELTA":
+//          metadataFolder = "_delta_log";
+//          break;
+//        case "HUDI":
+//          metadataFolder = ".hoodie";
+//          break;
       }
       if (!metadataFolder.isEmpty()) {
         try {
