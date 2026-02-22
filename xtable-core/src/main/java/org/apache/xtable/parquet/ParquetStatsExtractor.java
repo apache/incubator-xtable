@@ -140,8 +140,7 @@ public class ParquetStatsExtractor {
         partitionValueExtractor.extractPartitionValues(
             partitionSpecExtractor.spec(
                 partitionValueExtractor.extractSchemaForParquetPartitions(
-                    parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
-                    file.getPath().toString())),
+                    parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()))),
             parentPath.toString());
     return InternalDataFile.builder()
         .physicalPath(parentPath.toString())
