@@ -473,8 +473,8 @@ public class ITParquetConversionSource {
             .schema(schema)
             .options(sourceOptions)
             // .option("recursiveFileLookup", "true")
-            // .option("pathGlobFilter", "*.parquet")
-            .parquet(sourceTable.getDataPath() + "/*.parquet")
+            .option("pathGlobFilter", "[!m]*")
+            .parquet(sourceTable.getDataPath())
             .orderBy("id"); // order by id to ensure deterministic order for comparison
     Map<String, Dataset<Row>> targetRowsByFormat =
         targetFormats.stream()
