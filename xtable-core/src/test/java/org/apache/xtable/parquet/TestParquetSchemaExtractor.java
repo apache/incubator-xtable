@@ -18,8 +18,6 @@
  
 package org.apache.xtable.parquet;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -84,6 +82,23 @@ public class TestParquetSchemaExtractor {
 
     Assertions.assertEquals(decimalType, schemaExtractor.toInternalSchema(decimalPrimitive, null));
 
+    // test fixed size byte array
+    Map<InternalSchema.MetadataKey, Object> fixedMetadata =
+        Collections.singletonMap(
+            InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 16);
+    InternalSchema fixedType =
+        InternalSchema.builder()
+            .name("fixed")
+            .dataType(InternalType.FIXED)
+            .isNullable(false)
+            .metadata(fixedMetadata)
+            .build();
+    Type fixedPrimitiveType =
+        Types.required(PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY)
+            .length(16)
+            .named("fixed");
+    Assertions.assertEquals(fixedType, schemaExtractor.toInternalSchema(fixedPrimitiveType, null));
+
     // tests for timestamp and date
     InternalSchema testDate =
         InternalSchema.builder().name("date").dataType(InternalType.DATE).isNullable(false).build();
@@ -126,12 +141,18 @@ public class TestParquetSchemaExtractor {
         Types.required(PrimitiveTypeName.INT64)
             .as(LogicalTypeAnnotation.timestampType(false, LogicalTypeAnnotation.TimeUnit.MILLIS))
             .named("timestamp_millis");
+    Type timestampMicrosPrimitiveType =
+        Types.required(PrimitiveTypeName.INT64)
+            .as(LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.MICROS))
+            .named("timestamp_micros");
     Type timestampNanosPrimitiveType =
         Types.required(PrimitiveTypeName.INT64)
             .as(LogicalTypeAnnotation.timestampType(false, LogicalTypeAnnotation.TimeUnit.NANOS))
             .named("timestamp_nanos");
     Assertions.assertEquals(
         testTimestampMillis, schemaExtractor.toInternalSchema(timestampMillisPrimitiveType, null));
+    Assertions.assertEquals(
+        testTimestampMicros, schemaExtractor.toInternalSchema(timestampMicrosPrimitiveType, null));
     Assertions.assertEquals(
         testTimestampNanos, schemaExtractor.toInternalSchema(timestampNanosPrimitiveType, null));
 

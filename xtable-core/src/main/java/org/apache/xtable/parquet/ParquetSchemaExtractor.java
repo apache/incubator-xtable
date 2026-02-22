@@ -195,6 +195,10 @@ public class ParquetSchemaExtractor {
                 InternalSchema.MetadataKey.DECIMAL_SCALE,
                 ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalType).getScale());
             newDataType = InternalType.DECIMAL;
+          } else {
+            newDataType = InternalType.FIXED;
+            metadata.put(
+                InternalSchema.MetadataKey.FIXED_BYTES_SIZE, primitiveType.getTypeLength());
           }
           break;
         case BINARY:

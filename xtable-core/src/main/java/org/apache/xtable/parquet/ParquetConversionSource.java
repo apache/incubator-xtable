@@ -116,7 +116,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                         HudiPathUtils.getPartitionPath(new Path(basePath), file.getPath())))
                 .lastModified(file.getModificationTime())
                 .columnStats(
-                    parquetStatsExtractor.getColumnStatsForaFile(
+                    parquetStatsExtractor.getStatsForFile(
                         parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath())))
                 .build());
   }
@@ -135,7 +135,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         .lastModified(parquetFile.getModificationTime())
         .fileSizeBytes(parquetFile.getLen())
         .columnStats(
-            parquetStatsExtractor.getColumnStatsForaFile(
+            parquetStatsExtractor.getStatsForFile(
                 parquetMetadataExtractor.readParquetMetadata(hadoopConf, parquetFile.getPath())))
         .build();
   }
