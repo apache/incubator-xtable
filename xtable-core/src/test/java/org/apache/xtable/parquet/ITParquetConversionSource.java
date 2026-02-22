@@ -97,7 +97,7 @@ public class ITParquetConversionSource {
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
     sparkConf.set("spark.sql.parquet.writeLegacyFormat", "false");
     sparkConf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS");
-
+    sparkConf.set("parquet.summary.metadata.level", "NONE");
     sparkConf.set("spark.serializer", "org.apache.spark.serializer.JavaSerializer");
     sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
@@ -207,12 +207,12 @@ public class ITParquetConversionSource {
         case "ICEBERG":
           metadataFolder = "metadata";
           break;
-//        case "DELTA":
-//          metadataFolder = "_delta_log";
-//          break;
-//        case "HUDI":
-//          metadataFolder = ".hoodie";
-//          break;
+        case "DELTA":
+          metadataFolder = "_delta_log";
+          break;
+        case "HUDI":
+          metadataFolder = ".hoodie";
+          break;
       }
       if (!metadataFolder.isEmpty()) {
         try {
@@ -304,7 +304,7 @@ public class ITParquetConversionSource {
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
       writeData(dfAppend, dataPath, xTablePartitionConfig);
-      cleanupTargetMetadata(dataPath, targetTableFormats);
+      // cleanupTargetMetadata(dataPath, targetTableFormats);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
               sourceTableFormat,
@@ -501,8 +501,8 @@ public class ITParquetConversionSource {
             .read()
             .schema(schema)
             .options(sourceOptions)
-            .option("recursiveFileLookup", "true")
-            .option("pathGlobFilter", "*.parquet")
+            // .option("recursiveFileLookup", "true")
+            // .option("pathGlobFilter", "*.parquet")
             .parquet(sourceTable.getDataPath())
             .orderBy("id"); // order by id to ensure deterministic order for comparison
     Map<String, Dataset<Row>> targetRowsByFormat =
