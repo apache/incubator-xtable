@@ -97,7 +97,7 @@ public class ITParquetConversionSource {
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
     sparkConf.set("spark.sql.parquet.writeLegacyFormat", "false");
     sparkConf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS");
-    sparkConf.set("parquet.summary.metadata.level", "NONE");
+
     sparkConf.set("spark.serializer", "org.apache.spark.serializer.JavaSerializer");
     sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
@@ -200,33 +200,6 @@ public class ITParquetConversionSource {
     }
   }
 
-  private void cleanupTargetMetadata(String dataPath, List<String> formats) {
-    for (String format : formats) {
-      String metadataFolder = "";
-      switch (format.toUpperCase()) {
-        case "ICEBERG":
-          metadataFolder = "metadata";
-          break;
-        case "DELTA":
-          metadataFolder = "_delta_log";
-          break;
-        case "HUDI":
-          metadataFolder = ".hoodie";
-          break;
-      }
-      if (!metadataFolder.isEmpty()) {
-        try {
-          org.apache.hadoop.fs.Path path = new org.apache.hadoop.fs.Path(dataPath, metadataFolder);
-          org.apache.hadoop.fs.FileSystem fs = path.getFileSystem(jsc.hadoopConfiguration());
-          if (fs.exists(path)) {
-            fs.delete(path, true);
-          }
-        } catch (IOException e) {
-        }
-      }
-    }
-  }
-
   @ParameterizedTest
   @MethodSource("provideArgsForSyncTesting")
   void testSync(TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
@@ -304,7 +277,6 @@ public class ITParquetConversionSource {
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
       writeData(dfAppend, dataPath, xTablePartitionConfig);
-      // cleanupTargetMetadata(dataPath, targetTableFormats);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
               sourceTableFormat,
@@ -501,7 +473,7 @@ public class ITParquetConversionSource {
             .read()
             .schema(schema)
             .options(sourceOptions)
-            .option("recursiveFileLookup", "true")
+            // .option("recursiveFileLookup", "true")
             .option("pathGlobFilter", "*.parquet")
             .parquet(sourceTable.getDataPath())
             .orderBy("id"); // order by id to ensure deterministic order for comparison
