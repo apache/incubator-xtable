@@ -98,7 +98,7 @@ public class ITParquetConversionSource {
     sparkConf.set("spark.sql.parquet.writeLegacyFormat", "false");
     sparkConf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS");
     sparkConf.set("parquet.summary.metadata.level","NONE");
-    sparkConf.set("spark.sql.sources.partitionDiscovery.enabled", "false")
+    sparkConf.set("spark.sql.sources.partitionDiscovery.enabled", "false");
     sparkConf.set("spark.serializer", "org.apache.spark.serializer.JavaSerializer");
     sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
