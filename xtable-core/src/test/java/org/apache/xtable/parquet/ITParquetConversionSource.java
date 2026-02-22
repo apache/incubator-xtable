@@ -15,11 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.parquet;
 
 import static org.apache.xtable.GenericTable.getTableName;
-import static org.apache.xtable.model.storage.TableFormat.*;
+import static org.apache.xtable.model.storage.TableFormat.DELTA;
+import static org.apache.xtable.model.storage.TableFormat.HUDI;
+import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
+import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -215,15 +218,15 @@ public class ITParquetConversionSource {
     schema =
         DataTypes.createStructType(
             new StructField[] {
-                DataTypes.createStructField("id", DataTypes.IntegerType, false),
-                DataTypes.createStructField("name", DataTypes.StringType, false),
-                DataTypes.createStructField("hasSiblings", DataTypes.BooleanType, false),
-                DataTypes.createStructField("age", DataTypes.DoubleType, false),
-                DataTypes.createStructField(
-                    "timestamp",
-                    DataTypes.TimestampType,
-                    false,
-                    new MetadataBuilder().putString("precision", "millis").build())
+              DataTypes.createStructField("id", DataTypes.IntegerType, false),
+              DataTypes.createStructField("name", DataTypes.StringType, false),
+              DataTypes.createStructField("hasSiblings", DataTypes.BooleanType, false),
+              DataTypes.createStructField("age", DataTypes.DoubleType, false),
+              DataTypes.createStructField(
+                  "timestamp",
+                  DataTypes.TimestampType,
+                  false,
+                  new MetadataBuilder().putString("precision", "millis").build())
             });
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
     String dataPath =
@@ -238,8 +241,8 @@ public class ITParquetConversionSource {
 
     Path pathForXTable = Paths.get(dataPath);
     try (GenericTable table =
-             GenericTable.getInstance(
-                 tableName, pathForXTable, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
+        GenericTable.getInstance(
+            tableName, pathForXTable, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
       ConversionConfig conversionConfig =
           getTableSyncConfig(
               sourceTableFormat,
