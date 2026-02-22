@@ -97,7 +97,7 @@ public class ITParquetConversionSource {
     sparkConf.set("parquet.avro.write-old-list-structure", "false");
     sparkConf.set("spark.sql.parquet.writeLegacyFormat", "false");
     sparkConf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS");
-
+    sparkConf.set("parquet.summary.metadata.level","NONE");
     sparkConf.set("spark.serializer", "org.apache.spark.serializer.JavaSerializer");
     sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
     jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
