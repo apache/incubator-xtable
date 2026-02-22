@@ -83,7 +83,6 @@ public class ParquetSchemaExtractor {
    */
   public InternalSchema toInternalSchema(Type schema, String parentPath) {
     InternalType newDataType = null;
-    Type.Repetition currentRepetition = null;
     List<InternalField> subFields = null;
     PrimitiveType primitiveType;
     LogicalTypeAnnotation logicalType;

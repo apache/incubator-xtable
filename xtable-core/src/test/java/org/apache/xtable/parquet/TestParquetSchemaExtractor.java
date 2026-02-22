@@ -22,16 +22,20 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 
-import org.apache.parquet.schema.*;
 import org.apache.parquet.schema.GroupType;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
+import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 import org.apache.parquet.schema.Type;
 import org.apache.parquet.schema.Type.Repetition;
 import org.apache.parquet.schema.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -393,64 +397,55 @@ public class TestParquetSchemaExtractor {
     Assertions.assertEquals(internalSchema, schemaExtractor.toInternalSchema(messageType, null));
   }
 
-  @Test
-  void testThreeLevelListRequiredElement() {
-    GroupType parquetSchema =
-        Types.requiredList()
-            .element(
-                Types.required(PrimitiveTypeName.INT32)
-                    .as(LogicalTypeAnnotation.intType(32, false))
-                    .named("element"))
-            .named("my_list");
-    InternalSchema expected = listSchema("my_list", false);
-    Assertions.assertEquals(expected, schemaExtractor.toInternalSchema(parquetSchema, null));
+  static Stream<Arguments> listEncodings() {
+    return Stream.of(
+        Arguments.of(
+            "3-level required element",
+            Types.requiredList()
+                .element(
+                    Types.required(PrimitiveTypeName.INT32)
+                        .named("element"))
+                .named("my_list"),
+            false),
+        Arguments.of(
+            "3-level optional element",
+            Types.requiredList()
+                .element(
+                    Types.optional(PrimitiveTypeName.INT32)
+                        .named("element"))
+                .named("my_list"),
+            true),
+        Arguments.of(
+            "2-level required element",
+            Types.buildGroup(Type.Repetition.REQUIRED)
+                .as(LogicalTypeAnnotation.listType())
+                .addField(
+                    Types.primitive(PrimitiveTypeName.INT32, Type.Repetition.REQUIRED)
+                        .named("element"))
+                .named("my_list"),
+            false),
+        Arguments.of(
+            "2-level optional element",
+            Types.buildGroup(Type.Repetition.REQUIRED)
+                .as(LogicalTypeAnnotation.listType())
+                .addField(
+                    Types.primitive(PrimitiveTypeName.INT32, Type.Repetition.OPTIONAL)
+                        .named("element"))
+                .named("my_list"),
+            true));
   }
 
-  @Test
-  void testThreeLevelListOptionalElement() {
-    GroupType parquetSchema =
-        Types.requiredList()
-            .element(
-                Types.optional(PrimitiveTypeName.INT32)
-                    .as(LogicalTypeAnnotation.intType(32, false))
-                    .named("element"))
-            .named("my_list");
-    InternalSchema expected = listSchema("my_list", true);
-    Assertions.assertEquals(expected, schemaExtractor.toInternalSchema(parquetSchema, null));
-  }
-
-  @Test
-  void testTwoLevelListRequiredElement() {
-    GroupType parquetSchema =
-        Types.buildGroup(Type.Repetition.REQUIRED)
-            .as(LogicalTypeAnnotation.listType())
-            .addField(
-                Types.primitive(PrimitiveTypeName.INT32, Type.Repetition.REQUIRED)
-                    .as(LogicalTypeAnnotation.intType(32, false))
-                    .named("element"))
-            .named("my_list");
-    InternalSchema expected = listSchema("my_list", false);
-    Assertions.assertEquals(expected, schemaExtractor.toInternalSchema(parquetSchema, null));
-  }
-
-  @Test
-  void testTwoLevelListOptionalElement() {
-    GroupType parquetSchema =
-        Types.buildGroup(Type.Repetition.REQUIRED)
-            .as(LogicalTypeAnnotation.listType())
-            .addField(
-                Types.primitive(PrimitiveTypeName.INT32, Type.Repetition.OPTIONAL)
-                    .as(LogicalTypeAnnotation.intType(32, false))
-                    .named("element"))
-            .named("my_list");
-    InternalSchema expected = listSchema("my_list", true);
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("listEncodings")
+  void testListEncoding(String description, GroupType parquetSchema, boolean elementNullable) {
+    InternalSchema expected = listSchema(elementNullable);
     Assertions.assertEquals(expected, schemaExtractor.toInternalSchema(parquetSchema, null));
   }
 
   /** Builds the expected InternalSchema for a required LIST of INT32 elements. */
-  private static InternalSchema listSchema(String name, boolean elementNullable) {
+  private static InternalSchema listSchema(boolean elementNullable) {
     return InternalSchema.builder()
-        .name(name)
+        .name("my_list")
         .dataType(InternalType.LIST)
         .isNullable(false)
         .fields(
