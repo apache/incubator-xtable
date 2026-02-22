@@ -41,11 +41,13 @@ import org.apache.parquet.schema.PrimitiveType;
 
 import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.schema.SchemaFieldFinder;
 
 @Value
 @Builder
@@ -80,8 +82,9 @@ public class ParquetStatsExtractor {
   private static final Comparator<Object> COMPARABLE_COMPARATOR =
       (a, b) -> ((Comparable<Object>) a).compareTo(b);
 
-  private static ColumnStat mergeColumnChunks(List<ColumnChunkMetaData> chunks) {
+  private static ColumnStat mergeColumnChunks(List<ColumnChunkMetaData> chunks, InternalSchema internalSchema) {
     ColumnChunkMetaData first = chunks.get(0);
+    InternalField internalField = SchemaFieldFinder.getInstance().findFieldByPath(internalSchema, first.getPath().toDotString());
     PrimitiveType primitiveType = first.getPrimitiveType();
     long totalNumValues = chunks.stream().mapToLong(ColumnChunkMetaData::getValueCount).sum();
     long totalSize = chunks.stream().mapToLong(ColumnChunkMetaData::getTotalSize).sum();
@@ -96,23 +99,14 @@ public class ParquetStatsExtractor {
             .max(COMPARABLE_COMPARATOR)
             .orElseThrow(() -> new IllegalStateException("No chunks for column"));
     return ColumnStat.builder()
-        .field(
-            InternalField.builder()
-                .name(primitiveType.getName())
-                .fieldId(
-                    primitiveType.getId() == null ? null : primitiveType.getId().intValue())
-                .parentPath(null)
-                .schema(
-                    schemaExtractor.toInternalSchema(
-                        primitiveType, first.getPath().toDotString()))
-                .build())
+        .field(internalField)
         .numValues(totalNumValues)
         .totalSize(totalSize)
         .range(Range.vector(globalMin, globalMax))
         .build();
   }
 
-  public static List<ColumnStat> getStatsForFile(ParquetMetadata footer) {
+  public static List<ColumnStat> getStatsForFile(ParquetMetadata footer, InternalSchema internalSchema) {
     MessageType schema = parquetMetadataExtractor.getSchema(footer);
     return footer.getBlocks().stream()
         .flatMap(block -> block.getColumns().stream())
@@ -121,32 +115,8 @@ public class ParquetStatsExtractor {
                 chunk -> schema.getColumnDescription(chunk.getPath().toArray())))
         .values()
         .stream()
-        .map(ParquetStatsExtractor::mergeColumnChunks)
+        .map(columnChunks -> mergeColumnChunks(columnChunks, internalSchema))
         .collect(Collectors.toList());
-  }
-
-  public static InternalDataFile toInternalDataFile(Configuration hadoopConf, Path parentPath)
-      throws IOException {
-    FileSystem fs = FileSystem.get(hadoopConf);
-    FileStatus file = fs.getFileStatus(parentPath);
-    ParquetMetadata footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
-    List<ColumnStat> columnStatsForAFile = getStatsForFile(footer);
-    List<PartitionValue> partitionValues =
-        partitionValueExtractor.extractPartitionValues(
-            partitionSpecExtractor.spec(
-                partitionValueExtractor.extractSchemaForParquetPartitions(
-                    parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
-                    file.getPath().toString())),
-            parentPath.toString());
-    return InternalDataFile.builder()
-        .physicalPath(parentPath.toString())
-        .fileFormat(FileFormat.APACHE_PARQUET)
-        .partitionValues(partitionValues)
-        .fileSizeBytes(file.getLen())
-        .recordCount(getMaxFromColumnStats(columnStatsForAFile).orElse(0L))
-        .columnStats(columnStatsForAFile)
-        .lastModified(file.getModificationTime())
-        .build();
   }
 
   private static Object convertStatsToInternalType(PrimitiveType primitiveType, Object value) {

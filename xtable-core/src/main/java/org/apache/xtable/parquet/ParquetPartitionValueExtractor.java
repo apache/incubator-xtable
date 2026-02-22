@@ -130,9 +130,4 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
   public static ParquetPartitionValueExtractor getInstance() {
     return INSTANCE;
   }
-
-  public InternalSchema extractSchemaForParquetPartitions(ParquetMetadata footer, String path) {
-    MessageType parquetSchema = parquetMetadataExtractor.getSchema(footer);
-    return schemaExtractor.toInternalSchema(parquetSchema, path);
-  }
 }

@@ -61,12 +61,9 @@ public class ParquetSchemaExtractor {
                   .dataType(InternalType.STRING)
                   .isNullable(false)
                   .build())
-          .defaultValue("")
           .build();
   private static final ParquetSchemaExtractor INSTANCE = new ParquetSchemaExtractor();
-  private static final String ELEMENT = "element";
-  private static final String KEY = "key";
-  private static final String VALUE = "value";
+  private static final String LIST = "list";
 
   public static ParquetSchemaExtractor getInstance() {
     return INSTANCE;
@@ -237,11 +234,18 @@ public class ParquetSchemaExtractor {
       // GroupTypes
       logicalType = schema.getLogicalTypeAnnotation();
       if (logicalType instanceof LogicalTypeAnnotation.ListLogicalTypeAnnotation) {
-        String schemaName = schema.asGroupType().getName();
-        Type.ID schemaId = schema.getId();
+        Type elementType;
+        // check if 3-level or 2-level list encoding
+        if (schema.asGroupType().getFieldCount() == 1
+            && !schema.asGroupType().getType(0).isPrimitive()
+            && schema.asGroupType().getType(0).asGroupType().getName().equals(LIST)) {
+          elementType = schema.asGroupType().getType(0).asGroupType().getType(0);
+        } else {
+          elementType = schema.asGroupType().getType(0);
+        }
         InternalSchema elementSchema =
             toInternalSchema(
-                schema.asGroupType().getType(0),
+                elementType,
                 SchemaUtils.getFullyQualifiedPath(
                     parentPath, InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME));
         InternalField elementField =
@@ -249,7 +253,7 @@ public class ParquetSchemaExtractor {
                 .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
                 .parentPath(parentPath)
                 .schema(elementSchema)
-                .fieldId(schemaId == null ? null : schemaId.intValue())
+                .fieldId(elementType.getId() == null ? null : elementType.getId().intValue())
                 .build();
         return InternalSchema.builder()
             .name(schema.getName())
@@ -260,25 +264,34 @@ public class ParquetSchemaExtractor {
             .build();
       } else if (logicalType instanceof LogicalTypeAnnotation.MapLogicalTypeAnnotation) {
         String schemaName = schema.asGroupType().getName();
-        Type.ID schemaId = schema.getId();
+        List<Type> keyAndValueTypes = schema.asGroupType().getFields().get(0).asGroupType().getFields();
+        Type keyType = keyAndValueTypes.get(0);
+        InternalSchema keySchema =
+            toInternalSchema(keyType, SchemaUtils.getFullyQualifiedPath(parentPath, InternalField.Constants.MAP_KEY_FIELD_NAME));
+        InternalField keyField =
+            MAP_KEY_FIELD.toBuilder()
+                .parentPath(parentPath)
+                .schema(keySchema)
+                .fieldId(keyType.getId() == null ? null : keyType.getId().intValue())
+                .build();
+
+        Type valueType = keyAndValueTypes.get(1);
         InternalSchema valueSchema =
-            toInternalSchema(
-                schema.asGroupType().getType(0),
-                SchemaUtils.getFullyQualifiedPath(
+            toInternalSchema(valueType, SchemaUtils.getFullyQualifiedPath(
                     parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME));
         InternalField valueField =
             InternalField.builder()
                 .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
                 .parentPath(parentPath)
                 .schema(valueSchema)
-                .fieldId(schemaId == null ? null : schemaId.intValue())
+                .fieldId(valueType.getId() == null ? null : valueType.getId().intValue())
                 .build();
         return InternalSchema.builder()
             .name(schemaName)
             .dataType(InternalType.MAP)
             .comment(null)
             .isNullable(isNullable(schema.asGroupType()))
-            .fields(valueSchema.getFields())
+            .fields(Arrays.asList(keyField, valueField))
             .build();
       } else {
         subFields = new ArrayList<>(schema.asGroupType().getFields().size());
@@ -289,13 +302,6 @@ public class ParquetSchemaExtractor {
               toInternalSchema(
                   parquetField, SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
 
-          if (schema.asGroupType().getFields().size()
-              == 1) { // TODO Tuple (many subelements in a list)
-            newDataType = subFieldSchema.getDataType();
-            elementName = subFieldSchema.getName();
-            // subFields = subFieldSchema.getFields();
-            break;
-          }
           subFields.add(
               InternalField.builder()
                   .parentPath(parentPath)
@@ -342,10 +348,6 @@ public class ParquetSchemaExtractor {
    */
   public Type fromInternalSchema(InternalSchema internalSchema, String currentPath) {
     Type type = null;
-    Type listType = null;
-    Type mapType = null;
-    Type mapKeyType = null;
-    Type mapValueType = null;
     String fieldName = internalSchema.getName();
     InternalType internalType = internalSchema.getDataType();
     switch (internalType) {
@@ -463,7 +465,7 @@ public class ParquetSchemaExtractor {
                         InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(field.getName()))
                 .findFirst()
                 .orElseThrow(() -> new SchemaExtractorException("Invalid array schema"));
-        listType = fromInternalSchema(elementField.getSchema(), elementField.getPath());
+        Type listType = fromInternalSchema(elementField.getSchema(), elementField.getPath());
         type = Types.requiredList().setElementType(listType).named(internalSchema.getName());
         // TODO nullable lists
         break;
@@ -479,8 +481,8 @@ public class ParquetSchemaExtractor {
                     field -> InternalField.Constants.MAP_VALUE_FIELD_NAME.equals(field.getName()))
                 .findFirst()
                 .orElseThrow(() -> new SchemaExtractorException("Invalid map schema"));
-        mapKeyType = fromInternalSchema(keyField.getSchema(), valueField.getPath());
-        mapValueType = fromInternalSchema(valueField.getSchema(), valueField.getPath());
+        Type mapKeyType = fromInternalSchema(keyField.getSchema(), valueField.getPath());
+        Type mapValueType = fromInternalSchema(valueField.getSchema(), valueField.getPath());
         type =
             Types.requiredMap().key(mapKeyType).value(mapValueType).named(internalSchema.getName());
         // TODO nullable lists

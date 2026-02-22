@@ -21,7 +21,6 @@ package org.apache.xtable.parquet;
 import static org.apache.parquet.column.Encoding.BIT_PACKED;
 import static org.apache.parquet.column.Encoding.PLAIN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -58,20 +57,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
-import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.InternalDataFile;
 
 class TestParquetStatsExtractor {
 
-  private static final ParquetStatsExtractor statsExtractor = ParquetStatsExtractor.getInstance();
-  private static final ParquetMetadataExtractor metadataExtractor =
-      ParquetMetadataExtractor.getInstance();
-
   @TempDir static java.nio.file.Path tempDir = Paths.get("./");
-
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
 
   /** Write a two-row single-column Parquet file; Parquet computes min/max automatically. */
   private static Path writeParquetFile(File file, MessageType schema, Object minVal, Object maxVal)
@@ -110,8 +99,8 @@ class TestParquetStatsExtractor {
   /** Read all column stats from a written file. */
   private static List<ColumnStat> readStats(Path path) {
     Configuration conf = new Configuration();
-    ParquetMetadata footer = metadataExtractor.readParquetMetadata(conf, path);
-    return ParquetStatsExtractor.getStatsForFile(footer);
+    ParquetMetadata footer = ParquetMetadataExtractor.getInstance().readParquetMetadata(conf, path);
+    return ParquetStatsExtractor.getStatsForFile(footer, ParquetSchemaExtractor.getInstance().toInternalSchema(footer.getFileMetaData().getSchema(), ""));
   }
 
   private static IntStatistics intStats(int min, int max) {
@@ -120,25 +109,6 @@ class TestParquetStatsExtractor {
     s.updateStats(max);
     return s;
   }
-
-  @Test
-  void testToInternalDataFile() throws IOException {
-    MessageType schema = new MessageType("m", Types.required(PrimitiveTypeName.INT32).named("id"));
-    File file = tempDir.resolve("parquet-test-to-idf").toFile();
-    Path path = writeParquetFile(file, schema, 1, 100);
-    Configuration conf = new Configuration();
-    InternalDataFile dataFile = statsExtractor.toInternalDataFile(conf, path);
-    assertEquals(FileFormat.APACHE_PARQUET, dataFile.getFileFormat());
-    assertTrue(dataFile.getPhysicalPath().contains("parquet-test-to-idf"));
-    assertEquals(1, dataFile.getColumnStats().size());
-    assertEquals(
-        InternalType.INT, dataFile.getColumnStats().get(0).getField().getSchema().getDataType());
-    assertEquals(2L, dataFile.getRecordCount()); // writeParquetFile writes 2 rows
-  }
-
-  // ---------------------------------------------------------------------------
-  // Parameterized Test 1: primitive types (InternalType + Range)
-  // ---------------------------------------------------------------------------
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("primitiveTypeTestCases")

@@ -165,9 +165,7 @@ public class TestParquetSchemaExtractor {
 
   @Test
   public void testGroupTypes() {
-
     // map
-
     InternalSchema internalMap =
         InternalSchema.builder()
             .name("map")
@@ -176,8 +174,8 @@ public class TestParquetSchemaExtractor {
             .fields(
                 Arrays.asList(
                     InternalField.builder()
-                        .name("key")
-                        .parentPath("_one_field_value")
+                        .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                        .parentPath(null)
                         .schema(
                             InternalSchema.builder()
                                 .name("key")
@@ -187,8 +185,8 @@ public class TestParquetSchemaExtractor {
                         .defaultValue(null)
                         .build(),
                     InternalField.builder()
-                        .name("value")
-                        .parentPath("_one_field_value")
+                        .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                        .parentPath(null)
                         .schema(
                             InternalSchema.builder()
                                 .name("value")
@@ -302,6 +300,38 @@ public class TestParquetSchemaExtractor {
             .fields(
                 Arrays.asList(
                     InternalField.builder()
+                            .name("map")
+                            .schema(
+                                InternalSchema.builder()
+                                    .name("map")
+                                    .isNullable(false)
+                                    .dataType(InternalType.MAP)
+                                    .fields(
+                                        Arrays.asList(
+                                            InternalField.builder()
+                                                .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                                .parentPath("map")
+                                                .schema(
+                                                    InternalSchema.builder()
+                                                        .name("key")
+                                                        .dataType(InternalType.FLOAT)
+                                                        .isNullable(false)
+                                                        .build())
+                                                .defaultValue(null)
+                                                .build(),
+                                            InternalField.builder()
+                                                .name(InternalField.Constants.MAP_VALUE_FIELD_NAME) // "value")
+                                                .parentPath("map")
+                                                .schema(
+                                                    InternalSchema.builder()
+                                                        .name("value")
+                                                        .dataType(InternalType.INT)
+                                                        .isNullable(false)
+                                                        .build())
+                                                .build()))
+                                    .build())
+                              .build(),
+                    InternalField.builder()
                         .name("my_list")
                         .schema(
                             InternalSchema.builder()
@@ -317,7 +347,7 @@ public class TestParquetSchemaExtractor {
                                                 InternalSchema.builder()
                                                     .name("element")
                                                     .dataType(InternalType.INT)
-                                                    .isNullable(true)
+                                                    .isNullable(false)
                                                     .build())
                                             .build()))
                                 .build())
@@ -354,12 +384,87 @@ public class TestParquetSchemaExtractor {
             .named("my_list");
     MessageType messageType =
         Types.buildMessage()
-            // .addField(testMap)
+            .addField(testMap)
             .addField(listType)
             .addField(testGroupType)
             .named("my_record");
 
     Assertions.assertEquals(internalMap, schemaExtractor.toInternalSchema(testMap, null));
     Assertions.assertEquals(internalSchema, schemaExtractor.toInternalSchema(messageType, null));
+  }
+
+  @Test
+  void testThreeLevelListRequiredElement() {
+    GroupType parquetSchema =
+        Types.requiredList()
+            .element(
+                Types.required(PrimitiveTypeName.INT32)
+                    .as(LogicalTypeAnnotation.intType(32, false))
+                    .named("element"))
+            .named("my_list");
+    InternalSchema expected = listSchema("my_list", false);
+    Assertions.assertEquals(expected, schemaExtractor.toInternalSchema(parquetSchema, null));
+  }
+
+  @Test
+  void testThreeLevelListOptionalElement() {
+    GroupType parquetSchema =
+        Types.requiredList()
+            .element(
+                Types.optional(PrimitiveTypeName.INT32)
+                    .as(LogicalTypeAnnotation.intType(32, false))
+                    .named("element"))
+            .named("my_list");
+    InternalSchema expected = listSchema("my_list", true);
+    Assertions.assertEquals(expected, schemaExtractor.toInternalSchema(parquetSchema, null));
+  }
+
+  @Test
+  void testTwoLevelListRequiredElement() {
+    GroupType parquetSchema =
+        Types.buildGroup(Type.Repetition.REQUIRED)
+            .as(LogicalTypeAnnotation.listType())
+            .addField(
+                Types.primitive(PrimitiveTypeName.INT32, Type.Repetition.REQUIRED)
+                    .as(LogicalTypeAnnotation.intType(32, false))
+                    .named("element"))
+            .named("my_list");
+    InternalSchema expected = listSchema("my_list", false);
+    Assertions.assertEquals(expected, schemaExtractor.toInternalSchema(parquetSchema, null));
+  }
+
+  @Test
+  void testTwoLevelListOptionalElement() {
+    GroupType parquetSchema =
+        Types.buildGroup(Type.Repetition.REQUIRED)
+            .as(LogicalTypeAnnotation.listType())
+            .addField(
+                Types.primitive(PrimitiveTypeName.INT32, Type.Repetition.OPTIONAL)
+                    .as(LogicalTypeAnnotation.intType(32, false))
+                    .named("element"))
+            .named("my_list");
+    InternalSchema expected = listSchema("my_list", true);
+    Assertions.assertEquals(expected, schemaExtractor.toInternalSchema(parquetSchema, null));
+  }
+
+  /** Builds the expected InternalSchema for a required LIST of INT32 elements. */
+  private static InternalSchema listSchema(String name, boolean elementNullable) {
+    return InternalSchema.builder()
+        .name(name)
+        .dataType(InternalType.LIST)
+        .isNullable(false)
+        .fields(
+            Collections.singletonList(
+                InternalField.builder()
+                    .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                    .parentPath(null)
+                    .schema(
+                        InternalSchema.builder()
+                            .name("element")
+                            .dataType(InternalType.INT)
+                            .isNullable(elementNullable)
+                            .build())
+                    .build()))
+        .build();
   }
 }
