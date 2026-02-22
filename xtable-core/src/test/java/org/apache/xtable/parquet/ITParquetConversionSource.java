@@ -135,12 +135,11 @@ public class ITParquetConversionSource {
     if (partitionConfig != null) {
       sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
     }
-    String absolutePath = URI.create(table.getDataPath()).getPath();
     SourceTable sourceTable =
         SourceTable.builder()
             .name(tableName)
             .formatName(sourceTableFormat)
-            .basePath(absolutePath)
+            .basePath(table.getBasePath())
             .dataPath(table.getDataPath())
             .additionalProperties(sourceProperties)
             .build();
@@ -153,7 +152,7 @@ public class ITParquetConversionSource {
                         .name(tableName)
                         .formatName(formatName)
                         // set the metadata path to the data path as the default (required by Hudi)
-                        .basePath(absolutePath)
+                        .basePath(table.getBasePath())
                         .metadataRetention(metadataRetention)
                         .build())
             .collect(Collectors.toList());
