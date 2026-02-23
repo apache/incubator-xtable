@@ -60,6 +60,13 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
   public HudiConversionSource(
       HoodieTableMetaClient metaClient,
       PathBasedPartitionSpecExtractor sourcePartitionSpecExtractor) {
+    this(metaClient, sourcePartitionSpecExtractor, false);
+  }
+
+  public HudiConversionSource(
+      HoodieTableMetaClient metaClient,
+      PathBasedPartitionSpecExtractor sourcePartitionSpecExtractor,
+      boolean skipStats) {
     this.metaClient = metaClient;
     this.tableExtractor =
         new HudiTableExtractor(new HudiSchemaExtractor(), sourcePartitionSpecExtractor);
@@ -68,7 +75,8 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
             metaClient,
             new PathBasedPartitionValuesExtractor(
                 sourcePartitionSpecExtractor.getPathToPartitionFieldFormat()),
-            new HudiFileStatsExtractor(metaClient));
+            new HudiFileStatsExtractor(metaClient),
+            skipStats);
   }
 
   @Override
