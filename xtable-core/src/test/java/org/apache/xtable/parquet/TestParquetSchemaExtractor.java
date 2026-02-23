@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import org.apache.parquet.schema.GroupType;
 import org.apache.parquet.schema.LogicalTypeAnnotation;
@@ -32,6 +33,9 @@ import org.apache.parquet.schema.Type.Repetition;
 import org.apache.parquet.schema.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
@@ -82,6 +86,20 @@ public class TestParquetSchemaExtractor {
 
     Assertions.assertEquals(decimalType, schemaExtractor.toInternalSchema(decimalPrimitive, null));
 
+    // test fixed size byte array
+    Map<InternalSchema.MetadataKey, Object> fixedMetadata =
+        Collections.singletonMap(InternalSchema.MetadataKey.FIXED_BYTES_SIZE, 16);
+    InternalSchema fixedType =
+        InternalSchema.builder()
+            .name("fixed")
+            .dataType(InternalType.FIXED)
+            .isNullable(false)
+            .metadata(fixedMetadata)
+            .build();
+    Type fixedPrimitiveType =
+        Types.required(PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY).length(16).named("fixed");
+    Assertions.assertEquals(fixedType, schemaExtractor.toInternalSchema(fixedPrimitiveType, null));
+
     // tests for timestamp and date
     InternalSchema testDate =
         InternalSchema.builder().name("date").dataType(InternalType.DATE).isNullable(false).build();
@@ -124,12 +142,18 @@ public class TestParquetSchemaExtractor {
         Types.required(PrimitiveTypeName.INT64)
             .as(LogicalTypeAnnotation.timestampType(false, LogicalTypeAnnotation.TimeUnit.MILLIS))
             .named("timestamp_millis");
+    Type timestampMicrosPrimitiveType =
+        Types.required(PrimitiveTypeName.INT64)
+            .as(LogicalTypeAnnotation.timestampType(true, LogicalTypeAnnotation.TimeUnit.MICROS))
+            .named("timestamp_micros");
     Type timestampNanosPrimitiveType =
         Types.required(PrimitiveTypeName.INT64)
             .as(LogicalTypeAnnotation.timestampType(false, LogicalTypeAnnotation.TimeUnit.NANOS))
             .named("timestamp_nanos");
     Assertions.assertEquals(
         testTimestampMillis, schemaExtractor.toInternalSchema(timestampMillisPrimitiveType, null));
+    Assertions.assertEquals(
+        testTimestampMicros, schemaExtractor.toInternalSchema(timestampMicrosPrimitiveType, null));
     Assertions.assertEquals(
         testTimestampNanos, schemaExtractor.toInternalSchema(timestampNanosPrimitiveType, null));
 
@@ -142,9 +166,7 @@ public class TestParquetSchemaExtractor {
 
   @Test
   public void testGroupTypes() {
-
     // map
-
     InternalSchema internalMap =
         InternalSchema.builder()
             .name("map")
@@ -153,8 +175,8 @@ public class TestParquetSchemaExtractor {
             .fields(
                 Arrays.asList(
                     InternalField.builder()
-                        .name("key")
-                        .parentPath("_one_field_value")
+                        .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                        .parentPath(null)
                         .schema(
                             InternalSchema.builder()
                                 .name("key")
@@ -164,8 +186,8 @@ public class TestParquetSchemaExtractor {
                         .defaultValue(null)
                         .build(),
                     InternalField.builder()
-                        .name("value")
-                        .parentPath("_one_field_value")
+                        .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                        .parentPath(null)
                         .schema(
                             InternalSchema.builder()
                                 .name("value")
@@ -279,6 +301,40 @@ public class TestParquetSchemaExtractor {
             .fields(
                 Arrays.asList(
                     InternalField.builder()
+                        .name("map")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .isNullable(false)
+                                .dataType(InternalType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("map")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("key")
+                                                    .dataType(InternalType.FLOAT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .defaultValue(null)
+                                            .build(),
+                                        InternalField.builder()
+                                            .name(
+                                                InternalField.Constants
+                                                    .MAP_VALUE_FIELD_NAME) // "value")
+                                            .parentPath("map")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("value")
+                                                    .dataType(InternalType.INT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build(),
+                    InternalField.builder()
                         .name("my_list")
                         .schema(
                             InternalSchema.builder()
@@ -294,7 +350,7 @@ public class TestParquetSchemaExtractor {
                                                 InternalSchema.builder()
                                                     .name("element")
                                                     .dataType(InternalType.INT)
-                                                    .isNullable(true)
+                                                    .isNullable(false)
                                                     .build())
                                             .build()))
                                 .build())
@@ -331,12 +387,74 @@ public class TestParquetSchemaExtractor {
             .named("my_list");
     MessageType messageType =
         Types.buildMessage()
-            // .addField(testMap)
+            .addField(testMap)
             .addField(listType)
             .addField(testGroupType)
             .named("my_record");
 
     Assertions.assertEquals(internalMap, schemaExtractor.toInternalSchema(testMap, null));
     Assertions.assertEquals(internalSchema, schemaExtractor.toInternalSchema(messageType, null));
+  }
+
+  static Stream<Arguments> listEncodings() {
+    return Stream.of(
+        Arguments.of(
+            "3-level required element",
+            Types.requiredList()
+                .element(Types.required(PrimitiveTypeName.INT32).named("element"))
+                .named("my_list"),
+            false),
+        Arguments.of(
+            "3-level optional element",
+            Types.requiredList()
+                .element(Types.optional(PrimitiveTypeName.INT32).named("element"))
+                .named("my_list"),
+            true),
+        Arguments.of(
+            "2-level required element",
+            Types.buildGroup(Type.Repetition.REQUIRED)
+                .as(LogicalTypeAnnotation.listType())
+                .addField(
+                    Types.primitive(PrimitiveTypeName.INT32, Type.Repetition.REQUIRED)
+                        .named("element"))
+                .named("my_list"),
+            false),
+        Arguments.of(
+            "2-level optional element",
+            Types.buildGroup(Type.Repetition.REQUIRED)
+                .as(LogicalTypeAnnotation.listType())
+                .addField(
+                    Types.primitive(PrimitiveTypeName.INT32, Type.Repetition.OPTIONAL)
+                        .named("element"))
+                .named("my_list"),
+            true));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("listEncodings")
+  void testListEncoding(String description, GroupType parquetSchema, boolean elementNullable) {
+    InternalSchema expected = listSchema(elementNullable);
+    Assertions.assertEquals(expected, schemaExtractor.toInternalSchema(parquetSchema, null));
+  }
+
+  /** Builds the expected InternalSchema for a required LIST of INT32 elements. */
+  private static InternalSchema listSchema(boolean elementNullable) {
+    return InternalSchema.builder()
+        .name("my_list")
+        .dataType(InternalType.LIST)
+        .isNullable(false)
+        .fields(
+            Collections.singletonList(
+                InternalField.builder()
+                    .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                    .parentPath(null)
+                    .schema(
+                        InternalSchema.builder()
+                            .name("element")
+                            .dataType(InternalType.INT)
+                            .isNullable(elementNullable)
+                            .build())
+                    .build()))
+        .build();
   }
 }

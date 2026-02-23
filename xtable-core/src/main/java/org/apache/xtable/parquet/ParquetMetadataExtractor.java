@@ -20,6 +20,9 @@ package org.apache.xtable.parquet;
 
 import java.io.IOException;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.HadoopReadOptions;
@@ -27,11 +30,11 @@ import org.apache.parquet.ParquetReadOptions;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
-import org.apache.parquet.io.InputFile;
 import org.apache.parquet.schema.MessageType;
 
 import org.apache.xtable.exception.ReadException;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ParquetMetadataExtractor {
 
   private static final ParquetMetadataExtractor INSTANCE = new ParquetMetadataExtractor();
@@ -40,23 +43,16 @@ public class ParquetMetadataExtractor {
     return INSTANCE;
   }
 
-  public static MessageType getSchema(ParquetMetadata footer) {
-    MessageType schema = footer.getFileMetaData().getSchema();
-    return schema;
+  public MessageType getSchema(ParquetMetadata footer) {
+    return footer.getFileMetaData().getSchema();
   }
 
-  public static ParquetMetadata readParquetMetadata(Configuration conf, Path filePath) {
-    InputFile file = null;
-    try {
-      file = HadoopInputFile.fromPath(filePath, conf);
-    } catch (IOException e) {
-      throw new ReadException("Failed to read the parquet file", e);
-    }
-
+  public ParquetMetadata readParquetMetadata(Configuration conf, Path filePath) {
     ParquetReadOptions options = HadoopReadOptions.builder(conf, filePath).build();
-    try (ParquetFileReader fileReader = ParquetFileReader.open(file, options)) {
+    try (ParquetFileReader fileReader =
+        ParquetFileReader.open(HadoopInputFile.fromPath(filePath, conf), options)) {
       return fileReader.getFooter();
-    } catch (Exception e) {
+    } catch (IOException e) {
       throw new ReadException("Failed to read the parquet file", e);
     }
   }

@@ -18,42 +18,36 @@
  
 package org.apache.xtable.parquet;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import lombok.Builder;
 import lombok.Value;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.parquet.column.ColumnDescriptor;
+import org.apache.parquet.column.statistics.Statistics;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.parquet.io.api.Binary;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.PrimitiveType;
 
-import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
-import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.FileFormat;
-import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.schema.SchemaFieldFinder;
 
 @Value
 @Builder
 public class ParquetStatsExtractor {
 
   private static final ParquetStatsExtractor INSTANCE = new ParquetStatsExtractor();
-
-  private static final ParquetSchemaExtractor schemaExtractor =
-      ParquetSchemaExtractor.getInstance();
 
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
@@ -62,97 +56,79 @@ public class ParquetStatsExtractor {
     return INSTANCE;
   }
 
-  private static final ParquetPartitionValueExtractor partitionValueExtractor =
-      ParquetPartitionValueExtractor.getInstance();
-  private static PathBasedPartitionSpecExtractor partitionSpecExtractor =
-      ParquetPartitionSpecExtractor.getInstance();
+  @SuppressWarnings("unchecked")
+  private static final Comparator<Object> COMPARABLE_COMPARATOR =
+      (a, b) -> ((Comparable<Object>) a).compareTo(b);
 
-  public static List<ColumnStat> getColumnStatsForaFile(ParquetMetadata footer) {
-    return getStatsForFile(footer).values().stream()
-        .flatMap(List::stream)
+  private static ColumnStat mergeColumnChunks(
+      List<ColumnChunkMetaData> chunks, InternalSchema internalSchema) {
+    ColumnChunkMetaData first = chunks.get(0);
+    String dotStringPath = first.getPath().toDotString();
+    InternalField internalField =
+        SchemaFieldFinder.getInstance().findFieldByPath(internalSchema, dotStringPath);
+    Objects.requireNonNull(internalField, "No field found for path: " + dotStringPath);
+    PrimitiveType primitiveType = first.getPrimitiveType();
+    long totalNumValues = chunks.stream().mapToLong(ColumnChunkMetaData::getValueCount).sum();
+    long totalSize = chunks.stream().mapToLong(ColumnChunkMetaData::getTotalSize).sum();
+    long totalNullValues =
+        chunks.stream()
+            .map(ColumnChunkMetaData::getStatistics)
+            .mapToLong(Statistics::getNumNulls)
+            .sum();
+    Object globalMin =
+        chunks.stream()
+            .filter(c -> c.getStatistics().hasNonNullValue())
+            .map(c -> convertStatsToInternalType(primitiveType, c.getStatistics().genericGetMin()))
+            .min(COMPARABLE_COMPARATOR)
+            .orElse(null);
+    Object globalMax =
+        chunks.stream()
+            .filter(c -> c.getStatistics().hasNonNullValue())
+            .map(c -> convertStatsToInternalType(primitiveType, c.getStatistics().genericGetMax()))
+            .max(COMPARABLE_COMPARATOR)
+            .orElse(null);
+    return ColumnStat.builder()
+        .field(internalField)
+        .numValues(totalNumValues)
+        .numNulls(totalNullValues)
+        .totalSize(totalSize)
+        .range(Range.vector(globalMin, globalMax))
+        .build();
+  }
+
+  public static List<ColumnStat> getStatsForFile(
+      ParquetMetadata footer, InternalSchema internalSchema) {
+    MessageType schema = parquetMetadataExtractor.getSchema(footer);
+    return footer.getBlocks().stream()
+        .flatMap(block -> block.getColumns().stream())
+        .collect(
+            Collectors.groupingBy(chunk -> schema.getColumnDescription(chunk.getPath().toArray())))
+        .values()
+        .stream()
+        .map(columnChunks -> mergeColumnChunks(columnChunks, internalSchema))
         .collect(Collectors.toList());
   }
 
-  private static Optional<Long> getMaxFromColumnStats(List<ColumnStat> columnStats) {
-    return columnStats.stream()
-        .filter(entry -> entry.getField().getParentPath() == null)
-        .map(ColumnStat::getNumValues)
-        .filter(numValues -> numValues > 0)
-        .max(Long::compareTo);
-  }
+  private static Object convertStatsToInternalType(PrimitiveType primitiveType, Object value) {
+    LogicalTypeAnnotation annotation = primitiveType.getLogicalTypeAnnotation();
 
-  public static Map<ColumnDescriptor, List<ColumnStat>> getStatsForFile(ParquetMetadata footer) {
-    Map<ColumnDescriptor, List<ColumnStat>> columnDescStats = new HashMap<>();
-    MessageType schema = parquetMetadataExtractor.getSchema(footer);
-    List<ColumnChunkMetaData> columns = new ArrayList<>();
-    columns =
-        footer.getBlocks().stream()
-            .flatMap(blockMetaData -> blockMetaData.getColumns().stream())
-            .collect(Collectors.toList());
-    columnDescStats =
-        columns.stream()
-            .collect(
-                Collectors.groupingBy(
-                    columnMetaData ->
-                        schema.getColumnDescription(columnMetaData.getPath().toArray()),
-                    Collectors.mapping(
-                        columnMetaData ->
-                            ColumnStat.builder()
-                                .field(
-                                    InternalField.builder()
-                                        .name(columnMetaData.getPrimitiveType().getName())
-                                        .fieldId(
-                                            columnMetaData.getPrimitiveType().getId() == null
-                                                ? null
-                                                : columnMetaData
-                                                    .getPrimitiveType()
-                                                    .getId()
-                                                    .intValue())
-                                        .parentPath(null)
-                                        .schema(
-                                            schemaExtractor.toInternalSchema(
-                                                columnMetaData.getPrimitiveType(),
-                                                columnMetaData.getPath().toDotString()))
-                                        .build())
-                                .numValues(columnMetaData.getValueCount())
-                                .totalSize(columnMetaData.getTotalSize())
-                                .range(
-                                    Range.vector(
-                                        ParquetStatsConverterUtil
-                                            .convertStatBinaryTypeToLogicalType(
-                                                columnMetaData,
-                                                true), // if stats are string convert to
-                                        // litteraly a string stat and
-                                        // store to range
-                                        ParquetStatsConverterUtil
-                                            .convertStatBinaryTypeToLogicalType(
-                                                columnMetaData, false)))
-                                .build(),
-                        Collectors.toList())));
-    return columnDescStats;
-  }
-
-  public static InternalDataFile toInternalDataFile(Configuration hadoopConf, Path parentPath)
-      throws IOException {
-    FileSystem fs = FileSystem.get(hadoopConf);
-    FileStatus file = fs.getFileStatus(parentPath);
-    ParquetMetadata footer = parquetMetadataExtractor.readParquetMetadata(hadoopConf, parentPath);
-    List<ColumnStat> columnStatsForAFile = getColumnStatsForaFile(footer);
-    List<PartitionValue> partitionValues =
-        partitionValueExtractor.extractPartitionValues(
-            partitionSpecExtractor.spec(
-                partitionValueExtractor.extractSchemaForParquetPartitions(
-                    parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
-                    file.getPath().toString())),
-            parentPath.toString());
-    return InternalDataFile.builder()
-        .physicalPath(parentPath.toString())
-        .fileFormat(FileFormat.APACHE_PARQUET)
-        .partitionValues(partitionValues)
-        .fileSizeBytes(file.getLen())
-        .recordCount(getMaxFromColumnStats(columnStatsForAFile).orElse(0L))
-        .columnStats(columnStatsForAFile)
-        .lastModified(file.getModificationTime())
-        .build();
+    // DECIMAL: convert unscaled backing value → BigDecimal regardless of primitive type
+    if (annotation instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+      int scale = ((LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) annotation).getScale();
+      switch (primitiveType.getPrimitiveTypeName()) {
+        case INT32:
+        case INT64:
+          return new BigDecimal(BigInteger.valueOf(((Number) value).longValue()), scale);
+        case BINARY:
+        case FIXED_LEN_BYTE_ARRAY:
+          return new BigDecimal(new BigInteger(((Binary) value).getBytes()), scale);
+        default:
+          return value;
+      }
+    } else if (annotation instanceof LogicalTypeAnnotation.StringLogicalTypeAnnotation) {
+      // STRING: convert binary → String
+      return new String(((Binary) value).getBytes(), StandardCharsets.UTF_8);
+    }
+    return value;
   }
 }
