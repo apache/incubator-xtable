@@ -23,13 +23,13 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import lombok.Builder;
 import lombok.Value;
 
-import org.apache.hadoop.fs.*;
+import org.apache.parquet.column.statistics.Statistics;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.io.api.Binary;
@@ -65,14 +65,6 @@ public class ParquetStatsExtractor {
   private static PathBasedPartitionSpecExtractor partitionSpecExtractor =
       ParquetPartitionSpecExtractor.getInstance();
 
-  private static Optional<Long> getMaxFromColumnStats(List<ColumnStat> columnStats) {
-    return columnStats.stream()
-        .filter(entry -> entry.getField().getParentPath() == null)
-        .map(ColumnStat::getNumValues)
-        .filter(numValues -> numValues > 0)
-        .max(Long::compareTo);
-  }
-
   @SuppressWarnings("unchecked")
   private static final Comparator<Object> COMPARABLE_COMPARATOR =
       (a, b) -> ((Comparable<Object>) a).compareTo(b);
@@ -80,25 +72,31 @@ public class ParquetStatsExtractor {
   private static ColumnStat mergeColumnChunks(
       List<ColumnChunkMetaData> chunks, InternalSchema internalSchema) {
     ColumnChunkMetaData first = chunks.get(0);
+    String dotStringPath = first.getPath().toDotString();
     InternalField internalField =
         SchemaFieldFinder.getInstance()
-            .findFieldByPath(internalSchema, first.getPath().toDotString());
+            .findFieldByPath(internalSchema, dotStringPath);
+    Objects.requireNonNull(internalField, "No field found for path: " + dotStringPath);
     PrimitiveType primitiveType = first.getPrimitiveType();
     long totalNumValues = chunks.stream().mapToLong(ColumnChunkMetaData::getValueCount).sum();
     long totalSize = chunks.stream().mapToLong(ColumnChunkMetaData::getTotalSize).sum();
+    long totalNullValues = chunks.stream().map(ColumnChunkMetaData::getStatistics).mapToLong(Statistics::getNumNulls).sum();
     Object globalMin =
         chunks.stream()
+            .filter(c -> c.getStatistics().hasNonNullValue())
             .map(c -> convertStatsToInternalType(primitiveType, c.getStatistics().genericGetMin()))
             .min(COMPARABLE_COMPARATOR)
-            .orElseThrow(() -> new IllegalStateException("No chunks for column"));
+            .orElse(null);
     Object globalMax =
         chunks.stream()
+            .filter(c -> c.getStatistics().hasNonNullValue())
             .map(c -> convertStatsToInternalType(primitiveType, c.getStatistics().genericGetMax()))
             .max(COMPARABLE_COMPARATOR)
-            .orElseThrow(() -> new IllegalStateException("No chunks for column"));
+            .orElse(null);
     return ColumnStat.builder()
         .field(internalField)
         .numValues(totalNumValues)
+        .numNulls(totalNullValues)
         .totalSize(totalSize)
         .range(Range.vector(globalMin, globalMax))
         .build();

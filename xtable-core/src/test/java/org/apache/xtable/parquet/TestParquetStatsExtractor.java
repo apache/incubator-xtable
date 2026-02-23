@@ -21,6 +21,7 @@ package org.apache.xtable.parquet;
 import static org.apache.parquet.column.Encoding.BIT_PACKED;
 import static org.apache.parquet.column.Encoding.PLAIN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -45,9 +46,10 @@ import org.apache.parquet.hadoop.example.GroupWriteSupport;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.io.api.Binary;
-import org.apache.parquet.schema.*;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
+import org.apache.parquet.schema.Types;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -60,13 +62,13 @@ import org.apache.xtable.model.stat.ColumnStat;
 
 class TestParquetStatsExtractor {
 
+  private final Configuration conf = new Configuration();
   @TempDir static java.nio.file.Path tempDir = Paths.get("./");
 
   /** Write a two-row single-column Parquet file; Parquet computes min/max automatically. */
-  private static Path writeParquetFile(File file, MessageType schema, Object minVal, Object maxVal)
+  private Path writeParquetFile(File file, MessageType schema, Object minVal, Object maxVal)
       throws IOException {
     Path path = new Path(file.toURI());
-    Configuration conf = new Configuration();
     GroupWriteSupport.setSchema(schema, conf);
     SimpleGroupFactory factory = new SimpleGroupFactory(schema);
     String fieldName = schema.getFields().get(0).getName();
@@ -97,8 +99,7 @@ class TestParquetStatsExtractor {
   }
 
   /** Read all column stats from a written file. */
-  private static List<ColumnStat> readStats(Path path) {
-    Configuration conf = new Configuration();
+  private List<ColumnStat> readStats(Path path) {
     ParquetMetadata footer = ParquetMetadataExtractor.getInstance().readParquetMetadata(conf, path);
     return ParquetStatsExtractor.getStatsForFile(
         footer,
@@ -439,10 +440,6 @@ class TestParquetStatsExtractor {
             new BigDecimal("0.1000")));
   }
 
-  // ---------------------------------------------------------------------------
-  // Standalone edge-case tests
-  // ---------------------------------------------------------------------------
-
   @Test
   void testMultipleColumnsStat() throws IOException {
     MessageType schema =
@@ -453,7 +450,6 @@ class TestParquetStatsExtractor {
 
     File file = tempDir.resolve("parquet-test-multi-col").toFile();
     Path path = new Path(file.toURI());
-    Configuration conf = new Configuration();
     GroupWriteSupport.setSchema(schema, conf);
     SimpleGroupFactory factory = new SimpleGroupFactory(schema);
     try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(path).withConf(conf).build()) {
@@ -500,7 +496,6 @@ class TestParquetStatsExtractor {
 
     File file = tempDir.resolve("parquet-test-multi-rg").toFile();
     Path path = new Path(file.toURI());
-    Configuration conf = new Configuration();
     ParquetFileWriter w = new ParquetFileWriter(conf, schema, path);
     w.start();
     w.startBlock(10);
@@ -521,5 +516,53 @@ class TestParquetStatsExtractor {
     assertEquals(10, columnStat.getRange().getMinValue());
     assertEquals(500, columnStat.getRange().getMaxValue());
     assertEquals(15L, columnStat.getNumValues());
+  }
+
+  @Test
+  void testAllNullColumnStats() throws IOException {
+    MessageType schema =
+        new MessageType("message", Types.optional(PrimitiveTypeName.INT32).named("col"));
+    File file = tempDir.resolve("parquet-all-null").toFile();
+    Path path = new Path(file.toURI());
+    GroupWriteSupport.setSchema(schema, conf);
+    SimpleGroupFactory factory = new SimpleGroupFactory(schema);
+    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(path).withConf(conf).build()) {
+      writer.write(factory.newGroup());
+      writer.write(factory.newGroup());
+      writer.write(factory.newGroup());
+    }
+
+    List<ColumnStat> columnStats = readStats(path);
+    assertEquals(1, columnStats.size());
+    ColumnStat stat = columnStats.get(0);
+    assertEquals(3L, stat.getNumNulls());
+    assertNull(stat.getRange().getMinValue());
+    assertNull(stat.getRange().getMaxValue());
+  }
+
+  @Test
+  void testNumNullsIsSet() throws IOException {
+    MessageType schema =
+        new MessageType("message", Types.optional(PrimitiveTypeName.INT32).named("col"));
+    File file = tempDir.resolve("parquet-partial-null").toFile();
+    Path path = new Path(file.toURI());
+    GroupWriteSupport.setSchema(schema, conf);
+    SimpleGroupFactory factory = new SimpleGroupFactory(schema);
+    try (ParquetWriter<Group> writer = ExampleParquetWriter.builder(path).withConf(conf).build()) {
+      Group row1 = factory.newGroup();
+      row1.add("col", 10);
+      writer.write(row1);
+      writer.write(factory.newGroup()); // null row
+      Group row3 = factory.newGroup();
+      row3.add("col", 50);
+      writer.write(row3);
+    }
+
+    List<ColumnStat> columnStats = readStats(path);
+    assertEquals(1, columnStats.size());
+    ColumnStat stat = columnStats.get(0);
+    assertEquals(1L, stat.getNumNulls());
+    assertEquals(10, stat.getRange().getMinValue());
+    assertEquals(50, stat.getRange().getMaxValue());
   }
 }
