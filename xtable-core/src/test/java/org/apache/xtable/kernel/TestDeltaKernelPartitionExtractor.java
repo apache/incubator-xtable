@@ -22,19 +22,30 @@ import static org.apache.xtable.kernel.DeltaKernelPartitionExtractor.DELTA_GENER
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
 import scala.collection.JavaConverters;
 
-import io.delta.kernel.types.*;
+import io.delta.kernel.types.DateType;
 import io.delta.kernel.types.FieldMetadata;
+import io.delta.kernel.types.IntegerType;
+import io.delta.kernel.types.StringType;
 import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
+import io.delta.kernel.types.TimestampType;
 
-import org.apache.xtable.model.schema.*;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 

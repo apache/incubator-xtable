@@ -34,7 +34,11 @@ import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.utils.SnapshotManager;
 
 import org.apache.xtable.exception.ReadException;
-import org.apache.xtable.model.*;
+import org.apache.xtable.model.CommitsBacklog;
+import org.apache.xtable.model.InstantsForIncrementalSync;
+import org.apache.xtable.model.InternalSnapshot;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.TableChange;
 import org.apache.xtable.model.schema.InternalPartitionField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
