@@ -130,6 +130,11 @@ public class DeltaDataFileUpdatesExtractor {
 
   private String getColumnStats(
       InternalSchema schema, long recordCount, List<ColumnStat> columnStats) {
+    // In skip-stats mode source files may not have row count/column stats.
+    // Return null so Delta doesn't persist incorrect numRecords=0 metadata.
+    if (recordCount <= 0 && (columnStats == null || columnStats.isEmpty())) {
+      return null;
+    }
     try {
       return deltaStatsExtractor.convertStatsToDeltaFormat(schema, recordCount, columnStats);
     } catch (JsonProcessingException e) {

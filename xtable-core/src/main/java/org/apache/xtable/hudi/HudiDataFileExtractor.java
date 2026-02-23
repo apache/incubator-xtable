@@ -144,9 +144,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
     List<InternalDataFile> filesAdded =
         skipStats
-            ? fileStatsExtractor
-                .addRecordCountToFiles(tableMetadata, allInfo.getAdded().stream(), table.getReadSchema())
-                .collect(Collectors.toList())
+            ? allInfo.getAdded()
             : fileStatsExtractor
                 .addStatsToFiles(tableMetadata, allInfo.getAdded().stream(), table.getReadSchema())
                 .collect(Collectors.toList());
@@ -373,8 +371,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                       .map(baseFile -> buildFileWithoutStats(partitionValues, baseFile));
                 });
     if (skipStats) {
-      return PartitionFileGroup.fromFiles(
-          fileStatsExtractor.addRecordCountToFiles(tableMetadata, filesWithoutStats, table.getReadSchema()));
+      return PartitionFileGroup.fromFiles(filesWithoutStats);
     }
     Stream<InternalDataFile> files =
         fileStatsExtractor.addStatsToFiles(tableMetadata, filesWithoutStats, table.getReadSchema());
