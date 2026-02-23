@@ -26,9 +26,9 @@ import java.util.Properties;
 
 import lombok.Value;
 
-import com.google.common.base.Preconditions;
-
 import org.apache.hadoop.conf.Configuration;
+
+import com.google.common.base.Preconditions;
 
 import org.apache.xtable.model.schema.PartitionFieldSpec;
 import org.apache.xtable.model.schema.PartitionTransformType;
