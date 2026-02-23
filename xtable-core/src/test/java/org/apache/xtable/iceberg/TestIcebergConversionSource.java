@@ -18,8 +18,15 @@
  
 package org.apache.xtable.iceberg;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -40,7 +47,20 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
-import org.apache.iceberg.*;
+import org.apache.iceberg.AppendFiles;
+import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.ContentScanTask;
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.PartitionData;
+import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.PartitionSpecParser;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.SchemaParser;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.TableScan;
+import org.apache.iceberg.Transaction;
 import org.apache.iceberg.data.GenericRecord;
 import org.apache.iceberg.data.parquet.GenericParquetWriter;
 import org.apache.iceberg.expressions.Expressions;
@@ -59,9 +79,11 @@ import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.PartitionValue;
-import org.apache.xtable.model.storage.*;
+import org.apache.xtable.model.storage.DataLayoutStrategy;
 import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.TableFormat;
 
 @Execution(ExecutionMode.SAME_THREAD)
 class TestIcebergConversionSource {
@@ -99,15 +121,15 @@ class TestIcebergConversionSource {
 
     Snapshot snapshot = catalogSales.currentSnapshot();
     InternalTable internalTable = conversionSource.getTable(snapshot);
-    Assertions.assertNotNull(internalTable);
+    assertNotNull(internalTable);
     assertEquals(TableFormat.ICEBERG, internalTable.getTableFormat());
-    Assertions.assertTrue(internalTable.getName().endsWith("catalog_sales"));
+    assertTrue(internalTable.getName().endsWith("catalog_sales"));
     assertEquals(catalogSales.location(), internalTable.getBasePath());
     assertEquals(DataLayoutStrategy.HIVE_STYLE_PARTITION, internalTable.getLayoutStrategy());
     assertEquals(snapshot.timestampMillis(), internalTable.getLatestCommitTime().toEpochMilli());
-    Assertions.assertNotNull(internalTable.getReadSchema());
+    assertNotNull(internalTable.getReadSchema());
 
-    Assertions.assertEquals(7, internalTable.getReadSchema().getFields().size());
+    assertEquals(7, internalTable.getReadSchema().getFields().size());
     validateSchema(internalTable.getReadSchema(), catalogSales.schema());
 
     assertEquals(1, internalTable.getPartitioningFields().size());
@@ -171,14 +193,14 @@ class TestIcebergConversionSource {
                 .build());
 
     InternalSnapshot internalSnapshot = spyConversionSource.getCurrentSnapshot();
-    Assertions.assertNotNull(internalSnapshot);
+    assertNotNull(internalSnapshot);
     assertEquals(String.valueOf(iceCurrentSnapshot.snapshotId()), internalSnapshot.getVersion());
-    Assertions.assertNotNull(internalSnapshot.getTable());
+    assertNotNull(internalSnapshot.getTable());
     verify(spyConversionSource, times(1)).getTable(iceCurrentSnapshot);
     verify(spyPartitionConverter, times(5)).toXTable(any(), any(), any());
     verify(spyDataFileExtractor, times(5)).fromIceberg(any(), any(), any());
 
-    Assertions.assertNotNull(internalSnapshot.getPartitionedDataFiles());
+    assertNotNull(internalSnapshot.getPartitionedDataFiles());
     List<PartitionFileGroup> dataFileChunks = internalSnapshot.getPartitionedDataFiles();
     assertEquals(5, dataFileChunks.size());
     for (PartitionFileGroup dataFilesChunk : dataFileChunks) {
@@ -187,7 +209,7 @@ class TestIcebergConversionSource {
       InternalDataFile internalDataFile = internalDataFiles.get(0);
       assertEquals(FileFormat.APACHE_PARQUET, internalDataFile.getFileFormat());
       assertEquals(1, internalDataFile.getRecordCount());
-      Assertions.assertTrue(internalDataFile.getPhysicalPath().startsWith("file:" + workingDir));
+      assertTrue(internalDataFile.getPhysicalPath().startsWith("file:" + workingDir));
 
       List<PartitionValue> partitionValues = internalDataFile.getPartitionValues();
       assertEquals(1, partitionValues.size());
@@ -284,7 +306,7 @@ class TestIcebergConversionSource {
     assertEquals(4, catalogSales.history().size());
     catalogSales.expireSnapshots().expireSnapshotId(snapshot1.snapshotId()).commit();
     assertEquals(3, catalogSales.history().size());
-    Assertions.assertNull(catalogSales.snapshot(snapshot1.snapshotId()));
+    assertNull(catalogSales.snapshot(snapshot1.snapshotId()));
     Snapshot snapshot6 = catalogSales.currentSnapshot();
     // expire does not generate a new snapshot
     assertEquals(snapshot6, snapshot5);
@@ -404,7 +426,7 @@ class TestIcebergConversionSource {
 
     for (Types.NestedField expectedField : expectedSchema.columns()) {
       Types.NestedField column = columnMap.get(expectedField.name());
-      Assertions.assertNotNull(column);
+      assertNotNull(column);
       assertEquals(expectedField.fieldId(), column.fieldId());
       assertEquals(expectedField.type(), column.type());
       assertEquals(expectedField.isOptional(), column.isOptional());
