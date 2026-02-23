@@ -26,7 +26,6 @@ import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
-import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
@@ -151,7 +150,6 @@ public class ITParquetConversionSource {
                     TargetTable.builder()
                         .name(tableName)
                         .formatName(formatName)
-                        // set the metadata path to the data path as the default (required by Hudi)
                         .basePath(table.getBasePath())
                         .metadataRetention(metadataRetention)
                         .build())
@@ -311,6 +309,8 @@ public class ITParquetConversionSource {
                   "day",
                   functions.date_format(
                       functions.col("timestamp").cast(DataTypes.TimestampType), "dd"));
+        } else {
+          throw new IllegalArgumentException("Unsupported partition column: " + partitionCol);
         }
       }
       df.write().mode(SaveMode.Append).partitionBy(partitionCols).parquet(dataPath);
