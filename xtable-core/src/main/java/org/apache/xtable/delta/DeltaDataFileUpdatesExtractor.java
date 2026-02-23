@@ -131,8 +131,9 @@ public class DeltaDataFileUpdatesExtractor {
   private String getColumnStats(
       InternalSchema schema, long recordCount, List<ColumnStat> columnStats) {
     // In skip-stats mode source files may not have row count/column stats.
-    // Return null so Delta doesn't persist incorrect numRecords=0 metadata.
-    if (recordCount <= 0 && (columnStats == null || columnStats.isEmpty())) {
+    // Return null only when row count is unknown (negative sentinel).
+    // Explicit rowCount=0 should be persisted as numRecords=0.
+    if (recordCount < 0 && (columnStats == null || columnStats.isEmpty())) {
       return null;
     }
     try {
