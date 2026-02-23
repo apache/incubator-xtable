@@ -110,7 +110,8 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     return createInternalTableFromFile(file);
   }
 
-  private Stream<InternalDataFile> getInternalDataFiles(Stream<LocatedFileStatus> parquetFiles) {
+  private Stream<InternalDataFile> getInternalDataFiles(
+      Stream<LocatedFileStatus> parquetFiles, InternalSchema schema) {
     return parquetFiles.map(
         file ->
             InternalDataFile.builder()
@@ -119,35 +120,29 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                 .fileSizeBytes(file.getLen())
                 .partitionValues(
                     partitionValueExtractor.extractPartitionValues(
-                        partitionSpecExtractor.spec(
-                            partitionValueExtractor.extractSchemaForParquetPartitions(
-                                parquetMetadataExtractor.readParquetMetadata(
-                                    hadoopConf, file.getPath()),
-                                file.getPath().toString())),
+                        partitionSpecExtractor.spec(schema),
                         HudiPathUtils.getPartitionPath(new Path(basePath), file.getPath())))
                 .lastModified(file.getModificationTime())
                 .columnStats(
-                    parquetStatsExtractor.getColumnStatsForaFile(
-                        parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath())))
+                    parquetStatsExtractor.getStatsForFile(
+                        parquetMetadataExtractor.readParquetMetadata(hadoopConf, file.getPath()),
+                        schema))
                 .build());
   }
 
-  private InternalDataFile createInternalDataFileFromParquetFile(FileStatus parquetFile) {
+  private InternalDataFile createInternalDataFileFromParquetFile(
+      FileStatus parquetFile, InternalSchema schema) {
     return InternalDataFile.builder()
         .physicalPath(parquetFile.getPath().toString())
         .partitionValues(
             partitionValueExtractor.extractPartitionValues(
-                partitionSpecExtractor.spec(
-                    partitionValueExtractor.extractSchemaForParquetPartitions(
-                        parquetMetadataExtractor.readParquetMetadata(
-                            hadoopConf, parquetFile.getPath()),
-                        parquetFile.getPath().toString())),
-                basePath))
+                partitionSpecExtractor.spec(schema), basePath))
         .lastModified(parquetFile.getModificationTime())
         .fileSizeBytes(parquetFile.getLen())
         .columnStats(
-            parquetStatsExtractor.getColumnStatsForaFile(
-                parquetMetadataExtractor.readParquetMetadata(hadoopConf, parquetFile.getPath())))
+            parquetStatsExtractor.getStatsForFile(
+                parquetMetadataExtractor.readParquetMetadata(hadoopConf, parquetFile.getPath()),
+                schema))
         .build();
   }
 
@@ -169,7 +164,8 @@ public class ParquetConversionSource implements ConversionSource<Long> {
             .collect(Collectors.toList());
     InternalTable internalTable = getMostRecentTable(parquetFiles);
     for (FileStatus tableStatus : tableChangesAfter) {
-      InternalDataFile currentDataFile = createInternalDataFileFromParquetFile(tableStatus);
+      InternalDataFile currentDataFile =
+          createInternalDataFileFromParquetFile(tableStatus, internalTable.getReadSchema());
       addedInternalDataFiles.add(currentDataFile);
     }
 
@@ -198,9 +194,9 @@ public class ParquetConversionSource implements ConversionSource<Long> {
   @Override
   public InternalSnapshot getCurrentSnapshot() {
     // to avoid consume the stream call the method twice to return the same stream of parquet files
-    Stream<InternalDataFile> internalDataFiles =
-        getInternalDataFiles(getParquetFiles(hadoopConf, basePath));
     InternalTable table = getMostRecentTable(getParquetFiles(hadoopConf, basePath));
+    Stream<InternalDataFile> internalDataFiles =
+        getInternalDataFiles(getParquetFiles(hadoopConf, basePath), table.getReadSchema());
     return InternalSnapshot.builder()
         .table(table)
         .sourceIdentifier(
