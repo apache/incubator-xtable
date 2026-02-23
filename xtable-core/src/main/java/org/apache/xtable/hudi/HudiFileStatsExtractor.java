@@ -102,6 +102,30 @@ public class HudiFileStatsExtractor {
         : computeColumnStatsFromParquetFooters(files, nameFieldMap);
   }
 
+  /**
+   * Adds record count information only.
+   *
+   * <p>This avoids materializing full min/max/null column stats in memory while still writing
+   * correct file row counts (for example Delta `numRecords`).
+   */
+  public Stream<InternalDataFile> addRecordCountToFiles(
+      HoodieTableMetadata metadataTable, Stream<InternalDataFile> files, InternalSchema schema) {
+    boolean useMetadataTableColStats =
+        metadataTable != null
+            && metaClient
+                .getTableConfig()
+                .isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS);
+    final Map<String, InternalField> nameFieldMap =
+        schema.getAllFields().stream()
+            .collect(
+                Collectors.toMap(
+                    field -> getFieldNameForStats(field, useMetadataTableColStats),
+                    Function.identity()));
+    return useMetadataTableColStats
+        ? computeRecordCountFromMetadataTable(metadataTable, files, nameFieldMap)
+        : computeRecordCountFromParquetFooters(files);
+  }
+
   private Stream<InternalDataFile> computeColumnStatsFromParquetFooters(
       Stream<InternalDataFile> files, Map<String, InternalField> nameFieldMap) {
     return files.map(
@@ -113,6 +137,16 @@ public class HudiFileStatsExtractor {
               .recordCount(fileStats.getRowCount())
               .build();
         });
+  }
+
+  private Stream<InternalDataFile> computeRecordCountFromParquetFooters(
+      Stream<InternalDataFile> files) {
+    return files.map(
+        file ->
+            file.toBuilder()
+                .recordCount(
+                    UTILS.getRowCount(metaClient.getHadoopConf(), new Path(file.getPhysicalPath())))
+                .build());
   }
 
   private Pair<String, String> getPartitionAndFileName(String path) {
@@ -164,6 +198,37 @@ public class HudiFileStatsExtractor {
                       .collect(CustomCollectors.toList(fileStats.size()));
               long recordCount = getMaxFromColumnStats(columnStats).orElse(0L);
               return file.toBuilder().columnStats(columnStats).recordCount(recordCount).build();
+            });
+  }
+
+  private Stream<InternalDataFile> computeRecordCountFromMetadataTable(
+      HoodieTableMetadata metadataTable,
+      Stream<InternalDataFile> files,
+      Map<String, InternalField> nameFieldMap) {
+    if (nameFieldMap.isEmpty()) {
+      return files.map(file -> file.toBuilder().recordCount(0L).build());
+    }
+    Map<Pair<String, String>, InternalDataFile> filePathsToDataFile =
+        files.collect(
+            Collectors.toMap(
+                file -> getPartitionAndFileName(file.getPhysicalPath()), Function.identity()));
+    if (filePathsToDataFile.isEmpty()) {
+      return Stream.empty();
+    }
+    // Query a single column to fetch per-file valueCount, which is sufficient for row count.
+    String anyField = nameFieldMap.keySet().iterator().next();
+    Map<Pair<String, String>, HoodieMetadataColumnStats> statsByFile =
+        metadataTable.getColumnStats(new ArrayList<>(filePathsToDataFile.keySet()), anyField);
+    return filePathsToDataFile.entrySet().stream()
+        .map(
+            entry -> {
+              HoodieMetadataColumnStats stats = statsByFile.get(entry.getKey());
+              long recordCount =
+                  stats != null
+                      ? stats.getValueCount()
+                      : UTILS.getRowCount(
+                          metaClient.getHadoopConf(), new Path(entry.getValue().getPhysicalPath()));
+              return entry.getValue().toBuilder().recordCount(recordCount).build();
             });
   }
 

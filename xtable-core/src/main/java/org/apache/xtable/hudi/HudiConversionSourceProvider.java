@@ -49,7 +49,10 @@ public class HudiConversionSourceProvider extends ConversionSourceProvider<Hoodi
     boolean omitMetadataFields =
         HudiSourceConfig.getOmitMetadataFields(
             sourceTable.getAdditionalProperties(), hadoopConf);
+    boolean skipStats =
+        HudiSourceConfig.getSkipStats(sourceTable.getAdditionalProperties(), hadoopConf);
 
-    return new HudiConversionSource(metaClient, sourcePartitionSpecExtractor, omitMetadataFields);
+    return new HudiConversionSource(
+        metaClient, sourcePartitionSpecExtractor, omitMetadataFields, skipStats);
   }
 }
