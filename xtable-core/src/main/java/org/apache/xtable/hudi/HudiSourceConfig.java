@@ -23,11 +23,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
+
 import lombok.Value;
 
-import com.google.common.base.Preconditions;
-
 import org.apache.hadoop.conf.Configuration;
+
+import com.google.common.base.Preconditions;
 
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.reflection.ReflectionUtils;
@@ -43,6 +44,7 @@ public class HudiSourceConfig {
       "xtable.hudi.source.omit_metadata_fields";
   public static final String HUDI_OMIT_METADATA_FIELDS_CONFIG =
       "hoodie.datasource.hive_sync.omit_metadata_fields";
+  public static final String SKIP_STATS_CONFIG = "xtable.hudi.source.skip_stats";
 
   String partitionSpecExtractorClass;
   List<PartitionFieldSpec> partitionFieldSpecs;
@@ -97,7 +99,8 @@ public class HudiSourceConfig {
 
   public static boolean getOmitMetadataFields(Properties properties, Configuration configuration) {
     String propertyValue =
-        getPropertyOrNull(properties, OMIT_METADATA_FIELDS_CONFIG, HUDI_OMIT_METADATA_FIELDS_CONFIG);
+        getPropertyOrNull(
+            properties, OMIT_METADATA_FIELDS_CONFIG, HUDI_OMIT_METADATA_FIELDS_CONFIG);
     if (propertyValue != null) {
       return Boolean.parseBoolean(propertyValue);
     }
@@ -111,12 +114,30 @@ public class HudiSourceConfig {
     return configValue != null && Boolean.parseBoolean(configValue);
   }
 
+  public static boolean getSkipStats(Properties properties, Configuration configuration) {
+    String propertyValue = getPropertyOrNull(properties, SKIP_STATS_CONFIG, null);
+    if (propertyValue != null) {
+      return Boolean.parseBoolean(propertyValue);
+    }
+    if (configuration == null) {
+      return false;
+    }
+    String configValue = configuration.get(SKIP_STATS_CONFIG);
+    return configValue != null && Boolean.parseBoolean(configValue);
+  }
+
   private static String getPropertyOrNull(
       Properties properties, String primaryKey, String fallbackKey) {
     if (properties == null) {
       return null;
     }
     String value = properties.getProperty(primaryKey);
-    return value != null ? value : properties.getProperty(fallbackKey);
+    if (value != null) {
+      return value;
+    }
+    if (fallbackKey == null) {
+      return null;
+    }
+    return properties.getProperty(fallbackKey);
   }
 }
