@@ -876,6 +876,7 @@
                         <importOrder>
                             <order>java,javax,lombok,org,org.apache.hudi,org.apache.iceberg,org.apache.spark.sql.delta,scala,com,io.delta,org.apache.xtable</order>
                         </importOrder>
+                        <removeUnusedImports/>
                         <removeWildcardImports/>
                         <excludes>
                             <exclude>${target.dir.pattern}</exclude>
