@@ -100,8 +100,7 @@ public class HudiSourceConfig {
     return configValue != null && Boolean.parseBoolean(configValue);
   }
 
-  private static String getPropertyOrNull(
-      Properties properties, String key) {
+  private static String getPropertyOrNull(Properties properties, String key) {
     if (properties == null) {
       return null;
     }
