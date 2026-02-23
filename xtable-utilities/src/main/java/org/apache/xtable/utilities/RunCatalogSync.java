@@ -51,6 +51,8 @@ import org.apache.hadoop.conf.Configuration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.core.config.Configurator;
 
 import org.apache.xtable.catalog.CatalogConversionFactory;
 import org.apache.xtable.conversion.ConversionConfig;
@@ -111,6 +113,10 @@ public class RunCatalogSync {
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   public static void main(String[] args) throws Exception {
+    // Reduce noisy per-partition FS-view logs while keeping useful metadata index INFO logs.
+    Configurator.setLevel(
+        "org.apache.hudi.common.table.view.AbstractTableFileSystemView", Level.WARN);
+
     CommandLineParser parser = new DefaultParser();
     CommandLine cmd;
     try {
