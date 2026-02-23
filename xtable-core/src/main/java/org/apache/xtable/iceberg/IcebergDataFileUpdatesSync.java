@@ -112,7 +112,8 @@ public class IcebergDataFileUpdatesSync {
             .withPath(dataFile.getPhysicalPath())
             .withFileSizeInBytes(dataFile.getFileSizeBytes())
             .withFormat(convertFileFormat(dataFile.getFileFormat()));
-    if (dataFile.getRecordCount() > 0 || !dataFile.getColumnStats().isEmpty()) {
+    // Iceberg data files always require a record count. Persist explicit zero counts as metrics.
+    if (dataFile.getRecordCount() >= 0 || !dataFile.getColumnStats().isEmpty()) {
       builder.withMetrics(
           columnStatsConverter.toIceberg(
               schema, dataFile.getRecordCount(), dataFile.getColumnStats()));

@@ -139,6 +139,9 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   public InternalTable getCurrentTable() {
     Table iceTable = getSourceTable();
     Snapshot currentSnapshot = iceTable.currentSnapshot();
+    if (currentSnapshot == null) {
+      throw new ReadException("Unable to read latest snapshot from Iceberg source table");
+    }
     return getTable(currentSnapshot);
   }
 
@@ -147,6 +150,9 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
     Table iceTable = getSourceTable();
 
     Snapshot currentSnapshot = iceTable.currentSnapshot();
+    if (currentSnapshot == null) {
+      throw new ReadException("Unable to read latest snapshot from Iceberg source table");
+    }
     InternalTable irTable = getTable(currentSnapshot);
 
     TableScan scan =
