@@ -23,11 +23,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
+
 import lombok.Value;
 
-import com.google.common.base.Preconditions;
-
 import org.apache.hadoop.conf.Configuration;
+
+import com.google.common.base.Preconditions;
 
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.reflection.ReflectionUtils;
@@ -98,7 +99,8 @@ public class HudiSourceConfig {
 
   public static boolean getOmitMetadataFields(Properties properties, Configuration configuration) {
     String propertyValue =
-        getPropertyOrNull(properties, OMIT_METADATA_FIELDS_CONFIG, HUDI_OMIT_METADATA_FIELDS_CONFIG);
+        getPropertyOrNull(
+            properties, OMIT_METADATA_FIELDS_CONFIG, HUDI_OMIT_METADATA_FIELDS_CONFIG);
     if (propertyValue != null) {
       return Boolean.parseBoolean(propertyValue);
     }

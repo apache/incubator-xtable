@@ -120,25 +120,20 @@ public class IcebergSchemaSync {
           && !latestColumn.type().equals(currentColumn.type())) {
         updates.put(
             latestColumn.fieldId(),
-            () ->
-                updateSchema.updateColumn(
-                    fqName, latestColumn.type().asPrimitiveType()));
+            () -> updateSchema.updateColumn(fqName, latestColumn.type().asPrimitiveType()));
       }
       // update whether the column is required
       if (latestColumn.isOptional() != currentColumn.isOptional()) {
         if (latestColumn.isOptional()) {
-          updates.put(
-              latestColumn.fieldId(), () -> updateSchema.makeColumnOptional(fqName));
+          updates.put(latestColumn.fieldId(), () -> updateSchema.makeColumnOptional(fqName));
         } else {
-          updates.put(
-              latestColumn.fieldId(), () -> updateSchema.requireColumn(fqName));
+          updates.put(latestColumn.fieldId(), () -> updateSchema.requireColumn(fqName));
         }
       }
       // update the comment of the column
       if (!Objects.equals(currentColumn.doc(), latestColumn.doc())) {
         updates.put(
-            latestColumn.fieldId(),
-            () -> updateSchema.updateColumnDoc(fqName, latestColumn.doc()));
+            latestColumn.fieldId(), () -> updateSchema.updateColumnDoc(fqName, latestColumn.doc()));
       }
       if (latestColumn.type().isStructType()) {
         updates.putAll(

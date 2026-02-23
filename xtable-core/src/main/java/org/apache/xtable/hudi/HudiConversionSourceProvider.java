@@ -47,8 +47,7 @@ public class HudiConversionSourceProvider extends ConversionSourceProvider<Hoodi
         HudiSourceConfig.fromProperties(sourceTable.getAdditionalProperties())
             .loadSourcePartitionSpecExtractor();
     boolean omitMetadataFields =
-        HudiSourceConfig.getOmitMetadataFields(
-            sourceTable.getAdditionalProperties(), hadoopConf);
+        HudiSourceConfig.getOmitMetadataFields(sourceTable.getAdditionalProperties(), hadoopConf);
     boolean skipStats =
         HudiSourceConfig.getSkipStats(sourceTable.getAdditionalProperties(), hadoopConf);
 
