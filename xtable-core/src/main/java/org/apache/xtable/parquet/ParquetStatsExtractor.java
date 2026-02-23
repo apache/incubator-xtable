@@ -37,7 +37,6 @@ import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.PrimitiveType;
 
-import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
@@ -50,20 +49,12 @@ public class ParquetStatsExtractor {
 
   private static final ParquetStatsExtractor INSTANCE = new ParquetStatsExtractor();
 
-  private static final ParquetSchemaExtractor schemaExtractor =
-      ParquetSchemaExtractor.getInstance();
-
   private static final ParquetMetadataExtractor parquetMetadataExtractor =
       ParquetMetadataExtractor.getInstance();
 
   public static ParquetStatsExtractor getInstance() {
     return INSTANCE;
   }
-
-  private static final ParquetPartitionValueExtractor partitionValueExtractor =
-      ParquetPartitionValueExtractor.getInstance();
-  private static PathBasedPartitionSpecExtractor partitionSpecExtractor =
-      ParquetPartitionSpecExtractor.getInstance();
 
   @SuppressWarnings("unchecked")
   private static final Comparator<Object> COMPARABLE_COMPARATOR =
@@ -74,13 +65,16 @@ public class ParquetStatsExtractor {
     ColumnChunkMetaData first = chunks.get(0);
     String dotStringPath = first.getPath().toDotString();
     InternalField internalField =
-        SchemaFieldFinder.getInstance()
-            .findFieldByPath(internalSchema, dotStringPath);
+        SchemaFieldFinder.getInstance().findFieldByPath(internalSchema, dotStringPath);
     Objects.requireNonNull(internalField, "No field found for path: " + dotStringPath);
     PrimitiveType primitiveType = first.getPrimitiveType();
     long totalNumValues = chunks.stream().mapToLong(ColumnChunkMetaData::getValueCount).sum();
     long totalSize = chunks.stream().mapToLong(ColumnChunkMetaData::getTotalSize).sum();
-    long totalNullValues = chunks.stream().map(ColumnChunkMetaData::getStatistics).mapToLong(Statistics::getNumNulls).sum();
+    long totalNullValues =
+        chunks.stream()
+            .map(ColumnChunkMetaData::getStatistics)
+            .mapToLong(Statistics::getNumNulls)
+            .sum();
     Object globalMin =
         chunks.stream()
             .filter(c -> c.getStatistics().hasNonNullValue())
