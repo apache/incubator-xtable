@@ -18,7 +18,7 @@
  
 package org.apache.xtable.utilities;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import lombok.SneakyThrows;
 
