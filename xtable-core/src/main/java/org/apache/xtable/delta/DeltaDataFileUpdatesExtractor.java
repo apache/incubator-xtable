@@ -20,7 +20,10 @@ package org.apache.xtable.delta;
 
 import static org.apache.xtable.delta.ScalaUtils.convertJavaMapToScala;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
