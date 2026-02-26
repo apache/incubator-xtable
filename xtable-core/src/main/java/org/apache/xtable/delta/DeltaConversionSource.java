@@ -70,8 +70,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   @Builder.Default
   private final DeltaTableExtractor tableExtractor = DeltaTableExtractor.builder().build();
 
-  @Builder.Default
-  private final boolean skipColumnStats = false;
+  @Builder.Default private final boolean skipColumnStats = false;
 
   private Optional<DeltaIncrementalChangesState> deltaIncrementalChangesState = Optional.empty();
 

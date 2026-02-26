@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.iceberg;
 
 import java.util.Properties;
@@ -42,4 +42,3 @@ public final class IcebergSourceConfig {
     return configValue != null && Boolean.parseBoolean(configValue);
   }
 }
-

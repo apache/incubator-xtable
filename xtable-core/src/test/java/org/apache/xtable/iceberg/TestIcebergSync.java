@@ -317,7 +317,11 @@ public class TestIcebergSync {
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot);
 
     validateIcebergTable(
-        tableName, table, Sets.newHashSet(dataFileWithZeroCount), Expressions.alwaysTrue());
+        tableName,
+        table,
+        Sets.newHashSet(dataFileWithZeroCount),
+        Expressions.alwaysTrue(),
+        icebergSchema);
     verify(mockColumnStatsConverter, times(1))
         .toIceberg(any(Schema.class), eq(0L), eq(Collections.emptyList()));
   }

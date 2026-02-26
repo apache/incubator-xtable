@@ -87,8 +87,7 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   private final IcebergDataFileExtractor dataFileExtractor =
       IcebergDataFileExtractor.builder().build();
 
-  @Builder.Default
-  private final boolean skipColumnStats = false;
+  @Builder.Default private final boolean skipColumnStats = false;
 
   private Table initSourceTable() {
     IcebergTableManager tableManager = IcebergTableManager.of(hadoopConf);
