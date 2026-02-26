@@ -79,25 +79,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testCreateTableDelta_NoColumns() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    props.put(DatabricksUnityCatalogConfig.AUTH_TYPE, "oauth-m2m");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     when(mockStatementExecution.executeStatement(any(ExecuteStatementRequest.class)))
         .thenReturn(
@@ -122,24 +104,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testCreateTableRejectsNonDelta() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.ICEBERG,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.ICEBERG);
 
     InternalTable table = InternalTable.builder().basePath("s3://bucket/path").build();
     ThreePartHierarchicalTableIdentifier tableIdentifier =
@@ -150,24 +115,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testCreateTableRejectsInvalidIdentifier() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     InternalTable table = InternalTable.builder().basePath("s3://bucket/path").build();
     ThreePartHierarchicalTableIdentifier tableIdentifier =
@@ -178,24 +126,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testCreateOrReplaceTableDelta() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     when(mockStatementExecution.executeStatement(any(ExecuteStatementRequest.class)))
         .thenReturn(
@@ -220,24 +151,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testCreateOrReplaceTableRejectsNonDelta() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.ICEBERG,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.ICEBERG);
 
     InternalTable table = InternalTable.builder().basePath("s3://bucket/path").build();
     ThreePartHierarchicalTableIdentifier tableIdentifier =
@@ -249,24 +163,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testCreateOrReplaceTableRecreateFailureWarnsAndThrows() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     when(mockStatementExecution.executeStatement(any(ExecuteStatementRequest.class)))
         .thenReturn(
@@ -286,24 +183,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testRefreshTableSchemaEvolution() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     when(mockStatementExecution.executeStatement(any(ExecuteStatementRequest.class)))
         .thenReturn(
@@ -344,24 +224,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testRefreshTableSchemaMatchNoop() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     InternalSchema idSchema =
         InternalSchema.builder().name("id").dataType(InternalType.INT).isNullable(true).build();
@@ -392,24 +255,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testRefreshTableWithNullCatalogTableNoop() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     InternalSchema idSchema =
         InternalSchema.builder().name("id").dataType(InternalType.INT).isNullable(true).build();
@@ -434,24 +280,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testRefreshTableWithNullSchemaNoop() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     InternalTable table = InternalTable.builder().basePath("s3://bucket/path").build();
     TableInfo catalogTable = new TableInfo();
@@ -465,24 +294,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testRefreshTableWithEmptySchemaNoop() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     InternalSchema readSchema =
         InternalSchema.builder()
@@ -504,24 +316,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testDropTable() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     ThreePartHierarchicalTableIdentifier tableIdentifier =
         new ThreePartHierarchicalTableIdentifier("main", "default", "people");
@@ -533,24 +328,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testDropTableFailure() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     ThreePartHierarchicalTableIdentifier tableIdentifier =
         new ThreePartHierarchicalTableIdentifier("main", "default", "people");
@@ -566,24 +344,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testHasDatabaseTrue() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     when(mockSchemasApi.get("main.default")).thenReturn(new SchemaInfo());
 
@@ -597,24 +358,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testHasDatabaseFalse() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     when(mockSchemasApi.get("main.default")).thenThrow(new NotFound("not found", null));
 
@@ -626,24 +370,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testHasDatabaseRejectsInvalidIdentifier() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     ThreePartHierarchicalTableIdentifier tableIdentifier =
         new ThreePartHierarchicalTableIdentifier("main", "default;DROP_SCHEMA", "people");
@@ -653,24 +380,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testHasDatabaseFailedStatement() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     when(mockSchemasApi.get("main.default")).thenThrow(new RuntimeException("boom"));
 
@@ -681,24 +391,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testCreateDatabase() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     ThreePartHierarchicalTableIdentifier tableIdentifier =
         new ThreePartHierarchicalTableIdentifier("main", "default", "people");
@@ -714,24 +407,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testCreateDatabaseFailure() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     ThreePartHierarchicalTableIdentifier tableIdentifier =
         new ThreePartHierarchicalTableIdentifier("main", "default", "people");
@@ -743,24 +419,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testGetTableFound() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     TableInfo tableInfo = new TableInfo().setStorageLocation("s3://bucket/path");
     when(mockTablesApi.get("main.default.people")).thenReturn(tableInfo);
@@ -775,24 +434,7 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testGetTableNotFound() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     when(mockTablesApi.get("main.default.people")).thenThrow(new NotFound("not found", null));
 
@@ -804,29 +446,33 @@ public class TestDatabricksUnityCatalogSyncClient {
 
   @Test
   void testGetTableFailedStatement() {
-    Map<String, String> props = new HashMap<>();
-    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
-    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
-    ExternalCatalogConfig config =
-        ExternalCatalogConfig.builder()
-            .catalogId("uc")
-            .catalogType(CatalogType.DATABRICKS_UC)
-            .catalogProperties(props)
-            .build();
-
-    DatabricksUnityCatalogSyncClient client =
-        new DatabricksUnityCatalogSyncClient(
-            config,
-            TableFormat.DELTA,
-            new Configuration(),
-            mockStatementExecution,
-            mockTablesApi,
-            mockSchemasApi);
+    DatabricksUnityCatalogSyncClient client = createClient(TableFormat.DELTA);
 
     when(mockTablesApi.get("main.default.people")).thenThrow(new RuntimeException("boom"));
 
     ThreePartHierarchicalTableIdentifier tableIdentifier =
         new ThreePartHierarchicalTableIdentifier("main", "default", "people");
     assertThrows(CatalogSyncException.class, () -> client.getTable(tableIdentifier));
+  }
+
+  private DatabricksUnityCatalogSyncClient createClient(String tableFormat) {
+    return new DatabricksUnityCatalogSyncClient(
+        createCatalogConfig(),
+        tableFormat,
+        new Configuration(),
+        mockStatementExecution,
+        mockTablesApi,
+        mockSchemasApi);
+  }
+
+  private ExternalCatalogConfig createCatalogConfig() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    return ExternalCatalogConfig.builder()
+        .catalogId("uc")
+        .catalogType(CatalogType.DATABRICKS_UC)
+        .catalogProperties(props)
+        .build();
   }
 }
