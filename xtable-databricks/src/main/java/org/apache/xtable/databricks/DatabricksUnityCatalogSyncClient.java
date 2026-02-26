@@ -226,8 +226,22 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
   @Override
   public void createOrReplaceTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
     ensureDeltaOnly();
+    String fullName = getFullName(tableIdentifier);
     dropTable(table, tableIdentifier);
-    createTable(table, tableIdentifier);
+    try {
+      createTable(table, tableIdentifier);
+    } catch (Exception e) {
+      log.error(
+          "Databricks UC createOrReplaceTable failed to recreate {} after drop. "
+              + "Table was dropped but not recreated.",
+          fullName,
+          e);
+      throw new CatalogSyncException(
+          "Databricks UC createOrReplaceTable failed after drop for "
+              + fullName
+              + ": table was dropped but not recreated",
+          e);
+    }
   }
 
   @Override

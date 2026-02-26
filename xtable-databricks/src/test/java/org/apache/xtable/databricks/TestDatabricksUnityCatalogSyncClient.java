@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -235,6 +236,43 @@ public class TestDatabricksUnityCatalogSyncClient {
 
     assertThrows(
         CatalogSyncException.class, () -> client.createOrReplaceTable(table, tableIdentifier));
+  }
+
+  @Test
+  void testCreateOrReplaceTableRecreateFailureWarnsAndThrows() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    when(mockStatementExecution.executeStatement(any(ExecuteStatementRequest.class)))
+        .thenReturn(
+            new StatementResponse()
+                .setStatus(new StatementStatus().setState(StatementState.FAILED)));
+
+    InternalTable table = InternalTable.builder().basePath("s3://bucket/path").build();
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people");
+
+    CatalogSyncException exception =
+        assertThrows(
+            CatalogSyncException.class, () -> client.createOrReplaceTable(table, tableIdentifier));
+    assertTrue(exception.getMessage().contains("table was dropped but not recreated"));
+    verify(mockTablesApi).delete("main.default.people");
   }
 
   @Test
