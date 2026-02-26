@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -66,6 +67,7 @@ import org.apache.xtable.spi.sync.CatalogSyncClient;
  */
 @Log4j2
 public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<TableInfo> {
+  private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("[a-zA-Z0-9_]+");
 
   private ExternalCatalogConfig catalogConfig;
   private DatabricksUnityCatalogConfig databricksConfig;
@@ -128,6 +130,8 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
     if (StringUtils.isBlank(schema)) {
       throw new CatalogSyncException("Databricks UC requires a schema name");
     }
+    validateIdentifierComponent("catalog", catalog);
+    validateIdentifierComponent("schema", schema);
 
     String fullName = catalog + "." + schema;
     try {
@@ -153,6 +157,8 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
     if (StringUtils.isBlank(schema)) {
       throw new CatalogSyncException("Databricks UC requires a schema name");
     }
+    validateIdentifierComponent("catalog", catalog);
+    validateIdentifierComponent("schema", schema);
 
     try {
       schemasApi.create(new CreateSchema().setCatalogName(catalog).setName(schema));
@@ -284,7 +290,28 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
       throw new CatalogSyncException(
           "Databricks UC requires a catalog name (expected catalog.schema.table)");
     }
+    String schema = hierarchical.getDatabaseName();
+    if (StringUtils.isBlank(schema)) {
+      throw new CatalogSyncException("Databricks UC requires a schema name");
+    }
+    String table = hierarchical.getTableName();
+    if (StringUtils.isBlank(table)) {
+      throw new CatalogSyncException("Databricks UC requires a table name");
+    }
+
+    validateIdentifierComponent("catalog", catalog);
+    validateIdentifierComponent("schema", schema);
+    validateIdentifierComponent("table", table);
     return hierarchical.getId();
+  }
+
+  private static void validateIdentifierComponent(String componentName, String value) {
+    if (!IDENTIFIER_PATTERN.matcher(value).matches()) {
+      throw new CatalogSyncException(
+          String.format(
+              "Invalid Databricks UC %s name '%s'. Only [a-zA-Z0-9_]+ is allowed.",
+              componentName, value));
+    }
   }
 
   private StatementResponse executeStatement(String statement) {

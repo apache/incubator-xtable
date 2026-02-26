@@ -139,6 +139,34 @@ public class TestDatabricksUnityCatalogSyncClient {
   }
 
   @Test
+  void testCreateTableRejectsInvalidIdentifier() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    InternalTable table = InternalTable.builder().basePath("s3://bucket/path").build();
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people;DROP_TABLE");
+
+    assertThrows(CatalogSyncException.class, () -> client.createTable(table, tableIdentifier));
+  }
+
+  @Test
   void testCreateOrReplaceTableDelta() {
     Map<String, String> props = new HashMap<>();
     props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
@@ -387,6 +415,33 @@ public class TestDatabricksUnityCatalogSyncClient {
         new ThreePartHierarchicalTableIdentifier("main", "default", "people");
     boolean exists = client.hasDatabase(tableIdentifier);
     assertEquals(false, exists);
+  }
+
+  @Test
+  void testHasDatabaseRejectsInvalidIdentifier() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default;DROP_SCHEMA", "people");
+
+    assertThrows(CatalogSyncException.class, () -> client.hasDatabase(tableIdentifier));
   }
 
   @Test
