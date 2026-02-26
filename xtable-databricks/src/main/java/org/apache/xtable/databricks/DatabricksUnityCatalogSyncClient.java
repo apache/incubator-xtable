@@ -267,26 +267,28 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
       throw new CatalogSyncException(
           "Databricks UC catalog requires host and warehouseId in catalogProperties");
     }
-    if (this.statementExecution == null) {
+    if (shouldInitializeWorkspaceClient()) {
       this.workspaceClient = new WorkspaceClient(buildConfig(databricksConfig));
+    }
+    if (this.statementExecution == null) {
       this.statementExecution = workspaceClient.statementExecution();
     }
     if (this.tablesApi == null) {
-      if (this.workspaceClient == null) {
-        this.workspaceClient = new WorkspaceClient(buildConfig(databricksConfig));
-      }
       this.tablesApi = this.workspaceClient.tables();
     }
     if (this.schemasApi == null) {
-      if (this.workspaceClient == null) {
-        this.workspaceClient = new WorkspaceClient(buildConfig(databricksConfig));
-      }
       this.schemasApi = this.workspaceClient.schemas();
     }
     log.info(
         "Initialized Databricks UC sync client for catalogId={} tableFormat={}",
         catalogConfig.getCatalogId(),
         tableFormat);
+  }
+
+  private boolean shouldInitializeWorkspaceClient() {
+    boolean missingApis =
+        this.statementExecution == null || this.tablesApi == null || this.schemasApi == null;
+    return this.workspaceClient == null && missingApis;
   }
 
   private void ensureDeltaOnly() {
