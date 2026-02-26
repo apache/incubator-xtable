@@ -15,25 +15,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+
 package org.apache.xtable.iceberg;
 
-import org.apache.iceberg.Snapshot;
+import java.util.Properties;
 
-import org.apache.xtable.conversion.ConversionSourceProvider;
-import org.apache.xtable.conversion.SourceTable;
+import org.apache.hadoop.conf.Configuration;
 
-/** A concrete implementation of {@link ConversionSourceProvider} for Hudi table format. */
-public class IcebergConversionSourceProvider extends ConversionSourceProvider<Snapshot> {
-  @Override
-  public IcebergConversionSource getConversionSourceInstance(SourceTable sourceTableConfig) {
-    boolean skipColumnStats =
-        IcebergSourceConfig.getSkipColumnStats(
-            sourceTableConfig.getAdditionalProperties(), hadoopConf);
-    return IcebergConversionSource.builder()
-        .sourceTableConfig(sourceTableConfig)
-        .hadoopConf(hadoopConf)
-        .skipColumnStats(skipColumnStats)
-        .build();
+/** Configuration keys for Iceberg source format. */
+public final class IcebergSourceConfig {
+  public static final String SKIP_COLUMN_STATS_CONFIG = "xtable.source.skip_column_stats";
+
+  private IcebergSourceConfig() {}
+
+  public static boolean getSkipColumnStats(Properties properties, Configuration configuration) {
+    if (properties != null) {
+      String propertyValue = properties.getProperty(SKIP_COLUMN_STATS_CONFIG);
+      if (propertyValue != null) {
+        return Boolean.parseBoolean(propertyValue);
+      }
+    }
+    if (configuration == null) {
+      return false;
+    }
+    String configValue = configuration.get(SKIP_COLUMN_STATS_CONFIG);
+    return configValue != null && Boolean.parseBoolean(configValue);
   }
 }
+

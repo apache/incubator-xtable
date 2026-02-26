@@ -87,6 +87,9 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
   private final IcebergDataFileExtractor dataFileExtractor =
       IcebergDataFileExtractor.builder().build();
 
+  @Builder.Default
+  private final boolean skipColumnStats = false;
+
   private Table initSourceTable() {
     IcebergTableManager tableManager = IcebergTableManager.of(hadoopConf);
     String[] namespace = sourceTableConfig.getNamespace();
@@ -171,8 +174,10 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
     }
     InternalTable irTable = getTable(currentSnapshot);
 
-    TableScan scan =
-        iceTable.newScan().useSnapshot(currentSnapshot.snapshotId()).includeColumnStats();
+    TableScan scan = iceTable.newScan().useSnapshot(currentSnapshot.snapshotId());
+    if (!skipColumnStats) {
+      scan = scan.includeColumnStats();
+    }
     PartitionSpec partitionSpec = iceTable.spec();
     List<PartitionFileGroup> partitionedDataFiles;
     try (CloseableIterable<FileScanTask> files = scan.planFiles()) {
@@ -199,7 +204,8 @@ public class IcebergConversionSource implements ConversionSource<Snapshot> {
       DataFile file, PartitionSpec partitionSpec, InternalTable internalTable) {
     List<PartitionValue> partitionValues =
         partitionConverter.toXTable(internalTable, file.partition(), partitionSpec);
-    return dataFileExtractor.fromIceberg(file, partitionValues, internalTable.getReadSchema());
+    return dataFileExtractor.fromIceberg(
+        file, partitionValues, internalTable.getReadSchema(), !skipColumnStats);
   }
 
   @Override
