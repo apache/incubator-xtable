@@ -72,7 +72,6 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
   private ExternalCatalogConfig catalogConfig;
   private DatabricksUnityCatalogConfig databricksConfig;
-  private Configuration hadoopConf;
   private String tableFormat;
   private WorkspaceClient workspaceClient;
   private StatementExecutionAPI statementExecution;
@@ -274,7 +273,6 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
       ExternalCatalogConfig catalogConfig, String tableFormat, Configuration configuration) {
     this.catalogConfig = catalogConfig;
     this.tableFormat = tableFormat;
-    this.hadoopConf = configuration;
     this.databricksConfig = DatabricksUnityCatalogConfig.from(catalogConfig);
 
     if (databricksConfig.getHost() == null || databricksConfig.getWarehouseId() == null) {
