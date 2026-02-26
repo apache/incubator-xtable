@@ -69,6 +69,14 @@ public class TestDatabricksUnityCatalogSyncClient {
   @Mock private SchemasAPI mockSchemasApi;
 
   @Test
+  void testGetCatalogIdFailsWhenNotInitialized() {
+    DatabricksUnityCatalogSyncClient client = new DatabricksUnityCatalogSyncClient();
+
+    CatalogSyncException exception = assertThrows(CatalogSyncException.class, client::getCatalogId);
+    assertTrue(exception.getMessage().contains("not initialized"));
+  }
+
+  @Test
   void testCreateTableDelta_NoColumns() {
     Map<String, String> props = new HashMap<>();
     props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");

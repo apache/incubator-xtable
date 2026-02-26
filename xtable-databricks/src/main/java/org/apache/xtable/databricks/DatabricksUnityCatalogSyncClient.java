@@ -78,7 +78,12 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
   private TablesAPI tablesApi;
   private SchemasAPI schemasApi;
 
-  // For loading the instance using ServiceLoader
+  /**
+   * For loading the instance using ServiceLoader.
+   *
+   * <p>This constructor requires {@link #init(ExternalCatalogConfig, String, Configuration)} to be
+   * called before invoking catalog operations.
+   */
   public DatabricksUnityCatalogSyncClient() {}
 
   public DatabricksUnityCatalogSyncClient(
@@ -101,6 +106,7 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
   @Override
   public String getCatalogId() {
+    ensureInitialized();
     return catalogConfig.getCatalogId();
   }
 
@@ -119,6 +125,7 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
   @Override
   public boolean hasDatabase(CatalogTableIdentifier tableIdentifier) {
+    ensureInitialized();
     HierarchicalTableIdentifier hierarchical =
         CatalogUtils.toHierarchicalTableIdentifier(tableIdentifier);
     String catalog = hierarchical.getCatalogName();
@@ -146,6 +153,7 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
   @Override
   public void createDatabase(CatalogTableIdentifier tableIdentifier) {
+    ensureInitialized();
     HierarchicalTableIdentifier hierarchical =
         CatalogUtils.toHierarchicalTableIdentifier(tableIdentifier);
     String catalog = hierarchical.getCatalogName();
@@ -169,6 +177,7 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
   @Override
   public TableInfo getTable(CatalogTableIdentifier tableIdentifier) {
+    ensureInitialized();
     String fullName = getFullName(tableIdentifier);
     try {
       return tablesApi.get(fullName);
@@ -181,6 +190,7 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
   @Override
   public void createTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
+    ensureInitialized();
     ensureDeltaOnly();
     String fullName = getFullName(tableIdentifier);
     String location = table.getBasePath();
@@ -199,6 +209,7 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
   @Override
   public void refreshTable(
       InternalTable table, TableInfo catalogTable, CatalogTableIdentifier tableIdentifier) {
+    ensureInitialized();
     ensureDeltaOnly();
     if (catalogTable == null) {
       log.warn(
@@ -225,6 +236,7 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
   @Override
   public void createOrReplaceTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
+    ensureInitialized();
     ensureDeltaOnly();
     String fullName = getFullName(tableIdentifier);
     dropTable(table, tableIdentifier);
@@ -246,6 +258,7 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
 
   @Override
   public void dropTable(InternalTable table, CatalogTableIdentifier tableIdentifier) {
+    ensureInitialized();
     String fullName = getFullName(tableIdentifier);
     try {
       log.info("Databricks UC drop table: {}", fullName);
@@ -289,6 +302,19 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
     boolean missingApis =
         this.statementExecution == null || this.tablesApi == null || this.schemasApi == null;
     return this.workspaceClient == null && missingApis;
+  }
+
+  private void ensureInitialized() {
+    if (this.catalogConfig == null
+        || this.databricksConfig == null
+        || this.tableFormat == null
+        || this.statementExecution == null
+        || this.tablesApi == null
+        || this.schemasApi == null) {
+      throw new CatalogSyncException(
+          "DatabricksUnityCatalogSyncClient is not initialized. "
+              + "Call init(catalogConfig, tableFormat, configuration) before use.");
+    }
   }
 
   private void ensureDeltaOnly() {
