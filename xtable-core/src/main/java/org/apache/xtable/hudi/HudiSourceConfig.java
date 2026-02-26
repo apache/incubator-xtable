@@ -41,7 +41,7 @@ public class HudiSourceConfig {
       "xtable.hudi.source.partition_spec_extractor_class";
   public static final String PARTITION_FIELD_SPEC_CONFIG =
       "xtable.hudi.source.partition_field_spec_config";
-  public static final String SKIP_STATS_CONFIG = "xtable.hudi.source.skip_stats";
+  public static final String SKIP_COLUMN_STATS_CONFIG = "xtable.hudi.source.skip_column_stats";
 
   String partitionSpecExtractorClass;
   List<PartitionFieldSpec> partitionFieldSpecs;
@@ -88,15 +88,15 @@ public class HudiSourceConfig {
         partitionSpecExtractorClass, this.getPartitionFieldSpecs());
   }
 
-  public static boolean getSkipStats(Properties properties, Configuration configuration) {
-    String propertyValue = getPropertyOrNull(properties, SKIP_STATS_CONFIG);
+  public static boolean getSkipColumnStats(Properties properties, Configuration configuration) {
+    String propertyValue = getPropertyOrNull(properties, SKIP_COLUMN_STATS_CONFIG);
     if (propertyValue != null) {
       return Boolean.parseBoolean(propertyValue);
     }
     if (configuration == null) {
       return false;
     }
-    String configValue = configuration.get(SKIP_STATS_CONFIG);
+    String configValue = configuration.get(SKIP_COLUMN_STATS_CONFIG);
     return configValue != null && Boolean.parseBoolean(configValue);
   }
 

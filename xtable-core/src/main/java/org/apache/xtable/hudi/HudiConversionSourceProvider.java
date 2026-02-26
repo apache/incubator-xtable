@@ -46,9 +46,9 @@ public class HudiConversionSourceProvider extends ConversionSourceProvider<Hoodi
     final PathBasedPartitionSpecExtractor sourcePartitionSpecExtractor =
         HudiSourceConfig.fromProperties(sourceTable.getAdditionalProperties())
             .loadSourcePartitionSpecExtractor();
-    boolean skipStats =
-        HudiSourceConfig.getSkipStats(sourceTable.getAdditionalProperties(), hadoopConf);
+    boolean skipColumnStats =
+        HudiSourceConfig.getSkipColumnStats(sourceTable.getAdditionalProperties(), hadoopConf);
 
-    return new HudiConversionSource(metaClient, sourcePartitionSpecExtractor, skipStats);
+    return new HudiConversionSource(metaClient, sourcePartitionSpecExtractor, skipColumnStats);
   }
 }

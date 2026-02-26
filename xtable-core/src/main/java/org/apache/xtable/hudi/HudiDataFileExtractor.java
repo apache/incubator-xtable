@@ -77,7 +77,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
   private final HoodieEngineContext engineContext;
   private final PathBasedPartitionValuesExtractor partitionValuesExtractor;
   private final HudiFileStatsExtractor fileStatsExtractor;
-  private final boolean skipStats;
+  private final boolean skipColumnStats;
   private final HoodieMetadataConfig metadataConfig;
   private final FileSystemViewManager fileSystemViewManager;
   private final Path basePath;
@@ -91,9 +91,9 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
   public HudiDataFileExtractor(
       HoodieTableMetaClient metaClient,
-      HudiPartitionValuesExtractor hudiPartitionValuesExtractor,
+      PathBasedPartitionValuesExtractor hudiPartitionValuesExtractor,
       HudiFileStatsExtractor hudiFileStatsExtractor,
-      boolean skipStats) {
+      boolean skipColumnStats) {
     this.engineContext = new HoodieLocalEngineContext(metaClient.getHadoopConf());
     metadataConfig =
         HoodieMetadataConfig.newBuilder()
@@ -116,7 +116,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
     this.metaClient = metaClient;
     this.partitionValuesExtractor = hudiPartitionValuesExtractor;
     this.fileStatsExtractor = hudiFileStatsExtractor;
-    this.skipStats = skipStats;
+    this.skipColumnStats = skipColumnStats;
   }
 
   public List<PartitionFileGroup> getFilesCurrentState(InternalTable table) {
@@ -143,7 +143,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
             visibleTimeline, instant, fsView, hoodieInstantForDiff, table.getPartitioningFields());
 
     List<InternalDataFile> filesAdded =
-        skipStats
+        skipColumnStats
             ? fileStatsExtractor
                 .addRecordCountToFiles(
                     tableMetadata, allInfo.getAdded().stream(), table.getReadSchema())
@@ -373,7 +373,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                       .getLatestBaseFiles(partitionPath)
                       .map(baseFile -> buildFileWithoutStats(partitionValues, baseFile));
                 });
-    if (skipStats) {
+    if (skipColumnStats) {
       Stream<InternalDataFile> filesWithRecordCount =
           fileStatsExtractor.addRecordCountToFiles(
               tableMetadata, filesWithoutStats, table.getReadSchema());
