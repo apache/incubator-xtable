@@ -21,7 +21,9 @@ package org.apache.xtable.glue.table;
 import static org.apache.xtable.glue.GlueCatalogSyncClient.GLUE_EXTERNAL_TABLE_TYPE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +39,10 @@ import software.amazon.awssdk.services.glue.model.TableInput;
 
 @ExtendWith(MockitoExtension.class)
 public class TestDeltaGlueCatalogTableBuilder extends GlueCatalogSyncTestBase {
+  private static final String DELTA_INPUT_FORMAT_CLASS = "io.delta.hive.HiveInputFormat";
+  private static final String DELTA_OUTPUT_FORMAT_CLASS = "io.delta.hive.DeltaOutputFormat";
+  private static final String DELTA_SERDE_LIBRARY_CLASS =
+      "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe";
 
   private DeltaGlueCatalogTableBuilder deltaGlueCatalogTableBuilder;
 
@@ -92,12 +98,52 @@ public class TestDeltaGlueCatalogTableBuilder extends GlueCatalogSyncTestBase {
     assertEquals(expected, output);
   }
 
+  @Test
+  void testGetUpdateTableInputBackfillsDeltaPropertiesForExistingTable() {
+    setupCommonMocks();
+    Map<String, String> existingParameters = new HashMap<>();
+    existingParameters.put("custom_param", "custom_value");
+
+    Table glueTable =
+        Table.builder()
+            .parameters(existingParameters)
+            .storageDescriptor(
+                StorageDescriptor.builder()
+                    .columns(DELTA_GLUE_SCHEMA)
+                    .location(TEST_BASE_PATH)
+                    .serdeInfo(SerDeInfo.builder().build())
+                    .build())
+            .partitionKeys(PARTITION_KEYS)
+            .build();
+
+    Map<String, String> expectedParameters =
+        new HashMap<>(deltaGlueCatalogTableBuilder.getTableParameters());
+    expectedParameters.put("custom_param", "custom_value");
+
+    TableInput expected =
+        TableInput.builder()
+            .name(TEST_CATALOG_TABLE_IDENTIFIER.getTableName())
+            .tableType(GLUE_EXTERNAL_TABLE_TYPE)
+            .parameters(expectedParameters)
+            .storageDescriptor(getTestStorageDescriptor(UPDATED_DELTA_GLUE_SCHEMA))
+            .partitionKeys(PARTITION_KEYS)
+            .build();
+
+    TableInput output =
+        deltaGlueCatalogTableBuilder.getUpdateTableRequest(
+            TEST_UPDATED_DELTA_INTERNAL_TABLE, glueTable, TEST_CATALOG_TABLE_IDENTIFIER);
+    assertEquals(expected, output);
+  }
+
   private StorageDescriptor getTestStorageDescriptor(List<Column> columns) {
     return StorageDescriptor.builder()
         .columns(columns)
         .location(TEST_BASE_PATH)
+        .inputFormat(DELTA_INPUT_FORMAT_CLASS)
+        .outputFormat(DELTA_OUTPUT_FORMAT_CLASS)
         .serdeInfo(
             SerDeInfo.builder()
+                .serializationLibrary(DELTA_SERDE_LIBRARY_CLASS)
                 .parameters(
                     deltaGlueCatalogTableBuilder.getSerDeParameters(TEST_DELTA_INTERNAL_TABLE))
                 .build())
