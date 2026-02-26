@@ -300,6 +300,33 @@ public class TestIcebergSync {
   }
 
   @Test
+  public void testSnapshotWithZeroRecordCountFileAndNoColumnStats() throws Exception {
+    InternalTable table =
+        getInternalTable(tableName, basePath, internalSchema, null, LAST_COMMIT_TIME);
+
+    InternalDataFile dataFileWithZeroCount =
+        getDataFile(1, Collections.emptyList()).toBuilder().recordCount(0).build();
+    InternalSnapshot snapshot = buildSnapshot(table, "0", dataFileWithZeroCount);
+
+    when(mockSchemaExtractor.toIceberg(internalSchema)).thenReturn(icebergSchema);
+    when(mockPartitionSpecExtractor.toIceberg(eq(null), any()))
+        .thenReturn(PartitionSpec.unpartitioned());
+    mockColStatsForFile(dataFileWithZeroCount, 1);
+
+    TableFormatSync.getInstance()
+        .syncSnapshot(Collections.singletonList(conversionTarget), snapshot);
+
+    validateIcebergTable(
+        tableName,
+        table,
+        Sets.newHashSet(dataFileWithZeroCount),
+        Expressions.alwaysTrue(),
+        icebergSchema);
+    verify(mockColumnStatsConverter, times(1))
+        .toIceberg(any(Schema.class), eq(0L), eq(Collections.emptyList()));
+  }
+
+  @Test
   public void testIncompleteWriteRollback() throws Exception {
     List<InternalField> fields2 = new ArrayList<>(internalSchema.getFields());
     fields2.add(

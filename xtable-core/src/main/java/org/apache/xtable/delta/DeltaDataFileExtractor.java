@@ -54,6 +54,11 @@ public class DeltaDataFileExtractor {
     return new DeltaDataFileIterator(deltaSnapshot, schema, true);
   }
 
+  public DataFileIterator iterator(
+      Snapshot deltaSnapshot, InternalSchema schema, boolean includeColumnStats) {
+    return new DeltaDataFileIterator(deltaSnapshot, schema, includeColumnStats);
+  }
+
   public class DeltaDataFileIterator implements DataFileIterator {
     private final FileFormat fileFormat;
     private final List<InternalField> fields;

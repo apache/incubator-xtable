@@ -163,6 +163,51 @@ public class TestHudiFileStatsExtractor {
   }
 
   @Test
+  void recordCountOnlyWithMetadataTable(@TempDir Path tempDir) throws Exception {
+    String tableName = GenericTable.getTableName();
+    String basePath;
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.withSchema(
+            tableName, tempDir, "long_field:SIMPLE", HoodieTableType.COPY_ON_WRITE, AVRO_SCHEMA)) {
+      List<HoodieRecord<HoodieAvroPayload>> records =
+          getRecords().stream().map(this::buildRecord).collect(Collectors.toList());
+      table.insertRecords(true, records);
+      basePath = table.getBasePath();
+    }
+    HoodieTableMetadata tableMetadata =
+        HoodieTableMetadata.create(
+            new HoodieJavaEngineContext(configuration),
+            HoodieMetadataConfig.newBuilder().enable(true).build(),
+            basePath,
+            true);
+    Path parquetFile =
+        Files.list(Paths.get(new URI(basePath)))
+            .filter(path -> path.toString().endsWith(".parquet"))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("No files found"));
+    InternalDataFile inputFile =
+        InternalDataFile.builder()
+            .physicalPath(parquetFile.toString())
+            .columnStats(Collections.emptyList())
+            .fileFormat(FileFormat.APACHE_PARQUET)
+            .lastModified(1234L)
+            .fileSizeBytes(4321L)
+            .recordCount(0)
+            .build();
+    HoodieTableMetaClient metaClient =
+        HoodieTableMetaClient.builder().setBasePath(basePath).setConf(configuration).build();
+    HudiFileStatsExtractor fileStatsExtractor = new HudiFileStatsExtractor(metaClient);
+    List<InternalDataFile> output =
+        fileStatsExtractor
+            .addRecordCountToFiles(tableMetadata, Stream.of(inputFile), schema)
+            .collect(Collectors.toList());
+
+    assertEquals(1, output.size());
+    assertEquals(2, output.get(0).getRecordCount());
+    assertEquals(0, output.get(0).getColumnStats().size());
+  }
+
+  @Test
   void columnStatsWithoutMetadataTable(@TempDir Path tempDir) throws IOException {
     Path file = tempDir.resolve("tmp.parquet");
     GenericData genericData = GenericData.get();
@@ -197,6 +242,46 @@ public class TestHudiFileStatsExtractor {
             .addStatsToFiles(null, Stream.of(inputFile), schema)
             .collect(Collectors.toList());
     validateOutput(output);
+  }
+
+  @Test
+  void recordCountOnlyWithoutMetadataTable(@TempDir Path tempDir) throws IOException {
+    Path file = tempDir.resolve("tmp.parquet");
+    GenericData genericData = GenericData.get();
+    genericData.addLogicalTypeConversion(new Conversions.DecimalConversion());
+    try (ParquetWriter<GenericRecord> writer =
+        AvroParquetWriter.<GenericRecord>builder(
+                HadoopOutputFile.fromPath(
+                    new org.apache.hadoop.fs.Path(file.toUri()), configuration))
+            .withSchema(AVRO_SCHEMA)
+            .withDataModel(genericData)
+            .build()) {
+      for (GenericRecord record : getRecords()) {
+        writer.write(record);
+      }
+    }
+
+    InternalDataFile inputFile =
+        InternalDataFile.builder()
+            .physicalPath(file.toString())
+            .columnStats(Collections.emptyList())
+            .fileFormat(FileFormat.APACHE_PARQUET)
+            .lastModified(1234L)
+            .fileSizeBytes(4321L)
+            .recordCount(0)
+            .build();
+
+    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
+    when(mockMetaClient.getHadoopConf()).thenReturn(configuration);
+    HudiFileStatsExtractor fileStatsExtractor = new HudiFileStatsExtractor(mockMetaClient);
+    List<InternalDataFile> output =
+        fileStatsExtractor
+            .addRecordCountToFiles(null, Stream.of(inputFile), schema)
+            .collect(Collectors.toList());
+
+    assertEquals(1, output.size());
+    assertEquals(2, output.get(0).getRecordCount());
+    assertEquals(0, output.get(0).getColumnStats().size());
   }
 
   private void validateOutput(List<InternalDataFile> output) {

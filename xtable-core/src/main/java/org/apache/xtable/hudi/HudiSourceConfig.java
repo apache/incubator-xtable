@@ -26,6 +26,8 @@ import java.util.Properties;
 
 import lombok.Value;
 
+import org.apache.hadoop.conf.Configuration;
+
 import com.google.common.base.Preconditions;
 
 import org.apache.xtable.model.schema.PartitionFieldSpec;
@@ -39,6 +41,7 @@ public class HudiSourceConfig {
       "xtable.hudi.source.partition_spec_extractor_class";
   public static final String PARTITION_FIELD_SPEC_CONFIG =
       "xtable.hudi.source.partition_field_spec_config";
+  public static final String SKIP_COLUMN_STATS_CONFIG = "xtable.source.skip_column_stats";
 
   String partitionSpecExtractorClass;
   List<PartitionFieldSpec> partitionFieldSpecs;
@@ -83,5 +86,24 @@ public class HudiSourceConfig {
         partitionSpecExtractorClass, "HudiSourcePartitionSpecExtractor class not provided");
     return ReflectionUtils.createInstanceOfClass(
         partitionSpecExtractorClass, this.getPartitionFieldSpecs());
+  }
+
+  public static boolean getSkipColumnStats(Properties properties, Configuration configuration) {
+    String propertyValue = getPropertyOrNull(properties, SKIP_COLUMN_STATS_CONFIG);
+    if (propertyValue != null) {
+      return Boolean.parseBoolean(propertyValue);
+    }
+    if (configuration == null) {
+      return false;
+    }
+    String configValue = configuration.get(SKIP_COLUMN_STATS_CONFIG);
+    return configValue != null && Boolean.parseBoolean(configValue);
+  }
+
+  private static String getPropertyOrNull(Properties properties, String key) {
+    if (properties == null) {
+      return null;
+    }
+    return properties.getProperty(key);
   }
 }
