@@ -31,14 +31,12 @@ public class DatabricksUnityCatalogConfig {
   public static final String AUTH_TYPE = "externalCatalog.uc.authType";
   public static final String CLIENT_ID = "externalCatalog.uc.clientId";
   public static final String CLIENT_SECRET = "externalCatalog.uc.clientSecret";
-  public static final String TOKEN = "externalCatalog.uc.token";
 
   String host;
   String warehouseId;
   String authType;
   String clientId;
   String clientSecret;
-  String token;
 
   public static DatabricksUnityCatalogConfig from(ExternalCatalogConfig catalogConfig) {
     Map<String, String> props = catalogConfig.getCatalogProperties();
@@ -47,7 +45,6 @@ public class DatabricksUnityCatalogConfig {
         props.get(WAREHOUSE_ID),
         props.get(AUTH_TYPE),
         props.get(CLIENT_ID),
-        props.get(CLIENT_SECRET),
-        props.get(TOKEN));
+        props.get(CLIENT_SECRET));
   }
 }

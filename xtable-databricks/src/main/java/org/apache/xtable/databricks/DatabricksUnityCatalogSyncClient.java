@@ -386,9 +386,7 @@ public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<Table
     if (!StringUtils.isBlank(config.getAuthType())) {
       dbConfig.setAuthType(config.getAuthType());
     }
-    if (!StringUtils.isBlank(config.getToken())) {
-      dbConfig.setToken(config.getToken());
-    } else if (!StringUtils.isBlank(config.getClientId())
+    if (!StringUtils.isBlank(config.getClientId())
         && !StringUtils.isBlank(config.getClientSecret())) {
       dbConfig.setClientId(config.getClientId());
       dbConfig.setClientSecret(config.getClientSecret());
