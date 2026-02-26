@@ -50,6 +50,10 @@ public class DeltaGlueCatalogTableBuilder implements CatalogTableBuilder<TableIn
 
   private final GlueSchemaExtractor schemaExtractor;
   private static final String tableFormat = TableFormat.DELTA;
+  private static final String DELTA_INPUT_FORMAT_CLASS = "io.delta.hive.HiveInputFormat";
+  private static final String DELTA_OUTPUT_FORMAT_CLASS = "io.delta.hive.DeltaOutputFormat";
+  private static final String DELTA_SERDE_LIBRARY_CLASS =
+      "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe";
 
   public DeltaGlueCatalogTableBuilder() {
     this.schemaExtractor = GlueSchemaExtractor.getInstance();
@@ -71,7 +75,13 @@ public class DeltaGlueCatalogTableBuilder implements CatalogTableBuilder<TableIn
             StorageDescriptor.builder()
                 .columns(schemaExtractor.getNonPartitionColumns(table, columnsMap))
                 .location(table.getBasePath())
-                .serdeInfo(SerDeInfo.builder().parameters(getSerDeParameters(table)).build())
+                .inputFormat(DELTA_INPUT_FORMAT_CLASS)
+                .outputFormat(DELTA_OUTPUT_FORMAT_CLASS)
+                .serdeInfo(
+                    SerDeInfo.builder()
+                        .serializationLibrary(DELTA_SERDE_LIBRARY_CLASS)
+                        .parameters(getSerDeParameters(table))
+                        .build())
                 .build())
         .partitionKeys(schemaExtractor.getPartitionColumns(table, columnsMap))
         .build();
@@ -82,17 +92,47 @@ public class DeltaGlueCatalogTableBuilder implements CatalogTableBuilder<TableIn
       InternalTable table, Table catalogTable, CatalogTableIdentifier tblIdentifier) {
     HierarchicalTableIdentifier tableIdentifier = toHierarchicalTableIdentifier(tblIdentifier);
     Map<String, String> parameters = new HashMap<>(catalogTable.parameters());
+    parameters.putAll(getTableParameters());
+
+    StorageDescriptor currentStorageDescriptor = catalogTable.storageDescriptor();
+    Map<String, String> serdeParameters = new HashMap<>();
+    if (currentStorageDescriptor != null
+        && currentStorageDescriptor.serdeInfo() != null
+        && currentStorageDescriptor.serdeInfo().parameters() != null) {
+      serdeParameters.putAll(currentStorageDescriptor.serdeInfo().parameters());
+    }
+    serdeParameters.putAll(getSerDeParameters(table));
+    SerDeInfo serdeInfo =
+        (currentStorageDescriptor != null && currentStorageDescriptor.serdeInfo() != null)
+            ? currentStorageDescriptor
+                .serdeInfo()
+                .toBuilder()
+                .serializationLibrary(DELTA_SERDE_LIBRARY_CLASS)
+                .parameters(serdeParameters)
+                .build()
+            : SerDeInfo.builder()
+                .serializationLibrary(DELTA_SERDE_LIBRARY_CLASS)
+                .parameters(serdeParameters)
+                .build();
+
     Map<String, Column> columnsMap =
         schemaExtractor.toColumns(tableFormat, table.getReadSchema(), catalogTable).stream()
             .collect(Collectors.toMap(Column::name, c -> c));
+    StorageDescriptor storageDescriptor =
+        (currentStorageDescriptor != null
+                ? currentStorageDescriptor.toBuilder()
+                : StorageDescriptor.builder().location(table.getBasePath()))
+            .columns(schemaExtractor.getNonPartitionColumns(table, columnsMap))
+            .inputFormat(DELTA_INPUT_FORMAT_CLASS)
+            .outputFormat(DELTA_OUTPUT_FORMAT_CLASS)
+            .serdeInfo(serdeInfo)
+            .build();
+
     return TableInput.builder()
         .name(tableIdentifier.getTableName())
         .tableType(GLUE_EXTERNAL_TABLE_TYPE)
         .parameters(parameters)
-        .storageDescriptor(
-            catalogTable.storageDescriptor().toBuilder()
-                .columns(schemaExtractor.getNonPartitionColumns(table, columnsMap))
-                .build())
+        .storageDescriptor(storageDescriptor)
         .partitionKeys(schemaExtractor.getPartitionColumns(table, columnsMap))
         .build();
   }
