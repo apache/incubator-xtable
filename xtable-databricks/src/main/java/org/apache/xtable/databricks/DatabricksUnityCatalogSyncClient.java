@@ -59,11 +59,12 @@ import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.CatalogSyncClient;
 
 /**
- * Databricks Unity Catalog implementation skeleton for CatalogSyncClient.
+ * Databricks Unity Catalog implementation of {@link CatalogSyncClient}.
  *
- * <p>This is a placeholder to wire Databricks UC as a catalog target via the SQL Statement
- * Execution API. Actual DDL execution and schema diffing should be implemented in a follow-up
- * change.
+ * <p>Supports external Delta table sync operations (create, drop, create-or-replace, get table and
+ * schema/database operations) using Databricks SDK APIs and SQL Statement Execution API. Schema
+ * refresh compares desired and existing schemas and triggers metadata sync when differences are
+ * detected.
  */
 @Log4j2
 public class DatabricksUnityCatalogSyncClient implements CatalogSyncClient<TableInfo> {
