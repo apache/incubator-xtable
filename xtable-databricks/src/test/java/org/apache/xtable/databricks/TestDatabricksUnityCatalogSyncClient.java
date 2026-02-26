@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -339,6 +340,166 @@ public class TestDatabricksUnityCatalogSyncClient {
     assertEquals(
         "MSCK REPAIR TABLE main.default.people SYNC METADATA",
         requestCaptor.getValue().getStatement());
+  }
+
+  @Test
+  void testRefreshTableSchemaMatchNoop() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    InternalSchema idSchema =
+        InternalSchema.builder().name("id").dataType(InternalType.INT).isNullable(true).build();
+    InternalSchema readSchema =
+        InternalSchema.builder()
+            .name("root")
+            .dataType(InternalType.RECORD)
+            .isNullable(true)
+            .fields(
+                java.util.Arrays.asList(
+                    InternalField.builder().name("id").schema(idSchema).build()))
+            .build();
+    InternalTable table =
+        InternalTable.builder().basePath("s3://bucket/path").readSchema(readSchema).build();
+    TableInfo catalogTable =
+        new TableInfo()
+            .setColumns(
+                java.util.Arrays.asList(
+                    new ColumnInfo().setName("id").setTypeText("int").setNullable(true)));
+
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people");
+
+    client.refreshTable(table, catalogTable, tableIdentifier);
+
+    verify(mockStatementExecution, never()).executeStatement(any(ExecuteStatementRequest.class));
+  }
+
+  @Test
+  void testRefreshTableWithNullCatalogTableNoop() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    InternalSchema idSchema =
+        InternalSchema.builder().name("id").dataType(InternalType.INT).isNullable(true).build();
+    InternalSchema readSchema =
+        InternalSchema.builder()
+            .name("root")
+            .dataType(InternalType.RECORD)
+            .isNullable(true)
+            .fields(
+                java.util.Arrays.asList(
+                    InternalField.builder().name("id").schema(idSchema).build()))
+            .build();
+    InternalTable table =
+        InternalTable.builder().basePath("s3://bucket/path").readSchema(readSchema).build();
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people");
+
+    client.refreshTable(table, null, tableIdentifier);
+
+    verify(mockStatementExecution, never()).executeStatement(any(ExecuteStatementRequest.class));
+  }
+
+  @Test
+  void testRefreshTableWithNullSchemaNoop() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    InternalTable table = InternalTable.builder().basePath("s3://bucket/path").build();
+    TableInfo catalogTable = new TableInfo();
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people");
+
+    client.refreshTable(table, catalogTable, tableIdentifier);
+
+    verify(mockStatementExecution, never()).executeStatement(any(ExecuteStatementRequest.class));
+  }
+
+  @Test
+  void testRefreshTableWithEmptySchemaNoop() {
+    Map<String, String> props = new HashMap<>();
+    props.put(DatabricksUnityCatalogConfig.HOST, "https://example.cloud.databricks.com");
+    props.put(DatabricksUnityCatalogConfig.WAREHOUSE_ID, "wh-1");
+    ExternalCatalogConfig config =
+        ExternalCatalogConfig.builder()
+            .catalogId("uc")
+            .catalogType(CatalogType.DATABRICKS_UC)
+            .catalogProperties(props)
+            .build();
+
+    DatabricksUnityCatalogSyncClient client =
+        new DatabricksUnityCatalogSyncClient(
+            config,
+            TableFormat.DELTA,
+            new Configuration(),
+            mockStatementExecution,
+            mockTablesApi,
+            mockSchemasApi);
+
+    InternalSchema readSchema =
+        InternalSchema.builder()
+            .name("root")
+            .dataType(InternalType.RECORD)
+            .isNullable(true)
+            .fields(java.util.Collections.emptyList())
+            .build();
+    InternalTable table =
+        InternalTable.builder().basePath("s3://bucket/path").readSchema(readSchema).build();
+    TableInfo catalogTable = new TableInfo();
+    ThreePartHierarchicalTableIdentifier tableIdentifier =
+        new ThreePartHierarchicalTableIdentifier("main", "default", "people");
+
+    client.refreshTable(table, catalogTable, tableIdentifier);
+
+    verify(mockStatementExecution, never()).executeStatement(any(ExecuteStatementRequest.class));
   }
 
   @Test
