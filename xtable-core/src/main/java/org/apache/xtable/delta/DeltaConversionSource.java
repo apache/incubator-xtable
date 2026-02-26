@@ -70,6 +70,9 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   @Builder.Default
   private final DeltaTableExtractor tableExtractor = DeltaTableExtractor.builder().build();
 
+  @Builder.Default
+  private final boolean skipColumnStats = false;
+
   private Optional<DeltaIncrementalChangesState> deltaIncrementalChangesState = Optional.empty();
 
   private final SparkSession sparkSession;
@@ -123,7 +126,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
                 fileFormat,
                 tableAtVersion.getPartitioningFields(),
                 tableAtVersion.getReadSchema().getAllFields(),
-                true,
+                !skipColumnStats,
                 DeltaPartitionExtractor.getInstance(),
                 DeltaStatsExtractor.getInstance());
         addedFiles.put(dataFile.getPhysicalPath(), dataFile);
@@ -223,7 +226,8 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   }
 
   private List<PartitionFileGroup> getInternalDataFiles(Snapshot snapshot, InternalSchema schema) {
-    try (DataFileIterator fileIterator = dataFileExtractor.iterator(snapshot, schema)) {
+    try (DataFileIterator fileIterator =
+        dataFileExtractor.iterator(snapshot, schema, !skipColumnStats)) {
       List<InternalDataFile> dataFiles = new ArrayList<>();
       fileIterator.forEachRemaining(dataFiles::add);
       return PartitionFileGroup.fromFiles(dataFiles);

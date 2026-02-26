@@ -41,7 +41,7 @@ public class HudiSourceConfig {
       "xtable.hudi.source.partition_spec_extractor_class";
   public static final String PARTITION_FIELD_SPEC_CONFIG =
       "xtable.hudi.source.partition_field_spec_config";
-  public static final String SKIP_COLUMN_STATS_CONFIG = "xtable.hudi.source.skip_column_stats";
+  public static final String SKIP_COLUMN_STATS_CONFIG = "xtable.source.skip_column_stats";
 
   String partitionSpecExtractorClass;
   List<PartitionFieldSpec> partitionFieldSpecs;
