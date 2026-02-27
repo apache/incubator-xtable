@@ -20,7 +20,9 @@ package org.apache.xtable.glue;
 
 import static org.apache.xtable.glue.GlueSchemaExtractor.getColumnProperty;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -741,6 +743,51 @@ public class TestGlueSchemaExtractor extends TestSchemaExtractorBase {
             Collections.emptyMap());
     column = getCurrentGlueTableColumn(tableFormat, "booleanField", "boolean", comment, 1, false);
     assertEquals(column, GlueSchemaExtractor.getInstance().toColumn(field, tableFormat));
+  }
+
+  @Test
+  void testColumnCommentSanitization() {
+    String tableFormat = TableFormat.ICEBERG;
+    String comment = "line1\nline2\rline3\u0000line4\u000Bline5\tline6";
+    InternalField field =
+        getPrimitiveInternalField(
+            "booleanField",
+            "boolean",
+            InternalType.BOOLEAN,
+            comment,
+            false,
+            1,
+            null,
+            Collections.emptyMap());
+    Column column =
+        getCurrentGlueTableColumn(
+            tableFormat,
+            "booleanField",
+            "boolean",
+            "line1 line2 line3line4 line5\tline6",
+            1,
+            false);
+    assertEquals(column, GlueSchemaExtractor.getInstance().toColumn(field, tableFormat));
+  }
+
+  @Test
+  void testSanitizeForGlue() {
+    assertEquals("line1 line2", GlueSchemaExtractor.sanitizeForGlue("line1\nline2"));
+    assertEquals("line1 line2", GlueSchemaExtractor.sanitizeForGlue("line1\rline2"));
+    assertEquals("line1line2", GlueSchemaExtractor.sanitizeForGlue("line1\u0000line2"));
+    assertEquals("line1 line2", GlueSchemaExtractor.sanitizeForGlue("line1\u000Bline2"));
+    assertEquals("keep\ttab", GlueSchemaExtractor.sanitizeForGlue("keep\ttab"));
+    assertEquals("smile \uD83D\uDE00", GlueSchemaExtractor.sanitizeForGlue("smile \uD83D\uDE00"));
+    assertEquals("ab", GlueSchemaExtractor.sanitizeForGlue("a\uD800b"));
+    assertEquals("ab", GlueSchemaExtractor.sanitizeForGlue("a\uDC00b"));
+  }
+
+  @Test
+  void testGlueValidationRegexCompatibility() {
+    assertTrue(GlueSchemaExtractor.isValidGlueString("plain text\twith tab"));
+    assertFalse(GlueSchemaExtractor.isValidGlueString("line1\nline2"));
+    assertTrue(GlueSchemaExtractor.isValidGlueString("emoji \uD83D\uDE00"));
+    assertFalse(GlueSchemaExtractor.isValidGlueString("bad\uD800"));
   }
 
   static Stream<Arguments> getNonPartitionColumnsTestArgs() {

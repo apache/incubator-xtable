@@ -104,9 +104,7 @@ public class DeltaGlueCatalogTableBuilder implements CatalogTableBuilder<TableIn
     serdeParameters.putAll(getSerDeParameters(table));
     SerDeInfo serdeInfo =
         (currentStorageDescriptor != null && currentStorageDescriptor.serdeInfo() != null)
-            ? currentStorageDescriptor
-                .serdeInfo()
-                .toBuilder()
+            ? currentStorageDescriptor.serdeInfo().toBuilder()
                 .serializationLibrary(DELTA_SERDE_LIBRARY_CLASS)
                 .parameters(serdeParameters)
                 .build()
