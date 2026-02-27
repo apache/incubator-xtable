@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
@@ -55,6 +56,8 @@ public class GlueSchemaExtractor {
   private static final String FIELD_OPTIONAL = "field.optional";
   private static final String FIELD_CURRENT = "field.current";
   private static final int MAX_COLUMN_COMMENT_LENGTH = 255;
+  private static final Pattern GLUE_ALLOWED_CHARS_PATTERN =
+      Pattern.compile("^[\\u0020-\\uD7FF\\uE000-\\uFFFD\\x{10000}-\\x{10FFFF}\\t]*$");
 
   public static GlueSchemaExtractor getInstance() {
     return INSTANCE;
@@ -122,6 +125,14 @@ public class GlueSchemaExtractor {
 
     String comment = field.getSchema().getComment();
     if (!StringUtils.isEmpty(comment)) {
+      String sanitizedComment = sanitizeForGlue(comment);
+      if (!StringUtils.equals(comment, sanitizedComment)) {
+        log.warn(
+            "Column: {} comment has been sanitized due to unsupported characters for Glue",
+            field.getName());
+      }
+      comment = sanitizedComment;
+
       // Glue has restriction on column comment to not exceed 255 chars
       // https://docs.aws.amazon.com/glue/latest/webapi/API_Column.html
       if (comment.length() > MAX_COLUMN_COMMENT_LENGTH) {
@@ -134,6 +145,36 @@ public class GlueSchemaExtractor {
       builder.comment(comment);
     }
     return builder.build();
+  }
+
+  static boolean isValidGlueString(String value) {
+    return value == null || GLUE_ALLOWED_CHARS_PATTERN.matcher(value).matches();
+  }
+
+  private static boolean isGlueAllowedCodePoint(int codePoint) {
+    return codePoint == '\t'
+        || (codePoint >= 0x20 && codePoint <= 0xD7FF)
+        || (codePoint >= 0xE000 && codePoint <= 0xFFFD)
+        || (codePoint >= 0x10000 && codePoint <= 0x10FFFF);
+  }
+
+  @VisibleForTesting
+  static String sanitizeForGlue(String value) {
+    if (value == null || isValidGlueString(value)) {
+      return value;
+    }
+
+    StringBuilder sanitized = new StringBuilder(value.length());
+    for (int i = 0; i < value.length(); ) {
+      int codePoint = value.codePointAt(i);
+      if (isGlueAllowedCodePoint(codePoint)) {
+        sanitized.appendCodePoint(codePoint);
+      } else if (Character.isWhitespace(codePoint)) {
+        sanitized.append(' ');
+      }
+      i += Character.charCount(codePoint);
+    }
+    return sanitized.toString();
   }
 
   /**
