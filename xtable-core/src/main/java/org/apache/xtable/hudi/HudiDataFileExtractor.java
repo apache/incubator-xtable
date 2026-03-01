@@ -23,9 +23,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -166,6 +168,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
     try {
       List<InternalDataFile> addedFiles = new ArrayList<>();
       List<InternalDataFile> removedFiles = new ArrayList<>();
+      Map<String, List<PartitionValue>> partitionValuesByPath = new HashMap<>();
       switch (instant.getAction()) {
         case HoodieTimeline.COMMIT_ACTION:
         case HoodieTimeline.DELTA_COMMIT_ACTION:
@@ -186,7 +189,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
                             instantToConsider,
                             partitionPath,
                             affectedFileIds,
-                            partitioningFields);
+                            partitioningFields,
+                            partitionValuesByPath);
                     addedFiles.addAll(addedAndRemovedFiles.getAdded());
                     removedFiles.addAll(addedAndRemovedFiles.getRemoved());
                   });
@@ -216,7 +220,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
                             partitionPath,
                             replacedFileIdsByPartition,
                             newFileIds,
-                            partitioningFields);
+                            partitioningFields,
+                            partitionValuesByPath);
                     addedFiles.addAll(addedAndRemovedFiles.getAdded());
                     removedFiles.addAll(addedAndRemovedFiles.getRemoved());
                   });
@@ -231,7 +236,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
                   (partition, metadata) ->
                       removedFiles.addAll(
                           getRemovedFiles(
-                              partition, metadata.getSuccessDeleteFiles(), partitioningFields)));
+                              partition,
+                              metadata.getSuccessDeleteFiles(),
+                              partitioningFields,
+                              partitionValuesByPath)));
           break;
         case HoodieTimeline.RESTORE_ACTION:
           HoodieRestoreMetadata restoreMetadata =
@@ -251,7 +259,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
                                               getRemovedFiles(
                                                   partition,
                                                   metadata.getSuccessDeleteFiles(),
-                                                  partitioningFields)))));
+                                                  partitioningFields,
+                                                  partitionValuesByPath)))));
           break;
         case HoodieTimeline.CLEAN_ACTION:
         case HoodieTimeline.SAVEPOINT_ACTION:
@@ -272,9 +281,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
   private List<InternalDataFile> getRemovedFiles(
       String partitionPath,
       List<String> deletedPaths,
-      List<InternalPartitionField> partitioningFields) {
+      List<InternalPartitionField> partitioningFields,
+      Map<String, List<PartitionValue>> partitionValuesByPath) {
     List<PartitionValue> partitionValues =
-        partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
+        getPartitionValues(partitionPath, partitioningFields, partitionValuesByPath);
     return deletedPaths.stream()
         .map(
             path -> {
@@ -299,11 +309,12 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieInstant instantToConsider,
       String partitionPath,
       Set<String> affectedFileIds,
-      List<InternalPartitionField> partitioningFields) {
+      List<InternalPartitionField> partitioningFields,
+      Map<String, List<PartitionValue>> partitionValuesByPath) {
     List<InternalDataFile> filesToAdd = new ArrayList<>(affectedFileIds.size());
     List<InternalDataFile> filesToRemove = new ArrayList<>(affectedFileIds.size());
     List<PartitionValue> partitionValues =
-        partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
+        getPartitionValues(partitionPath, partitioningFields, partitionValuesByPath);
     Stream<HoodieFileGroup> fileGroups =
         Stream.concat(
             fsView.getAllFileGroups(partitionPath), fsView.getAllReplacedFileGroups(partitionPath));
@@ -337,11 +348,12 @@ public class HudiDataFileExtractor implements AutoCloseable {
       String partitionPath,
       Set<String> replacedFileIds,
       Set<String> newFileIds,
-      List<InternalPartitionField> partitioningFields) {
+      List<InternalPartitionField> partitioningFields,
+      Map<String, List<PartitionValue>> partitionValuesByPath) {
     List<InternalDataFile> filesToAdd = new ArrayList<>(newFileIds.size());
     List<InternalDataFile> filesToRemove = new ArrayList<>(replacedFileIds.size());
     List<PartitionValue> partitionValues =
-        partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
+        getPartitionValues(partitionPath, partitioningFields, partitionValuesByPath);
     Stream<HoodieFileGroup> fileGroups =
         Stream.concat(
             fsView.getAllFileGroups(partitionPath),
@@ -371,6 +383,15 @@ public class HudiDataFileExtractor implements AutoCloseable {
       }
     }
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
+  }
+
+  private List<PartitionValue> getPartitionValues(
+      String partitionPath,
+      List<InternalPartitionField> partitioningFields,
+      Map<String, List<PartitionValue>> partitionValuesByPath) {
+    return partitionValuesByPath.computeIfAbsent(
+        partitionPath,
+        path -> partitionValuesExtractor.extractPartitionValues(partitioningFields, path));
   }
 
   private List<PartitionFileGroup> getInternalDataFilesForPartitions(
