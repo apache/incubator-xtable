@@ -26,6 +26,7 @@ import static org.apache.xtable.utilities.RunSync.loadTableFormatConversionConfi
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -90,6 +91,7 @@ public class RunCatalogSync {
   private static final String HADOOP_CONFIG_PATH = "hadoopConfig";
   private static final String CONVERTERS_CONFIG_PATH = "convertersConfig";
   private static final String FAIL_ON_ERROR_OPTION = "failOnError";
+  private static final String CONTINUOUS_CATCHUP_OPTION = "continuousCatchup";
   private static final String HELP_OPTION = "h";
   private static final Map<String, ConversionSourceProvider> CONVERSION_SOURCE_PROVIDERS =
       new HashMap<>();
@@ -118,6 +120,11 @@ public class RunCatalogSync {
               "failOnError",
               false,
               "Fail the process if any table or catalog sync fails")
+          .addOption(
+              CONTINUOUS_CATCHUP_OPTION,
+              "continuous-catchup",
+              false,
+              "Continuously rerun incremental sync until no newer source commit is observed")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
 
   public static void main(String[] args) throws Exception {
@@ -141,6 +148,7 @@ public class RunCatalogSync {
     }
 
     boolean failOnError = cmd.hasOption(FAIL_ON_ERROR_OPTION);
+    boolean continuousCatchup = cmd.hasOption(CONTINUOUS_CATCHUP_OPTION);
 
     DatasetConfig datasetConfig;
     try (InputStream inputStream =
@@ -193,6 +201,10 @@ public class RunCatalogSync {
                     .build());
       }
       SyncMode syncMode = getSyncMode();
+      if (continuousCatchup && syncMode != SyncMode.INCREMENTAL) {
+        log.warn(
+            "--continuous-catchup is only applicable in INCREMENTAL mode. Running a single sync round.");
+      }
       ConversionConfig conversionConfig =
           ConversionConfig.builder()
               .sourceTable(sourceTable)
@@ -206,13 +218,45 @@ public class RunCatalogSync {
                   targetTables.stream().map(TargetTable::getFormatName))
               .distinct()
               .collect(Collectors.toList());
+      Map<String, ConversionSourceProvider> conversionSourceProviders =
+          getConversionSourceProviders(tableFormats, tableFormatConverters, hadoopConf);
       try {
-        Map<String, SyncResult> syncResults =
-            conversionController.syncTableAcrossCatalogs(
-                conversionConfig,
-                getConversionSourceProviders(tableFormats, tableFormatConverters, hadoopConf));
-        if (failOnError && hasSyncFailures(syncResults)) {
-          throw new RuntimeException("Sync completed with failures. See logs for details.");
+        Optional<Instant> previousLatestInstant = Optional.empty();
+        int catchupRound = 0;
+        while (true) {
+          catchupRound += 1;
+          Map<String, SyncResult> syncResults =
+              conversionController.syncTableAcrossCatalogs(
+                  conversionConfig, conversionSourceProviders);
+          if (failOnError && hasSyncFailures(syncResults)) {
+            throw new RuntimeException("Sync completed with failures. See logs for details.");
+          }
+          if (!continuousCatchup || syncMode != SyncMode.INCREMENTAL) {
+            break;
+          }
+          Optional<Instant> latestSyncedInstant = getLatestSyncedInstant(syncResults);
+          if (!latestSyncedInstant.isPresent()) {
+            log.info(
+                "Stopping continuous catchup for table {} after round {} as no synced instant was reported.",
+                sourceTable.getBasePath(),
+                catchupRound);
+            break;
+          }
+          if (previousLatestInstant.isPresent()
+              && !latestSyncedInstant.get().isAfter(previousLatestInstant.get())) {
+            log.info(
+                "Stopping continuous catchup for table {} after round {} at instant {} (no newer commit detected).",
+                sourceTable.getBasePath(),
+                catchupRound,
+                latestSyncedInstant.get());
+            break;
+          }
+          previousLatestInstant = latestSyncedInstant;
+          log.info(
+              "Continuous catchup round {} for table {} synced up to instant {}. Checking for newer commits.",
+              catchupRound,
+              sourceTable.getBasePath(),
+              latestSyncedInstant.get());
         }
       } catch (Exception e) {
         log.error("Error running sync for {}", sourceTable.getBasePath(), e);
@@ -253,6 +297,13 @@ public class RunCatalogSync {
     }
     return syncResult.getCatalogSyncStatusList().stream()
         .anyMatch(status -> status.getStatusCode() == SyncStatusCode.ERROR);
+  }
+
+  private static Optional<Instant> getLatestSyncedInstant(Map<String, SyncResult> syncResults) {
+    return syncResults.values().stream()
+        .map(SyncResult::getLastInstantSynced)
+        .filter(instant -> instant != null)
+        .max(Instant::compareTo);
   }
 
   static Optional<CatalogConversionSource> getCatalogConversionSource(

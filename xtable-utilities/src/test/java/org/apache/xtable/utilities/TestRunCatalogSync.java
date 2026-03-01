@@ -35,4 +35,14 @@ class TestRunCatalogSync {
     // Ensure yaml gets parsed without any errors.
     assertDoesNotThrow(() -> RunCatalogSync.main(args));
   }
+
+  @SneakyThrows
+  @Test
+  void testMainWithContinuousCatchup() {
+    String catalogConfigYamlPath =
+        TestRunCatalogSync.class.getClassLoader().getResource("catalogConfig.yaml").getPath();
+    String[] args = {"-catalogConfig", catalogConfigYamlPath, "--continuous-catchup"};
+    // Ensure options parsing and execution works with continuous catchup enabled.
+    assertDoesNotThrow(() -> RunCatalogSync.main(args));
+  }
 }
