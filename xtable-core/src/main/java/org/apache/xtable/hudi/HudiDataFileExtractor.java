@@ -175,10 +175,10 @@ public class HudiDataFileExtractor implements AutoCloseable {
               .getPartitionToWriteStats()
               .forEach(
                   (partitionPath, writeStats) -> {
-                    Set<String> affectedFileIds =
-                        writeStats.stream()
-                            .map(HoodieWriteStat::getFileId)
-                            .collect(Collectors.toSet());
+                    Set<String> affectedFileIds = new HashSet<>(writeStats.size());
+                    for (HoodieWriteStat writeStat : writeStats) {
+                      affectedFileIds.add(writeStat.getFileId());
+                    }
                     AddedAndRemovedFiles addedAndRemovedFiles =
                         getUpdatesToPartition(
                             fsView,
@@ -200,13 +200,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
               .forEach(
                   (partitionPath, fileIds) -> {
                     Set<String> replacedFileIdsByPartition = new HashSet<>(fileIds);
-                    Set<String> newFileIds =
+                    List<HoodieWriteStat> newWriteStats =
                         replaceMetadata
                             .getPartitionToWriteStats()
-                            .getOrDefault(partitionPath, Collections.emptyList())
-                            .stream()
-                            .map(HoodieWriteStat::getFileId)
-                            .collect(Collectors.toSet());
+                            .getOrDefault(partitionPath, Collections.emptyList());
+                    Set<String> newFileIds = new HashSet<>(newWriteStats.size());
+                    for (HoodieWriteStat writeStat : newWriteStats) {
+                      newFileIds.add(writeStat.getFileId());
+                    }
                     AddedAndRemovedFiles addedAndRemovedFiles =
                         getUpdatesToPartitionForReplaceCommit(
                             fsView,
