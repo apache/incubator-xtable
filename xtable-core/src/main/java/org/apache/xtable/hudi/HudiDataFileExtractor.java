@@ -414,11 +414,29 @@ public class HudiDataFileExtractor implements AutoCloseable {
       Stream<InternalDataFile> filesWithRecordCount =
           fileStatsExtractor.addRecordCountToFiles(
               tableMetadata, filesWithoutStats, table.getReadSchema());
-      return PartitionFileGroup.fromFiles(filesWithRecordCount);
+      return toPartitionFileGroups(filesWithRecordCount);
     }
     Stream<InternalDataFile> files =
         fileStatsExtractor.addStatsToFiles(tableMetadata, filesWithoutStats, table.getReadSchema());
-    return PartitionFileGroup.fromFiles(files);
+    return toPartitionFileGroups(files);
+  }
+
+  private List<PartitionFileGroup> toPartitionFileGroups(Stream<InternalDataFile> files) {
+    Map<List<PartitionValue>, List<InternalDataFile>> grouped = new HashMap<>();
+    files.forEach(
+        file ->
+            grouped
+                .computeIfAbsent(file.getPartitionValues(), ignored -> new ArrayList<>())
+                .add(file));
+    List<PartitionFileGroup> groupedFiles = new ArrayList<>(grouped.size());
+    for (Map.Entry<List<PartitionValue>, List<InternalDataFile>> entry : grouped.entrySet()) {
+      groupedFiles.add(
+          PartitionFileGroup.builder()
+              .partitionValues(entry.getKey())
+              .files(entry.getValue())
+              .build());
+    }
+    return groupedFiles;
   }
 
   @Override
