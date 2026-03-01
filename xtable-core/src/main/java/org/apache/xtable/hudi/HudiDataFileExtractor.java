@@ -24,6 +24,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -306,25 +307,27 @@ public class HudiDataFileExtractor implements AutoCloseable {
     Stream<HoodieFileGroup> fileGroups =
         Stream.concat(
             fsView.getAllFileGroups(partitionPath), fsView.getAllReplacedFileGroups(partitionPath));
-    fileGroups
-        .filter(fileGroup -> affectedFileIds.contains(fileGroup.getFileGroupId().getFileId()))
-        .forEach(
-            fileGroup -> {
-              List<HoodieBaseFile> baseFiles =
-                  fileGroup.getAllBaseFiles().collect(Collectors.toList());
-              boolean newBaseFileAdded = false;
-              for (HoodieBaseFile baseFile : baseFiles) {
-                if (baseFile.getCommitTime().equals(instantToConsider.getTimestamp())) {
-                  newBaseFileAdded = true;
-                  filesToAdd.add(buildFileWithoutStats(partitionValues, baseFile));
-                } else if (newBaseFileAdded) {
-                  // if a new base file was added, then the previous base file for the group needs
-                  // to be removed
-                  filesToRemove.add(buildFileWithoutStats(partitionValues, baseFile));
-                  break;
-                }
-              }
-            });
+    Iterator<HoodieFileGroup> fileGroupIterator = fileGroups.iterator();
+    while (fileGroupIterator.hasNext()) {
+      HoodieFileGroup fileGroup = fileGroupIterator.next();
+      if (!affectedFileIds.contains(fileGroup.getFileGroupId().getFileId())) {
+        continue;
+      }
+      boolean newBaseFileAdded = false;
+      Iterator<HoodieBaseFile> baseFileIterator = fileGroup.getAllBaseFiles().iterator();
+      while (baseFileIterator.hasNext()) {
+        HoodieBaseFile baseFile = baseFileIterator.next();
+        if (baseFile.getCommitTime().equals(instantToConsider.getTimestamp())) {
+          newBaseFileAdded = true;
+          filesToAdd.add(buildFileWithoutStats(partitionValues, baseFile));
+        } else if (newBaseFileAdded) {
+          // if a new base file was added, then the previous base file for the group needs
+          // to be removed
+          filesToRemove.add(buildFileWithoutStats(partitionValues, baseFile));
+          break;
+        }
+      }
+    }
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
   }
 
@@ -344,17 +347,29 @@ public class HudiDataFileExtractor implements AutoCloseable {
             fsView.getAllFileGroups(partitionPath),
             fsView.getReplacedFileGroupsBeforeOrOn(
                 instantToConsider.getTimestamp(), partitionPath));
-    fileGroups.forEach(
-        fileGroup -> {
-          List<HoodieBaseFile> baseFiles = fileGroup.getAllBaseFiles().collect(Collectors.toList());
-          String fileId = fileGroup.getFileGroupId().getFileId();
-          if (newFileIds.contains(fileId)) {
-            filesToAdd.add(
-                buildFileWithoutStats(partitionValues, baseFiles.get(baseFiles.size() - 1)));
-          } else if (replacedFileIds.contains(fileId)) {
-            filesToRemove.add(buildFileWithoutStats(partitionValues, baseFiles.get(0)));
-          }
-        });
+    Iterator<HoodieFileGroup> fileGroupIterator = fileGroups.iterator();
+    while (fileGroupIterator.hasNext()) {
+      HoodieFileGroup fileGroup = fileGroupIterator.next();
+      String fileId = fileGroup.getFileGroupId().getFileId();
+      if (!newFileIds.contains(fileId) && !replacedFileIds.contains(fileId)) {
+        continue;
+      }
+      HoodieBaseFile firstBaseFile = null;
+      HoodieBaseFile lastBaseFile = null;
+      Iterator<HoodieBaseFile> baseFileIterator = fileGroup.getAllBaseFiles().iterator();
+      while (baseFileIterator.hasNext()) {
+        HoodieBaseFile baseFile = baseFileIterator.next();
+        if (firstBaseFile == null) {
+          firstBaseFile = baseFile;
+        }
+        lastBaseFile = baseFile;
+      }
+      if (newFileIds.contains(fileId) && lastBaseFile != null) {
+        filesToAdd.add(buildFileWithoutStats(partitionValues, lastBaseFile));
+      } else if (replacedFileIds.contains(fileId) && firstBaseFile != null) {
+        filesToRemove.add(buildFileWithoutStats(partitionValues, firstBaseFile));
+      }
+    }
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
   }
 
