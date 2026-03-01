@@ -23,11 +23,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -168,7 +165,6 @@ public class HudiDataFileExtractor implements AutoCloseable {
     try {
       List<InternalDataFile> addedFiles = new ArrayList<>();
       List<InternalDataFile> removedFiles = new ArrayList<>();
-      Map<String, List<PartitionValue>> partitionValuesByPath = new HashMap<>();
       switch (instant.getAction()) {
         case HoodieTimeline.COMMIT_ACTION:
         case HoodieTimeline.DELTA_COMMIT_ACTION:
@@ -179,18 +175,17 @@ public class HudiDataFileExtractor implements AutoCloseable {
               .getPartitionToWriteStats()
               .forEach(
                   (partitionPath, writeStats) -> {
-                    Set<String> affectedFileIds = new HashSet<>(writeStats.size());
-                    for (HoodieWriteStat writeStat : writeStats) {
-                      affectedFileIds.add(writeStat.getFileId());
-                    }
+                    Set<String> affectedFileIds =
+                        writeStats.stream()
+                            .map(HoodieWriteStat::getFileId)
+                            .collect(Collectors.toSet());
                     AddedAndRemovedFiles addedAndRemovedFiles =
                         getUpdatesToPartition(
                             fsView,
                             instantToConsider,
                             partitionPath,
                             affectedFileIds,
-                            partitioningFields,
-                            partitionValuesByPath);
+                            partitioningFields);
                     addedFiles.addAll(addedAndRemovedFiles.getAdded());
                     removedFiles.addAll(addedAndRemovedFiles.getRemoved());
                   });
@@ -219,8 +214,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                             partitionPath,
                             replacedFileIdsByPartition,
                             newFileIds,
-                            partitioningFields,
-                            partitionValuesByPath);
+                            partitioningFields);
                     addedFiles.addAll(addedAndRemovedFiles.getAdded());
                     removedFiles.addAll(addedAndRemovedFiles.getRemoved());
                   });
@@ -235,10 +229,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                   (partition, metadata) ->
                       removedFiles.addAll(
                           getRemovedFiles(
-                              partition,
-                              metadata.getSuccessDeleteFiles(),
-                              partitioningFields,
-                              partitionValuesByPath)));
+                              partition, metadata.getSuccessDeleteFiles(), partitioningFields)));
           break;
         case HoodieTimeline.RESTORE_ACTION:
           HoodieRestoreMetadata restoreMetadata =
@@ -258,8 +249,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
                                               getRemovedFiles(
                                                   partition,
                                                   metadata.getSuccessDeleteFiles(),
-                                                  partitioningFields,
-                                                  partitionValuesByPath)))));
+                                                  partitioningFields)))));
           break;
         case HoodieTimeline.CLEAN_ACTION:
         case HoodieTimeline.SAVEPOINT_ACTION:
@@ -280,10 +270,9 @@ public class HudiDataFileExtractor implements AutoCloseable {
   private List<InternalDataFile> getRemovedFiles(
       String partitionPath,
       List<String> deletedPaths,
-      List<InternalPartitionField> partitioningFields,
-      Map<String, List<PartitionValue>> partitionValuesByPath) {
+      List<InternalPartitionField> partitioningFields) {
     List<PartitionValue> partitionValues =
-        getPartitionValues(partitionPath, partitioningFields, partitionValuesByPath);
+        partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
     return deletedPaths.stream()
         .map(
             path -> {
@@ -308,36 +297,33 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieInstant instantToConsider,
       String partitionPath,
       Set<String> affectedFileIds,
-      List<InternalPartitionField> partitioningFields,
-      Map<String, List<PartitionValue>> partitionValuesByPath) {
+      List<InternalPartitionField> partitioningFields) {
     List<InternalDataFile> filesToAdd = new ArrayList<>(affectedFileIds.size());
     List<InternalDataFile> filesToRemove = new ArrayList<>(affectedFileIds.size());
     List<PartitionValue> partitionValues =
-        getPartitionValues(partitionPath, partitioningFields, partitionValuesByPath);
+        partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
     Stream<HoodieFileGroup> fileGroups =
         Stream.concat(
             fsView.getAllFileGroups(partitionPath), fsView.getAllReplacedFileGroups(partitionPath));
-    Iterator<HoodieFileGroup> fileGroupIterator = fileGroups.iterator();
-    while (fileGroupIterator.hasNext()) {
-      HoodieFileGroup fileGroup = fileGroupIterator.next();
-      if (!affectedFileIds.contains(fileGroup.getFileGroupId().getFileId())) {
-        continue;
-      }
-      boolean newBaseFileAdded = false;
-      Iterator<HoodieBaseFile> baseFileIterator = fileGroup.getAllBaseFiles().iterator();
-      while (baseFileIterator.hasNext()) {
-        HoodieBaseFile baseFile = baseFileIterator.next();
-        if (baseFile.getCommitTime().equals(instantToConsider.getTimestamp())) {
-          newBaseFileAdded = true;
-          filesToAdd.add(buildFileWithoutStats(partitionValues, baseFile));
-        } else if (newBaseFileAdded) {
-          // if a new base file was added, then the previous base file for the group needs
-          // to be removed
-          filesToRemove.add(buildFileWithoutStats(partitionValues, baseFile));
-          break;
-        }
-      }
-    }
+    fileGroups
+        .filter(fileGroup -> affectedFileIds.contains(fileGroup.getFileGroupId().getFileId()))
+        .forEach(
+            fileGroup -> {
+              List<HoodieBaseFile> baseFiles =
+                  fileGroup.getAllBaseFiles().collect(Collectors.toList());
+              boolean newBaseFileAdded = false;
+              for (HoodieBaseFile baseFile : baseFiles) {
+                if (baseFile.getCommitTime().equals(instantToConsider.getTimestamp())) {
+                  newBaseFileAdded = true;
+                  filesToAdd.add(buildFileWithoutStats(partitionValues, baseFile));
+                } else if (newBaseFileAdded) {
+                  // if a new base file was added, then the previous base file for the group needs
+                  // to be removed
+                  filesToRemove.add(buildFileWithoutStats(partitionValues, baseFile));
+                  break;
+                }
+              }
+            });
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
   }
 
@@ -347,50 +333,28 @@ public class HudiDataFileExtractor implements AutoCloseable {
       String partitionPath,
       Set<String> replacedFileIds,
       Set<String> newFileIds,
-      List<InternalPartitionField> partitioningFields,
-      Map<String, List<PartitionValue>> partitionValuesByPath) {
+      List<InternalPartitionField> partitioningFields) {
     List<InternalDataFile> filesToAdd = new ArrayList<>(newFileIds.size());
     List<InternalDataFile> filesToRemove = new ArrayList<>(replacedFileIds.size());
     List<PartitionValue> partitionValues =
-        getPartitionValues(partitionPath, partitioningFields, partitionValuesByPath);
+        partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
     Stream<HoodieFileGroup> fileGroups =
         Stream.concat(
             fsView.getAllFileGroups(partitionPath),
             fsView.getReplacedFileGroupsBeforeOrOn(
                 instantToConsider.getTimestamp(), partitionPath));
-    Iterator<HoodieFileGroup> fileGroupIterator = fileGroups.iterator();
-    while (fileGroupIterator.hasNext()) {
-      HoodieFileGroup fileGroup = fileGroupIterator.next();
-      String fileId = fileGroup.getFileGroupId().getFileId();
-      if (!newFileIds.contains(fileId) && !replacedFileIds.contains(fileId)) {
-        continue;
-      }
-      HoodieBaseFile firstBaseFile = null;
-      HoodieBaseFile lastBaseFile = null;
-      Iterator<HoodieBaseFile> baseFileIterator = fileGroup.getAllBaseFiles().iterator();
-      while (baseFileIterator.hasNext()) {
-        HoodieBaseFile baseFile = baseFileIterator.next();
-        if (firstBaseFile == null) {
-          firstBaseFile = baseFile;
-        }
-        lastBaseFile = baseFile;
-      }
-      if (newFileIds.contains(fileId) && lastBaseFile != null) {
-        filesToAdd.add(buildFileWithoutStats(partitionValues, lastBaseFile));
-      } else if (replacedFileIds.contains(fileId) && firstBaseFile != null) {
-        filesToRemove.add(buildFileWithoutStats(partitionValues, firstBaseFile));
-      }
-    }
+    fileGroups.forEach(
+        fileGroup -> {
+          List<HoodieBaseFile> baseFiles = fileGroup.getAllBaseFiles().collect(Collectors.toList());
+          String fileId = fileGroup.getFileGroupId().getFileId();
+          if (newFileIds.contains(fileId)) {
+            filesToAdd.add(
+                buildFileWithoutStats(partitionValues, baseFiles.get(baseFiles.size() - 1)));
+          } else if (replacedFileIds.contains(fileId)) {
+            filesToRemove.add(buildFileWithoutStats(partitionValues, baseFiles.get(0)));
+          }
+        });
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
-  }
-
-  private List<PartitionValue> getPartitionValues(
-      String partitionPath,
-      List<InternalPartitionField> partitioningFields,
-      Map<String, List<PartitionValue>> partitionValuesByPath) {
-    return partitionValuesByPath.computeIfAbsent(
-        partitionPath,
-        path -> partitionValuesExtractor.extractPartitionValues(partitioningFields, path));
   }
 
   private List<PartitionFileGroup> getInternalDataFilesForPartitions(
@@ -413,29 +377,11 @@ public class HudiDataFileExtractor implements AutoCloseable {
       Stream<InternalDataFile> filesWithRecordCount =
           fileStatsExtractor.addRecordCountToFiles(
               tableMetadata, filesWithoutStats, table.getReadSchema());
-      return toPartitionFileGroups(filesWithRecordCount);
+      return PartitionFileGroup.fromFiles(filesWithRecordCount);
     }
     Stream<InternalDataFile> files =
         fileStatsExtractor.addStatsToFiles(tableMetadata, filesWithoutStats, table.getReadSchema());
-    return toPartitionFileGroups(files);
-  }
-
-  private List<PartitionFileGroup> toPartitionFileGroups(Stream<InternalDataFile> files) {
-    Map<List<PartitionValue>, List<InternalDataFile>> grouped = new HashMap<>();
-    files.forEach(
-        file ->
-            grouped
-                .computeIfAbsent(file.getPartitionValues(), ignored -> new ArrayList<>())
-                .add(file));
-    List<PartitionFileGroup> groupedFiles = new ArrayList<>(grouped.size());
-    for (Map.Entry<List<PartitionValue>, List<InternalDataFile>> entry : grouped.entrySet()) {
-      groupedFiles.add(
-          PartitionFileGroup.builder()
-              .partitionValues(entry.getKey())
-              .files(entry.getValue())
-              .build());
-    }
-    return groupedFiles;
+    return PartitionFileGroup.fromFiles(files);
   }
 
   @Override
