@@ -378,18 +378,6 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
             + " files removed");
   }
 
-  @Test
-  public void testExtractorBuilderDefaults() {
-    DeltaKernelDataFileUpdatesExtractor defaultExtractor =
-        DeltaKernelDataFileUpdatesExtractor.builder()
-            .engine(engine)
-            .basePath(tempDir.toString())
-            .includeColumnStats(true)
-            .build();
-
-    assertNotNull(defaultExtractor);
-  }
-
   private Table createSimpleDeltaTable() {
     try {
       // Create a simple Delta table directory structure

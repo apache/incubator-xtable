@@ -18,17 +18,39 @@
  
 package org.apache.xtable.kernel;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.extern.log4j.Log4j2;
 
 import scala.collection.Seq;
 
+import org.apache.hadoop.conf.Configuration;
+
 import com.google.common.annotations.VisibleForTesting;
 
+import io.delta.kernel.Operation;
+import io.delta.kernel.Snapshot;
 import io.delta.kernel.Table;
+import io.delta.kernel.Transaction;
+import io.delta.kernel.TransactionBuilder;
+import io.delta.kernel.TransactionCommitResult;
+import io.delta.kernel.data.ColumnVector;
+import io.delta.kernel.data.ColumnarBatch;
+import io.delta.kernel.data.MapValue;
+import io.delta.kernel.data.Row;
+import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
+import io.delta.kernel.hook.PostCommitHook;
+import io.delta.kernel.utils.CloseableIterable;
+import io.delta.kernel.utils.CloseableIterator;
 import io.delta.kernel.internal.SnapshotImpl;
 import io.delta.kernel.internal.actions.Metadata;
 import io.delta.kernel.internal.actions.RowBackedAction;
@@ -36,6 +58,8 @@ import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
 
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.exception.ReadException;
+import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -45,6 +69,40 @@ import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.ConversionTarget;
 
+/**
+ * Implementation of {@link ConversionTarget} for Delta Lake using the Delta Kernel API.
+ *
+ * <p>This implementation uses Delta Kernel (io.delta.kernel) instead of Delta Standalone for write
+ * operations, providing better compatibility with cloud storage (S3, GCS, Azure Blob Storage, HDFS)
+ * and improved support for Delta Lake 3.x features.
+ *
+ * <p><strong>Known Limitations:</strong>
+ *
+ * <ul>
+ *   <li><strong>Commit Tags:</strong> Delta Kernel 4.0.0 does not support commit tags in
+ *       commitInfo (e.g., XTABLE_METADATA tags). This affects source-to-target commit identifier
+ *       mapping.
+ *   <li><strong>Schema Evolution:</strong> Schema changes are handled through Delta Kernel's
+ *       transaction API, which may have different semantics compared to Delta Standalone.
+ *   <li><strong>Internal API Usage:</strong> This implementation casts to internal classes
+ *       (SnapshotImpl, TableImpl) to access metadata and commit history, as Delta Kernel 4.0.0
+ *       lacks public APIs for these operations. These casts are brittle and may break on version
+ *       upgrades. Public API alternatives should be used when available.
+ * </ul>
+ *
+ * <p><strong>Implementation Choice:</strong> Delta Kernel API was chosen over Delta Standalone to:
+ *
+ * <ul>
+ *   <li>Support newer Delta Lake features and protocol versions
+ *   <li>Align with the Delta Lake community's direction (Kernel is the recommended API)
+ *   <li>Reduce dependency on Spark-specific implementations
+ * </ul>
+ *
+ * @see ConversionTarget
+ * @see io.delta.kernel.Table
+ * @see io.delta.kernel.Transaction
+ */
+@Log4j2
 public class DeltaKernelConversionTarget implements ConversionTarget {
   private DeltaKernelSchemaExtractor schemaExtractor;
   private DeltaKernelPartitionExtractor partitionExtractor;
@@ -65,6 +123,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
         DeltaKernelDataFileUpdatesExtractor.builder()
             .engine(engine)
             .basePath(targetTable.getBasePath())
+            // Column statistics are not needed for conversion operations
             .includeColumnStats(false)
             .build());
   }
@@ -86,8 +145,8 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
   }
 
   @Override
-  public void init(TargetTable targetTable, org.apache.hadoop.conf.Configuration configuration) {
-    Engine engine = io.delta.kernel.defaults.engine.DefaultEngine.create(configuration);
+  public void init(TargetTable targetTable, Configuration configuration) {
+    Engine engine = DefaultEngine.create(configuration);
 
     this.basePath = targetTable.getBasePath();
     this.logRetentionInHours = targetTable.getMetadataRetention().toHours();
@@ -98,6 +157,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
         DeltaKernelDataFileUpdatesExtractor.builder()
             .engine(engine)
             .basePath(targetTable.getBasePath())
+            // Column statistics are not needed for conversion operations
             .includeColumnStats(false)
             .build();
   }
@@ -118,13 +178,16 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
     if (partitionSpec != null) {
       Map<String, StructField> spec =
           partitionExtractor.convertToDeltaPartitionFormat(partitionSpec);
-      for (Map.Entry<String, StructField> e : spec.entrySet()) {
-        transactionState.getPartitionColumns().add(e.getKey());
-        if (e.getValue() != null
+      for (Map.Entry<String, StructField> partitionEntry : spec.entrySet()) {
+        String partitionColumnName = partitionEntry.getKey();
+        StructField partitionField = partitionEntry.getValue();
+
+        transactionState.getPartitionColumns().add(partitionColumnName);
+        if (partitionField != null
             && transactionState.getLatestSchema().fields().stream()
-                .noneMatch(field -> field.getName().equals(e.getValue().getName()))) {
+                .noneMatch(field -> field.getName().equals(partitionField.getName()))) {
           // add generated columns to schema.
-          transactionState.addColumn(e.getValue());
+          transactionState.addColumn(partitionField);
         }
       }
     }
@@ -163,9 +226,11 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
   @Override
   public Optional<TableSyncMetadata> getTableMetadata() {
     Table table = Table.forPath(engine, basePath);
-    io.delta.kernel.Snapshot snapshot = table.getLatestSnapshot(engine);
+    Snapshot snapshot = table.getLatestSnapshot(engine);
 
-    // Cast to SnapshotImpl to access internal getMetadata() method
+    // WORKAROUND: Cast to SnapshotImpl (internal class) to access metadata configuration.
+    // Delta Kernel 4.0.0 does not provide a public API to access table metadata/configuration.
+    // This cast is brittle and may break on Kernel version upgrades.
     Metadata metadata = ((SnapshotImpl) snapshot).getMetadata();
 
     // Get configuration from metadata
@@ -183,33 +248,36 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
   @Override
   public Optional<String> getTargetCommitIdentifier(String sourceIdentifier) {
     Table table = Table.forPath(engine, basePath);
-    io.delta.kernel.Snapshot currentSnapshot = table.getLatestSnapshot(engine);
+    Snapshot currentSnapshot = table.getLatestSnapshot(engine);
 
-    // Cast to TableImpl to access getChanges API
+    // WORKAROUND: Cast to TableImpl (internal class) to access getChanges() API for reading commit history.
+    // Delta Kernel 4.0.0 does not provide a public API to iterate through table changes/commits.
+    // This cast is brittle and may break on Kernel version upgrades.
+    // TODO: Replace with public API when available (track: https://github.com/delta-io/delta/issues/XXXX)
     io.delta.kernel.internal.TableImpl tableImpl = (io.delta.kernel.internal.TableImpl) table;
 
     // Request COMMITINFO actions to read commit metadata
-    java.util.Set<io.delta.kernel.internal.DeltaLogActionUtils.DeltaAction> actionSet =
-        new java.util.HashSet<>();
+    Set<io.delta.kernel.internal.DeltaLogActionUtils.DeltaAction> actionSet =
+        new HashSet<>();
     actionSet.add(io.delta.kernel.internal.DeltaLogActionUtils.DeltaAction.COMMITINFO);
 
     // Get changes from version 0 to current version
-    try (io.delta.kernel.utils.CloseableIterator<io.delta.kernel.data.ColumnarBatch> iter =
+    try (CloseableIterator<ColumnarBatch> iter =
         tableImpl.getChanges(engine, 0, currentSnapshot.getVersion(), actionSet)) {
 
       while (iter.hasNext()) {
-        io.delta.kernel.data.ColumnarBatch batch = iter.next();
+        ColumnarBatch batch = iter.next();
         int commitInfoIndex =
             batch
                 .getSchema()
                 .indexOf(
                     io.delta.kernel.internal.DeltaLogActionUtils.DeltaAction.COMMITINFO.colName);
 
-        try (io.delta.kernel.utils.CloseableIterator<io.delta.kernel.data.Row> rows =
+        try (CloseableIterator<Row> rows =
             batch.getRows()) {
 
           while (rows.hasNext()) {
-            io.delta.kernel.data.Row row = rows.next();
+            Row row = rows.next();
 
             // Get version (first column)
             long version = row.getLong(0);
@@ -220,7 +288,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
             }
 
             // Get CommitInfo row
-            io.delta.kernel.data.Row commitInfoRow = row.getStruct(commitInfoIndex);
+            Row commitInfoRow = row.getStruct(commitInfoIndex);
 
             // Get tags from CommitInfo (tags is a MapValue)
             int tagsIndex = commitInfoRow.getSchema().indexOf("tags");
@@ -228,12 +296,12 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
               continue;
             }
 
-            io.delta.kernel.data.MapValue tags = commitInfoRow.getMap(tagsIndex);
+            MapValue tags = commitInfoRow.getMap(tagsIndex);
 
             // Search for XTABLE_METADATA key in tags
             // Use Delta Kernel's MapValue API: getKeys() and getValues() return ColumnVectors
-            io.delta.kernel.data.ColumnVector keys = tags.getKeys();
-            io.delta.kernel.data.ColumnVector values = tags.getValues();
+            ColumnVector keys = tags.getKeys();
+            ColumnVector values = tags.getValues();
             int tagSize = tags.getSize();
             for (int i = 0; i < tagSize; i++) {
               String key = keys.getString(i);
@@ -254,11 +322,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
                   }
                 } catch (Exception e) {
                   // Log and continue to next commit
-                  System.err.println(
-                      "Failed to parse commit metadata for version "
-                          + version
-                          + ": "
-                          + e.getMessage());
+                  log.warn("Failed to parse commit metadata for version {}: {}", version, e.getMessage());
                 }
                 break;
               }
@@ -267,7 +331,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
         }
       }
     } catch (Exception e) {
-      throw new RuntimeException("Failed to read commit history", e);
+      throw new ReadException("Failed to read commit history", e);
     }
 
     return Optional.empty();
@@ -287,10 +351,11 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
       this.partitionColumns = new ArrayList<>();
       this.retentionInHours = retentionInHours;
 
-      if (checkTableExists()) {
+      try {
         Table table = Table.forPath(engine, basePath);
         this.latestSchema = table.getLatestSnapshot(engine).getSchema();
-      } else {
+      } catch (Exception e) {
+        // Table doesn't exist yet
         this.latestSchema = null;
       }
     }
@@ -308,8 +373,8 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
     private void commitTransaction() {
       boolean tableExists = checkTableExists();
 
-      io.delta.kernel.Operation operation =
-          tableExists ? io.delta.kernel.Operation.WRITE : io.delta.kernel.Operation.CREATE_TABLE;
+      Operation operation =
+          tableExists ? Operation.WRITE : Operation.CREATE_TABLE;
 
       if (!tableExists) {
         java.io.File tableDir = new java.io.File(basePath);
@@ -319,7 +384,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
       }
 
       Table table = Table.forPath(engine, basePath);
-      io.delta.kernel.TransactionBuilder txnBuilder =
+      TransactionBuilder txnBuilder =
           table.createTransactionBuilder(engine, "XTable Delta Sync", operation);
 
       // Schema evolution for existing tables is handled via Metadata actions manually
@@ -335,8 +400,8 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
       Map<String, String> tableProperties = getConfigurationsForDeltaSync();
       txnBuilder = txnBuilder.withTableProperties(engine, tableProperties);
 
-      io.delta.kernel.Transaction txn = txnBuilder.build(engine);
-      List<io.delta.kernel.data.Row> allActionRows = new ArrayList<>();
+      Transaction txn = txnBuilder.build(engine);
+      List<Row> allActionRows = new ArrayList<>();
 
       scala.collection.Iterator<RowBackedAction> actionsIterator = actions.iterator();
       while (actionsIterator.hasNext()) {
@@ -345,22 +410,22 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
         if (action instanceof io.delta.kernel.internal.actions.AddFile) {
           io.delta.kernel.internal.actions.AddFile addFile =
               (io.delta.kernel.internal.actions.AddFile) action;
-          io.delta.kernel.data.Row wrappedRow =
+          Row wrappedRow =
               io.delta.kernel.internal.actions.SingleAction.createAddFileSingleAction(
                   addFile.toRow());
           allActionRows.add(wrappedRow);
         } else if (action instanceof io.delta.kernel.internal.actions.RemoveFile) {
           io.delta.kernel.internal.actions.RemoveFile removeFile =
               (io.delta.kernel.internal.actions.RemoveFile) action;
-          io.delta.kernel.data.Row wrappedRow =
+          Row wrappedRow =
               io.delta.kernel.internal.actions.SingleAction.createRemoveFileSingleAction(
                   removeFile.toRow());
           allActionRows.add(wrappedRow);
         }
       }
 
-      io.delta.kernel.utils.CloseableIterator<io.delta.kernel.data.Row> allActionsIterator =
-          new io.delta.kernel.utils.CloseableIterator<io.delta.kernel.data.Row>() {
+      CloseableIterator<Row> allActionsIterator =
+          new CloseableIterator<Row>() {
             private int currentIndex = 0;
 
             @Override
@@ -369,7 +434,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
             }
 
             @Override
-            public io.delta.kernel.data.Row next() {
+            public Row next() {
               return allActionRows.get(currentIndex++);
             }
 
@@ -377,26 +442,26 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
             public void close() {}
           };
 
-      io.delta.kernel.utils.CloseableIterable<io.delta.kernel.data.Row> dataActions =
+      CloseableIterable<Row> dataActions =
           io.delta.kernel.utils.CloseableIterable.inMemoryIterable(allActionsIterator);
 
       try {
-        io.delta.kernel.TransactionCommitResult result = txn.commit(engine, dataActions);
+        TransactionCommitResult result = txn.commit(engine, dataActions);
 
         // Execute PostCommitHooks to create checkpoints and _last_checkpoint metadata file
-        java.util.List<io.delta.kernel.hook.PostCommitHook> hooks = result.getPostCommitHooks();
+        List<PostCommitHook> hooks = result.getPostCommitHooks();
         if (hooks != null && !hooks.isEmpty()) {
-          for (io.delta.kernel.hook.PostCommitHook hook : hooks) {
+          for (PostCommitHook hook : hooks) {
             try {
               hook.threadSafeInvoke(engine);
             } catch (Exception hookEx) {
               // Post-commit hooks are optimizations; log but don't fail the transaction
+              log.warn("Post-commit hook failed but transaction succeeded", hookEx);
             }
           }
         }
       } catch (Exception e) {
-        throw new RuntimeException(
-            "Failed to commit Delta Kernel transaction: " + e.getMessage(), e);
+        throw new UpdateException("Failed to commit Delta Kernel transaction", e);
       }
 
       // NOTE: Delta Kernel API limitations compared to Delta Standalone:
@@ -408,15 +473,11 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
 
     private boolean checkTableExists() {
       try {
-        java.io.File tableDir;
-        if (basePath.startsWith("file:")) {
-          tableDir = new java.io.File(java.net.URI.create(basePath));
-        } else {
-          tableDir = new java.io.File(basePath);
-        }
-        java.io.File deltaLogDir = new java.io.File(tableDir, "_delta_log");
-        return deltaLogDir.exists() && deltaLogDir.isDirectory();
+        Table table = Table.forPath(engine, basePath);
+        table.getLatestSnapshot(engine);
+        return true;
       } catch (Exception e) {
+        // Table doesn't exist or _delta_log is not accessible
         return false;
       }
     }

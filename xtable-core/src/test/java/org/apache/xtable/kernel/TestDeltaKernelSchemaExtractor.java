@@ -926,19 +926,19 @@ public class TestDeltaKernelSchemaExtractor {
     // Check id field
     StructField idDeltaField = deltaSchema.fields().get(0);
     assertEquals("id", idDeltaField.getName());
-    assertTrue(idDeltaField.getDataType() instanceof IntegerType);
+    assertEquals(IntegerType.INTEGER, idDeltaField.getDataType());
     assertEquals(false, idDeltaField.isNullable());
 
     // Check name field
     StructField nameDeltaField = deltaSchema.fields().get(1);
     assertEquals("name", nameDeltaField.getName());
-    assertTrue(nameDeltaField.getDataType() instanceof StringType);
+    assertEquals(StringType.STRING, nameDeltaField.getDataType());
     assertEquals(true, nameDeltaField.isNullable());
 
     // Check active field
     StructField activeDeltaField = deltaSchema.fields().get(2);
     assertEquals("active", activeDeltaField.getName());
-    assertTrue(activeDeltaField.getDataType() instanceof BooleanType);
+    assertEquals(BooleanType.BOOLEAN, activeDeltaField.getDataType());
     assertEquals(false, activeDeltaField.isNullable());
   }
 
@@ -1005,9 +1005,7 @@ public class TestDeltaKernelSchemaExtractor {
       StructField converted = convertedDeltaSchema.fields().get(i);
 
       assertEquals(original.getName(), converted.getName());
-      assertEquals(
-          original.getDataType().getClass().getSimpleName(),
-          converted.getDataType().getClass().getSimpleName());
+      assertEquals(original.getDataType(), converted.getDataType());
       assertEquals(original.isNullable(), converted.isNullable());
     }
   }

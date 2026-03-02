@@ -82,9 +82,12 @@ public class TestDeltaKernelSync {
 
   @BeforeEach
   public void setup() throws IOException {
-    tableName = "test-" + UUID.randomUUID();
+    tableName = "test-" + UUID.randomUUID();ghghfg
+    jkhjkhjk
     basePath = tempDir.resolve(tableName);
     Files.createDirectories(basePath);
+
+
 
     Configuration hadoopConf = new Configuration();
     engine = DefaultEngine.create(hadoopConf);
@@ -181,8 +184,9 @@ public class TestDeltaKernelSync {
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(checkpointTarget), snapshot11);
 
-    // Sleep briefly to ensure checkpoint file system operations complete
-    Thread.sleep(100);
+    // Wait for checkpoint file to be created (polling with timeout)
+    Path checkpointFile = checkpointTestPath.resolve("_delta_log/00000000000000000010.checkpoint.parquet");
+    waitForFileToExist(checkpointFile, Duration.ofSeconds(5));
 
     // 12th sync: NOW checkpoint exists and can be used to detect file removals
     InternalDataFile file23 = getDataFile(23, Collections.emptyList(), checkpointTestPath);
@@ -339,7 +343,7 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled("Disabled due to tags not present in commitinfo")
+  @Disabled("Disabled due to tags not present in commitinfo - https://github.com/delta-io/delta/issues/6167")
   public void testSourceTargetIdMapping() throws Exception {
     InternalSchema baseSchema = getInternalSchema();
     InternalTable sourceTable =
@@ -410,8 +414,9 @@ public class TestDeltaKernelSync {
         .syncSnapshot(Collections.singletonList(conversionTarget), snapshot);
 
     Optional<TableSyncMetadata> metadata = conversionTarget.getTableMetadata();
-    assertTrue(metadata.isPresent());
-    assertNotNull(metadata.get().getLastInstantSynced());
+    assertTrue(metadata.isPresent(), "Metadata should be present after sync");
+    TableSyncMetadata syncMetadata = metadata.get();
+    assertNotNull(syncMetadata.getLastInstantSynced(), "Last instant synced should not be null");
   }
 
   private void validateDeltaTable(Path basePath, Set<InternalDataFile> expectedFiles)
@@ -603,5 +608,31 @@ public class TestDeltaKernelSync {
                     .build())
             .build());
     return getInternalSchema().toBuilder().fields(fields).build();
+  }
+
+  /**
+   * Waits for a file to exist using a polling mechanism with timeout.
+   *
+   * @param filePath the path to the file to wait for
+   * @param timeout maximum time to wait
+   * @throws AssertionError if the file doesn't exist within the timeout
+   */
+  private void waitForFileToExist(Path filePath, Duration timeout) {
+    long endTime = System.currentTimeMillis() + timeout.toMillis();
+    long pollInterval = 50; // Poll every 50ms
+
+    while (System.currentTimeMillis() < endTime) {
+      if (Files.exists(filePath)) {
+        return; // File exists, success!
+      }
+      try {
+        Thread.sleep(pollInterval);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        fail("Interrupted while waiting for file to exist: " + filePath);
+      }
+    }
+
+    fail("File did not exist within timeout of " + timeout + ": " + filePath);
   }
 }
