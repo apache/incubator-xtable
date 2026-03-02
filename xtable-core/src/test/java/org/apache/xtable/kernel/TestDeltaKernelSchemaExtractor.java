@@ -1006,7 +1006,6 @@ public class TestDeltaKernelSchemaExtractor {
 
     // Convert to InternalSchema
     InternalSchema internalSchema = extractor.toInternalSchema(originalDeltaSchema);
-
     // Convert back to Delta Kernel StructType
     StructType convertedDeltaSchema = extractor.fromInternalSchema(internalSchema);
 
