@@ -33,27 +33,24 @@ import scala.collection.Seq;
 
 import io.delta.kernel.Snapshot;
 import io.delta.kernel.Table;
-import io.delta.kernel.data.FilteredColumnarBatch;
 import io.delta.kernel.data.MapValue;
 import io.delta.kernel.data.Row;
 import io.delta.kernel.engine.Engine;
-import io.delta.kernel.internal.ScanImpl;
 import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
 import io.delta.kernel.internal.util.VectorUtils;
 import io.delta.kernel.types.StructType;
-import io.delta.kernel.utils.CloseableIterator;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.spi.extractor.DataFileIterator;
 import org.apache.xtable.model.storage.FilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.InternalFile;
 import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.paths.PathUtils;
+import org.apache.xtable.spi.extractor.DataFileIterator;
 
 @Builder
 public class DeltaKernelDataFileUpdatesExtractor {
@@ -106,12 +103,11 @@ public class DeltaKernelDataFileUpdatesExtractor {
       } catch (Exception e) {
         throw new RuntimeException("Failed to scan existing Delta files", e);
       }
-      
 
       physicalSchema = snapshot.getSchema();
-      
+
     } else {
-        
+
       // Table doesn't exist yet - no previous files to remove
       // Convert InternalSchema to StructType for physical schema
       DeltaKernelSchemaExtractor schemaExtractor = DeltaKernelSchemaExtractor.getInstance();
@@ -140,8 +136,8 @@ public class DeltaKernelDataFileUpdatesExtractor {
   }
 
   /**
-   * Converts an InternalDataFile back to Delta Kernel's AddFile action.
-   * This is needed to create RemoveFile actions from existing files.
+   * Converts an InternalDataFile back to Delta Kernel's AddFile action. This is needed to create
+   * RemoveFile actions from existing files.
    */
   private AddFile createAddFileFromInternalDataFile(
       InternalDataFile internalFile, StructType physicalSchema) {

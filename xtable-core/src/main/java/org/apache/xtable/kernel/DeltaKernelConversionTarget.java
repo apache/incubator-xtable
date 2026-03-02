@@ -30,9 +30,9 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 
-import scala.collection.Seq;
-
 import org.apache.hadoop.conf.Configuration;
+
+import scala.collection.Seq;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -49,13 +49,13 @@ import io.delta.kernel.data.Row;
 import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
 import io.delta.kernel.hook.PostCommitHook;
-import io.delta.kernel.utils.CloseableIterable;
-import io.delta.kernel.utils.CloseableIterator;
 import io.delta.kernel.internal.SnapshotImpl;
 import io.delta.kernel.internal.actions.Metadata;
 import io.delta.kernel.internal.actions.RowBackedAction;
 import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
+import io.delta.kernel.utils.CloseableIterable;
+import io.delta.kernel.utils.CloseableIterator;
 
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.exception.ReadException;
@@ -79,9 +79,8 @@ import org.apache.xtable.spi.sync.ConversionTarget;
  * <p><strong>Known Limitations:</strong>
  *
  * <ul>
- *   <li><strong>Commit Tags:</strong> Delta Kernel 4.0.0 does not support commit tags in
- *       commitInfo (e.g., XTABLE_METADATA tags). This affects source-to-target commit identifier
- *       mapping.
+ *   <li><strong>Commit Tags:</strong> Delta Kernel 4.0.0 does not support commit tags in commitInfo
+ *       (e.g., XTABLE_METADATA tags). This affects source-to-target commit identifier mapping.
  *   <li><strong>Schema Evolution:</strong> Schema changes are handled through Delta Kernel's
  *       transaction API, which may have different semantics compared to Delta Standalone.
  *   <li><strong>Internal API Usage:</strong> This implementation casts to internal classes
@@ -250,15 +249,16 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
     Table table = Table.forPath(engine, basePath);
     Snapshot currentSnapshot = table.getLatestSnapshot(engine);
 
-    // WORKAROUND: Cast to TableImpl (internal class) to access getChanges() API for reading commit history.
+    // WORKAROUND: Cast to TableImpl (internal class) to access getChanges() API for reading commit
+    // history.
     // Delta Kernel 4.0.0 does not provide a public API to iterate through table changes/commits.
     // This cast is brittle and may break on Kernel version upgrades.
-    // TODO: Replace with public API when available (track: https://github.com/delta-io/delta/issues/XXXX)
+    // TODO: Replace with public API when available (track:
+    // https://github.com/delta-io/delta/issues/XXXX)
     io.delta.kernel.internal.TableImpl tableImpl = (io.delta.kernel.internal.TableImpl) table;
 
     // Request COMMITINFO actions to read commit metadata
-    Set<io.delta.kernel.internal.DeltaLogActionUtils.DeltaAction> actionSet =
-        new HashSet<>();
+    Set<io.delta.kernel.internal.DeltaLogActionUtils.DeltaAction> actionSet = new HashSet<>();
     actionSet.add(io.delta.kernel.internal.DeltaLogActionUtils.DeltaAction.COMMITINFO);
 
     // Get changes from version 0 to current version
@@ -273,8 +273,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
                 .indexOf(
                     io.delta.kernel.internal.DeltaLogActionUtils.DeltaAction.COMMITINFO.colName);
 
-        try (CloseableIterator<Row> rows =
-            batch.getRows()) {
+        try (CloseableIterator<Row> rows = batch.getRows()) {
 
           while (rows.hasNext()) {
             Row row = rows.next();
@@ -322,7 +321,10 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
                   }
                 } catch (Exception e) {
                   // Log and continue to next commit
-                  log.warn("Failed to parse commit metadata for version {}: {}", version, e.getMessage());
+                  log.warn(
+                      "Failed to parse commit metadata for version {}: {}",
+                      version,
+                      e.getMessage());
                 }
                 break;
               }
@@ -373,8 +375,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
     private void commitTransaction() {
       boolean tableExists = checkTableExists();
 
-      Operation operation =
-          tableExists ? Operation.WRITE : Operation.CREATE_TABLE;
+      Operation operation = tableExists ? Operation.WRITE : Operation.CREATE_TABLE;
 
       if (!tableExists) {
         java.io.File tableDir = new java.io.File(basePath);

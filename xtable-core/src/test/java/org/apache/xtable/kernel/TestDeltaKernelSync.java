@@ -86,8 +86,6 @@ public class TestDeltaKernelSync {
     basePath = tempDir.resolve(tableName);
     Files.createDirectories(basePath);
 
-
-
     Configuration hadoopConf = new Configuration();
     engine = DefaultEngine.create(hadoopConf);
 
@@ -184,7 +182,8 @@ public class TestDeltaKernelSync {
         .syncSnapshot(Collections.singletonList(checkpointTarget), snapshot11);
 
     // Wait for checkpoint file to be created (polling with timeout)
-    Path checkpointFile = checkpointTestPath.resolve("_delta_log/00000000000000000010.checkpoint.parquet");
+    Path checkpointFile =
+        checkpointTestPath.resolve("_delta_log/00000000000000000010.checkpoint.parquet");
     waitForFileToExist(checkpointFile, Duration.ofSeconds(5));
 
     // 12th sync: NOW checkpoint exists and can be used to detect file removals
@@ -342,7 +341,8 @@ public class TestDeltaKernelSync {
   }
 
   @Test
-  @Disabled("Disabled due to tags not present in commitinfo - https://github.com/delta-io/delta/issues/6167")
+  @Disabled(
+      "Disabled due to tags not present in commitinfo - https://github.com/delta-io/delta/issues/6167")
   public void testSourceTargetIdMapping() throws Exception {
     InternalSchema baseSchema = getInternalSchema();
     InternalTable sourceTable =
