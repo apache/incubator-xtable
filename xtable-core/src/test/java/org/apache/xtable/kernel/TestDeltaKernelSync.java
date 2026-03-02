@@ -82,8 +82,7 @@ public class TestDeltaKernelSync {
 
   @BeforeEach
   public void setup() throws IOException {
-    tableName = "test-" + UUID.randomUUID();ghghfg
-    jkhjkhjk
+    tableName = "test-" + UUID.randomUUID();
     basePath = tempDir.resolve(tableName);
     Files.createDirectories(basePath);
 
