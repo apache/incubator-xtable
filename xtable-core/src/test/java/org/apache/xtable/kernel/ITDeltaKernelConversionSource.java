@@ -19,7 +19,10 @@
 package org.apache.xtable.kernel;
 
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -39,7 +42,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -56,13 +63,23 @@ import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestSparkDeltaTable;
 import org.apache.xtable.ValidationTestHelper;
 import org.apache.xtable.conversion.SourceTable;
-import org.apache.xtable.model.*;
-import org.apache.xtable.model.schema.*;
+import org.apache.xtable.model.CommitsBacklog;
+import org.apache.xtable.model.InstantsForIncrementalSync;
+import org.apache.xtable.model.InternalSnapshot;
+import org.apache.xtable.model.InternalTable;
+import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.schema.InternalField;
+import org.apache.xtable.model.schema.InternalPartitionField;
+import org.apache.xtable.model.schema.InternalSchema;
+import org.apache.xtable.model.schema.InternalType;
+import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.*;
 import org.apache.xtable.model.storage.DataLayoutStrategy;
+import org.apache.xtable.model.storage.FileFormat;
+import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.PartitionFileGroup;
 import org.apache.xtable.model.storage.TableFormat;
 
 public class ITDeltaKernelConversionSource {
@@ -709,7 +726,7 @@ public class ITDeltaKernelConversionSource {
 
   private void validatePropertiesDataFile(InternalDataFile expected, InternalDataFile actual)
       throws URISyntaxException {
-    Assertions.assertTrue(
+    assertTrue(
         Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
         () -> "path == " + actual.getPhysicalPath() + " is not absolute");
     Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
@@ -719,7 +736,7 @@ public class ITDeltaKernelConversionSource {
     Instant now = Instant.now();
     long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
     long maxRange = now.toEpochMilli();
-    Assertions.assertTrue(
+    assertTrue(
         actual.getLastModified() > minRange && actual.getLastModified() <= maxRange,
         () ->
             "last modified == "

@@ -563,6 +563,81 @@ public class TestDeltaSchemaExtractor {
   }
 
   @Test
+  public void testBinaryInMapAndArrayWithoutMetadata() {
+    InternalSchema expectedSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("binaryList")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("array")
+                                .isNullable(false)
+                                .dataType(InternalType.LIST)
+                                .fields(
+                                    Collections.singletonList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                            .parentPath("binaryList")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("binary")
+                                                    .dataType(InternalType.BYTES)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("binaryMap")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .isNullable(false)
+                                .dataType(InternalType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("binaryMap")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("string")
+                                                    .dataType(InternalType.STRING)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                                            .parentPath("binaryMap")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("binary")
+                                                    .dataType(InternalType.BYTES)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build()))
+            .build();
+
+    StructType structRepresentation =
+        new StructType()
+            .add("binaryList", DataTypes.createArrayType(DataTypes.BinaryType, false), false)
+            .add(
+                "binaryMap",
+                DataTypes.createMapType(DataTypes.StringType, DataTypes.BinaryType, false),
+                false);
+
+    Assertions.assertEquals(
+        expectedSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+  }
+
+  @Test
   public void testNestedRecords() {
     InternalSchema internalSchema =
         InternalSchema.builder()

@@ -20,7 +20,9 @@ package org.apache.xtable.hudi;
 
 import static java.util.stream.Collectors.groupingBy;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.nio.file.Path;
 import java.time.Instant;
