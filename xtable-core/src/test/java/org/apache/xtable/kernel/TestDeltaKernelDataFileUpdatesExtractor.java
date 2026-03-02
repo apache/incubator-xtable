@@ -18,15 +18,12 @@
  
 package org.apache.xtable.kernel;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.*;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.BeforeEach;
