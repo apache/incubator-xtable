@@ -18,6 +18,9 @@
  
 package org.apache.xtable.hudi;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.apache.hadoop.fs.Path;
 
 public class HudiPathUtils {
@@ -27,5 +30,19 @@ public class HudiPathUtils {
     int startIndex = tableBasePath.toUri().getPath().length() + 1;
     int endIndex = pathStr.length() - fileName.length() - 1;
     return endIndex <= startIndex ? "" : pathStr.substring(startIndex, endIndex);
+  }
+
+  /** Filters out metadata/hidden directory paths like _delta_log and .hoodie. */
+  public static List<String> filterMetadataPaths(List<String> partitionPaths) {
+    return partitionPaths.stream()
+        .filter(
+            p -> {
+              if (p.isEmpty()) {
+                return true;
+              }
+              String name = new Path(p).getName();
+              return !name.startsWith("_") && !name.startsWith(".");
+            })
+        .collect(Collectors.toList());
   }
 }
