@@ -90,8 +90,9 @@ public class BaseFileUpdatesExtractor {
     // can be dropped
     Set<String> partitionPathsToDrop =
         new HashSet<>(
-            FSUtils.getAllPartitionPaths(
-                engineContext, metadataConfig, metaClient.getBasePathV2().toString()));
+            HudiPathUtils.filterMetadataPaths(
+                FSUtils.getAllPartitionPaths(
+                    engineContext, metadataConfig, metaClient.getBasePathV2().toString())));
     ReplaceMetadata replaceMetadata =
         partitionedDataFiles.stream()
             .map(

@@ -120,6 +120,21 @@ public class TestHudiCatalogPartitionSyncTool {
     mockHudiCatalogPartitionSyncTool = createMockHudiPartitionSyncTool();
   }
 
+  @Test
+  void testGetAllPartitionPathsOnStorageFiltersMetadataDirs() {
+    setupCommonMocks();
+    try (MockedStatic<FSUtils> mockFSUtils = mockStatic(FSUtils.class)) {
+      mockFSUtils
+          .when(() -> FSUtils.getAllPartitionPaths(any(), eq(TEST_BASE_PATH), eq(true), eq(false)))
+          .thenReturn(Arrays.asList("key1", "_delta_log", ".hoodie", "key2"));
+
+      List<String> result =
+          mockHudiCatalogPartitionSyncTool.getAllPartitionPathsOnStorage(TEST_BASE_PATH);
+
+      assertEquals(Arrays.asList("key1", "key2"), result);
+    }
+  }
+
   @SneakyThrows
   @Test
   void testSyncAllPartitions() {

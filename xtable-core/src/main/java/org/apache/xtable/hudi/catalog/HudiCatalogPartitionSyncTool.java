@@ -49,6 +49,7 @@ import org.apache.xtable.catalog.CatalogPartitionEvent;
 import org.apache.xtable.catalog.CatalogPartitionSyncOperations;
 import org.apache.xtable.catalog.CatalogPartitionSyncTool;
 import org.apache.xtable.exception.CatalogSyncException;
+import org.apache.xtable.hudi.HudiPathUtils;
 import org.apache.xtable.hudi.HudiTableManager;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
@@ -213,7 +214,8 @@ public class HudiCatalogPartitionSyncTool implements CatalogPartitionSyncTool {
   public List<String> getAllPartitionPathsOnStorage(String basePath) {
     HoodieLocalEngineContext engineContext = new HoodieLocalEngineContext(configuration);
     // ToDo - if we need to config to validate assumeDatePartitioning
-    return FSUtils.getAllPartitionPaths(engineContext, basePath, true, false);
+    return HudiPathUtils.filterMetadataPaths(
+        FSUtils.getAllPartitionPaths(engineContext, basePath, true, false));
   }
 
   public List<String> getWrittenPartitionsSince(
