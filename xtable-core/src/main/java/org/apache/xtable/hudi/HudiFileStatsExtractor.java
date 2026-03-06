@@ -104,7 +104,11 @@ public class HudiFileStatsExtractor {
 
   private Stream<InternalDataFile> computeColumnStatsFromParquetFooters(
       Stream<InternalDataFile> files, Map<String, InternalField> nameFieldMap) {
-    return files.map(
+    // Use the common ForkJoinPool for parquet footer reads; parallelism can be tuned via
+    // -Djava.util.concurrent.ForkJoinPool.common.parallelism.
+    return files
+        .parallel()
+        .map(
         file -> {
           HudiFileStats fileStats =
               computeColumnStatsForFile(new Path(file.getPhysicalPath()), nameFieldMap);
