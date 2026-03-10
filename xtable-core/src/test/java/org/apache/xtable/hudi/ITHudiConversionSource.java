@@ -419,6 +419,54 @@ public class ITHudiConversionSource {
     }
   }
 
+  @Test
+  public void testMultipleInsertOverwriteOnSamePartitions() {
+    String tableName = "test_table_" + UUID.randomUUID();
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, "level:SIMPLE", HoodieTableType.COPY_ON_WRITE)) {
+      List<List<String>> allBaseFilePaths = new ArrayList<>();
+      List<TableChange> allTableChanges = new ArrayList<>();
+
+      // Initial insert into partition "INFO"
+      String commitInstant1 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50, "INFO");
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+      allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
+
+      // INSERT_OVERWRITE on "INFO" partition (replacecommit A — new file groups replace initial)
+      List<HoodieRecord<HoodieAvroPayload>> overwriteRecords1 = table.generateRecords(30, "INFO");
+      table.insertOverwrite(overwriteRecords1);
+      allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
+
+      // INSERT_OVERWRITE on "INFO" partition again (replacecommit B — new file groups replace A's)
+      List<HoodieRecord<HoodieAvroPayload>> overwriteRecords2 = table.generateRecords(20, "INFO");
+      table.insertOverwrite(overwriteRecords2);
+      allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
+
+      HudiConversionSource hudiClient =
+          getHudiSourceClient(CONFIGURATION, table.getBasePath(), "level:VALUE");
+      // Get the current snapshot
+      InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
+      ValidationTestHelper.validateSnapshot(
+          internalSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
+      // Get changes in Incremental format since the initial insert
+      InstantsForIncrementalSync instantsForIncrementalSync =
+          InstantsForIncrementalSync.builder()
+              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
+              .build();
+      CommitsBacklog<HoodieInstant> instantCommitsBacklog =
+          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
+      for (HoodieInstant instant : instantCommitsBacklog.getCommitsToProcess()) {
+        TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
+        allTableChanges.add(tableChange);
+      }
+      // Without the fix, replacecommit A would have 0 adds because the FileSystemView
+      // built from the full timeline marks A's file groups as replaced by B.
+      ValidationTestHelper.validateTableChanges(allBaseFilePaths, allTableChanges);
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("testsForAllTableTypes")
   public void testsForDeleteAllRecordsInPartition(HoodieTableType tableType) {

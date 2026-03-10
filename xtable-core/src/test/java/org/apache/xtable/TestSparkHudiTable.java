@@ -220,6 +220,19 @@ public class TestSparkHudiTable extends TestAbstractHudiTable {
     assertNoWriteErrors(result);
   }
 
+  public List<HoodieRecord<HoodieAvroPayload>> insertOverwrite(
+      List<HoodieRecord<HoodieAvroPayload>> records) {
+    String actionType =
+        CommitUtils.getCommitActionType(
+            WriteOperationType.INSERT_OVERWRITE, HoodieTableType.COPY_ON_WRITE);
+    String instant = getStartCommitOfActionType(actionType);
+    JavaRDD<HoodieRecord<HoodieAvroPayload>> writeRecords = jsc.parallelize(records, 1);
+    HoodieWriteResult writeResult = writeClient.insertOverwrite(writeRecords, instant);
+    List<WriteStatus> result = writeResult.getWriteStatuses().collect();
+    assertNoWriteErrors(result);
+    return records;
+  }
+
   public void cluster() {
     String instant = writeClient.scheduleClustering(Option.empty()).get();
     writeClient.cluster(instant, true);
