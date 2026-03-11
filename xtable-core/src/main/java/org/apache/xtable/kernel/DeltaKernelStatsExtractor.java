@@ -265,22 +265,27 @@ public class DeltaKernelStatsExtractor {
    */
   private Map<String, Object> flattenStatMap(Map<String, Object> statMap) {
     Map<String, Object> result = new HashMap<>();
+    // Return empty map if input is null
+    if (statMap == null) {
+      return result;
+    }
     Queue<StatField> statFieldQueue = new ArrayDeque<>();
     statFieldQueue.add(StatField.of("", statMap));
     while (!statFieldQueue.isEmpty()) {
       StatField statField = statFieldQueue.poll();
       String prefix = statField.getParentPath().isEmpty() ? "" : statField.getParentPath() + ".";
-      statField
-          .getValues()
-          .forEach(
-              (fieldName, value) -> {
-                String fullName = prefix + fieldName;
-                if (value instanceof Map) {
-                  statFieldQueue.add(StatField.of(fullName, (Map<String, Object>) value));
-                } else {
-                  result.put(fullName, value);
-                }
-              });
+      Map<String, Object> values = statField.getValues();
+      if (values != null) {
+        values.forEach(
+            (fieldName, value) -> {
+              String fullName = prefix + fieldName;
+              if (value instanceof Map) {
+                statFieldQueue.add(StatField.of(fullName, (Map<String, Object>) value));
+              } else {
+                result.put(fullName, value);
+              }
+            });
+      }
     }
     return result;
   }
