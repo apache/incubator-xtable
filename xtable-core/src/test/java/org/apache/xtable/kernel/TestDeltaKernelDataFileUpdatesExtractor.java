@@ -240,30 +240,6 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
   }
 
   @Test
-  public void testApplySnapshotWithRemovedFiles() throws IOException {
-    // This test verifies that files in the current snapshot but not in new data
-    // are converted to RemoveFile actions
-
-    Table table = createSimpleDeltaTable();
-
-    // Provide empty partitioned data files (simulating all files removed)
-    List<PartitionFileGroup> partitionedDataFiles = Collections.emptyList();
-
-    // Execute applySnapshot
-    scala.collection.Seq<RowBackedAction> actions =
-        extractor.applySnapshot(table, partitionedDataFiles, testSchema);
-
-    // Verify
-    assertNotNull(actions);
-    List<RowBackedAction> actionList = JavaConverters.seqAsJavaList(actions);
-
-    // If the table had files, they should be converted to RemoveFile actions
-    // Since we created a simple empty table, this might be empty or have remove actions
-    // depending on the table state
-    assertNotNull(actionList);
-  }
-
-  @Test
   public void testDifferentialSyncWithExistingData() throws IOException {
     // This test simulates a real differential sync scenario:
     // 1. Delta table has existing files: file1.parquet, file2.parquet

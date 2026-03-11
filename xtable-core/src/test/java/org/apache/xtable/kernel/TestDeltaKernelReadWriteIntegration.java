@@ -140,8 +140,14 @@ public class TestDeltaKernelReadWriteIntegration {
     // Extract data files from partition groups (files with same partition values are grouped)
     List<InternalDataFile> dataFiles = extractDataFiles(readSnapshot);
     assertEquals(2, dataFiles.size(), "Should have 2 files in snapshot");
-    assertTrue(dataFiles.stream().anyMatch(f -> f.getFileSizeBytes() == file1.getFileSizeBytes()));
-    assertTrue(dataFiles.stream().anyMatch(f -> f.getFileSizeBytes() == file2.getFileSizeBytes()));
+
+    // Compare by physical path to uniquely identify files (not by size which could be duplicated)
+    assertTrue(
+        dataFiles.stream().anyMatch(f -> f.getPhysicalPath().contains("data_1.parquet")),
+        "Should contain file1 (data_1.parquet)");
+    assertTrue(
+        dataFiles.stream().anyMatch(f -> f.getPhysicalPath().contains("data_2.parquet")),
+        "Should contain file2 (data_2.parquet)");
   }
 
   /**
@@ -255,15 +261,15 @@ public class TestDeltaKernelReadWriteIntegration {
     List<InternalDataFile> files2 = extractDataFiles(read2);
     assertEquals(2, files2.size(), "Should have 2 files after second snapshot");
 
-    // Verify correct files are present
+    // Verify correct files are present (compare by path, not size)
     assertTrue(
-        files2.stream().anyMatch(f -> f.getFileSizeBytes() == file2.getFileSizeBytes()),
+        files2.stream().anyMatch(f -> f.getPhysicalPath().contains("data_2.parquet")),
         "file2 should be present");
     assertTrue(
-        files2.stream().anyMatch(f -> f.getFileSizeBytes() == file3.getFileSizeBytes()),
+        files2.stream().anyMatch(f -> f.getPhysicalPath().contains("data_3.parquet")),
         "file3 should be present");
     assertFalse(
-        files2.stream().anyMatch(f -> f.getFileSizeBytes() == file1.getFileSizeBytes()),
+        files2.stream().anyMatch(f -> f.getPhysicalPath().contains("data_1.parquet")),
         "file1 should be removed");
 
     // === SNAPSHOT 3: Replace all files ===
@@ -274,7 +280,9 @@ public class TestDeltaKernelReadWriteIntegration {
     InternalSnapshot read3 = reader.getCurrentSnapshot();
     List<InternalDataFile> files3 = extractDataFiles(read3);
     assertEquals(1, files3.size(), "Should have only 1 file after third snapshot");
-    assertEquals(file4.getFileSizeBytes(), files3.get(0).getFileSizeBytes());
+    assertTrue(
+        files3.get(0).getPhysicalPath().contains("data_4.parquet"),
+        "Should contain file4 (data_4.parquet)");
   }
 
   /** Test 4: Read at Specific Version (Time Travel) Validates version-based reading. */
@@ -318,9 +326,9 @@ public class TestDeltaKernelReadWriteIntegration {
     List<InternalDataFile> latestFiles = extractDataFiles(latestSnapshot);
     assertEquals(2, latestFiles.size());
 
-    // Verify latest version doesn't have file1
+    // Verify latest version doesn't have file1 (compare by path, not size)
     assertFalse(
-        latestFiles.stream().anyMatch(f -> f.getFileSizeBytes() == file1.getFileSizeBytes()),
+        latestFiles.stream().anyMatch(f -> f.getPhysicalPath().contains("data_1.parquet")),
         "Latest version should not have file1");
   }
 
@@ -458,7 +466,7 @@ public class TestDeltaKernelReadWriteIntegration {
 
       return InternalDataFile.builder()
           .fileFormat(FileFormat.APACHE_PARQUET)
-          .fileSizeBytes(1000 + index) // Unique size for identification
+          .fileSizeBytes(1000 + index)
           .physicalPath(physicalPath)
           .recordCount(100)
           .partitionValues(partitionValues)

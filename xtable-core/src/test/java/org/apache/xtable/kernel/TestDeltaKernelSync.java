@@ -21,8 +21,8 @@ package org.apache.xtable.kernel;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -38,7 +38,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -62,6 +61,7 @@ import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.utils.CloseableIterator;
 
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
@@ -85,7 +85,6 @@ import org.apache.xtable.spi.sync.TableFormatSync;
  * Spark SQL dependencies.
  */
 public class TestDeltaKernelSync {
-  private static final Random RANDOM = new Random();
   private static final Instant LAST_COMMIT_TIME = Instant.ofEpochSecond(1000);
 
   @TempDir public Path tempDir;
@@ -170,8 +169,6 @@ public class TestDeltaKernelSync {
                 .build(),
             engine);
 
-    System.out.println("=== Starting 10 syncs to trigger checkpoint ===");
-
     // Do 10 syncs to trigger checkpoint creation
     for (int i = 0; i < 10; i++) {
       InternalDataFile file1 = getDataFile(i * 2 + 1, Collections.emptyList(), checkpointTestPath);
@@ -180,37 +177,30 @@ public class TestDeltaKernelSync {
       InternalSnapshot snapshot = buildSnapshot(checkpointTable, String.valueOf(i), file1, file2);
       TableFormatSync.getInstance()
           .syncSnapshot(Collections.singletonList(checkpointTarget), snapshot);
-
-      System.out.println("Completed sync " + (i + 1) + " of 10");
     }
-
-    System.out.println("=== 10 syncs complete. Checkpoint should be created at version 10 ===");
 
     // 11th sync: This triggers checkpoint creation at version 10
     InternalDataFile file21 = getDataFile(21, Collections.emptyList(), checkpointTestPath);
     InternalDataFile file22 = getDataFile(22, Collections.emptyList(), checkpointTestPath);
     InternalSnapshot snapshot11 = buildSnapshot(checkpointTable, "10", file21, file22);
 
-    System.out.println("=== Doing 11th sync (creates checkpoint at version 10) ===");
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(checkpointTarget), snapshot11);
 
-    // Wait for checkpoint file to be created (polling with timeout)
+    // Checkpoint is created synchronously via post-commit hooks
     Path checkpointFile =
         checkpointTestPath.resolve("_delta_log/00000000000000000010.checkpoint.parquet");
-    waitForFileToExist(checkpointFile, Duration.ofSeconds(5));
+    assertTrue(Files.exists(checkpointFile), "Checkpoint file should exist after 10 commits");
 
     // 12th sync: NOW checkpoint exists and can be used to detect file removals
     InternalDataFile file23 = getDataFile(23, Collections.emptyList(), checkpointTestPath);
     InternalDataFile file24 = getDataFile(24, Collections.emptyList(), checkpointTestPath);
     InternalSnapshot snapshot12 = buildSnapshot(checkpointTable, "11", file23, file24);
 
-    System.out.println("=== Doing 12th sync (should use checkpoint to remove file21/file22) ===");
     TableFormatSync.getInstance()
         .syncSnapshot(Collections.singletonList(checkpointTarget), snapshot12);
 
     // Validate: Should only have file23 and file24 (file21/file22 should be removed)
-    System.out.println("=== Validating: only file23 and file24 should remain ===");
     validateDeltaTable(checkpointTestPath, new HashSet<>(Arrays.asList(file23, file24)));
   }
 
@@ -410,10 +400,15 @@ public class TestDeltaKernelSync {
     conversionTarget.syncFilesForSnapshot(snapshot.getPartitionedDataFiles());
     conversionTarget.completeSync();
 
-    // No crash should happen during the process
-    Optional<String> unmappedTargetId = conversionTarget.getTargetCommitIdentifier("0");
-    // The targetIdentifier is expected to not be found
-    assertFalse(unmappedTargetId.isPresent());
+    // getTargetCommitIdentifier is not supported in DeltaKernelConversionTarget
+    // because Delta Kernel 4.0.0 does not support commit tags
+    NotSupportedException exception =
+        assertThrows(
+            NotSupportedException.class, () -> conversionTarget.getTargetCommitIdentifier("0"));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains("Source-to-target commit identifier mapping is not supported"));
   }
 
   @Test
@@ -508,12 +503,12 @@ public class TestDeltaKernelSync {
 
       return InternalDataFile.builder()
           .fileFormat(FileFormat.APACHE_PARQUET)
-          .fileSizeBytes(RANDOM.nextInt(10000))
+          .fileSizeBytes(1000L + (index * 100L)) // Deterministic size based on index
           .physicalPath(physicalPath)
-          .recordCount(RANDOM.nextInt(10000))
+          .recordCount(100L + (index * 10L)) // Deterministic record count based on index
           .partitionValues(partitionValues)
           .columnStats(Collections.emptyList())
-          .lastModified(Instant.now().toEpochMilli())
+          .lastModified(1000000000L + (index * 1000L)) // Deterministic timestamp based on index
           .build();
     } catch (IOException e) {
       throw new RuntimeException("Failed to create test data file", e);
@@ -621,31 +616,5 @@ public class TestDeltaKernelSync {
                     .build())
             .build());
     return getInternalSchema().toBuilder().fields(fields).build();
-  }
-
-  /**
-   * Waits for a file to exist using a polling mechanism with timeout.
-   *
-   * @param filePath the path to the file to wait for
-   * @param timeout maximum time to wait
-   * @throws AssertionError if the file doesn't exist within the timeout
-   */
-  private void waitForFileToExist(Path filePath, Duration timeout) {
-    long endTime = System.currentTimeMillis() + timeout.toMillis();
-    long pollInterval = 50; // Poll every 50ms
-
-    while (System.currentTimeMillis() < endTime) {
-      if (Files.exists(filePath)) {
-        return; // File exists, success!
-      }
-      try {
-        Thread.sleep(pollInterval);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        fail("Interrupted while waiting for file to exist: " + filePath);
-      }
-    }
-
-    fail("File did not exist within timeout of " + timeout + ": " + filePath);
   }
 }

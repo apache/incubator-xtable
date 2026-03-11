@@ -43,6 +43,7 @@ import io.delta.kernel.internal.util.VectorUtils;
 import io.delta.kernel.types.StructType;
 
 import org.apache.xtable.collectors.CustomCollectors;
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.storage.FilesDiff;
 import org.apache.xtable.model.storage.InternalDataFile;
@@ -101,7 +102,7 @@ public class DeltaKernelDataFileUpdatesExtractor {
           previousFiles.put(fullPath, removeFile);
         }
       } catch (Exception e) {
-        throw new RuntimeException("Failed to scan existing Delta files", e);
+        throw new ReadException("Failed to scan existing Delta files", e);
       }
 
       physicalSchema = snapshot.getSchema();
@@ -126,13 +127,7 @@ public class DeltaKernelDataFileUpdatesExtractor {
   }
 
   private boolean checkTableExists(Table table) {
-    try {
-      table.getLatestSnapshot(engine);
-      return true;
-    } catch (Exception e) {
-      // Table doesn't exist or _delta_log is not accessible
-      return false;
-    }
+    return DeltaKernelUtils.tableExists(engine, table.getPath(engine));
   }
 
   /**
