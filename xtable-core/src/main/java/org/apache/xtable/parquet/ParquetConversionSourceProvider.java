@@ -32,7 +32,8 @@ public class ParquetConversionSourceProvider extends ConversionSourceProvider<Lo
     ParquetPartitionValueExtractor partitionValueExtractor =
         new ParquetPartitionValueExtractor(
             sourcePartitionSpecExtractor.getPathToPartitionFieldFormat());
-    ParquetDataManager dataManager = new ParquetDataManager(this.hadoopConf, sourceTable.getBasePath());
+    ParquetDataManager dataManager =
+        new ParquetDataManager(this.hadoopConf, sourceTable.getBasePath());
     return ParquetConversionSource.builder()
         .tableName(sourceTable.getName())
         .basePath(sourceTable.getBasePath())
