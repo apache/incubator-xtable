@@ -181,7 +181,7 @@ public class TestIcebergSchemaSync {
 
     verify(mockUpdateSchema).deleteColumn("array_field.element.element_string");
     verify(mockUpdateSchema)
-        .addColumn("array_field.element", "element_double", Types.DoubleType.get(), null);
+        .addColumn("array_field.element", "element_double", Types.DoubleType.get(), (String) null);
     verify(mockUpdateSchema).commit();
   }
 
@@ -194,7 +194,8 @@ public class TestIcebergSchemaSync {
 
     verify(mockUpdateSchema).deleteColumn("map_field.value.value_string");
     verify(mockUpdateSchema)
-        .addRequiredColumn("map_field.value", "value_double", Types.DoubleType.get(), null);
+        .addRequiredColumn(
+            "map_field.value", "value_double", Types.DoubleType.get(), (String) null);
     verify(mockUpdateSchema).commit();
   }
 
@@ -290,7 +291,7 @@ public class TestIcebergSchemaSync {
 
     schemaSync.sync(SCHEMA, latest, mockTransaction);
 
-    verify(mockUpdateSchema).updateColumnDoc("int_field", "doc");
+    verify(mockUpdateSchema).updateColumnDoc("record.int_field", "doc");
     verify(mockUpdateSchema).commit();
   }
 
@@ -311,7 +312,7 @@ public class TestIcebergSchemaSync {
 
     schemaSync.sync(SCHEMA, latest, mockTransaction);
 
-    verify(mockUpdateSchema).updateColumnDoc("element_string", "doc");
+    verify(mockUpdateSchema).updateColumnDoc("array_field.element.element_string", "doc");
     verify(mockUpdateSchema).commit();
   }
 
@@ -335,7 +336,7 @@ public class TestIcebergSchemaSync {
 
     schemaSync.sync(SCHEMA, latest, mockTransaction);
 
-    verify(mockUpdateSchema).updateColumnDoc("value_string", "doc");
+    verify(mockUpdateSchema).updateColumnDoc("map_field.value.value_string", "doc");
     verify(mockUpdateSchema).commit();
   }
 

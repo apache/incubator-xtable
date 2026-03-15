@@ -19,7 +19,7 @@
 package org.apache.xtable;
 
 import static org.apache.iceberg.SnapshotSummary.TOTAL_RECORDS_PROP;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -371,7 +371,7 @@ public class TestIcebergTable implements GenericTable<Record, String> {
     DataWriter<Record> dataWriter =
         Parquet.writeData(file)
             .schema(icebergTable.schema())
-            .createWriterFunc(GenericParquetWriter::buildWriter)
+            .createWriterFunc(GenericParquetWriter::create)
             .overwrite()
             .withSpec(icebergTable.spec())
             .withPartition(partitionKey)
