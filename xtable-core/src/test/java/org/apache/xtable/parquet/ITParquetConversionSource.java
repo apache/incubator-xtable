@@ -204,7 +204,7 @@ public class ITParquetConversionSource {
     }
   }
 
-  /*@ParameterizedTest
+  @ParameterizedTest
   @MethodSource("provideArgsForSyncTesting")
   void testSync(TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
     String tableName = getTableName();
@@ -296,7 +296,7 @@ public class ITParquetConversionSource {
       checkDatasetEquivalenceWithFilter(
           sourceTableFormat, table, targetTableFormats, isPartitioned);
     }
-  }*/
+  }
 
   private void writeData(Dataset<Row> df, String dataPath, String partitionConfig) {
     if (partitionConfig != null) {
