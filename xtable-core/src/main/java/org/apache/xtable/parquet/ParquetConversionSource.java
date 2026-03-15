@@ -169,6 +169,9 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     }
 
     return TableChange.builder()
+        .sourceIdentifier(
+            getCommitIdentifier(
+                parquetDataManager.getMostRecentParquetFile().getModificationTime()))
         .tableAsOfChange(internalTable)
         .filesDiff(InternalFilesDiff.builder().filesAdded(addedInternalDataFiles).build())
         .build();
