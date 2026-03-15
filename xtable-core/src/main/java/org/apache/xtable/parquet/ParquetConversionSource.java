@@ -161,7 +161,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         parquetFiles
             .filter(fileStatus -> fileStatus.getModificationTime() > modificationTime)
             .collect(Collectors.toList());
-    InternalTable internalTable = getMostRecentTable(parquetFiles);
+    InternalTable internalTable = getMostRecentTable(getParquetFiles(hadoopConf, basePath));
     for (FileStatus tableStatus : tableChangesAfter) {
       InternalDataFile currentDataFile =
           createInternalDataFileFromParquetFile(tableStatus, internalTable.getReadSchema());
