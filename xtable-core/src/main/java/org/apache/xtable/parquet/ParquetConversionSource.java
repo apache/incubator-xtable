@@ -140,7 +140,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         .physicalPath(parquetFile.getPath().toString())
         .partitionValues(
             partitionValueExtractor.extractPartitionValues(
-                partitionSpecExtractor.spec(schema), basePath))
+                partitionSpecExtractor.spec(schema), HudiPathUtils.getPartitionPath(new Path(basePath), parquetFile.getPath())))
         .lastModified(parquetFile.getModificationTime())
         .fileSizeBytes(parquetFile.getLen())
         .columnStats(

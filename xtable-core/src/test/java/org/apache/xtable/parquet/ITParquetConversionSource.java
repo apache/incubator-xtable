@@ -181,7 +181,7 @@ public class ITParquetConversionSource {
     return partitionConfigs.stream()
         .flatMap(
             partitionConfig ->
-                Stream.of(SyncMode.FULL) // Incremental sync is not yet supported
+                Stream.of(SyncMode.FULL, SyncMode.INCREMENTAL) // Incremental sync is not yet supported
                     .map(
                         syncMode ->
                             Arguments.of(
