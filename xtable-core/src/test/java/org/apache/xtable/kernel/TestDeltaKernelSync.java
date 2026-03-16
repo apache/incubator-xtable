@@ -169,7 +169,7 @@ public class TestDeltaKernelSync {
                 .build(),
             engine);
 
-    // Do 10 syncs to trigger checkpoint creation
+    // Do 10 syncs to trigger checkpoint
     for (int i = 0; i < 10; i++) {
       InternalDataFile file1 = getDataFile(i * 2 + 1, Collections.emptyList(), checkpointTestPath);
       InternalDataFile file2 = getDataFile(i * 2 + 2, Collections.emptyList(), checkpointTestPath);
