@@ -47,7 +47,9 @@ import io.delta.kernel.engine.Engine;
 import io.delta.kernel.exceptions.TableNotFoundException;
 import io.delta.kernel.hook.PostCommitHook;
 import io.delta.kernel.internal.SnapshotImpl;
+import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.internal.actions.Metadata;
+import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
 import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
@@ -119,6 +121,8 @@ import org.apache.xtable.spi.sync.ConversionTarget;
  */
 @Log4j2
 public class DeltaKernelConversionTarget implements ConversionTarget {
+  private static final String DELTA_LOG_RETENTION_DURATION = "delta.logRetentionDuration";
+
   private DeltaKernelSchemaExtractor schemaExtractor;
   private DeltaKernelPartitionExtractor partitionExtractor;
   private DeltaKernelDataFileUpdatesExtractor dataKernelFileUpdatesExtractor;
@@ -400,16 +404,14 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
       // Iterate through actions (Java List) and convert to Row format
       for (RowBackedAction action : actions) {
 
-        if (action instanceof io.delta.kernel.internal.actions.AddFile) {
-          io.delta.kernel.internal.actions.AddFile addFile =
-              (io.delta.kernel.internal.actions.AddFile) action;
+        if (action instanceof AddFile) {
+          AddFile addFile = (AddFile) action;
           Row wrappedRow =
               io.delta.kernel.internal.actions.SingleAction.createAddFileSingleAction(
                   addFile.toRow());
           allActionRows.add(wrappedRow);
-        } else if (action instanceof io.delta.kernel.internal.actions.RemoveFile) {
-          io.delta.kernel.internal.actions.RemoveFile removeFile =
-              (io.delta.kernel.internal.actions.RemoveFile) action;
+        } else if (action instanceof RemoveFile) {
+          RemoveFile removeFile = (RemoveFile) action;
           Row wrappedRow =
               io.delta.kernel.internal.actions.SingleAction.createRemoveFileSingleAction(
                   removeFile.toRow());
@@ -473,7 +475,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
 
       configMap.put(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
       configMap.put(
-          "delta.logRetentionDuration", String.format("interval %d hours", retentionInHours));
+          DELTA_LOG_RETENTION_DURATION, String.format("interval %d hours", retentionInHours));
 
       return configMap;
     }
