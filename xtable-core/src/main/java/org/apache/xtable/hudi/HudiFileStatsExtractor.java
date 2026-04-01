@@ -34,6 +34,7 @@ import java.util.stream.Stream;
 
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.io.api.Binary;
@@ -57,6 +58,7 @@ import org.apache.xtable.model.stat.Range;
 import org.apache.xtable.model.storage.InternalDataFile;
 
 /** Responsible for Column stats extraction for Hudi. */
+@Slf4j
 @AllArgsConstructor
 public class HudiFileStatsExtractor {
   /*
@@ -91,15 +93,19 @@ public class HudiFileStatsExtractor {
             && metaClient
                 .getTableConfig()
                 .isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS);
-    final Map<String, InternalField> nameFieldMap =
+    final Map<String, InternalField> parquetNameFieldMap =
         schema.getAllFields().stream()
             .collect(
-                Collectors.toMap(
-                    field -> getFieldNameForStats(field, useMetadataTableColStats),
-                    Function.identity()));
-    return useMetadataTableColStats
-        ? computeColumnStatsFromMetadataTable(metadataTable, files, nameFieldMap)
-        : computeColumnStatsFromParquetFooters(files, nameFieldMap);
+                Collectors.toMap(field -> getFieldNameForStats(field, false), Function.identity()));
+    if (!useMetadataTableColStats) {
+      return computeColumnStatsFromParquetFooters(files, parquetNameFieldMap);
+    }
+    final Map<String, InternalField> metadataNameFieldMap =
+        schema.getAllFields().stream()
+            .collect(
+                Collectors.toMap(field -> getFieldNameForStats(field, true), Function.identity()));
+    return computeColumnStatsFromMetadataTable(
+        metadataTable, files, metadataNameFieldMap, parquetNameFieldMap);
   }
 
   private Stream<InternalDataFile> computeColumnStatsFromParquetFooters(
@@ -124,7 +130,8 @@ public class HudiFileStatsExtractor {
   private Stream<InternalDataFile> computeColumnStatsFromMetadataTable(
       HoodieTableMetadata metadataTable,
       Stream<InternalDataFile> files,
-      Map<String, InternalField> nameFieldMap) {
+      Map<String, InternalField> nameFieldMap,
+      Map<String, InternalField> parquetNameFieldMap) {
     Map<Pair<String, String>, InternalDataFile> filePathsToDataFile =
         files.collect(
             Collectors.toMap(
@@ -151,20 +158,45 @@ public class HudiFileStatsExtractor {
                     Map.Entry::getKey,
                     Collectors.mapping(
                         Map.Entry::getValue, CustomCollectors.toList(nameFieldMap.size()))));
-    return filePathsToDataFile.entrySet().stream()
-        .map(
-            pathToDataFile -> {
-              Pair<String, String> filePath = pathToDataFile.getKey();
-              InternalDataFile file = pathToDataFile.getValue();
-              List<Pair<InternalField, HoodieMetadataColumnStats>> fileStats =
-                  stats.getOrDefault(filePath, Collections.emptyList());
-              List<ColumnStat> columnStats =
-                  fileStats.stream()
-                      .map(pair -> getColumnStatFromHudiStat(pair.getLeft(), pair.getRight()))
-                      .collect(CustomCollectors.toList(fileStats.size()));
-              long recordCount = getMaxFromColumnStats(columnStats).orElse(0L);
-              return file.toBuilder().columnStats(columnStats).recordCount(recordCount).build();
-            });
+    List<InternalDataFile> withStats = new ArrayList<>();
+    List<InternalDataFile> filesWithoutStats = new ArrayList<>();
+    for (Map.Entry<Pair<String, String>, InternalDataFile> pathToDataFile :
+        filePathsToDataFile.entrySet()) {
+      classifyFileByMetadataStats(pathToDataFile, stats, withStats, filesWithoutStats);
+    }
+    if (!filesWithoutStats.isEmpty()) {
+      log.warn(
+          "{} file(s) had no column stats in the metadata table for table {}; falling back to parquet footers",
+          filesWithoutStats.size(),
+          metaClient.getBasePathV2());
+      withStats.addAll(
+          computeColumnStatsFromParquetFooters(filesWithoutStats.stream(), parquetNameFieldMap)
+              .collect(Collectors.toList()));
+    }
+    return withStats.stream();
+  }
+
+  private void classifyFileByMetadataStats(
+      Map.Entry<Pair<String, String>, InternalDataFile> pathToDataFile,
+      Map<Pair<String, String>, List<Pair<InternalField, HoodieMetadataColumnStats>>> stats,
+      List<InternalDataFile> withStats,
+      List<InternalDataFile> filesWithoutStats) {
+    Pair<String, String> filePath = pathToDataFile.getKey();
+    InternalDataFile file = pathToDataFile.getValue();
+    List<Pair<InternalField, HoodieMetadataColumnStats>> fileStats =
+        stats.getOrDefault(filePath, Collections.emptyList());
+    List<ColumnStat> columnStats =
+        fileStats.stream()
+            .map(pair -> getColumnStatFromHudiStat(pair.getLeft(), pair.getRight()))
+            .collect(CustomCollectors.toList(fileStats.size()));
+    long recordCount = getMaxFromColumnStats(columnStats).orElse(0L);
+    InternalDataFile result =
+        file.toBuilder().columnStats(columnStats).recordCount(recordCount).build();
+    if (columnStats.isEmpty()) {
+      filesWithoutStats.add(result);
+    } else {
+      withStats.add(result);
+    }
   }
 
   private Optional<Long> getMaxFromColumnStats(List<ColumnStat> columnStats) {
