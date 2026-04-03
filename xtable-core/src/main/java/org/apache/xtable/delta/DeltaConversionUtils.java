@@ -39,7 +39,8 @@ public class DeltaConversionUtils {
             .set(
                 "spark.sql.catalog.spark_catalog",
                 "org.apache.spark.sql.delta.catalog.DeltaCatalog")
-            .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true");
+            .set("spark.databricks.delta.constraints.allowUnenforcedNotNull.enabled", "true")
+            .set("spark.databricks.delta.checkpoint.exceptionThrowing.enabled", "true");
     SparkSession.Builder builder = SparkSession.builder().config(sparkConf);
     conf.forEach(
         entry ->
