@@ -419,12 +419,13 @@ public class ITHudiConversionSource {
     }
   }
 
-  @Test
-  public void testMultipleInsertOverwriteOnSamePartitions() {
+  @ParameterizedTest
+  @MethodSource("testsForAllTableTypes")
+  public void testMultipleInsertOverwriteOnSamePartitions(HoodieTableType tableType) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
         TestSparkHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, "level:SIMPLE", HoodieTableType.COPY_ON_WRITE)) {
+            tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -436,12 +437,12 @@ public class ITHudiConversionSource {
 
       // INSERT_OVERWRITE on "INFO" partition (replacecommit A — new file groups replace initial)
       List<HoodieRecord<HoodieAvroPayload>> overwriteRecords1 = table.generateRecords(30, "INFO");
-      table.insertOverwrite(overwriteRecords1);
+      table.insertOverwrite(overwriteRecords1, tableType);
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 
       // INSERT_OVERWRITE on "INFO" partition again (replacecommit B — new file groups replace A's)
       List<HoodieRecord<HoodieAvroPayload>> overwriteRecords2 = table.generateRecords(20, "INFO");
-      table.insertOverwrite(overwriteRecords2);
+      table.insertOverwrite(overwriteRecords2, tableType);
       allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
 
       HudiConversionSource hudiClient =
