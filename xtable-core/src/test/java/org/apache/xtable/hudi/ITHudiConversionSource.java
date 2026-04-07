@@ -424,8 +424,7 @@ public class ITHudiConversionSource {
   public void testMultipleInsertOverwriteOnSamePartitions(HoodieTableType tableType) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
-        TestSparkHudiTable.forStandardSchema(
-            tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+        TestSparkHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
