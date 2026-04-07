@@ -162,8 +162,12 @@ public class HudiFileStatsExtractor {
     List<InternalDataFile> filesWithoutStats = new ArrayList<>();
     for (Map.Entry<Pair<String, String>, InternalDataFile> pathToDataFile :
         filePathsToDataFile.entrySet()) {
-      tryEnrichWithMetadataStats(pathToDataFile, stats)
-          .ifPresentOrElse(withStats::add, () -> filesWithoutStats.add(pathToDataFile.getValue()));
+      Optional<InternalDataFile> enriched = tryEnrichWithMetadataStats(pathToDataFile, stats);
+      if (enriched.isPresent()) {
+        withStats.add(enriched.get());
+      } else {
+        filesWithoutStats.add(pathToDataFile.getValue());
+      }
     }
     if (!filesWithoutStats.isEmpty()) {
       log.warn(
