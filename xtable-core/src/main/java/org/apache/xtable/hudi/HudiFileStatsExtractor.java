@@ -162,7 +162,8 @@ public class HudiFileStatsExtractor {
     List<InternalDataFile> filesWithoutStats = new ArrayList<>();
     for (Map.Entry<Pair<String, String>, InternalDataFile> pathToDataFile :
         filePathsToDataFile.entrySet()) {
-      classifyFileByMetadataStats(pathToDataFile, stats, withStats, filesWithoutStats);
+      tryEnrichWithMetadataStats(pathToDataFile, stats)
+          .ifPresentOrElse(withStats::add, () -> filesWithoutStats.add(pathToDataFile.getValue()));
     }
     if (!filesWithoutStats.isEmpty()) {
       log.warn(
@@ -176,27 +177,22 @@ public class HudiFileStatsExtractor {
     return withStats.stream();
   }
 
-  private void classifyFileByMetadataStats(
+  private Optional<InternalDataFile> tryEnrichWithMetadataStats(
       Map.Entry<Pair<String, String>, InternalDataFile> pathToDataFile,
-      Map<Pair<String, String>, List<Pair<InternalField, HoodieMetadataColumnStats>>> stats,
-      List<InternalDataFile> withStats,
-      List<InternalDataFile> filesWithoutStats) {
+      Map<Pair<String, String>, List<Pair<InternalField, HoodieMetadataColumnStats>>> stats) {
     Pair<String, String> filePath = pathToDataFile.getKey();
     InternalDataFile file = pathToDataFile.getValue();
     List<Pair<InternalField, HoodieMetadataColumnStats>> fileStats =
         stats.getOrDefault(filePath, Collections.emptyList());
+    if (fileStats.isEmpty()) {
+      return Optional.empty();
+    }
     List<ColumnStat> columnStats =
         fileStats.stream()
             .map(pair -> getColumnStatFromHudiStat(pair.getLeft(), pair.getRight()))
             .collect(CustomCollectors.toList(fileStats.size()));
     long recordCount = getMaxFromColumnStats(columnStats).orElse(0L);
-    InternalDataFile result =
-        file.toBuilder().columnStats(columnStats).recordCount(recordCount).build();
-    if (columnStats.isEmpty()) {
-      filesWithoutStats.add(result);
-    } else {
-      withStats.add(result);
-    }
+    return Optional.of(file.toBuilder().columnStats(columnStats).recordCount(recordCount).build());
   }
 
   private Optional<Long> getMaxFromColumnStats(List<ColumnStat> columnStats) {

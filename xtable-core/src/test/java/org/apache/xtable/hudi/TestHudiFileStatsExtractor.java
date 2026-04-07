@@ -283,13 +283,13 @@ public class TestHudiFileStatsExtractor {
 
     assertEquals(2, output.size());
     // fileWithoutStats must have fallen back to parquet footers and have full stats
-    InternalDataFile fallen =
+    InternalDataFile fromFooter =
         output.stream()
             .filter(f -> f.getPhysicalPath().equals(fileWithoutStats.getPhysicalPath()))
             .findFirst()
             .orElseThrow(() -> new RuntimeException("missing file in output"));
-    assertFalse(fallen.getColumnStats().isEmpty());
-    assertEquals(2, fallen.getRecordCount());
+    assertFalse(fromFooter.getColumnStats().isEmpty());
+    assertEquals(2, fromFooter.getRecordCount());
     // fileWithStats came from metadata table (only has long_field stat)
     InternalDataFile fromMeta =
         output.stream()
