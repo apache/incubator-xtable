@@ -27,24 +27,39 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Properties;
+import java.util.HashMap;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
+import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
 import org.apache.hudi.common.util.Option;
 
 class TestHudiConversionSource {
 
+  private static byte[] serializeCleanMetadata(String earliestCommitToRetain) throws Exception {
+    HoodieCleanMetadata metadata =
+        HoodieCleanMetadata.newBuilder()
+            .setStartCleanTime("000")
+            .setTimeTakenInMillis(0L)
+            .setTotalFilesDeleted(0)
+            .setEarliestCommitToRetain(earliestCommitToRetain)
+            .setBootstrapPartitionMetadata(new HashMap<>())
+            .setPartitionMetadata(new HashMap<>())
+            .build();
+    return TimelineMetadataUtils.serializeCleanMetadata(metadata).get();
+  }
+
   @Test
   void testIsIncrementalSyncSafeFromWithNullEarliestCommitToRetainNoCleanInstants()
       throws Exception {
-    // Mock the dependencies
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     HoodieActiveTimeline mockActiveTimeline = mock(HoodieActiveTimeline.class);
     HoodieTimeline mockCleanerTimeline = mock(HoodieTimeline.class);
@@ -52,68 +67,41 @@ class TestHudiConversionSource {
     HoodieTimeline mockCompletedCommitsTimeline = mock(HoodieTimeline.class);
     HoodieInstant mockCleanInstant = mock(HoodieInstant.class);
     HoodieInstant mockCommitInstant = mock(HoodieInstant.class);
-    HoodieCleanMetadata mockCleanMetadata = mock(HoodieCleanMetadata.class);
 
-    // Set up the mock chain for cleaner timeline
+    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
     when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
-
-    // Mock the Hadoop configuration to prevent NPE in HudiDataFileExtractor
-    Configuration hadoopConf = new Configuration();
-    hadoopConf.addResource("core-default.xml");
-    when(mockMetaClient.getHadoopConf()).thenReturn(hadoopConf);
-
-    // Mock table config to prevent NPE in HudiDataFileExtractor
-    org.apache.hudi.common.table.HoodieTableConfig mockTableConfig =
-        mock(org.apache.hudi.common.table.HoodieTableConfig.class);
+    when(mockMetaClient.getHadoopConf()).thenReturn(new Configuration());
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.isMetadataTableAvailable()).thenReturn(false);
+    when(mockMetaClient.getBasePathV2()).thenReturn(new Path("/tmp/test-table"));
     when(mockActiveTimeline.getCleanerTimeline()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.filterCompletedInstants()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.lastInstant()).thenReturn(Option.of(mockCleanInstant));
-    when(mockActiveTimeline.deserializeInstantContent(mockCleanInstant, HoodieCleanMetadata.class))
-        .thenReturn(mockCleanMetadata);
+    // Use empty string — Strings.isNullOrEmpty("") is true, same behavior as null
+    when(mockActiveTimeline.getInstantDetails(mockCleanInstant))
+        .thenReturn(Option.of(serializeCleanMetadata("")));
 
-    // Set up the key behavior: earliestCommitToRetain is null
-    when(mockCleanMetadata.getEarliestCommitToRetain()).thenReturn(null);
-
-    // Set up mocks for handleEmptyEarliestCommitToRetain - no clean instants after last sync
     when(mockCleanerTimeline.filter(any())).thenReturn(mockFilteredCleanerTimeline);
     when(mockFilteredCleanerTimeline.getInstants()).thenReturn(Collections.emptyList());
 
-    // Set up the mock chain for commit timeline (for doesCommitExistsAsOfInstant)
     when(mockActiveTimeline.filterCompletedInstants()).thenReturn(mockCompletedCommitsTimeline);
     when(mockCompletedCommitsTimeline.findInstantsBeforeOrEquals(any(String.class)))
         .thenReturn(mockCompletedCommitsTimeline);
+    when(mockCommitInstant.getTimestamp()).thenReturn("20200101120000000");
     when(mockCompletedCommitsTimeline.lastInstant()).thenReturn(Option.of(mockCommitInstant));
 
-    // Create the HudiConversionSource with proper Configuration
-    Configuration conf = new Configuration();
-    conf.addResource("core-default.xml");
-    conf.addResource("core-site.xml");
-    conf.addResource("hdfs-default.xml");
-    conf.addResource("hdfs-site.xml");
     HudiConversionSource hudiConversionSource =
-        new HudiConversionSource(
-            mockMetaClient, mock(HudiSourcePartitionSpecExtractor.class), conf, new Properties());
+        new HudiConversionSource(mockMetaClient, mock(HudiSourcePartitionSpecExtractor.class));
 
-    // Test that isIncrementalSyncSafeFrom returns true when earliestCommitToRetain is null
-    // and no clean instants after last sync
-    Instant testInstant = Instant.now().minusSeconds(3600); // 1 hour ago
-    boolean result = hudiConversionSource.isIncrementalSyncSafeFrom(testInstant);
-
-    // This should return true because when earliestCommitToRetain is null and no clean instants
-    // after last sync,
-    // handleEmptyEarliestCommitToRetain returns false, making isAffectedByCleanupProcess return
-    // false
+    Instant testInstant = Instant.now().minusSeconds(3600);
     assertTrue(
-        result,
+        hudiConversionSource.isIncrementalSyncSafeFrom(testInstant),
         "isIncrementalSyncSafeFrom should return true when earliestCommitToRetain is null and no clean instants after last sync");
   }
 
   @Test
   void testIsIncrementalSyncSafeFromWithNullEarliestCommitToRetainWithCleanInstants()
       throws Exception {
-    // Mock the dependencies
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     HoodieActiveTimeline mockActiveTimeline = mock(HoodieActiveTimeline.class);
     HoodieTimeline mockCleanerTimeline = mock(HoodieTimeline.class);
@@ -122,68 +110,42 @@ class TestHudiConversionSource {
     HoodieInstant mockCleanInstant = mock(HoodieInstant.class);
     HoodieInstant mockCleanInstantAfterSync = mock(HoodieInstant.class);
     HoodieInstant mockCommitInstant = mock(HoodieInstant.class);
-    HoodieCleanMetadata mockCleanMetadata = mock(HoodieCleanMetadata.class);
 
-    // Set up the mock chain for cleaner timeline
+    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
     when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
-
-    // Mock the Hadoop configuration to prevent NPE in HudiDataFileExtractor
-    Configuration hadoopConf = new Configuration();
-    hadoopConf.addResource("core-default.xml");
-    when(mockMetaClient.getHadoopConf()).thenReturn(hadoopConf);
-
-    // Mock table config to prevent NPE in HudiDataFileExtractor
-    org.apache.hudi.common.table.HoodieTableConfig mockTableConfig =
-        mock(org.apache.hudi.common.table.HoodieTableConfig.class);
+    when(mockMetaClient.getHadoopConf()).thenReturn(new Configuration());
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.isMetadataTableAvailable()).thenReturn(false);
+    when(mockMetaClient.getBasePathV2()).thenReturn(new Path("/tmp/test-table"));
     when(mockActiveTimeline.getCleanerTimeline()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.filterCompletedInstants()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.lastInstant()).thenReturn(Option.of(mockCleanInstant));
-    when(mockActiveTimeline.deserializeInstantContent(mockCleanInstant, HoodieCleanMetadata.class))
-        .thenReturn(mockCleanMetadata);
+    // Use empty string — Strings.isNullOrEmpty("") is true, same behavior as null
+    when(mockActiveTimeline.getInstantDetails(mockCleanInstant))
+        .thenReturn(Option.of(serializeCleanMetadata("")));
 
-    // Set up the key behavior: earliestCommitToRetain is null
-    when(mockCleanMetadata.getEarliestCommitToRetain()).thenReturn(null);
-
-    // Set up mocks for handleEmptyEarliestCommitToRetain - clean instants exist after last sync
     when(mockCleanerTimeline.filter(any())).thenReturn(mockFilteredCleanerTimeline);
     when(mockFilteredCleanerTimeline.getInstants())
         .thenReturn(Arrays.asList(mockCleanInstantAfterSync));
 
-    // Set up the mock chain for commit timeline (for doesCommitExistsAsOfInstant)
     when(mockActiveTimeline.filterCompletedInstants()).thenReturn(mockCompletedCommitsTimeline);
     when(mockCompletedCommitsTimeline.findInstantsBeforeOrEquals(any(String.class)))
         .thenReturn(mockCompletedCommitsTimeline);
+    when(mockCommitInstant.getTimestamp()).thenReturn("20200101120000000");
     when(mockCompletedCommitsTimeline.lastInstant()).thenReturn(Option.of(mockCommitInstant));
 
-    // Create the HudiConversionSource with proper Configuration
-    Configuration conf = new Configuration();
-    conf.addResource("core-default.xml");
-    conf.addResource("core-site.xml");
-    conf.addResource("hdfs-default.xml");
-    conf.addResource("hdfs-site.xml");
     HudiConversionSource hudiConversionSource =
-        new HudiConversionSource(
-            mockMetaClient, mock(HudiSourcePartitionSpecExtractor.class), conf, new Properties());
+        new HudiConversionSource(mockMetaClient, mock(HudiSourcePartitionSpecExtractor.class));
 
-    // Test that isIncrementalSyncSafeFrom returns false when earliestCommitToRetain is null
-    // but clean instants exist after last sync
-    Instant testInstant = Instant.now().minusSeconds(3600); // 1 hour ago
-    boolean result = hudiConversionSource.isIncrementalSyncSafeFrom(testInstant);
-
-    // This should return false because when earliestCommitToRetain is null and clean instants exist
-    // after last sync,
-    // handleEmptyEarliestCommitToRetain returns true, making isAffectedByCleanupProcess return true
+    Instant testInstant = Instant.now().minusSeconds(3600);
     assertFalse(
-        result,
+        hudiConversionSource.isIncrementalSyncSafeFrom(testInstant),
         "isIncrementalSyncSafeFrom should return false when earliestCommitToRetain is null but clean instants exist after last sync");
   }
 
   @Test
   void testIsIncrementalSyncSafeFromWithEmptyEarliestCommitToRetainWithCleanInstants()
       throws Exception {
-    // Mock the dependencies
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     HoodieActiveTimeline mockActiveTimeline = mock(HoodieActiveTimeline.class);
     HoodieTimeline mockCleanerTimeline = mock(HoodieTimeline.class);
@@ -192,62 +154,35 @@ class TestHudiConversionSource {
     HoodieInstant mockCleanInstant = mock(HoodieInstant.class);
     HoodieInstant mockCleanInstantAfterSync = mock(HoodieInstant.class);
     HoodieInstant mockCommitInstant = mock(HoodieInstant.class);
-    HoodieCleanMetadata mockCleanMetadata = mock(HoodieCleanMetadata.class);
 
-    // Set up the mock chain for cleaner timeline
+    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
     when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
-
-    // Mock the Hadoop configuration to prevent NPE in HudiDataFileExtractor
-    Configuration hadoopConf = new Configuration();
-    hadoopConf.addResource("core-default.xml");
-    when(mockMetaClient.getHadoopConf()).thenReturn(hadoopConf);
-
-    // Mock table config to prevent NPE in HudiDataFileExtractor
-    org.apache.hudi.common.table.HoodieTableConfig mockTableConfig =
-        mock(org.apache.hudi.common.table.HoodieTableConfig.class);
+    when(mockMetaClient.getHadoopConf()).thenReturn(new Configuration());
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.isMetadataTableAvailable()).thenReturn(false);
+    when(mockMetaClient.getBasePathV2()).thenReturn(new Path("/tmp/test-table"));
     when(mockActiveTimeline.getCleanerTimeline()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.filterCompletedInstants()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.lastInstant()).thenReturn(Option.of(mockCleanInstant));
-    when(mockActiveTimeline.deserializeInstantContent(mockCleanInstant, HoodieCleanMetadata.class))
-        .thenReturn(mockCleanMetadata);
+    when(mockActiveTimeline.getInstantDetails(mockCleanInstant))
+        .thenReturn(Option.of(serializeCleanMetadata("")));
 
-    // Set up the key behavior: earliestCommitToRetain is empty string
-    when(mockCleanMetadata.getEarliestCommitToRetain()).thenReturn("");
-
-    // Set up mocks for handleEmptyEarliestCommitToRetain - clean instants exist after last sync
     when(mockCleanerTimeline.filter(any())).thenReturn(mockFilteredCleanerTimeline);
     when(mockFilteredCleanerTimeline.getInstants())
         .thenReturn(Arrays.asList(mockCleanInstantAfterSync));
 
-    // Set up the mock chain for commit timeline (for doesCommitExistsAsOfInstant)
     when(mockActiveTimeline.filterCompletedInstants()).thenReturn(mockCompletedCommitsTimeline);
     when(mockCompletedCommitsTimeline.findInstantsBeforeOrEquals(any(String.class)))
         .thenReturn(mockCompletedCommitsTimeline);
+    when(mockCommitInstant.getTimestamp()).thenReturn("20200101120000000");
     when(mockCompletedCommitsTimeline.lastInstant()).thenReturn(Option.of(mockCommitInstant));
 
-    // Create the HudiConversionSource with proper Configuration
-    Configuration conf = new Configuration();
-    conf.addResource("core-default.xml");
-    conf.addResource("core-site.xml");
-    conf.addResource("hdfs-default.xml");
-    conf.addResource("hdfs-site.xml");
     HudiConversionSource hudiConversionSource =
-        new HudiConversionSource(
-            mockMetaClient, mock(HudiSourcePartitionSpecExtractor.class), conf, new Properties());
+        new HudiConversionSource(mockMetaClient, mock(HudiSourcePartitionSpecExtractor.class));
 
-    // Test that isIncrementalSyncSafeFrom returns false when earliestCommitToRetain is
-    // empty/whitespace
-    // and clean instants exist after last sync
-    Instant testInstant = Instant.now().minusSeconds(3600); // 1 hour ago
-    boolean result = hudiConversionSource.isIncrementalSyncSafeFrom(testInstant);
-
-    // This should return false because when earliestCommitToRetain is empty/whitespace and clean
-    // instants exist after last sync,
-    // handleEmptyEarliestCommitToRetain returns true, making isAffectedByCleanupProcess return true
+    Instant testInstant = Instant.now().minusSeconds(3600);
     assertFalse(
-        result,
-        "isIncrementalSyncSafeFrom should return false when earliestCommitToRetain is empty/whitespace and clean instants exist after last sync");
+        hudiConversionSource.isIncrementalSyncSafeFrom(testInstant),
+        "isIncrementalSyncSafeFrom should return false when earliestCommitToRetain is empty and clean instants exist after last sync");
   }
 }
