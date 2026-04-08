@@ -91,7 +91,7 @@ class TestHudiConversionSource {
     when(mockCompletedCommitsTimeline.lastInstant()).thenReturn(Option.of(mockCommitInstant));
 
     HudiConversionSource hudiConversionSource =
-        new HudiConversionSource(mockMetaClient, mock(HudiSourcePartitionSpecExtractor.class));
+        new HudiConversionSource(mockMetaClient, mock(PathBasedPartitionSpecExtractor.class));
 
     Instant testInstant = Instant.now().minusSeconds(3600);
     assertTrue(
@@ -135,7 +135,7 @@ class TestHudiConversionSource {
     when(mockCompletedCommitsTimeline.lastInstant()).thenReturn(Option.of(mockCommitInstant));
 
     HudiConversionSource hudiConversionSource =
-        new HudiConversionSource(mockMetaClient, mock(HudiSourcePartitionSpecExtractor.class));
+        new HudiConversionSource(mockMetaClient, mock(PathBasedPartitionSpecExtractor.class));
 
     Instant testInstant = Instant.now().minusSeconds(3600);
     assertFalse(
@@ -178,7 +178,7 @@ class TestHudiConversionSource {
     when(mockCompletedCommitsTimeline.lastInstant()).thenReturn(Option.of(mockCommitInstant));
 
     HudiConversionSource hudiConversionSource =
-        new HudiConversionSource(mockMetaClient, mock(HudiSourcePartitionSpecExtractor.class));
+        new HudiConversionSource(mockMetaClient, mock(PathBasedPartitionSpecExtractor.class));
 
     Instant testInstant = Instant.now().minusSeconds(3600);
     assertFalse(
