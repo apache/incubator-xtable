@@ -28,6 +28,7 @@ import static org.apache.xtable.model.storage.TableFormat.PAIMON;
 import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
@@ -103,9 +104,11 @@ import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.TestIcebergDataHelper;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.paimon.PaimonConversionSourceProvider;
+import org.apache.xtable.spi.extractor.ConversionSource;
 
 public class ITConversionController {
   @TempDir public static Path tempDir;
@@ -172,6 +175,18 @@ public class ITConversionController {
 
   private static Stream<Arguments> testCasesWithSyncModes() {
     return Stream.of(Arguments.of(SyncMode.INCREMENTAL), Arguments.of(SyncMode.FULL));
+  }
+
+  private static Stream<Arguments> sourceSkipColumnStatsAndSyncModes() {
+    List<Arguments> arguments = new ArrayList<>();
+    for (String sourceFormat : Arrays.asList(HUDI, DELTA, ICEBERG)) {
+      for (SyncMode syncMode : SyncMode.values()) {
+        for (boolean skipColumnStats : new boolean[] {true, false}) {
+          arguments.add(Arguments.of(sourceFormat, syncMode, skipColumnStats));
+        }
+      }
+    }
+    return arguments.stream();
   }
 
   private ConversionSourceProvider<?> getConversionSourceProvider(String sourceTableFormat) {
@@ -500,6 +515,60 @@ public class ITConversionController {
                       targetTableFormat ->
                           getTimeTravelOption(targetTableFormat, instantAfterSecondSync))),
           100);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("sourceSkipColumnStatsAndSyncModes")
+  public void testSkipColumnStatsAcrossSources(
+      String sourceTableFormat, SyncMode syncMode, boolean skipColumnStats) throws Exception {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider =
+        getConversionSourceProvider(sourceTableFormat);
+    List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
+    try (GenericTable table =
+        GenericTable.getInstance(tableName, tempDir, sparkSession, jsc, sourceTableFormat, false)) {
+      table.insertRows(20);
+      try (ConversionSource<?> conversionSource =
+          conversionSourceProvider.getConversionSourceInstance(
+              SourceTable.builder()
+                  .name(tableName)
+                  .formatName(sourceTableFormat)
+                  .basePath(table.getBasePath())
+                  .dataPath(table.getDataPath())
+                  .additionalProperties(
+                      getSourcePropertiesForSkipColumnStats(skipColumnStats, null))
+                  .build())) {
+        List<InternalDataFile> dataFiles =
+            conversionSource.getCurrentSnapshot().getPartitionedDataFiles().stream()
+                .flatMap(group -> group.getDataFiles().stream())
+                .collect(Collectors.toList());
+        assertFalse(dataFiles.isEmpty(), "Expected at least one data file in source snapshot");
+        boolean hasAnyColumnStats =
+            dataFiles.stream().anyMatch(file -> !file.getColumnStats().isEmpty());
+        if (skipColumnStats) {
+          assertFalse(
+              hasAnyColumnStats, "Column stats should be skipped when skip_column_stats=true");
+        } else {
+          assertTrue(
+              hasAnyColumnStats, "Column stats should be present when skip_column_stats=false");
+        }
+
+        ConversionConfig conversionConfig =
+            getTableSyncConfig(
+                sourceTableFormat,
+                syncMode,
+                tableName,
+                table,
+                targetTableFormats,
+                null,
+                null,
+                getSourcePropertiesForSkipColumnStats(skipColumnStats, null));
+        ConversionController conversionController =
+            new ConversionController(jsc.hadoopConfiguration());
+        conversionController.sync(conversionConfig, conversionSourceProvider);
+        checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 20);
+      }
     }
   }
 
@@ -1115,7 +1184,28 @@ public class ITConversionController {
       List<String> targetTableFormats,
       String partitionConfig,
       Duration metadataRetention) {
+    return getTableSyncConfig(
+        sourceTableFormat,
+        syncMode,
+        tableName,
+        table,
+        targetTableFormats,
+        partitionConfig,
+        metadataRetention,
+        new Properties());
+  }
+
+  private static ConversionConfig getTableSyncConfig(
+      String sourceTableFormat,
+      SyncMode syncMode,
+      String tableName,
+      GenericTable table,
+      List<String> targetTableFormats,
+      String partitionConfig,
+      Duration metadataRetention,
+      Properties additionalSourceProperties) {
     Properties sourceProperties = new Properties();
+    sourceProperties.putAll(additionalSourceProperties);
     if (partitionConfig != null) {
       sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
     }
@@ -1146,5 +1236,15 @@ public class ITConversionController {
         .targetTables(targetTables)
         .syncMode(syncMode)
         .build();
+  }
+
+  private static Properties getSourcePropertiesForSkipColumnStats(
+      boolean skipColumnStats, String partitionConfig) {
+    Properties sourceProperties = new Properties();
+    sourceProperties.put("xtable.source.skip_column_stats", String.valueOf(skipColumnStats));
+    if (partitionConfig != null) {
+      sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
+    }
+    return sourceProperties;
   }
 }

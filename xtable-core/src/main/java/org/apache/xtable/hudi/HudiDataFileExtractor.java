@@ -77,6 +77,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
   private final HoodieEngineContext engineContext;
   private final PathBasedPartitionValuesExtractor partitionValuesExtractor;
   private final HudiFileStatsExtractor fileStatsExtractor;
+  private final boolean skipColumnStats;
   private final HoodieMetadataConfig metadataConfig;
   private final FileSystemViewManager fileSystemViewManager;
   private final Path basePath;
@@ -85,6 +86,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
       HoodieTableMetaClient metaClient,
       PathBasedPartitionValuesExtractor hudiPartitionValuesExtractor,
       HudiFileStatsExtractor hudiFileStatsExtractor) {
+    this(metaClient, hudiPartitionValuesExtractor, hudiFileStatsExtractor, false);
+  }
+
+  public HudiDataFileExtractor(
+      HoodieTableMetaClient metaClient,
+      PathBasedPartitionValuesExtractor hudiPartitionValuesExtractor,
+      HudiFileStatsExtractor hudiFileStatsExtractor,
+      boolean skipColumnStats) {
     this.engineContext = new HoodieLocalEngineContext(metaClient.getHadoopConf());
     metadataConfig =
         HoodieMetadataConfig.newBuilder()
@@ -107,6 +116,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
     this.metaClient = metaClient;
     this.partitionValuesExtractor = hudiPartitionValuesExtractor;
     this.fileStatsExtractor = hudiFileStatsExtractor;
+    this.skipColumnStats = skipColumnStats;
   }
 
   public List<PartitionFileGroup> getFilesCurrentState(InternalTable table) {
@@ -132,11 +142,15 @@ public class HudiDataFileExtractor implements AutoCloseable {
         getAddedAndRemovedPartitionInfo(
             visibleTimeline, instant, fsView, hoodieInstantForDiff, table.getPartitioningFields());
 
-    Stream<InternalDataFile> filesAddedWithoutStats = allInfo.getAdded().stream();
     List<InternalDataFile> filesAdded =
-        fileStatsExtractor
-            .addStatsToFiles(tableMetadata, filesAddedWithoutStats, table.getReadSchema())
-            .collect(Collectors.toList());
+        skipColumnStats
+            ? fileStatsExtractor
+                .addRecordCountToFiles(
+                    tableMetadata, allInfo.getAdded().stream(), table.getReadSchema())
+                .collect(Collectors.toList())
+            : fileStatsExtractor
+                .addStatsToFiles(tableMetadata, allInfo.getAdded().stream(), table.getReadSchema())
+                .collect(Collectors.toList());
     List<InternalDataFile> filesRemoved = allInfo.getRemoved();
 
     return InternalFilesDiff.builder().filesAdded(filesAdded).filesRemoved(filesRemoved).build();
@@ -359,6 +373,12 @@ public class HudiDataFileExtractor implements AutoCloseable {
                       .getLatestBaseFiles(partitionPath)
                       .map(baseFile -> buildFileWithoutStats(partitionValues, baseFile));
                 });
+    if (skipColumnStats) {
+      Stream<InternalDataFile> filesWithRecordCount =
+          fileStatsExtractor.addRecordCountToFiles(
+              tableMetadata, filesWithoutStats, table.getReadSchema());
+      return PartitionFileGroup.fromFiles(filesWithRecordCount);
+    }
     Stream<InternalDataFile> files =
         fileStatsExtractor.addStatsToFiles(tableMetadata, filesWithoutStats, table.getReadSchema());
     return PartitionFileGroup.fromFiles(files);

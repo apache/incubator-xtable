@@ -31,12 +31,15 @@ public class DeltaConversionSourceProvider extends ConversionSourceProvider<Long
   public DeltaConversionSource getConversionSourceInstance(SourceTable sourceTable) {
     SparkSession sparkSession = DeltaConversionUtils.buildSparkSession(hadoopConf);
     DeltaTable deltaTable = DeltaTable.forPath(sparkSession, sourceTable.getBasePath());
+    boolean skipColumnStats =
+        DeltaSourceConfig.getSkipColumnStats(sourceTable.getAdditionalProperties(), hadoopConf);
     return DeltaConversionSource.builder()
         .sparkSession(sparkSession)
         .tableName(sourceTable.getName())
         .basePath(sourceTable.getBasePath())
         .deltaTable(deltaTable)
         .deltaLog(deltaTable.deltaLog())
+        .skipColumnStats(skipColumnStats)
         .build();
   }
 }

@@ -53,7 +53,7 @@ public class IcebergDataFileExtractor {
     return fromIceberg(dataFile, partitionValues, schema, true);
   }
 
-  private InternalDataFile fromIceberg(
+  InternalDataFile fromIceberg(
       DataFile dataFile,
       List<PartitionValue> partitionValues,
       InternalSchema schema,
