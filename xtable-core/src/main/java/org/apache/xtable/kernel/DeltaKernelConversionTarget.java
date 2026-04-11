@@ -18,6 +18,8 @@
  
 package org.apache.xtable.kernel;
 
+import static io.delta.kernel.utils.CloseableIterable.inMemoryIterable;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,6 +53,7 @@ import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.internal.actions.Metadata;
 import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
+import io.delta.kernel.internal.actions.SingleAction;
 import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
 import io.delta.kernel.utils.CloseableIterable;
@@ -99,6 +102,7 @@ import org.apache.xtable.spi.sync.ConversionTarget;
  * <ul>
  *   <li><strong>Commit Tags:</strong> Delta Kernel 4.0.0 does not support commit tags in commitInfo
  *       (e.g., XTABLE_METADATA tags). This affects source-to-target commit identifier mapping.
+ *       Tracked in: https://github.com/apache/incubator-xtable/issues/819
  *   <li><strong>Schema Evolution:</strong> Schema changes are handled through Delta Kernel's
  *       transaction API, which may have different semantics compared to Delta Standalone.
  *   <li><strong>Internal API Usage:</strong> This implementation casts to internal classes
@@ -208,8 +212,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
         DeltaKernelDataFileUpdatesExtractor.builder()
             .engine(engine)
             .basePath(targetTable.getBasePath())
-            // Column statistics are not needed for conversion operations
-            .includeColumnStats(false)
+            .includeColumnStats(true)
             .build());
   }
 
@@ -262,10 +265,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
     Table table = Table.forPath(engine, basePath);
     transactionState.setActions(
         dataKernelFileUpdatesExtractor.applyDiff(
-            internalFilesDiff,
-            transactionState.getLatestSchemaInternal(),
-            table.getPath(engine),
-            table.getLatestSnapshot(engine).getSchema()));
+            internalFilesDiff, basePath, table.getLatestSnapshot(engine).getSchema()));
   }
 
   @Override
@@ -301,6 +301,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
     // Delta Kernel 4.0.0 does not support commit tags in commitInfo, which are required for
     // source-to-target commit identifier mapping. This limitation is documented in:
     // https://github.com/delta-io/delta/issues/6167
+    // XTable tracking issue: https://github.com/apache/incubator-xtable/issues/819
     //
     // Unlike DeltaConversionTarget (which uses Delta Standalone with commit tag support),
     // DeltaKernelConversionTarget cannot retrieve commit tags from Delta Kernel's API.
@@ -385,8 +386,12 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
       TransactionBuilder txnBuilder =
           table.createTransactionBuilder(engine, "XTable Delta Sync", operation);
 
-      // Schema evolution for existing tables is handled via Metadata actions manually
-      // as Delta Kernel 4.0.0 doesn't support schema evolution via withSchema
+      // LIMITATION: Schema evolution for existing tables is NOT supported in Delta Kernel 4.0.0.
+      // The withSchema() method only works during CREATE_TABLE operations. For existing tables:
+      // - AddFile/RemoveFile actions are created using the old schema from existing snapshot
+      // - If source schema has evolved (columns added/removed/type changed), the Delta table
+      //   will have mismatched metadata and data, causing query failures or incorrect results
+      // This is a known Delta Kernel limitation: https://github.com/delta-io/delta/issues/4305
       if (!tableExists) {
         txnBuilder = txnBuilder.withSchema(engine, latestSchema);
 
@@ -406,15 +411,11 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
 
         if (action instanceof AddFile) {
           AddFile addFile = (AddFile) action;
-          Row wrappedRow =
-              io.delta.kernel.internal.actions.SingleAction.createAddFileSingleAction(
-                  addFile.toRow());
+          Row wrappedRow = SingleAction.createAddFileSingleAction(addFile.toRow());
           allActionRows.add(wrappedRow);
         } else if (action instanceof RemoveFile) {
           RemoveFile removeFile = (RemoveFile) action;
-          Row wrappedRow =
-              io.delta.kernel.internal.actions.SingleAction.createRemoveFileSingleAction(
-                  removeFile.toRow());
+          Row wrappedRow = SingleAction.createRemoveFileSingleAction(removeFile.toRow());
           allActionRows.add(wrappedRow);
         }
       }
@@ -437,8 +438,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
             public void close() {}
           };
 
-      CloseableIterable<Row> dataActions =
-          io.delta.kernel.utils.CloseableIterable.inMemoryIterable(allActionsIterator);
+      CloseableIterable<Row> dataActions = inMemoryIterable(allActionsIterator);
 
       try {
         TransactionCommitResult result = txn.commit(engine, dataActions);

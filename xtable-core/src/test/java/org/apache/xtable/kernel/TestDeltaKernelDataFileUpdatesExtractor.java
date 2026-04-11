@@ -18,6 +18,7 @@
  
 package org.apache.xtable.kernel;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,6 +32,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,6 +47,7 @@ import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
+import io.delta.kernel.internal.util.VectorUtils;
 import io.delta.kernel.types.IntegerType;
 import io.delta.kernel.types.StringType;
 import io.delta.kernel.types.StructField;
@@ -122,12 +125,15 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
     String testFilePath = tempDir.resolve("test_data.parquet").toString();
     Files.createFile(Paths.get(testFilePath));
 
+    long expectedFileSize = 1024L;
+    long expectedRecordCount = 100L;
+
     InternalDataFile dataFile =
         InternalDataFile.builder()
             .physicalPath(testFilePath)
-            .fileSizeBytes(1024L)
+            .fileSizeBytes(expectedFileSize)
             .lastModified(Instant.now().toEpochMilli())
-            .recordCount(100L)
+            .recordCount(expectedRecordCount)
             .partitionValues(Collections.emptyList())
             .columnStats(Collections.emptyList())
             .build();
@@ -154,6 +160,31 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
     // Verify we have AddFile actions
     boolean hasAddFile = actionList.stream().anyMatch(action -> action instanceof AddFile);
     assertTrue(hasAddFile, "Should contain AddFile actions");
+
+    // Verify AddFile content
+    AddFile addFile =
+        actionList.stream()
+            .filter(action -> action instanceof AddFile)
+            .map(action -> (AddFile) action)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Expected AddFile action not found"));
+
+    // Assert on AddFile properties
+    assertTrue(
+        addFile.getPath().contains("test_data.parquet"),
+        "AddFile path should contain the test file name");
+    assertTrue(addFile.getSize() > 0, "AddFile size should be greater than 0");
+
+    // Verify partition values
+    assertNotNull(addFile.getPartitionValues(), "AddFile partition values should not be null");
+    Map<String, String> partitionValuesMap = VectorUtils.toJavaMap(addFile.getPartitionValues());
+    assertTrue(
+        partitionValuesMap.isEmpty(),
+        "AddFile partition values should be empty for non-partitioned table");
+
+    // Verify modification time is set
+    assertTrue(
+        addFile.getModificationTime() > 0, "AddFile modification time should be greater than 0");
   }
 
   @Test
@@ -283,9 +314,14 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
     Path newFile3 = tablePath.resolve("file3.parquet");
     Files.createFile(newFile3);
 
+    // IMPORTANT: Convert paths to absolute URI strings for consistent comparison with Delta Kernel
+    // Delta Kernel uses Hadoop Path which produces URI format (file:/...), not plain string paths
+    String file2PhysicalPath = new org.apache.hadoop.fs.Path(existingFile2.toUri()).toString();
+    String file3PhysicalPath = new org.apache.hadoop.fs.Path(newFile3.toUri()).toString();
+
     InternalDataFile dataFile2 =
         InternalDataFile.builder()
-            .physicalPath(existingFile2.toString())
+            .physicalPath(file2PhysicalPath)
             .fileSizeBytes(2048L)
             .lastModified(Instant.now().toEpochMilli())
             .recordCount(100L)
@@ -295,7 +331,7 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
 
     InternalDataFile dataFile3 =
         InternalDataFile.builder()
-            .physicalPath(newFile3.toString())
+            .physicalPath(file3PhysicalPath)
             .fileSizeBytes(3072L)
             .lastModified(Instant.now().toEpochMilli())
             .recordCount(150L)
@@ -331,13 +367,14 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
     long removeFileCount =
         actionList.stream().filter(action -> action instanceof RemoveFile).count();
 
-    // Verify: Should have AddFile for file3 (new file)
-    assertTrue(addFileCount >= 1, "Should have at least 1 AddFile action for new file (file3)");
+    // Verify: Should have exactly 1 AddFile for file3 (new file)
+    assertEquals(1, addFileCount, "Should have exactly 1 AddFile action for new file (file3)");
 
-    // Verify: Should have RemoveFile for file1 (removed from new sync)
-    assertTrue(
-        removeFileCount >= 1,
-        "Should have at least 1 RemoveFile action for file1 that's not in new sync");
+    // Verify: Should have exactly 1 RemoveFile for file1 (removed from new sync)
+    assertEquals(
+        1,
+        removeFileCount,
+        "Should have exactly 1 RemoveFile action for file1 that's not in new sync");
 
     // Verify specific files in actions
     boolean hasFile3Add =
@@ -348,14 +385,16 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
 
     assertTrue(hasFile3Add, "Should have AddFile action for file3.parquet");
 
+    // Verify file1 is in RemoveFile actions
+    boolean hasFile1Remove =
+        actionList.stream()
+            .filter(action -> action instanceof RemoveFile)
+            .map(action -> (RemoveFile) action)
+            .anyMatch(removeFile -> removeFile.getPath().contains("file1.parquet"));
+
+    assertTrue(hasFile1Remove, "Should have RemoveFile action for file1.parquet");
+
     // Note: file2 should not appear in actions as it's unchanged
-    // file1 should appear as RemoveFile as it's not in the new sync
-    System.out.println(
-        "Differential sync completed: "
-            + addFileCount
-            + " files added, "
-            + removeFileCount
-            + " files removed");
   }
 
   private Table createSimpleDeltaTable() {

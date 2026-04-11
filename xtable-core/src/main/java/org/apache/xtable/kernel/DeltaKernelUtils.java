@@ -36,6 +36,12 @@ public class DeltaKernelUtils {
   /**
    * Checks if a Delta table exists at the specified path.
    *
+   * <p>NOTE: This method loads the full snapshot, which reads and parses transaction log files.
+   * This is heavyweight but reliable. A lighter approach using {@code
+   * engine.getFileSystemClient().listFrom(basePath + "/_delta_log")} was attempted but had issues
+   * with exception handling - {@code listFrom()} may throw different exception types depending on
+   * the filesystem implementation.
+   *
    * <p>This method only catches {@link TableNotFoundException}, allowing other exceptions (network
    * errors, permission issues, corrupted metadata) to propagate. This ensures real errors are
    * visible rather than being silently masked.

@@ -884,7 +884,7 @@ public class TestDeltaKernelSchemaExtractor {
         DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
   }
 
-  // ========== Tests for fromInternalSchema() - New Tests ==========
+  // ========== Tests for fromInternalSchema() ==========
 
   @Test
   public void testFromInternalSchemaSimpleTypes() {
@@ -995,6 +995,398 @@ public class TestDeltaKernelSchemaExtractor {
   }
 
   @Test
+  public void testFromInternalSchemaWithNestedRecords() {
+    // Create InternalSchema with multi-level nested structures
+    // Structure: root { id, person { street, city, nested { deepValue } } }
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("record")
+            .dataType(InternalType.RECORD)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("id")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("integer")
+                                .dataType(InternalType.INT)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("person")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("struct")
+                                .dataType(InternalType.RECORD)
+                                .isNullable(true)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name("street")
+                                            .parentPath("person")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("string")
+                                                    .dataType(InternalType.STRING)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        InternalField.builder()
+                                            .name("city")
+                                            .parentPath("person")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("string")
+                                                    .dataType(InternalType.STRING)
+                                                    .isNullable(true)
+                                                    .build())
+                                            .defaultValue(
+                                                InternalField.Constants.NULL_DEFAULT_VALUE)
+                                            .build(),
+                                        InternalField.builder()
+                                            .name("nested")
+                                            .parentPath("person")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("struct")
+                                                    .dataType(InternalType.RECORD)
+                                                    .isNullable(false)
+                                                    .fields(
+                                                        Collections.singletonList(
+                                                            InternalField.builder()
+                                                                .name("deepValue")
+                                                                .parentPath("person.nested")
+                                                                .schema(
+                                                                    InternalSchema.builder()
+                                                                        .name("string")
+                                                                        .dataType(
+                                                                            InternalType.STRING)
+                                                                        .isNullable(true)
+                                                                        .build())
+                                                                .defaultValue(
+                                                                    InternalField.Constants
+                                                                        .NULL_DEFAULT_VALUE)
+                                                                .build()))
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    // Convert to Delta Kernel StructType
+    StructType deltaSchema = extractor.fromInternalSchema(internalSchema);
+
+    // Verify structure
+    assertNotNull(deltaSchema);
+    assertEquals(2, deltaSchema.fields().size());
+
+    // Check id field
+    StructField idField = deltaSchema.fields().get(0);
+    assertEquals("id", idField.getName());
+    assertEquals(IntegerType.INTEGER, idField.getDataType());
+    assertEquals(false, idField.isNullable());
+
+    // Check person nested field
+    StructField personField = deltaSchema.fields().get(1);
+    assertEquals("person", personField.getName());
+    assertTrue(personField.getDataType() instanceof StructType);
+    assertEquals(true, personField.isNullable());
+
+    StructType personType = (StructType) personField.getDataType();
+    assertEquals(3, personType.fields().size());
+
+    // Check nested fields in person
+    StructField streetField = personType.fields().get(0);
+    assertEquals("street", streetField.getName());
+    assertEquals(StringType.STRING, streetField.getDataType());
+    assertEquals(false, streetField.isNullable());
+
+    StructField cityField = personType.fields().get(1);
+    assertEquals("city", cityField.getName());
+    assertEquals(StringType.STRING, cityField.getDataType());
+    assertEquals(true, cityField.isNullable());
+
+    // Check doubly nested field
+    StructField nestedField = personType.fields().get(2);
+    assertEquals("nested", nestedField.getName());
+    assertTrue(nestedField.getDataType() instanceof StructType);
+    assertEquals(false, nestedField.isNullable());
+
+    StructType nestedType = (StructType) nestedField.getDataType();
+    assertEquals(1, nestedType.fields().size());
+
+    StructField deepValueField = nestedType.fields().get(0);
+    assertEquals("deepValue", deepValueField.getName());
+    assertEquals(StringType.STRING, deepValueField.getDataType());
+    assertEquals(true, deepValueField.isNullable());
+  }
+
+  @Test
+  public void testFromInternalSchemaWithLists() {
+    // Create InternalSchema with lists: scores (List<Int>), items (List<Struct>)
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("record")
+            .dataType(InternalType.RECORD)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("scores")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("array")
+                                .isNullable(false)
+                                .dataType(InternalType.LIST)
+                                .fields(
+                                    Collections.singletonList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                            .parentPath("scores")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(InternalType.INT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("items")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("array")
+                                .isNullable(true)
+                                .dataType(InternalType.LIST)
+                                .fields(
+                                    Collections.singletonList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                            .parentPath("items")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("struct")
+                                                    .isNullable(true)
+                                                    .dataType(InternalType.RECORD)
+                                                    .fields(
+                                                        Arrays.asList(
+                                                            InternalField.builder()
+                                                                .name("itemName")
+                                                                .parentPath(
+                                                                    "items._one_field_element")
+                                                                .schema(
+                                                                    InternalSchema.builder()
+                                                                        .name("string")
+                                                                        .dataType(
+                                                                            InternalType.STRING)
+                                                                        .isNullable(false)
+                                                                        .build())
+                                                                .build(),
+                                                            InternalField.builder()
+                                                                .name("itemPrice")
+                                                                .parentPath(
+                                                                    "items._one_field_element")
+                                                                .schema(
+                                                                    InternalSchema.builder()
+                                                                        .name("double")
+                                                                        .dataType(
+                                                                            InternalType.DOUBLE)
+                                                                        .isNullable(true)
+                                                                        .build())
+                                                                .defaultValue(
+                                                                    InternalField.Constants
+                                                                        .NULL_DEFAULT_VALUE)
+                                                                .build()))
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    // Convert to Delta Kernel StructType
+    StructType deltaSchema = extractor.fromInternalSchema(internalSchema);
+
+    // Verify structure
+    assertNotNull(deltaSchema);
+    assertEquals(2, deltaSchema.fields().size());
+
+    // Check scores (list of int)
+    StructField scoresField = deltaSchema.fields().get(0);
+    assertEquals("scores", scoresField.getName());
+    assertTrue(scoresField.getDataType() instanceof ArrayType);
+    assertEquals(false, scoresField.isNullable());
+
+    ArrayType scoresArrayType = (ArrayType) scoresField.getDataType();
+    assertEquals(IntegerType.INTEGER, scoresArrayType.getElementType());
+
+    // Check items (list of records)
+    StructField itemsField = deltaSchema.fields().get(1);
+    assertEquals("items", itemsField.getName());
+    assertTrue(itemsField.getDataType() instanceof ArrayType);
+    assertEquals(true, itemsField.isNullable());
+
+    ArrayType itemsArrayType = (ArrayType) itemsField.getDataType();
+    assertTrue(itemsArrayType.getElementType() instanceof StructType);
+
+    StructType itemElementType = (StructType) itemsArrayType.getElementType();
+    assertEquals(2, itemElementType.fields().size());
+
+    StructField itemNameField = itemElementType.fields().get(0);
+    assertEquals("itemName", itemNameField.getName());
+    assertEquals(StringType.STRING, itemNameField.getDataType());
+    assertEquals(false, itemNameField.isNullable());
+
+    StructField itemPriceField = itemElementType.fields().get(1);
+    assertEquals("itemPrice", itemPriceField.getName());
+    assertEquals(DoubleType.DOUBLE, itemPriceField.getDataType());
+    assertEquals(true, itemPriceField.isNullable());
+  }
+
+  @Test
+  public void testFromInternalSchemaWithMaps() {
+    // Create InternalSchema with maps: counts (Map<String,Int>), locations (Map<Int,Struct>)
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("record")
+            .dataType(InternalType.RECORD)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("counts")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .isNullable(false)
+                                .dataType(InternalType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("counts")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("string")
+                                                    .dataType(InternalType.STRING)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                                            .parentPath("counts")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(InternalType.INT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("locations")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .isNullable(true)
+                                .dataType(InternalType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("locations")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("integer")
+                                                    .dataType(InternalType.INT)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                                            .parentPath("locations")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("struct")
+                                                    .isNullable(true)
+                                                    .dataType(InternalType.RECORD)
+                                                    .fields(
+                                                        Arrays.asList(
+                                                            InternalField.builder()
+                                                                .name("latitude")
+                                                                .parentPath(
+                                                                    "locations._one_field_value")
+                                                                .schema(
+                                                                    InternalSchema.builder()
+                                                                        .name("double")
+                                                                        .dataType(
+                                                                            InternalType.DOUBLE)
+                                                                        .isNullable(false)
+                                                                        .build())
+                                                                .build(),
+                                                            InternalField.builder()
+                                                                .name("longitude")
+                                                                .parentPath(
+                                                                    "locations._one_field_value")
+                                                                .schema(
+                                                                    InternalSchema.builder()
+                                                                        .name("double")
+                                                                        .dataType(
+                                                                            InternalType.DOUBLE)
+                                                                        .isNullable(false)
+                                                                        .build())
+                                                                .build()))
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    // Convert to Delta Kernel StructType
+    StructType deltaSchema = extractor.fromInternalSchema(internalSchema);
+
+    // Verify structure
+    assertNotNull(deltaSchema);
+    assertEquals(2, deltaSchema.fields().size());
+
+    // Check counts (map<string, int>)
+    StructField countsField = deltaSchema.fields().get(0);
+    assertEquals("counts", countsField.getName());
+    assertTrue(countsField.getDataType() instanceof MapType);
+    assertEquals(false, countsField.isNullable());
+
+    MapType countsMapType = (MapType) countsField.getDataType();
+    assertEquals(StringType.STRING, countsMapType.getKeyType());
+    assertEquals(IntegerType.INTEGER, countsMapType.getValueType());
+
+    // Check locations (map<int, struct>)
+    StructField locationsField = deltaSchema.fields().get(1);
+    assertEquals("locations", locationsField.getName());
+    assertTrue(locationsField.getDataType() instanceof MapType);
+    assertEquals(true, locationsField.isNullable());
+
+    MapType locationsMapType = (MapType) locationsField.getDataType();
+    assertEquals(IntegerType.INTEGER, locationsMapType.getKeyType());
+    assertTrue(locationsMapType.getValueType() instanceof StructType);
+
+    StructType locationValueType = (StructType) locationsMapType.getValueType();
+    assertEquals(2, locationValueType.fields().size());
+
+    StructField latitudeField = locationValueType.fields().get(0);
+    assertEquals("latitude", latitudeField.getName());
+    assertEquals(DoubleType.DOUBLE, latitudeField.getDataType());
+    assertEquals(false, latitudeField.isNullable());
+
+    StructField longitudeField = locationValueType.fields().get(1);
+    assertEquals("longitude", longitudeField.getName());
+    assertEquals(DoubleType.DOUBLE, longitudeField.getDataType());
+    assertEquals(false, longitudeField.isNullable());
+  }
+
+  @Test
   public void testRoundTripConversion() {
     // Create a Delta Kernel StructType
     StructType originalDeltaSchema =
@@ -1019,6 +1411,63 @@ public class TestDeltaKernelSchemaExtractor {
       assertEquals(original.getName(), converted.getName());
       assertEquals(original.getDataType(), converted.getDataType());
       assertEquals(original.isNullable(), converted.isNullable());
+    }
+  }
+
+  @Test
+  public void testRoundTripConversionWithComplexTypes() {
+    // Create a complex Delta Kernel StructType with nested records, lists, and maps
+    StructType addressType =
+        new StructType()
+            .add("street", StringType.STRING, false)
+            .add("city", StringType.STRING, true);
+
+    StructType itemType =
+        new StructType()
+            .add("name", StringType.STRING, false)
+            .add("price", DoubleType.DOUBLE, true);
+
+    StructType originalDeltaSchema =
+        new StructType()
+            .add("id", IntegerType.INTEGER, false)
+            .add("name", StringType.STRING, true)
+            .add("address", addressType, true)
+            .add("scores", new ArrayType(IntegerType.INTEGER, false), false)
+            .add("items", new ArrayType(itemType, true), true)
+            .add("tags", new MapType(StringType.STRING, StringType.STRING, false), false)
+            .add("metadata", new MapType(StringType.STRING, itemType, true), true);
+
+    // Convert to InternalSchema
+    InternalSchema internalSchema = extractor.toInternalSchema(originalDeltaSchema);
+
+    // Convert back to Delta Kernel StructType
+    StructType convertedDeltaSchema = extractor.fromInternalSchema(internalSchema);
+
+    // Verify structure matches
+    assertNotNull(convertedDeltaSchema);
+    assertEquals(originalDeltaSchema.fields().size(), convertedDeltaSchema.fields().size());
+
+    // Verify each field
+    for (int i = 0; i < originalDeltaSchema.fields().size(); i++) {
+      StructField original = originalDeltaSchema.fields().get(i);
+      StructField converted = convertedDeltaSchema.fields().get(i);
+
+      assertEquals(original.getName(), converted.getName());
+      assertEquals(original.isNullable(), converted.isNullable());
+
+      // For complex types, verify the structure
+      if (original.getDataType() instanceof StructType) {
+        assertTrue(converted.getDataType() instanceof StructType);
+        StructType originalStruct = (StructType) original.getDataType();
+        StructType convertedStruct = (StructType) converted.getDataType();
+        assertEquals(originalStruct.fields().size(), convertedStruct.fields().size());
+      } else if (original.getDataType() instanceof ArrayType) {
+        assertTrue(converted.getDataType() instanceof ArrayType);
+      } else if (original.getDataType() instanceof MapType) {
+        assertTrue(converted.getDataType() instanceof MapType);
+      } else {
+        assertEquals(original.getDataType(), converted.getDataType());
+      }
     }
   }
 }

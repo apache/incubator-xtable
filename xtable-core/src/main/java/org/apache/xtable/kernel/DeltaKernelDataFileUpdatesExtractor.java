@@ -94,7 +94,7 @@ public class DeltaKernelDataFileUpdatesExtractor {
           InternalDataFile internalFile = fileIterator.next();
 
           // Convert InternalDataFile back to AddFile to create RemoveFile action
-          AddFile addFile = createAddFileFromInternalDataFile(internalFile, snapshot.getSchema());
+          AddFile addFile = createAddFileAction(internalFile, basePath, snapshot.getSchema());
           RemoveFile removeFile =
               new RemoveFile(addFile.toRemoveFileRow(false, Optional.of(snapshot.getVersion())));
           String fullPath =
@@ -118,70 +118,27 @@ public class DeltaKernelDataFileUpdatesExtractor {
     FilesDiff<InternalFile, RowBackedAction> diff =
         InternalFilesDiff.findNewAndRemovedFiles(partitionedDataFiles, previousFiles);
 
-    return applyDiff(
-        diff.getFilesAdded(),
-        diff.getFilesRemoved(),
-        tableSchema,
-        table.getPath(engine),
-        physicalSchema);
+    return applyDiff(diff.getFilesAdded(), diff.getFilesRemoved(), basePath, physicalSchema);
   }
 
   private boolean checkTableExists(Table table) {
     return DeltaKernelUtils.tableExists(engine, table.getPath(engine));
   }
 
-  /**
-   * Converts an InternalDataFile back to Delta Kernel's AddFile action. This is needed to create
-   * RemoveFile actions from existing files.
-   */
-  private AddFile createAddFileFromInternalDataFile(
-      InternalDataFile internalFile, StructType physicalSchema) {
-    // Extract partition values from InternalDataFile using existing logic
-    Map<String, String> partitionValuesMap =
-        deltaKernelPartitionExtractor.partitionValueSerialization(internalFile);
-    MapValue partitionValues = convertToMapValue(partitionValuesMap);
-
-    // Create AddFile Row using the same pattern as createAddFileAction
-    Row addFileRow =
-        AddFile.createAddFileRow(
-            physicalSchema,
-            PathUtils.getRelativePath(internalFile.getPhysicalPath(), basePath),
-            partitionValues,
-            internalFile.getFileSizeBytes(),
-            internalFile.getLastModified(),
-            true, // dataChange - assume true for existing files
-            Optional.empty(), // deletionVector
-            Optional.empty(), // tags
-            Optional.empty(), // baseRowId
-            Optional.empty(), // defaultRowCommitVersion
-            Optional.empty()); // stats - set to empty since we're creating RemoveFile
-
-    // Wrap the Row back into an AddFile object
-    return new AddFile(addFileRow);
-  }
-
   public Seq<RowBackedAction> applyDiff(
-      InternalFilesDiff internalFilesDiff,
-      InternalSchema tableSchema,
-      String tableBasePath,
-      StructType physicalSchema) {
+      InternalFilesDiff internalFilesDiff, String tableBasePath, StructType physicalSchema) {
     List<RowBackedAction> removeActions =
         internalFilesDiff.dataFilesRemoved().stream()
             .map(dFile -> createAddFileAction(dFile, tableBasePath, physicalSchema))
             .map(addFile -> new RemoveFile(addFile.toRemoveFileRow(false, Optional.empty())))
             .collect(CustomCollectors.toList(internalFilesDiff.dataFilesRemoved().size()));
     return applyDiff(
-        internalFilesDiff.dataFilesAdded(),
-        removeActions,
-        tableSchema,
-        tableBasePath,
-        physicalSchema);
+        internalFilesDiff.dataFilesAdded(), removeActions, tableBasePath, physicalSchema);
   }
 
   private Seq<RowBackedAction> applyDiff(
       Set<? extends InternalFile> filesAdded,
       Collection<RowBackedAction> removeFileActions,
-      InternalSchema tableSchema,
       String tableBasePath,
       StructType physicalSchema) {
     Stream<RowBackedAction> addActions =
