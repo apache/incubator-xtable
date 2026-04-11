@@ -326,9 +326,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
         partitionValuesExtractor.extractPartitionValues(partitioningFields, partitionPath);
     Stream<HoodieFileGroup> fileGroups =
         Stream.concat(
-            fsView.getAllFileGroups(partitionPath),
-            fsView.getReplacedFileGroupsBeforeOrOn(
-                instantToConsider.getTimestamp(), partitionPath));
+            fsView.getAllFileGroups(partitionPath), fsView.getAllReplacedFileGroups(partitionPath));
     fileGroups.forEach(
         fileGroup -> {
           List<HoodieBaseFile> baseFiles = fileGroup.getAllBaseFiles().collect(Collectors.toList());
