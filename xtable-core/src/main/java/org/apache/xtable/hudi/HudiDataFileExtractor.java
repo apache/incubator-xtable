@@ -115,7 +115,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
           tableMetadata != null
               ? tableMetadata.getAllPartitionPaths()
               : FSUtils.getAllPartitionPaths(engineContext, metadataConfig, basePath.toString());
-      return getInternalDataFilesForPartitions(allPartitionPaths, table);
+      return getInternalDataFilesForPartitions(
+          HudiPathUtils.filterMetadataPaths(allPartitionPaths), table);
     } catch (IOException ex) {
       throw new ReadException(
           "Unable to read partitions for table " + metaClient.getTableConfig().getTableName(), ex);
