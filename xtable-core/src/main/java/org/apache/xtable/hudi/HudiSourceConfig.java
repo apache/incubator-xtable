@@ -26,6 +26,8 @@ import java.util.Properties;
 
 import lombok.Value;
 
+import org.apache.hadoop.conf.Configuration;
+
 import com.google.common.base.Preconditions;
 
 import org.apache.xtable.model.schema.PartitionFieldSpec;
@@ -39,6 +41,10 @@ public class HudiSourceConfig {
       "xtable.hudi.source.partition_spec_extractor_class";
   public static final String PARTITION_FIELD_SPEC_CONFIG =
       "xtable.hudi.source.partition_field_spec_config";
+  public static final String OMIT_METADATA_FIELDS_CONFIG =
+      "xtable.hudi.source.omit_metadata_fields";
+  public static final String HUDI_OMIT_METADATA_FIELDS_CONFIG =
+      "hoodie.datasource.hive_sync.omit_metadata_fields";
 
   String partitionSpecExtractorClass;
   List<PartitionFieldSpec> partitionFieldSpecs;
@@ -83,5 +89,31 @@ public class HudiSourceConfig {
         partitionSpecExtractorClass, "HudiSourcePartitionSpecExtractor class not provided");
     return ReflectionUtils.createInstanceOfClass(
         partitionSpecExtractorClass, this.getPartitionFieldSpecs());
+  }
+
+  public static boolean getOmitMetadataFields(Properties properties, Configuration configuration) {
+    String propertyValue =
+        getPropertyOrNull(
+            properties, OMIT_METADATA_FIELDS_CONFIG, HUDI_OMIT_METADATA_FIELDS_CONFIG);
+    if (propertyValue != null) {
+      return Boolean.parseBoolean(propertyValue);
+    }
+    if (configuration == null) {
+      return false;
+    }
+    String configValue = configuration.get(OMIT_METADATA_FIELDS_CONFIG);
+    if (configValue == null) {
+      configValue = configuration.get(HUDI_OMIT_METADATA_FIELDS_CONFIG);
+    }
+    return configValue != null && Boolean.parseBoolean(configValue);
+  }
+
+  private static String getPropertyOrNull(
+      Properties properties, String primaryKey, String fallbackKey) {
+    if (properties == null) {
+      return null;
+    }
+    String value = properties.getProperty(primaryKey);
+    return value != null ? value : properties.getProperty(fallbackKey);
   }
 }
