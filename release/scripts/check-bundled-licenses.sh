@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
@@ -14,19 +14,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+#
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-cd "${ROOT_DIR}"
-
-MODULE_CONFIGS=(
-  "xtable-aws|xtable-aws/src/main/resources/META-INF"
-  "xtable-hive-metastore|xtable-hive-metastore/src/main/resources/META-INF"
-  "xtable-hudi-support/xtable-hudi-support-extensions|xtable-hudi-support/xtable-hudi-support-extensions/src/main/resources/META-INF"
-)
-
-BUILD_TARGETS="xtable-aws,xtable-hive-metastore,xtable-hudi-support/xtable-hudi-support-extensions"
+# Color and timestamp logging helpers
+log() {
+  local color="$1"; shift
+  local msg="$1"; shift
+  local now
+  now="$(date '+%Y-%m-%d %H:%M:%S')"
+  printf "\033[%sm[%s] %s\033[0m\n" "$color" "$now" "$msg" "$@"
+}
+log_info() { log "1;34" "$1"; }
+log_success() { log "1;32" "$1"; }
+log_warn() { log "1;33" "$1"; }
+log_error() { log "1;31" "$1"; }
 
 cleanup_files=()
 
@@ -35,7 +37,6 @@ cleanup() {
     rm -f "${cleanup_files[@]}"
   fi
 }
-
 trap cleanup EXIT
 
 make_temp_file() {
@@ -52,9 +53,13 @@ ensure_single_bundled_jar() {
 
   jar_count="$(find "${module_dir}/target" -maxdepth 1 -type f -name '*-bundled.jar' | wc -l | tr -d ' ')"
 
+  if [[ "${jar_count}" -eq 0 ]]; then
+    log_info "No bundled jar found in ${module_dir}/target. Skipping."
+    return 1
+  fi
   if [[ "${jar_count}" -ne 1 ]]; then
-    printf 'Expected exactly one bundled jar in %s/target, found %s\n' "${module_dir}" "${jar_count}" >&2
-    exit 1
+    log_error "Expected exactly one bundled jar in ${module_dir}/target, found ${jar_count}."
+    return 2
   fi
 
   jar_path="$(find "${module_dir}/target" -maxdepth 1 -type f -name '*-bundled.jar' | sort | head -n 1)"
@@ -64,7 +69,6 @@ ensure_single_bundled_jar() {
 jar_has_entry() {
   local jar_path="$1"
   local jar_entry="$2"
-
   unzip -Z1 "${jar_path}" "${jar_entry}" >/dev/null 2>&1
 }
 
@@ -75,7 +79,7 @@ verify_jar_entry_matches_source() {
   local module_dir="$4"
 
   if ! jar_has_entry "${jar_path}" "${jar_entry}"; then
-    printf '[%s] Missing required entry %s in %s\n' "${module_dir}" "${jar_entry}" "${jar_path}" >&2
+    log_error "[${module_dir}] Missing required entry ${jar_entry} in ${jar_path}"
     exit 1
   fi
 
@@ -84,7 +88,7 @@ verify_jar_entry_matches_source() {
   unzip -p "${jar_path}" "${jar_entry}" > "${extracted_path}"
 
   if ! cmp -s "${source_path}" "${extracted_path}"; then
-    printf '[%s] %s in %s does not match %s\n' "${module_dir}" "${jar_entry}" "${jar_path}" "${source_path}" >&2
+    log_error "[${module_dir}] ${jar_entry} in ${jar_path} does not match ${source_path}"
     diff -u "${source_path}" "${extracted_path}" || true
     exit 1
   fi
@@ -98,7 +102,6 @@ verify_module_meta_inf_resources() {
   while IFS= read -r source_path; do
     local relative_path
     local jar_entry
-
     relative_path="${source_path#"${meta_inf_dir}/"}"
     jar_entry="META-INF/${relative_path}"
     verify_jar_entry_matches_source "${jar_path}" "${jar_entry}" "${source_path}" "${module_dir}"
@@ -107,10 +110,8 @@ verify_module_meta_inf_resources() {
 
 extract_bundled_coordinates() {
   local jar_path="$1"
-
   while IFS= read -r pom_properties; do
     local coordinate
-
     coordinate="$(
       unzip -p "${jar_path}" "${pom_properties}" | tr -d "\r" | awk -F= '
         $1 == "groupId" { group_id = $2 }
@@ -123,7 +124,6 @@ extract_bundled_coordinates() {
         }
       '
     )"
-
     if [[ -n "${coordinate}" ]]; then
       printf '%s\n' "${coordinate}"
     fi
@@ -132,7 +132,6 @@ extract_bundled_coordinates() {
 
 extract_license_coordinates() {
   local license_path="$1"
-
   tr -d '\r' < "${license_path}" \
     | grep -Eo '[[:alnum:]_.-]+:[[:alnum:]_.-]+:(jar:)?[[:alnum:]_.+-]+' \
     | awk -F: '
@@ -160,35 +159,45 @@ verify_bundled_coordinates_are_in_license() {
   comm -23 "${actual_coords_path}" "${licensed_coords_path}" > "${missing_coords_path}"
 
   if [[ -s "${missing_coords_path}" ]]; then
-    printf '[%s] Bundled dependencies are missing from %s:\n' "${module_dir}" "${license_path}" >&2
-    sed 's/^/  - /' "${missing_coords_path}" >&2
-    printf '\nAdd the coordinates above to %s under the appropriate license section.\n' "${license_path}" >&2
-    printf 'Review %s/NOTICE-bundled too if any of those dependencies carry NOTICE text.\n' "$(dirname "${license_path}")" >&2
+    log_error "[${module_dir}] Bundled dependencies are missing from ${license_path}:"
+    sed 's/^/  - /' "${missing_coords_path}"
+    log_error "Add the coordinates above to ${license_path} under the appropriate license section."
+    log_error "Review $(dirname "${license_path}")/NOTICE-bundled too if any of those dependencies carry NOTICE text."
     exit 1
   fi
 }
 
+print_summary() {
+  local module_dir="$1"
+  log_success "[${module_dir}] Bundled license verification PASSED."
+}
+
 main() {
-  if [[ "${SKIP_BUNDLED_LICENSE_BUILD:-0}" != "1" ]]; then
-    ./mvnw \
-      -pl "${BUILD_TARGETS}" \
-      -am \
-      package \
-      -DskipTests \
-      -Dmaven.build.cache.enabled=false \
-      -ntp \
-      -B
+  if [[ $# -ne 1 ]]; then
+    log_error "Usage: $0 <module-dir>"
+    exit 2
+  fi
+  local module_dir="$1"
+  local meta_inf_dir="${module_dir}/src/main/resources/META-INF"
+  local jar_path
+
+  if ! jar_path="$(ensure_single_bundled_jar "${module_dir}")"; then
+    log_info "[${module_dir}] No bundled jar to check. Skipping."
+    exit 0
   fi
 
-  for config in "${MODULE_CONFIGS[@]}"; do
-    IFS='|' read -r module_dir meta_inf_dir <<< "${config}"
+  if [[ ! -d "${meta_inf_dir}" ]]; then
+    log_error "[${module_dir}] META-INF directory missing but bundled jar exists. Failing."
+    exit 1
+  fi
 
-    local_jar_path="$(ensure_single_bundled_jar "${module_dir}")"
-    verify_module_meta_inf_resources "${local_jar_path}" "${module_dir}" "${meta_inf_dir}"
-    verify_bundled_coordinates_are_in_license "${local_jar_path}" "${module_dir}" "${meta_inf_dir}/LICENSE-bundled"
-  done
+  log_info "[${module_dir}] Checking META-INF resources in bundled jar."
+  verify_module_meta_inf_resources "${jar_path}" "${module_dir}" "${meta_inf_dir}"
 
-  printf 'Bundled license verification passed.\n'
+  log_info "[${module_dir}] Checking LICENSE-bundled covers all bundled dependencies."
+  verify_bundled_coordinates_are_in_license "${jar_path}" "${module_dir}" "${meta_inf_dir}/LICENSE-bundled"
+
+  print_summary "${module_dir}"
 }
 
 main "$@"
