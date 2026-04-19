@@ -54,11 +54,10 @@ ensure_single_bundled_jar() {
   jar_count="$(find "${module_dir}/target" -maxdepth 1 -type f -name '*-bundled.jar' | wc -l | tr -d ' ')"
 
   if [[ "${jar_count}" -eq 0 ]]; then
-    log_info "No bundled jar found in ${module_dir}/target. Skipping."
-    return 1
+    return 0
   fi
   if [[ "${jar_count}" -ne 1 ]]; then
-    log_error "Expected exactly one bundled jar in ${module_dir}/target, found ${jar_count}."
+    log_error "Expected exactly one bundled jar in ${module_dir}/target, found ${jar_count}." >&2
     return 2
   fi
 
@@ -148,21 +147,41 @@ verify_bundled_coordinates_are_in_license() {
   local actual_coords_path
   local licensed_coords_path
   local missing_coords_path
+  local version_mismatch_path
 
   actual_coords_path="$(make_temp_file)"
   licensed_coords_path="$(make_temp_file)"
   missing_coords_path="$(make_temp_file)"
+  version_mismatch_path="$(make_temp_file)"
 
   extract_bundled_coordinates "${jar_path}" > "${actual_coords_path}"
   extract_license_coordinates "${license_path}" > "${licensed_coords_path}"
 
+  # Check for missing coordinates (full match: groupId:artifactId:version)
   comm -23 "${actual_coords_path}" "${licensed_coords_path}" > "${missing_coords_path}"
+
+  # Check for version mismatches
+  awk -F: '{print $1":"$2":"$3}' "${actual_coords_path}" | while IFS=: read -r group_id artifact_id version; do
+    if grep -q "^${group_id}:${artifact_id}:" "${licensed_coords_path}"; then
+      license_version=$(grep "^${group_id}:${artifact_id}:" "${licensed_coords_path}" | awk -F: '{print $3}')
+      if [[ "$license_version" != "$version" ]]; then
+        echo "${group_id}:${artifact_id}: expected version $version but found $license_version in LICENSE-bundled" >> "$version_mismatch_path"
+      fi
+    fi
+  done
 
   if [[ -s "${missing_coords_path}" ]]; then
     log_error "[${module_dir}] Bundled dependencies are missing from ${license_path}:"
     sed 's/^/  - /' "${missing_coords_path}"
     log_error "Add the coordinates above to ${license_path} under the appropriate license section."
     log_error "Review $(dirname "${license_path}")/NOTICE-bundled too if any of those dependencies carry NOTICE text."
+    exit 1
+  fi
+
+  if [[ -s "${version_mismatch_path}" ]]; then
+    log_error "[${module_dir}] Version mismatches found between bundled jar and LICENSE-bundled:"
+    sed 's/^/  - /' "${version_mismatch_path}"
+    log_error "Update the version in ${license_path} to match the bundled jar."
     exit 1
   fi
 }
@@ -181,11 +200,21 @@ main() {
   local meta_inf_dir="${module_dir}/src/main/resources/META-INF"
   local jar_path
 
-  if ! jar_path="$(ensure_single_bundled_jar "${module_dir}")"; then
+  local jar_path_output
+  local rc
+  jar_path_output=""
+  rc=0
+  jar_path_output=$(ensure_single_bundled_jar "${module_dir}") || rc=$?
+  if [[ $rc -eq 2 ]]; then
+    # Multiple jars found, error already logged in function
+    exit 1
+  fi
+  if [[ -z "${jar_path_output}" ]]; then
     log_info "[${module_dir}] No bundled jar to check. Skipping."
     exit 0
   fi
 
+  local jar_path="${jar_path_output}"
   if [[ ! -d "${meta_inf_dir}" ]]; then
     log_error "[${module_dir}] META-INF directory missing but bundled jar exists. Failing."
     exit 1

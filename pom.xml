@@ -989,7 +989,7 @@
                             <executable>bash</executable>
                             <workingDirectory>${project.basedir}</workingDirectory>
                             <arguments>
-                                <argument>release/scripts/check-bundled-licenses.sh</argument>
+                                <argument>${maven.multiModuleProjectDirectory}/release/scripts/check-bundled-licenses.sh</argument>
                                 <argument>${project.basedir}</argument>
                             </arguments>
                         </configuration>
