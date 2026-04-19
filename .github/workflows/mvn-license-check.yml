@@ -43,4 +43,7 @@ jobs:
           cache: maven
 
       - name: Apache License Check
-        run: ./mvnw apache-rat:check -B
+        run: ./mvnw apache-rat:check -Dmaven.build.cache.enabled=false -ntp -B
+
+      - name: Verify bundled binary license metadata
+        run: bash release/scripts/check-bundled-licenses.sh
