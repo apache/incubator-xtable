@@ -46,6 +46,6 @@ class ParquetFileInfo {
   }
 
   private ParquetMetadata getMetadataInternal() {
-    return ParquetMetadataExtractor.readParquetMetadata(conf, path);
+    return ParquetMetadataExtractor.getInstance().readParquetMetadata(conf, path);
   }
 }
