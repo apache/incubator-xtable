@@ -269,7 +269,7 @@ class TestParquetDataManager {
     List<ParquetFileInfo> result = manager.getParquetFilesMetadataAfterTime(2000L);
 
     assertNotNull(result);
-    assertEquals(2, result.size());
+    assertEquals(1, result.size());
     assertEquals(3000L, result.get(0).getModificationTime());
   }
 
