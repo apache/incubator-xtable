@@ -38,12 +38,12 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import java.util.HashSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -522,7 +522,7 @@ public class ITParquetConversionSource {
           FileStatus refreshedStatus = fs.getFileStatus(fileStatus.getPath());
           expectedAddedFiles.add(
               conversionSource.createInternalDataFileFromParquetFile(
-                      refreshedStatus, conversionSource.getCurrentTable().getReadSchema()));
+                  refreshedStatus, conversionSource.getCurrentTable().getReadSchema()));
         } else {
           fs.setTimes(fileStatus.getPath(), targetModificationTime, -1);
         }
