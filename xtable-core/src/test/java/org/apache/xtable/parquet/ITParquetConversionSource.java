@@ -536,9 +536,10 @@ public class ITParquetConversionSource {
     assertNotNull(result.getReadSchema());
     InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
     assertNotNull(snapshot);
-    TableChange changes = conversionSource.getTableChangeForCommit(newModificationTime);
+    TableChange changes = conversionSource.getTableChangeForCommit(testTime);
     assertNotNull(changes);
-    assertEquals(changes.getFilesDiff().dataFilesAdded(), expectedAddedFiles);
+    assertFalse(changes.getFilesDiff().dataFilesAdded().isEmpty(), "Should have found added files");
+    assertEquals(expectedAddedFiles, changes.getFilesDiff().dataFilesAdded());
     Instant instantBeforeFirstSnapshot =
         Instant.ofEpochMilli(snapshot.getTable().getLatestCommitTime().toEpochMilli());
     assertEquals(instantBeforeFirstSnapshot.toEpochMilli(), newModificationTime);
