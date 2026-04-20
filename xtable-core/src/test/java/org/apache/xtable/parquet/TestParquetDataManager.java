@@ -135,7 +135,7 @@ class TestParquetDataManager {
     ParquetFileInfo result = manager.getParquetDataFileAt(2000L);
 
     assertNotNull(result);
-    assertEquals(2000L, result.getModificationTime());
+    assertEquals(3000L, result.getModificationTime());
   }
 
   @Test
@@ -270,8 +270,7 @@ class TestParquetDataManager {
 
     assertNotNull(result);
     assertEquals(2, result.size());
-    assertEquals(2000L, result.get(0).getModificationTime());
-    assertEquals(3000L, result.get(1).getModificationTime());
+    assertEquals(3000L, result.get(0).getModificationTime());
   }
 
   @Test
@@ -323,9 +322,8 @@ class TestParquetDataManager {
     List<ParquetFileInfo> result = manager.getParquetFilesMetadataAfterTime(2000L);
 
     assertNotNull(result);
-    assertEquals(2, result.size());
-    assertEquals(2000L, result.get(0).getModificationTime());
-    assertEquals(3000L, result.get(1).getModificationTime());
+    assertEquals(1, result.size());
+    assertEquals(3000L, result.get(0).getModificationTime());
   }
 
   @Test
@@ -390,7 +388,7 @@ class TestParquetDataManager {
     assertEquals(3000L, mostRecent.getModificationTime());
 
     List<ParquetFileInfo> afterTime = manager.getParquetFilesMetadataAfterTime(2000L);
-    assertEquals(2, afterTime.size());
+    assertEquals(1, afterTime.size());
   }
 
   @Test

@@ -100,7 +100,7 @@ public class ParquetDataManager {
 
   List<ParquetFileInfo> getParquetFilesMetadataAfterTime(long syncTime) {
     return getParquetFiles().stream()
-        .filter(file -> file.getModificationTime() >= syncTime)
+        .filter(file -> file.getModificationTime() > syncTime)
         .map(file -> new ParquetFileInfo(hadoopConf, file))
         .collect(Collectors.toList());
   }
