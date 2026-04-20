@@ -52,6 +52,7 @@ import lombok.Builder;
 import lombok.Value;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.RemoteIterator;
@@ -518,9 +519,10 @@ public class ITParquetConversionSource {
 
         if (fileStatus.getModificationTime() > testTime) {
           fs.setTimes(fileStatus.getPath(), newModificationTime, -1);
+          FileStatus refreshedStatus = fs.getFileStatus(fileStatus.getPath());
           expectedAddedFiles.add(
               conversionSource.createInternalDataFileFromParquetFile(
-                  fileStatus, conversionSource.getCurrentTable().getReadSchema()));
+                      refreshedStatus, conversionSource.getCurrentTable().getReadSchema()));
         } else {
           fs.setTimes(fileStatus.getPath(), targetModificationTime, -1);
         }
@@ -539,8 +541,7 @@ public class ITParquetConversionSource {
     TableChange changes = conversionSource.getTableChangeForCommit(testTime);
     assertNotNull(changes);
     assertFalse(changes.getFilesDiff().dataFilesAdded().isEmpty(), "Should have found added files");
-    //assertEquals(expectedAddedFiles, changes.getFilesDiff().dataFilesAdded());
-    assertEquals(expectedAddedFiles, changes.getFilesDiff().dataFilesAdded(), "Actual files found: " + changes.getFilesDiff().dataFilesAdded());
+    assertEquals(expectedAddedFiles, changes.getFilesDiff().dataFilesAdded());
     Instant instantBeforeFirstSnapshot =
         Instant.ofEpochMilli(snapshot.getTable().getLatestCommitTime().toEpochMilli());
     assertEquals(instantBeforeFirstSnapshot.toEpochMilli(), newModificationTime);
