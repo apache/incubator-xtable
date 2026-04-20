@@ -217,6 +217,59 @@
                                     <file>target/classes/META-INF/NOTICE-bundled</file>
                                 </transformer>
                             </transformers>
+                            <artifactSet>
+                                <includes combine.children="append">
+                                    <include>org.apache.xtable:xtable-api</include>
+                                    <include>org.apache.xtable:xtable-core</include>
+                                    <!-- Hive dependencies -->
+
+                                    <!-- Jackson dependencies -->
+                                    <include>com.fasterxml.jackson.core:jackson-core</include>
+                                    <include>com.fasterxml.jackson.core:jackson-databind</include>
+                                    <include>com.fasterxml.jackson.core:jackson-annotations</include>
+                                    <include>com.fasterxml.jackson.datatype:jackson-datatype-jdk8</include>
+                                    <include>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</include>
+                                    <include>com.fasterxml.jackson.module:jackson-module-scala_2.12</include>
+                                    <!-- File format dependencies -->
+                                    <include>org.apache.avro:avro</include>
+                                    <include>org.apache.parquet:parquet-avro</include>
+                                    <include>org.apache.parquet:parquet-column</include>
+                                    <include>org.apache.parquet:parquet-encoding</include>
+                                    <include>org.apache.parquet:parquet-common</include>
+                                    <!-- Utils -->
+                                    <include>com.google.guava:guava</include>
+                                    <include>com.github.ben-manes.caffeine:caffeine</include>
+                                    <include>org.apache.commons:commons-lang3</include>
+                                    <!-- Delta dependencies -->
+                                    <include>io.delta:delta-core_${scala.binary.version}</include>
+                                    <include>io.delta:delta-storage</include>
+                                    <!-- Hudi dependencies -->
+                                    <include>org.apache.hudi:hudi-common</include>
+                                    <include>org.apache.hudi:hudi-java-client</include>
+                                    <include>org.apache.hudi:hudi-client-common</include>
+                                    <!-- Iceberg dependencies -->
+                                    <include>org.apache.iceberg:iceberg-core</include>
+                                    <include>org.apache.iceberg:iceberg-api</include>
+                                    <include>org.apache.iceberg:iceberg-common</include>
+                                    <include>org.apache.iceberg:iceberg-bundled-guava</include>
+                                    <!-- Paimon dependencies -->
+                                    <include>org.apache.paimon:paimon-bundle</include>
+                                    <!-- HBase - required by current Hudi version -->
+                                    <include>org.apache.hbase:hbase-client</include>
+                                    <include>org.apache.hbase:hbase-common</include>
+                                    <include>org.apache.hbase:hbase-hadoop-compat</include>
+                                    <include>org.apache.hbase:hbase-metrics-api</include>
+                                    <include>org.apache.hbase:hbase-protocol-shaded</include>
+                                    <include>org.apache.hbase:hbase-server</include>
+                                    <include>org.apache.hbase.thirdparty:hbase-shaded-miscellaneous</include>
+                                    <include>org.apache.hbase.thirdparty:hbase-shaded-netty</include>
+                                    <include>org.apache.hbase.thirdparty:hbase-shaded-protobuf</include>
+                                    <include>org.apache.htrace:htrace-core4</include>
+                                    <include>com.esotericsoftware:kryo</include>
+                                    <include>org.openjdk.jol:jol-core</include>
+                                    <include>org.lz4:lz4-java</include>
+                                </includes>
+                            </artifactSet>
                         </configuration>
                     </execution>
                 </executions>
