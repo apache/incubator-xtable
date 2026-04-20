@@ -516,7 +516,7 @@ public class ITParquetConversionSource {
       while (it.hasNext()) {
         LocatedFileStatus fileStatus = it.next();
 
-        if (fileStatus.getModificationTime() > newModificationTime) {
+        if (fileStatus.getModificationTime() > testTime) {
           fs.setTimes(fileStatus.getPath(), newModificationTime, -1);
           expectedAddedFiles.add(
               conversionSource.createInternalDataFileFromParquetFile(
