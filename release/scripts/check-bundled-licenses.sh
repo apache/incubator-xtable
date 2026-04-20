@@ -140,48 +140,78 @@ extract_license_coordinates() {
     | sort -u
 }
 
+# Extracts runtime dependencies using Maven for the given module
+extract_runtime_dependencies() {
+  local module_dir="$1"
+  local module_name
+  module_name=$(basename "$module_dir")
+  local dep_tree_output
+  dep_tree_output=$(./mvnw -pl "$module_name" dependency:tree -Dscope=runtime 2>/dev/null)
+  echo "$dep_tree_output" | awk '
+    {
+      # Remove [INFO]
+      sub(/^\[INFO\] /, "");
+
+      # Strip tree structure (|, +-, \- with leading whitespace)
+      gsub(/^[[:space:]\|]*[+\-]+[[:space:]]*/, "");
+
+      # Only process lines that look like Maven coordinates
+      if ($0 ~ /^[a-zA-Z0-9_.-]+:[a-zA-Z0-9_.-]+:/) {
+        n = split($0, a, ":");
+
+        # groupId:artifactId:version
+        if (n >= 4) {
+          print a[1] ":" a[2] ":" a[4];
+        }
+      }
+    }
+  ' | sort -u
+}
+
 verify_bundled_coordinates_are_in_license() {
   local jar_path="$1"
   local module_dir="$2"
   local license_path="$3"
-  local actual_coords_path
+  local runtime_deps_path
   local licensed_coords_path
   local missing_coords_path
   local version_mismatch_path
 
-  actual_coords_path="$(make_temp_file)"
+  runtime_deps_path="$(make_temp_file)"
   licensed_coords_path="$(make_temp_file)"
   missing_coords_path="$(make_temp_file)"
   version_mismatch_path="$(make_temp_file)"
 
-  extract_bundled_coordinates "${jar_path}" > "${actual_coords_path}"
-  extract_license_coordinates "${license_path}" > "${licensed_coords_path}"
+  extract_runtime_dependencies "$module_dir" > "$runtime_deps_path"
+  extract_license_coordinates "$license_path" > "$licensed_coords_path"
 
-  # Check for missing coordinates (full match: groupId:artifactId:version)
-  comm -23 "${actual_coords_path}" "${licensed_coords_path}" > "${missing_coords_path}"
+  # Check for missing coordinates (groupId:artifactId)
+  awk -F: '{print $1":"$2}' "$runtime_deps_path" | sort -u > "$runtime_deps_path.gaid"
+  awk -F: '{print $1":"$2}' "$licensed_coords_path" | sort -u > "$licensed_coords_path.gaid"
+  comm -23 "$runtime_deps_path.gaid" "$licensed_coords_path.gaid" > "$missing_coords_path"
 
-  # Check for version mismatches
-  awk -F: '{print $1":"$2":"$3}' "${actual_coords_path}" | while IFS=: read -r group_id artifact_id version; do
-    if grep -q "^${group_id}:${artifact_id}:" "${licensed_coords_path}"; then
-      license_version=$(grep "^${group_id}:${artifact_id}:" "${licensed_coords_path}" | awk -F: '{print $3}')
-      if [[ "$license_version" != "$version" ]]; then
+  # Check for version mismatches (if present in LICENSE-bundled)
+  awk -F: '{print $1":"$2":"$3}' "$runtime_deps_path" | while IFS=: read -r group_id artifact_id version; do
+    if grep -q "^${group_id}:${artifact_id}:" "$licensed_coords_path"; then
+      license_version=$(grep "^${group_id}:${artifact_id}:" "$licensed_coords_path" | awk -F: '{print $3}')
+      if [[ -n "$license_version" && "$license_version" != "$version" ]]; then
         echo "${group_id}:${artifact_id}: expected version $version but found $license_version in LICENSE-bundled" >> "$version_mismatch_path"
       fi
     fi
   done
 
-  if [[ -s "${missing_coords_path}" ]]; then
-    log_error "[${module_dir}] Bundled dependencies are missing from ${license_path}:"
-    sed 's/^/  - /' "${missing_coords_path}"
+  if [[ -s "$missing_coords_path" ]]; then
+    log_error "[${module_dir}] Runtime dependencies are missing from ${license_path}:"
+    sed 's/^/  - /' "$missing_coords_path"
     log_error "Add the coordinates above to ${license_path} under the appropriate license section."
     log_error "Review $(dirname "${license_path}")/NOTICE-bundled too if any of those dependencies carry NOTICE text."
     exit 1
   fi
 
-  if [[ -s "${version_mismatch_path}" ]]; then
-    log_error "[${module_dir}] Version mismatches found between bundled jar and LICENSE-bundled:"
-    sed 's/^/  - /' "${version_mismatch_path}"
-    log_error "Update the version in ${license_path} to match the bundled jar."
+  if [[ -s "$version_mismatch_path" ]]; then
+    log_error "[${module_dir}] Version mismatches found between runtime dependencies and LICENSE-bundled:"
+    sed 's/^/  - /' "$version_mismatch_path"
+    log_error "Update the version in ${license_path} to match the runtime dependency."
     exit 1
   fi
 }
