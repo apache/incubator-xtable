@@ -244,7 +244,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   @Override
   public boolean isIncrementalSyncSafeFrom(Instant timeInMillis) {
-    Stream<ParquetFileInfo> parquetFilesMetadata = parquetDataManager.getCurrentFileInfo();
+    Stream<ParquetFileInfo> parquetFilesMetadata = parquetDataManager.getCurrentFilesInfo();
     OptionalLong earliestModTimeOpt =
         parquetFilesMetadata.mapToLong(ParquetFileInfo::getModificationTime).min();
 

@@ -203,7 +203,7 @@ class TestParquetDataManager {
   }
 
   @Test
-  void testGetCurrentFileInfo_multipleFiles() throws IOException {
+  void testGetCurrentFilesInfo_multipleFiles() throws IOException {
     LocatedFileStatus file1 = createMockFileStatus("file1.parquet", 1000L);
     LocatedFileStatus file2 = createMockFileStatus("file2.parquet", 2000L);
     LocatedFileStatus file3 = createMockFileStatus("file3.parquet", 3000L);
@@ -214,7 +214,7 @@ class TestParquetDataManager {
 
     ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
 
-    Stream<ParquetFileInfo> result = manager.getCurrentFileInfo();
+    Stream<ParquetFileInfo> result = manager.getCurrentFilesInfo();
 
     assertNotNull(result);
     List<ParquetFileInfo> fileList = result.collect(Collectors.toList());
@@ -225,20 +225,20 @@ class TestParquetDataManager {
   }
 
   @Test
-  void testGetCurrentFileInfo_emptyList() throws IOException {
+  void testGetCurrentFilesInfo_emptyList() throws IOException {
     RemoteIterator<LocatedFileStatus> iterator = new StubbedRemoteIterator(Collections.emptyList());
     FileSystem mockFs = createMockFileSystem(iterator);
 
     ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
 
-    Stream<ParquetFileInfo> result = manager.getCurrentFileInfo();
+    Stream<ParquetFileInfo> result = manager.getCurrentFilesInfo();
 
     assertNotNull(result);
     assertEquals(0, result.count());
   }
 
   @Test
-  void testGetCurrentFileInfo_streamCharacteristics() throws IOException {
+  void testGetCurrentFilesInfo_streamCharacteristics() throws IOException {
     LocatedFileStatus file1 = createMockFileStatus("file1.parquet", 1000L);
     LocatedFileStatus file2 = createMockFileStatus("file2.parquet", 2000L);
 
@@ -248,7 +248,7 @@ class TestParquetDataManager {
 
     ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
 
-    Stream<ParquetFileInfo> result = manager.getCurrentFileInfo();
+    Stream<ParquetFileInfo> result = manager.getCurrentFilesInfo();
 
     assertNotNull(result);
     assertTrue(result.allMatch(info -> info.getModificationTime() > 0));
@@ -341,7 +341,7 @@ class TestParquetDataManager {
     verify(mockFs, never()).listFiles(any(org.apache.hadoop.fs.Path.class), anyBoolean());
 
     // Access multiple times
-    manager.getCurrentFileInfo();
+    manager.getCurrentFilesInfo();
     manager.getMostRecentParquetFile();
     manager.getParquetFilesMetadataAfterTime(0L);
 

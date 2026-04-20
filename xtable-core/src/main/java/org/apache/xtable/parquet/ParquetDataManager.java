@@ -94,7 +94,7 @@ public class ParquetDataManager {
     }
   }
 
-  Stream<ParquetFileInfo> getCurrentFileInfo() {
+  Stream<ParquetFileInfo> getCurrentFilesInfo() {
     return getParquetFiles().stream()
         .map(fileStatus -> new ParquetFileInfo(hadoopConf, fileStatus));
   }
