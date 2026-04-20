@@ -134,7 +134,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
                 .build());
   }
 
-  private InternalDataFile createInternalDataFileFromParquetFile(
+  public InternalDataFile createInternalDataFileFromParquetFile(
       FileStatus parquetFile, InternalSchema schema) {
     return InternalDataFile.builder()
         .physicalPath(parquetFile.getPath().toString())

@@ -35,14 +35,6 @@ import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -87,6 +79,7 @@ import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
+import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 
@@ -504,24 +497,27 @@ public class ITParquetConversionSource {
     conversionSourceProvider.init(conf);
     ParquetConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
+    Set<InternalDataFile> expectedAddedFiles = new HashSet<>();
 
     for (String partition : newPartitions) {
       org.apache.hadoop.fs.Path partitionPath =
           new org.apache.hadoop.fs.Path(outputPath, partition);
 
-      RemoteIterator<LocatedFileStatus> it = fs.listFiles(partitionPath, false);
+      RemoteIterator<LocatedFileStatus> it = fs.listFiles(partitionPath, true);
       while (it.hasNext()) {
         LocatedFileStatus fileStatus = it.next();
 
         if (fileStatus.getModificationTime() > newModificationTime) {
           fs.setTimes(fileStatus.getPath(), newModificationTime, -1);
+          expectedAddedFiles.add(
+              conversionSource.createInternalDataFileFromParquetFile(
+                  fileStatus, conversionSource.getCurrentTable().getReadSchema()));
         } else {
           fs.setTimes(fileStatus.getPath(), targetModificationTime, -1);
         }
       }
       fs.setTimes(partitionPath, newModificationTime, -1);
     }
-
     InternalTable result = conversionSource.getTable(newModificationTime);
     assertEquals(
         Instant.ofEpochMilli(newModificationTime).toString(),
@@ -533,6 +529,7 @@ public class ITParquetConversionSource {
     assertNotNull(snapshot);
     TableChange changes = conversionSource.getTableChangeForCommit(newModificationTime);
     assertNotNull(changes);
+    assertEquals(changes.getFilesDiff().dataFilesAdded(), expectedAddedFiles);
     Instant instantBeforeFirstSnapshot =
         Instant.ofEpochMilli(snapshot.getTable().getLatestCommitTime().toEpochMilli());
     assertEquals(instantBeforeFirstSnapshot.toEpochMilli(), newModificationTime);

@@ -20,7 +20,6 @@ package org.apache.xtable.parquet;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -57,7 +56,7 @@ public class ParquetDataManager {
     this.hadoopConf = hadoopConf;
     this.basePath = basePath;
     try {
-      URI uri = Paths.get(basePath).toUri();
+      URI uri = new Path(basePath).toUri();
       this.fileSystem = FileSystem.get(uri, hadoopConf);
     } catch (IOException e) {
       throw new ReadException("Unable to initialize file system for base path: " + basePath, e);
@@ -77,7 +76,7 @@ public class ParquetDataManager {
 
   ParquetFileInfo getParquetDataFileAt(long targetTime) {
     return getParquetFiles().stream()
-        .filter(file -> file.getModificationTime() >= targetTime)
+        .filter(file -> file.getModificationTime() > targetTime)
         .min(Comparator.comparing(LocatedFileStatus::getModificationTime))
         .map(file -> new ParquetFileInfo(hadoopConf, file))
         .orElseThrow(() -> new IllegalStateException("No file found at or after " + targetTime));
