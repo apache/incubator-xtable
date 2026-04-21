@@ -457,7 +457,7 @@ public class ITParquetConversionSource {
 
     Dataset<Row> dfInit = sparkSession.createDataFrame(data, schema);
     Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet_table_test_2");
-    // String outputPath = fixedPath.toString();
+    
     Dataset<Row> df = dfInit.withColumn("full_date", expr("make_date(year, month, 1)"));
     String outputPath =
         new java.io.File("target/fixed-parquet-data/parquet_table_test_2").getAbsolutePath();
