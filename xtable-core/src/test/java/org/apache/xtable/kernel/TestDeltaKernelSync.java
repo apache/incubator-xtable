@@ -437,28 +437,30 @@ public class TestDeltaKernelSync {
 
     // Scan all files
     ScanImpl scan = (ScanImpl) snapshot.getScanBuilder().build();
-    CloseableIterator<FilteredColumnarBatch> scanFiles = scan.getScanFiles(engine, false);
 
     Map<String, InternalDataFile> pathToFile =
         expectedFiles.stream()
             .collect(Collectors.toMap(InternalDataFile::getPhysicalPath, Function.identity()));
 
     int count = 0;
-    while (scanFiles.hasNext()) {
-      FilteredColumnarBatch batch = scanFiles.next();
-      CloseableIterator<Row> rows = batch.getRows();
+    try (CloseableIterator<FilteredColumnarBatch> scanFiles = scan.getScanFiles(engine, false)) {
+      while (scanFiles.hasNext()) {
+        FilteredColumnarBatch batch = scanFiles.next();
+        try (CloseableIterator<Row> rows = batch.getRows()) {
+          while (rows.hasNext()) {
+            Row scanFileRow = rows.next();
+            AddFile addFile =
+                new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
 
-      while (rows.hasNext()) {
-        Row scanFileRow = rows.next();
-        AddFile addFile =
-            new AddFile(scanFileRow.getStruct(scanFileRow.getSchema().indexOf("add")));
-
-        String fullPath =
-            new org.apache.hadoop.fs.Path(basePath.resolve(addFile.getPath()).toUri()).toString();
-        InternalDataFile expected = pathToFile.get(fullPath);
-        assertNotNull(expected, "Unexpected file in Delta table: " + fullPath);
-        assertEquals(addFile.getSize(), expected.getFileSizeBytes());
-        count++;
+            String fullPath =
+                new org.apache.hadoop.fs.Path(basePath.resolve(addFile.getPath()).toUri())
+                    .toString();
+            InternalDataFile expected = pathToFile.get(fullPath);
+            assertNotNull(expected, "Unexpected file in Delta table: " + fullPath);
+            assertEquals(addFile.getSize(), expected.getFileSizeBytes());
+            count++;
+          }
+        }
       }
     }
 

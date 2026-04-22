@@ -127,12 +127,13 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
 
     long expectedFileSize = 1024L;
     long expectedRecordCount = 100L;
+    long expectedModificationTime = Instant.now().toEpochMilli();
 
     InternalDataFile dataFile =
         InternalDataFile.builder()
             .physicalPath(testFilePath)
             .fileSizeBytes(expectedFileSize)
-            .lastModified(Instant.now().toEpochMilli())
+            .lastModified(expectedModificationTime)
             .recordCount(expectedRecordCount)
             .partitionValues(Collections.emptyList())
             .columnStats(Collections.emptyList())
@@ -173,7 +174,7 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
     assertTrue(
         addFile.getPath().contains("test_data.parquet"),
         "AddFile path should contain the test file name");
-    assertTrue(addFile.getSize() > 0, "AddFile size should be greater than 0");
+    assertEquals(expectedFileSize, addFile.getSize(), "AddFile size should match expected size");
 
     // Verify partition values
     assertNotNull(addFile.getPartitionValues(), "AddFile partition values should not be null");
@@ -182,9 +183,11 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
         partitionValuesMap.isEmpty(),
         "AddFile partition values should be empty for non-partitioned table");
 
-    // Verify modification time is set
-    assertTrue(
-        addFile.getModificationTime() > 0, "AddFile modification time should be greater than 0");
+    // Verify modification time is set correctly
+    assertEquals(
+        expectedModificationTime,
+        addFile.getModificationTime(),
+        "AddFile modification time should match expected time");
   }
 
   @Test

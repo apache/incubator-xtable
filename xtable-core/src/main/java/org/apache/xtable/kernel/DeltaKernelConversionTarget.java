@@ -20,7 +20,6 @@ package org.apache.xtable.kernel;
 
 import static io.delta.kernel.utils.CloseableIterable.inMemoryIterable;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -255,17 +254,25 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
   @Override
   public void syncFilesForSnapshot(List<PartitionFileGroup> partitionedDataFiles) {
     Table table = Table.forPath(engine, basePath);
+    // Pass cached snapshot to avoid reloading it
     transactionState.setActions(
         dataKernelFileUpdatesExtractor.applySnapshot(
-            table, partitionedDataFiles, transactionState.getLatestSchemaInternal()));
+            table,
+            partitionedDataFiles,
+            transactionState.getLatestSchemaInternal(),
+            transactionState.getCachedSnapshot()));
   }
 
   @Override
   public void syncFilesForDiff(InternalFilesDiff internalFilesDiff) {
-    Table table = Table.forPath(engine, basePath);
+    // Use cached schema directly (already extracted during TransactionState initialization)
+    // For new tables, latestSchema is null and applyDiff will handle it appropriately
     transactionState.setActions(
         dataKernelFileUpdatesExtractor.applyDiff(
-            internalFilesDiff, basePath, table.getLatestSnapshot(engine).getSchema()));
+            internalFilesDiff,
+            transactionState.getLatestSchemaInternal(),
+            basePath,
+            transactionState.getLatestSchema()));
   }
 
   @Override
@@ -327,6 +334,11 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
     private TableSyncMetadata metadata;
     private List<RowBackedAction> actions;
 
+    // Cache the snapshot to avoid multiple loads during a single sync cycle
+    // This snapshot is used for: schema extraction, table existence check, and file diff operations
+    private Snapshot cachedSnapshot;
+    private boolean tableExists;
+
     private TransactionState(Engine engine, long retentionInHours) {
       this.engine = engine;
       this.partitionColumns = new ArrayList<>();
@@ -334,10 +346,14 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
 
       try {
         Table table = Table.forPath(engine, basePath);
-        this.latestSchema = table.getLatestSnapshot(engine).getSchema();
+        this.cachedSnapshot = table.getLatestSnapshot(engine);
+        this.latestSchema = cachedSnapshot.getSchema();
+        this.tableExists = true;
       } catch (TableNotFoundException e) {
         // Expected: table doesn't exist yet on first sync
         this.latestSchema = null;
+        this.cachedSnapshot = null;
+        this.tableExists = false;
       }
       // Let other exceptions propagate (network issues, permissions, corrupted metadata, etc.)
     }
@@ -347,6 +363,14 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
      */
     void addPartitionColumn(String columnName) {
       partitionColumns.add(columnName);
+    }
+
+    /**
+     * Gets the cached snapshot. Returns null if no snapshot was cached (new table). Package-private
+     * to allow access from outer class.
+     */
+    Snapshot getCachedSnapshot() {
+      return cachedSnapshot;
     }
 
     void setMetadata(TableSyncMetadata metadata) {
@@ -371,16 +395,8 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
     }
 
     private void commitTransaction() {
-      boolean tableExists = checkTableExists();
-
+      // Use cached table existence check instead of loading snapshot again
       Operation operation = tableExists ? Operation.WRITE : Operation.CREATE_TABLE;
-
-      if (!tableExists) {
-        File tableDir = new File(basePath);
-        if (!tableDir.exists()) {
-          tableDir.mkdirs();
-        }
-      }
 
       Table table = Table.forPath(engine, basePath);
       TransactionBuilder txnBuilder =
@@ -466,12 +482,11 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
       // - The commit timestamp is managed by Delta Kernel automatically
     }
 
-    private boolean checkTableExists() {
-      return DeltaKernelUtils.tableExists(engine, basePath);
-    }
-
     private Map<String, String> getConfigurationsForDeltaSync() {
       Map<String, String> configMap = new HashMap<>();
+      // Delta Kernel will automatically upgrade protocol versions if/when features that require
+      // higher versions are used. Explicitly setting them via table properties is not supported
+      // in Delta Kernel 4.0.0 and causes UnknownConfiguration errors.
 
       configMap.put(TableSyncMetadata.XTABLE_METADATA, metadata.toJson());
       configMap.put(
