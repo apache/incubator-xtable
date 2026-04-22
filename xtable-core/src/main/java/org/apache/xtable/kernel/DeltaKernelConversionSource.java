@@ -119,6 +119,9 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
     String provider = ((SnapshotImpl) snapshot).getMetadata().getFormat().getProvider();
     FileFormat fileFormat = actionsConverter.convertToFileFormat(provider);
 
+    // Cache table base path once to avoid creating new Engine per file
+    String tableBasePath = table.getPath(engine);
+
     List<RowBackedAction> actionsForVersion = getChangesState().getActionsForVersion(versionNumber);
 
     for (RowBackedAction action : actionsForVersion) {
@@ -128,7 +131,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
         InternalDataFile dataFile =
             actionsConverter.convertAddActionToInternalDataFile(
                 addFile,
-                table,
+                tableBasePath, // Use cached base path
                 fileFormat,
                 tableAtVersion.getPartitioningFields(),
                 tableAtVersion.getReadSchema().getFields(),
@@ -147,7 +150,7 @@ public class DeltaKernelConversionSource implements ConversionSource<Long> {
         InternalDataFile dataFile =
             actionsConverter.convertRemoveActionToInternalDataFile(
                 removeFile,
-                table,
+                tableBasePath, // Use cached base path
                 fileFormat,
                 tableAtVersion.getPartitioningFields(),
                 DeltaKernelPartitionExtractor.getInstance(),
