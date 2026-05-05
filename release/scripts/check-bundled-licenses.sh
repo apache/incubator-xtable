@@ -143,10 +143,9 @@ extract_license_coordinates() {
 # Extracts runtime dependencies using Maven for the given module
 extract_runtime_dependencies() {
   local module_dir="$1"
-  local module_name
-  module_name=$(basename "$module_dir")
+  local project_root="$2"
   local dep_tree_output
-  dep_tree_output=$(./mvnw -pl "$module_name" dependency:tree -Dscope=runtime 2>/dev/null)
+  dep_tree_output=$("${project_root}/mvnw" -f "${module_dir}/pom.xml" dependency:tree -Dscope=runtime 2>/dev/null)
   echo "$dep_tree_output" | awk '
     {
       # Remove [INFO]
@@ -172,6 +171,7 @@ verify_bundled_coordinates_are_in_license() {
   local jar_path="$1"
   local module_dir="$2"
   local license_path="$3"
+  local project_root="$4"
   local runtime_deps_path
   local licensed_coords_path
   local missing_coords_path
@@ -182,7 +182,7 @@ verify_bundled_coordinates_are_in_license() {
   missing_coords_path="$(make_temp_file)"
   version_mismatch_path="$(make_temp_file)"
 
-  extract_runtime_dependencies "$module_dir" > "$runtime_deps_path"
+  extract_runtime_dependencies "$module_dir" "$project_root" > "$runtime_deps_path"
   extract_license_coordinates "$license_path" > "$licensed_coords_path"
 
   # Check for missing coordinates (groupId:artifactId)
@@ -222,11 +222,12 @@ print_summary() {
 }
 
 main() {
-  if [[ $# -ne 1 ]]; then
-    log_error "Usage: $0 <module-dir>"
+  if [[ $# -ne 2 ]]; then
+    log_error "Usage: $0 <module-dir> <project-root>"
     exit 2
   fi
   local module_dir="$1"
+  local project_root="$2"
   local meta_inf_dir="${module_dir}/src/main/resources/META-INF"
   local jar_path
 
@@ -254,7 +255,7 @@ main() {
   verify_module_meta_inf_resources "${jar_path}" "${module_dir}" "${meta_inf_dir}"
 
   log_info "[${module_dir}] Checking LICENSE-bundled covers all bundled dependencies."
-  verify_bundled_coordinates_are_in_license "${jar_path}" "${module_dir}" "${meta_inf_dir}/LICENSE-bundled"
+  verify_bundled_coordinates_are_in_license "${jar_path}" "${module_dir}" "${meta_inf_dir}/LICENSE-bundled" "${project_root}"
 
   print_summary "${module_dir}"
 }

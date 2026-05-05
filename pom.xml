@@ -1012,6 +1012,7 @@
                             <arguments>
                                 <argument>${maven.multiModuleProjectDirectory}/release/scripts/check-bundled-licenses.sh</argument>
                                 <argument>${project.basedir}</argument>
+                                <argument>${maven.multiModuleProjectDirectory}</argument>
                             </arguments>
                         </configuration>
                     </execution>
