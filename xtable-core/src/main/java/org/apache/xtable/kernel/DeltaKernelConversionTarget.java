@@ -467,7 +467,10 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
               hook.threadSafeInvoke(engine);
             } catch (Exception hookEx) {
               // Post-commit hooks are optimizations; log but don't fail the transaction
-              log.warn("Post-commit hook failed for table {} but transaction succeeded", basePath, hookEx);
+              log.warn(
+                  "Post-commit hook failed for table {} but transaction succeeded",
+                  basePath,
+                  hookEx);
             }
           }
         }
