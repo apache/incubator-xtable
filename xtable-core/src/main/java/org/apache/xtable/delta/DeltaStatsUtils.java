@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -77,7 +78,7 @@ public class DeltaStatsUtils {
   /* this data structure collects type names of all unrecognized Delta Lake stats. For instance
   data file stats in presence of delete vectors would contain 'tightBounds' stat which is
   currently not handled by XTable */
-  private static final Set<String> unsupportedStats = new HashSet<>();
+  private static final Set<String> unsupportedStats = ConcurrentHashMap.newKeySet();
 
   private DeltaStatsUtils() {
     // Utility class, prevent instantiation
@@ -241,7 +242,7 @@ public class DeltaStatsUtils {
         try {
           currObject = (HashMap<String, Object>) currObject.get(part);
         } catch (ClassCastException e) {
-          throw new RuntimeException(
+          throw new ParseException(
               String.format(
                   "Cannot cast to hashmap while inserting stats at path %s",
                   String.join("->", pathParts)),

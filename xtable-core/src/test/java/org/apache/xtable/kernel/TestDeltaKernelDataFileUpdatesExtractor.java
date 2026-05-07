@@ -149,9 +149,9 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
                 .partitionValues(Collections.emptyList())
                 .build());
 
-    // Execute applySnapshot
+    // Execute applySnapshot (use 4-arg version to test production code path)
     scala.collection.Seq<RowBackedAction> actions =
-        extractor.applySnapshot(table, partitionedDataFiles, testSchema);
+        extractor.applySnapshot(table, partitionedDataFiles, testSchema, null);
 
     // Verify actions are created
     assertNotNull(actions);
@@ -259,9 +259,9 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
                 .partitionValues(Collections.singletonList(partitionValue2))
                 .build());
 
-    // Execute applySnapshot
+    // Execute applySnapshot (use 4-arg version to test production code path)
     scala.collection.Seq<RowBackedAction> actions =
-        extractor.applySnapshot(table, partitionedDataFiles, testSchema);
+        extractor.applySnapshot(table, partitionedDataFiles, testSchema, null);
 
     // Verify
     assertNotNull(actions);
@@ -358,7 +358,7 @@ public class TestDeltaKernelDataFileUpdatesExtractor {
             .build();
 
     scala.collection.Seq<RowBackedAction> actions =
-        syncExtractor.applySnapshot(table, newPartitionedDataFiles, testSchema);
+        syncExtractor.applySnapshot(table, newPartitionedDataFiles, testSchema, null);
 
     // Step 4: Verify the differential sync results
     assertNotNull(actions, "Actions should not be null");

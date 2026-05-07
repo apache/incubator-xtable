@@ -40,6 +40,7 @@ import org.apache.xtable.model.stat.FileStats;
  * @deprecated This class is a thin wrapper around DeltaStatsUtils. Consider using DeltaStatsUtils
  *     directly.
  */
+@Deprecated
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaStatsExtractor {
   private static final DeltaStatsExtractor INSTANCE = new DeltaStatsExtractor();

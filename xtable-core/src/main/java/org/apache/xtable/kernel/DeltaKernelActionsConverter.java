@@ -25,11 +25,9 @@ import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
 import io.delta.kernel.Table;
-import io.delta.kernel.defaults.engine.DefaultEngine;
 import io.delta.kernel.engine.Engine;
 import io.delta.kernel.internal.actions.AddFile;
 import io.delta.kernel.internal.actions.RemoveFile;
@@ -70,51 +68,13 @@ public class DeltaKernelActionsConverter {
         includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
     long recordCount = fileStats.getNumRecords();
 
-    Map<String, String> scalaMap = partitionValues;
-
     return InternalDataFile.builder()
         .physicalPath(getFullPathToFile(addFile.getPath(), tableBasePath))
         .fileFormat(fileFormat)
         .fileSizeBytes(addFile.getSize())
         .lastModified(addFile.getModificationTime())
-        .partitionValues(partitionExtractor.partitionValueExtraction(scalaMap, partitionFields))
-        .columnStats(columnStats)
-        .recordCount(recordCount)
-        .build();
-  }
-
-  /**
-   * Converts AddFile to InternalDataFile (deprecated - inefficient).
-   *
-   * @deprecated Use {@link #convertAddActionToInternalDataFile(AddFile, String, FileFormat, List,
-   *     List, boolean, DeltaKernelPartitionExtractor, DeltaKernelStatsExtractor, Map)} with cached
-   *     tableBasePath instead to avoid creating new Engine per call
-   */
-  @Deprecated
-  public InternalDataFile convertAddActionToInternalDataFile(
-      AddFile addFile,
-      Table table,
-      FileFormat fileFormat,
-      List<InternalPartitionField> partitionFields,
-      List<InternalField> fields,
-      boolean includeColumnStats,
-      DeltaKernelPartitionExtractor partitionExtractor,
-      DeltaKernelStatsExtractor fileStatsExtractor,
-      Map<String, String> partitionValues) {
-    // WARNING: Creates new Configuration + Engine per call - inefficient!
-    FileStats fileStats = fileStatsExtractor.getColumnStatsForFile(addFile, fields);
-    List<ColumnStat> columnStats =
-        includeColumnStats ? fileStats.getColumnStats() : Collections.emptyList();
-    long recordCount = fileStats.getNumRecords();
-
-    Map<String, String> scalaMap = partitionValues;
-
-    return InternalDataFile.builder()
-        .physicalPath(getFullPathToFile(addFile.getPath(), table)) // Inefficient!
-        .fileFormat(fileFormat)
-        .fileSizeBytes(addFile.getSize())
-        .lastModified(addFile.getModificationTime())
-        .partitionValues(partitionExtractor.partitionValueExtraction(scalaMap, partitionFields))
+        .partitionValues(
+            partitionExtractor.partitionValueExtraction(partitionValues, partitionFields))
         .columnStats(columnStats)
         .recordCount(recordCount)
         .build();
@@ -132,37 +92,11 @@ public class DeltaKernelActionsConverter {
       List<InternalPartitionField> partitionFields,
       DeltaKernelPartitionExtractor partitionExtractor,
       Map<String, String> partitionValues) {
-    Map<String, String> scalaMap = partitionValues;
-
     return InternalDataFile.builder()
         .physicalPath(getFullPathToFile(removeFile.getPath(), tableBasePath))
         .fileFormat(fileFormat)
-        .partitionValues(partitionExtractor.partitionValueExtraction(scalaMap, partitionFields))
-        .build();
-  }
-
-  /**
-   * Converts RemoveFile to InternalDataFile (deprecated - inefficient).
-   *
-   * @deprecated Use {@link #convertRemoveActionToInternalDataFile(RemoveFile, String, FileFormat,
-   *     List, DeltaKernelPartitionExtractor, Map)} with cached tableBasePath instead to avoid
-   *     creating new Engine per call
-   */
-  @Deprecated
-  public InternalDataFile convertRemoveActionToInternalDataFile(
-      RemoveFile removeFile,
-      Table table,
-      FileFormat fileFormat,
-      List<InternalPartitionField> partitionFields,
-      DeltaKernelPartitionExtractor partitionExtractor,
-      Map<String, String> partitionValues) {
-    // WARNING: Creates new Configuration + Engine per call - inefficient!
-    Map<String, String> scalaMap = partitionValues;
-
-    return InternalDataFile.builder()
-        .physicalPath(getFullPathToFile(removeFile.getPath(), table)) // Inefficient!
-        .fileFormat(fileFormat)
-        .partitionValues(partitionExtractor.partitionValueExtraction(scalaMap, partitionFields))
+        .partitionValues(
+            partitionExtractor.partitionValueExtraction(partitionValues, partitionFields))
         .build();
   }
 
@@ -174,29 +108,6 @@ public class DeltaKernelActionsConverter {
     }
     throw new NotSupportedException(
         String.format("delta file format %s is not recognized", provider));
-  }
-
-  /**
-   * Constructs the full path to a file, handling both relative and absolute paths.
-   *
-   * <p><strong>DEPRECATED:</strong> This method creates a new Configuration and Engine on every
-   * call, which is extremely inefficient. Use {@link #getFullPathToFile(String, Engine, Table)} or
-   * {@link #getFullPathToFile(String, String)} instead.
-   *
-   * @param dataFilePath the data file path (relative or absolute)
-   * @param table the Delta table
-   * @return the full absolute path to the file
-   * @deprecated Use {@link #getFullPathToFile(String, Engine, Table)} to avoid creating new
-   *     Engine/Configuration on every call, or {@link #getFullPathToFile(String, String)} if you
-   *     already have the base path
-   */
-  @Deprecated
-  static String getFullPathToFile(String dataFilePath, Table table) {
-    // WARNING: This creates new Configuration + Engine per call - severe performance issue!
-    // Kept for backwards compatibility but should not be used in hot paths
-    Configuration hadoopConf = new Configuration();
-    Engine myEngine = DefaultEngine.create(hadoopConf);
-    return getFullPathToFile(dataFilePath, myEngine, table);
   }
 
   /**
@@ -220,9 +131,13 @@ public class DeltaKernelActionsConverter {
    * @return the full absolute path to the file
    */
   static String getFullPathToFile(String dataFilePath, String tableBasePath) {
-    if (dataFilePath.startsWith(tableBasePath)) {
+    // Check if the file path is already absolute and under the table base path
+    // Use separator check to avoid false positives (e.g., "/foo" matching "/foobar/x.parquet")
+    String basePathWithSeparator =
+        tableBasePath.endsWith(Path.SEPARATOR) ? tableBasePath : tableBasePath + Path.SEPARATOR;
+    if (dataFilePath.startsWith(basePathWithSeparator)) {
       return dataFilePath;
     }
-    return tableBasePath + Path.SEPARATOR + dataFilePath;
+    return basePathWithSeparator + dataFilePath;
   }
 }

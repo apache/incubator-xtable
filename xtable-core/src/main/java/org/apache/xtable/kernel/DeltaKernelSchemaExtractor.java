@@ -246,7 +246,7 @@ public class DeltaKernelSchemaExtractor {
                         field.getName(),
                         convertFieldType(field),
                         field.getSchema().isNullable(),
-                        getFieldMetadata(field.getSchema())))
+                        getFieldMetadata(field)))
             .collect(CustomCollectors.toList(internalSchema.getFields().size()));
     return new StructType(fields);
   }
@@ -283,10 +283,23 @@ public class DeltaKernelSchemaExtractor {
       case DOUBLE:
         return DoubleType.DOUBLE;
       case DECIMAL:
-        int precision =
-            (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
-        int scale =
-            (int) field.getSchema().getMetadata().get(InternalSchema.MetadataKey.DECIMAL_SCALE);
+        Map<InternalSchema.MetadataKey, Object> metadata = field.getSchema().getMetadata();
+        if (metadata == null) {
+          throw new IllegalStateException(
+              String.format(
+                  "DECIMAL field '%s' missing metadata - cannot determine precision/scale",
+                  field.getName()));
+        }
+        Object precisionObj = metadata.get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+        Object scaleObj = metadata.get(InternalSchema.MetadataKey.DECIMAL_SCALE);
+        if (!(precisionObj instanceof Number) || !(scaleObj instanceof Number)) {
+          throw new IllegalStateException(
+              String.format(
+                  "DECIMAL field '%s' missing precision/scale metadata - found precision=%s, scale=%s",
+                  field.getName(), precisionObj, scaleObj));
+        }
+        int precision = ((Number) precisionObj).intValue();
+        int scale = ((Number) scaleObj).intValue();
         return new DecimalType(precision, scale);
       case RECORD:
         return fromInternalSchema(field.getSchema());
@@ -323,13 +336,20 @@ public class DeltaKernelSchemaExtractor {
   }
 
   /**
-   * Creates Delta Kernel FieldMetadata from InternalSchema.
+   * Creates Delta Kernel FieldMetadata from InternalField.
    *
-   * @param schema the internal schema
+   * @param field the internal field
    * @return Delta Kernel FieldMetadata
    */
-  private FieldMetadata getFieldMetadata(InternalSchema schema) {
+  private FieldMetadata getFieldMetadata(InternalField field) {
     FieldMetadata.Builder metadataBuilder = FieldMetadata.builder();
+
+    // Propagate column mapping ID to maintain Delta column mapping
+    if (field.getFieldId() != null) {
+      metadataBuilder.putLong(DELTA_COLUMN_MAPPING_ID, field.getFieldId().longValue());
+    }
+
+    InternalSchema schema = field.getSchema();
 
     // Handle UUID type
     InternalType type = schema.getDataType();

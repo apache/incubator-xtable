@@ -79,19 +79,6 @@ public class DeltaKernelDataFileUpdatesExtractor {
   private final boolean includeColumnStats;
 
   /**
-   * Applies snapshot changes, loading the snapshot fresh.
-   *
-   * @param table the Delta table
-   * @param partitionedDataFiles the new data files to sync
-   * @param tableSchema the internal schema
-   * @return sequence of Delta actions (AddFile/RemoveFile)
-   */
-  public Seq<RowBackedAction> applySnapshot(
-      Table table, List<PartitionFileGroup> partitionedDataFiles, InternalSchema tableSchema) {
-    return applySnapshot(table, partitionedDataFiles, tableSchema, null);
-  }
-
-  /**
    * Applies snapshot changes with an optional cached snapshot to avoid redundant loads.
    *
    * @param table the Delta table
@@ -336,18 +323,20 @@ public class DeltaKernelDataFileUpdatesExtractor {
       case DECIMAL:
         // Extract precision and scale from schema metadata
         Map<InternalSchema.MetadataKey, Object> metadata = fieldSchema.getMetadata();
-        int precision = 10; // default precision
-        int scale = 0; // default scale
-        if (metadata != null) {
-          Object precisionObj = metadata.get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
-          Object scaleObj = metadata.get(InternalSchema.MetadataKey.DECIMAL_SCALE);
-          if (precisionObj instanceof Number) {
-            precision = ((Number) precisionObj).intValue();
-          }
-          if (scaleObj instanceof Number) {
-            scale = ((Number) scaleObj).intValue();
-          }
+        if (metadata == null) {
+          throw new IllegalStateException(
+              "DECIMAL field schema missing metadata - cannot determine precision/scale for stats");
         }
+        Object precisionObj = metadata.get(InternalSchema.MetadataKey.DECIMAL_PRECISION);
+        Object scaleObj = metadata.get(InternalSchema.MetadataKey.DECIMAL_SCALE);
+        if (!(precisionObj instanceof Number) || !(scaleObj instanceof Number)) {
+          throw new IllegalStateException(
+              String.format(
+                  "DECIMAL field schema missing precision/scale metadata - found precision=%s, scale=%s",
+                  precisionObj, scaleObj));
+        }
+        int precision = ((Number) precisionObj).intValue();
+        int scale = ((Number) scaleObj).intValue();
         return Literal.ofDecimal((java.math.BigDecimal) value, precision, scale);
       default:
         // Unsupported type for stats

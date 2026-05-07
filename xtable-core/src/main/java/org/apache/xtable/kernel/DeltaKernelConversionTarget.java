@@ -171,7 +171,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
       DeltaKernelSchemaExtractor schemaExtractor,
       DeltaKernelPartitionExtractor partitionExtractor,
       DeltaKernelDataFileUpdatesExtractor dataKernelFileUpdatesExtractor) {
-    _init(
+    initInternal(
         tableDataPath,
         logRetentionInHours,
         engine,
@@ -183,7 +183,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
   /**
    * Private initialization helper to avoid code duplication between constructor and init() paths.
    */
-  private void _init(
+  private void initInternal(
       String tableDataPath,
       long logRetentionInHours,
       Engine engine,
@@ -202,7 +202,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
   public void init(TargetTable targetTable, Configuration configuration) {
     Engine engine = DefaultEngine.create(configuration);
 
-    _init(
+    initInternal(
         targetTable.getBasePath(),
         targetTable.getMetadataRetention().toHours(),
         engine,
@@ -467,7 +467,7 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
               hook.threadSafeInvoke(engine);
             } catch (Exception hookEx) {
               // Post-commit hooks are optimizations; log but don't fail the transaction
-              log.warn("Post-commit hook failed but transaction succeeded", hookEx);
+              log.warn("Post-commit hook failed for table {} but transaction succeeded", basePath, hookEx);
             }
           }
         }
