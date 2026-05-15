@@ -131,7 +131,7 @@ public class TestDeltaKernelReadWriteIntegration {
     // Verify schema
     InternalSchema readSchema = readTable.getReadSchema();
     assertNotNull(readSchema);
-    assertEquals(schema.getFields().size(), readSchema.getFields().size());
+    assertEquals(schema, readSchema);
 
     // Read current snapshot
     InternalSnapshot readSnapshot = reader.getCurrentSnapshot();
@@ -352,7 +352,7 @@ public class TestDeltaKernelReadWriteIntegration {
     // Read back
     InternalTable readTable = reader.getCurrentTable();
     assertNotNull(readTable);
-    assertEquals(schema.getFields().size(), readTable.getReadSchema().getFields().size());
+    assertEquals(schema, readTable.getReadSchema());
 
     InternalSnapshot readSnapshot = reader.getCurrentSnapshot();
     assertNotNull(readSnapshot);

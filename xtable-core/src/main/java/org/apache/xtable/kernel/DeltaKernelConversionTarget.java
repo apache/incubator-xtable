@@ -200,6 +200,12 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
 
   @Override
   public void init(TargetTable targetTable, Configuration configuration) {
+    if (this.engine != null) {
+      throw new IllegalStateException(
+          "init() called on an already initialized instance. "
+              + "Do not call init() after using the parameterized constructor.");
+    }
+
     Engine engine = DefaultEngine.create(configuration);
 
     initInternal(

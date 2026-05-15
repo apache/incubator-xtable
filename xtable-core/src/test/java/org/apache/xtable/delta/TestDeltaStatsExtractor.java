@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.apache.spark.sql.delta.actions.AddFile;
@@ -49,6 +50,12 @@ import org.apache.xtable.testutil.ColumnStatMapUtil;
 public class TestDeltaStatsExtractor {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+
+  @BeforeEach
+  public void setUp() {
+    // Clear static state to ensure test isolation
+    DeltaStatsUtils.clearUnsupportedStats();
+  }
 
   @Test
   public void testDeltaStats() throws JsonProcessingException {

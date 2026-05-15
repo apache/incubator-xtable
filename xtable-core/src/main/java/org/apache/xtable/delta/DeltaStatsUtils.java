@@ -310,6 +310,16 @@ public class DeltaStatsUtils {
     return Collections.unmodifiableSet(unsupportedStats);
   }
 
+  /**
+   * Clears the unsupported stats cache. This is necessary for test isolation because
+   * unsupportedStats is static mutable state that persists across test cases in the same JVM.
+   * Without clearing, tests can pass or fail depending on execution order.
+   */
+  @VisibleForTesting
+  public static void clearUnsupportedStats() {
+    unsupportedStats.clear();
+  }
+
   /** Internal representation of Delta stats JSON structure. */
   @lombok.Builder
   @Value
