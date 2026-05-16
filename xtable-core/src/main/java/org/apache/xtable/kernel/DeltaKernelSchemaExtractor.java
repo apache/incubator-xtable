@@ -82,7 +82,7 @@ public class DeltaKernelSchemaExtractor {
 
     if (dataType instanceof IntegerType) {
       type = InternalType.INT;
-      trimmedTypeName = "integer";
+      trimmedTypeName = "int";
     } else if (dataType instanceof StringType) {
       type = InternalType.STRING;
       trimmedTypeName = "string";

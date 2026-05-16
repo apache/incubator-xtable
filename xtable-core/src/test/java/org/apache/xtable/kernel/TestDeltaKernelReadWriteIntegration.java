@@ -128,10 +128,11 @@ public class TestDeltaKernelReadWriteIntegration {
         actualPath.endsWith(expectedPath) || actualPath.equals(expectedPath),
         "Base path should match. Expected: " + expectedPath + ", Actual: " + actualPath);
 
-    // Verify schema
+    // Verify schema (Delta normalizes schema names and timestamp precision)
     InternalSchema readSchema = readTable.getReadSchema();
     assertNotNull(readSchema);
-    assertEquals(schema, readSchema);
+    InternalSchema expectedSchema = createSimpleSchema(true); // Get Delta-normalized version
+    assertEquals(expectedSchema, readSchema);
 
     // Read current snapshot
     InternalSnapshot readSnapshot = reader.getCurrentSnapshot();
@@ -352,7 +353,9 @@ public class TestDeltaKernelReadWriteIntegration {
     // Read back
     InternalTable readTable = reader.getCurrentTable();
     assertNotNull(readTable);
-    assertEquals(schema, readTable.getReadSchema());
+    // Delta normalizes schema names and timestamp precision
+    InternalSchema expectedSchema = createSimpleSchema(true);
+    assertEquals(expectedSchema, readTable.getReadSchema());
 
     InternalSnapshot readSnapshot = reader.getCurrentSnapshot();
     assertNotNull(readSnapshot);
@@ -381,13 +384,26 @@ public class TestDeltaKernelReadWriteIntegration {
   }
 
   private InternalSchema createSimpleSchema() {
+    return createSimpleSchema(false);
+  }
+
+  /**
+   * Creates a simple test schema.
+   *
+   * @param forComparison if true, returns schema with Delta-normalized values (for comparing
+   *     against read results)
+   */
+  private InternalSchema createSimpleSchema(boolean forComparison) {
+    // Delta Kernel always uses MICROS precision for timestamps
     Map<InternalSchema.MetadataKey, Object> timestampMetadata = new HashMap<>();
     timestampMetadata.put(
-        InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MILLIS);
+        InternalSchema.MetadataKey.TIMESTAMP_PRECISION,
+        forComparison ? InternalSchema.MetadataValue.MICROS : InternalSchema.MetadataValue.MILLIS);
 
     return InternalSchema.builder()
         .dataType(InternalType.RECORD)
-        .name("test_schema")
+        // Delta Kernel normalizes struct type name to "struct"
+        .name(forComparison ? "struct" : "test_schema")
         .fields(
             Arrays.asList(
                 InternalField.builder()
@@ -407,6 +423,7 @@ public class TestDeltaKernelReadWriteIntegration {
                             .dataType(InternalType.STRING)
                             .isNullable(true)
                             .build())
+                    .defaultValue(forComparison ? InternalField.Constants.NULL_DEFAULT_VALUE : null)
                     .build(),
                 InternalField.builder()
                     .name("int_field")
@@ -416,6 +433,7 @@ public class TestDeltaKernelReadWriteIntegration {
                             .dataType(InternalType.INT)
                             .isNullable(true)
                             .build())
+                    .defaultValue(forComparison ? InternalField.Constants.NULL_DEFAULT_VALUE : null)
                     .build(),
                 InternalField.builder()
                     .name("timestamp_field")
@@ -426,6 +444,7 @@ public class TestDeltaKernelReadWriteIntegration {
                             .isNullable(true)
                             .metadata(timestampMetadata)
                             .build())
+                    .defaultValue(forComparison ? InternalField.Constants.NULL_DEFAULT_VALUE : null)
                     .build()))
         .isNullable(false)
         .build();

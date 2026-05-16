@@ -94,7 +94,7 @@ public class TestDeltaKernelSchemaExtractor {
                         .name("requiredInt")
                         .schema(
                             InternalSchema.builder()
-                                .name("integer")
+                                .name("int")
                                 .dataType(InternalType.INT)
                                 .isNullable(false)
                                 .build())
@@ -103,7 +103,7 @@ public class TestDeltaKernelSchemaExtractor {
                         .name("optionalInt")
                         .schema(
                             InternalSchema.builder()
-                                .name("integer")
+                                .name("int")
                                 .dataType(InternalType.INT)
                                 .isNullable(true)
                                 .build())
@@ -449,7 +449,7 @@ public class TestDeltaKernelSchemaExtractor {
                                             .parentPath("intMap")
                                             .schema(
                                                 InternalSchema.builder()
-                                                    .name("integer")
+                                                    .name("int")
                                                     .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
@@ -470,7 +470,7 @@ public class TestDeltaKernelSchemaExtractor {
                                             .parentPath("recordMap")
                                             .schema(
                                                 InternalSchema.builder()
-                                                    .name("integer")
+                                                    .name("int")
                                                     .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
@@ -551,7 +551,7 @@ public class TestDeltaKernelSchemaExtractor {
                                             .parentPath("intList")
                                             .schema(
                                                 InternalSchema.builder()
-                                                    .name("integer")
+                                                    .name("int")
                                                     .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
@@ -615,7 +615,7 @@ public class TestDeltaKernelSchemaExtractor {
                                             .parentPath("nestedOne")
                                             .schema(
                                                 InternalSchema.builder()
-                                                    .name("integer")
+                                                    .name("int")
                                                     .dataType(InternalType.INT)
                                                     .isNullable(true)
                                                     .comment("nestedOptionalIntComment")
@@ -743,7 +743,7 @@ public class TestDeltaKernelSchemaExtractor {
                                             .parentPath("nestedOne")
                                             .schema(
                                                 InternalSchema.builder()
-                                                    .name("integer")
+                                                    .name("int")
                                                     .dataType(InternalType.INT)
                                                     .isNullable(true)
                                                     .build())
@@ -894,7 +894,7 @@ public class TestDeltaKernelSchemaExtractor {
             .name("id")
             .schema(
                 InternalSchema.builder()
-                    .name("integer")
+                    .name("int")
                     .dataType(InternalType.INT)
                     .isNullable(false)
                     .build())
@@ -1008,7 +1008,7 @@ public class TestDeltaKernelSchemaExtractor {
                         .name("id")
                         .schema(
                             InternalSchema.builder()
-                                .name("integer")
+                                .name("int")
                                 .dataType(InternalType.INT)
                                 .isNullable(false)
                                 .build())
@@ -1146,7 +1146,7 @@ public class TestDeltaKernelSchemaExtractor {
                                             .parentPath("scores")
                                             .schema(
                                                 InternalSchema.builder()
-                                                    .name("integer")
+                                                    .name("int")
                                                     .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
@@ -1278,7 +1278,7 @@ public class TestDeltaKernelSchemaExtractor {
                                             .parentPath("counts")
                                             .schema(
                                                 InternalSchema.builder()
-                                                    .name("integer")
+                                                    .name("int")
                                                     .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
@@ -1299,7 +1299,7 @@ public class TestDeltaKernelSchemaExtractor {
                                             .parentPath("locations")
                                             .schema(
                                                 InternalSchema.builder()
-                                                    .name("integer")
+                                                    .name("int")
                                                     .dataType(InternalType.INT)
                                                     .isNullable(false)
                                                     .build())
