@@ -89,7 +89,7 @@ done
 
 if [[ ${#missing_runtime_trees[@]} -gt 0 ]]; then
   module_csv="$(IFS=,; printf '%s' "${missing_runtime_trees[*]}")"
-  ./mvnw -pl "${module_csv}" -DskipTests dependency:tree -Dscope=runtime -DoutputType=text -DoutputFile=target/dependency-tree-runtime.txt
+  ./mvnw -pl "${module_csv}" -am -DskipTests dependency:tree -Dscope=runtime -DoutputType=text -DoutputFile=target/dependency-tree-runtime.txt
 fi
 
 overall_status=0

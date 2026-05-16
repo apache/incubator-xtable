@@ -107,7 +107,7 @@ Current shaded modules include:
 Generate runtime dependency trees for changed shaded modules:
 
 ```bash
-./mvnw -pl <module[,module...]> -DskipTests dependency:tree -Dscope=runtime -DoutputType=text -DoutputFile=target/dependency-tree-runtime.txt
+./mvnw -pl <module[,module...]> -am -DskipTests dependency:tree -Dscope=runtime -DoutputType=text -DoutputFile=target/dependency-tree-runtime.txt
 ```
 
 Regenerate bundled license metadata:
@@ -125,7 +125,7 @@ release/scripts/validate_shaded_license_coverage.sh
 If only one or two modules changed, prefer targeted Maven verification:
 
 ```bash
-./mvnw -pl <module[,module...]> -DskipTests dependency:tree -Dscope=runtime -DoutputType=text -DoutputFile=target/dependency-tree-runtime.txt
+./mvnw -pl <module[,module...]> -am -DskipTests dependency:tree -Dscope=runtime -DoutputType=text -DoutputFile=target/dependency-tree-runtime.txt
 ```
 
 If broader confidence is needed, run:

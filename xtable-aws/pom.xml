@@ -51,6 +51,13 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Iceberg dependencies -->
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- AWS Glue dependencies -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
@@ -127,94 +134,25 @@
                             </transformers>
                             <artifactSet>
                                 <includes>
-                                    <include>org.apache.xtable:xtable-api</include>
                                     <include>com.fasterxml.jackson.core:jackson-annotations</include>
                                     <include>com.fasterxml.jackson.core:jackson-core</include>
                                     <include>com.fasterxml.jackson.core:jackson-databind</include>
-                                    <include>com.fasterxml.jackson.datatype:jackson-datatype-jdk8</include>
                                     <include>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</include>
                                     <include>com.fasterxml.jackson.module:jackson-module-scala_${scala.binary.version}</include>
-                                    <include>com.github.ben-manes.caffeine:caffeine</include>
-                                    <include>com.github.davidmoten:guava-mini</include>
-                                    <include>com.github.davidmoten:hilbert-curve</include>
                                     <include>com.github.luben:zstd-jni</include>
                                     <include>com.google.errorprone:error_prone_annotations</include>
                                     <include>com.google.guava:failureaccess</include>
                                     <include>com.google.guava:guava</include>
                                     <include>com.google.guava:listenablefuture</include>
                                     <include>com.google.j2objc:j2objc-annotations</include>
-                                    <include>com.google.protobuf:protobuf-java</include>
-                                    <include>com.lmax:disruptor</include>
                                     <include>com.thoughtworks.paranamer:paranamer</include>
-                                    <include>commons-lang:commons-lang</include>
                                     <include>commons-pool:commons-pool</include>
-                                    <include>io.airlift:aircompressor</include>
-                                    <include>io.delta:delta-core_${scala.binary.version}</include>
-                                    <include>io.delta:delta-kernel-api</include>
-                                    <include>io.delta:delta-kernel-defaults</include>
-                                    <include>io.delta:delta-storage</include>
-                                    <include>io.dropwizard.metrics:metrics-graphite</include>
-                                    <include>io.dropwizard.metrics:metrics-jmx</include>
-                                    <include>io.javalin:javalin</include>
                                     <include>io.netty:netty-codec-http</include>
                                     <include>io.netty:netty-codec-http2</include>
-                                    <include>io.prometheus:simpleclient</include>
-                                    <include>io.prometheus:simpleclient_common</include>
-                                    <include>io.prometheus:simpleclient_dropwizard</include>
-                                    <include>io.prometheus:simpleclient_httpserver</include>
-                                    <include>io.prometheus:simpleclient_pushgateway</include>
-                                    <include>jakarta.annotation:jakarta.annotation-api</include>
-                                    <include>jakarta.validation:jakarta.validation-api</include>
-                                    <include>jakarta.ws.rs:jakarta.ws.rs-api</include>
-                                    <include>javax.activation:javax.activation-api</include>
                                     <include>javax.annotation:javax.annotation-api</include>
-                                    <include>javax.servlet.jsp:javax.servlet.jsp-api</include>
-                                    <include>javax.ws.rs:javax.ws.rs-api</include>
-                                    <include>javax.xml.bind:jaxb-api</include>
-                                    <include>joda-time:joda-time</include>
-                                    <include>org.antlr:antlr4-runtime</include>
                                     <include>org.apache.avro:avro</include>
-                                    <include>org.apache.commons:commons-crypto</include>
-                                    <include>org.apache.hbase.thirdparty:hbase-shaded-gson</include>
-                                    <include>org.apache.hbase.thirdparty:hbase-shaded-jersey</include>
-                                    <include>org.apache.hbase.thirdparty:hbase-shaded-jetty</include>
-                                    <include>org.apache.hbase.thirdparty:hbase-shaded-miscellaneous</include>
-                                    <include>org.apache.hbase.thirdparty:hbase-shaded-netty</include>
-                                    <include>org.apache.hbase.thirdparty:hbase-shaded-protobuf</include>
-                                    <include>org.apache.hbase:hbase-asyncfs</include>
-                                    <include>org.apache.hbase:hbase-client</include>
-                                    <include>org.apache.hbase:hbase-common</include>
-                                    <include>org.apache.hbase:hbase-hadoop-compat</include>
-                                    <include>org.apache.hbase:hbase-hadoop2-compat</include>
-                                    <include>org.apache.hbase:hbase-http</include>
-                                    <include>org.apache.hbase:hbase-logging</include>
-                                    <include>org.apache.hbase:hbase-metrics</include>
-                                    <include>org.apache.hbase:hbase-metrics-api</include>
-                                    <include>org.apache.hbase:hbase-procedure</include>
-                                    <include>org.apache.hbase:hbase-protocol</include>
-                                    <include>org.apache.hbase:hbase-protocol-shaded</include>
-                                    <include>org.apache.hbase:hbase-replication</include>
-                                    <include>org.apache.hbase:hbase-server</include>
-                                    <include>org.apache.hbase:hbase-zookeeper</include>
-                                    <include>org.apache.hive:hive-storage-api</include>
-                                    <include>org.apache.htrace:htrace-core4</include>
-                                    <include>org.apache.httpcomponents.client5:httpclient5</include>
-                                    <include>org.apache.httpcomponents.core5:httpcore5</include>
-                                    <include>org.apache.httpcomponents.core5:httpcore5-h2</include>
-                                    <include>org.apache.httpcomponents:fluent-hc</include>
-                                    <include>org.apache.hudi:hudi-common</include>
-                                    <include>org.apache.hudi:hudi-client-common</include>
-                                    <include>org.apache.hudi:hudi-java-client</include>
-                                    <include>org.apache.hudi:hudi-timeline-service</include>
-                                    <include>org.apache.iceberg:iceberg-api</include>
-                                    <include>org.apache.iceberg:iceberg-bundled-guava</include>
-                                    <include>org.apache.iceberg:iceberg-common</include>
-                                    <include>org.apache.iceberg:iceberg-core</include>
                                     <include>org.apache.logging.log4j:log4j-1.2-api</include>
                                     <include>org.apache.logging.log4j:log4j-api</include>
-                                    <include>org.apache.orc:orc-core</include>
-                                    <include>org.apache.orc:orc-shims</include>
-                                    <include>org.apache.paimon:paimon-bundle</include>
                                     <include>org.apache.parquet:parquet-avro</include>
                                     <include>org.apache.parquet:parquet-column</include>
                                     <include>org.apache.parquet:parquet-common</include>
@@ -222,42 +160,11 @@
                                     <include>org.apache.parquet:parquet-format-structures</include>
                                     <include>org.apache.parquet:parquet-hadoop</include>
                                     <include>org.apache.parquet:parquet-jackson</include>
+                                    <include>org.apache.xtable:xtable-api</include>
                                     <include>org.apache.xtable:xtable-core_${scala.binary.version}</include>
                                     <include>org.apache.xtable:xtable-hudi-support-utils</include>
-                                    <include>org.apache.yetus:audience-annotations</include>
                                     <include>org.checkerframework:checker-qual</include>
-                                    <include>org.eclipse.jetty.websocket:websocket-api</include>
-                                    <include>org.eclipse.jetty.websocket:websocket-client</include>
-                                    <include>org.eclipse.jetty.websocket:websocket-common</include>
-                                    <include>org.eclipse.jetty.websocket:websocket-server</include>
-                                    <include>org.eclipse.jetty.websocket:websocket-servlet</include>
-                                    <include>org.eclipse.jetty:jetty-client</include>
-                                    <include>org.eclipse.jetty:jetty-http</include>
-                                    <include>org.eclipse.jetty:jetty-io</include>
-                                    <include>org.eclipse.jetty:jetty-security</include>
-                                    <include>org.eclipse.jetty:jetty-server</include>
-                                    <include>org.eclipse.jetty:jetty-servlet</include>
-                                    <include>org.eclipse.jetty:jetty-util</include>
-                                    <include>org.eclipse.jetty:jetty-util-ajax</include>
-                                    <include>org.eclipse.jetty:jetty-webapp</include>
-                                    <include>org.eclipse.jetty:jetty-xml</include>
-                                    <include>org.glassfish.hk2.external:jakarta.inject</include>
-                                    <include>org.glassfish.web:javax.servlet.jsp</include>
-                                    <include>org.glassfish:javax.el</include>
-                                    <include>org.jamon:jamon-runtime</include>
-                                    <include>org.javassist:javassist</include>
-                                    <include>org.jetbrains:annotations</include>
-                                    <include>org.jetbrains.kotlin:kotlin-stdlib</include>
-                                    <include>org.jetbrains.kotlin:kotlin-stdlib-common</include>
-                                    <include>org.jetbrains.kotlin:kotlin-stdlib-jdk7</include>
-                                    <include>org.jetbrains.kotlin:kotlin-stdlib-jdk8</include>
-                                    <include>org.jruby.jcodings:jcodings</include>
-                                    <include>org.jruby.joni:joni</include>
-                                    <include>org.lz4:lz4-java</include>
                                     <include>org.reactivestreams:reactive-streams</include>
-                                    <include>org.roaringbitmap:RoaringBitmap</include>
-                                    <include>org.roaringbitmap:shims</include>
-                                    <include>org.rocksdb:rocksdbjni</include>
                                     <include>org.scala-lang:scala-library</include>
                                     <include>software.amazon.awssdk:annotations</include>
                                     <include>software.amazon.awssdk:apache-client</include>
