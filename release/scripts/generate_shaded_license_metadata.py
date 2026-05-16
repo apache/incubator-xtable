@@ -1,4 +1,50 @@
-                                 Apache License
+#!/usr/bin/env python3
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+from __future__ import annotations
+
+import pathlib
+import re
+import xml.etree.ElementTree as ET
+import zipfile
+from collections import defaultdict
+from functools import lru_cache
+
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+REPO = pathlib.Path.home() / ".m2" / "repository"
+NS = {"m": "http://maven.apache.org/POM/4.0.0"}
+
+FAMILY_ORDER = [
+    "Apache License 2.0",
+    "Apache Software License 1.1",
+    "BSD 3-Clause",
+    "BSD 2-Clause",
+    "MIT License",
+    "Eclipse Distribution License - v 1.0",
+    "CDDL + GPLv2 with classpath exception",
+    "CDDL",
+    "EPL 2.0",
+    "Common Public License Version 1.0",
+    "Mozilla Public License 2.0",
+    "Public Domain",
+]
+
+APACHE_BANNER = """                                 Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
 
@@ -204,181 +250,239 @@
 
 This product bundles various third-party components under other open source licenses.
 This section summarizes those components and their licenses. See licenses/ for text of these licenses.
+"""
+
+NOTICE_TEMPLATE = """Apache XTable (incubating)
+Copyright 2024-2026 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (https://www.apache.org/).
+
+--------------------------------------------------------------------------------
+
+This binary artifact bundles the following projects with NOTICE:
+"""
 
 
-Apache License 2.0
-------------------
-com.fasterxml.jackson.core:jackson-annotations:2.18.2
-com.fasterxml.jackson.core:jackson-core:2.18.2
-com.fasterxml.jackson.core:jackson-databind:2.18.2
-com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.5
-com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.2
-com.fasterxml.jackson.module:jackson-module-scala_2.12:2.18.2
-com.github.ben-manes.caffeine:caffeine:2.9.1
-com.github.davidmoten:guava-mini:0.1.3
-com.github.davidmoten:hilbert-curve:0.2.2
-com.google.errorprone:error_prone_annotations:2.21.1
-com.google.guava:failureaccess:1.0.1
-com.google.guava:guava:32.1.3-jre
-com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
-com.google.j2objc:j2objc-annotations:2.8
-com.lmax:disruptor:3.4.2
-commons-lang:commons-lang:2.6
-commons-pool:commons-pool:1.6
-io.airlift:aircompressor:0.27
-io.delta:delta-core_2.12:2.4.0
-io.delta:delta-kernel-api:4.0.0
-io.delta:delta-kernel-defaults:4.0.0
-io.delta:delta-storage:2.4.0
-io.dropwizard.metrics:metrics-graphite:4.1.1
-io.dropwizard.metrics:metrics-jmx:4.1.1
-io.javalin:javalin:4.6.7
-io.netty:netty-codec-http:4.1.110.Final
-io.netty:netty-codec-http2:4.1.110.Final
-io.prometheus:simpleclient:0.8.0
-io.prometheus:simpleclient_common:0.8.0
-io.prometheus:simpleclient_dropwizard:0.8.0
-io.prometheus:simpleclient_httpserver:0.8.0
-io.prometheus:simpleclient_pushgateway:0.8.0
-jakarta.validation:jakarta.validation-api:2.0.2
-javax.servlet.jsp:javax.servlet.jsp-api:2.3.1
-joda-time:joda-time:2.9.9
-org.apache.avro:avro:1.12.0
-org.apache.commons:commons-crypto:1.0.0
-org.apache.hbase:hbase-asyncfs:2.4.9
-org.apache.hbase:hbase-client:2.4.9
-org.apache.hbase:hbase-common:2.4.9
-org.apache.hbase:hbase-hadoop-compat:2.4.9
-org.apache.hbase:hbase-hadoop2-compat:2.4.9
-org.apache.hbase:hbase-http:2.4.9
-org.apache.hbase:hbase-logging:2.4.9
-org.apache.hbase:hbase-metrics:2.4.9
-org.apache.hbase:hbase-metrics-api:2.4.9
-org.apache.hbase:hbase-procedure:2.4.9
-org.apache.hbase:hbase-protocol:2.4.9
-org.apache.hbase:hbase-protocol-shaded:2.4.9
-org.apache.hbase:hbase-replication:2.4.9
-org.apache.hbase:hbase-server:2.4.9
-org.apache.hbase:hbase-zookeeper:2.4.9
-org.apache.hbase.thirdparty:hbase-shaded-gson:3.5.1
-org.apache.hbase.thirdparty:hbase-shaded-jersey:3.5.1
-org.apache.hbase.thirdparty:hbase-shaded-jetty:3.5.1
-org.apache.hbase.thirdparty:hbase-shaded-miscellaneous:3.5.1
-org.apache.hbase.thirdparty:hbase-shaded-netty:3.5.1
-org.apache.hbase.thirdparty:hbase-shaded-protobuf:3.5.1
-org.apache.hive:hive-storage-api:2.6.0
-org.apache.htrace:htrace-core4:4.2.0-incubating
-org.apache.httpcomponents:fluent-hc:4.4.1
-org.apache.httpcomponents.client5:httpclient5:5.4.3
-org.apache.httpcomponents.core5:httpcore5:5.3.4
-org.apache.httpcomponents.core5:httpcore5-h2:5.3.4
-org.apache.hudi:hudi-client-common:0.14.0
-org.apache.hudi:hudi-common:0.14.0
-org.apache.hudi:hudi-java-client:0.14.0
-org.apache.hudi:hudi-timeline-service:0.14.0
-org.apache.iceberg:iceberg-api:1.9.2
-org.apache.iceberg:iceberg-bundled-guava:1.9.2
-org.apache.iceberg:iceberg-common:1.9.2
-org.apache.iceberg:iceberg-core:1.9.2
-org.apache.logging.log4j:log4j-1.2-api:2.22.0
-org.apache.logging.log4j:log4j-api:2.22.0
-org.apache.orc:orc-core:1.6.0
-org.apache.orc:orc-shims:1.6.0
-org.apache.paimon:paimon-bundle:1.3.1
-org.apache.parquet:parquet-avro:1.15.2
-org.apache.parquet:parquet-column:1.15.2
-org.apache.parquet:parquet-common:1.15.2
-org.apache.parquet:parquet-encoding:1.15.2
-org.apache.parquet:parquet-format-structures:1.15.2
-org.apache.parquet:parquet-hadoop:1.15.2
-org.apache.parquet:parquet-jackson:1.15.2
-org.apache.yetus:audience-annotations:0.5.0
-org.eclipse.jetty:jetty-client:9.4.54.v20240208
-org.eclipse.jetty:jetty-http:9.4.54.v20240208
-org.eclipse.jetty:jetty-io:9.4.54.v20240208
-org.eclipse.jetty:jetty-security:9.4.54.v20240208
-org.eclipse.jetty:jetty-server:9.4.54.v20240208
-org.eclipse.jetty:jetty-servlet:9.4.54.v20240208
-org.eclipse.jetty:jetty-util:9.4.54.v20240208
-org.eclipse.jetty:jetty-util-ajax:9.4.54.v20240208
-org.eclipse.jetty:jetty-webapp:9.4.54.v20240208
-org.eclipse.jetty:jetty-xml:9.4.54.v20240208
-org.eclipse.jetty.websocket:websocket-api:9.4.54.v20240208
-org.eclipse.jetty.websocket:websocket-client:9.4.54.v20240208
-org.eclipse.jetty.websocket:websocket-common:9.4.54.v20240208
-org.eclipse.jetty.websocket:websocket-server:9.4.54.v20240208
-org.eclipse.jetty.websocket:websocket-servlet:9.4.54.v20240208
-org.javassist:javassist:3.25.0-GA
-org.jetbrains:annotations:17.0.0
-org.jetbrains.kotlin:kotlin-stdlib:1.5.32
-org.jetbrains.kotlin:kotlin-stdlib-common:1.5.32
-org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.5.32
-org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.5.32
-org.lz4:lz4-java:1.8.0
-org.roaringbitmap:RoaringBitmap:0.9.47
-org.roaringbitmap:shims:0.9.47
-org.rocksdb:rocksdbjni:6.29.4.1
-org.scala-lang:scala-library:2.12.20
-software.amazon.awssdk:annotations:2.29.40
-software.amazon.awssdk:apache-client:2.29.40
-software.amazon.awssdk:auth:2.29.40
-software.amazon.awssdk:aws-core:2.29.40
-software.amazon.awssdk:aws-json-protocol:2.29.40
-software.amazon.awssdk:checksums:2.29.40
-software.amazon.awssdk:checksums-spi:2.29.40
-software.amazon.awssdk:endpoints-spi:2.29.40
-software.amazon.awssdk:glue:2.29.40
-software.amazon.awssdk:http-auth:2.29.40
-software.amazon.awssdk:http-auth-aws:2.29.40
-software.amazon.awssdk:http-auth-aws-eventstream:2.29.40
-software.amazon.awssdk:http-auth-spi:2.29.40
-software.amazon.awssdk:http-client-spi:2.29.40
-software.amazon.awssdk:identity-spi:2.29.40
-software.amazon.awssdk:json-utils:2.29.40
-software.amazon.awssdk:metrics-spi:2.29.40
-software.amazon.awssdk:netty-nio-client:2.29.40
-software.amazon.awssdk:profiles:2.29.40
-software.amazon.awssdk:protocol-core:2.29.40
-software.amazon.awssdk:regions:2.29.40
-software.amazon.awssdk:retries:2.29.40
-software.amazon.awssdk:retries-spi:2.29.40
-software.amazon.awssdk:sdk-core:2.29.40
-software.amazon.awssdk:third-party-jackson-core:2.29.40
-software.amazon.awssdk:utils:2.29.40
-software.amazon.eventstream:eventstream:1.0.1
+GROUP_OVERRIDES = {
+    "aopalliance": "Public Domain",
+    "asm": "BSD 3-Clause",
+    "commons-el": "Apache Software License 1.1",
+    "commons-httpclient": "Apache License 2.0",
+    "io.netty": "Apache License 2.0",
+    "it.unimi.dsi": "Apache License 2.0",
+    "javax.activation": "CDDL + GPLv2 with classpath exception",
+    "javax.inject": "Apache License 2.0",
+    "javax.mail": "CDDL",
+    "javax.servlet": "Apache License 2.0",
+    "javax.servlet.jsp": "Apache License 2.0",
+    "javax.transaction": "Apache License 2.0",
+    "org.apache.hbase": "Apache License 2.0",
+    "org.apache.velocity": "Apache License 2.0",
+    "org.apache.zookeeper": "Apache License 2.0",
+    "org.codehaus.jackson": "Apache License 2.0",
+    "oro": "Apache Software License 1.1",
+    "software.amazon.awssdk": "Apache License 2.0",
+    "software.amazon.eventstream": "Apache License 2.0",
+    "stax": "CDDL + GPLv2 with classpath exception",
+    "xml-apis": "Apache Software License 1.1",
+    "xmlenc": "BSD 3-Clause",
+}
 
-BSD 3-Clause
-------------
-com.google.protobuf:protobuf-java:3.25.5
-com.thoughtworks.paranamer:paranamer:2.8
-org.antlr:antlr4-runtime:4.9.3
+ARTIFACT_OVERRIDES = {
+    ("io.netty", "netty-resolver-dns-native-macos"): "Apache License 2.0",
+    ("io.netty", "netty-transport-native-epoll"): "Apache License 2.0",
+    ("io.netty", "netty-transport-native-kqueue"): "Apache License 2.0",
+    ("org.apache.hive", "hive-exec"): "Apache License 2.0",
+    ("org.apache.orc", "orc-core"): "Apache License 2.0",
+    ("org.apache.orc", "orc-mapreduce"): "Apache License 2.0",
+    ("org.bouncycastle", "bcprov-jdk18on"): "MIT License",
+}
 
-BSD 2-Clause
-------------
-com.github.luben:zstd-jni:1.5.6-6
 
-MIT License
------------
-org.checkerframework:checker-qual:3.37.0
-org.jruby.jcodings:jcodings:1.0.55
-org.jruby.joni:joni:2.1.31
-org.reactivestreams:reactive-streams:1.0.4
+def tree_coords(module: pathlib.Path) -> list[tuple[str, str, str]]:
+    coords = set()
+    for line in (module / "target" / "dependency-tree-runtime.txt").read_text().splitlines():
+        line = re.sub(r"^[| +\\-]+", "", line)
+        parts = line.split(":")
+        if len(parts) >= 5 and parts[2] not in ("pom", "test-jar"):
+            coords.add((parts[0], parts[1], parts[3]))
+    return sorted(coords)
 
-CDDL + GPLv2 with classpath exception
--------------------------------------
-javax.activation:javax.activation-api:1.2.0
-javax.annotation:javax.annotation-api:1.2
-javax.xml.bind:jaxb-api:2.2.11
-org.glassfish:javax.el:3.0.0
-org.glassfish.web:javax.servlet.jsp:2.3.2
 
-EPL 2.0
--------
-jakarta.annotation:jakarta.annotation-api:1.3.5
-jakarta.ws.rs:jakarta.ws.rs-api:2.1.6
-javax.ws.rs:javax.ws.rs-api:2.1.1
-org.glassfish.hk2.external:jakarta.inject:2.6.1
+def shade_modules() -> list[pathlib.Path]:
+    modules = []
+    for pom_path in sorted(ROOT.rglob("pom.xml")):
+        if "<artifactId>maven-shade-plugin</artifactId>" not in pom_path.read_text():
+            continue
+        if pom_path.parent == ROOT:
+            continue
+        modules.append(pom_path.parent)
+    return modules
 
-Mozilla Public License 2.0
---------------------------
-org.jamon:jamon-runtime:2.4.1
+
+def pom_path(group: str, artifact: str, version: str) -> pathlib.Path:
+    return REPO / pathlib.Path(group.replace(".", "/")) / artifact / version / f"{artifact}-{version}.pom"
+
+
+def jar_path(group: str, artifact: str, version: str) -> pathlib.Path:
+    return REPO / pathlib.Path(group.replace(".", "/")) / artifact / version / f"{artifact}-{version}.jar"
+
+
+@lru_cache(maxsize=None)
+def licenses_for(group: str, artifact: str, version: str) -> tuple[str, ...]:
+    path = pom_path(group, artifact, version)
+    if not path.exists():
+        return ("__MISSING__",)
+
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError:
+        return ("__PARSE_ERROR__",)
+
+    values = [
+        item.text.strip()
+        for item in root.findall("./m:licenses/m:license/m:name", NS)
+        if item.text and item.text.strip()
+    ]
+    if values:
+        return tuple(values)
+
+    parent = root.find("./m:parent", NS)
+    if parent is not None:
+        pg = parent.findtext("m:groupId", default="", namespaces=NS).strip()
+        pa = parent.findtext("m:artifactId", default="", namespaces=NS).strip()
+        pv = parent.findtext("m:version", default="", namespaces=NS).strip()
+        if pg and pa and pv and "${" not in pg + pa + pv:
+            return licenses_for(pg, pa, pv)
+
+    return ()
+
+
+def normalize_family(group: str, artifact: str, version: str) -> str:
+    key = (group, artifact)
+    if key in ARTIFACT_OVERRIDES:
+        return ARTIFACT_OVERRIDES[key]
+    if group in GROUP_OVERRIDES:
+        return GROUP_OVERRIDES[group]
+
+    licenses = licenses_for(group, artifact, version)
+    joined = " | ".join(licenses)
+
+    apache_markers = (
+        "Apache License",
+        "Apache Software License",
+        "Apache-2.0",
+        "Apache 2",
+        "Apache v2",
+    )
+    if any(marker in joined for marker in apache_markers):
+        return "Apache License 2.0"
+    if "Apache Software License, Version 1.1" in joined:
+        return "Apache Software License 1.1"
+    if "MIT" in joined:
+        return "MIT License"
+    if "Public Domain" in joined:
+        return "Public Domain"
+    if "Eclipse Distribution License" in joined or "EDL 1.0" in joined:
+        return "Eclipse Distribution License - v 1.0"
+    if "Mozilla" in joined or "MPL" in joined:
+        return "Mozilla Public License 2.0"
+    if "Common Public License" in joined:
+        return "Common Public License Version 1.0"
+    if "EPL 2.0" in joined or "Eclipse Public License 2.0" in joined:
+        return "EPL 2.0"
+    if "CDDL + GPLv2 with classpath exception" in joined or "CDDL/GPLv2+CE" in joined:
+        return "CDDL + GPLv2 with classpath exception"
+    if "CDDL" in joined or "GPL2 w/ CPE" in joined:
+        return "CDDL + GPLv2 with classpath exception"
+    if "BSD 2-Clause" in joined:
+        return "BSD 2-Clause"
+    if "BSD" in joined or "Go license" in joined:
+        return "BSD 3-Clause"
+
+    raise ValueError(f"Unmapped license for {group}:{artifact}:{version}: {licenses}")
+
+
+def render_license(groups: dict[str, list[tuple[str, str, str]]]) -> str:
+    lines = [APACHE_BANNER, ""]
+    for family in FAMILY_ORDER:
+        coords = groups.get(family)
+        if not coords:
+            continue
+        lines.append(family)
+        lines.append("-" * len(family))
+        for group, artifact, version in coords:
+            lines.append(f"{group}:{artifact}:{version}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def third_party_coords(module: pathlib.Path) -> list[tuple[str, str, str]]:
+    return [coord for coord in tree_coords(module) if coord[0] != "org.apache.xtable"]
+
+
+@lru_cache(maxsize=None)
+def notice_text_for(group: str, artifact: str, version: str) -> str | None:
+    path = jar_path(group, artifact, version)
+    if not path.exists():
+        return None
+
+    candidates = (
+        "META-INF/NOTICE",
+        "META-INF/NOTICE.txt",
+        "NOTICE",
+        "NOTICE.txt",
+    )
+    with zipfile.ZipFile(path) as jar_file:
+        names = set(jar_file.namelist())
+        for candidate in candidates:
+            if candidate not in names:
+                continue
+            text = jar_file.read(candidate).decode("utf-8", errors="replace")
+            lines = [line.rstrip() for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+            normalized = "\n".join(lines).strip()
+            if normalized:
+                return normalized
+    return None
+
+
+def render_notice(module: pathlib.Path) -> str:
+    grouped_notices: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
+    for coord in third_party_coords(module):
+        notice_text = notice_text_for(*coord)
+        if notice_text is None:
+            continue
+        grouped_notices[notice_text].append(coord)
+
+    lines = [NOTICE_TEMPLATE, "--------------------------------------------------------------------------------", ""]
+    for notice_text in sorted(grouped_notices):
+        for group, artifact, version in grouped_notices[notice_text]:
+            lines.append(f"Group: {group} Name: {artifact} Version: {version}")
+        lines.append("")
+        lines.append("NOTICE:")
+        for line in notice_text.splitlines():
+            lines.append(f"| {line}" if line else "|")
+        lines.append("")
+        lines.append("--------------------------------------------------------------------------------")
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def main() -> None:
+    for module in shade_modules():
+        groups: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
+        for coord in third_party_coords(module):
+            family = normalize_family(*coord)
+            groups[family].append(coord)
+
+        license_path = module / "src" / "main" / "resources" / "META-INF" / "LICENSE-bundled"
+        notice_path = module / "src" / "main" / "resources" / "META-INF" / "NOTICE-bundled"
+        license_path.parent.mkdir(parents=True, exist_ok=True)
+        license_path.write_text(render_license(groups))
+        notice_path.write_text(render_notice(module))
+
+
+if __name__ == "__main__":
+    main()
