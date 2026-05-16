@@ -249,10 +249,7 @@ public class TestDeltaKernelPartitionExtractor {
                     InternalField.builder()
                         .name("id")
                         .schema(
-                            InternalSchema.builder()
-                                .name("integer")
-                                .dataType(InternalType.INT)
-                                .build())
+                            InternalSchema.builder().name("int").dataType(InternalType.INT).build())
                         .build())
                 .transformType(PartitionTransformType.VALUE)
                 .build());
@@ -309,10 +306,7 @@ public class TestDeltaKernelPartitionExtractor {
                     InternalField.builder()
                         .name("id")
                         .schema(
-                            InternalSchema.builder()
-                                .name("integer")
-                                .dataType(InternalType.INT)
-                                .build())
+                            InternalSchema.builder().name("int").dataType(InternalType.INT).build())
                         .build())
                 .transformType(PartitionTransformType.VALUE)
                 .build(),

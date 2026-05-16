@@ -88,7 +88,7 @@ public class ITDeltaKernelConversionSource {
           .name("col1")
           .schema(
               InternalSchema.builder()
-                  .name("integer")
+                  .name("int")
                   .dataType(InternalType.INT)
                   .isNullable(true)
                   .build())
@@ -100,7 +100,7 @@ public class ITDeltaKernelConversionSource {
           .name("col2")
           .schema(
               InternalSchema.builder()
-                  .name("integer")
+                  .name("int")
                   .dataType(InternalType.INT)
                   .isNullable(true)
                   .build())
@@ -112,7 +112,7 @@ public class ITDeltaKernelConversionSource {
           .name("col3")
           .schema(
               InternalSchema.builder()
-                  .name("integer")
+                  .name("int")
                   .dataType(InternalType.INT)
                   .isNullable(true)
                   .build())
