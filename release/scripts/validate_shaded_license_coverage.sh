@@ -63,12 +63,28 @@ classify_license_family() {
 }
 
 SCALA_BINARY_VERSION="$(sed -n 's:.*<scala.binary.version>\(.*\)</scala.binary.version>.*:\1:p' pom.xml | head -n 1)"
+SKIPPED_SHADE_MODULES=(
+  "xtable-utilities"
+)
+
+should_skip_module() {
+  local module="$1"
+  local skipped_module
+  for skipped_module in "${SKIPPED_SHADE_MODULES[@]}"; do
+    if [[ "${module}" == "${skipped_module}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
 
 SHADE_MODULES=()
 while IFS= read -r module; do
   module_dir="$(dirname "${module}")"
   if [[ "${module_dir}" != "." ]]; then
-    SHADE_MODULES+=("${module_dir}")
+    if ! should_skip_module "${module_dir}"; then
+      SHADE_MODULES+=("${module_dir}")
+    fi
   fi
 done < <(
   rg -l '<artifactId>maven-shade-plugin</artifactId>' --glob 'pom.xml' \

@@ -102,6 +102,8 @@ Current shaded modules include:
 - `xtable-hudi-support/xtable-hudi-support-extensions`
 - `xtable-utilities`
 
+`xtable-utilities` is intentionally skipped by `release/scripts/validate_shaded_license_coverage.sh` while it is not published. Keep its bundled metadata useful for local builds, but do not treat it as release-blocking until that artifact is published.
+
 ## Required Commands For Dependency Work
 
 Generate runtime dependency trees for changed shaded modules:
