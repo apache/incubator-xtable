@@ -31,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -243,20 +242,17 @@ public class ITParquetConversionSource {
                   new MetadataBuilder().putString("precision", "millis").build())
             });
     Dataset<Row> df = sparkSession.createDataFrame(data, schema);
-    String dataPath =
-        tempDir
-            .resolve(
-                (xTablePartitionConfig == null ? "non_partitioned_data_" : "partitioned_data_")
-                    + tableFormatPartitionDataHolder.getSyncMode())
-            .toString();
+    Path dataPath =
+        tempDir.resolve(
+            (xTablePartitionConfig == null ? "non_partitioned_data_" : "partitioned_data_")
+                + tableFormatPartitionDataHolder.getSyncMode());
 
-    writeData(df, dataPath, xTablePartitionConfig);
+    writeData(df, dataPath.toString(), xTablePartitionConfig);
     boolean isPartitioned = xTablePartitionConfig != null;
 
-    Path pathForXTable = Paths.get(dataPath);
     try (GenericTable table =
         GenericTable.getInstance(
-            tableName, pathForXTable, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
+            tableName, dataPath, sparkSession, jsc, sourceTableFormat, isPartitioned)) {
       ConversionConfig conversionConfig =
           getTableSyncConfig(
               sourceTableFormat,
@@ -456,11 +452,10 @@ public class ITParquetConversionSource {
             RowFactory.create(103, "BA", 2027, 11));
 
     Dataset<Row> dfInit = sparkSession.createDataFrame(data, schema);
-    Path fixedPath = Paths.get("target", "fixed-parquet-data", "parquet_table_test_2");
+    Path fixedPath = tempDir.resolve("fixed-parquet-data/parquet_table_test_2");
 
     Dataset<Row> df = dfInit.withColumn("full_date", expr("make_date(year, month, 1)"));
-    String outputPath =
-        new java.io.File("target/fixed-parquet-data/parquet_table_test_2").getAbsolutePath();
+    String outputPath = fixedPath.toString();
     df.coalesce(1).write().partitionBy("year", "month").mode("overwrite").parquet(outputPath);
 
     // test find files to sync

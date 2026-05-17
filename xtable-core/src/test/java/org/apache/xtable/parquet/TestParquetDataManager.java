@@ -39,6 +39,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -88,6 +89,14 @@ class TestParquetDataManager {
     FileSystem mockFs = mock(FileSystem.class);
     when(mockFs.listFiles(any(org.apache.hadoop.fs.Path.class), anyBoolean())).thenReturn(iterator);
     return mockFs;
+  }
+
+  private static Set<Long> getModificationTimes(List<ParquetFileInfo> files) {
+    return files.stream().map(ParquetFileInfo::getModificationTime).collect(Collectors.toSet());
+  }
+
+  private static Set<Long> modificationTimes(Long... modificationTimes) {
+    return Arrays.stream(modificationTimes).collect(Collectors.toSet());
   }
 
   @Test
@@ -219,9 +228,7 @@ class TestParquetDataManager {
     assertNotNull(result);
     List<ParquetFileInfo> fileList = result.collect(Collectors.toList());
     assertEquals(3, fileList.size());
-    assertEquals(1000L, fileList.get(0).getModificationTime());
-    assertEquals(2000L, fileList.get(1).getModificationTime());
-    assertEquals(3000L, fileList.get(2).getModificationTime());
+    assertEquals(modificationTimes(1000L, 2000L, 3000L), getModificationTimes(fileList));
   }
 
   @Test
@@ -270,7 +277,7 @@ class TestParquetDataManager {
 
     assertNotNull(result);
     assertEquals(1, result.size());
-    assertEquals(3000L, result.get(0).getModificationTime());
+    assertEquals(Collections.singleton(3000L), getModificationTimes(result));
   }
 
   @Test
@@ -323,7 +330,7 @@ class TestParquetDataManager {
 
     assertNotNull(result);
     assertEquals(1, result.size());
-    assertEquals(3000L, result.get(0).getModificationTime());
+    assertEquals(Collections.singleton(3000L), getModificationTimes(result));
   }
 
   @Test
@@ -362,7 +369,7 @@ class TestParquetDataManager {
     List<ParquetFileInfo> result = manager.getParquetFilesMetadataAfterTime(0L);
 
     assertEquals(1, result.size());
-    assertEquals(1000L, result.get(0).getModificationTime());
+    assertEquals(Collections.singleton(1000L), getModificationTimes(result));
   }
 
   @Test

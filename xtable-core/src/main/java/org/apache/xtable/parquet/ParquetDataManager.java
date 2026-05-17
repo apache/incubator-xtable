@@ -37,6 +37,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.util.functional.RemoteIterators;
 
+import com.google.common.annotations.VisibleForTesting;
+
 import org.apache.xtable.exception.ReadException;
 
 /**
@@ -46,7 +48,9 @@ import org.apache.xtable.exception.ReadException;
  * parquet files and filtering the files based on the modification times.
  */
 @Log4j2
-@RequiredArgsConstructor
+@RequiredArgsConstructor(
+    access = AccessLevel.PACKAGE,
+    onConstructor_ = {@VisibleForTesting})
 public class ParquetDataManager {
   private final Configuration hadoopConf;
   private final String basePath;
