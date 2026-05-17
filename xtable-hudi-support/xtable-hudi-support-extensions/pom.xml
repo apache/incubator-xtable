@@ -111,7 +111,6 @@
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-parquet</artifactId>
-            <scope>provided</scope>
         </dependency>
 
         <!-- hudi -->
@@ -235,6 +234,7 @@
                                     <include>com.thoughtworks.paranamer:paranamer</include>
                                     <include>org.apache.logging.log4j:log4j-1.2-api</include>
                                     <include>org.apache.logging.log4j:log4j-api</include>
+                                    <include>org.apache.iceberg:iceberg-parquet</include>
                                     <include>org.apache.xtable:xtable-api</include>
                                     <include>org.apache.xtable:xtable-core_${scala.binary.version}</include>
                                     <include>org.apache.xtable:xtable-hudi-support-utils</include>

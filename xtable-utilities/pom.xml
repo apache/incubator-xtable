@@ -156,6 +156,10 @@
             <artifactId>iceberg-api</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-parquet</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.delta</groupId>
             <artifactId>delta-core_${scala.binary.version}</artifactId>
         </dependency>
@@ -562,6 +566,7 @@
                             <include>org.apache.iceberg:iceberg-common</include>
                             <include>org.apache.iceberg:iceberg-core</include>
                             <include>org.apache.iceberg:iceberg-hive-runtime</include>
+                            <include>org.apache.iceberg:iceberg-parquet</include>
                             <include>org.apache.ivy:ivy</include>
                             <include>org.apache.kerby:kerb-core</include>
                             <include>org.apache.kerby:kerb-crypto</include>
