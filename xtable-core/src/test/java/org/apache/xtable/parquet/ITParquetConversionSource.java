@@ -279,7 +279,7 @@ public class ITParquetConversionSource {
                   new Timestamp(System.currentTimeMillis() + 1500)));
 
       Dataset<Row> dfAppend = sparkSession.createDataFrame(dataToAppend, schema);
-      writeData(dfAppend, dataPath, xTablePartitionConfig);
+      writeData(dfAppend, dataPath.toString(), xTablePartitionConfig);
       ConversionConfig conversionConfigAppended =
           getTableSyncConfig(
               sourceTableFormat,
