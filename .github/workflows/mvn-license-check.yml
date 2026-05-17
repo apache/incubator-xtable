@@ -44,3 +44,6 @@ jobs:
 
       - name: Apache License Check
         run: ./mvnw apache-rat:check -B
+
+      - name: Validate Shaded Dependency License Metadata
+        run: release/scripts/validate_shaded_license_coverage.sh

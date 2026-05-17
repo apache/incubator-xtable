@@ -54,12 +54,14 @@
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-hive-runtime</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <!-- Delta dependencies  -->
         <dependency>
             <groupId>io.delta</groupId>
             <artifactId>delta-hive_${scala.binary.version}</artifactId>
+            <scope>provided</scope>
         </dependency>
 
         <!-- HMS dependencies -->
@@ -217,6 +219,192 @@
                                     <file>target/classes/META-INF/NOTICE-bundled</file>
                                 </transformer>
                             </transformers>
+                            <artifactSet>
+                                <includes>
+                                    <include>ant:ant</include>
+                                    <include>aopalliance:aopalliance</include>
+                                    <include>asm:asm</include>
+                                    <include>asm:asm-commons</include>
+                                    <include>asm:asm-tree</include>
+                                    <include>co.cask.tephra:tephra-api</include>
+                                    <include>co.cask.tephra:tephra-core</include>
+                                    <include>co.cask.tephra:tephra-hbase-compat-1.0</include>
+                                    <include>com.fasterxml.jackson.core:jackson-annotations</include>
+                                    <include>com.fasterxml.jackson.core:jackson-core</include>
+                                    <include>com.fasterxml.jackson.core:jackson-databind</include>
+                                    <include>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</include>
+                                    <include>com.fasterxml.jackson.module:jackson-module-scala_${scala.binary.version}</include>
+                                    <include>com.github.joshelser:dropwizard-metrics-hadoop-metrics2-reporter</include>
+                                    <include>com.github.luben:zstd-jni</include>
+                                    <include>com.github.stephenc.findbugs:findbugs-annotations</include>
+                                    <include>com.google.errorprone:error_prone_annotations</include>
+                                    <include>com.google.guava:failureaccess</include>
+                                    <include>com.google.guava:guava</include>
+                                    <include>com.google.guava:listenablefuture</include>
+                                    <include>com.google.inject.extensions:guice-assistedinject</include>
+                                    <include>com.google.inject.extensions:guice-servlet</include>
+                                    <include>com.google.inject:guice</include>
+                                    <include>com.google.j2objc:j2objc-annotations</include>
+                                    <include>com.google.protobuf:protobuf-java</include>
+                                    <include>com.jolbox:bonecp</include>
+                                    <include>com.sun.jersey.contribs:jersey-guice</include>
+                                    <include>com.sun.jersey:jersey-client</include>
+                                    <include>com.sun.jersey:jersey-json</include>
+                                    <include>com.tdunning:json</include>
+                                    <include>com.thoughtworks.paranamer:paranamer</include>
+                                    <include>com.zaxxer:HikariCP</include>
+                                    <include>commons-daemon:commons-daemon</include>
+                                    <include>commons-dbcp:commons-dbcp</include>
+                                    <include>commons-el:commons-el</include>
+                                    <include>commons-httpclient:commons-httpclient</include>
+                                    <include>commons-lang:commons-lang</include>
+                                    <include>commons-pool:commons-pool</include>
+                                    <include>io.airlift:aircompressor</include>
+                                    <include>io.airlift:slice</include>
+                                    <include>io.dropwizard.metrics:metrics-json</include>
+                                    <include>io.dropwizard.metrics:metrics-jvm</include>
+                                    <include>io.netty:netty</include>
+                                    <include>io.netty:netty-all</include>
+                                    <include>io.netty:netty-codec-dns</include>
+                                    <include>io.netty:netty-codec-haproxy</include>
+                                    <include>io.netty:netty-codec-http</include>
+                                    <include>io.netty:netty-codec-http2</include>
+                                    <include>io.netty:netty-codec-memcache</include>
+                                    <include>io.netty:netty-codec-mqtt</include>
+                                    <include>io.netty:netty-codec-redis</include>
+                                    <include>io.netty:netty-codec-smtp</include>
+                                    <include>io.netty:netty-codec-socks</include>
+                                    <include>io.netty:netty-codec-stomp</include>
+                                    <include>io.netty:netty-codec-xml</include>
+                                    <include>io.netty:netty-handler-proxy</include>
+                                    <include>io.netty:netty-handler-ssl-ocsp</include>
+                                    <include>io.netty:netty-resolver-dns</include>
+                                    <include>io.netty:netty-resolver-dns-classes-macos</include>
+                                    <include>io.netty:netty-resolver-dns-native-macos</include>
+                                    <include>io.netty:netty-transport-classes-kqueue</include>
+                                    <include>io.netty:netty-transport-native-epoll</include>
+                                    <include>io.netty:netty-transport-native-kqueue</include>
+                                    <include>io.netty:netty-transport-rxtx</include>
+                                    <include>io.netty:netty-transport-sctp</include>
+                                    <include>io.netty:netty-transport-udt</include>
+                                    <include>it.unimi.dsi:fastutil</include>
+                                    <include>javax.activation:activation</include>
+                                    <include>javax.annotation:javax.annotation-api</include>
+                                    <include>javax.inject:javax.inject</include>
+                                    <include>javax.jdo:jdo-api</include>
+                                    <include>javax.mail:mail</include>
+                                    <include>javax.servlet:jsp-api</include>
+                                    <include>javax.servlet:servlet-api</include>
+                                    <include>javax.transaction:jta</include>
+                                    <include>javax.transaction:transaction-api</include>
+                                    <include>javolution:javolution</include>
+                                    <include>jline:jline</include>
+                                    <include>joda-time:joda-time</include>
+                                    <include>junit:junit</include>
+                                    <include>net.hydromatic:eigenbase-properties</include>
+                                    <include>net.sf.jpam:jpam</include>
+                                    <include>net.sf.opencsv:opencsv</include>
+                                    <include>org.antlr:ST4</include>
+                                    <include>org.antlr:antlr-runtime</include>
+                                    <include>org.apache.ant:ant</include>
+                                    <include>org.apache.ant:ant-launcher</include>
+                                    <include>org.apache.avro:avro</include>
+                                    <include>org.apache.curator:curator-framework</include>
+                                    <include>org.apache.derby:derby</include>
+                                    <include>org.apache.geronimo.specs:geronimo-annotation_1.0_spec</include>
+                                    <include>org.apache.geronimo.specs:geronimo-jaspic_1.0_spec</include>
+                                    <include>org.apache.geronimo.specs:geronimo-jta_1.1_spec</include>
+                                    <include>org.apache.hadoop:hadoop-client</include>
+                                    <include>org.apache.hadoop:hadoop-hdfs</include>
+                                    <include>org.apache.hadoop:hadoop-mapreduce-client-app</include>
+                                    <include>org.apache.hadoop:hadoop-mapreduce-client-common</include>
+                                    <include>org.apache.hadoop:hadoop-mapreduce-client-core</include>
+                                    <include>org.apache.hadoop:hadoop-mapreduce-client-jobclient</include>
+                                    <include>org.apache.hadoop:hadoop-mapreduce-client-shuffle</include>
+                                    <include>org.apache.hadoop:hadoop-yarn-api</include>
+                                    <include>org.apache.hadoop:hadoop-yarn-common</include>
+                                    <include>org.apache.hadoop:hadoop-yarn-registry</include>
+                                    <include>org.apache.hadoop:hadoop-yarn-server-applicationhistoryservice</include>
+                                    <include>org.apache.hadoop:hadoop-yarn-server-common</include>
+                                    <include>org.apache.hadoop:hadoop-yarn-server-resourcemanager</include>
+                                    <include>org.apache.hadoop:hadoop-yarn-server-web-proxy</include>
+                                    <include>org.apache.hbase:hbase-annotations</include>
+                                    <include>org.apache.hbase:hbase-client</include>
+                                    <include>org.apache.hbase:hbase-common</include>
+                                    <include>org.apache.hbase:hbase-protocol</include>
+                                    <include>org.apache.hive.shims:hive-shims-0.23</include>
+                                    <include>org.apache.hive.shims:hive-shims-common</include>
+                                    <include>org.apache.hive.shims:hive-shims-scheduler</include>
+                                    <include>org.apache.hive:hive-common</include>
+                                    <include>org.apache.hive:hive-exec</include>
+                                    <include>org.apache.hive:hive-jdbc</include>
+                                    <include>org.apache.hive:hive-llap-client</include>
+                                    <include>org.apache.hive:hive-llap-common</include>
+                                    <include>org.apache.hive:hive-llap-server</include>
+                                    <include>org.apache.hive:hive-llap-tez</include>
+                                    <include>org.apache.hive:hive-metastore</include>
+                                    <include>org.apache.hive:hive-serde</include>
+                                    <include>org.apache.hive:hive-service</include>
+                                    <include>org.apache.hive:hive-service-rpc</include>
+                                    <include>org.apache.hive:hive-shims</include>
+                                    <include>org.apache.hive:hive-storage-api</include>
+                                    <include>org.apache.hive:hive-vector-code-gen</include>
+                                    <include>org.apache.htrace:htrace-core</include>
+                                    <include>org.apache.httpcomponents:httpcore</include>
+                                    <include>org.apache.ivy:ivy</include>
+                                    <include>org.apache.logging.log4j:log4j-1.2-api</include>
+                                    <include>org.apache.logging.log4j:log4j-api</include>
+                                    <include>org.apache.orc:orc-core</include>
+                                    <include>org.apache.parquet:parquet-avro</include>
+                                    <include>org.apache.parquet:parquet-column</include>
+                                    <include>org.apache.parquet:parquet-common</include>
+                                    <include>org.apache.parquet:parquet-encoding</include>
+                                    <include>org.apache.parquet:parquet-format-structures</include>
+                                    <include>org.apache.parquet:parquet-hadoop</include>
+                                    <include>org.apache.parquet:parquet-jackson</include>
+                                    <include>org.apache.slider:slider-core</include>
+                                    <include>org.apache.thrift:libfb303</include>
+                                    <include>org.apache.thrift:libthrift</include>
+                                    <include>org.apache.twill:twill-api</include>
+                                    <include>org.apache.twill:twill-common</include>
+                                    <include>org.apache.twill:twill-core</include>
+                                    <include>org.apache.twill:twill-discovery-api</include>
+                                    <include>org.apache.twill:twill-discovery-core</include>
+                                    <include>org.apache.twill:twill-zookeeper</include>
+                                    <include>org.apache.velocity:velocity</include>
+                                    <include>org.apache.xtable:xtable-api</include>
+                                    <include>org.apache.xtable:xtable-core_${scala.binary.version}</include>
+                                    <include>org.apache.xtable:xtable-hudi-support-utils</include>
+                                    <include>org.apache.zookeeper:zookeeper</include>
+                                    <include>org.checkerframework:checker-qual</include>
+                                    <include>org.codehaus.groovy:groovy-all</include>
+                                    <include>org.codehaus.jackson:jackson-core-asl</include>
+                                    <include>org.codehaus.jackson:jackson-jaxrs</include>
+                                    <include>org.codehaus.jackson:jackson-mapper-asl</include>
+                                    <include>org.codehaus.jackson:jackson-xc</include>
+                                    <include>org.datanucleus:datanucleus-api-jdo</include>
+                                    <include>org.datanucleus:datanucleus-core</include>
+                                    <include>org.datanucleus:datanucleus-rdbms</include>
+                                    <include>org.datanucleus:javax.jdo</include>
+                                    <include>org.eclipse.jetty.aggregate:jetty-all</include>
+                                    <include>org.eclipse.jetty.orbit:javax.servlet</include>
+                                    <include>org.fusesource.leveldbjni:leveldbjni-all</include>
+                                    <include>org.hamcrest:hamcrest-core</include>
+                                    <include>org.jamon:jamon-runtime</include>
+                                    <include>org.jruby.jcodings:jcodings</include>
+                                    <include>org.jruby.joni:joni</include>
+                                    <include>org.mortbay.jetty:jetty</include>
+                                    <include>org.mortbay.jetty:jetty-util</include>
+                                    <include>org.scala-lang:scala-library</include>
+                                    <include>oro:oro</include>
+                                    <include>stax:stax-api</include>
+                                    <include>tomcat:jasper-compiler</include>
+                                    <include>tomcat:jasper-runtime</include>
+                                    <include>xerces:xercesImpl</include>
+                                    <include>xml-apis:xml-apis</include>
+                                    <include>xmlenc:xmlenc</include>
+                                </includes>
+                            </artifactSet>
                         </configuration>
                     </execution>
                 </executions>

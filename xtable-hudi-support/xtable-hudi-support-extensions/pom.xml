@@ -96,6 +96,7 @@
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-core</artifactId>
+            <scope>provided</scope>
             <exclusions>
                 <exclusion>
                     <groupId>io.airlift</groupId>
@@ -128,6 +129,11 @@
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-java-client</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-core_${scala.binary.version}</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -217,6 +223,26 @@
                                     <file>target/classes/META-INF/NOTICE-bundled</file>
                                 </transformer>
                             </transformers>
+                            <artifactSet>
+                                <includes>
+                                    <include>com.fasterxml.jackson.module:jackson-module-scala_${scala.binary.version}</include>
+                                    <include>com.google.errorprone:error_prone_annotations</include>
+                                    <include>com.google.guava:failureaccess</include>
+                                    <include>com.google.guava:guava</include>
+                                    <include>com.google.guava:listenablefuture</include>
+                                    <include>com.google.j2objc:j2objc-annotations</include>
+                                    <include>com.thoughtworks.paranamer:paranamer</include>
+                                    <include>org.apache.logging.log4j:log4j-1.2-api</include>
+                                    <include>org.apache.logging.log4j:log4j-api</include>
+                                    <include>org.apache.iceberg:iceberg-parquet</include>
+                                    <include>org.apache.xtable:xtable-api</include>
+                                    <include>org.apache.xtable:xtable-core_${scala.binary.version}</include>
+                                    <include>org.apache.xtable:xtable-hudi-support-utils</include>
+                                    <include>org.checkerframework:checker-qual</include>
+                                    <include>org.scala-lang:scala-library</include>
+                                    <include>org.slf4j:slf4j-api</include>
+                                </includes>
+                            </artifactSet>
                         </configuration>
                     </execution>
                 </executions>

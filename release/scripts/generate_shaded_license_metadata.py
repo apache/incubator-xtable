@@ -1,4 +1,50 @@
-                                 Apache License
+#!/usr/bin/env python3
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+from __future__ import annotations
+
+import pathlib
+import re
+import xml.etree.ElementTree as ET
+import zipfile
+from collections import defaultdict
+from functools import lru_cache
+
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+REPO = pathlib.Path.home() / ".m2" / "repository"
+NS = {"m": "http://maven.apache.org/POM/4.0.0"}
+
+FAMILY_ORDER = [
+    "Apache License 2.0",
+    "Apache Software License 1.1",
+    "BSD 3-Clause",
+    "BSD 2-Clause",
+    "MIT License",
+    "Eclipse Distribution License - v 1.0",
+    "CDDL + GPLv2 with classpath exception",
+    "CDDL",
+    "EPL 2.0",
+    "Common Public License Version 1.0",
+    "Mozilla Public License 2.0",
+    "Public Domain",
+]
+
+APACHE_BANNER = """                                 Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
 
@@ -204,217 +250,239 @@
 
 This product bundles various third-party components under other open source licenses.
 This section summarizes those components and their licenses. See licenses/ for text of these licenses.
+"""
+
+NOTICE_TEMPLATE = """Apache XTable (incubating)
+Copyright 2024-2026 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (https://www.apache.org/).
+
+--------------------------------------------------------------------------------
+
+This binary artifact bundles the following projects with NOTICE:
+"""
 
 
-Apache License 2.0
-------------------
-ant:ant:1.6.5
-co.cask.tephra:tephra-api:0.6.0
-co.cask.tephra:tephra-core:0.6.0
-co.cask.tephra:tephra-hbase-compat-1.0:0.6.0
-com.fasterxml.jackson.core:jackson-annotations:2.18.2
-com.fasterxml.jackson.core:jackson-core:2.18.2
-com.fasterxml.jackson.core:jackson-databind:2.18.2
-com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.2
-com.fasterxml.jackson.module:jackson-module-scala_2.12:2.18.2
-com.github.joshelser:dropwizard-metrics-hadoop-metrics2-reporter:0.1.2
-com.github.stephenc.findbugs:findbugs-annotations:1.3.9-1
-com.google.errorprone:error_prone_annotations:2.21.1
-com.google.guava:failureaccess:1.0.1
-com.google.guava:guava:32.1.3-jre
-com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
-com.google.inject:guice:3.0
-com.google.inject.extensions:guice-assistedinject:3.0
-com.google.inject.extensions:guice-servlet:3.0
-com.google.j2objc:j2objc-annotations:2.8
-com.jolbox:bonecp:0.8.0.RELEASE
-com.tdunning:json:1.8
-com.zaxxer:HikariCP:2.5.1
-commons-daemon:commons-daemon:1.0.13
-commons-dbcp:commons-dbcp:1.4
-commons-httpclient:commons-httpclient:3.1
-commons-lang:commons-lang:2.6
-commons-pool:commons-pool:1.5.4
-io.airlift:aircompressor:0.8
-io.airlift:slice:0.29
-io.dropwizard.metrics:metrics-json:3.1.0
-io.dropwizard.metrics:metrics-jvm:3.1.0
-io.netty:netty:3.7.0.Final
-io.netty:netty-all:4.1.110.Final
-io.netty:netty-codec-dns:4.1.110.Final
-io.netty:netty-codec-haproxy:4.1.110.Final
-io.netty:netty-codec-http:4.1.110.Final
-io.netty:netty-codec-http2:4.1.110.Final
-io.netty:netty-codec-memcache:4.1.110.Final
-io.netty:netty-codec-mqtt:4.1.110.Final
-io.netty:netty-codec-redis:4.1.110.Final
-io.netty:netty-codec-smtp:4.1.110.Final
-io.netty:netty-codec-socks:4.1.110.Final
-io.netty:netty-codec-stomp:4.1.110.Final
-io.netty:netty-codec-xml:4.1.110.Final
-io.netty:netty-handler-proxy:4.1.110.Final
-io.netty:netty-handler-ssl-ocsp:4.1.110.Final
-io.netty:netty-resolver-dns:4.1.110.Final
-io.netty:netty-resolver-dns-classes-macos:4.1.110.Final
-io.netty:netty-resolver-dns-native-macos:osx-aarch_64
-io.netty:netty-resolver-dns-native-macos:osx-x86_64
-io.netty:netty-transport-classes-kqueue:4.1.110.Final
-io.netty:netty-transport-native-epoll:linux-aarch_64
-io.netty:netty-transport-native-epoll:linux-riscv64
-io.netty:netty-transport-native-epoll:linux-x86_64
-io.netty:netty-transport-native-kqueue:osx-aarch_64
-io.netty:netty-transport-native-kqueue:osx-x86_64
-io.netty:netty-transport-rxtx:4.1.110.Final
-io.netty:netty-transport-sctp:4.1.110.Final
-io.netty:netty-transport-udt:4.1.110.Final
-it.unimi.dsi:fastutil:6.5.6
-javax.inject:javax.inject:1
-javax.jdo:jdo-api:3.0.1
-javax.servlet:jsp-api:2.0
-javax.servlet:servlet-api:2.4
-javax.transaction:jta:1.1
-javax.transaction:transaction-api:1.1
-joda-time:joda-time:2.8.1
-net.hydromatic:eigenbase-properties:1.1.5
-net.sf.jpam:jpam:1.1
-net.sf.opencsv:opencsv:2.3
-org.apache.ant:ant:1.9.1
-org.apache.ant:ant-launcher:1.9.1
-org.apache.avro:avro:1.12.0
-org.apache.curator:curator-framework:2.7.1
-org.apache.derby:derby:10.10.2.0
-org.apache.geronimo.specs:geronimo-annotation_1.0_spec:1.1.1
-org.apache.geronimo.specs:geronimo-jaspic_1.0_spec:1.0
-org.apache.geronimo.specs:geronimo-jta_1.1_spec:1.1.1
-org.apache.hadoop:hadoop-client:2.7.1
-org.apache.hadoop:hadoop-hdfs:2.7.1
-org.apache.hadoop:hadoop-mapreduce-client-app:2.7.1
-org.apache.hadoop:hadoop-mapreduce-client-common:2.7.1
-org.apache.hadoop:hadoop-mapreduce-client-core:2.5.1
-org.apache.hadoop:hadoop-mapreduce-client-jobclient:2.7.1
-org.apache.hadoop:hadoop-mapreduce-client-shuffle:2.7.1
-org.apache.hadoop:hadoop-yarn-api:2.7.2
-org.apache.hadoop:hadoop-yarn-common:2.5.1
-org.apache.hadoop:hadoop-yarn-registry:2.7.1
-org.apache.hadoop:hadoop-yarn-server-applicationhistoryservice:2.7.2
-org.apache.hadoop:hadoop-yarn-server-common:2.7.2
-org.apache.hadoop:hadoop-yarn-server-resourcemanager:2.7.2
-org.apache.hadoop:hadoop-yarn-server-web-proxy:2.7.2
-org.apache.hbase:hbase-annotations:1.1.1
-org.apache.hbase:hbase-client:1.1.1
-org.apache.hbase:hbase-common:1.1.1
-org.apache.hbase:hbase-protocol:1.1.1
-org.apache.hive:hive-common:2.3.9
-org.apache.hive:hive-exec:core
-org.apache.hive:hive-jdbc:2.3.9
-org.apache.hive:hive-llap-client:2.3.9
-org.apache.hive:hive-llap-common:2.3.9
-org.apache.hive:hive-llap-server:2.3.9
-org.apache.hive:hive-llap-tez:2.3.9
-org.apache.hive:hive-metastore:2.3.9
-org.apache.hive:hive-serde:2.3.9
-org.apache.hive:hive-service:2.3.9
-org.apache.hive:hive-service-rpc:2.3.9
-org.apache.hive:hive-shims:2.3.9
-org.apache.hive:hive-storage-api:2.4.0
-org.apache.hive:hive-vector-code-gen:2.3.9
-org.apache.hive.shims:hive-shims-0.23:2.3.9
-org.apache.hive.shims:hive-shims-common:2.3.9
-org.apache.hive.shims:hive-shims-scheduler:2.3.9
-org.apache.htrace:htrace-core:3.1.0-incubating
-org.apache.httpcomponents:httpcore:4.4
-org.apache.ivy:ivy:2.5.2
-org.apache.logging.log4j:log4j-1.2-api:2.22.0
-org.apache.logging.log4j:log4j-api:2.22.0
-org.apache.orc:orc-core:1.3.4
-org.apache.parquet:parquet-avro:1.15.2
-org.apache.parquet:parquet-column:1.15.2
-org.apache.parquet:parquet-common:1.15.2
-org.apache.parquet:parquet-encoding:1.15.2
-org.apache.parquet:parquet-format-structures:1.15.2
-org.apache.parquet:parquet-hadoop:1.15.2
-org.apache.parquet:parquet-jackson:1.15.2
-org.apache.slider:slider-core:0.90.2-incubating
-org.apache.thrift:libfb303:0.9.3
-org.apache.thrift:libthrift:0.9.3
-org.apache.twill:twill-api:0.6.0-incubating
-org.apache.twill:twill-common:0.6.0-incubating
-org.apache.twill:twill-core:0.6.0-incubating
-org.apache.twill:twill-discovery-api:0.6.0-incubating
-org.apache.twill:twill-discovery-core:0.6.0-incubating
-org.apache.twill:twill-zookeeper:0.6.0-incubating
-org.apache.velocity:velocity:1.5
-org.apache.zookeeper:zookeeper:3.4.6
-org.codehaus.groovy:groovy-all:2.4.4
-org.codehaus.jackson:jackson-core-asl:1.9.13
-org.codehaus.jackson:jackson-jaxrs:1.9.13
-org.codehaus.jackson:jackson-mapper-asl:1.9.13
-org.codehaus.jackson:jackson-xc:1.9.13
-org.datanucleus:datanucleus-api-jdo:4.2.4
-org.datanucleus:datanucleus-core:4.1.17
-org.datanucleus:datanucleus-rdbms:4.1.19
-org.datanucleus:javax.jdo:3.2.0-m3
-org.eclipse.jetty.aggregate:jetty-all:7.6.0.v20120127
-org.eclipse.jetty.orbit:javax.servlet:3.0.0.v201112011016
-org.mortbay.jetty:jetty:6.1.26
-org.mortbay.jetty:jetty-util:6.1.26
-org.scala-lang:scala-library:2.12.20
-tomcat:jasper-compiler:5.5.23
-tomcat:jasper-runtime:5.5.23
-xerces:xercesImpl:2.9.1
+GROUP_OVERRIDES = {
+    "aopalliance": "Public Domain",
+    "asm": "BSD 3-Clause",
+    "commons-el": "Apache Software License 1.1",
+    "commons-httpclient": "Apache License 2.0",
+    "io.netty": "Apache License 2.0",
+    "it.unimi.dsi": "Apache License 2.0",
+    "javax.activation": "CDDL + GPLv2 with classpath exception",
+    "javax.inject": "Apache License 2.0",
+    "javax.mail": "CDDL",
+    "javax.servlet": "Apache License 2.0",
+    "javax.servlet.jsp": "Apache License 2.0",
+    "javax.transaction": "Apache License 2.0",
+    "org.apache.hbase": "Apache License 2.0",
+    "org.apache.velocity": "Apache License 2.0",
+    "org.apache.zookeeper": "Apache License 2.0",
+    "org.codehaus.jackson": "Apache License 2.0",
+    "oro": "Apache Software License 1.1",
+    "software.amazon.awssdk": "Apache License 2.0",
+    "software.amazon.eventstream": "Apache License 2.0",
+    "stax": "CDDL + GPLv2 with classpath exception",
+    "xml-apis": "Apache Software License 1.1",
+    "xmlenc": "BSD 3-Clause",
+}
 
-Apache Software License 1.1
----------------------------
-commons-el:commons-el:1.0
-oro:oro:2.0.8
-xml-apis:xml-apis:1.3.04
+ARTIFACT_OVERRIDES = {
+    ("io.netty", "netty-resolver-dns-native-macos"): "Apache License 2.0",
+    ("io.netty", "netty-transport-native-epoll"): "Apache License 2.0",
+    ("io.netty", "netty-transport-native-kqueue"): "Apache License 2.0",
+    ("org.apache.hive", "hive-exec"): "Apache License 2.0",
+    ("org.apache.orc", "orc-core"): "Apache License 2.0",
+    ("org.apache.orc", "orc-mapreduce"): "Apache License 2.0",
+    ("org.bouncycastle", "bcprov-jdk18on"): "MIT License",
+}
 
-BSD 3-Clause
-------------
-asm:asm:3.1
-asm:asm-commons:3.1
-asm:asm-tree:3.1
-com.google.protobuf:protobuf-java:3.25.5
-com.thoughtworks.paranamer:paranamer:2.8
-javolution:javolution:5.5.1
-jline:jline:2.12
-org.antlr:ST4:4.0.4
-org.antlr:antlr-runtime:3.5.2
-org.fusesource.leveldbjni:leveldbjni-all:1.8
-org.hamcrest:hamcrest-core:1.3
-xmlenc:xmlenc:0.52
 
-BSD 2-Clause
-------------
-com.github.luben:zstd-jni:1.5.6-6
+def tree_coords(module: pathlib.Path) -> list[tuple[str, str, str]]:
+    coords = set()
+    for line in (module / "target" / "dependency-tree-runtime.txt").read_text().splitlines():
+        line = re.sub(r"^[| +\\-]+", "", line)
+        parts = line.split(":")
+        if len(parts) >= 5 and parts[2] not in ("pom", "test-jar"):
+            coords.add((parts[0], parts[1], parts[3]))
+    return sorted(coords)
 
-MIT License
------------
-org.checkerframework:checker-qual:3.37.0
-org.jruby.jcodings:jcodings:1.0.8
-org.jruby.joni:joni:2.1.2
 
-CDDL + GPLv2 with classpath exception
--------------------------------------
-com.sun.jersey:jersey-client:1.9
-com.sun.jersey:jersey-json:1.9
-com.sun.jersey.contribs:jersey-guice:1.9
-javax.activation:activation:1.1
-javax.annotation:javax.annotation-api:1.3.2
-stax:stax-api:1.0.1
+def shade_modules() -> list[pathlib.Path]:
+    modules = []
+    for pom_path in sorted(ROOT.rglob("pom.xml")):
+        if "<artifactId>maven-shade-plugin</artifactId>" not in pom_path.read_text():
+            continue
+        if pom_path.parent == ROOT:
+            continue
+        modules.append(pom_path.parent)
+    return modules
 
-CDDL
-----
-javax.mail:mail:1.4.1
 
-Common Public License Version 1.0
----------------------------------
-junit:junit:4.11
+def pom_path(group: str, artifact: str, version: str) -> pathlib.Path:
+    return REPO / pathlib.Path(group.replace(".", "/")) / artifact / version / f"{artifact}-{version}.pom"
 
-Mozilla Public License 2.0
---------------------------
-org.jamon:jamon-runtime:2.3.1
 
-Public Domain
--------------
-aopalliance:aopalliance:1.0
+def jar_path(group: str, artifact: str, version: str) -> pathlib.Path:
+    return REPO / pathlib.Path(group.replace(".", "/")) / artifact / version / f"{artifact}-{version}.jar"
+
+
+@lru_cache(maxsize=None)
+def licenses_for(group: str, artifact: str, version: str) -> tuple[str, ...]:
+    path = pom_path(group, artifact, version)
+    if not path.exists():
+        return ("__MISSING__",)
+
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError:
+        return ("__PARSE_ERROR__",)
+
+    values = [
+        item.text.strip()
+        for item in root.findall("./m:licenses/m:license/m:name", NS)
+        if item.text and item.text.strip()
+    ]
+    if values:
+        return tuple(values)
+
+    parent = root.find("./m:parent", NS)
+    if parent is not None:
+        pg = parent.findtext("m:groupId", default="", namespaces=NS).strip()
+        pa = parent.findtext("m:artifactId", default="", namespaces=NS).strip()
+        pv = parent.findtext("m:version", default="", namespaces=NS).strip()
+        if pg and pa and pv and "${" not in pg + pa + pv:
+            return licenses_for(pg, pa, pv)
+
+    return ()
+
+
+def normalize_family(group: str, artifact: str, version: str) -> str:
+    key = (group, artifact)
+    if key in ARTIFACT_OVERRIDES:
+        return ARTIFACT_OVERRIDES[key]
+    if group in GROUP_OVERRIDES:
+        return GROUP_OVERRIDES[group]
+
+    licenses = licenses_for(group, artifact, version)
+    joined = " | ".join(licenses)
+
+    apache_markers = (
+        "Apache License",
+        "Apache Software License",
+        "Apache-2.0",
+        "Apache 2",
+        "Apache v2",
+    )
+    if any(marker in joined for marker in apache_markers):
+        return "Apache License 2.0"
+    if "Apache Software License, Version 1.1" in joined:
+        return "Apache Software License 1.1"
+    if "MIT" in joined:
+        return "MIT License"
+    if "Public Domain" in joined:
+        return "Public Domain"
+    if "Eclipse Distribution License" in joined or "EDL 1.0" in joined:
+        return "Eclipse Distribution License - v 1.0"
+    if "Mozilla" in joined or "MPL" in joined:
+        return "Mozilla Public License 2.0"
+    if "Common Public License" in joined:
+        return "Common Public License Version 1.0"
+    if "EPL 2.0" in joined or "Eclipse Public License 2.0" in joined:
+        return "EPL 2.0"
+    if "CDDL + GPLv2 with classpath exception" in joined or "CDDL/GPLv2+CE" in joined:
+        return "CDDL + GPLv2 with classpath exception"
+    if "CDDL" in joined or "GPL2 w/ CPE" in joined:
+        return "CDDL + GPLv2 with classpath exception"
+    if "BSD 2-Clause" in joined:
+        return "BSD 2-Clause"
+    if "BSD" in joined or "Go license" in joined:
+        return "BSD 3-Clause"
+
+    raise ValueError(f"Unmapped license for {group}:{artifact}:{version}: {licenses}")
+
+
+def render_license(groups: dict[str, list[tuple[str, str, str]]]) -> str:
+    lines = [APACHE_BANNER, ""]
+    for family in FAMILY_ORDER:
+        coords = groups.get(family)
+        if not coords:
+            continue
+        lines.append(family)
+        lines.append("-" * len(family))
+        for group, artifact, version in coords:
+            lines.append(f"{group}:{artifact}:{version}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def third_party_coords(module: pathlib.Path) -> list[tuple[str, str, str]]:
+    return [coord for coord in tree_coords(module) if coord[0] != "org.apache.xtable"]
+
+
+@lru_cache(maxsize=None)
+def notice_text_for(group: str, artifact: str, version: str) -> str | None:
+    path = jar_path(group, artifact, version)
+    if not path.exists():
+        return None
+
+    candidates = (
+        "META-INF/NOTICE",
+        "META-INF/NOTICE.txt",
+        "NOTICE",
+        "NOTICE.txt",
+    )
+    with zipfile.ZipFile(path) as jar_file:
+        names = set(jar_file.namelist())
+        for candidate in candidates:
+            if candidate not in names:
+                continue
+            text = jar_file.read(candidate).decode("utf-8", errors="replace")
+            lines = [line.rstrip() for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+            normalized = "\n".join(lines).strip()
+            if normalized:
+                return normalized
+    return None
+
+
+def render_notice(module: pathlib.Path) -> str:
+    grouped_notices: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
+    for coord in third_party_coords(module):
+        notice_text = notice_text_for(*coord)
+        if notice_text is None:
+            continue
+        grouped_notices[notice_text].append(coord)
+
+    lines = [NOTICE_TEMPLATE, "--------------------------------------------------------------------------------", ""]
+    for notice_text in sorted(grouped_notices):
+        for group, artifact, version in grouped_notices[notice_text]:
+            lines.append(f"Group: {group} Name: {artifact} Version: {version}")
+        lines.append("")
+        lines.append("NOTICE:")
+        for line in notice_text.splitlines():
+            lines.append(f"| {line}" if line else "|")
+        lines.append("")
+        lines.append("--------------------------------------------------------------------------------")
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def main() -> None:
+    for module in shade_modules():
+        groups: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
+        for coord in third_party_coords(module):
+            family = normalize_family(*coord)
+            groups[family].append(coord)
+
+        license_path = module / "src" / "main" / "resources" / "META-INF" / "LICENSE-bundled"
+        notice_path = module / "src" / "main" / "resources" / "META-INF" / "NOTICE-bundled"
+        license_path.parent.mkdir(parents=True, exist_ok=True)
+        license_path.write_text(render_license(groups))
+        notice_path.write_text(render_notice(module))
+
+
+if __name__ == "__main__":
+    main()

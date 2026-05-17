@@ -1,5 +1,5 @@
 Apache XTable (incubating)
-Copyright 2024-2025 The Apache Software Foundation
+Copyright 2024-2026 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (https://www.apache.org/).
@@ -12,8 +12,6 @@ This binary artifact bundles the following projects with NOTICE:
 
 Group: com.fasterxml.jackson.core Name: jackson-annotations Version: 2.18.2
 Group: com.fasterxml.jackson.core Name: jackson-databind Version: 2.18.2
-Group: com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.2
-com.fasterxml.jackson.module:jackson-module-scala_2.12:2.18.2
 
 NOTICE:
 | # Jackson JSON processor
@@ -41,6 +39,8 @@ NOTICE:
 --------------------------------------------------------------------------------
 
 Group: com.fasterxml.jackson.core Name: jackson-core Version: 2.18.2
+Group: org.apache.parquet Name: parquet-jackson Version: 1.15.2
+Group: software.amazon.awssdk Name: third-party-jackson-core Version: 2.29.40
 
 NOTICE:
 | # Jackson JSON processor
@@ -78,42 +78,58 @@ NOTICE:
 
 --------------------------------------------------------------------------------
 
-Group: io.delta:delta-core_2.12:2.4.0
-Group:  io.delta:delta-storage:2.4.0
+Group: com.fasterxml.jackson.datatype Name: jackson-datatype-jsr310 Version: 2.18.2
 
 NOTICE:
-| Delta Lake
-| Copyright (2021) The Delta Lake Project Authors.
+| # Jackson JSON processor
 |
-| Licensed under the Apache License, Version 2.0 (the "License");
-| you may not use this file except in compliance with the License.
-| You may obtain a copy of the License at
+| Jackson is a high-performance, Free/Open Source JSON processing library.
+| It was originally written by Tatu Saloranta (tatu.saloranta@iki.fi), and has
+| been in development since 2007.
+| It is currently developed by a community of developers.
 |
-| http://www.apache.org/licenses/LICENSE-2.0
+| ## Licensing
 |
-| Unless required by applicable law or agreed to in writing, software
-| distributed under the License is distributed on an "AS IS" BASIS,
-| WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-| See the License for the specific language governing permissions and
-| limitations under the License.
+| Jackson components are licensed under Apache (Software) License, version 2.0,
+| as per accompanying LICENSE file.
 |
-| This project includes software licensed by the Apache Software Foundation (Apache 2.0)
-| from the Apache Spark project (www.github.com/apache/spark)
+| ## Credits
 |
-| ----------------------------------------------------------
-| Apache Spark
-| Copyright 2014 and onwards The Apache Software Foundation.
-|
-| This product includes software developed at
-| The Apache Software Foundation (http://www.apache.org/).
+| A list of contributors may be found from CREDITS file, which is included
+| in some artifacts (usually source distributions); but is always available
+| from the source code management (SCM) system project uses.
 
 --------------------------------------------------------------------------------
 
-Group: software.amazon.awssdk:glue:2.29.40
+Group: software.amazon.awssdk Name: annotations Version: 2.29.40
+Group: software.amazon.awssdk Name: apache-client Version: 2.29.40
+Group: software.amazon.awssdk Name: auth Version: 2.29.40
+Group: software.amazon.awssdk Name: aws-core Version: 2.29.40
+Group: software.amazon.awssdk Name: aws-json-protocol Version: 2.29.40
+Group: software.amazon.awssdk Name: checksums Version: 2.29.40
+Group: software.amazon.awssdk Name: checksums-spi Version: 2.29.40
+Group: software.amazon.awssdk Name: endpoints-spi Version: 2.29.40
+Group: software.amazon.awssdk Name: glue Version: 2.29.40
+Group: software.amazon.awssdk Name: http-auth Version: 2.29.40
+Group: software.amazon.awssdk Name: http-auth-aws Version: 2.29.40
+Group: software.amazon.awssdk Name: http-auth-aws-eventstream Version: 2.29.40
+Group: software.amazon.awssdk Name: http-auth-spi Version: 2.29.40
+Group: software.amazon.awssdk Name: http-client-spi Version: 2.29.40
+Group: software.amazon.awssdk Name: identity-spi Version: 2.29.40
+Group: software.amazon.awssdk Name: json-utils Version: 2.29.40
+Group: software.amazon.awssdk Name: metrics-spi Version: 2.29.40
+Group: software.amazon.awssdk Name: netty-nio-client Version: 2.29.40
+Group: software.amazon.awssdk Name: profiles Version: 2.29.40
+Group: software.amazon.awssdk Name: protocol-core Version: 2.29.40
+Group: software.amazon.awssdk Name: regions Version: 2.29.40
+Group: software.amazon.awssdk Name: retries Version: 2.29.40
+Group: software.amazon.awssdk Name: retries-spi Version: 2.29.40
+Group: software.amazon.awssdk Name: sdk-core Version: 2.29.40
+Group: software.amazon.awssdk Name: utils Version: 2.29.40
 
 NOTICE:
-| AWS SDK for Java
-| Copyright 2010-2014 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+| AWS SDK for Java 2.0
+| Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 |
 | This product includes software developed by
 | Amazon Technologies, Inc (http://www.amazon.com/).
@@ -124,7 +140,109 @@ NOTICE:
 | This software includes third party software subject to the following copyrights:
 | - XML parsing and utility functions from JetS3t - Copyright 2006-2009 James Murty.
 | - PKCS#1 PEM encoded private key parsing and utility functions from oauth.googlecode.com - Copyright 1998-2010 AOL Inc.
+| - Apache Commons Lang - https://github.com/apache/commons-lang
+| - Netty Reactive Streams - https://github.com/playframework/netty-reactive-streams
+| - Jackson-core - https://github.com/FasterXML/jackson-core
+| - Jackson-dataformat-cbor - https://github.com/FasterXML/jackson-dataformats-binary
 |
 | The licenses for these third party components are included in LICENSE.txt
+|
+| - For Apache Commons Lang see also this required NOTICE:
+|   Apache Commons Lang
+|   Copyright 2001-2020 The Apache Software Foundation
+|
+|   This product includes software developed at
+|   The Apache Software Foundation (https://www.apache.org/).
+
+--------------------------------------------------------------------------------
+
+Group: org.apache.avro Name: avro Version: 1.12.0
+
+NOTICE:
+| Apache Avro
+| Copyright 2009-2024 The Apache Software Foundation
+|
+|
+| This product includes software developed at
+| The Apache Software Foundation (http://www.apache.org/).
+
+--------------------------------------------------------------------------------
+
+Group: commons-pool Name: commons-pool Version: 1.6
+
+NOTICE:
+| Apache Commons Pool
+| Copyright 2001-2012 The Apache Software Foundation
+|
+| This product includes software developed by
+| The Apache Software Foundation (http://www.apache.org/).
+
+--------------------------------------------------------------------------------
+
+Group: org.apache.logging.log4j Name: log4j-1.2-api Version: 2.22.0
+
+NOTICE:
+| Apache Log4j 1.x Compatibility API
+| Copyright 1999-2023 The Apache Software Foundation
+|
+|
+| This product includes software developed at
+| The Apache Software Foundation (http://www.apache.org/).
+
+--------------------------------------------------------------------------------
+
+Group: org.apache.logging.log4j Name: log4j-api Version: 2.22.0
+
+NOTICE:
+| Apache Log4j API
+| Copyright 1999-2023 The Apache Software Foundation
+|
+|
+| This product includes software developed at
+| The Apache Software Foundation (http://www.apache.org/).
+
+--------------------------------------------------------------------------------
+
+Group: org.apache.parquet Name: parquet-avro Version: 1.15.2
+
+NOTICE:
+| Apache Parquet Avro
+| Copyright 2014-2024 The Apache Software Foundation
+|
+| This product includes software developed at
+| The Apache Software Foundation (http://www.apache.org/).
+|
+| --------------------------------------------------------------------------------
+|
+| This product includes code from Apache Avro, which includes the following in
+| its NOTICE file:
+|
+|   Apache Avro
+|   Copyright 2010-2015 The Apache Software Foundation
+|
+|   This product includes software developed at
+|   The Apache Software Foundation (http://www.apache.org/).
+
+--------------------------------------------------------------------------------
+
+Group: org.scala-lang Name: scala-library Version: 2.12.20
+
+NOTICE:
+| Scala
+| Copyright (c) 2002-2024 EPFL
+| Copyright (c) 2011-2024 Lightbend, Inc.
+|
+| Scala includes software developed at
+| LAMP/EPFL (https://lamp.epfl.ch/) and
+| Lightbend, Inc. (https://www.lightbend.com/).
+|
+| Licensed under the Apache License, Version 2.0 (the "License").
+| Unless required by applicable law or agreed to in writing, software
+| distributed under the License is distributed on an "AS IS" BASIS,
+| WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+| See the License for the specific language governing permissions and
+| limitations under the License.
+|
+| This software includes projects with other licenses -- see `doc/LICENSE.md`.
 
 --------------------------------------------------------------------------------
