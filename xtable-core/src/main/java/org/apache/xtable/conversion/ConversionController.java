@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +44,7 @@ import org.apache.xtable.catalog.CatalogConversionFactory;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
+import org.apache.xtable.model.InstantsForIncrementalSync.TargetSyncInstant;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.catalog.CatalogTableIdentifier;
 import org.apache.xtable.model.metadata.TableSyncMetadata;
@@ -351,10 +353,21 @@ public class ConversionController {
 
   private InstantsForIncrementalSync getMostOutOfSyncCommitAndPendingCommits(
       Map<ConversionTarget, TableSyncMetadata> lastSyncMetadataByFormat) {
+    List<TargetSyncInstant> targetSyncInstants =
+        lastSyncMetadataByFormat.entrySet().stream()
+            .map(
+                entry ->
+                    TargetSyncInstant.builder()
+                        .tableFormat(entry.getKey().getTableFormat())
+                        .lastSyncInstant(entry.getValue().getLastInstantSynced())
+                        .build())
+            .sorted(
+                Comparator.comparing(TargetSyncInstant::getLastSyncInstant)
+                    .thenComparing(TargetSyncInstant::getTableFormat))
+            .collect(Collectors.toList());
     Instant mostOutOfSyncCommit =
-        lastSyncMetadataByFormat.values().stream()
-            .map(TableSyncMetadata::getLastInstantSynced)
-            .sorted()
+        targetSyncInstants.stream()
+            .map(TargetSyncInstant::getLastSyncInstant)
             .findFirst()
             .orElseThrow(
                 () ->
@@ -368,6 +381,7 @@ public class ConversionController {
             .collect(Collectors.toList());
     return InstantsForIncrementalSync.builder()
         .lastSyncInstant(mostOutOfSyncCommit)
+        .targetSyncInstants(targetSyncInstants)
         .pendingCommits(allPendingInstants)
         .build();
   }
