@@ -27,6 +27,7 @@ import static org.apache.xtable.model.storage.TableFormat.PARQUET;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -84,7 +85,10 @@ import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.hudi.HudiTestUtil;
+import org.apache.xtable.model.InstantsForIncrementalSync;
+import org.apache.xtable.model.InstantsForIncrementalSync.TargetSyncInstant;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
@@ -541,6 +545,32 @@ public class ITParquetConversionSource {
         Instant.ofEpochMilli(snapshot.getTable().getLatestCommitTime().toEpochMilli());
     assertEquals(instantBeforeFirstSnapshot.toEpochMilli(), newModificationTime);
     assertTrue(conversionSource.isIncrementalSyncSafeFrom(Instant.ofEpochMilli(testTime)));
+  }
+
+  @Test
+  void testGetCommitsBacklog_rejectsDifferentTargetSyncInstants() {
+    ParquetConversionSource source =
+        ParquetConversionSource.builder().hadoopConf(new Configuration()).build();
+    InstantsForIncrementalSync syncInstants =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(1000L))
+            .targetSyncInstants(
+                Arrays.asList(
+                    TargetSyncInstant.builder()
+                        .tableFormat(ICEBERG)
+                        .lastSyncInstant(Instant.ofEpochMilli(1000L))
+                        .build(),
+                    TargetSyncInstant.builder()
+                        .tableFormat(DELTA)
+                        .lastSyncInstant(Instant.ofEpochMilli(2000L))
+                        .build()))
+            .build();
+
+    NotSupportedException exception =
+        assertThrows(NotSupportedException.class, () -> source.getCommitsBacklog(syncInstants));
+    assertTrue(exception.getMessage().contains("target formats synced to different instants"));
+    assertTrue(exception.getMessage().contains("ICEBERG=1970-01-01T00:00:01Z"));
+    assertTrue(exception.getMessage().contains("DELTA=1970-01-01T00:00:02Z"));
   }
 
   private void updateModificationTimeRecursive(

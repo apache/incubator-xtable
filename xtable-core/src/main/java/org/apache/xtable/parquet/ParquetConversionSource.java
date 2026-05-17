@@ -46,6 +46,7 @@ import org.apache.hadoop.util.functional.RemoteIterators;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
+import org.apache.xtable.exception.NotSupportedException;
 import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.hudi.HudiPathUtils;
 import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
@@ -153,6 +154,20 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   @Override
   public CommitsBacklog<Long> getCommitsBacklog(InstantsForIncrementalSync syncInstants) {
+    if (syncInstants.getTargetSyncInstants().stream()
+            .map(InstantsForIncrementalSync.TargetSyncInstant::getLastSyncInstant)
+            .distinct()
+            .count()
+        > 1) {
+      String targetSyncInstants =
+          syncInstants.getTargetSyncInstants().stream()
+              .map(target -> target.getTableFormat() + "=" + target.getLastSyncInstant().toString())
+              .collect(Collectors.joining(", "));
+      throw new NotSupportedException(
+          "Parquet incremental sync does not support target formats synced to different instants. "
+              + "Run a full sync to realign the target tables. Target instants: "
+              + targetSyncInstants);
+    }
     List<Long> commitsToProcess =
         Collections.singletonList(syncInstants.getLastSyncInstant().toEpochMilli());
     return CommitsBacklog.<Long>builder().commitsToProcess(commitsToProcess).build();
