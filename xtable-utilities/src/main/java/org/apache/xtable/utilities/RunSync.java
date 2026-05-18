@@ -326,7 +326,7 @@ public class RunSync {
     String icebergCatalogConfigpath = getValueFromConfig(cmd, ICEBERG_CATALOG_CONFIG_PATH);
     String hadoopConfigpath = getValueFromConfig(cmd, HADOOP_CONFIG_PATH);
     String conversionProviderConfigpath = getValueFromConfig(cmd, CONVERTERS_CONFIG_PATH);
-    long timeoutInSeconds = Long.parseLong(getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION));
+    long timeoutInSeconds = getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION) == null || getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION).isEmpty() ? 0L : Long.parseLong(getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION));
     DatasetConfig datasetConfig = getDatasetConfig(datasetConfigpath);
     CatalogConfig catalogConfig = getIcebergCatalogConfig(icebergCatalogConfigpath);
     Configuration hadoopConf = gethadoopConf(hadoopConfigpath);
