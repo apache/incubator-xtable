@@ -118,12 +118,13 @@ public class RunSync {
               true,
               "The interval in seconds to schedule the loop. Requires --continuousMode to be set. Defaults to 5 seconds.")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility")
-            .addOption(
-                    SYNC_TIMEOUT_OPTION,
-                    "syncTimeout",
-                    true,
-                    "The maximum time in seconds allowed for a single table sync before timing out. Defaults to no timeout.")
-            .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");;
+          .addOption(
+              SYNC_TIMEOUT_OPTION,
+              "syncTimeout",
+              true,
+              "The maximum time in seconds allowed for a single table sync before timing out. Defaults to no timeout.")
+          .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
+  ;
 
   static SourceTable sourceTableBuilder(
       @NonNull DatasetConfig.Table table,
@@ -175,44 +176,54 @@ public class RunSync {
     java.util.concurrent.ScheduledExecutorService delayer = Executors.newScheduledThreadPool(1);
     for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
       log.info(
-              "Running sync for basePath {} for following table formats {}",
-              table.getTableBasePath(),
-              tableFormatList);
+          "Running sync for basePath {} for following table formats {}",
+          table.getTableBasePath(),
+          tableFormatList);
       Properties sourceProperties = new Properties();
       if (table.getPartitionSpec() != null) {
         sourceProperties.put(
-                HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec());
+            HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, table.getPartitionSpec());
       }
 
       SourceTable sourceTable =
-              sourceTableBuilder(table, catalogConfig, datasetConfig, sourceProperties);
+          sourceTableBuilder(table, catalogConfig, datasetConfig, sourceProperties);
       List<TargetTable> targetTables = targetTableBuilder(table, catalogConfig, tableFormatList);
       ConversionConfig conversionConfig =
-              ConversionConfig.builder()
-                      .sourceTable(sourceTable)
-                      .targetTables(targetTables)
-                      .syncMode(SyncMode.INCREMENTAL)
-                      .build();
+          ConversionConfig.builder()
+              .sourceTable(sourceTable)
+              .targetTables(targetTables)
+              .syncMode(SyncMode.INCREMENTAL)
+              .build();
       if (timeoutInSeconds > 0) {
-        CompletableFuture<Void> syncFuture = CompletableFuture.runAsync(() -> {
-          conversionController.sync(conversionConfig, conversionSourceProvider);
-        }, syncExecutor);
+        CompletableFuture<Void> syncFuture =
+            CompletableFuture.runAsync(
+                () -> {
+                  conversionController.sync(conversionConfig, conversionSourceProvider);
+                },
+                syncExecutor);
 
-        delayer.schedule(() -> {
-          if (!syncFuture.isDone()) {
-            // end complete the future exceptionally with a TimeoutException
-            syncFuture.completeExceptionally(new java.util.concurrent.TimeoutException(
-                    "Sync timed out for " + table.getTableBasePath()));
-            syncFuture.cancel(true); // send interrupt signal to the executing worker thread
-          }
-        }, timeoutInSeconds, TimeUnit.SECONDS);
+        delayer.schedule(
+            () -> {
+              if (!syncFuture.isDone()) {
+                // end complete the future exceptionally with a TimeoutException
+                syncFuture.completeExceptionally(
+                    new java.util.concurrent.TimeoutException(
+                        "Sync timed out for " + table.getTableBasePath()));
+                syncFuture.cancel(true); // send interrupt signal to the executing worker thread
+              }
+            },
+            timeoutInSeconds,
+            TimeUnit.SECONDS);
 
         // wait for whichever happens first (completion or timeout exception)
         try {
           syncFuture.join();
         } catch (java.util.concurrent.CompletionException e) {
           if (e.getCause() instanceof java.util.concurrent.TimeoutException) {
-            log.error("Sync timed out for {} after {} seconds", table.getTableBasePath(), timeoutInSeconds);
+            log.error(
+                "Sync timed out for {} after {} seconds",
+                table.getTableBasePath(),
+                timeoutInSeconds);
           } else {
             log.error("Error running sync for {}", table.getTableBasePath(), e.getCause());
           }
@@ -326,7 +337,11 @@ public class RunSync {
     String icebergCatalogConfigpath = getValueFromConfig(cmd, ICEBERG_CATALOG_CONFIG_PATH);
     String hadoopConfigpath = getValueFromConfig(cmd, HADOOP_CONFIG_PATH);
     String conversionProviderConfigpath = getValueFromConfig(cmd, CONVERTERS_CONFIG_PATH);
-    long timeoutInSeconds = getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION) == null || getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION).isEmpty() ? 0L : Long.parseLong(getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION));
+    long timeoutInSeconds =
+        getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION) == null
+                || getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION).isEmpty()
+            ? 0L
+            : Long.parseLong(getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION));
     DatasetConfig datasetConfig = getDatasetConfig(datasetConfigpath);
     CatalogConfig catalogConfig = getIcebergCatalogConfig(icebergCatalogConfigpath);
     Configuration hadoopConf = gethadoopConf(hadoopConfigpath);
@@ -334,7 +349,12 @@ public class RunSync {
         getConversionSourceProvider(conversionProviderConfigpath, datasetConfig, hadoopConf);
     List<String> tableFormatList = datasetConfig.getTargetFormats();
     syncTableMetadata(
-        datasetConfig, tableFormatList, catalogConfig, hadoopConf, conversionSourceProvider, timeoutInSeconds);
+        datasetConfig,
+        tableFormatList,
+        catalogConfig,
+        hadoopConf,
+        conversionSourceProvider,
+        timeoutInSeconds);
   }
 
   static byte[] getCustomConfigurations(String Configpath) throws IOException {
