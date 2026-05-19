@@ -26,6 +26,7 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -79,6 +80,7 @@ public class RunSync {
   private static final String CONTINUOUS_MODE = "m";
   private static final String CONTINUOUS_MODE_INTERVAL = "t";
   private static final String HELP_OPTION = "h";
+  private static final String SYNC_TIMEOUT_OPTION = "timeout";
 
   private static final Options OPTIONS =
       new Options()
@@ -115,7 +117,14 @@ public class RunSync {
               "continuousModeInterval",
               true,
               "The interval in seconds to schedule the loop. Requires --continuousMode to be set. Defaults to 5 seconds.")
+          .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility")
+          .addOption(
+              SYNC_TIMEOUT_OPTION,
+              "syncTimeout",
+              true,
+              "The maximum time in seconds allowed for a single table sync before timing out. Defaults to no timeout.")
           .addOption(HELP_OPTION, "help", false, "Displays help information to run this utility");
+  ;
 
   static SourceTable sourceTableBuilder(
       @NonNull DatasetConfig.Table table,
@@ -155,13 +164,16 @@ public class RunSync {
     return targetTables;
   }
 
-  static void syncTableMetdata(
+  static void syncTableMetadata(
       DatasetConfig datasetConfig,
       List<String> tableFormatList,
       CatalogConfig catalogConfig,
       Configuration hadoopConf,
-      ConversionSourceProvider conversionSourceProvider) {
+      ConversionSourceProvider conversionSourceProvider,
+      long timeoutInSeconds) {
     ConversionController conversionController = new ConversionController(hadoopConf);
+    java.util.concurrent.ExecutorService syncExecutor = Executors.newCachedThreadPool();
+    java.util.concurrent.ScheduledExecutorService delayer = Executors.newScheduledThreadPool(1);
     for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
       log.info(
           "Running sync for basePath {} for following table formats {}",
@@ -182,10 +194,47 @@ public class RunSync {
               .targetTables(targetTables)
               .syncMode(SyncMode.INCREMENTAL)
               .build();
-      try {
-        conversionController.sync(conversionConfig, conversionSourceProvider);
-      } catch (Exception e) {
-        log.error("Error running sync for {}", table.getTableBasePath(), e);
+      if (timeoutInSeconds > 0) {
+        CompletableFuture<Void> syncFuture =
+            CompletableFuture.runAsync(
+                () -> {
+                  conversionController.sync(conversionConfig, conversionSourceProvider);
+                },
+                syncExecutor);
+
+        delayer.schedule(
+            () -> {
+              if (!syncFuture.isDone()) {
+                // end complete the future exceptionally with a TimeoutException
+                syncFuture.completeExceptionally(
+                    new java.util.concurrent.TimeoutException(
+                        "Sync timed out for " + table.getTableBasePath()));
+                syncFuture.cancel(true); // send interrupt signal to the executing worker thread
+              }
+            },
+            timeoutInSeconds,
+            TimeUnit.SECONDS);
+
+        // wait for whichever happens first (completion or timeout exception)
+        try {
+          syncFuture.join();
+        } catch (java.util.concurrent.CompletionException e) {
+          if (e.getCause() instanceof java.util.concurrent.TimeoutException) {
+            log.error(
+                "Sync timed out for {} after {} seconds",
+                table.getTableBasePath(),
+                timeoutInSeconds);
+          } else {
+            log.error("Error running sync for {}", table.getTableBasePath(), e.getCause());
+          }
+        }
+      } else {
+        // fallback to original synchronous behavior if no timeout option is provided
+        try {
+          conversionController.sync(conversionConfig, conversionSourceProvider);
+        } catch (Exception e) {
+          log.error("Error running sync for {}", table.getTableBasePath(), e);
+        }
       }
     }
   }
@@ -288,14 +337,24 @@ public class RunSync {
     String icebergCatalogConfigpath = getValueFromConfig(cmd, ICEBERG_CATALOG_CONFIG_PATH);
     String hadoopConfigpath = getValueFromConfig(cmd, HADOOP_CONFIG_PATH);
     String conversionProviderConfigpath = getValueFromConfig(cmd, CONVERTERS_CONFIG_PATH);
+    long timeoutInSeconds =
+        getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION) == null
+                || getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION).isEmpty()
+            ? 0L
+            : Long.parseLong(getValueFromConfig(cmd, SYNC_TIMEOUT_OPTION));
     DatasetConfig datasetConfig = getDatasetConfig(datasetConfigpath);
     CatalogConfig catalogConfig = getIcebergCatalogConfig(icebergCatalogConfigpath);
     Configuration hadoopConf = gethadoopConf(hadoopConfigpath);
     ConversionSourceProvider conversionSourceProvider =
         getConversionSourceProvider(conversionProviderConfigpath, datasetConfig, hadoopConf);
     List<String> tableFormatList = datasetConfig.getTargetFormats();
-    syncTableMetdata(
-        datasetConfig, tableFormatList, catalogConfig, hadoopConf, conversionSourceProvider);
+    syncTableMetadata(
+        datasetConfig,
+        tableFormatList,
+        catalogConfig,
+        hadoopConf,
+        conversionSourceProvider,
+        timeoutInSeconds);
   }
 
   static byte[] getCustomConfigurations(String Configpath) throws IOException {
