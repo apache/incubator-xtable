@@ -25,12 +25,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import lombok.Builder;
 import lombok.Value;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.fs.Path;
 
@@ -71,6 +74,7 @@ import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
 /** Extracts all the files for Hudi table represented by {@link InternalTable}. */
+@Log4j2
 public class HudiDataFileExtractor implements AutoCloseable {
   private final HoodieTableMetadata tableMetadata;
   private final HoodieTableMetaClient metaClient;
@@ -161,16 +165,13 @@ public class HudiDataFileExtractor implements AutoCloseable {
               .getPartitionToWriteStats()
               .forEach(
                   (partitionPath, writeStats) -> {
-                    Set<String> affectedFileIds =
-                        writeStats.stream()
-                            .map(HoodieWriteStat::getFileId)
-                            .collect(Collectors.toSet());
                     AddedAndRemovedFiles addedAndRemovedFiles =
                         getUpdatesToPartition(
                             fsView,
+                            timeline,
                             instantToConsider,
                             partitionPath,
-                            affectedFileIds,
+                            writeStats,
                             partitioningFields);
                     addedFiles.addAll(addedAndRemovedFiles.getAdded());
                     removedFiles.addAll(addedAndRemovedFiles.getRemoved());
@@ -280,10 +281,26 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
   private AddedAndRemovedFiles getUpdatesToPartition(
       TableFileSystemView fsView,
+      HoodieTimeline timeline,
       HoodieInstant instantToConsider,
       String partitionPath,
-      Set<String> affectedFileIds,
+      List<HoodieWriteStat> writeStats,
       List<InternalPartitionField> partitioningFields) {
+    Set<String> affectedFileIds =
+        writeStats.stream().map(HoodieWriteStat::getFileId).collect(Collectors.toSet());
+    // Build a map from fileId → prevCommit for file groups that are UPSERTs (not brand-new).
+    // Used below to recover the old file path when CLEAN has already deleted it from the FS.
+    Map<String, String> fileIdToPrevCommit =
+        writeStats.stream()
+            .filter(
+                ws ->
+                    ws.getPrevCommit() != null
+                        && !HoodieTimeline.INIT_INSTANT_TS.equals(ws.getPrevCommit()))
+            .collect(
+                Collectors.toMap(
+                    HoodieWriteStat::getFileId,
+                    HoodieWriteStat::getPrevCommit,
+                    (existing, replacement) -> existing));
     List<InternalDataFile> filesToAdd = new ArrayList<>(affectedFileIds.size());
     List<InternalDataFile> filesToRemove = new ArrayList<>(affectedFileIds.size());
     List<PartitionValue> partitionValues =
@@ -298,6 +315,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
               List<HoodieBaseFile> baseFiles =
                   fileGroup.getAllBaseFiles().collect(Collectors.toList());
               boolean newBaseFileAdded = false;
+              boolean removeEmitted = false;
               for (HoodieBaseFile baseFile : baseFiles) {
                 if (baseFile.getCommitTime().equals(instantToConsider.getTimestamp())) {
                   newBaseFileAdded = true;
@@ -306,11 +324,66 @@ public class HudiDataFileExtractor implements AutoCloseable {
                   // if a new base file was added, then the previous base file for the group needs
                   // to be removed
                   filesToRemove.add(buildFileWithoutStats(partitionValues, baseFile));
+                  removeEmitted = true;
                   break;
+                }
+              }
+              // Recover old file path from timeline when CLEAN deleted it before this sync.
+              if (newBaseFileAdded && !removeEmitted) {
+                String fileId = fileGroup.getFileGroupId().getFileId();
+                String prevCommit = fileIdToPrevCommit.get(fileId);
+                if (prevCommit != null) {
+                  recoverRemovedFile(timeline, partitionPath, fileId, prevCommit, partitionValues)
+                      .ifPresent(filesToRemove::add);
                 }
               }
             });
     return AddedAndRemovedFiles.builder().added(filesToAdd).removed(filesToRemove).build();
+  }
+
+  /**
+   * Looks up the previous base file path from the timeline when CLEAN has already deleted it from
+   * storage, so the downstream format can emit a proper REMOVE for the stale file.
+   *
+   * @return the old {@link InternalDataFile}, or empty if the previous commit is no longer in the
+   *     visible timeline (e.g. archived before this sync ran)
+   */
+  Optional<InternalDataFile> recoverRemovedFile(
+      HoodieTimeline timeline,
+      String partitionPath,
+      String fileId,
+      String prevCommitTime,
+      List<PartitionValue> partitionValues) {
+    return timeline.getInstants().stream()
+        .filter(instant -> prevCommitTime.equals(instant.getTimestamp()))
+        .findFirst()
+        .flatMap(
+            prevInstant -> {
+              try {
+                HoodieCommitMetadata prevMeta =
+                    HoodieCommitMetadata.fromBytes(
+                        timeline.getInstantDetails(prevInstant).get(), HoodieCommitMetadata.class);
+                return prevMeta
+                    .getPartitionToWriteStats()
+                    .getOrDefault(partitionPath, Collections.emptyList())
+                    .stream()
+                    .filter(ws -> fileId.equals(ws.getFileId()))
+                    .findFirst()
+                    .map(
+                        ws ->
+                            buildFileWithoutStats(
+                                partitionValues, new HoodieBaseFile(ws.getPath())));
+              } catch (IOException e) {
+                log.warn(
+                    "Unable to read previous commit {} to recover removed file for fileId {} "
+                        + "in partition {}",
+                    prevCommitTime,
+                    fileId,
+                    partitionPath,
+                    e);
+                return Optional.empty();
+              }
+            });
   }
 
   private AddedAndRemovedFiles getUpdatesToPartitionForReplaceCommit(
