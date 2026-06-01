@@ -20,9 +20,12 @@ package org.apache.xtable.iceberg;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -39,6 +42,11 @@ import org.apache.iceberg.UpdateProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NotFoundException;
+import org.apache.iceberg.mapping.MappedField;
+import org.apache.iceberg.mapping.MappedFields;
+import org.apache.iceberg.mapping.MappingUtil;
+import org.apache.iceberg.mapping.NameMapping;
+import org.apache.iceberg.mapping.NameMappingParser;
 
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.model.InternalTable;
@@ -161,13 +169,58 @@ public class IcebergConversionTarget implements ConversionTarget {
     }
   }
 
+  /**
+   * Create a name mapping from the given schema, add storage names in {@link
+   * IcebergSchemaExtractor#getIdToStorageName()}, if any exist, to the name mapping, and apply the
+   * updated mapping to the table.
+   *
+   * <p>This method should only be called when the name mapping is not set, or when field IDs are
+   * provided in the source schema
+   *
+   * @param schema the {@link Schema} from which to create the name mapping
+   */
+  private void createAndSetNameMapping(Schema schema) {
+    NameMapping mapping = MappingUtil.create(schema);
+    MappedFields updatedMappedFields =
+        updateNameMapping(mapping.asMappedFields(), schemaExtractor.getIdToStorageName());
+    transaction
+        .updateProperties()
+        .set(
+            TableProperties.DEFAULT_NAME_MAPPING,
+            NameMappingParser.toJson(NameMapping.of(updatedMappedFields)))
+        .commit();
+  }
+
+  private MappedFields updateNameMapping(
+      MappedFields mapping, Map<Integer, String> idToStorageName) {
+    if (mapping == null) {
+      return null;
+    }
+    List<MappedField> fieldResults = new ArrayList<>();
+    for (MappedField field : mapping.fields()) {
+      Set<String> fieldNames = new HashSet<>(field.names());
+      if (idToStorageName.containsKey(field.id())) {
+        fieldNames.add(idToStorageName.get(field.id()));
+      }
+      MappedFields nestedMapping = updateNameMapping(field.nestedMapping(), idToStorageName);
+      fieldResults.add(MappedField.of(field.id(), fieldNames, nestedMapping));
+    }
+    return MappedFields.of(fieldResults);
+  }
+
   @Override
   public void syncSchema(InternalSchema schema) {
     Schema latestSchema = schemaExtractor.toIceberg(schema);
+    if (!transaction.table().properties().containsKey(TableProperties.DEFAULT_NAME_MAPPING)) {
+      createAndSetNameMapping(latestSchema);
+    }
     if (!transaction.table().schema().sameSchema(latestSchema)) {
       boolean hasFieldIds =
           schema.getAllFields().stream().anyMatch(field -> field.getFieldId() != null);
       if (hasFieldIds) {
+        // If field IDs are provided in the source schema, manually update the name mapping to
+        // ensure the IDs match the correct fields.
+        createAndSetNameMapping(latestSchema);
         // There is no clean way to sync the schema with the provided field IDs using the
         // transaction API so we commit the current transaction and interact directly with
         // the operations API.

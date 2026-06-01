@@ -200,6 +200,24 @@ public class ColumnStatMapUtil {
           .schema(InternalSchema.builder().name("double").dataType(InternalType.DOUBLE).build())
           .build();
 
+  private static final InternalField NESTED_STRING_FIELD =
+      InternalField.builder()
+          .name("nested_string_field")
+          .parentPath("nested_struct_field_primitive")
+          .schema(InternalSchema.builder().name("a_string").dataType(InternalType.STRING).build())
+          .build();
+
+  private static final InternalField NESTED_STRUCT_FIELD_PRIMITIVE =
+      InternalField.builder()
+          .name("nested_struct_field_primitive")
+          .schema(
+              InternalSchema.builder()
+                  .name("nested_struct_field_primitive")
+                  .dataType(InternalType.RECORD)
+                  .fields(Arrays.asList(NESTED_STRING_FIELD))
+                  .build())
+          .build();
+
   public static InternalSchema getSchema() {
     return InternalSchema.builder()
         .name("record")
@@ -216,6 +234,7 @@ public class ColumnStatMapUtil {
                 ARRAY_LONG_FIELD,
                 MAP_STRING_LONG_FIELD,
                 NESTED_STRUCT_FIELD,
+                NESTED_STRUCT_FIELD_PRIMITIVE,
                 DECIMAL_FIELD,
                 FLOAT_FIELD,
                 DOUBLE_FIELD))
@@ -343,7 +362,21 @@ public class ColumnStatMapUtil {
             .numValues(50)
             .totalSize(123)
             .build();
+    ColumnStat nestedStringColumnStats =
+        ColumnStat.builder()
+            .field(NESTED_STRING_FIELD)
+            .numNulls(1)
+            .range(Range.vector("alice", "zion"))
+            .numValues(50)
+            .totalSize(500)
+            .build();
 
+    ColumnStat ignoredColumnStatsNestedStructFieldPrimitive =
+        ColumnStat.builder()
+            .field(NESTED_STRUCT_FIELD_PRIMITIVE)
+            .numNulls(0)
+            .range(Range.scalar("IGNORED"))
+            .build();
     ColumnStat ignoredColumnStatsArrayLongField =
         ColumnStat.builder()
             .field(ARRAY_LONG_FIELD)
@@ -385,6 +418,8 @@ public class ColumnStatMapUtil {
         decimalColumnStats,
         floatColumnStats,
         doubleColumnStats,
+        nestedStringColumnStats,
+        ignoredColumnStatsNestedStructFieldPrimitive,
         ignoredColumnStatsArrayLongField,
         ignoredColumnStatsMapStringField,
         ignoredColumnStatsNestedStructField,

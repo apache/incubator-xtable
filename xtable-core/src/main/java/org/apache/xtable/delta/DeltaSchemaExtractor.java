@@ -55,6 +55,7 @@ import org.apache.xtable.schema.SchemaUtils;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaSchemaExtractor {
   private static final String DELTA_COLUMN_MAPPING_ID = "delta.columnMapping.id";
+  private static final String DELTA_COLUMN_MAPPING_NAME = "delta.columnMapping.physicalName";
   private static final DeltaSchemaExtractor INSTANCE = new DeltaSchemaExtractor();
   // Timestamps in Delta are microsecond precision by default
   private static final Map<InternalSchema.MetadataKey, Object>
@@ -100,7 +101,8 @@ public class DeltaSchemaExtractor {
         type = InternalType.DOUBLE;
         break;
       case "binary":
-        if (originalMetadata.contains(InternalSchema.XTABLE_LOGICAL_TYPE)
+        if (originalMetadata != null
+            && originalMetadata.contains(InternalSchema.XTABLE_LOGICAL_TYPE)
             && "uuid".equals(originalMetadata.getString(InternalSchema.XTABLE_LOGICAL_TYPE))) {
           type = InternalType.UUID;
         } else {
@@ -136,6 +138,10 @@ public class DeltaSchemaExtractor {
                           field.metadata().contains(DELTA_COLUMN_MAPPING_ID)
                               ? (int) field.metadata().getLong(DELTA_COLUMN_MAPPING_ID)
                               : null;
+                      String storageName =
+                          field.metadata().contains(DELTA_COLUMN_MAPPING_NAME)
+                              ? field.metadata().getString(DELTA_COLUMN_MAPPING_NAME)
+                              : null;
                       String fieldComment =
                           field.getComment().isDefined() ? field.getComment().get() : null;
                       InternalSchema schema =
@@ -148,6 +154,7 @@ public class DeltaSchemaExtractor {
                       return InternalField.builder()
                           .name(field.name())
                           .fieldId(fieldId)
+                          .storageName(storageName)
                           .parentPath(parentPath)
                           .schema(schema)
                           .defaultValue(

@@ -42,8 +42,12 @@ import lombok.extern.log4j.Log4j2;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
-import io.delta.kernel.types.*;
+import io.delta.kernel.types.DataType;
+import io.delta.kernel.types.DateType;
 import io.delta.kernel.types.FieldMetadata;
+import io.delta.kernel.types.IntegerType;
+import io.delta.kernel.types.StructField;
+import io.delta.kernel.types.StructType;
 
 import org.apache.xtable.exception.PartitionSpecException;
 import org.apache.xtable.model.schema.InternalPartitionField;

@@ -333,11 +333,7 @@ public class TestIcebergDataHelper {
       case STRUCT:
         return generateInsertRecord(timeLowerBound, timeUpperBound, fieldType.asStructType());
       case UUID:
-        UUID uuid = UUID.randomUUID();
-        ByteBuffer byteBuffer = ByteBuffer.wrap(new byte[16]);
-        byteBuffer.putLong(uuid.getMostSignificantBits());
-        byteBuffer.putLong(uuid.getLeastSignificantBits());
-        return byteBuffer.array();
+        return UUID.randomUUID();
       case LIST:
         Types.ListType listType = (Types.ListType) fieldType;
         int listSize = RANDOM.nextInt(5) + 1;

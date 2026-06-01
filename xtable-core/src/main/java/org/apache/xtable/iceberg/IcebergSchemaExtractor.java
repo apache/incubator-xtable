@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
@@ -53,18 +54,69 @@ import org.apache.xtable.model.schema.InternalType;
 @Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class IcebergSchemaExtractor {
-  private static final IcebergSchemaExtractor INSTANCE = new IcebergSchemaExtractor();
   private static final String MAP_KEY_FIELD_NAME = "key";
   private static final String MAP_VALUE_FIELD_NAME = "value";
   private static final String LIST_ELEMENT_FIELD_NAME = "element";
+  @Getter private final Map<Integer, String> idToStorageName = new HashMap<>();
 
   public static IcebergSchemaExtractor getInstance() {
-    return INSTANCE;
+    return new IcebergSchemaExtractor();
+  }
+
+  private void initializeFieldIdTracker(InternalSchema schema, AtomicInteger fieldIdTracker) {
+    schema.getFields().stream()
+        .forEach(
+            field -> {
+              if (field.getFieldId() != null) {
+                fieldIdTracker.accumulateAndGet(field.getFieldId(), Math::max);
+              }
+              initializeFieldIdTracker(field, fieldIdTracker);
+            });
+  }
+
+  private void initializeFieldIdTracker(InternalField field, AtomicInteger fieldIdTracker) {
+    switch (field.getSchema().getDataType()) {
+      case RECORD:
+        initializeFieldIdTracker(field.getSchema(), fieldIdTracker);
+        return;
+      case MAP:
+        field.getSchema().getFields().stream()
+            .filter(
+                mapField ->
+                    InternalField.Constants.MAP_KEY_FIELD_NAME.equals(mapField.getName())
+                        || InternalField.Constants.MAP_VALUE_FIELD_NAME.equals(mapField.getName()))
+            .forEach(
+                mapField -> {
+                  if (mapField.getFieldId() != null) {
+                    fieldIdTracker.accumulateAndGet(mapField.getFieldId(), Math::max);
+                  }
+                  initializeFieldIdTracker(mapField, fieldIdTracker);
+                });
+        return;
+      case LIST:
+        field.getSchema().getFields().stream()
+            .filter(
+                arrayField ->
+                    InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(arrayField.getName()))
+            .forEach(
+                arrayField -> {
+                  if (arrayField.getFieldId() != null) {
+                    fieldIdTracker.accumulateAndGet(arrayField.getFieldId(), Math::max);
+                  }
+                  initializeFieldIdTracker(arrayField, fieldIdTracker);
+                });
+        return;
+      default:
+        return;
+    }
   }
 
   public Schema toIceberg(InternalSchema internalSchema) {
     // if field IDs are not assigned in the source, just use an incrementing integer
     AtomicInteger fieldIdTracker = new AtomicInteger(0);
+    // traverse the schema before conversion to ensure fieldIdTracker won't return any
+    // fieldIds that are already present in the schema
+    initializeFieldIdTracker(internalSchema, fieldIdTracker);
     List<Types.NestedField> nestedFields = convertFields(internalSchema, fieldIdTracker);
     List<InternalField> recordKeyFields = internalSchema.getRecordKeyFields();
     boolean recordKeyFieldsAreNotRequired =
@@ -154,6 +206,9 @@ public class IcebergSchemaExtractor {
     List<Types.NestedField> nestedFields = new ArrayList<>(schema.getFields().size());
     for (int i = 0; i < schema.getFields().size(); i++) {
       InternalField field = schema.getFields().get(i);
+      if (field.getStorageName() != null) {
+        idToStorageName.put(ids.get(i), field.getStorageName());
+      }
       nestedFields.add(
           Types.NestedField.of(
               ids.get(i),

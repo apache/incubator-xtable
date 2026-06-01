@@ -20,17 +20,17 @@ package org.apache.xtable.parquet;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
 
 import lombok.NonNull;
-
-import org.apache.parquet.hadoop.metadata.ParquetMetadata;
-import org.apache.parquet.schema.MessageType;
 
 import org.apache.xtable.exception.PartitionValuesExtractorException;
 import org.apache.xtable.hudi.PathBasedPartitionValuesExtractor;
 import org.apache.xtable.model.schema.InternalPartitionField;
-import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
 
@@ -129,10 +129,5 @@ public class ParquetPartitionValueExtractor extends PathBasedPartitionValuesExtr
 
   public static ParquetPartitionValueExtractor getInstance() {
     return INSTANCE;
-  }
-
-  public InternalSchema extractSchemaForParquetPartitions(ParquetMetadata footer, String path) {
-    MessageType parquetSchema = parquetMetadataExtractor.getSchema(footer);
-    return schemaExtractor.toInternalSchema(parquetSchema, path);
   }
 }

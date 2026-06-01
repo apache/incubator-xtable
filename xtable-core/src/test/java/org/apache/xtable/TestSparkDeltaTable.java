@@ -69,12 +69,27 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
     return new TestSparkDeltaTable(tableName, tempDir, sparkSession, partitionField, true);
   }
 
+  public static TestSparkDeltaTable forColumnMappingEnabled(
+      String tableName, Path tempDir, SparkSession sparkSession, String partitionField) {
+    return new TestSparkDeltaTable(tableName, tempDir, sparkSession, partitionField, true, true);
+  }
+
   public TestSparkDeltaTable(
       String name,
       Path tempDir,
       SparkSession sparkSession,
       String partitionField,
       boolean includeAdditionalColumns) {
+    this(name, tempDir, sparkSession, partitionField, includeAdditionalColumns, false);
+  }
+
+  public TestSparkDeltaTable(
+      String name,
+      Path tempDir,
+      SparkSession sparkSession,
+      String partitionField,
+      boolean includeAdditionalColumns,
+      boolean enableColumnMapping) {
     try {
       this.tableName = name;
       this.basePath = initBasePath(tempDir, tableName);
@@ -82,7 +97,8 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
       this.partitionField = partitionField;
       this.includeAdditionalColumns = includeAdditionalColumns;
       this.testDeltaHelper =
-          TestDeltaHelper.createTestDataHelper(partitionField, includeAdditionalColumns);
+          TestDeltaHelper.createTestDataHelper(
+              partitionField, includeAdditionalColumns, enableColumnMapping);
       testDeltaHelper.createTable(sparkSession, tableName, basePath);
       this.deltaLog = DeltaLog.forTable(sparkSession, basePath);
       this.deltaTable = DeltaTable.forPath(sparkSession, basePath);
@@ -259,5 +275,21 @@ public class TestSparkDeltaTable implements GenericTable<Row, Object>, Closeable
     return Arrays.asList(testDeltaHelper.getTableStructSchema().fieldNames()).stream()
         .filter(columnName -> !columnName.equals("yearOfBirth"))
         .collect(Collectors.toList());
+  }
+
+  public void dropColumn(String colName) {
+    testDeltaHelper.dropColumn(colName);
+    sparkSession.sql(String.format("ALTER TABLE delta.`%s` DROP COLUMN %s", basePath, colName));
+  }
+
+  public void renameColumn(String colName, String newColName) {
+    testDeltaHelper.renameColumn(colName, newColName);
+    sparkSession.sql(
+        String.format(
+            "ALTER TABLE delta.`%s` RENAME COLUMN %s TO %s", basePath, colName, newColName));
+  }
+
+  public void addColumn() {
+    testDeltaHelper.addColumn();
   }
 }

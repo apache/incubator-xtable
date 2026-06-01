@@ -59,6 +59,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -106,6 +108,7 @@ import org.apache.xtable.spi.sync.TableFormatSync;
  * Validates that the metadata for the table is properly created/updated. {@link
  * ITConversionController} validates that the table and its data can be properly read.
  */
+@Execution(ExecutionMode.SAME_THREAD)
 public class TestIcebergSync {
   private static final Random RANDOM = new Random();
   private static final Instant LAST_COMMIT_TIME = Instant.ofEpochSecond(1000);

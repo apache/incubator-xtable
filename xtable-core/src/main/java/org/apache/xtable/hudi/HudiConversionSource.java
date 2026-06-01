@@ -42,6 +42,7 @@ import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.timeline.InstantComparison;
 import org.apache.hudi.common.util.Option;
 
+import com.google.common.base.Strings;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
@@ -186,9 +187,32 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
     HoodieCleanMetadata cleanMetadata =
         metaClient.getActiveTimeline().readCleanMetadata(lastCleanInstant.get());
     String earliestCommitToRetain = cleanMetadata.getEarliestCommitToRetain();
+    if (Strings.isNullOrEmpty(earliestCommitToRetain)) {
+      return cleanInstantsOccurredSinceLastSyncedInstant(instant);
+    }
     Instant earliestCommitToRetainInstant =
         HudiInstantUtils.parseFromInstantTime(earliestCommitToRetain);
     return earliestCommitToRetainInstant.isAfter(instant);
+  }
+
+  // When clean instants have empty earliestCommitToRetain, trigger full snapshot sync if any
+  // clean instants occurred after the last synced instant to err on the side of caution
+  private boolean cleanInstantsOccurredSinceLastSyncedInstant(Instant instant) {
+    String lastSyncedCommitTime = HudiInstantUtils.convertInstantToCommit(instant);
+    List<HoodieInstant> cleanInstantsAfterLastSync =
+        metaClient
+            .getActiveTimeline()
+            .getCleanerTimeline()
+            .filterCompletedInstants()
+            .filter(
+                cleanInstant ->
+                    HoodieTimeline.compareTimestamps(
+                        cleanInstant.getTimestamp(),
+                        HoodieTimeline.GREATER_THAN,
+                        lastSyncedCommitTime))
+            .getInstants();
+
+    return !cleanInstantsAfterLastSync.isEmpty();
   }
 
   private CommitsPair getCompletedAndPendingCommitsForInstants(List<Instant> lastPendingInstants) {

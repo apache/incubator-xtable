@@ -19,7 +19,9 @@
 package org.apache.xtable.delta;
 
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -41,7 +43,6 @@ import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -68,8 +69,11 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.*;
+import org.apache.xtable.model.storage.DataLayoutStrategy;
+import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.TableFormat;
 
 public class ITDeltaConversionSource {
 
@@ -192,7 +196,7 @@ public class ITDeltaConversionSource {
         Collections.emptyList());
     // Validate data files
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
-    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
+    assertEquals(1, snapshot.getPartitionedDataFiles().size());
     validatePartitionDataFiles(
         PartitionFileGroup.builder()
             .files(
@@ -305,7 +309,7 @@ public class ITDeltaConversionSource {
                 .build()));
     // Validate data files
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
-    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
+    assertEquals(1, snapshot.getPartitionedDataFiles().size());
     List<PartitionValue> partitionValue =
         Collections.singletonList(
             PartitionValue.builder()
@@ -713,7 +717,7 @@ public class ITDeltaConversionSource {
   private void validateDataFiles(
       List<InternalDataFile> expectedFiles, List<InternalDataFile> actualFiles)
       throws URISyntaxException {
-    Assertions.assertEquals(expectedFiles.size(), actualFiles.size());
+    assertEquals(expectedFiles.size(), actualFiles.size());
     for (int i = 0; i < expectedFiles.size(); i++) {
       InternalDataFile expected = expectedFiles.get(i);
       InternalDataFile actual = actualFiles.get(i);
@@ -723,17 +727,17 @@ public class ITDeltaConversionSource {
 
   private void validatePropertiesDataFile(InternalDataFile expected, InternalDataFile actual)
       throws URISyntaxException {
-    Assertions.assertTrue(
+    assertTrue(
         Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
         () -> "path == " + actual.getPhysicalPath() + " is not absolute");
-    Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
-    Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
-    Assertions.assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
-    Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
+    assertEquals(expected.getFileFormat(), actual.getFileFormat());
+    assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
+    assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
+    assertEquals(expected.getRecordCount(), actual.getRecordCount());
     Instant now = Instant.now();
     long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
     long maxRange = now.toEpochMilli();
-    Assertions.assertTrue(
+    assertTrue(
         actual.getLastModified() > minRange && actual.getLastModified() <= maxRange,
         () ->
             "last modified == "
@@ -742,7 +746,7 @@ public class ITDeltaConversionSource {
                 + minRange
                 + " and "
                 + maxRange);
-    Assertions.assertEquals(expected.getColumnStats(), actual.getColumnStats());
+    assertEquals(expected.getColumnStats(), actual.getColumnStats());
   }
 
   private static Stream<Arguments> testWithPartitionToggle() {
