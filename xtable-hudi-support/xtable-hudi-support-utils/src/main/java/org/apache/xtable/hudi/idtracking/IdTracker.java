@@ -35,7 +35,8 @@ import lombok.NoArgsConstructor;
 
 import org.apache.avro.Schema;
 
-import org.apache.hudi.avro.HoodieAvroUtils;
+import org.apache.hudi.common.schema.HoodieSchema;
+import org.apache.hudi.common.schema.HoodieSchemaUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
 
@@ -123,7 +124,10 @@ public class IdTracker {
     AtomicInteger currentId = new AtomicInteger(existingState.getLastIdUsed());
     // add meta fields to the schema in order to ensure they will be assigned IDs
     Schema schemaForIdMapping =
-        includeMetaFields ? HoodieAvroUtils.addMetadataFields(schema) : schema;
+        includeMetaFields
+            ? HoodieSchemaUtils.addMetadataFields(HoodieSchema.fromAvroSchema(schema))
+                .toAvroSchema()
+            : schema;
     if (currentId.intValue() != 0) {
       // if the schema has ID tracking, update the existing mappings.
       List<IdMapping> updatedMappings =

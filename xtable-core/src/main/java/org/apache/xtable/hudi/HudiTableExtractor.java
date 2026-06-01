@@ -62,7 +62,7 @@ public class HudiTableExtractor {
     InternalSchema canonicalSchema;
     Schema avroSchema;
     try {
-      avroSchema = tableSchemaResolver.getTableAvroSchema(commit.requestedTime());
+      avroSchema = tableSchemaResolver.getTableSchema(commit.requestedTime()).toAvroSchema();
       canonicalSchema = schemaExtractor.schema(avroSchema);
     } catch (Exception e) {
       throw new SchemaExtractorException(

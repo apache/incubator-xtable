@@ -207,7 +207,7 @@
         <!-- Delta test dependencies -->
         <dependency>
             <groupId>io.delta</groupId>
-            <artifactId>delta-spark_${scala.binary.version}</artifactId>
+            <artifactId>delta-core_${scala.binary.version}</artifactId>
             <version>${delta.version}</version>
             <scope>test</scope>
         </dependency>

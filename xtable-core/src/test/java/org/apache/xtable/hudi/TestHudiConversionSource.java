@@ -29,8 +29,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
@@ -54,7 +52,7 @@ class TestHudiConversionSource {
             .setBootstrapPartitionMetadata(new HashMap<>())
             .setPartitionMetadata(new HashMap<>())
             .build();
-    return TimelineMetadataUtils.serializeCleanMetadata(metadata).get();
+    return TimelineMetadataUtils.serializeAvroMetadata(metadata, HoodieCleanMetadata.class).get();
   }
 
   @Test
@@ -70,10 +68,8 @@ class TestHudiConversionSource {
 
     HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
     when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
-    when(mockMetaClient.getHadoopConf()).thenReturn(new Configuration());
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.isMetadataTableAvailable()).thenReturn(false);
-    when(mockMetaClient.getBasePathV2()).thenReturn(new Path("/tmp/test-table"));
     when(mockActiveTimeline.getCleanerTimeline()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.filterCompletedInstants()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.lastInstant()).thenReturn(Option.of(mockCleanInstant));
@@ -87,7 +83,7 @@ class TestHudiConversionSource {
     when(mockActiveTimeline.filterCompletedInstants()).thenReturn(mockCompletedCommitsTimeline);
     when(mockCompletedCommitsTimeline.findInstantsBeforeOrEquals(any(String.class)))
         .thenReturn(mockCompletedCommitsTimeline);
-    when(mockCommitInstant.getTimestamp()).thenReturn("20200101120000000");
+    when(mockCommitInstant.requestedTime()).thenReturn("20200101120000000");
     when(mockCompletedCommitsTimeline.lastInstant()).thenReturn(Option.of(mockCommitInstant));
 
     HudiConversionSource hudiConversionSource =
@@ -113,10 +109,8 @@ class TestHudiConversionSource {
 
     HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
     when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
-    when(mockMetaClient.getHadoopConf()).thenReturn(new Configuration());
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.isMetadataTableAvailable()).thenReturn(false);
-    when(mockMetaClient.getBasePathV2()).thenReturn(new Path("/tmp/test-table"));
     when(mockActiveTimeline.getCleanerTimeline()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.filterCompletedInstants()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.lastInstant()).thenReturn(Option.of(mockCleanInstant));
@@ -131,7 +125,7 @@ class TestHudiConversionSource {
     when(mockActiveTimeline.filterCompletedInstants()).thenReturn(mockCompletedCommitsTimeline);
     when(mockCompletedCommitsTimeline.findInstantsBeforeOrEquals(any(String.class)))
         .thenReturn(mockCompletedCommitsTimeline);
-    when(mockCommitInstant.getTimestamp()).thenReturn("20200101120000000");
+    when(mockCommitInstant.requestedTime()).thenReturn("20200101120000000");
     when(mockCompletedCommitsTimeline.lastInstant()).thenReturn(Option.of(mockCommitInstant));
 
     HudiConversionSource hudiConversionSource =
@@ -157,10 +151,8 @@ class TestHudiConversionSource {
 
     HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
     when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
-    when(mockMetaClient.getHadoopConf()).thenReturn(new Configuration());
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.isMetadataTableAvailable()).thenReturn(false);
-    when(mockMetaClient.getBasePathV2()).thenReturn(new Path("/tmp/test-table"));
     when(mockActiveTimeline.getCleanerTimeline()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.filterCompletedInstants()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.lastInstant()).thenReturn(Option.of(mockCleanInstant));
@@ -174,7 +166,7 @@ class TestHudiConversionSource {
     when(mockActiveTimeline.filterCompletedInstants()).thenReturn(mockCompletedCommitsTimeline);
     when(mockCompletedCommitsTimeline.findInstantsBeforeOrEquals(any(String.class)))
         .thenReturn(mockCompletedCommitsTimeline);
-    when(mockCommitInstant.getTimestamp()).thenReturn("20200101120000000");
+    when(mockCommitInstant.requestedTime()).thenReturn("20200101120000000");
     when(mockCompletedCommitsTimeline.lastInstant()).thenReturn(Option.of(mockCommitInstant));
 
     HudiConversionSource hudiConversionSource =

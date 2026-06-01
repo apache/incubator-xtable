@@ -35,8 +35,6 @@ import org.junit.jupiter.api.Test;
 
 import org.apache.spark.sql.delta.actions.AddFile;
 
-import scala.Option;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -127,18 +125,7 @@ public class TestDeltaStatsExtractor {
     String stats =
         DeltaStatsExtractor.getInstance()
             .convertStatsToDeltaFormat(schema, numRecords, columnStats);
-    AddFile addFile =
-        new AddFile(
-            "file://path/to/file",
-            null,
-            0,
-            0,
-            true,
-            stats,
-            null,
-            null,
-            Option.empty(),
-            Option.empty());
+    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
     DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
     FileStats actual = extractor.getColumnStatsForFile(addFile, fields);
     List<ColumnStat> actualColumStats = actual.getColumnStats();
@@ -174,18 +161,7 @@ public class TestDeltaStatsExtractor {
     deltaStats.put("tightBounds", Boolean.TRUE);
     deltaStats.put("nonExisting", minValues);
     String stats = MAPPER.writeValueAsString(deltaStats);
-    AddFile addFile =
-        new AddFile(
-            "file://path/to/file",
-            null,
-            0,
-            0,
-            true,
-            stats,
-            null,
-            null,
-            Option.empty(),
-            Option.empty());
+    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, stats, null, null);
     DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
     FileStats actual = extractor.getColumnStatsForFile(addFile, fields);
     List<ColumnStat> actualColumStats = actual.getColumnStats();
@@ -228,18 +204,7 @@ public class TestDeltaStatsExtractor {
   @Test
   void convertNullStatsToInternalRepresentation() {
     List<InternalField> fields = getSchemaFields();
-    AddFile addFile =
-        new AddFile(
-            "file://path/to/file",
-            null,
-            0,
-            0,
-            true,
-            null,
-            null,
-            null,
-            Option.empty(),
-            Option.empty());
+    AddFile addFile = new AddFile("file://path/to/file", null, 0, 0, true, null, null, null);
     DeltaStatsExtractor extractor = DeltaStatsExtractor.getInstance();
     FileStats actual = extractor.getColumnStatsForFile(addFile, fields);
     List<ColumnStat> actualColumStats = actual.getColumnStats();

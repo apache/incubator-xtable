@@ -42,7 +42,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.client.BaseHoodieClient;
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
@@ -53,6 +52,8 @@ import org.apache.hudi.common.model.HoodieAvroRecord;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.schema.HoodieSchema;
+import org.apache.hudi.common.schema.HoodieSchemaUtils;
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.HoodieTableVersion;
@@ -154,7 +155,11 @@ public class TestAddFieldIdsClientInitCallback {
     BaseHoodieClient client = setBaseHoodieClientMocks(localEngineContext, config);
 
     when(mockIdTracker.addIdTracking(
-            inputSchema, Option.of(HoodieAvroUtils.addMetadataFields(existingSchema)), false))
+            inputSchema,
+            Option.of(
+                HoodieSchemaUtils.addMetadataFields(HoodieSchema.fromAvroSchema(existingSchema))
+                    .toAvroSchema()),
+            false))
         .thenReturn(updatedSchema);
 
     callback.call(client);

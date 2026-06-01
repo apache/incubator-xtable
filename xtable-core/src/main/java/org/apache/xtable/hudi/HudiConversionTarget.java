@@ -395,7 +395,7 @@ public class HudiConversionTarget implements ConversionTarget {
       if (schema == null) {
         try {
           // reuse existing table schema if no schema is provided as part of this commit
-          schema = new TableSchemaResolver(metaClient).getTableAvroSchema();
+          schema = new TableSchemaResolver(metaClient).getTableSchema().toAvroSchema();
         } catch (Exception ex) {
           throw new ReadException("Unable to read Hudi table schema", ex);
         }

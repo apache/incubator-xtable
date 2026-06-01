@@ -27,6 +27,7 @@ import org.apache.parquet.schema.MessageType;
 
 import org.apache.hudi.avro.HoodieAvroWriteSupport;
 import org.apache.hudi.common.bloom.BloomFilter;
+import org.apache.hudi.common.schema.HoodieSchema;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 
@@ -55,7 +56,7 @@ public class HoodieAvroWriteSupportWithFieldIds extends HoodieAvroWriteSupport {
       Properties properties) {
     super(
         addFieldIdsToParquetSchema(schema, avroSchema, properties),
-        avroSchema,
+        HoodieSchema.fromAvroSchema(avroSchema),
         bloomFilterOpt,
         properties);
   }

@@ -25,6 +25,7 @@ import org.apache.avro.Schema;
 import org.apache.hudi.callback.HoodieClientInitCallback;
 import org.apache.hudi.client.BaseHoodieClient;
 import org.apache.hudi.common.fs.FSUtils;
+import org.apache.hudi.common.schema.HoodieSchema;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.util.Option;
@@ -68,7 +69,9 @@ public class AddFieldIdsClientInitCallback implements HoodieClientInitCallback {
                   .build();
           if (FSUtils.isTableExists(config.getBasePath(), metaClient.getStorage())) {
             currentSchema =
-                new TableSchemaResolver(metaClient).getTableAvroSchemaFromLatestCommit(true);
+                new TableSchemaResolver(metaClient)
+                    .getTableSchemaFromLatestCommit(true)
+                    .map(HoodieSchema::toAvroSchema);
           }
         } catch (Exception ex) {
           log.warn("Unable to fetch current schema for fieldIds", ex);

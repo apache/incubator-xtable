@@ -565,7 +565,7 @@ public class ITHudiConversionTarget {
   @SneakyThrows
   private void assertSchema(HoodieTableMetaClient metaClient, boolean includeMetaFields) {
     TableSchemaResolver tableSchemaResolver = new TableSchemaResolver(metaClient);
-    Schema actual = tableSchemaResolver.getTableAvroSchema();
+    Schema actual = tableSchemaResolver.getTableSchema().toAvroSchema();
     Schema expected;
     if (includeMetaFields) {
       expected =

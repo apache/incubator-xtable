@@ -206,9 +206,9 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
             .filterCompletedInstants()
             .filter(
                 cleanInstant ->
-                    HoodieTimeline.compareTimestamps(
-                        cleanInstant.getTimestamp(),
-                        HoodieTimeline.GREATER_THAN,
+                    InstantComparison.compareTimestamps(
+                        cleanInstant.requestedTime(),
+                        InstantComparison.GREATER_THAN,
                         lastSyncedCommitTime))
             .getInstants();
 
