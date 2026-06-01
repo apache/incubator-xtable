@@ -196,7 +196,7 @@ public class DeltaSchemaExtractor {
             toInternalSchema(
                 mapType.keyType(),
                 SchemaUtils.getFullyQualifiedPath(
-                    parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
+                    parentPath, InternalField.Constants.MAP_KEY_FIELD_NAME),
                 false,
                 null,
                 null);

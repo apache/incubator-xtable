@@ -79,6 +79,8 @@ public class DeltaKernelSchemaExtractor {
     InternalType type = null;
     Map<InternalSchema.MetadataKey, Object> metadata = null;
     List<InternalField> fields = null;
+    InternalType type;
+    String trimmedTypeName;
 
     if (dataType instanceof IntegerType) {
       type = InternalType.INT;
@@ -193,7 +195,7 @@ public class DeltaKernelSchemaExtractor {
           toInternalSchema(
               mapType.getKeyType(),
               SchemaUtils.getFullyQualifiedPath(
-                  parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
+                  parentPath, InternalField.Constants.MAP_KEY_FIELD_NAME),
               false,
               null,
               null);
@@ -220,6 +222,8 @@ public class DeltaKernelSchemaExtractor {
       type = InternalType.MAP;
       fields = Arrays.asList(keyField, valueField);
       trimmedTypeName = "map";
+    } else {
+      throw new NotSupportedException("Unsupported type: " + dataType);
     }
     return InternalSchema.builder()
         .name(trimmedTypeName)
