@@ -34,13 +34,7 @@ import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.FileStats;
 
-/**
- * Delta Standalone stats extractor - delegates to {@link DeltaStatsUtils} for shared logic.
- *
- * @deprecated This class is a thin wrapper around DeltaStatsUtils. Consider using DeltaStatsUtils
- *     directly.
- */
-@Deprecated
+/** Delta Standalone stats extractor - delegates to {@link DeltaStatsUtils} for shared logic. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DeltaStatsExtractor {
   private static final DeltaStatsExtractor INSTANCE = new DeltaStatsExtractor();

@@ -72,14 +72,10 @@ public class ConversionTargetFactory {
   }
 
   /**
-   * Create an instance of the ConversionTarget for the given table format name, using the supplied
-   * target properties to disambiguate when more than one implementation is registered for a format.
-   *
-   * <p>Delta registers two implementations sharing {@link TableFormat#DELTA}: the default Delta
-   * Standalone {@code DeltaConversionTarget} and the Delta Kernel {@code
-   * DeltaKernelConversionTarget}. The {@link DeltaConversionTargetConfig#USE_KERNEL} property
-   * (default {@code false}) selects between them. For all other formats exactly one implementation
-   * matches, so the flag has no effect.
+   * Resolves the ConversionTarget for the given format, using the target properties to pick between
+   * the Delta Standalone and Delta Kernel implementations (both registered under {@link
+   * TableFormat#DELTA}) via {@link DeltaConversionTargetConfig#USE_KERNEL} (default {@code false}).
+   * Other formats have a single implementation, so the flag has no effect.
    *
    * @param tableFormatName the target table format name
    * @param properties target table additional properties used to resolve the implementation
@@ -93,14 +89,14 @@ public class ConversionTargetFactory {
     ServiceLoader<ConversionTarget> loader = ServiceLoader.load(ConversionTarget.class);
     for (ConversionTarget target : loader) {
       if (target.getTableFormat().equalsIgnoreCase(tableFormatName)
-          && isKernelTarget(target) == useKernel) {
+          && isDeltaKernelTarget(target) == useKernel) {
         return target;
       }
     }
     throw new NotSupportedException("Target format is not yet supported: " + tableFormatName);
   }
 
-  private static boolean isKernelTarget(ConversionTarget target) {
+  private static boolean isDeltaKernelTarget(ConversionTarget target) {
     return target instanceof DeltaKernelConversionTarget;
   }
 }
