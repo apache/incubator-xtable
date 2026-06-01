@@ -76,6 +76,7 @@ public class DeltaKernelDataFileExtractor {
     private final CloseableIterator<FilteredColumnarBatch> scanFiles;
     private final FileFormat fileFormat;
     private final Table table;
+    private final String tableBasePath; // Cached to avoid repeated Engine calls
     private final List<InternalField> fields;
     private final List<InternalPartitionField> partitionFields;
     private final boolean includeColumnStats;
@@ -91,6 +92,7 @@ public class DeltaKernelDataFileExtractor {
         boolean includeColumnStats) {
       this.includeColumnStats = includeColumnStats;
       this.table = table;
+      this.tableBasePath = table.getPath(engine); // Cache base path once
       this.fields = schema.getFields();
       String provider = ((SnapshotImpl) snapshot).getMetadata().getFormat().getProvider();
       this.fileFormat = actionsConverter.convertToFileFormat(provider);
@@ -159,7 +161,7 @@ public class DeltaKernelDataFileExtractor {
 
           return actionsConverter.convertAddActionToInternalDataFile(
               addFile,
-              table,
+              tableBasePath, // Use cached base path instead of Table
               fileFormat,
               partitionFields,
               fields,

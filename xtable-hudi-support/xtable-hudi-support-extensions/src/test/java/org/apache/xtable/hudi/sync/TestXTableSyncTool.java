@@ -64,6 +64,18 @@ public class TestXTableSyncTool {
         );
   }
 
+  /**
+   * Cases supported by the Delta Kernel writer. The timestamp-transform partition is excluded
+   * because XTable models it as a Delta generated column, and Delta Kernel 4.0.0 cannot write
+   * tables that use the "generatedColumns" writer feature.
+   */
+  private static Stream<Arguments> kernelTestCases() {
+    return Stream.of(
+        Arguments.of(""), // unpartitioned
+        Arguments.of("partition_string") // identity transform for partition
+        );
+  }
+
   @BeforeAll
   public static void initSpark() {
     SparkConf sparkConf =
@@ -99,6 +111,33 @@ public class TestXTableSyncTool {
 
     Properties properties = new Properties();
     properties.put(XTableSyncConfig.XTABLE_FORMATS.key(), "iceberg,DELTA");
+    properties.put(KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME.key(), partitionPath);
+    properties.put(HoodieSyncConfig.META_SYNC_BASE_PATH.key(), path);
+    properties.putAll(options);
+
+    new XTableSyncTool(properties, new Configuration()).syncHoodieTable();
+    // lightweight check to make sure metadata dirs are made - assumes that InternalTable sync is
+    // correct if it succeeds
+    assertTrue(Files.exists(Paths.get(URI.create(path + "/_delta_log"))));
+    assertTrue(Files.exists(Paths.get(URI.create(path + "/metadata"))));
+  }
+
+  @ParameterizedTest
+  @MethodSource(value = "kernelTestCases")
+  public void testSyncWithDeltaKernel(String partitionPath) {
+    String tableName = "table-" + UUID.randomUUID();
+    String path = tempDir.toUri() + "/" + tableName;
+    Map<String, String> options = new HashMap<>();
+    options.put(DataSourceWriteOptions.PRECOMBINE_FIELD().key(), "key");
+    options.put(DataSourceWriteOptions.RECORDKEY_FIELD().key(), "key");
+    options.put(DataSourceWriteOptions.PARTITIONPATH_FIELD().key(), partitionPath);
+    options.put("hoodie.table.name", tableName);
+    writeBasicHudiTable(path, options);
+
+    Properties properties = new Properties();
+    properties.put(XTableSyncConfig.XTABLE_FORMATS.key(), "iceberg,DELTA");
+    // Route the Delta target through the Delta Kernel writer instead of Delta Standalone.
+    properties.put(XTableSyncConfig.XTABLE_DELTA_USE_KERNEL.key(), "true");
     properties.put(KeyGeneratorOptions.PARTITIONPATH_FIELD_NAME.key(), partitionPath);
     properties.put(HoodieSyncConfig.META_SYNC_BASE_PATH.key(), path);
     properties.putAll(options);
