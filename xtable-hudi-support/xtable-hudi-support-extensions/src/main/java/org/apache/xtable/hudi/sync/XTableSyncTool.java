@@ -41,6 +41,7 @@ import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.delta.DeltaConversionTargetConfig;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
 import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.sync.SyncMode;
@@ -84,6 +85,10 @@ public class XTableSyncTool extends HoodieSyncTool {
             ? Duration.ofHours(
                 config.getInt(XTableSyncConfig.XTABLE_TARGET_METADATA_RETENTION_HOURS))
             : null;
+    Properties targetProperties = new Properties();
+    if (config.getBooleanOrDefault(XTableSyncConfig.XTABLE_DELTA_USE_KERNEL)) {
+      targetProperties.setProperty(DeltaConversionTargetConfig.USE_KERNEL, Boolean.TRUE.toString());
+    }
     List<TargetTable> targetTables =
         formatsToSync.stream()
             .map(
@@ -93,6 +98,7 @@ public class XTableSyncTool extends HoodieSyncTool {
                         .metadataRetention(metadataRetention)
                         .formatName(format)
                         .name(tableName)
+                        .additionalProperties(targetProperties)
                         .build())
             .collect(Collectors.toList());
     ConversionConfig conversionConfig =

@@ -290,7 +290,13 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
   @Override
   public Optional<TableSyncMetadata> getTableMetadata() {
     Table table = Table.forPath(engine, basePath);
-    Snapshot snapshot = table.getLatestSnapshot(engine);
+    Snapshot snapshot;
+    try {
+      snapshot = table.getLatestSnapshot(engine);
+    } catch (TableNotFoundException e) {
+      // Table does not exist yet (first sync) - there is no prior sync metadata to read.
+      return Optional.empty();
+    }
 
     // WORKAROUND: Cast to SnapshotImpl (internal class) to access metadata configuration.
     // Delta Kernel 4.0.0 does not provide a public API to access table metadata/configuration.
