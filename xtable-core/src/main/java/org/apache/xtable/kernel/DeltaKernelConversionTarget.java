@@ -53,10 +53,10 @@ import io.delta.kernel.internal.actions.Metadata;
 import io.delta.kernel.internal.actions.RemoveFile;
 import io.delta.kernel.internal.actions.RowBackedAction;
 import io.delta.kernel.internal.actions.SingleAction;
+import io.delta.kernel.internal.util.Utils;
 import io.delta.kernel.types.StructField;
 import io.delta.kernel.types.StructType;
 import io.delta.kernel.utils.CloseableIterable;
-import io.delta.kernel.utils.CloseableIterator;
 
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.exception.NotSupportedException;
@@ -442,25 +442,8 @@ public class DeltaKernelConversionTarget implements ConversionTarget {
         }
       }
 
-      CloseableIterator<Row> allActionsIterator =
-          new CloseableIterator<Row>() {
-            private int currentIndex = 0;
-
-            @Override
-            public boolean hasNext() {
-              return currentIndex < allActionRows.size();
-            }
-
-            @Override
-            public Row next() {
-              return allActionRows.get(currentIndex++);
-            }
-
-            @Override
-            public void close() {}
-          };
-
-      CloseableIterable<Row> dataActions = inMemoryIterable(allActionsIterator);
+      CloseableIterable<Row> dataActions =
+          inMemoryIterable(Utils.toCloseableIterator(allActionRows.iterator()));
 
       try {
         TransactionCommitResult result = txn.commit(engine, dataActions);
