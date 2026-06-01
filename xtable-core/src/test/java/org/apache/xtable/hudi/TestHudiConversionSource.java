@@ -18,9 +18,11 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +31,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 
+import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
@@ -37,22 +40,20 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
-import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.storage.StoragePath;
 
 class TestHudiConversionSource {
 
-  private static byte[] serializeCleanMetadata(String earliestCommitToRetain) throws Exception {
-    HoodieCleanMetadata metadata =
-        HoodieCleanMetadata.newBuilder()
-            .setStartCleanTime("000")
-            .setTimeTakenInMillis(0L)
-            .setTotalFilesDeleted(0)
-            .setEarliestCommitToRetain(earliestCommitToRetain)
-            .setBootstrapPartitionMetadata(new HashMap<>())
-            .setPartitionMetadata(new HashMap<>())
-            .build();
-    return TimelineMetadataUtils.serializeAvroMetadata(metadata, HoodieCleanMetadata.class).get();
+  private static HoodieCleanMetadata cleanMetadata(String earliestCommitToRetain) {
+    return HoodieCleanMetadata.newBuilder()
+        .setStartCleanTime("000")
+        .setTimeTakenInMillis(0L)
+        .setTotalFilesDeleted(0)
+        .setEarliestCommitToRetain(earliestCommitToRetain)
+        .setBootstrapPartitionMetadata(new HashMap<>())
+        .setPartitionMetadata(new HashMap<>())
+        .build();
   }
 
   @Test
@@ -70,12 +71,13 @@ class TestHudiConversionSource {
     when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.isMetadataTableAvailable()).thenReturn(false);
+    doReturn(getStorageConf(new Configuration())).when(mockMetaClient).getStorageConf();
+    when(mockMetaClient.getBasePath()).thenReturn(new StoragePath("/tmp/test-table"));
     when(mockActiveTimeline.getCleanerTimeline()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.filterCompletedInstants()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.lastInstant()).thenReturn(Option.of(mockCleanInstant));
     // Use empty string — Strings.isNullOrEmpty("") is true, same behavior as null
-    when(mockActiveTimeline.getInstantDetails(mockCleanInstant))
-        .thenReturn(Option.of(serializeCleanMetadata("")));
+    when(mockActiveTimeline.readCleanMetadata(mockCleanInstant)).thenReturn(cleanMetadata(""));
 
     when(mockCleanerTimeline.filter(any())).thenReturn(mockFilteredCleanerTimeline);
     when(mockFilteredCleanerTimeline.getInstants()).thenReturn(Collections.emptyList());
@@ -111,12 +113,13 @@ class TestHudiConversionSource {
     when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.isMetadataTableAvailable()).thenReturn(false);
+    doReturn(getStorageConf(new Configuration())).when(mockMetaClient).getStorageConf();
+    when(mockMetaClient.getBasePath()).thenReturn(new StoragePath("/tmp/test-table"));
     when(mockActiveTimeline.getCleanerTimeline()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.filterCompletedInstants()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.lastInstant()).thenReturn(Option.of(mockCleanInstant));
     // Use empty string — Strings.isNullOrEmpty("") is true, same behavior as null
-    when(mockActiveTimeline.getInstantDetails(mockCleanInstant))
-        .thenReturn(Option.of(serializeCleanMetadata("")));
+    when(mockActiveTimeline.readCleanMetadata(mockCleanInstant)).thenReturn(cleanMetadata(""));
 
     when(mockCleanerTimeline.filter(any())).thenReturn(mockFilteredCleanerTimeline);
     when(mockFilteredCleanerTimeline.getInstants())
@@ -153,11 +156,12 @@ class TestHudiConversionSource {
     when(mockMetaClient.getActiveTimeline()).thenReturn(mockActiveTimeline);
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.isMetadataTableAvailable()).thenReturn(false);
+    doReturn(getStorageConf(new Configuration())).when(mockMetaClient).getStorageConf();
+    when(mockMetaClient.getBasePath()).thenReturn(new StoragePath("/tmp/test-table"));
     when(mockActiveTimeline.getCleanerTimeline()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.filterCompletedInstants()).thenReturn(mockCleanerTimeline);
     when(mockCleanerTimeline.lastInstant()).thenReturn(Option.of(mockCleanInstant));
-    when(mockActiveTimeline.getInstantDetails(mockCleanInstant))
-        .thenReturn(Option.of(serializeCleanMetadata("")));
+    when(mockActiveTimeline.readCleanMetadata(mockCleanInstant)).thenReturn(cleanMetadata(""));
 
     when(mockCleanerTimeline.filter(any())).thenReturn(mockFilteredCleanerTimeline);
     when(mockFilteredCleanerTimeline.getInstants())

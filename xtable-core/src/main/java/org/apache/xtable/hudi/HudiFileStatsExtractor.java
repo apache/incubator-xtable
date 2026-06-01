@@ -103,19 +103,13 @@ public class HudiFileStatsExtractor {
             && metaClient
                 .getTableConfig()
                 .isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS);
-    final Map<String, InternalField> parquetNameFieldMap =
+    final Map<String, InternalField> nameFieldMap =
         schema.getAllFields().stream()
-            .collect(
-                Collectors.toMap(field -> getFieldNameForStats(field, false), Function.identity()));
+            .collect(Collectors.toMap(this::getFieldNameForStats, Function.identity()));
     if (!useMetadataTableColStats) {
-      return computeColumnStatsFromParquetFooters(files, parquetNameFieldMap);
+      return computeColumnStatsFromParquetFooters(files, nameFieldMap);
     }
-    final Map<String, InternalField> metadataNameFieldMap =
-        schema.getAllFields().stream()
-            .collect(
-                Collectors.toMap(field -> getFieldNameForStats(field, true), Function.identity()));
-    return computeColumnStatsFromMetadataTable(
-        metadataTable, files, metadataNameFieldMap, parquetNameFieldMap);
+    return computeColumnStatsFromMetadataTable(metadataTable, files, nameFieldMap, nameFieldMap);
   }
 
   private Stream<InternalDataFile> computeColumnStatsFromParquetFooters(
@@ -388,12 +382,12 @@ public class HudiFileStatsExtractor {
     return (int) ((Date) date).toLocalDate().toEpochDay();
   }
 
-  private String getFieldNameForStats(InternalField field, boolean isReadFromMetadataTable) {
+  private String getFieldNameForStats(InternalField field) {
     String convertedDotPath = HudiSchemaExtractor.convertFromXTablePath(field.getPath());
-    // the array field naming is different for metadata table
-    if (isReadFromMetadataTable) {
-      return convertedDotPath.replace(ARRAY_DOT_FIELD, PARQUET_ELMENT_DOT_FIELD);
-    }
-    return convertedDotPath;
+    // As of Hudi 1.2.0 the column-stats reader (both parquet footers and the metadata table)
+    // reports array elements using the standard parquet 3-level "list.element" path, derived from
+    // the schema regardless of how the underlying file was written, so we always normalize to it.
+    // (Hudi 1.1 reported the parquet-footer path as ".array"; this distinction no longer exists.)
+    return convertedDotPath.replace(ARRAY_DOT_FIELD, PARQUET_ELMENT_DOT_FIELD);
   }
 }
