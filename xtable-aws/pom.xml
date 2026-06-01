@@ -51,6 +51,13 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Iceberg dependencies -->
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- AWS Glue dependencies -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
@@ -125,6 +132,69 @@
                                     <file>target/classes/META-INF/NOTICE-bundled</file>
                                 </transformer>
                             </transformers>
+                            <artifactSet>
+                                <includes>
+                                    <include>com.fasterxml.jackson.core:jackson-annotations</include>
+                                    <include>com.fasterxml.jackson.core:jackson-core</include>
+                                    <include>com.fasterxml.jackson.core:jackson-databind</include>
+                                    <include>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</include>
+                                    <include>com.fasterxml.jackson.module:jackson-module-scala_${scala.binary.version}</include>
+                                    <include>com.github.luben:zstd-jni</include>
+                                    <include>com.google.errorprone:error_prone_annotations</include>
+                                    <include>com.google.guava:failureaccess</include>
+                                    <include>com.google.guava:guava</include>
+                                    <include>com.google.guava:listenablefuture</include>
+                                    <include>com.google.j2objc:j2objc-annotations</include>
+                                    <include>com.thoughtworks.paranamer:paranamer</include>
+                                    <include>commons-pool:commons-pool</include>
+                                    <include>io.netty:netty-codec-http</include>
+                                    <include>io.netty:netty-codec-http2</include>
+                                    <include>javax.annotation:javax.annotation-api</include>
+                                    <include>org.apache.avro:avro</include>
+                                    <include>org.apache.logging.log4j:log4j-1.2-api</include>
+                                    <include>org.apache.logging.log4j:log4j-api</include>
+                                    <include>org.apache.parquet:parquet-avro</include>
+                                    <include>org.apache.parquet:parquet-column</include>
+                                    <include>org.apache.parquet:parquet-common</include>
+                                    <include>org.apache.parquet:parquet-encoding</include>
+                                    <include>org.apache.parquet:parquet-format-structures</include>
+                                    <include>org.apache.parquet:parquet-hadoop</include>
+                                    <include>org.apache.parquet:parquet-jackson</include>
+                                    <include>org.apache.xtable:xtable-api</include>
+                                    <include>org.apache.xtable:xtable-core_${scala.binary.version}</include>
+                                    <include>org.apache.xtable:xtable-hudi-support-utils</include>
+                                    <include>org.checkerframework:checker-qual</include>
+                                    <include>org.reactivestreams:reactive-streams</include>
+                                    <include>org.scala-lang:scala-library</include>
+                                    <include>software.amazon.awssdk:annotations</include>
+                                    <include>software.amazon.awssdk:apache-client</include>
+                                    <include>software.amazon.awssdk:auth</include>
+                                    <include>software.amazon.awssdk:aws-core</include>
+                                    <include>software.amazon.awssdk:aws-json-protocol</include>
+                                    <include>software.amazon.awssdk:checksums</include>
+                                    <include>software.amazon.awssdk:checksums-spi</include>
+                                    <include>software.amazon.awssdk:endpoints-spi</include>
+                                    <include>software.amazon.awssdk:glue</include>
+                                    <include>software.amazon.awssdk:http-auth</include>
+                                    <include>software.amazon.awssdk:http-auth-aws</include>
+                                    <include>software.amazon.awssdk:http-auth-aws-eventstream</include>
+                                    <include>software.amazon.awssdk:http-auth-spi</include>
+                                    <include>software.amazon.awssdk:http-client-spi</include>
+                                    <include>software.amazon.awssdk:identity-spi</include>
+                                    <include>software.amazon.awssdk:json-utils</include>
+                                    <include>software.amazon.awssdk:metrics-spi</include>
+                                    <include>software.amazon.awssdk:netty-nio-client</include>
+                                    <include>software.amazon.awssdk:profiles</include>
+                                    <include>software.amazon.awssdk:protocol-core</include>
+                                    <include>software.amazon.awssdk:regions</include>
+                                    <include>software.amazon.awssdk:retries</include>
+                                    <include>software.amazon.awssdk:retries-spi</include>
+                                    <include>software.amazon.awssdk:sdk-core</include>
+                                    <include>software.amazon.awssdk:third-party-jackson-core</include>
+                                    <include>software.amazon.awssdk:utils</include>
+                                    <include>software.amazon.eventstream:eventstream</include>
+                                </includes>
+                            </artifactSet>
                         </configuration>
                     </execution>
                 </executions>

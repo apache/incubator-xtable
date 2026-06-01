@@ -38,6 +38,8 @@ future.
    by something like `./mvnw test -Dtest=TestDeltaSync -pl xtable-core`.
 4. Similarly, use `./mvnw clean verify` or `./mvnw verify` to run integration tests.
 
+Automation and coding agents should also follow the repository-specific workflow in [AGENTS.md](./AGENTS.md), especially for dependency updates, shaded modules, and targeted validation.
+
 **Note:** When using Maven version 3.9 or above, Maven automatically caches the build. To ignore build caching, you can 
 add the `-Dmaven.build.cache.enabled=false` parameter. For example, `./mvnw clean package -DskipTests -Dmaven.build.cache.enabled=false`
 
