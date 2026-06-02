@@ -79,8 +79,6 @@ public class DeltaKernelSchemaExtractor {
     InternalType type = null;
     Map<InternalSchema.MetadataKey, Object> metadata = null;
     List<InternalField> fields = null;
-    InternalType type;
-    String trimmedTypeName;
 
     if (dataType instanceof IntegerType) {
       type = InternalType.INT;
