@@ -98,7 +98,8 @@ public class DeltaKernelSchemaExtractor {
       type = InternalType.DOUBLE;
       trimmedTypeName = "double";
     } else if (dataType instanceof BinaryType) {
-      if (originalMetadata.contains(InternalSchema.XTABLE_LOGICAL_TYPE)
+      if (originalMetadata != null
+          && originalMetadata.contains(InternalSchema.XTABLE_LOGICAL_TYPE)
           && "uuid".equals(originalMetadata.getString(InternalSchema.XTABLE_LOGICAL_TYPE))) {
         type = InternalType.UUID;
         trimmedTypeName = "binary";
