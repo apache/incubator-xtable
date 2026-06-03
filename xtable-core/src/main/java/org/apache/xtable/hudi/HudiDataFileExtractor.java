@@ -371,7 +371,8 @@ public class HudiDataFileExtractor implements AutoCloseable {
       fileSystemViewManager.close();
     } catch (Exception e) {
       throw new ReadException(
-          "Could not close table metadata for table " + metaClient.getTableConfig().getTableName());
+          "Could not close table metadata for table " + metaClient.getTableConfig().getTableName(),
+          e);
     }
   }
 
