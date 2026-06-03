@@ -497,6 +497,67 @@ public class TestDeltaPartitionExtractor {
   }
 
   @Test
+  public void testGeneratedPartitionValueExtractionWithMissingComponent() {
+    // A composite (generated column) partition is derived from multiple columns. When one of the
+    // component values is missing from the partition values map the value cannot be reconstructed
+    // and must resolve to null rather than a string containing the literal "null".
+    Map<String, String> partitionValuesMap =
+        new HashMap<String, String>() {
+          {
+            put("partition_column1", "partition_value1");
+            put("year_partition_column", "2013");
+            // month_partition_column is intentionally absent
+            put("day_partition_column", "20");
+          }
+        };
+    scala.collection.mutable.Map<String, String> scalaMap =
+        convertJavaMapToScalaMap(partitionValuesMap);
+    InternalPartitionField internalPartitionField1 =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("partition_column1")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    InternalPartitionField internalPartitionField2 =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("some_date_column")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("timestamp")
+                            .dataType(InternalType.TIMESTAMP)
+                            .build())
+                    .build())
+            .partitionFieldNames(
+                Arrays.asList(
+                    "year_partition_column", "month_partition_column", "day_partition_column"))
+            .transformType(PartitionTransformType.DAY)
+            .build();
+    List<PartitionValue> expectedPartitionValues =
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(internalPartitionField1)
+                .range(Range.scalar("partition_value1"))
+                .build(),
+            PartitionValue.builder()
+                .partitionField(internalPartitionField2)
+                .range(Range.scalar(null))
+                .build());
+    List<PartitionValue> partitionValues =
+        deltaPartitionExtractor.partitionValueExtraction(
+            scalaMap, Arrays.asList(internalPartitionField1, internalPartitionField2));
+    assertEquals(expectedPartitionValues, partitionValues);
+  }
+
+  @Test
   void convertBucketPartition() {
     InternalPartitionField internalPartitionField =
         InternalPartitionField.builder()
