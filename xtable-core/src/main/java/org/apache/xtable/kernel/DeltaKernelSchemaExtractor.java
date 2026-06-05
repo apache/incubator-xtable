@@ -96,7 +96,8 @@ public class DeltaKernelSchemaExtractor {
       type = InternalType.DOUBLE;
       trimmedTypeName = "double";
     } else if (dataType instanceof BinaryType) {
-      if (originalMetadata.contains(InternalSchema.XTABLE_LOGICAL_TYPE)
+      if (originalMetadata != null
+          && originalMetadata.contains(InternalSchema.XTABLE_LOGICAL_TYPE)
           && "uuid".equals(originalMetadata.getString(InternalSchema.XTABLE_LOGICAL_TYPE))) {
         type = InternalType.UUID;
         trimmedTypeName = "binary";
@@ -193,7 +194,7 @@ public class DeltaKernelSchemaExtractor {
           toInternalSchema(
               mapType.getKeyType(),
               SchemaUtils.getFullyQualifiedPath(
-                  parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
+                  parentPath, InternalField.Constants.MAP_KEY_FIELD_NAME),
               false,
               null,
               null);
@@ -220,6 +221,8 @@ public class DeltaKernelSchemaExtractor {
       type = InternalType.MAP;
       fields = Arrays.asList(keyField, valueField);
       trimmedTypeName = "map";
+    } else {
+      throw new NotSupportedException("Unsupported type: " + dataType);
     }
     return InternalSchema.builder()
         .name(trimmedTypeName)

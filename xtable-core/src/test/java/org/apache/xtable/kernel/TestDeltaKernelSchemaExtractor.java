@@ -500,6 +500,174 @@ public class TestDeltaKernelSchemaExtractor {
   }
 
   @Test
+  public void testMapWithStructKey() {
+    InternalSchema structKeySchema =
+        InternalSchema.builder()
+            .name("struct")
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("id")
+                        .parentPath("structKeyMap._one_field_key")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("long")
+                                .dataType(InternalType.LONG)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("region")
+                        .parentPath("structKeyMap._one_field_key")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .dataType(InternalType.RECORD)
+            .build();
+    InternalSchema structValueSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .isNullable(true)
+            .fields(
+                Collections.singletonList(
+                    InternalField.builder()
+                        .name("payload")
+                        .parentPath("structKeyMap._one_field_value")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .isNullable(false)
+                                .build())
+                        .build()))
+            .dataType(InternalType.RECORD)
+            .build();
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Collections.singletonList(
+                    InternalField.builder()
+                        .name("structKeyMap")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .isNullable(true)
+                                .dataType(InternalType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("structKeyMap")
+                                            .schema(structKeySchema)
+                                            .build(),
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                                            .parentPath("structKeyMap")
+                                            .schema(structValueSchema)
+                                            .build()))
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    io.delta.kernel.types.StructType keyStruct =
+        new StructType().add("id", LongType.LONG, false).add("region", StringType.STRING, true);
+    io.delta.kernel.types.StructType valueStruct =
+        new StructType().add("payload", StringType.STRING, false);
+    io.delta.kernel.types.StructType structRepresentation =
+        new StructType().add("structKeyMap", new MapType(keyStruct, valueStruct, true));
+
+    Assertions.assertEquals(
+        internalSchema,
+        DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+  }
+
+  @Test
+  public void testBinaryInComplexTypesDoesNotThrow() {
+    // Regression: BinaryType nested inside MapType/ArrayType receives null originalMetadata
+    // from the parent recursion; ensure the BinaryType branch handles null without NPE.
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("binaryKeyMap")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .isNullable(true)
+                                .dataType(InternalType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("binaryKeyMap")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("binary")
+                                                    .dataType(InternalType.BYTES)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build(),
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                                            .parentPath("binaryKeyMap")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("binary")
+                                                    .dataType(InternalType.BYTES)
+                                                    .isNullable(true)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build(),
+                    InternalField.builder()
+                        .name("binaryList")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("array")
+                                .isNullable(false)
+                                .dataType(InternalType.LIST)
+                                .fields(
+                                    Collections.singletonList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
+                                            .parentPath("binaryList")
+                                            .schema(
+                                                InternalSchema.builder()
+                                                    .name("binary")
+                                                    .dataType(InternalType.BYTES)
+                                                    .isNullable(false)
+                                                    .build())
+                                            .build()))
+                                .build())
+                        .build()))
+            .build();
+
+    io.delta.kernel.types.StructType structRepresentation =
+        new StructType()
+            .add("binaryKeyMap", new MapType(BinaryType.BINARY, BinaryType.BINARY, true))
+            .add("binaryList", new ArrayType(BinaryType.BINARY, false), false);
+
+    Assertions.assertEquals(
+        internalSchema,
+        DeltaKernelSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+  }
+
+  @Test
   public void testLists() {
     InternalSchema recordListElementSchema =
         InternalSchema.builder()

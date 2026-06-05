@@ -473,6 +473,98 @@ public class TestDeltaSchemaExtractor {
   }
 
   @Test
+  public void testMapWithStructKey() {
+    InternalSchema structKeySchema =
+        InternalSchema.builder()
+            .name("struct")
+            .isNullable(false)
+            .fields(
+                Arrays.asList(
+                    InternalField.builder()
+                        .name("id")
+                        .parentPath("structKeyMap._one_field_key")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("long")
+                                .dataType(InternalType.LONG)
+                                .isNullable(false)
+                                .build())
+                        .build(),
+                    InternalField.builder()
+                        .name("region")
+                        .parentPath("structKeyMap._one_field_key")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .isNullable(true)
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .dataType(InternalType.RECORD)
+            .build();
+    InternalSchema structValueSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .isNullable(true)
+            .fields(
+                Collections.singletonList(
+                    InternalField.builder()
+                        .name("payload")
+                        .parentPath("structKeyMap._one_field_value")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("string")
+                                .dataType(InternalType.STRING)
+                                .isNullable(false)
+                                .build())
+                        .build()))
+            .dataType(InternalType.RECORD)
+            .build();
+    InternalSchema internalSchema =
+        InternalSchema.builder()
+            .name("struct")
+            .dataType(InternalType.RECORD)
+            .isNullable(false)
+            .fields(
+                Collections.singletonList(
+                    InternalField.builder()
+                        .name("structKeyMap")
+                        .schema(
+                            InternalSchema.builder()
+                                .name("map")
+                                .isNullable(true)
+                                .dataType(InternalType.MAP)
+                                .fields(
+                                    Arrays.asList(
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_KEY_FIELD_NAME)
+                                            .parentPath("structKeyMap")
+                                            .schema(structKeySchema)
+                                            .build(),
+                                        InternalField.builder()
+                                            .name(InternalField.Constants.MAP_VALUE_FIELD_NAME)
+                                            .parentPath("structKeyMap")
+                                            .schema(structValueSchema)
+                                            .build()))
+                                .build())
+                        .defaultValue(InternalField.Constants.NULL_DEFAULT_VALUE)
+                        .build()))
+            .build();
+
+    StructType keyStruct =
+        new StructType()
+            .add("id", DataTypes.LongType, false)
+            .add("region", DataTypes.StringType, true);
+    StructType valueStruct = new StructType().add("payload", DataTypes.StringType, false);
+    StructType structRepresentation =
+        new StructType().add("structKeyMap", DataTypes.createMapType(keyStruct, valueStruct, true));
+
+    Assertions.assertEquals(
+        internalSchema, DeltaSchemaExtractor.getInstance().toInternalSchema(structRepresentation));
+  }
+
+  @Test
   public void testLists() {
     InternalSchema recordListElementSchema =
         InternalSchema.builder()
