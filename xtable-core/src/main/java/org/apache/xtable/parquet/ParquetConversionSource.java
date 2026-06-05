@@ -183,7 +183,12 @@ public class ParquetConversionSource implements ConversionSource<Long> {
         parquetFiles.stream()
             .filter(fileStatus -> fileStatus.getModificationTime() > modificationTime)
             .collect(Collectors.toList());
-    InternalTable internalTable = getMostRecentTable(parquetFiles.stream());
+    // Derive both the table and the source identifier from the same snapshot. Using a separate
+    // listing for the identifier risks committing a modification time for a file that landed after
+    // the snapshot and was not included in filesAdded, which would permanently skip that file on
+    // the next incremental sync.
+    LocatedFileStatus mostRecentFile = getMostRecentParquetFile(parquetFiles.stream());
+    InternalTable internalTable = createInternalTableFromFile(mostRecentFile);
     for (FileStatus tableStatus : tableChangesAfter) {
       InternalDataFile currentDataFile =
           createInternalDataFileFromParquetFile(tableStatus, internalTable.getReadSchema());
@@ -191,9 +196,7 @@ public class ParquetConversionSource implements ConversionSource<Long> {
     }
 
     return TableChange.builder()
-        .sourceIdentifier(
-            getCommitIdentifier(
-                parquetDataManager.getMostRecentParquetFile().getModificationTime()))
+        .sourceIdentifier(getCommitIdentifier(mostRecentFile.getModificationTime()))
         .tableAsOfChange(internalTable)
         .filesDiff(InternalFilesDiff.builder().filesAdded(addedInternalDataFiles).build())
         .build();

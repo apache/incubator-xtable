@@ -541,6 +541,10 @@ public class ITParquetConversionSource {
     assertNotNull(changes);
     assertFalse(changes.getFilesDiff().dataFilesAdded().isEmpty(), "Should have found added files");
     assertEquals(expectedAddedFiles, changes.getFilesDiff().dataFilesAdded());
+    // The committed source identifier must be the most-recent modification time from the same
+    // listing used to compute filesAdded, otherwise a file could be marked synced without being
+    // included in the changes.
+    assertEquals(String.valueOf(newModificationTime), changes.getSourceIdentifier());
     Instant instantBeforeFirstSnapshot =
         Instant.ofEpochMilli(snapshot.getTable().getLatestCommitTime().toEpochMilli());
     assertEquals(instantBeforeFirstSnapshot.toEpochMilli(), newModificationTime);
