@@ -223,9 +223,6 @@ public class ITConversionController {
   @MethodSource("generateTestParametersForFormatsSyncModesAndPartitioning")
   public void testVariousOperations(
       String sourceTableFormat, SyncMode syncMode, boolean isPartitioned) {
-    // Disable the lock manager and heartbeat threads for both Catalog and Table configurations
-    jsc.hadoopConfiguration().set("iceberg.catalog.lock-impl", "");
-    jsc.hadoopConfiguration().set("iceberg.tables.hadoop.lock-impl", "");
     String tableName = getTableName();
     ConversionController conversionController = new ConversionController(jsc.hadoopConfiguration());
     List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
