@@ -130,88 +130,6 @@ class TestParquetDataManager {
   }
 
   @Test
-  void testGetParquetDataFileAt_exactMatch() throws IOException {
-    LocatedFileStatus file1 = createMockFileStatus("file1.parquet", 1000L);
-    LocatedFileStatus file2 = createMockFileStatus("file2.parquet", 2000L);
-    LocatedFileStatus file3 = createMockFileStatus("file3.parquet", 3000L);
-
-    RemoteIterator<LocatedFileStatus> iterator =
-        new StubbedRemoteIterator(Arrays.asList(file1, file2, file3));
-    FileSystem mockFs = createMockFileSystem(iterator);
-
-    ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
-
-    ParquetFileInfo result = manager.getParquetDataFileAt(2000L);
-
-    assertNotNull(result);
-    assertEquals(3000L, result.getModificationTime());
-  }
-
-  @Test
-  void testGetParquetDataFileAt_firstAfterTime() throws IOException {
-    LocatedFileStatus file1 = createMockFileStatus("file1.parquet", 1000L);
-    LocatedFileStatus file2 = createMockFileStatus("file2.parquet", 2500L);
-    LocatedFileStatus file3 = createMockFileStatus("file3.parquet", 3000L);
-
-    RemoteIterator<LocatedFileStatus> iterator =
-        new StubbedRemoteIterator(Arrays.asList(file1, file2, file3));
-    FileSystem mockFs = createMockFileSystem(iterator);
-
-    ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
-
-    ParquetFileInfo result = manager.getParquetDataFileAt(2000L);
-
-    assertNotNull(result);
-    assertEquals(2500L, result.getModificationTime());
-  }
-
-  @Test
-  void testGetParquetDataFileAt_multipleAfterTime() throws IOException {
-    LocatedFileStatus file1 = createMockFileStatus("file1.parquet", 1000L);
-    LocatedFileStatus file2 = createMockFileStatus("file2.parquet", 2500L);
-    LocatedFileStatus file3 = createMockFileStatus("file3.parquet", 3000L);
-
-    RemoteIterator<LocatedFileStatus> iterator =
-        new StubbedRemoteIterator(Arrays.asList(file1, file2, file3));
-    FileSystem mockFs = createMockFileSystem(iterator);
-
-    ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
-
-    ParquetFileInfo result = manager.getParquetDataFileAt(2000L);
-
-    assertNotNull(result);
-    assertEquals(2500L, result.getModificationTime());
-  }
-
-  @Test
-  void testGetParquetDataFileAt_noMatch() throws IOException {
-    RemoteIterator<LocatedFileStatus> iterator = new StubbedRemoteIterator(Collections.emptyList());
-    FileSystem mockFs = createMockFileSystem(iterator);
-
-    ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
-
-    IllegalStateException exception =
-        assertThrows(IllegalStateException.class, () -> manager.getParquetDataFileAt(5000L));
-    assertTrue(exception.getMessage().contains("No file found at or after 5000"));
-  }
-
-  @Test
-  void testGetParquetDataFileAt_allBefore() throws IOException {
-    LocatedFileStatus file1 = createMockFileStatus("file1.parquet", 1000L);
-    LocatedFileStatus file2 = createMockFileStatus("file2.parquet", 2000L);
-
-    RemoteIterator<LocatedFileStatus> iterator =
-        new StubbedRemoteIterator(Arrays.asList(file1, file2));
-    FileSystem mockFs = createMockFileSystem(iterator);
-
-    ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
-
-    IllegalStateException exception =
-        assertThrows(IllegalStateException.class, () -> manager.getParquetDataFileAt(3000L));
-    assertTrue(exception.getMessage().contains("No file found at or after 3000"));
-  }
-
-  @Test
   void testGetCurrentFilesInfo_multipleFiles() throws IOException {
     LocatedFileStatus file1 = createMockFileStatus("file1.parquet", 1000L);
     LocatedFileStatus file2 = createMockFileStatus("file2.parquet", 2000L);
@@ -262,78 +180,6 @@ class TestParquetDataManager {
   }
 
   @Test
-  void testGetParquetFilesMetadataAfterTime_someMatch() throws IOException {
-    LocatedFileStatus file1 = createMockFileStatus("file1.parquet", 1000L);
-    LocatedFileStatus file2 = createMockFileStatus("file2.parquet", 2000L);
-    LocatedFileStatus file3 = createMockFileStatus("file3.parquet", 3000L);
-
-    RemoteIterator<LocatedFileStatus> iterator =
-        new StubbedRemoteIterator(Arrays.asList(file1, file2, file3));
-    FileSystem mockFs = createMockFileSystem(iterator);
-
-    ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
-
-    List<ParquetFileInfo> result = manager.getParquetFilesMetadataAfterTime(2000L);
-
-    assertNotNull(result);
-    assertEquals(1, result.size());
-    assertEquals(Collections.singleton(3000L), getModificationTimes(result));
-  }
-
-  @Test
-  void testGetParquetFilesMetadataAfterTime_allMatch() throws IOException {
-    LocatedFileStatus file1 = createMockFileStatus("file1.parquet", 2000L);
-    LocatedFileStatus file2 = createMockFileStatus("file2.parquet", 3000L);
-
-    RemoteIterator<LocatedFileStatus> iterator =
-        new StubbedRemoteIterator(Arrays.asList(file1, file2));
-    FileSystem mockFs = createMockFileSystem(iterator);
-
-    ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
-
-    List<ParquetFileInfo> result = manager.getParquetFilesMetadataAfterTime(1000L);
-
-    assertNotNull(result);
-    assertEquals(2, result.size());
-  }
-
-  @Test
-  void testGetParquetFilesMetadataAfterTime_noneMatch() throws IOException {
-    LocatedFileStatus file1 = createMockFileStatus("file1.parquet", 1000L);
-    LocatedFileStatus file2 = createMockFileStatus("file2.parquet", 2000L);
-
-    RemoteIterator<LocatedFileStatus> iterator =
-        new StubbedRemoteIterator(Arrays.asList(file1, file2));
-    FileSystem mockFs = createMockFileSystem(iterator);
-
-    ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
-
-    List<ParquetFileInfo> result = manager.getParquetFilesMetadataAfterTime(5000L);
-
-    assertNotNull(result);
-    assertEquals(0, result.size());
-  }
-
-  @Test
-  void testGetParquetFilesMetadataAfterTime_exactTimeMatch() throws IOException {
-    LocatedFileStatus file1 = createMockFileStatus("file1.parquet", 1000L);
-    LocatedFileStatus file2 = createMockFileStatus("file2.parquet", 2000L);
-    LocatedFileStatus file3 = createMockFileStatus("file3.parquet", 3000L);
-
-    RemoteIterator<LocatedFileStatus> iterator =
-        new StubbedRemoteIterator(Arrays.asList(file1, file2, file3));
-    FileSystem mockFs = createMockFileSystem(iterator);
-
-    ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
-
-    List<ParquetFileInfo> result = manager.getParquetFilesMetadataAfterTime(2000L);
-
-    assertNotNull(result);
-    assertEquals(1, result.size());
-    assertEquals(Collections.singleton(3000L), getModificationTimes(result));
-  }
-
-  @Test
   void testGetParquetFiles_caching() throws IOException {
     LocatedFileStatus file = createMockFileStatus("file.parquet", 1000L);
     RemoteIterator<LocatedFileStatus> iterator =
@@ -348,7 +194,7 @@ class TestParquetDataManager {
     // Access multiple times
     manager.getCurrentFilesInfo();
     manager.getMostRecentParquetFile();
-    manager.getParquetFilesMetadataAfterTime(0L);
+    manager.getCurrentFilesInfo();
 
     // Verify filesystem was accessed only once
     verify(mockFs, times(1)).listFiles(any(org.apache.hadoop.fs.Path.class), anyBoolean());
@@ -366,7 +212,7 @@ class TestParquetDataManager {
 
     ParquetDataManager manager = new ParquetDataManager(CONF, "test-path", mockFs);
 
-    List<ParquetFileInfo> result = manager.getParquetFilesMetadataAfterTime(0L);
+    List<ParquetFileInfo> result = manager.getCurrentFilesInfo().collect(Collectors.toList());
 
     assertEquals(1, result.size());
     assertEquals(Collections.singleton(1000L), getModificationTimes(result));
@@ -394,8 +240,9 @@ class TestParquetDataManager {
     assertNotNull(mostRecent);
     assertEquals(3000L, mostRecent.getModificationTime());
 
-    List<ParquetFileInfo> afterTime = manager.getParquetFilesMetadataAfterTime(2000L);
-    assertEquals(1, afterTime.size());
+    long afterTime =
+        manager.getCurrentFilesInfo().filter(f -> f.getModificationTime() > 2000L).count();
+    assertEquals(1, afterTime);
   }
 
   @Test
@@ -420,7 +267,7 @@ class TestParquetDataManager {
     Files.setLastModifiedTime(file3, FileTime.fromMillis(3000L));
     ParquetDataManager manager = new ParquetDataManager(CONF, tempDir.toString());
 
-    List<ParquetFileInfo> allFiles = manager.getParquetFilesMetadataAfterTime(0L);
+    List<ParquetFileInfo> allFiles = manager.getCurrentFilesInfo().collect(Collectors.toList());
     assertEquals(3, allFiles.size());
 
     ParquetFileInfo mostRecent = manager.getMostRecentParquetFile();
@@ -447,7 +294,7 @@ class TestParquetDataManager {
 
     ParquetDataManager manager = new ParquetDataManager(CONF, tempDir.toString());
 
-    List<ParquetFileInfo> allFiles = manager.getParquetFilesMetadataAfterTime(0L);
+    List<ParquetFileInfo> allFiles = manager.getCurrentFilesInfo().collect(Collectors.toList());
     // Only parquet files should be included
     assertEquals(2, allFiles.size());
 

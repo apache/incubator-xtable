@@ -175,14 +175,15 @@ public class ParquetConversionSource implements ConversionSource<Long> {
 
   @Override
   public TableChange getTableChangeForCommit(Long modificationTime) {
-    Stream<LocatedFileStatus> parquetFiles = getParquetFiles(hadoopConf, basePath);
+    List<LocatedFileStatus> parquetFiles =
+        getParquetFiles(hadoopConf, basePath).collect(Collectors.toList());
     Set<InternalDataFile> addedInternalDataFiles = new HashSet<>();
 
     List<FileStatus> tableChangesAfter =
-        parquetFiles
+        parquetFiles.stream()
             .filter(fileStatus -> fileStatus.getModificationTime() > modificationTime)
             .collect(Collectors.toList());
-    InternalTable internalTable = getMostRecentTable(getParquetFiles(hadoopConf, basePath));
+    InternalTable internalTable = getMostRecentTable(parquetFiles.stream());
     for (FileStatus tableStatus : tableChangesAfter) {
       InternalDataFile currentDataFile =
           createInternalDataFileFromParquetFile(tableStatus, internalTable.getReadSchema());
@@ -216,16 +217,17 @@ public class ParquetConversionSource implements ConversionSource<Long> {
    */
   @Override
   public InternalSnapshot getCurrentSnapshot() {
-    // to avoid consume the stream call the method twice to return the same stream of parquet files
-    InternalTable table = getMostRecentTable(getParquetFiles(hadoopConf, basePath));
+    // Fetch the file listing once and reuse it across the table, data files, and source identifier.
+    List<LocatedFileStatus> parquetFiles =
+        getParquetFiles(hadoopConf, basePath).collect(Collectors.toList());
+    InternalTable table = getMostRecentTable(parquetFiles.stream());
     Stream<InternalDataFile> internalDataFiles =
-        getInternalDataFiles(getParquetFiles(hadoopConf, basePath), table.getReadSchema());
+        getInternalDataFiles(parquetFiles.stream(), table.getReadSchema());
     return InternalSnapshot.builder()
         .table(table)
         .sourceIdentifier(
             getCommitIdentifier(
-                getMostRecentParquetFile(getParquetFiles(hadoopConf, basePath))
-                    .getModificationTime()))
+                getMostRecentParquetFile(parquetFiles.stream()).getModificationTime()))
         .partitionedDataFiles(PartitionFileGroup.fromFiles(internalDataFiles))
         .build();
   }

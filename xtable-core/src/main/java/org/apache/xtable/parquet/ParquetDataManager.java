@@ -78,14 +78,6 @@ public class ParquetDataManager {
     return new ParquetFileInfo(hadoopConf, file);
   }
 
-  ParquetFileInfo getParquetDataFileAt(long targetTime) {
-    return getParquetFiles().stream()
-        .filter(file -> file.getModificationTime() > targetTime)
-        .min(Comparator.comparing(LocatedFileStatus::getModificationTime))
-        .map(file -> new ParquetFileInfo(hadoopConf, file))
-        .orElseThrow(() -> new IllegalStateException("No file found at or after " + targetTime));
-  }
-
   private List<LocatedFileStatus> loadParquetFiles() {
     try {
       RemoteIterator<LocatedFileStatus> iterator = fileSystem.listFiles(new Path(basePath), true);
@@ -100,12 +92,5 @@ public class ParquetDataManager {
   Stream<ParquetFileInfo> getCurrentFilesInfo() {
     return getParquetFiles().stream()
         .map(fileStatus -> new ParquetFileInfo(hadoopConf, fileStatus));
-  }
-
-  List<ParquetFileInfo> getParquetFilesMetadataAfterTime(long syncTime) {
-    return getParquetFiles().stream()
-        .filter(file -> file.getModificationTime() > syncTime)
-        .map(file -> new ParquetFileInfo(hadoopConf, file))
-        .collect(Collectors.toList());
   }
 }
