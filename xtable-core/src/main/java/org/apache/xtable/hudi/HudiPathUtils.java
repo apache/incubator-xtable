@@ -18,14 +18,38 @@
  
 package org.apache.xtable.hudi;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import org.apache.hadoop.fs.Path;
 
 public class HudiPathUtils {
+
+  private static final Set<String> METADATA_DIR_NAMES =
+      new HashSet<>(Arrays.asList(".hoodie", "_delta_log"));
+
   public static String getPartitionPath(Path tableBasePath, Path filePath) {
     String fileName = filePath.getName();
     String pathStr = filePath.toUri().getPath();
     int startIndex = tableBasePath.toUri().getPath().length() + 1;
     int endIndex = pathStr.length() - fileName.length() - 1;
     return endIndex <= startIndex ? "" : pathStr.substring(startIndex, endIndex);
+  }
+
+  /** Filters out known metadata directory paths like _delta_log and .hoodie. */
+  public static List<String> filterMetadataPaths(List<String> partitionPaths) {
+    return partitionPaths.stream()
+        .filter(
+            p -> {
+              if (p.isEmpty()) {
+                return true;
+              }
+              String name = p.substring(p.lastIndexOf('/') + 1);
+              return !METADATA_DIR_NAMES.contains(name);
+            })
+        .collect(Collectors.toList());
   }
 }
