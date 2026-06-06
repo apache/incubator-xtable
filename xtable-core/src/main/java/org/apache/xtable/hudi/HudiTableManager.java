@@ -18,6 +18,8 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -54,6 +56,10 @@ public class HudiTableManager {
       "org.apache.hudi.keygen.TimestampBasedKeyGenerator";
   private static final String COMPLEX_KEY_GENERATOR = "org.apache.hudi.keygen.ComplexKeyGenerator";
   private static final String SIMPLE_KEY_GENERATOR = "org.apache.hudi.keygen.SimpleKeyGenerator";
+  // Hudi 1.x spark query defaults to "default" database and spark read query picks up delta
+  // instead, 0.x doesn't have the same problem.
+  // TODO: https://github.com/apache/incubator-xtable/issues/774
+  private static final String DEFAULT_DATABASE_NAME = "default_hudi";
 
   private final Configuration configuration;
 
@@ -68,7 +74,7 @@ public class HudiTableManager {
       return Optional.of(
           HoodieTableMetaClient.builder()
               .setBasePath(tableDataPath)
-              .setConf(configuration)
+              .setConf(getStorageConf(configuration))
               .setLoadActiveTimelineOnLoad(false)
               .build());
     } catch (TableNotFoundException ex) {
@@ -102,11 +108,12 @@ public class HudiTableManager {
     boolean hiveStylePartitioningEnabled =
         DataLayoutStrategy.HIVE_STYLE_PARTITION == table.getLayoutStrategy();
     try {
-      return HoodieTableMetaClient.withPropertyBuilder()
+      return HoodieTableMetaClient.newTableBuilder()
           .setCommitTimezone(HoodieTimelineTimeZone.UTC)
           .setHiveStylePartitioningEnable(hiveStylePartitioningEnabled)
           .setTableType(HoodieTableType.COPY_ON_WRITE)
           .setTableName(table.getName())
+          .setDatabaseName(DEFAULT_DATABASE_NAME)
           .setPayloadClass(HoodieAvroPayload.class)
           .setRecordKeyFields(recordKeyField)
           .setKeyGeneratorClassProp(keyGeneratorClass)
@@ -117,7 +124,7 @@ public class HudiTableManager {
                   .map(InternalPartitionField::getSourceField)
                   .map(InternalField::getPath)
                   .collect(Collectors.joining(",")))
-          .initTable(configuration, tableDataPath);
+          .initTable(getStorageConf(configuration), tableDataPath);
     } catch (IOException ex) {
       throw new UpdateException("Unable to initialize Hudi table", ex);
     }
