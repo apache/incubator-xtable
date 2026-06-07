@@ -368,6 +368,63 @@ public class ITDeltaConversionSource {
     InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
   }
 
+  @Test
+  void getCurrentSnapshotGenColPartitionedWithNullSourceTest() {
+    // Reproduces partition value corruption for a composite generated-column partition. The
+    // year/month/day partition columns are all generated from a single source column, so a row
+    // whose source value is null produces null for every component. The extractor must resolve
+    // such a partition value to null instead of joining the components into a string containing
+    // the literal "null" (e.g. "null-null-null") and then failing to parse it as a date.
+    final String tableName = GenericTable.getTableName();
+    final Path basePath = tempDir.resolve(tableName);
+    sparkSession.sql(
+        "CREATE TABLE `"
+            + tableName
+            + "` (id BIGINT, event_time TIMESTAMP,"
+            + " year_col INT GENERATED ALWAYS AS (YEAR(event_time)),"
+            + " month_col INT GENERATED ALWAYS AS (MONTH(event_time)),"
+            + " day_col INT GENERATED ALWAYS AS (DAY(event_time)))"
+            + " USING DELTA PARTITIONED BY (year_col, month_col, day_col) LOCATION '"
+            + basePath
+            + "'");
+    // One row with a valid timestamp and one row whose timestamp (and therefore every generated
+    // partition column) is null.
+    sparkSession.sql(
+        "INSERT INTO TABLE `"
+            + tableName
+            + "` VALUES (1, CAST('2013-08-20 00:00:00' AS TIMESTAMP)),"
+            + " (2, CAST(NULL AS TIMESTAMP))");
+
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
+            .build();
+    DeltaConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+
+    // Before the fix this call throws while parsing the "null-null-null" partition value.
+    InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
+
+    List<InternalDataFile> dataFiles =
+        snapshot.getPartitionedDataFiles().stream()
+            .flatMap(group -> group.getDataFiles().stream())
+            .collect(Collectors.toList());
+    assertEquals(2, dataFiles.size());
+
+    // Exactly one file belongs to the null-source partition and its composite partition value is
+    // null rather than a corrupted, parsed-from-"null" value.
+    long nullPartitionFiles =
+        dataFiles.stream()
+            .filter(
+                file ->
+                    file.getPartitionValues().stream()
+                        .anyMatch(pv -> pv.getRange().getMaxValue() == null))
+            .count();
+    assertEquals(1, nullPartitionFiles);
+  }
+
   @ParameterizedTest
   @MethodSource("testWithPartitionToggle")
   public void testInsertsUpsertsAndDeletes(boolean isPartitioned) {

@@ -514,17 +514,19 @@ public class TestDeltaKernelPartitionExtractor {
   }
 
   @Test
-  public void testGeneratedPartitionValueExtractionWithMissingComponent() {
-    // A composite (generated column) partition is derived from multiple columns. When one of the
-    // component values is missing from the partition values map the value cannot be reconstructed
-    // and must resolve to null rather than a string containing the literal "null".
+  public void testGeneratedPartitionValueExtractionWithNullSource() {
+    // A composite (generated column) partition is derived from a single source column (e.g. year,
+    // month and day generated from one timestamp column). When the source value is null all of the
+    // derived component values are null in the Delta partition values. The partition value must
+    // resolve to null rather than a string containing the literal "null" (e.g. "null-null-null")
+    // which would then fail date parsing.
     Map<String, String> partitionValuesMap =
         new HashMap<String, String>() {
           {
             put("partition_column1", "partition_value1");
-            put("year_partition_column", "2013");
-            // month_partition_column is intentionally absent
-            put("day_partition_column", "20");
+            put("year_partition_column", null);
+            put("month_partition_column", null);
+            put("day_partition_column", null);
           }
         };
     java.util.Map<String, String> scalaMap = partitionValuesMap;
