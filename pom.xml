@@ -52,6 +52,7 @@
         <module>xtable-core</module>
         <module>xtable-utilities</module>
         <module>xtable-aws</module>
+        <module>xtable-databricks</module>
         <module>xtable-hive-metastore</module>
         <module>xtable-service</module>
     </modules>
@@ -73,6 +74,7 @@
         <hudi.version>0.14.0</hudi.version>
         <aws.version>2.29.40</aws.version>
         <hive.version>2.3.9</hive.version>
+        <databricks.sdk.version>0.85.0</databricks.sdk.version>
         <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
         <maven-javadoc-plugin.version>3.8.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.2.4</maven-gpg-plugin.version>
@@ -453,6 +455,13 @@
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>glue</artifactId>
                 <version>${aws.version}</version>
+            </dependency>
+
+            <!-- Databricks -->
+            <dependency>
+                <groupId>com.databricks</groupId>
+                <artifactId>databricks-sdk-java</artifactId>
+                <version>${databricks.sdk.version}</version>
             </dependency>
 
             <!-- Protobuf -->
