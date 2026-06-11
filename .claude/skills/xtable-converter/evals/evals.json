@@ -1,0 +1,35 @@
+{
+  "skill_name": "xtable-converter",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Convert my Hudi table at s3://lake/orders to Iceberg. It's partitioned by order_date (daily, paths look like 2026-06-11).",
+      "expected_output": "Valid YAML with partitionSpec order_date:DAY:yyyy-MM-dd shown for confirmation, then run + Conversion Report with per-table verdict",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Sync s3://lake/orders and s3://lake/sales from Hudi to both Delta and Iceberg, register under namespace analytics.core in our Glue catalog.",
+      "expected_output": "Multi-dataset config with namespace, asks for/uses icebergCatalogConfig, asks about partitioning for each Hudi table, ends with Conversion Report",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Make this Delta table queryable from Snowflake: abfs://gold@eglake.dfs.core.windows.net/bookings",
+      "expected_output": "Infers DELTA source -> ICEBERG target, asks nothing unnecessary, flags that abfs verification needs hadoop CLI (UNVERIFIED otherwise) before running",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Convert my table to Iceberg",
+      "expected_output": "Asks for source format and table path; never guesses a path",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Convert the Iceberg table at s3://lake/inventory to Hudi",
+      "expected_output": "Requires tableDataPath (suggests s3://lake/inventory/data), no partitionSpec, Conversion Report at the end",
+      "files": []
+    }
+  ]
+}
