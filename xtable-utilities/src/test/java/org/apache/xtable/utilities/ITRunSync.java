@@ -93,11 +93,43 @@ class ITRunSync {
     }
   }
 
+  @Test
+  void testSingleSyncModeWithoutInputTableFormat(@TempDir Path tempDir) throws IOException {
+    String tableName = "test-table";
+    try (GenericTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
+      table.insertRows(10);
+      File configFile = writeConfigFileWithoutSourceTableFormat(tempDir, table, tableName);
+      String[] args = new String[] {"--datasetConfig", configFile.getPath()};
+      RunSync.main(args);
+      Path icebergMetadataPath = Paths.get(URI.create(table.getBasePath() + "/metadata"));
+      waitForNumIcebergCommits(icebergMetadataPath, 3);
+    }
+  }
+
   private static File writeConfigFile(Path tempDir, GenericTable table, String tableName)
       throws IOException {
     RunSync.DatasetConfig config =
         RunSync.DatasetConfig.builder()
             .sourceFormat("HUDI")
+            .targetFormats(Collections.singletonList("ICEBERG"))
+            .datasets(
+                Collections.singletonList(
+                    RunSync.DatasetConfig.Table.builder()
+                        .tableBasePath(table.getBasePath())
+                        .tableName(tableName)
+                        .build()))
+            .build();
+    File configFile = new File(tempDir + "config.yaml");
+    RunSync.YAML_MAPPER.writeValue(configFile, config);
+    return configFile;
+  }
+
+  private static File writeConfigFileWithoutSourceTableFormat(
+      Path tempDir, GenericTable table, String tableName) throws IOException {
+    RunSync.DatasetConfig config =
+        RunSync.DatasetConfig.builder()
             .targetFormats(Collections.singletonList("ICEBERG"))
             .datasets(
                 Collections.singletonList(
