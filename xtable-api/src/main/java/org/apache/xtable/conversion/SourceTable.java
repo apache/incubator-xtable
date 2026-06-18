@@ -34,13 +34,21 @@ public class SourceTable extends ExternalTable {
   @Builder(toBuilder = true)
   public SourceTable(
       String name,
-      String formatName,
+      String formatName, // can be omitted in the yaml config file
       String basePath,
       String dataPath,
       String[] namespace,
       CatalogConfig catalogConfig,
       Properties additionalProperties) {
-    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties);
+    super(
+        name,
+        formatName != null
+            ? formatName
+            : DetectSourceType.safeDetectFormat(basePath, catalogConfig),
+        basePath,
+        namespace,
+        catalogConfig,
+        additionalProperties);
     this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
   }
 }
