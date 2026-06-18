@@ -52,7 +52,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.annotations.VisibleForTesting;
 
-import org.apache.xtable.conversion.*;
+import org.apache.xtable.conversion.CatalogConfig;
+import org.apache.xtable.conversion.ConversionConfig;
+import org.apache.xtable.conversion.ConversionController;
+import org.apache.xtable.conversion.ConversionSourceProvider;
+import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.conversion.DetectSourceType;
+import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.model.storage.TableFormat;
