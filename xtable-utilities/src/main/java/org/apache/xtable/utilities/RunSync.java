@@ -52,12 +52,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.annotations.VisibleForTesting;
 
-import org.apache.xtable.conversion.CatalogConfig;
-import org.apache.xtable.conversion.ConversionConfig;
-import org.apache.xtable.conversion.ConversionController;
-import org.apache.xtable.conversion.ConversionSourceProvider;
-import org.apache.xtable.conversion.SourceTable;
-import org.apache.xtable.conversion.TargetTable;
+import org.apache.xtable.conversion.*;
 import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
 import org.apache.xtable.model.storage.TableFormat;
@@ -214,18 +209,30 @@ public class RunSync {
   static ConversionSourceProvider<?> getConversionSourceProvider(
       String conversionProviderConfigpath, DatasetConfig datasetConfig, Configuration hadoopConf)
       throws IOException {
-    // Process source format
     String sourceFormat = datasetConfig.sourceFormat;
     byte[] customConfig = getCustomConfigurations(conversionProviderConfigpath);
     TableFormatConverters tableFormatConverters = loadTableFormatConversionConfigs(customConfig);
+    if (sourceFormat == null
+        && datasetConfig.getDatasets() != null
+        && !datasetConfig.getDatasets().isEmpty()) {
+      DatasetConfig.Table firstTable = datasetConfig.getDatasets().get(0);
+      if (firstTable.getTableBasePath() != null) {
+        try {
+          String tablePath = firstTable.getTableBasePath();
+          sourceFormat = DetectSourceType.detectFormat(tablePath, hadoopConf);
+          log.info(
+              "Source format was omitted in config. Auto-detected table format: {}", sourceFormat);
+        } catch (Exception e) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Source format %s is not supported. Known source and target formats are %s",
+                  sourceFormat, tableFormatConverters.getTableFormatConverters().keySet()));
+        }
+      }
+    }
+
     TableFormatConverters.ConversionConfig sourceConversionConfig =
         tableFormatConverters.getTableFormatConverters().get(sourceFormat);
-    if (sourceConversionConfig == null) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Source format %s is not supported. Known source and target formats are %s",
-              sourceFormat, tableFormatConverters.getTableFormatConverters().keySet()));
-    }
     String sourceProviderClass = sourceConversionConfig.conversionSourceProviderClass;
     ConversionSourceProvider<?> conversionSourceProvider =
         ReflectionUtils.createInstanceOfClass(sourceProviderClass);

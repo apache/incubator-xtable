@@ -40,7 +40,8 @@ public class DetectSourceType {
   }
 
   public static String detectFormat(String pathStr, Configuration conf) throws IOException {
-    Path basePath = new Path(pathStr);
+    String sanitizeBasePath = ExternalTable.sanitizeBasePath(pathStr);
+    Path basePath = new Path(sanitizeBasePath);
     FileSystem fs = basePath.getFileSystem(conf);
 
     if (!fs.exists(basePath)) {
