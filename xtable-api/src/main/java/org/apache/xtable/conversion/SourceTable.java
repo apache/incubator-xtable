@@ -46,16 +46,29 @@ public class SourceTable extends ExternalTable {
       String[] namespace,
       CatalogConfig catalogConfig,
       Properties additionalProperties,
-      Configuration conf) {
+      Configuration hadoopConf) {
+    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties);
+    this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
+    this.hadoopConf = hadoopConf;
+  }
+
+  public SourceTable(
+      @NonNull String name,
+      @NonNull String basePath,
+      String dataPath,
+      String[] namespace,
+      CatalogConfig catalogConfig,
+      Properties additionalProperties,
+      Configuration hadoopConf) {
     super(
         name,
-        formatName != null ? formatName : resolveFormatOrThrow(basePath, conf),
+        resolveFormatOrThrow(basePath, hadoopConf),
         basePath,
         namespace,
         catalogConfig,
         additionalProperties);
     this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
-    this.hadoopConf = conf;
+    this.hadoopConf = hadoopConf;
   }
 
   private static String resolveFormatOrThrow(String basePath, Configuration hadoopConf) {

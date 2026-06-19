@@ -65,7 +65,7 @@ class ExternalTable {
     this.additionalProperties = additionalProperties;
   }
 
-  public static String sanitizeBasePath(String tableBasePath) {
+  protected static String sanitizeBasePath(String tableBasePath) {
     Path path = new Path(tableBasePath);
     Preconditions.checkArgument(path.isAbsolute(), "Table base path must be absolute");
     if (path.isAbsoluteAndSchemeAuthorityNull()) {
