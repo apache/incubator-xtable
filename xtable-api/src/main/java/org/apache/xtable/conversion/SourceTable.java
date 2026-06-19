@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+ 
 package org.apache.xtable.conversion;
 
 import java.io.IOException;
@@ -35,24 +35,27 @@ public class SourceTable extends ExternalTable {
   /** The path to the data files, defaults to the basePath */
   @NonNull private final String dataPath;
 
+  private final transient Configuration hadoopConf;
+
   @Builder(toBuilder = true)
   public SourceTable(
-          String name,
-          String formatName,
-          String basePath,
-          String dataPath,
-          String[] namespace,
-          CatalogConfig catalogConfig,
-          Properties additionalProperties,
-          Configuration hadoopConf) {
+      String name,
+      String formatName,
+      String basePath,
+      String dataPath,
+      String[] namespace,
+      CatalogConfig catalogConfig,
+      Properties additionalProperties,
+      Configuration conf) {
     super(
-            name,
-            formatName != null ? formatName : resolveFormatOrThrow(basePath, hadoopConf),
-            basePath,
-            namespace,
-            catalogConfig,
-            additionalProperties);
+        name,
+        formatName != null ? formatName : resolveFormatOrThrow(basePath, conf),
+        basePath,
+        namespace,
+        catalogConfig,
+        additionalProperties);
     this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
+    this.hadoopConf = conf;
   }
 
   private static String resolveFormatOrThrow(String basePath, Configuration hadoopConf) {
