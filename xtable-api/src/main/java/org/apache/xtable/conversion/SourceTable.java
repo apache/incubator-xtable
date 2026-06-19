@@ -47,7 +47,7 @@ public class SourceTable extends ExternalTable {
       CatalogConfig catalogConfig,
       Properties additionalProperties,
       Configuration hadoopConf) {
-    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties);
+    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties, hadoopConf);
     this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
     this.hadoopConf = hadoopConf;
   }
@@ -66,7 +66,8 @@ public class SourceTable extends ExternalTable {
         basePath,
         namespace,
         catalogConfig,
-        additionalProperties);
+        additionalProperties,
+        hadoopConf);
     this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
     this.hadoopConf = hadoopConf;
   }

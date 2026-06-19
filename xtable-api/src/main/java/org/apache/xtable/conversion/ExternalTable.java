@@ -24,6 +24,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
 import com.google.common.base.Preconditions;
@@ -50,19 +51,23 @@ class ExternalTable {
   /** Optional, additional properties that can be used to define interactions with the table */
   protected final Properties additionalProperties;
 
+  protected final Configuration hadoopConf;
+
   ExternalTable(
       @NonNull String name,
       @NonNull String formatName,
       @NonNull String basePath,
       String[] namespace,
       CatalogConfig catalogConfig,
-      Properties additionalProperties) {
+      Properties additionalProperties,
+      Configuration hadoopConf) {
     this.name = name;
     this.formatName = formatName;
     this.basePath = sanitizeBasePath(basePath);
     this.namespace = namespace;
     this.catalogConfig = catalogConfig;
     this.additionalProperties = additionalProperties;
+    this.hadoopConf = hadoopConf;
   }
 
   protected static String sanitizeBasePath(String tableBasePath) {

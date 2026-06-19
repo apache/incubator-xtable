@@ -125,18 +125,31 @@ public class RunSync {
       Properties sourceProperties,
       Configuration hadoopConf)
       throws IOException {
-    SourceTable sourceTable =
-        SourceTable.builder()
-            .name(table.getTableName())
-            .basePath(table.getTableBasePath())
-            .namespace(table.getNamespace() == null ? null : table.getNamespace().split("\\."))
-            .dataPath(table.getTableDataPath())
-            .catalogConfig(catalogConfig)
-            .additionalProperties(sourceProperties)
-            .formatName(datasetConfig.sourceFormat)
-            .hadoopConf(hadoopConf)
-            .build();
-    return sourceTable;
+    if (datasetConfig.sourceFormat != null) {
+      SourceTable sourceTable =
+          SourceTable.builder()
+              .name(table.getTableName())
+              .basePath(table.getTableBasePath())
+              .namespace(table.getNamespace() == null ? null : table.getNamespace().split("\\."))
+              .dataPath(table.getTableDataPath())
+              .catalogConfig(catalogConfig)
+              .additionalProperties(sourceProperties)
+              .formatName(datasetConfig.sourceFormat)
+              .hadoopConf(hadoopConf)
+              .build();
+      return sourceTable;
+    } else {
+      SourceTable sourceTable =
+          new SourceTable(
+              table.getTableName(),
+              table.getTableBasePath(),
+              table.getTableDataPath(),
+              table.getNamespace() == null ? null : table.getNamespace().split("\\."),
+              catalogConfig,
+              sourceProperties,
+              hadoopConf);
+      return sourceTable;
+    }
   }
 
   static List<TargetTable> targetTableBuilder(
