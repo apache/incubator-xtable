@@ -73,7 +73,7 @@ public class SourceTable extends ExternalTable {
 
   private static String resolveFormatOrThrow(String basePath, Configuration hadoopConf) {
     try {
-      return DetectSourceType.detectFormat(basePath, hadoopConf);
+      return SourceTableFormatDetector.detectFormat(basePath, hadoopConf);
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to auto-detect source table format", e);
     }

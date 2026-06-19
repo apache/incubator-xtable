@@ -56,8 +56,8 @@ import org.apache.xtable.conversion.CatalogConfig;
 import org.apache.xtable.conversion.ConversionConfig;
 import org.apache.xtable.conversion.ConversionController;
 import org.apache.xtable.conversion.ConversionSourceProvider;
-import org.apache.xtable.conversion.DetectSourceType;
 import org.apache.xtable.conversion.SourceTable;
+import org.apache.xtable.conversion.SourceTableFormatDetector;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergCatalogConfig;
@@ -229,7 +229,7 @@ public class RunSync {
       if (firstTable.getTableBasePath() != null) {
         try {
           String tablePath = firstTable.getTableBasePath();
-          sourceFormat = DetectSourceType.detectFormat(tablePath, hadoopConf);
+          sourceFormat = SourceTableFormatDetector.detectFormat(tablePath, hadoopConf);
           log.info(
               "Source format was omitted in config. Auto-detected table format: {}", sourceFormat);
         } catch (Exception e) {

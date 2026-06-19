@@ -27,7 +27,9 @@ import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.hadoop.HadoopTables;
 
-public class DetectSourceType {
+import org.apache.xtable.model.storage.TableFormat;
+
+public class SourceTableFormatDetector {
   // helper method to detect input format
 
   public static String detectFormat(String pathStr, Configuration conf) throws IOException {
@@ -40,11 +42,11 @@ public class DetectSourceType {
     }
 
     if (fs.exists(new Path(basePath, "_delta_log"))) {
-      return "DELTA";
+      return TableFormat.DELTA;
     }
 
     if (fs.exists(new Path(basePath, ".hoodie"))) {
-      return "HUDI";
+      return TableFormat.HUDI;
     }
 
     // workaround for: .metadata can be set elsewhere
@@ -53,7 +55,7 @@ public class DetectSourceType {
       // if the path points to a valid Iceberg table (even with a custom metadata location),
       Table table = tables.load(pathStr);
       if (table != null) {
-        return "ICEBERG";
+        return TableFormat.ICEBERG;
       }
     } catch (Exception e) {
     }
