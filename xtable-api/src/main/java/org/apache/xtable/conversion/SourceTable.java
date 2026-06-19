@@ -1,24 +1,7 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
- 
 package org.apache.xtable.conversion;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Properties;
 
 import lombok.Builder;
@@ -36,22 +19,29 @@ public class SourceTable extends ExternalTable {
 
   @Builder(toBuilder = true)
   public SourceTable(
-      String name,
-      String formatName, // can be omitted in the yaml config file
-      String basePath,
-      String dataPath,
-      String[] namespace,
-      CatalogConfig catalogConfig,
-      Properties additionalProperties,
-      Configuration hadoopConf)
-      throws IOException {
+          String name,
+          String formatName,
+          String basePath,
+          String dataPath,
+          String[] namespace,
+          CatalogConfig catalogConfig,
+          Properties additionalProperties,
+          Configuration hadoopConf) {
     super(
-        name,
-        formatName != null ? formatName : DetectSourceType.detectFormat(basePath, hadoopConf),
-        basePath,
-        namespace,
-        catalogConfig,
-        additionalProperties);
+            name,
+            formatName != null ? formatName : resolveFormatOrThrow(basePath, hadoopConf),
+            basePath,
+            namespace,
+            catalogConfig,
+            additionalProperties);
     this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
+  }
+  
+  private static String resolveFormatOrThrow(String basePath, Configuration hadoopConf) {
+    try {
+      return DetectSourceType.detectFormat(basePath, hadoopConf);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to auto-detect source table format", e);
+    }
   }
 }
