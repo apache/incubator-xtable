@@ -24,8 +24,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
-import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.hadoop.HadoopTables;
 
 public class DetectSourceType {
   // helper method to detect input format

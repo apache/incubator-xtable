@@ -25,6 +25,7 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
+
 import org.apache.hadoop.conf.Configuration;
 
 @EqualsAndHashCode(callSuper = true)
@@ -35,19 +36,18 @@ public class SourceTable extends ExternalTable {
 
   @Builder(toBuilder = true)
   public SourceTable(
-          String name,
-          String formatName, // can be omitted in the yaml config file
-          String basePath,
-          String dataPath,
-          String[] namespace,
-          CatalogConfig catalogConfig,
-          Properties additionalProperties, Configuration hadoopConf
-      ) throws IOException {
+      String name,
+      String formatName, // can be omitted in the yaml config file
+      String basePath,
+      String dataPath,
+      String[] namespace,
+      CatalogConfig catalogConfig,
+      Properties additionalProperties,
+      Configuration hadoopConf)
+      throws IOException {
     super(
         name,
-        formatName != null
-            ? formatName
-            : DetectSourceType.detectFormat(basePath, hadoopConf),
+        formatName != null ? formatName : DetectSourceType.detectFormat(basePath, hadoopConf),
         basePath,
         namespace,
         catalogConfig,

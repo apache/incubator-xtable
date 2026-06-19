@@ -123,7 +123,8 @@ public class RunSync {
       CatalogConfig catalogConfig,
       @NonNull DatasetConfig datasetConfig,
       Properties sourceProperties,
-      Configuration hadoopConf) throws IOException {
+      Configuration hadoopConf)
+      throws IOException {
     SourceTable sourceTable =
         SourceTable.builder()
             .name(table.getTableName())
@@ -163,7 +164,8 @@ public class RunSync {
       List<String> tableFormatList,
       CatalogConfig catalogConfig,
       Configuration hadoopConf,
-      ConversionSourceProvider conversionSourceProvider) throws IOException {
+      ConversionSourceProvider conversionSourceProvider)
+      throws IOException {
     ConversionController conversionController = new ConversionController(hadoopConf);
     for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
       log.info(
