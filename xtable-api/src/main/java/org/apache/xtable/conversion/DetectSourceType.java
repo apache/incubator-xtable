@@ -24,20 +24,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
+import org.apache.iceberg.hadoop.HadoopTables;
+import org.apache.iceberg.Table;
+
 public class DetectSourceType {
   // helper method to detect input format
-  static String safeDetectFormat(String basePath, CatalogConfig catalogConfig) {
-    try {
-      Configuration conf = new Configuration();
-      // map props to hadoop's
-      if (catalogConfig != null && catalogConfig.getCatalogOptions() != null) {
-        catalogConfig.getCatalogOptions().forEach(conf::set);
-      }
-      return DetectSourceType.detectFormat(ExternalTable.sanitizeBasePath(basePath), conf);
-    } catch (IOException e) {
-      return "UNKNOWN";
-    }
-  }
 
   public static String detectFormat(String pathStr, Configuration conf) throws IOException {
     String sanitizeBasePath = ExternalTable.sanitizeBasePath(pathStr);
@@ -56,9 +47,15 @@ public class DetectSourceType {
       return "HUDI";
     }
 
-    Path icebergMetaDir = new Path(basePath, "metadata");
-    if (fs.exists(icebergMetaDir)) {
-      return "ICEBERG";
+    // workaround for: .metadata can be set elsewhere
+    try {
+      HadoopTables tables = new HadoopTables(conf);
+      // if the path points to a valid Iceberg table (even with a custom metadata location),
+      Table table = tables.load(pathStr);
+      if (table != null) {
+        return "ICEBERG";
+      }
+    } catch (Exception e) {
     }
 
     return "UNKNOWN";

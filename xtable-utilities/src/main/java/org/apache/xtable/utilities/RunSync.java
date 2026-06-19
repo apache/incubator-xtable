@@ -122,7 +122,8 @@ public class RunSync {
       @NonNull DatasetConfig.Table table,
       CatalogConfig catalogConfig,
       @NonNull DatasetConfig datasetConfig,
-      Properties sourceProperties) {
+      Properties sourceProperties,
+      Configuration hadoopConf) throws IOException {
     SourceTable sourceTable =
         SourceTable.builder()
             .name(table.getTableName())
@@ -132,6 +133,7 @@ public class RunSync {
             .catalogConfig(catalogConfig)
             .additionalProperties(sourceProperties)
             .formatName(datasetConfig.sourceFormat)
+            .hadoopConf(hadoopConf)
             .build();
     return sourceTable;
   }
@@ -161,7 +163,7 @@ public class RunSync {
       List<String> tableFormatList,
       CatalogConfig catalogConfig,
       Configuration hadoopConf,
-      ConversionSourceProvider conversionSourceProvider) {
+      ConversionSourceProvider conversionSourceProvider) throws IOException {
     ConversionController conversionController = new ConversionController(hadoopConf);
     for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
       log.info(
@@ -175,7 +177,7 @@ public class RunSync {
       }
 
       SourceTable sourceTable =
-          sourceTableBuilder(table, catalogConfig, datasetConfig, sourceProperties);
+          sourceTableBuilder(table, catalogConfig, datasetConfig, sourceProperties, hadoopConf);
       List<TargetTable> targetTables = targetTableBuilder(table, catalogConfig, tableFormatList);
       ConversionConfig conversionConfig =
           ConversionConfig.builder()
