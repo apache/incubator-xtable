@@ -5,7 +5,7 @@ Per (table, target), checks that the expected metadata exists at tableBasePath
 AND is newer than the run start timestamp:
   DELTA   -> _delta_log/*.json
   ICEBERG -> metadata/*.metadata.json
-  HUDI    -> .hoodie timeline files (.commit/.deltacommit/.replacecommit, incl. .hoodie/timeline/)
+  HUDI    -> .hoodie timeline instants (.commit/.deltacommit/.replacecommit, incl. .hoodie/timeline/)
 
 Local paths: checked directly. s3:// or s3a://: aws CLI. Other schemes: hadoop fs.
 If no tooling/access -> storage_status = "not_possible" -> verdict UNVERIFIED.
@@ -25,7 +25,7 @@ import sys
 METADATA_CHECKS = {
     "DELTA":   {"subdir": "_delta_log",  "pattern": r"\.json$"},
     "ICEBERG": {"subdir": "metadata",    "pattern": r"\.metadata\.json$"},
-    "HUDI":    {"subdir": ".hoodie",     "pattern": r"(\.commit|\.deltacommit|\.replacecommit|hoodie\.properties)$"},
+    "HUDI":    {"subdir": ".hoodie",     "pattern": r"\.(commit|deltacommit|replacecommit)$"},
 }
 
 # Patterns used to detect new commits on the SOURCE side (local paths only).
@@ -83,7 +83,7 @@ def check_s3(base, target, start_epoch):
         return "missing", f"no matching metadata at {url}"
     import datetime
     try:
-        ts = datetime.datetime.strptime(newest[0], "%Y-%m-%d %H:%M:%S").timestamp()
+        ts = datetime.datetime.strptime(newest[0], "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone.utc).timestamp()
         if ts >= start_epoch - 120:  # tolerance for clock/listing-time skew
             return "fresh", f"{newest[1]} ({newest[0]})"
         return "stale", f"newest {newest[1]} at {newest[0]}, older than run start"

@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir -p /tmp/xtable_run*)",
+      "Bash(mktemp -d /tmp/xtable_run_*)",
       "Bash(python3 .claude/skills/xtable-converter/scripts/*)",
       "Bash(java -cp *)",
       "Bash(find ~/.m2/repository/org/openjdk/jol*)",

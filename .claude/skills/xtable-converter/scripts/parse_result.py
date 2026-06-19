@@ -103,9 +103,9 @@ def main():
         mentions = [(i, ln) for i, ln in enumerate(lines) if any(b in ln for b in ident_bits)]
         for tgt in targets:
             status, message = "unknown", None
-            # error lines mentioning the table, or table mentions inside a stack-trace window
+            # error lines mentioning both this table and this specific target
             for i, ln in mentions:
-                if error_re.search(ln):
+                if error_re.search(ln) and (tgt.lower() in ln.lower() or len(targets) == 1):
                     status, message = "error", ln.strip()
                     break
             if status == "unknown":

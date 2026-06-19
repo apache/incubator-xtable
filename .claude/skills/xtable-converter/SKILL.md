@@ -58,8 +58,7 @@ datasets:
 Write it to disk immediately — do not wait for confirmation:
 
 ```
-RUN_DIR=/tmp/xtable_run
-mkdir -p $RUN_DIR
+RUN_DIR=$(mktemp -d /tmp/xtable_run_$(date -u +%Y%m%d_%H%M%SZ).XXXXXX)
 # write config.yaml to $RUN_DIR/config.yaml
 ```
 
@@ -68,30 +67,31 @@ Show the YAML in the same message that reports the conversion result.
 ### Step 3 — Run the conversion
 
 ```bash
-bash scripts/run_xtable.sh /tmp/xtable_run/config.yaml \
+bash .claude/skills/xtable-converter/scripts/run_xtable.sh "$RUN_DIR/config.yaml" \
   [--hadoopConfig path] [--icebergCatalogConfig path] [--convertersConfig path]
 ```
 
-The wrapper locates the bundled jar (env var `XTABLE_JAR`, or searches `xtable-utilities*/target` and the current dir), records the run start timestamp, streams the jar output to `/tmp/xtable_run/run_<ts>.log`, and writes `/tmp/xtable_run/run_meta.json` (exit code, log path, start epoch). It requires Java 11+. A non-zero exit code means the whole run FAILED — still continue to Step 4 to extract the reason.
+The wrapper locates the bundled jar (env var `XTABLE_JAR`, or searches `xtable-utilities*/target` and the current dir), records the run start timestamp, streams the jar output to `$RUN_DIR/run_<ts>.log`, and writes `$RUN_DIR/run_meta.json` (exit code, log path, start epoch). It requires Java 11+. A non-zero exit code means the whole run FAILED — still continue to Step 4 to extract the reason.
 
 **Known issue — `jol-core` missing from bundled jar:** If the run fails with `NoClassDefFoundError: org/openjdk/jol/info/GraphLayout`, bypass `run_xtable.sh` and invoke the jar directly with `jol-core` on the classpath:
 
 ```bash
 JOL_JAR=$(find ~/.m2/repository/org/openjdk/jol -name "jol-core-*.jar" | grep -v sources | head -1)
 XTABLE_JAR=<path-to-bundled.jar>
+JAVA11_HOME=<path-to-java11>   # e.g. /opt/homebrew/Cellar/openjdk@11/11.0.25/libexec/openjdk.jdk/Contents/Home
 TS=$(date +%s)
-LOG=/tmp/xtable_run/run_${TS}.log
-java -cp "$XTABLE_JAR:$JOL_JAR" org.apache.xtable.utilities.RunSync \
-  --datasetConfig /tmp/xtable_run/config.yaml > "$LOG" 2>&1
+LOG=$RUN_DIR/run_${TS}.log
+PATH="$JAVA11_HOME/bin:$PATH" java -cp "$XTABLE_JAR:$JOL_JAR" org.apache.xtable.utilities.RunSync \
+  --datasetConfig "$RUN_DIR/config.yaml" > "$LOG" 2>&1
 EXIT=$?
-printf '{"exit_code": %s, "log": "%s", "start_epoch": %s, "config": "/tmp/xtable_run/config.yaml"}\n' \
-  "$EXIT" "$LOG" "$TS" > /tmp/xtable_run/run_meta.json
+printf '{"exit_code": %s, "log": "%s", "start_epoch": %s, "config": "%s/config.yaml"}\n' \
+  "$EXIT" "$LOG" "$TS" "$RUN_DIR" > "$RUN_DIR/run_meta.json"
 ```
 
 ### Step 4 — Parse the log for per-table outcomes
 
 ```bash
-python3 scripts/parse_result.py /tmp/xtable_run/run_meta.json --config /tmp/xtable_run/config.yaml
+python3 .claude/skills/xtable-converter/scripts/parse_result.py "$RUN_DIR/run_meta.json" --config "$RUN_DIR/config.yaml"
 ```
 
 Outputs `log_results.json`: one record per (table, target) with `log_status` of `ok`, `error`, or `unknown`, plus the captured error message. Log markers are version-dependent — if you see many `unknown` statuses, read `references/troubleshooting.md` (section "Pinning log markers") and rely on Step 5 as ground truth.
@@ -99,9 +99,9 @@ Outputs `log_results.json`: one record per (table, target) with `log_status` of 
 ### Step 5 — Verify against storage and produce the final verdict
 
 ```bash
-python3 scripts/verify.py /tmp/xtable_run/run_meta.json \
-  --log-results /tmp/xtable_run/log_results.json \
-  --config /tmp/xtable_run/config.yaml
+python3 .claude/skills/xtable-converter/scripts/verify.py "$RUN_DIR/run_meta.json" \
+  --log-results "$RUN_DIR/log_results.json" \
+  --config "$RUN_DIR/config.yaml"
 ```
 
 For each (table, target) the script checks that the expected metadata exists at the target path **and is newer than the run start**: `_delta_log/*.json` for DELTA, `metadata/*.metadata.json` for ICEBERG, `.hoodie` timeline for HUDI. Local paths are checked directly; `s3://` via aws CLI; other schemes via `hadoop fs` if available. It merges with the log results into `final_report.json` using this verdict matrix:
