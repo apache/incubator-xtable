@@ -1126,6 +1126,7 @@ public class ITConversionController {
             .basePath(table.getBasePath())
             .dataPath(table.getDataPath())
             .additionalProperties(sourceProperties)
+            .hadoopConf(jsc.hadoopConfiguration())
             .build();
 
     List<TargetTable> targetTables =
@@ -1138,6 +1139,7 @@ public class ITConversionController {
                         // set the metadata path to the data path as the default (required by Hudi)
                         .basePath(table.getDataPath())
                         .metadataRetention(metadataRetention)
+                        .hadoopConf(jsc.hadoopConfiguration())
                         .build())
             .collect(Collectors.toList());
 
