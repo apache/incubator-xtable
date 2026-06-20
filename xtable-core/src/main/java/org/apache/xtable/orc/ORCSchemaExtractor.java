@@ -52,14 +52,15 @@ public class ORCSchemaExtractor {
 
     private static boolean isNullable(TypeDescription schema) {
         List<TypeDescription> subFields = schema.getChildren();
+        if (subFields == null) return false;
+
         for (TypeDescription subField : subFields) {
-            if (subField.equals(null)) {
+            if (subField == null) { 
                 return true;
             }
         }
         return false;
     }
-
     /**
      * Converts the ORC {@link } to {@link InternalSchema}.
      *
