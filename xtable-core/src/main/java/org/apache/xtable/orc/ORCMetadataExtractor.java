@@ -15,23 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+ 
 package org.apache.xtable.orc;
+
 import java.io.IOException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.orc.OrcFile;
 import org.apache.orc.Reader;
 import org.apache.orc.TypeDescription;
 
-
 public class ORCMetadataExtractor {
-    private static final ORCMetadataExtractor INSTANCE = new ORCMetadataExtractor();
-    public static ORCMetadataExtractor getInstance() {
-        return INSTANCE;
-    }
-    public static TypeDescription getSchema(Configuration conf,Path filePath) throws IOException {
-        Reader reader = OrcFile.createReader(filePath, OrcFile.readerOptions(conf));
-        return reader.getSchema();
+  private static final ORCMetadataExtractor INSTANCE = new ORCMetadataExtractor();
 
-    }
+  public static ORCMetadataExtractor getInstance() {
+    return INSTANCE;
+  }
+
+  public static TypeDescription getSchema(Configuration conf, Path filePath) throws IOException {
+    Reader reader = OrcFile.createReader(filePath, OrcFile.readerOptions(conf));
+    return reader.getSchema();
+  }
 }

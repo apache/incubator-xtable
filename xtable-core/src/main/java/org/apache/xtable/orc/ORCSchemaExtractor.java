@@ -15,163 +15,211 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+ 
 package org.apache.xtable.orc;
 
-
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
+import org.apache.orc.TypeDescription;
 
 import org.apache.xtable.exception.UnsupportedSchemaTypeException;
 import org.apache.xtable.model.schema.InternalField;
 import org.apache.xtable.model.schema.InternalSchema;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.schema.SchemaUtils;
-import org.apache.orc.TypeDescription;
 
-/**
- * Class that converts Avro Schema {@link } to Canonical Schema {@link InternalSchema} and
- * vice-versa. This conversion is fully reversible and there is a strict 1 to 1 mapping between avro
- * data types and canonical data types.
- */
+/** Class that converts ORC Schema to Canonical Schema {@link InternalSchema} and vice-versa. */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ORCSchemaExtractor {
-    private static final org.apache.xtable.orc.ORCSchemaExtractor INSTANCE = new org.apache.xtable.orc.ORCSchemaExtractor();
+  private static final org.apache.xtable.orc.ORCSchemaExtractor INSTANCE =
+      new org.apache.xtable.orc.ORCSchemaExtractor();
 
-    public static org.apache.xtable.orc.ORCSchemaExtractor getInstance() {
-        return INSTANCE;
+  public static org.apache.xtable.orc.ORCSchemaExtractor getInstance() {
+    return INSTANCE;
+  }
+
+  private static boolean isNullable(TypeDescription schema) {
+    List<TypeDescription> subFields = schema.getChildren();
+    if (subFields == null) return false;
+
+    for (TypeDescription subField : subFields) {
+      if (subField == null) {
+        return true;
+      }
     }
+    return false;
+  }
 
-    private static boolean isNullable(TypeDescription schema) {
-        List<TypeDescription> subFields = schema.getChildren();
-        if (subFields == null) return false;
+  /**
+   * Converts the ORC to {@link InternalSchema}.
+   *
+   * @param schema The schema being converted
+   * @param parentPath If this schema is nested within another, this will be a dot separated string
+   *     representing the path from the top most field to the current schema.
+   * @return a converted schema
+   */
+  private InternalSchema toInternalSchema(TypeDescription schema, String parentPath) {
+    InternalType newDataType;
+    Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
+    switch (schema.getCategory()) {
+      case INT:
+        newDataType = InternalType.INT;
+        break;
+      case DATE:
+        newDataType = InternalType.DATE;
+        break;
+      case LONG:
+        newDataType = InternalType.LONG;
+        break;
+      case TIMESTAMP:
+        newDataType = InternalType.TIMESTAMP;
+        metadata.put(
+            InternalSchema.MetadataKey.TIMESTAMP_PRECISION, InternalSchema.MetadataValue.MICROS);
+        break;
+      case DECIMAL:
+        newDataType = InternalType.DECIMAL;
+        metadata.put(InternalSchema.MetadataKey.DECIMAL_PRECISION, schema.getPrecision());
+        metadata.put(InternalSchema.MetadataKey.DECIMAL_SCALE, schema.getScale());
+        break;
+      case STRUCT:
+        List<TypeDescription> fieldTypes = schema.getChildren();
+        List<String> fieldNames = schema.getFieldNames();
+        List<InternalField> subFields = new ArrayList<>(fieldTypes.size());
 
-        for (TypeDescription subField : subFields) {
-            if (subField == null) { 
-                return true;
-            }
-        }
-        return false;
-    }
-    /**
-     * Converts the ORC {@link } to {@link InternalSchema}.
-     *
-     * @param schema     The schema being converted
-     * @param parentPath If this schema is nested within another, this will be a dot separated string
-     *                   representing the path from the top most field to the current schema.
-     * @return a converted schema
-     */
-    //TODO other types and precision and scale for decimal types
-    private InternalSchema toInternalSchema(
-            TypeDescription schema, String parentPath) {
-        InternalType newDataType;
-        Map<InternalSchema.MetadataKey, Object> metadata = new HashMap<>();
-        switch (schema.
-                getCategory()) {
-            case INT:
-                newDataType = InternalType.INT;
-                break;
-            case STRING:
-                newDataType = InternalType.STRING;
-                break;
-            case BOOLEAN:
-                newDataType = InternalType.BOOLEAN;
-                break;
-            case BYTE:
-                newDataType = InternalType.BYTES;
-                break;
-            case DOUBLE:
-                newDataType = InternalType.DOUBLE;
-                break;
-            case FLOAT:
-                newDataType = InternalType.FLOAT;
-                break;
-            case LONG:
-                newDataType = InternalType.LONG;
-                break;
-            case DECIMAL:
-                newDataType = InternalType.DECIMAL;
-                break;
-            case LIST:
-                int childId = schema.getId();
-                InternalSchema elementSchema =
-                        toInternalSchema(
-                                schema,
-                                SchemaUtils.getFullyQualifiedPath(
-                                        parentPath, InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                        );
-                InternalField elementField =
-                        InternalField.builder()
-                                .name(InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME)
-                                .parentPath(parentPath)
-                                .schema(elementSchema)
-                                .fieldId(childId)
-                                .build();
-                return InternalSchema.builder()
-                        .name(schema.getFullFieldName())
-                        .dataType(InternalType.LIST)
-                        .comment(schema.toString())
-                        .isNullable(isNullable(schema))
-                        .fields(Collections.singletonList(elementField))
-                        .build();
-            case UNION:
-            default:
-                throw new UnsupportedSchemaTypeException(
-                        String.format("Unsupported schema type %s", schema));
+        for (int i = 0; i < fieldTypes.size(); i++) {
+          TypeDescription childSchema = fieldTypes.get(i);
+          String fieldName = fieldNames.get(i);
+
+          InternalSchema subFieldSchema =
+              toInternalSchema(
+                  childSchema, SchemaUtils.getFullyQualifiedPath(parentPath, fieldName));
+
+          subFields.add(
+              InternalField.builder()
+                  .parentPath(parentPath)
+                  .name(fieldName)
+                  .schema(subFieldSchema)
+                  .fieldId(childSchema.getId())
+                  .build());
         }
         return InternalSchema.builder()
-                .name(schema.getFullFieldName())
-                .dataType(newDataType)
-                .comment(schema.toString())
-                .isNullable(isNullable(schema))
-                .metadata(metadata.isEmpty() ? null : metadata)
-                .build();
+            .name(schema.getFullFieldName())
+            .dataType(InternalType.RECORD)
+            .fields(subFields)
+            .isNullable(true)
+            .build();
+      default:
+        throw new UnsupportedSchemaTypeException(
+            String.format("Unsupported schema type category %s", schema.getCategory()));
     }
 
-    // TODO refine fromInternalSchema types
-    public TypeDescription fromInternalSchema(InternalSchema internalSchema, String currentPath) {
-        TypeDescription type = null;
-        String fieldName = internalSchema.getName();
-        InternalType internalType = internalSchema.getDataType();
-        switch (internalType) {
-            case BOOLEAN:
-                type = TypeDescription.createBoolean();
-                break;
-            case INT:
-                type = TypeDescription.createInt();
-                break;
-            case LONG:
-                type = TypeDescription.createLong();
-                break;
-            case STRING:
-                type = TypeDescription.createString();
-                break;
-            case FLOAT:
-                type = TypeDescription.createFloat();
-                break;
-            case DECIMAL:
-                type = TypeDescription.createDecimal();
-                break;
-            case DATE:
-                type = TypeDescription.createDate();
-                break;
-            case TIMESTAMP:
-                type = TypeDescription.createTimestamp();
-                break;
-            default:
-                throw new UnsupportedSchemaTypeException(
-                        "Encountered unhandled type during InternalSchema to ORC conversion:"
-                                + internalType);
+    return InternalSchema.builder()
+        .name(schema.getFullFieldName())
+        .dataType(newDataType)
+        .comment(schema.toString())
+        .isNullable(isNullable(schema))
+        .metadata(metadata.isEmpty() ? null : metadata)
+        .build();
+  }
+
+  public TypeDescription fromInternalSchema(InternalSchema internalSchema, String currentPath) {
+    if (internalSchema == null) {
+      return null;
+    }
+
+    TypeDescription type;
+    InternalType internalType = internalSchema.getDataType();
+
+    switch (internalType) {
+      case BOOLEAN:
+        type = TypeDescription.createBoolean();
+        break;
+      case INT:
+        type = TypeDescription.createInt();
+        break;
+      case LONG:
+        type = TypeDescription.createLong();
+        break;
+      case STRING:
+        type = TypeDescription.createString();
+        break;
+      case FLOAT:
+        type = TypeDescription.createFloat();
+        break;
+      case DOUBLE:
+        type = TypeDescription.createDouble();
+        break;
+      case DATE:
+        type = TypeDescription.createDate();
+        break;
+      case TIMESTAMP:
+      case TIMESTAMP_NTZ:
+        type = TypeDescription.createTimestamp();
+        break;
+      case DECIMAL:
+        int precision =
+            (int)
+                internalSchema
+                    .getMetadata()
+                    .getOrDefault(InternalSchema.MetadataKey.DECIMAL_PRECISION, 38);
+        int scale =
+            (int)
+                internalSchema
+                    .getMetadata()
+                    .getOrDefault(InternalSchema.MetadataKey.DECIMAL_SCALE, 10);
+        type = TypeDescription.createDecimal().withPrecision(precision).withScale(scale);
+        break;
+      case RECORD:
+        type = TypeDescription.createStruct();
+        if (internalSchema.getFields() != null) {
+          for (InternalField field : internalSchema.getFields()) {
+            String fieldPath = SchemaUtils.getFullyQualifiedPath(currentPath, field.getName());
+            TypeDescription fieldType = fromInternalSchema(field.getSchema(), fieldPath);
+            type.addField(field.getName(), fieldType);
+          }
         }
-        return type;
-    }
-}
+        break;
+      case LIST:
+        InternalField elementField =
+            internalSchema.getFields().stream()
+                .filter(
+                    field ->
+                        InternalField.Constants.ARRAY_ELEMENT_FIELD_NAME.equals(field.getName()))
+                .findFirst()
+                .orElseThrow(() -> new UnsupportedSchemaTypeException("Invalid array schema"));
 
+        TypeDescription elementType =
+            fromInternalSchema(elementField.getSchema(), elementField.getPath());
+        type = TypeDescription.createList(elementType);
+        break;
+      case MAP:
+        InternalField valueField =
+            internalSchema.getFields().stream()
+                .filter(
+                    field -> InternalField.Constants.MAP_VALUE_FIELD_NAME.equals(field.getName()))
+                .findFirst()
+                .orElseThrow(() -> new UnsupportedSchemaTypeException("Invalid map schema"));
+
+        TypeDescription keyType = TypeDescription.createString();
+        TypeDescription valueType =
+            fromInternalSchema(valueField.getSchema(), valueField.getPath());
+        type = TypeDescription.createMap(keyType, valueType);
+        break;
+      case BYTES:
+      case FIXED:
+      case UUID:
+        type = TypeDescription.createBinary();
+        break;
+      default:
+        throw new UnsupportedSchemaTypeException(
+            "Encountered unhandled type during InternalSchema to ORC conversion: " + internalType);
+    }
+    return type;
+  }
+}
