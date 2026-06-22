@@ -498,11 +498,8 @@ public class TestDeltaPartitionExtractor {
 
   @Test
   public void testGeneratedPartitionValueExtractionWithNullSource() {
-    // A composite (generated column) partition is derived from a single source column (e.g. year,
-    // month and day generated from one timestamp column). When the source value is null all of the
-    // derived component values are null in the Delta partition values. The partition value must
-    // resolve to null rather than a string containing the literal "null" (e.g. "null-null-null")
-    // which would then fail date parsing.
+    // Composite partition whose components (year/month/day) are all null must resolve to a null
+    // partition value, not the literal "null-null-null".
     Map<String, String> partitionValuesMap =
         new HashMap<String, String>() {
           {

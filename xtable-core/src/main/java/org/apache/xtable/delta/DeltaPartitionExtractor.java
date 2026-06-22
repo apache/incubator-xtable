@@ -326,15 +326,11 @@ public class DeltaPartitionExtractor {
     if (partitionFieldNames.size() == 1) {
       return values.getOrDefault(partitionFieldNames.get(0), null);
     }
-    // Composite partition (e.g. year and month generated columns derived from a single source
-    // field). If any component value is missing the partition value cannot be reconstructed, so
-    // return null instead of joining into a string containing the literal "null".
+    // Composite partition: any null component yields a null value, not joined "null"s.
     if (partitionFieldNames.stream().anyMatch(name -> values.get(name) == null)) {
       return null;
     }
-    return partitionFieldNames.stream()
-        .map(values::get)
-        .collect(Collectors.joining("-"));
+    return partitionFieldNames.stream().map(values::get).collect(Collectors.joining("-"));
   }
 
   private String getGeneratedColumnName(InternalPartitionField internalPartitionField) {

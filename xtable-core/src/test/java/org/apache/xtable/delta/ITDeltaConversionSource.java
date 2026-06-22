@@ -18,6 +18,9 @@
  
 package org.apache.xtable.delta;
 
+import static org.apache.spark.sql.types.DataTypes.IntegerType;
+import static org.apache.spark.sql.types.DataTypes.LongType;
+import static org.apache.spark.sql.types.DataTypes.TimestampType;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -51,6 +54,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import io.delta.tables.DeltaTable;
 
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestSparkDeltaTable;
@@ -370,29 +375,38 @@ public class ITDeltaConversionSource {
 
   @Test
   void getCurrentSnapshotGenColPartitionedWithNullSourceTest() {
-    // Reproduces partition value corruption for a composite generated-column partition. The
-    // year/month/day partition columns are all generated from a single source column, so a row
-    // whose source value is null produces null for every component. The extractor must resolve
-    // such a partition value to null instead of joining the components into a string containing
-    // the literal "null" (e.g. "null-null-null") and then failing to parse it as a date.
+    // year/month/day partition columns generated from one source column; a null source produces a
+    // null component for each, which must resolve to a null partition value, not "null-null-null".
     final String tableName = GenericTable.getTableName();
     final Path basePath = tempDir.resolve(tableName);
-    sparkSession.sql(
-        "CREATE TABLE `"
-            + tableName
-            + "` (id BIGINT, event_time TIMESTAMP,"
-            + " year_col INT GENERATED ALWAYS AS (YEAR(event_time)),"
-            + " month_col INT GENERATED ALWAYS AS (MONTH(event_time)),"
-            + " day_col INT GENERATED ALWAYS AS (DAY(event_time)))"
-            + " USING DELTA PARTITIONED BY (year_col, month_col, day_col) LOCATION '"
-            + basePath
-            + "'");
-    // One row with a valid timestamp and one row whose timestamp (and therefore every generated
-    // partition column) is null.
+    // Builder API, not CREATE TABLE SQL: Spark 3.4 rejects generated partition columns via SQL.
+    DeltaTable.createIfNotExists(sparkSession)
+        .tableName(tableName)
+        .location(basePath.toString())
+        .addColumn("id", LongType)
+        .addColumn("event_time", TimestampType)
+        .addColumn(
+            DeltaTable.columnBuilder("year_col")
+                .dataType(IntegerType)
+                .generatedAlwaysAs("YEAR(event_time)")
+                .build())
+        .addColumn(
+            DeltaTable.columnBuilder("month_col")
+                .dataType(IntegerType)
+                .generatedAlwaysAs("MONTH(event_time)")
+                .build())
+        .addColumn(
+            DeltaTable.columnBuilder("day_col")
+                .dataType(IntegerType)
+                .generatedAlwaysAs("DAY(event_time)")
+                .build())
+        .partitionedBy("year_col", "month_col", "day_col")
+        .execute();
+    // Second row has a null timestamp, so every generated partition column is null.
     sparkSession.sql(
         "INSERT INTO TABLE `"
             + tableName
-            + "` VALUES (1, CAST('2013-08-20 00:00:00' AS TIMESTAMP)),"
+            + "` (id, event_time) VALUES (1, CAST('2013-08-20 00:00:00' AS TIMESTAMP)),"
             + " (2, CAST(NULL AS TIMESTAMP))");
 
     SourceTable tableConfig =
@@ -404,7 +418,6 @@ public class ITDeltaConversionSource {
     DeltaConversionSource conversionSource =
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
 
-    // Before the fix this call throws while parsing the "null-null-null" partition value.
     InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
 
     List<InternalDataFile> dataFiles =
@@ -413,8 +426,7 @@ public class ITDeltaConversionSource {
             .collect(Collectors.toList());
     assertEquals(2, dataFiles.size());
 
-    // Exactly one file belongs to the null-source partition and its composite partition value is
-    // null rather than a corrupted, parsed-from-"null" value.
+    // Exactly one file is in the null-source partition, with a null partition value.
     long nullPartitionFiles =
         dataFiles.stream()
             .filter(
