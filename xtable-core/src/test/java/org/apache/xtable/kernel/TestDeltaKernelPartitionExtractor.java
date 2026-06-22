@@ -514,6 +514,64 @@ public class TestDeltaKernelPartitionExtractor {
   }
 
   @Test
+  public void testGeneratedPartitionValueExtractionWithNullSource() {
+    // Composite partition whose components (year/month/day) are all null must resolve to a null
+    // partition value, not the literal "null-null-null".
+    Map<String, String> partitionValuesMap =
+        new HashMap<String, String>() {
+          {
+            put("partition_column1", "partition_value1");
+            put("year_partition_column", null);
+            put("month_partition_column", null);
+            put("day_partition_column", null);
+          }
+        };
+    InternalPartitionField internalPartitionField1 =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("partition_column1")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    InternalPartitionField internalPartitionField2 =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("some_date_column")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("timestamp")
+                            .dataType(InternalType.TIMESTAMP)
+                            .build())
+                    .build())
+            .partitionFieldNames(
+                Arrays.asList(
+                    "year_partition_column", "month_partition_column", "day_partition_column"))
+            .transformType(PartitionTransformType.DAY)
+            .build();
+    List<PartitionValue> expectedPartitionValues =
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(internalPartitionField1)
+                .range(Range.scalar("partition_value1"))
+                .build(),
+            PartitionValue.builder()
+                .partitionField(internalPartitionField2)
+                .range(Range.scalar(null))
+                .build());
+    List<PartitionValue> partitionValues =
+        deltaKernelPartitionExtractor.partitionValueExtraction(
+            partitionValuesMap, Arrays.asList(internalPartitionField1, internalPartitionField2));
+    assertEquals(expectedPartitionValues, partitionValues);
+  }
+
+  @Test
   void convertBucketPartition() {
     InternalPartitionField internalPartitionField =
         InternalPartitionField.builder()

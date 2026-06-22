@@ -18,6 +18,9 @@
  
 package org.apache.xtable.delta;
 
+import static org.apache.spark.sql.types.DataTypes.IntegerType;
+import static org.apache.spark.sql.types.DataTypes.LongType;
+import static org.apache.spark.sql.types.DataTypes.TimestampType;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -51,6 +54,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import io.delta.tables.DeltaTable;
 
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestSparkDeltaTable;
@@ -366,6 +371,70 @@ public class ITDeltaConversionSource {
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
     // Get current snapshot
     InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
+  }
+
+  @Test
+  void getCurrentSnapshotGenColPartitionedWithNullSourceTest() {
+    // year/month/day partition columns generated from one source column; a null source produces a
+    // null component for each, which must resolve to a null partition value, not "null-null-null".
+    final String tableName = GenericTable.getTableName();
+    final Path basePath = tempDir.resolve(tableName);
+    // Builder API, not CREATE TABLE SQL: Spark 3.4 rejects generated partition columns via SQL.
+    DeltaTable.createIfNotExists(sparkSession)
+        .tableName(tableName)
+        .location(basePath.toString())
+        .addColumn("id", LongType)
+        .addColumn("event_time", TimestampType)
+        .addColumn(
+            DeltaTable.columnBuilder("year_col")
+                .dataType(IntegerType)
+                .generatedAlwaysAs("YEAR(event_time)")
+                .build())
+        .addColumn(
+            DeltaTable.columnBuilder("month_col")
+                .dataType(IntegerType)
+                .generatedAlwaysAs("MONTH(event_time)")
+                .build())
+        .addColumn(
+            DeltaTable.columnBuilder("day_col")
+                .dataType(IntegerType)
+                .generatedAlwaysAs("DAY(event_time)")
+                .build())
+        .partitionedBy("year_col", "month_col", "day_col")
+        .execute();
+    // Second row has a null timestamp, so every generated partition column is null.
+    sparkSession.sql(
+        "INSERT INTO TABLE `"
+            + tableName
+            + "` (id, event_time) VALUES (1, CAST('2013-08-20 00:00:00' AS TIMESTAMP)),"
+            + " (2, CAST(NULL AS TIMESTAMP))");
+
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
+            .build();
+    DeltaConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+
+    InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
+
+    List<InternalDataFile> dataFiles =
+        snapshot.getPartitionedDataFiles().stream()
+            .flatMap(group -> group.getDataFiles().stream())
+            .collect(Collectors.toList());
+    assertEquals(2, dataFiles.size());
+
+    // Exactly one file is in the null-source partition, with a null partition value.
+    long nullPartitionFiles =
+        dataFiles.stream()
+            .filter(
+                file ->
+                    file.getPartitionValues().stream()
+                        .anyMatch(pv -> pv.getRange().getMaxValue() == null))
+            .count();
+    assertEquals(1, nullPartitionFiles);
   }
 
   @ParameterizedTest
