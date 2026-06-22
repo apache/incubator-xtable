@@ -16,25 +16,25 @@
  * limitations under the License.
  */
  
-package org.apache.xtable.model.catalog;
+package org.apache.xtable.orc;
 
-/**
- * Represents a hierarchical table identifier, often including catalog, database (or schema), and
- * table names. Some catalogs may omit the catalog name.
- */
-public interface HierarchicalTableIdentifier extends CatalogTableIdentifier {
-  /**
-   * @return the catalog name if present, otherwise null
-   */
-  String getCatalogName();
+import java.io.IOException;
 
-  /**
-   * @return the database (or schema) name; required
-   */
-  String getDatabaseName();
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.orc.OrcFile;
+import org.apache.orc.Reader;
+import org.apache.orc.TypeDescription;
 
-  /**
-   * @return the table name; required
-   */
-  String getTableName();
+public class ORCMetadataExtractor {
+  private static final ORCMetadataExtractor INSTANCE = new ORCMetadataExtractor();
+
+  public static ORCMetadataExtractor getInstance() {
+    return INSTANCE;
+  }
+
+  public static TypeDescription getSchema(Configuration conf, Path filePath) throws IOException {
+    Reader reader = OrcFile.createReader(filePath, OrcFile.readerOptions(conf));
+    return reader.getSchema();
+  }
 }
