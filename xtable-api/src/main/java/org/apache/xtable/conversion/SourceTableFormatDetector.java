@@ -19,6 +19,8 @@
 package org.apache.xtable.conversion;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -37,29 +39,38 @@ public class SourceTableFormatDetector {
     Path basePath = new Path(sanitizeBasePath);
     FileSystem fs = basePath.getFileSystem(conf);
 
-    if (!fs.exists(basePath)) {
-      return "UNKNOWN";
-    }
+    List<String> matches = new ArrayList<>();
 
     if (fs.exists(new Path(basePath, "_delta_log"))) {
-      return TableFormat.DELTA;
+      matches.add(TableFormat.DELTA);
     }
 
     if (fs.exists(new Path(basePath, ".hoodie"))) {
-      return TableFormat.HUDI;
+      matches.add(TableFormat.HUDI);
     }
 
-    // workaround for: .metadata can be set elsewhere
     try {
       HadoopTables tables = new HadoopTables(conf);
-      // if the path points to a valid Iceberg table (even with a custom metadata location),
       Table table = tables.load(pathStr);
       if (table != null) {
-        return TableFormat.ICEBERG;
+        matches.add(TableFormat.ICEBERG);
       }
     } catch (Exception e) {
+      throw new IllegalArgumentException("Failed to inspect Iceberg table at " + pathStr, e);
     }
 
-    return "UNKNOWN";
+    if (matches.size() == 1) {
+      return matches.get(0);
+    }
+
+    if (matches.size() > 1) {
+      throw new IllegalArgumentException(
+          "Multiple table formats detected at path '"
+              + pathStr
+              + "': "
+              + matches
+              + ". Please provide one source format explicitly.");
+    }
+    throw new IllegalArgumentException("Unable to detect table format for path: " + pathStr);
   }
 }

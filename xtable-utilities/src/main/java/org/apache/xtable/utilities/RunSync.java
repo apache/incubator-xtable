@@ -256,6 +256,12 @@ public class RunSync {
 
     TableFormatConverters.ConversionConfig sourceConversionConfig =
         tableFormatConverters.getTableFormatConverters().get(sourceFormat);
+    if (sourceConversionConfig == null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Source format %s is not supported. Known source and target formats are %s",
+              sourceFormat, tableFormatConverters.getTableFormatConverters().keySet()));
+    }
     String sourceProviderClass = sourceConversionConfig.conversionSourceProviderClass;
     ConversionSourceProvider<?> conversionSourceProvider =
         ReflectionUtils.createInstanceOfClass(sourceProviderClass);

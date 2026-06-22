@@ -19,6 +19,7 @@
 package org.apache.xtable.utilities;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.IOException;
@@ -108,6 +109,17 @@ class ITRunSync {
     }
   }
 
+  @Test
+  void testSingleSyncModeWithoutInputTableFormatAndEmptyPath(@TempDir Path tempDir)
+      throws IOException {
+    String tableName = "test-table";
+
+    File configFile = writeConfigFileWithoutSourceTableFormatAndEmptyPath(tempDir, tableName);
+    String[] args = new String[] {"--datasetConfig", configFile.getPath()};
+
+    assertThrows(IllegalArgumentException.class, () -> RunSync.main(args));
+  }
+
   private static File writeConfigFile(Path tempDir, GenericTable table, String tableName)
       throws IOException {
     RunSync.DatasetConfig config =
@@ -118,6 +130,23 @@ class ITRunSync {
                 Collections.singletonList(
                     RunSync.DatasetConfig.Table.builder()
                         .tableBasePath(table.getBasePath())
+                        .tableName(tableName)
+                        .build()))
+            .build();
+    File configFile = new File(tempDir + "config.yaml");
+    RunSync.YAML_MAPPER.writeValue(configFile, config);
+    return configFile;
+  }
+
+  private static File writeConfigFileWithoutSourceTableFormatAndEmptyPath(
+      Path tempDir, String tableName) throws IOException {
+    RunSync.DatasetConfig config =
+        RunSync.DatasetConfig.builder()
+            .targetFormats(Collections.singletonList("ICEBERG"))
+            .datasets(
+                Collections.singletonList(
+                    RunSync.DatasetConfig.Table.builder()
+                        .tableBasePath("")
                         .tableName(tableName)
                         .build()))
             .build();
