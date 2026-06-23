@@ -70,7 +70,7 @@
         <lombok.version>1.18.36</lombok.version>
         <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
         <hadoop.version>3.4.1</hadoop.version>
-        <hudi.version>0.14.0</hudi.version>
+        <hudi.version>0.14.1</hudi.version>
         <aws.version>2.29.40</aws.version>
         <hive.version>2.3.9</hive.version>
         <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
