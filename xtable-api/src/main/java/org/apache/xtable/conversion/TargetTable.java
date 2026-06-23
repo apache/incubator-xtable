@@ -26,6 +26,8 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
+import org.apache.hadoop.conf.Configuration;
+
 @Getter
 @EqualsAndHashCode(callSuper = true)
 public class TargetTable extends ExternalTable {
@@ -39,8 +41,9 @@ public class TargetTable extends ExternalTable {
       String[] namespace,
       CatalogConfig catalogConfig,
       Duration metadataRetention,
-      Properties additionalProperties) {
-    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties);
+      Properties additionalProperties,
+      Configuration hadoopConf) {
+    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties, hadoopConf);
     this.metadataRetention =
         metadataRetention == null ? Duration.of(7, ChronoUnit.DAYS) : metadataRetention;
   }

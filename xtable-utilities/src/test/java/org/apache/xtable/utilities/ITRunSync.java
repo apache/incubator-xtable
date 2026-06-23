@@ -19,6 +19,7 @@
 package org.apache.xtable.utilities;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.IOException;
@@ -93,6 +94,32 @@ class ITRunSync {
     }
   }
 
+  @Test
+  void testSingleSyncModeWithoutInputTableFormat(@TempDir Path tempDir) throws IOException {
+    String tableName = "test-table";
+    try (GenericTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
+      table.insertRows(10);
+      File configFile = writeConfigFileWithoutSourceTableFormat(tempDir, table, tableName);
+      String[] args = new String[] {"--datasetConfig", configFile.getPath()};
+      RunSync.main(args);
+      Path icebergMetadataPath = Paths.get(URI.create(table.getBasePath() + "/metadata"));
+      waitForNumIcebergCommits(icebergMetadataPath, 3);
+    }
+  }
+
+  @Test
+  void testSingleSyncModeWithoutInputTableFormatAndEmptyPath(@TempDir Path tempDir)
+      throws IOException {
+    String tableName = "test-table";
+
+    File configFile = writeConfigFileWithoutSourceTableFormatAndEmptyPath(tempDir, tableName);
+    String[] args = new String[] {"--datasetConfig", configFile.getPath()};
+
+    assertThrows(IllegalArgumentException.class, () -> RunSync.main(args));
+  }
+
   private static File writeConfigFile(Path tempDir, GenericTable table, String tableName)
       throws IOException {
     RunSync.DatasetConfig config =
@@ -106,7 +133,41 @@ class ITRunSync {
                         .tableName(tableName)
                         .build()))
             .build();
-    File configFile = new File(tempDir + "config.yaml");
+    File configFile = tempDir.resolve("config.yaml").toFile();
+    RunSync.YAML_MAPPER.writeValue(configFile, config);
+    return configFile;
+  }
+
+  private static File writeConfigFileWithoutSourceTableFormatAndEmptyPath(
+      Path tempDir, String tableName) throws IOException {
+    RunSync.DatasetConfig config =
+        RunSync.DatasetConfig.builder()
+            .targetFormats(Collections.singletonList("ICEBERG"))
+            .datasets(
+                Collections.singletonList(
+                    RunSync.DatasetConfig.Table.builder()
+                        .tableBasePath("")
+                        .tableName(tableName)
+                        .build()))
+            .build();
+    File configFile = tempDir.resolve("config.yaml").toFile();
+    RunSync.YAML_MAPPER.writeValue(configFile, config);
+    return configFile;
+  }
+
+  private static File writeConfigFileWithoutSourceTableFormat(
+      Path tempDir, GenericTable table, String tableName) throws IOException {
+    RunSync.DatasetConfig config =
+        RunSync.DatasetConfig.builder()
+            .targetFormats(Collections.singletonList("ICEBERG"))
+            .datasets(
+                Collections.singletonList(
+                    RunSync.DatasetConfig.Table.builder()
+                        .tableBasePath(table.getBasePath())
+                        .tableName(tableName)
+                        .build()))
+            .build();
+    File configFile = tempDir.resolve("config.yaml").toFile();
     RunSync.YAML_MAPPER.writeValue(configFile, config);
     return configFile;
   }

@@ -18,6 +18,8 @@
  
 package org.apache.xtable.conversion;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Properties;
 
 import lombok.Builder;
@@ -25,11 +27,15 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NonNull;
 
+import org.apache.hadoop.conf.Configuration;
+
 @EqualsAndHashCode(callSuper = true)
 @Getter
 public class SourceTable extends ExternalTable {
   /** The path to the data files, defaults to the basePath */
   @NonNull private final String dataPath;
+
+  private final transient Configuration hadoopConf;
 
   @Builder(toBuilder = true)
   public SourceTable(
@@ -39,8 +45,38 @@ public class SourceTable extends ExternalTable {
       String dataPath,
       String[] namespace,
       CatalogConfig catalogConfig,
-      Properties additionalProperties) {
-    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties);
+      Properties additionalProperties,
+      Configuration hadoopConf) {
+    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties, hadoopConf);
     this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
+    this.hadoopConf = hadoopConf;
+  }
+
+  public SourceTable(
+      @NonNull String name,
+      @NonNull String basePath,
+      String dataPath,
+      String[] namespace,
+      CatalogConfig catalogConfig,
+      Properties additionalProperties,
+      Configuration hadoopConf) {
+    super(
+        name,
+        resolveFormatOrThrow(basePath, hadoopConf),
+        basePath,
+        namespace,
+        catalogConfig,
+        additionalProperties,
+        hadoopConf);
+    this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
+    this.hadoopConf = hadoopConf;
+  }
+
+  private static String resolveFormatOrThrow(String basePath, Configuration hadoopConf) {
+    try {
+      return SourceTableFormatDetector.detectFormat(basePath, hadoopConf);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to auto-detect source table format", e);
+    }
   }
 }
