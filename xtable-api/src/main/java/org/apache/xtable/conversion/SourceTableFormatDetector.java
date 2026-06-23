@@ -32,8 +32,11 @@ import org.apache.iceberg.hadoop.HadoopTables;
 import org.apache.xtable.model.storage.TableFormat;
 
 public class SourceTableFormatDetector {
+  // private constructor to prevent instantiation
+  private SourceTableFormatDetector() {
+    throw new UnsupportedOperationException("This class cannot be instantiated");
+  }
   // helper method to detect input format
-
   public static String detectFormat(String pathStr, Configuration conf) throws IOException {
     String sanitizeBasePath = ExternalTable.sanitizeBasePath(pathStr);
     Path basePath = new Path(sanitizeBasePath);
