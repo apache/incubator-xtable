@@ -56,7 +56,7 @@ public class SourceTableFormatDetector {
         matches.add(TableFormat.ICEBERG);
       }
     } catch (Exception e) {
-      throw new IllegalArgumentException("Failed to inspect Iceberg table at " + pathStr, e);
+      // throw new IllegalArgumentException("Failed to inspect Iceberg table at " + pathStr, e);
     }
 
     if (matches.size() == 1) {
