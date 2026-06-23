@@ -133,7 +133,7 @@ class ITRunSync {
                         .tableName(tableName)
                         .build()))
             .build();
-    File configFile = new File(tempDir + "config.yaml");
+    File configFile = tempDir.resolve("config.yaml").toFile();
     RunSync.YAML_MAPPER.writeValue(configFile, config);
     return configFile;
   }
@@ -150,7 +150,7 @@ class ITRunSync {
                         .tableName(tableName)
                         .build()))
             .build();
-    File configFile = new File(tempDir + "config.yaml");
+    File configFile = tempDir.resolve("config.yaml").toFile();
     RunSync.YAML_MAPPER.writeValue(configFile, config);
     return configFile;
   }
@@ -167,7 +167,7 @@ class ITRunSync {
                         .tableName(tableName)
                         .build()))
             .build();
-    File configFile = new File(tempDir + "config.yaml");
+    File configFile = tempDir.resolve("config.yaml").toFile();
     RunSync.YAML_MAPPER.writeValue(configFile, config);
     return configFile;
   }
