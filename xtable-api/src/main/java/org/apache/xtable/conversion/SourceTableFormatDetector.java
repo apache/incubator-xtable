@@ -59,18 +59,18 @@ public class SourceTableFormatDetector {
       throw new IllegalArgumentException("Failed to inspect Iceberg table at " + pathStr, e);
     }
 
-    if (matches.size() >= 1) {
+    if (matches.size() == 1) {
       return matches.get(0);
     }
 
-    /*if (matches.size() > 1) {
+    if (matches.size() > 1) {
       throw new IllegalArgumentException(
           "Multiple table formats detected at path '"
               + pathStr
               + "': "
               + matches
               + ". Please provide one source format explicitly.");
-    }*/
+    }
     throw new IllegalArgumentException("Unable to detect table format for path: " + pathStr);
   }
 }
