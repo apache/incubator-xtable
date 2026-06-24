@@ -73,6 +73,16 @@
                     <groupId>org.eclipse.jetty.orbit</groupId>
                     <artifactId>*</artifactId>
                 </exclusion>
+                <!--
+                  jetty-runner (via Hive's hive-service) is an executable uber-jar that bundles
+                  stale Jetty 9.3.20 classes (e.g. ScheduledExecutorScheduler without the
+                  (String, boolean, int) ctor), shadowing jetty-util 9.4.x and breaking Hudi 1.2's
+                  embedded TimelineService. It is not needed here, so exclude it.
+                -->
+                <exclusion>
+                    <groupId>org.eclipse.jetty</groupId>
+                    <artifactId>jetty-runner</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
 
