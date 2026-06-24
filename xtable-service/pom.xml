@@ -208,7 +208,6 @@
         <dependency>
             <groupId>io.delta</groupId>
             <artifactId>delta-core_${scala.binary.version}</artifactId>
-            <version>${delta.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>

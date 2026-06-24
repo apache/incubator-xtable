@@ -25,6 +25,7 @@ import static org.apache.xtable.hudi.HudiTestUtil.initTableAndGetMetaClient;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.parallel.ExecutionMode.SAME_THREAD;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -47,8 +48,8 @@ import org.apache.avro.SchemaBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -63,6 +64,7 @@ import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieFileGroup;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
+import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
@@ -99,6 +101,7 @@ import org.apache.xtable.spi.sync.ConversionTarget;
  * A suite of functional tests that assert that the metadata for the hudi table is properly written
  * to disk.
  */
+@Execution(SAME_THREAD)
 public class ITHudiConversionTarget {
   @TempDir public static Path tempDir;
   private static final StorageConfiguration CONFIGURATION = getStorageConf(new Configuration());
@@ -147,13 +150,14 @@ public class ITHudiConversionTarget {
     System.setProperty("user.timezone", "GMT");
   }
 
-  @Test
-  void syncForExistingTable() {
-    String partitionPath = "partition_path";
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void syncForExistingTable(boolean partitioned) {
+    String partitionPath = partitioned ? "partition_path" : "";
     String commitTime = "20231003013807542";
     String existingFileName1 = "existing_file_1.parquet";
     HoodieTableMetaClient setupMetaClient =
-        initTableAndGetMetaClient(tableBasePath, PARTITION_FIELD_NAME);
+        initTableAndGetMetaClient(tableBasePath, partitioned ? PARTITION_FIELD_NAME : "");
     // initialize the table with only 2 of the 3 fields
     Schema initialSchema =
         SchemaBuilder.record(TEST_SCHEMA_NAME)
@@ -178,6 +182,7 @@ public class ITHudiConversionTarget {
                   initialInstant,
                   InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR),
               Option.empty());
+      writeClient.setOperationType(WriteOperationType.INSERT);
       writeClient.commit(
           initialInstant,
           initialWriteStatuses,
@@ -193,7 +198,8 @@ public class ITHudiConversionTarget {
             .fileSizeBytes(100L)
             .columnStats(Collections.emptyList())
             .physicalPath(
-                String.format("file://%s/%s/%s", tableBasePath, partitionPath, existingFileName1))
+                String.format(
+                    "file://%s/%s", tableBasePath, getFilePath(partitionPath, existingFileName1)))
             .recordCount(2)
             .build();
     String fileName = "file_1.parquet";
@@ -206,7 +212,7 @@ public class ITHudiConversionTarget {
             .build();
     // perform sync
     HudiConversionTarget targetClient = getTargetClient();
-    InternalTable initialState = getState(Instant.now());
+    InternalTable initialState = getState(Instant.now(), partitioned);
     targetClient.beginSync(initialState);
     targetClient.syncFilesForDiff(internalFilesDiff);
     targetClient.syncSchema(SCHEMA);
@@ -220,22 +226,25 @@ public class ITHudiConversionTarget {
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(
         metaClient, partitionPath, Collections.singletonList(Pair.of(fileName, filePath)));
-    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
-        new HoodieBackedTableMetadata(
-            CONTEXT,
-            metaClient.getStorage(),
-            writeConfig.getMetadataConfig(),
-            tableBasePath,
-            true)) {
-      // assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
+    if (!partitioned) {
+      try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+          new HoodieBackedTableMetadata(
+              CONTEXT,
+              metaClient.getStorage(),
+              writeConfig.getMetadataConfig(),
+              tableBasePath,
+              true)) {
+        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
+      }
     }
     // include meta fields since the table was created with meta fields enabled
     assertSchema(metaClient, true);
   }
 
-  @Test
-  void syncForNewTable() {
-    String partitionPath = "partition_path";
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void syncForNewTable(boolean partitioned) {
+    String partitionPath = partitioned ? "partition_path" : "";
     String fileName = "file_1.parquet";
     String filePath = getFilePath(partitionPath, fileName);
     List<PartitionFileGroup> snapshot =
@@ -250,7 +259,7 @@ public class ITHudiConversionTarget {
                             .build()))
                 .build());
     // sync snapshot and metadata
-    InternalTable initialState = getState(Instant.now());
+    InternalTable initialState = getState(Instant.now(), partitioned);
     HudiConversionTarget targetClient = getTargetClient();
     targetClient.beginSync(initialState);
     targetClient.syncFilesForSnapshot(snapshot);
@@ -265,21 +274,24 @@ public class ITHudiConversionTarget {
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(
         metaClient, partitionPath, Collections.singletonList(Pair.of(fileName, filePath)));
-    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
-        new HoodieBackedTableMetadata(
-            CONTEXT,
-            metaClient.getStorage(),
-            getHoodieWriteConfig(metaClient).getMetadataConfig(),
-            tableBasePath,
-            true)) {
-      // assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
+    if (!partitioned) {
+      try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+          new HoodieBackedTableMetadata(
+              CONTEXT,
+              metaClient.getStorage(),
+              getHoodieWriteConfig(metaClient).getMetadataConfig(),
+              tableBasePath,
+              true)) {
+        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
+      }
     }
     assertSchema(metaClient, false);
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"partition_path", ""})
-  void archiveTimelineAndCleanMetadataTableAfterMultipleCommits(String partitionPath) {
+  @ValueSource(booleans = {true, false})
+  void archiveTimelineAndCleanMetadataTableAfterMultipleCommits(boolean partitioned) {
+    String partitionPath = partitioned ? "partition_path" : "";
     String fileName0 = "file_0.parquet";
     String filePath0 = getFilePath(partitionPath, fileName0);
 
@@ -300,7 +312,7 @@ public class ITHudiConversionTarget {
                             .build()))
                 .build());
     // sync snapshot and metadata
-    InternalTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));
+    InternalTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS), partitioned);
     HudiConversionTarget targetClient = getTargetClient();
     targetClient.beginSync(initialState);
     targetClient.syncFilesForSnapshot(snapshot);
@@ -316,14 +328,16 @@ public class ITHudiConversionTarget {
     Pair<String, String> file0Pair = Pair.of(fileName0, filePath0);
     assertFileGroupCorrectness(
         metaClient, partitionPath, Arrays.asList(file0Pair, Pair.of(fileName1, filePath1)));
-    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
-        new HoodieBackedTableMetadata(
-            CONTEXT,
-            metaClient.getStorage(),
-            getHoodieWriteConfig(metaClient).getMetadataConfig(),
-            tableBasePath,
-            true)) {
-      // assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
+    if (!partitioned) {
+      try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+          new HoodieBackedTableMetadata(
+              CONTEXT,
+              metaClient.getStorage(),
+              getHoodieWriteConfig(metaClient).getMetadataConfig(),
+              tableBasePath,
+              true)) {
+        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
+      }
     }
 
     // create a new commit that removes fileName1 and adds fileName2
@@ -334,21 +348,24 @@ public class ITHudiConversionTarget {
         Collections.singletonList(getTestFile(partitionPath, fileName2)),
         Collections.singletonList(getTestFile(partitionPath, fileName1)),
         Instant.now().minus(12, ChronoUnit.HOURS),
-        "1");
+        "1",
+        partitioned);
 
     assertFileGroupCorrectness(
         metaClient, partitionPath, Arrays.asList(file0Pair, Pair.of(fileName2, filePath2)));
-    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
-        new HoodieBackedTableMetadata(
-            CONTEXT,
-            metaClient.getStorage(),
-            getHoodieWriteConfig(metaClient).getMetadataConfig(),
-            tableBasePath,
-            true)) {
-      // the metadata for fileName1 should still be present until the cleaner kicks in
-      // assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
-      // new file stats should be present
-      // assertColStats(hoodieBackedTableMetadata, partitionPath, fileName2);
+    if (!partitioned) {
+      try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+          new HoodieBackedTableMetadata(
+              CONTEXT,
+              metaClient.getStorage(),
+              getHoodieWriteConfig(metaClient).getMetadataConfig(),
+              tableBasePath,
+              true)) {
+        // the metadata for fileName1 should still be present until the cleaner kicks in
+        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
+        // new file stats should be present
+        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName2);
+      }
     }
 
     // create a new commit that removes fileName2 and adds fileName3
@@ -359,7 +376,8 @@ public class ITHudiConversionTarget {
         Collections.singletonList(getTestFile(partitionPath, fileName3)),
         Collections.singletonList(getTestFile(partitionPath, fileName2)),
         Instant.now().minus(8, ChronoUnit.HOURS),
-        "2");
+        "2",
+        partitioned);
     System.out.println(metaClient.getCommitsTimeline().lastInstant().get().requestedTime());
 
     // create a commit that just adds fileName4
@@ -370,7 +388,8 @@ public class ITHudiConversionTarget {
         Collections.singletonList(getTestFile(partitionPath, fileName4)),
         Collections.emptyList(),
         Instant.now(),
-        "3");
+        "3",
+        partitioned);
     System.out.println(metaClient.getCommitsTimeline().lastInstant().get().requestedTime());
 
     // create another commit that should trigger archival of the first two commits
@@ -381,7 +400,8 @@ public class ITHudiConversionTarget {
         Collections.singletonList(getTestFile(partitionPath, fileName5)),
         Collections.emptyList(),
         Instant.now(),
-        "4");
+        "4",
+        partitioned);
     System.out.println(metaClient.getCommitsTimeline().lastInstant().get().requestedTime());
 
     assertFileGroupCorrectness(
@@ -393,16 +413,18 @@ public class ITHudiConversionTarget {
             Pair.of(fileName4, filePath4),
             Pair.of(fileName5, filePath5)));
     // col stats should be cleaned up for fileName1 but present for fileName2 and fileName3
-    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
-        new HoodieBackedTableMetadata(
-            CONTEXT,
-            metaClient.getStorage(),
-            getHoodieWriteConfig(metaClient).getMetadataConfig(),
-            tableBasePath,
-            true)) {
-      // assertEmptyColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
-      // assertColStats(hoodieBackedTableMetadata, partitionPath, fileName3);
-      // assertColStats(hoodieBackedTableMetadata, partitionPath, fileName4);
+    if (!partitioned) {
+      try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+          new HoodieBackedTableMetadata(
+              CONTEXT,
+              metaClient.getStorage(),
+              getHoodieWriteConfig(metaClient).getMetadataConfig(),
+              tableBasePath,
+              true)) {
+        // assertEmptyColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
+        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName3);
+        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName4);
+      }
     }
     // the first commit to the timeline should be archived
     assertEquals(
@@ -410,8 +432,9 @@ public class ITHudiConversionTarget {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"partition_path", ""})
-  void testSourceTargetMappingWithSnapshotAndIncrementalSync(String partitionPath) {
+  @ValueSource(booleans = {true, false})
+  void testSourceTargetMappingWithSnapshotAndIncrementalSync(boolean partitioned) {
+    String partitionPath = partitioned ? "partition_path" : "";
     // Step 1: Initialize Test Files for Initial Snapshot
     String fileName0 = "file_0.parquet";
     String fileName1 = "file_1.parquet";
@@ -432,7 +455,7 @@ public class ITHudiConversionTarget {
                 .build());
 
     // Step 2: Sync Initial Snapshot
-    InternalTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS));
+    InternalTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS), partitioned);
     HudiConversionTarget targetClient = getTargetClient();
     targetClient.beginSync(initialState);
     targetClient.syncFilesForSnapshot(initialSnapshot);
@@ -461,7 +484,8 @@ public class ITHudiConversionTarget {
         Collections.singletonList(getTestFile(partitionPath, fileName2)), // Adding file2
         Collections.singletonList(getTestFile(partitionPath, fileName1)), // Removing file1
         Instant.now().minus(12, ChronoUnit.HOURS),
-        "1"); // Incremental commit ID = "1"
+        "1", // Incremental commit ID = "1"
+        partitioned);
 
     // Step 5: Verify Source-Target Mapping for Incremental Sync
     metaClient.reloadActiveTimeline();
@@ -479,7 +503,8 @@ public class ITHudiConversionTarget {
         Collections.singletonList(getTestFile(partitionPath, fileName3)), // Adding file3
         Collections.singletonList(getTestFile(partitionPath, fileName2)), // Removing file2
         Instant.now().minus(8, ChronoUnit.HOURS),
-        "2"); // Incremental commit ID = "2"
+        "2", // Incremental commit ID = "2"
+        partitioned);
 
     // Step 7: Verify Source-Target Mapping for Second Incremental Sync
     metaClient.reloadActiveTimeline();
@@ -497,8 +522,9 @@ public class ITHudiConversionTarget {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"partition_path", ""})
-  void testGetTargetCommitIdentifierWithNullSourceIdentifier(String partitionPath) {
+  @ValueSource(booleans = {true, false})
+  void testGetTargetCommitIdentifierWithNullSourceIdentifier(boolean partitioned) {
+    String partitionPath = partitioned ? "partition_path" : "";
     // Initialize Test Files and Snapshot
     String fileName0 = "file_0.parquet";
     String fileName1 = "file_1.parquet";
@@ -517,7 +543,7 @@ public class ITHudiConversionTarget {
                             .range(Range.scalar("partitionPath"))
                             .build()))
                 .build());
-    InternalTable internalTable = getState(Instant.now().minus(24, ChronoUnit.HOURS));
+    InternalTable internalTable = getState(Instant.now().minus(24, ChronoUnit.HOURS), partitioned);
     HudiConversionTarget targetClient = getTargetClient();
 
     targetClient.beginSync(internalTable);
@@ -541,10 +567,11 @@ public class ITHudiConversionTarget {
       List<InternalDataFile> filesToAdd,
       List<InternalDataFile> filesToRemove,
       Instant commitStart,
-      String sourceIdentifier) {
+      String sourceIdentifier,
+      boolean partitioned) {
     InternalFilesDiff internalFilesDiff2 =
         InternalFilesDiff.builder().filesAdded(filesToAdd).filesRemoved(filesToRemove).build();
-    InternalTable state3 = getState(commitStart);
+    InternalTable state3 = getState(commitStart, partitioned);
     conversionTarget.beginSync(state3);
     conversionTarget.syncFilesForDiff(internalFilesDiff2);
     TableSyncMetadata latestState =
@@ -725,7 +752,8 @@ public class ITHudiConversionTarget {
                 .totalSize(5)
                 .build());
     return InternalDataFile.builder()
-        .physicalPath(String.format("file://%s/%s/%s", tableBasePath, partitionPath, fileName))
+        .physicalPath(
+            String.format("file://%s/%s", tableBasePath, getFilePath(partitionPath, fileName)))
         .fileSizeBytes(FILE_SIZE)
         .fileFormat(FileFormat.APACHE_PARQUET)
         .lastModified(LAST_MODIFIED)
@@ -734,21 +762,27 @@ public class ITHudiConversionTarget {
         .build();
   }
 
-  private InternalTable getState(Instant latestCommitTime) {
-    return InternalTable.builder()
-        .basePath(tableBasePath)
-        .name(TABLE_NAME)
-        .latestCommitTime(latestCommitTime)
-        .tableFormat(TableFormat.ICEBERG)
-        .layoutStrategy(DataLayoutStrategy.HIVE_STYLE_PARTITION)
-        .readSchema(SCHEMA)
-        .partitioningFields(
-            Collections.singletonList(
-                InternalPartitionField.builder()
-                    .sourceField(PARTITION_FIELD_SOURCE)
-                    .transformType(PartitionTransformType.VALUE)
-                    .build()))
-        .build();
+  private InternalTable getState(Instant latestCommitTime, boolean partitioned) {
+    InternalTable.InternalTableBuilder builder =
+        InternalTable.builder()
+            .basePath(tableBasePath)
+            .name(TABLE_NAME)
+            .latestCommitTime(latestCommitTime)
+            .tableFormat(TableFormat.ICEBERG)
+            .readSchema(SCHEMA);
+    if (partitioned) {
+      builder
+          .layoutStrategy(DataLayoutStrategy.HIVE_STYLE_PARTITION)
+          .partitioningFields(
+              Collections.singletonList(
+                  InternalPartitionField.builder()
+                      .sourceField(PARTITION_FIELD_SOURCE)
+                      .transformType(PartitionTransformType.VALUE)
+                      .build()));
+    } else {
+      builder.layoutStrategy(DataLayoutStrategy.FLAT).partitioningFields(Collections.emptyList());
+    }
+    return builder.build();
   }
 
   private HudiConversionTarget getTargetClient() {

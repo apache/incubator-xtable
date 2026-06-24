@@ -142,11 +142,14 @@ public class IdTracker {
   }
 
   /**
-   * Updates the IdMappings in the provided schema. For all newly added columns, we process column
-   * by column for new id assignment.
+   * Updates the IdMappings for the provided schema. The top-level columns are processed one by one:
+   * existing columns reuse their previously assigned IdMapping while newly added columns are
+   * assigned a new id.
    *
-   * <p>Different from generateIdMappings which traverse the entire schema tree, this method
-   * traverse individual columns and update the id mappings.
+   * <p>Unlike {@link #generateIdMappings} which regenerates mappings for the entire schema tree,
+   * this method preserves the existing top-level mappings and delegates to {@link
+   * #generateIdMappings} per column to (re)generate the nested mappings within that column's
+   * subtree.
    *
    * @param schema schema to update.
    * @param currentId last ID used.

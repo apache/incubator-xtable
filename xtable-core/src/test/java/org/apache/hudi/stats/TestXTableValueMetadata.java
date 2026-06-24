@@ -164,6 +164,16 @@ public class TestXTableValueMetadata {
   }
 
   @Test
+  void testFromInternalSchemaEnumMapsToString() {
+    InternalSchema schema =
+        InternalSchema.builder().name("enum_field").dataType(InternalType.ENUM).build();
+
+    ValueType result = XTableValueMetadata.fromInternalSchema(schema);
+
+    assertEquals(ValueType.STRING, result);
+  }
+
+  @Test
   void testFromInternalSchemaTimestampMillis() {
     InternalSchema schema =
         InternalSchema.builder()

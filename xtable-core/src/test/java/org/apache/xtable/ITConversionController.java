@@ -267,7 +267,11 @@ public class ITConversionController {
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 180);
       checkDatasetEquivalenceWithFilter(
-          sourceTableFormat, table, targetTableFormats, table.getFilterQuery());
+          sourceTableFormat,
+          table,
+          targetTableFormats,
+          table.getFilterQuery(),
+          Collections.emptyMap());
     }
 
     try (GenericTable tableWithUpdatedSchema =
@@ -353,7 +357,11 @@ public class ITConversionController {
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 80);
       checkDatasetEquivalenceWithFilter(
-          sourceTableFormat, table, targetTableFormats, table.getFilterQuery());
+          sourceTableFormat,
+          table,
+          targetTableFormats,
+          table.getFilterQuery(),
+          Collections.emptyMap());
     }
   }
 
@@ -530,33 +538,34 @@ public class ITConversionController {
         Arguments.of(
             buildArgsForPartition(
                 ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter)),
-        // TODO: Hudi 1.1 and ICEBERG nested partitioned filter data validation fails
-        // https://github.com/apache/incubator-xtable/issues/775
-        //        Arguments.of(
-        //            // Delta Lake does not currently support nested partition columns
-        //            buildArgsForPartition(
-        //                HUDI,
-        //                Arrays.asList(ICEBERG),
-        //                "nested_record.level:SIMPLE",
-        //                "nested_record.level:VALUE",
-        //                nestedLevelFilter)),
+        // TODO(hudi-1.2): re-enable the nested partition column case (HUDI -> ICEBERG partitioned
+        // on
+        // "nested_record.level"). Hudi 1.2's HoodieFileGroupReaderBasedFileFormat is the only batch
+        // reader and it converts the partition column into a top-level Avro field named
+        // "nested_record.level", which Avro rejects ("Illegal character in: nested_record.level").
+        // Delta is excluded here anyway since it does not support nested partition columns.
+        // Arguments.of(
+        //     buildArgsForPartition(
+        //         HUDI,
+        //         Arrays.asList(ICEBERG),
+        //         "nested_record.level:SIMPLE",
+        //         "nested_record.level:VALUE",
+        //         nestedLevelFilter)),
         Arguments.of(
             buildArgsForPartition(
                 HUDI,
                 Arrays.asList(ICEBERG, DELTA),
                 "severity:SIMPLE",
                 "severity:VALUE",
-                severityFilter)));
-    // TODO: Hudi 1.1 partitioned data query with timestamp and simple partition key values fails
-    // with parsing exception
-    // https://github.com/apache/incubator-xtable/issues/776
-    //        Arguments.of(
-    //            buildArgsForPartition(
-    //                HUDI,
-    //                Arrays.asList(ICEBERG, DELTA),
-    //                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
-    //                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
-    //                timestampAndLevelFilter)));
+                severityFilter)),
+        Arguments.of(
+            buildArgsForPartition(
+                HUDI,
+                Arrays.asList(ICEBERG, DELTA),
+                "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
+                "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
+                timestampAndLevelFilter,
+                getAdditionalHudiReadOptions())));
   }
 
   @ParameterizedTest
@@ -596,7 +605,11 @@ public class ITConversionController {
       conversionController.sync(conversionConfig, conversionSourceProvider);
 
       checkDatasetEquivalenceWithFilter(
-          sourceTableFormat, tableToClose, targetTableFormats, filter);
+          sourceTableFormat,
+          tableToClose,
+          targetTableFormats,
+          filter,
+          tableFormatPartitionDataHolder.getAdditionalHudiReadOptions());
     }
   }
 
@@ -856,7 +869,11 @@ public class ITConversionController {
       checkDatasetEquivalence(ICEBERG, table, targetTableFormats, 100);
       // Query with filter to assert partition does not impact ability to query
       checkDatasetEquivalenceWithFilter(
-          ICEBERG, table, targetTableFormats, "level == 'INFO' AND string_field > 'abc'");
+          ICEBERG,
+          table,
+          targetTableFormats,
+          "level == 'INFO' AND string_field > 'abc'",
+          Collections.emptyMap());
     }
   }
 
@@ -882,13 +899,18 @@ public class ITConversionController {
       String sourceFormat,
       GenericTable<?, ?> sourceTable,
       List<String> targetFormats,
-      String filter) {
+      String filter,
+      Map<String, String> additionalHudiReadOptions) {
+    Map<String, Map<String, String>> targetOptions =
+        targetFormats.contains(HUDI)
+            ? Collections.singletonMap(HUDI, additionalHudiReadOptions)
+            : Collections.emptyMap();
     checkDatasetEquivalence(
         sourceFormat,
         sourceTable,
-        Collections.emptyMap(),
+        HUDI.equals(sourceFormat) ? additionalHudiReadOptions : Collections.emptyMap(),
         targetFormats,
-        Collections.emptyMap(),
+        targetOptions,
         null,
         filter);
   }
@@ -1004,6 +1026,18 @@ public class ITConversionController {
   }
 
   /**
+   * Extra Hudi read options for partition tests that need them. Hudi 1.2 defaults to lazy
+   * file-index listing, which fails to parse partition values for some partition transforms (e.g.
+   * timestamp-based partitions); forcing eager listing avoids that. Passed only for the cases that
+   * require it via {@link #buildArgsForPartition}.
+   */
+  private static Map<String, String> getAdditionalHudiReadOptions() {
+    Map<String, String> options = new HashMap<>();
+    options.put("hoodie.datasource.read.file.index.listing.mode", "eager");
+    return options;
+  }
+
+  /**
    * Compares two datasets where dataset1Rows is for Iceberg and dataset2Rows is for other formats
    * (such as Delta or Hudi). - For the "uuid_field", if present, the UUID from dataset1 (Iceberg)
    * is compared with the Base64-encoded UUID from dataset2 (other formats), after decoding. - For
@@ -1116,26 +1150,27 @@ public class ITConversionController {
       String filter) {
     return buildArgsForPartition(
         sourceFormat,
-        Collections.emptyMap(),
         targetFormats,
         hudiPartitionConfig,
         xTablePartitionConfig,
-        filter);
+        filter,
+        Collections.emptyMap());
   }
 
   private static TableFormatPartitionDataHolder buildArgsForPartition(
       String sourceFormat,
-      Map<String, String> sourceFormatOptions,
       List<String> targetFormats,
       String hudiPartitionConfig,
       String xTablePartitionConfig,
-      String filter) {
+      String filter,
+      Map<String, String> additionalHudiReadOptions) {
     return TableFormatPartitionDataHolder.builder()
         .sourceTableFormat(sourceFormat)
         .targetTableFormats(targetFormats)
         .hudiSourceConfig(Optional.ofNullable(hudiPartitionConfig))
         .xTablePartitionConfig(xTablePartitionConfig)
         .filter(filter)
+        .additionalHudiReadOptions(additionalHudiReadOptions)
         .build();
   }
 
@@ -1148,6 +1183,7 @@ public class ITConversionController {
     String xTablePartitionConfig;
     Optional<String> hudiSourceConfig;
     String filter;
+    Map<String, String> additionalHudiReadOptions;
   }
 
   private static ConversionConfig getTableSyncConfig(

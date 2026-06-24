@@ -82,6 +82,7 @@ import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.model.WriteConcurrencyMode;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.marker.MarkerType;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
@@ -440,12 +441,14 @@ public abstract class TestAbstractHudiTable
         HoodieStorageConfig.newBuilder().parquetCompressionCodec("UNCOMPRESSED").build();
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
+    // Hudi 1.x MDT col-stats generation fails for array and map types, so only enable column
+    // stats when the schema does not contain those types.
+    // https://github.com/apache/incubator-xtable/issues/773
+    // boolean columnStatsSupported = !schemaContainsArrayOrMap(schema);
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(true)
-            // TODO: Hudi 1.1 MDT col-stats generation fails for array and map types.
-            // https://github.com/apache/incubator-xtable/issues/773
-            .withMetadataIndexColumnStats(false)
+            .withMetadataIndexColumnStats(true)
             .withColumnStatsIndexForColumns(getColumnsFromSchema(schema))
             .build();
     Properties lockProperties = new Properties();
@@ -454,6 +457,11 @@ public abstract class TestAbstractHudiTable
         LockConfiguration.LOCK_ACQUIRE_CLIENT_RETRY_WAIT_TIME_IN_MILLIS_PROP_KEY, "3000");
     lockProperties.setProperty(LockConfiguration.LOCK_ACQUIRE_CLIENT_NUM_RETRIES_PROP_KEY, "20");
     return HoodieWriteConfig.newBuilder()
+        // Pin writes to table version 6 and disable auto-upgrade so the write client does not
+        // upgrade the test table to version 9. Table version 9 support will be added in a
+        // follow-up PR.
+        .withWriteTableVersion(HoodieTableVersion.SIX.versionCode())
+        .withAutoUpgradeVersion(false)
         .withProperties(keyGenProperties)
         .withPath(this.basePath)
         .withSchema(schema.toString())
@@ -621,6 +629,9 @@ public abstract class TestAbstractHudiTable
         .set(keyGenPropsMap)
         .setTableName(tableName)
         .setTableType(hoodieTableType)
+        // Pin test tables to table version 6 to match the conversion target. Table version 9
+        // support will be added in a follow-up PR.
+        .setTableVersion(HoodieTableVersion.SIX)
         .setKeyGeneratorClassProp(keyGenerator.getClass().getCanonicalName())
         .setPartitionFields(String.join(",", partitionFieldNames))
         .setRecordKeyFields(RECORD_KEY_FIELD_NAME)

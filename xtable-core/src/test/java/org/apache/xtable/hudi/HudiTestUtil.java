@@ -43,6 +43,7 @@ import org.apache.hudi.common.model.HoodieDeltaWriteStat;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
@@ -58,6 +59,9 @@ public class HudiTestUtil {
     return HoodieTableMetaClient.newTableBuilder()
         .setCommitTimezone(HoodieTimelineTimeZone.UTC)
         .setTableType(HoodieTableType.COPY_ON_WRITE)
+        // Pin test tables to table version 6 to match the conversion target. Table version 9
+        // support will be added in a follow-up PR.
+        .setTableVersion(HoodieTableVersion.SIX)
         .setTableName("test_table")
         .setPayloadClass(HoodieAvroPayload.class)
         .setPartitionFields(partitionFields)
@@ -73,6 +77,11 @@ public class HudiTestUtil {
     Properties properties = new Properties();
     properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
     return HoodieWriteConfig.newBuilder()
+        // Pin writes to table version 6 and disable auto-upgrade so the write client does not
+        // upgrade the test table to version 9. Table version 9 support will be added in a
+        // follow-up PR.
+        .withWriteTableVersion(HoodieTableVersion.SIX.versionCode())
+        .withAutoUpgradeVersion(false)
         .withSchema(schema == null ? "" : schema.toString())
         .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(INMEMORY).build())
         .withPath(metaClient.getBasePath().toString())
@@ -81,7 +90,8 @@ public class HudiTestUtil {
             HoodieMetadataConfig.newBuilder()
                 .withMaxNumDeltaCommitsBeforeCompaction(2)
                 .enable(true)
-                .withMetadataIndexColumnStats(false)
+                // Mirror HudiConversionTarget: col-stats index only for un-partitioned tables.
+                .withMetadataIndexColumnStats(!metaClient.getTableConfig().isTablePartitioned())
                 .withProperties(properties)
                 .build())
         .withArchivalConfig(HoodieArchivalConfig.newBuilder().archiveCommitsWith(1, 2).build())

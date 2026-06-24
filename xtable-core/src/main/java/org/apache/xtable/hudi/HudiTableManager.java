@@ -34,6 +34,7 @@ import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.exception.TableNotFoundException;
 
@@ -112,6 +113,9 @@ public class HudiTableManager {
           .setCommitTimezone(HoodieTimelineTimeZone.UTC)
           .setHiveStylePartitioningEnable(hiveStylePartitioningEnabled)
           .setTableType(HoodieTableType.COPY_ON_WRITE)
+          // Pin new tables to table version 6 for now. Table version 9 (Hudi 1.x) support will be
+          // added in a follow-up PR.
+          .setTableVersion(HoodieTableVersion.SIX)
           .setTableName(table.getName())
           .setDatabaseName(DEFAULT_DATABASE_NAME)
           .setPayloadClass(HoodieAvroPayload.class)

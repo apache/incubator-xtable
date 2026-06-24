@@ -50,7 +50,7 @@ import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.client.timeline.HoodieTimelineArchiver;
-import org.apache.hudi.client.timeline.versioning.v2.TimelineArchiverV2;
+import org.apache.hudi.client.timeline.versioning.v1.TimelineArchiverV1;
 import org.apache.hudi.common.HoodieCleanStat;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
@@ -58,7 +58,9 @@ import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieFileGroup;
+import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
@@ -422,6 +424,7 @@ public class HudiConversionTarget implements ConversionTarget {
                     instantTime,
                     InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR),
                 Option.empty());
+        writeClient.setOperationType(WriteOperationType.UNKNOWN);
         writeClient.commit(
             instantTime,
             writeStatuses,
@@ -585,7 +588,7 @@ public class HudiConversionTarget implements ConversionTarget {
         HoodieJavaTable<?> table, HoodieWriteConfig config, HoodieEngineContext engineContext) {
       // trigger archiver manually
       try {
-        HoodieTimelineArchiver archiver = new TimelineArchiverV2(config, table);
+        HoodieTimelineArchiver archiver = new TimelineArchiverV1(config, table);
         archiver.archiveIfRequired(engineContext, true);
       } catch (IOException ex) {
         throw new UpdateException("Unable to archive Hudi timeline", ex);
@@ -606,6 +609,11 @@ public class HudiConversionTarget implements ConversionTarget {
       Properties properties = new Properties();
       properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
       return HoodieWriteConfig.newBuilder()
+          // Pin writes to table version 6 and disable auto-upgrade so the write client does not
+          // upgrade the table to version 9 (Hudi 1.x). Table version 9 support will be added in a
+          // follow-up PR.
+          .withWriteTableVersion(HoodieTableVersion.SIX.versionCode())
+          .withAutoUpgradeVersion(false)
           .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(INMEMORY).build())
           .withPath(metaClient.getBasePath().toString())
           .withPopulateMetaFields(metaClient.getTableConfig().populateMetaFields())
@@ -627,9 +635,15 @@ public class HudiConversionTarget implements ConversionTarget {
               HoodieMetadataConfig.newBuilder()
                   .enable(true)
                   .withProperties(properties)
-                  // TODO: Hudi 1.1 MDT col-stats generation fails for array and map types.
-                  // https://github.com/apache/incubator-xtable/issues/773
-                  .withMetadataIndexColumnStats(false)
+                  // Hudi 1.2.0 couples the partition-stats index to the column-stats index. For
+                  // partitioned tables the
+                  // partition-stats generation path rebuilds a file-system view over the committed
+                  // external
+                  // parquet files and groups them by fileId; XTable's externally-registered files
+                  // have non-Hudi names
+                  // whose fileId cannot be parsed once the "_hudiext" marker is stripped, leading
+                  // to failures.
+                  .withMetadataIndexColumnStats(!metaClient.getTableConfig().isTablePartitioned())
                   .withMaxNumDeltaCommitsBeforeCompaction(maxNumDeltaCommitsBeforeCompaction)
                   .build())
           .build();

@@ -18,7 +18,6 @@
  
 package org.apache.xtable.hudi;
 
-import static org.apache.hudi.common.table.timeline.InstantComparison.GREATER_THAN;
 import static org.apache.hudi.common.table.timeline.InstantComparison.LESSER_THAN_OR_EQUALS;
 
 import java.time.Instant;
@@ -239,21 +238,13 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
   }
 
   private CommitsPair getCompletedAndPendingCommitsAfterInstant(HoodieInstant commitInstant) {
-    // Get all instants after the provided commitInstant and instants that are yet to be completed.
-    // We use completionTime (not requestedTime) for filtering completed commits because we need
-    // commits that actually finished after the last sync, not just ones that were initiated after.
-    // This handles out-of-order completion scenarios where a later-requested commit may complete
-    // before an earlier-requested one.
+    // Table version 6 uses the old timeline view, so instants are selected and ordered by their
+    // requested (instant) time. Completion-time based handling will be added with table version 9
+    // support in a follow-up PR.
     List<HoodieInstant> allInstants =
         metaClient
             .getActiveTimeline()
-            .filter(
-                hoodieInstant ->
-                    !hoodieInstant.isCompleted()
-                        || InstantComparison.compareTimestamps(
-                            hoodieInstant.getCompletionTime(),
-                            GREATER_THAN,
-                            commitInstant.getCompletionTime()))
+            .findInstantsAfter(commitInstant.requestedTime())
             .getInstants();
     // collect the completed instants & inflight instants from all the instants.
     List<HoodieInstant> completedInstants =
@@ -262,10 +253,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
     if (completedInstants.isEmpty()) {
       return CommitsPair.builder().completedCommits(completedInstants).build();
     }
-    // Remove pending instants that were requested after the last completed instant finished.
-    // We compare requestedTime of pending instants against completionTime of the last completed
-    // instant because pending instants don't have a completionTime yet. This captures pending
-    // commits that were initiated before or during the last completed commit's execution.
+    // remove from pending instants that are larger than the last completed instant.
     HoodieInstant lastCompletedInstant = completedInstants.get(completedInstants.size() - 1);
     List<Instant> pendingInstants =
         allInstants.stream()
@@ -275,7 +263,7 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
                     InstantComparison.compareTimestamps(
                         hoodieInstant.requestedTime(),
                         LESSER_THAN_OR_EQUALS,
-                        lastCompletedInstant.getCompletionTime()))
+                        lastCompletedInstant.requestedTime()))
             .map(
                 hoodieInstant ->
                     HudiInstantUtils.parseFromInstantTime(hoodieInstant.requestedTime()))

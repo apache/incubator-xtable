@@ -36,8 +36,8 @@ import java.util.stream.Collectors;
 
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
-import lombok.SneakyThrows;
 import lombok.Value;
+import lombok.extern.slf4j.Slf4j;
 
 import org.apache.hadoop.fs.Path;
 
@@ -62,12 +62,14 @@ import org.apache.hudi.stats.ValueMetadata;
 import org.apache.hudi.stats.XTableValueMetadata;
 
 import org.apache.xtable.collectors.CustomCollectors;
+import org.apache.xtable.exception.ReadException;
 import org.apache.xtable.model.schema.InternalType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.InternalFilesDiff;
 import org.apache.xtable.model.storage.PartitionFileGroup;
 
+@Slf4j
 @AllArgsConstructor(staticName = "of")
 public class BaseFileUpdatesExtractor {
   private static final Pattern HUDI_BASE_FILE_PATTERN =
@@ -84,7 +86,6 @@ public class BaseFileUpdatesExtractor {
    * @param commit The current commit started by the Hudi client
    * @return The information needed to create a "replace" commit for the Hudi table
    */
-  @SneakyThrows
   ReplaceMetadata extractSnapshotChanges(
       List<PartitionFileGroup> partitionedDataFiles,
       HoodieTableMetaClient metaClient,
@@ -115,10 +116,18 @@ public class BaseFileUpdatesExtractor {
             meta -> tableMetadata);
     try (SyncableFileSystemView fsView = fileSystemViewManager.getFileSystemView(metaClient)) {
       return extractFromFsView(partitionedDataFiles, commit, fsView, metaClient, metadataConfig);
+    } catch (Exception ex) {
+      throw new ReadException(
+          "Failed to extract snapshot changes for Hudi table at " + tableBasePath, ex);
     } finally {
-      fileSystemViewManager.close();
-      if (tableMetadata != null) {
-        tableMetadata.close();
+      try {
+        fileSystemViewManager.close();
+        if (tableMetadata != null) {
+          tableMetadata.close();
+        }
+      } catch (Exception ex) {
+        log.warn(
+            "Failed to close file system view resources for Hudi table at {}", tableBasePath, ex);
       }
     }
   }

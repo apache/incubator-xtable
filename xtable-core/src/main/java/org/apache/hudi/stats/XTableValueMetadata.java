@@ -112,6 +112,8 @@ public class XTableValueMetadata {
       case DOUBLE:
         return ValueType.DOUBLE;
       case STRING:
+      case ENUM:
+        // Enum values are stored as their string symbols in column statistics.
         return ValueType.STRING;
       case BYTES:
         return ValueType.BYTES;
