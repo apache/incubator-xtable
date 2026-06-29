@@ -432,8 +432,7 @@ public class TestBaseFileUpdatesExtractor {
 
   private static void assertWriteStatusesEquivalent(
       List<WriteStatus> expected, List<WriteStatus> actual) {
-    // Hudi 1.2.0's WriteStatus#toString embeds per-instance identity state, so compare the fields
-    // XTable populates rather than the toString output.
+    // WriteStatus#toString is non-deterministic in Hudi 1.2.0, so compare the populated fields.
     assertEquals(expected.size(), actual.size(), "mismatched number of write statuses");
     Map<String, WriteStatus> actualByFileId =
         actual.stream().collect(Collectors.toMap(WriteStatus::getFileId, Function.identity()));
@@ -452,9 +451,8 @@ public class TestBaseFileUpdatesExtractor {
       assertEquals(expectedStat.getTotalWriteBytes(), actualStat.getTotalWriteBytes());
       assertEquals(expectedStat.getFileSizeInBytes(), actualStat.getFileSizeInBytes());
 
-      // Key by the column name embedded in each entry (not the map key), and compare the statistic
-      // fields explicitly rather than HoodieColumnRangeMetadata#equals, whose ValueMetadata is an
-      // index-version implementation detail.
+      // Key by the embedded column name (not the map key) and compare fields explicitly;
+      // HoodieColumnRangeMetadata#equals also covers index-version-specific ValueMetadata.
       Map<String, HoodieColumnRangeMetadata<Comparable>> expectedStats =
           reKeyByColumnName(expectedStat.getRecordsStats());
       Map<String, HoodieColumnRangeMetadata<Comparable>> actualStats =
@@ -561,8 +559,8 @@ public class TestBaseFileUpdatesExtractor {
         123L);
     addStat(columnStats, fileName, "float_field", 1.23f, 6.54321f, 2, 113, 123L);
     addStat(columnStats, fileName, "double_field", 1.23, 6.54321, 3, 114, 123L);
-    // Temporal columns: the recorded min/max depend on the index version (raw epoch values for V1,
-    // standardized java-time types for V2).
+    // Temporal columns: min/max standardized per index version (raw epoch for V1, java-time for
+    // V2).
     addTemporalStat(
         columnStats,
         fileName,

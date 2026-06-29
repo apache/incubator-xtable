@@ -117,7 +117,6 @@ public class HudiTestUtil {
             partitionPath.isEmpty() ? fileName : String.format("%s/%s", partitionPath, fileName),
             commitTime));
     writeStat.setNumWrites(recordCount);
-    // production (BaseFileUpdatesExtractor) sets numInserts to the record count
     writeStat.setNumInserts(recordCount);
     writeStat.setFileSizeInBytes(fileSize);
     writeStat.setTotalWriteBytes(fileSize);
