@@ -57,11 +57,11 @@ public class HudiTableManager {
       "org.apache.hudi.keygen.TimestampBasedKeyGenerator";
   private static final String COMPLEX_KEY_GENERATOR = "org.apache.hudi.keygen.ComplexKeyGenerator";
   private static final String SIMPLE_KEY_GENERATOR = "org.apache.hudi.keygen.SimpleKeyGenerator";
-  // Hudi 1.x spark query defaults to the "default" database where a spark read query can pick up a
-  // delta table of the same name instead of the hudi table; 0.x does not have this problem. Until
-  // that is resolved we register tables under a dedicated database.
-  // TODO: https://github.com/apache/incubator-xtable/issues/774
-  private static final String DEFAULT_DATABASE_NAME = "default_hudi";
+  // Register Hudi tables under a dedicated database: under Hudi 1.x a Spark read against the
+  // "default" database can resolve a same-named Delta table instead of the Hudi table.
+  // TODO: make this configurable / derive from the target namespace, see
+  // https://github.com/apache/incubator-xtable/issues/833
+  static final String DEFAULT_DATABASE_NAME = "default_hudi";
 
   private final Configuration configuration;
 
@@ -90,9 +90,12 @@ public class HudiTableManager {
    *
    * @param tableDataPath the base path for the data files in the table
    * @param table the table to initialize
+   * @param databaseName the database to register the table under; when null/empty the table falls
+   *     back to {@link #DEFAULT_DATABASE_NAME}
    * @return {@link HoodieTableMetaClient} for the table that was created
    */
-  HoodieTableMetaClient initializeHudiTable(String tableDataPath, InternalTable table) {
+  HoodieTableMetaClient initializeHudiTable(
+      String tableDataPath, InternalTable table, String databaseName) {
     String recordKeyField = "";
     if (table.getReadSchema() != null) {
       List<String> recordKeys =
@@ -109,6 +112,8 @@ public class HudiTableManager {
             table.getPartitioningFields(), table.getReadSchema().getRecordKeyFields());
     boolean hiveStylePartitioningEnabled =
         DataLayoutStrategy.HIVE_STYLE_PARTITION == table.getLayoutStrategy();
+    String resolvedDatabaseName =
+        (databaseName == null || databaseName.isEmpty()) ? DEFAULT_DATABASE_NAME : databaseName;
     try {
       return HoodieTableMetaClient.newTableBuilder()
           .setCommitTimezone(HoodieTimelineTimeZone.UTC)
@@ -119,7 +124,7 @@ public class HudiTableManager {
           // https://github.com/apache/incubator-xtable/issues/762.
           .setTableVersion(HoodieTableVersion.SIX)
           .setTableName(table.getName())
-          .setDatabaseName(DEFAULT_DATABASE_NAME)
+          .setDatabaseName(resolvedDatabaseName)
           .setPayloadClass(HoodieAvroPayload.class)
           .setRecordKeyFields(recordKeyField)
           .setKeyGeneratorClassProp(keyGeneratorClass)

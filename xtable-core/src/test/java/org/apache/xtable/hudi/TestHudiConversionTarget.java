@@ -276,7 +276,8 @@ public class TestHudiConversionTarget {
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.getRecordKeyFields())
         .thenReturn(Option.of(new String[] {"record_key_field"}));
-    when(mockHudiTableManager.initializeHudiTable(BASE_PATH, TABLE)).thenReturn(mockMetaClient);
+    when(mockHudiTableManager.initializeHudiTable(BASE_PATH, TABLE, null))
+        .thenReturn(mockMetaClient);
     HudiConversionTarget.CommitState mockCommitState = mock(HudiConversionTarget.CommitState.class);
     when(mockCommitStateCreator.create(
             mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS))

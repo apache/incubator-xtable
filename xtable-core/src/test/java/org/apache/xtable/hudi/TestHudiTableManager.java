@@ -96,7 +96,7 @@ public class TestHudiTableManager {
             .layoutStrategy(dataLayoutStrategy)
             .build();
 
-    tableManager.initializeHudiTable(tableBasePath, table);
+    tableManager.initializeHudiTable(tableBasePath, table, null);
 
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder()
@@ -104,6 +104,8 @@ public class TestHudiTableManager {
             .setConf(CONFIGURATION)
             .setLoadActiveTimelineOnLoad(false)
             .build();
+    // a null database name falls back to the default
+    assertEquals("default_hudi", metaClient.getTableConfig().getDatabaseName());
     assertFalse(metaClient.getTableConfig().populateMetaFields());
     assertEquals(
         expectedHivePartitioningEnabled,
@@ -119,6 +121,34 @@ public class TestHudiTableManager {
     assertEquals(
         "org.apache.hudi.keygen.ComplexKeyGenerator",
         metaClient.getTableConfig().getKeyGeneratorClassName());
+  }
+
+  @Test
+  void initializeHudiTableUsesProvidedDatabaseName() {
+    InternalTable table =
+        InternalTable.builder()
+            .name("testing_db")
+            .partitioningFields(Collections.emptyList())
+            .readSchema(
+                InternalSchema.builder()
+                    .fields(
+                        Collections.singletonList(InternalField.builder().name("field1").build()))
+                    .recordKeyFields(Collections.emptyList())
+                    .build())
+            .basePath("file://fake_path")
+            .tableFormat(TableFormat.ICEBERG)
+            .layoutStrategy(DataLayoutStrategy.FLAT)
+            .build();
+
+    tableManager.initializeHudiTable(tableBasePath, table, "my_namespace");
+
+    HoodieTableMetaClient metaClient =
+        HoodieTableMetaClient.builder()
+            .setBasePath(tableBasePath)
+            .setConf(CONFIGURATION)
+            .setLoadActiveTimelineOnLoad(false)
+            .build();
+    assertEquals("my_namespace", metaClient.getTableConfig().getDatabaseName());
   }
 
   public static Stream<Arguments> dataLayoutAndHivePartitioningEnabled() {

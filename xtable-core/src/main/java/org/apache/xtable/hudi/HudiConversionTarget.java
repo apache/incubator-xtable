@@ -110,6 +110,8 @@ public class HudiConversionTarget implements ConversionTarget {
   private String tableDataPath;
   private Optional<HoodieTableMetaClient> metaClient;
   private CommitState commitState;
+  // database to register the target table under, resolved from the target namespace
+  private String databaseName;
 
   public HudiConversionTarget() {}
 
@@ -128,6 +130,7 @@ public class HudiConversionTarget implements ConversionTarget {
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);
+    this.databaseName = resolveDatabaseName(targetTable);
   }
 
   @VisibleForTesting
@@ -181,6 +184,15 @@ public class HudiConversionTarget implements ConversionTarget {
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);
+    this.databaseName = resolveDatabaseName(targetTable);
+  }
+
+  /** Uses the first namespace level as the Hudi database name, or the default if none is set. */
+  private static String resolveDatabaseName(TargetTable targetTable) {
+    String[] namespace = targetTable.getNamespace();
+    return namespace != null && namespace.length > 0
+        ? namespace[0]
+        : HudiTableManager.DEFAULT_DATABASE_NAME;
   }
 
   @FunctionalInterface
@@ -275,7 +287,8 @@ public class HudiConversionTarget implements ConversionTarget {
   @Override
   public void beginSync(InternalTable table) {
     if (!metaClient.isPresent()) {
-      metaClient = Optional.of(hudiTableManager.initializeHudiTable(tableDataPath, table));
+      metaClient =
+          Optional.of(hudiTableManager.initializeHudiTable(tableDataPath, table, databaseName));
     } else {
       // make sure meta client has up-to-date view of the timeline
       getMetaClient().reloadActiveTimeline();
