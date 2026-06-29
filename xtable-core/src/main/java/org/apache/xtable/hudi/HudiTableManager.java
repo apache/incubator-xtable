@@ -57,10 +57,6 @@ public class HudiTableManager {
       "org.apache.hudi.keygen.TimestampBasedKeyGenerator";
   private static final String COMPLEX_KEY_GENERATOR = "org.apache.hudi.keygen.ComplexKeyGenerator";
   private static final String SIMPLE_KEY_GENERATOR = "org.apache.hudi.keygen.SimpleKeyGenerator";
-  // Hudi 1.x spark query defaults to "default" database and spark read query picks up delta
-  // instead, 0.x doesn't have the same problem.
-  // TODO: https://github.com/apache/incubator-xtable/issues/774
-  private static final String DEFAULT_DATABASE_NAME = "default_hudi";
 
   private final Configuration configuration;
 
@@ -114,10 +110,10 @@ public class HudiTableManager {
           .setHiveStylePartitioningEnable(hiveStylePartitioningEnabled)
           .setTableType(HoodieTableType.COPY_ON_WRITE)
           // Pin new tables to table version 6 for now. Table version 9 (Hudi 1.x) support will be
-          // added in a follow-up PR.
+          // added in a follow-up PR, tracked in
+          // https://github.com/apache/incubator-xtable/issues/762.
           .setTableVersion(HoodieTableVersion.SIX)
           .setTableName(table.getName())
-          .setDatabaseName(DEFAULT_DATABASE_NAME)
           .setPayloadClass(HoodieAvroPayload.class)
           .setRecordKeyFields(recordKeyField)
           .setKeyGeneratorClassProp(keyGeneratorClass)

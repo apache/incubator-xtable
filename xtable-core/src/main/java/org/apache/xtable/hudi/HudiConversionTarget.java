@@ -636,13 +636,12 @@ public class HudiConversionTarget implements ConversionTarget {
                   .enable(true)
                   .withProperties(properties)
                   // Hudi 1.2.0 couples the partition-stats index to the column-stats index. For
-                  // partitioned tables the
-                  // partition-stats generation path rebuilds a file-system view over the committed
-                  // external
-                  // parquet files and groups them by fileId; XTable's externally-registered files
-                  // have non-Hudi names
-                  // whose fileId cannot be parsed once the "_hudiext" marker is stripped, leading
-                  // to failures.
+                  // partitioned tables, the partition-stats generation path rebuilds a file-system
+                  // view over the committed external parquet files and groups them by fileId.
+                  // XTable's externally-registered files have non-Hudi names whose fileId cannot be
+                  // parsed once the "_hudiext" marker is stripped, which leads to failures. So
+                  // column stats are only enabled for un-partitioned tables for now. Tracked in
+                  // https://github.com/apache/incubator-xtable/issues/832.
                   .withMetadataIndexColumnStats(!metaClient.getTableConfig().isTablePartitioned())
                   .withMaxNumDeltaCommitsBeforeCompaction(maxNumDeltaCommitsBeforeCompaction)
                   .build())
