@@ -57,6 +57,11 @@ public class HudiTableManager {
       "org.apache.hudi.keygen.TimestampBasedKeyGenerator";
   private static final String COMPLEX_KEY_GENERATOR = "org.apache.hudi.keygen.ComplexKeyGenerator";
   private static final String SIMPLE_KEY_GENERATOR = "org.apache.hudi.keygen.SimpleKeyGenerator";
+  // Hudi 1.x spark query defaults to the "default" database where a spark read query can pick up a
+  // delta table of the same name instead of the hudi table; 0.x does not have this problem. Until
+  // that is resolved we register tables under a dedicated database.
+  // TODO: https://github.com/apache/incubator-xtable/issues/774
+  private static final String DEFAULT_DATABASE_NAME = "default_hudi";
 
   private final Configuration configuration;
 
@@ -114,6 +119,7 @@ public class HudiTableManager {
           // https://github.com/apache/incubator-xtable/issues/762.
           .setTableVersion(HoodieTableVersion.SIX)
           .setTableName(table.getName())
+          .setDatabaseName(DEFAULT_DATABASE_NAME)
           .setPayloadClass(HoodieAvroPayload.class)
           .setRecordKeyFields(recordKeyField)
           .setKeyGeneratorClassProp(keyGeneratorClass)
