@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.avro.Schema;
-import org.apache.avro.SchemaBuilder;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hudi.common.util.Option;
@@ -102,114 +101,6 @@ public class TestIdTracker {
     Schema schemaWithIdTracking = idTracker.addIdTracking(evolved, Option.of(initial), false);
     IdTracking actual = idTracker.getIdTracking(schemaWithIdTracking).get();
     assertEquals(getExpectTrackingForComplexSchemaEvolvedNoMetaFields(), actual);
-  }
-
-  /**
-   * Test that the ID tracking is correctly set for a schema with nested record fields. Multiple
-   * nested fields are added to the schema to test the tracking of nested fields.
-   */
-  @Test
-  public void testIdTrackingWithNestedRecordSchemas() {
-    // Define initial schema.
-    Schema initialSchema =
-        SchemaBuilder.record("ExampleRecord")
-            .namespace("com.example")
-            .fields()
-            .name("to_be_dropped")
-            .type()
-            .optional()
-            .bytesType()
-            .name("bytes_decimal")
-            .type()
-            .optional()
-            .bytesType()
-            .endRecord();
-    Schema schemaWithIdTracking = idTracker.addIdTracking(initialSchema, Option.empty(), false);
-
-    // Define evolved schema.
-    Schema updatedSchema =
-        SchemaBuilder.record("UpdatedRecord")
-            .namespace("com.example")
-            .fields()
-            .name("bytes_decimal")
-            .type()
-            .optional()
-            .bytesType()
-            .name("complex_nested_record")
-            .type()
-            .record("record")
-            .fields()
-            .name("record_array")
-            .type()
-            .array()
-            .items(
-                SchemaBuilder.record("record_array_item")
-                    .namespace("com.example")
-                    .fields()
-                    .name("nested_record1")
-                    .type(
-                        SchemaBuilder.record("simple_nested_record1")
-                            .namespace("com.example")
-                            .fields()
-                            .name("string_field")
-                            .type()
-                            .stringType()
-                            .noDefault()
-                            .name("int_field")
-                            .type()
-                            .intType()
-                            .noDefault()
-                            .endRecord())
-                    .noDefault()
-                    .name("nested_record2")
-                    .type(
-                        SchemaBuilder.record("simple_nested_record2")
-                            .namespace("com.example")
-                            .fields()
-                            .name("string_field")
-                            .type()
-                            .stringType()
-                            .noDefault()
-                            .name("int_field")
-                            .type()
-                            .intType()
-                            .noDefault()
-                            .endRecord())
-                    .noDefault()
-                    .endRecord())
-            .noDefault()
-            .name("nested_record3")
-            .type(
-                SchemaBuilder.record("simple_nested_record3")
-                    .namespace("com.example")
-                    .fields()
-                    .name("string_field")
-                    .type()
-                    .stringType()
-                    .noDefault()
-                    .name("int_field")
-                    .type()
-                    .intType()
-                    .noDefault()
-                    .endRecord())
-            .noDefault()
-            .endRecord()
-            .noDefault()
-            .name("primitive_map")
-            .type()
-            .map()
-            .values()
-            .stringType()
-            .noDefault()
-            .name("fixed_decimal")
-            .type()
-            .bytesType()
-            .noDefault()
-            .endRecord();
-    Schema updatedSchemaWithIdTracking =
-        idTracker.addIdTracking(updatedSchema, Option.of(schemaWithIdTracking), false);
-    IdTracking actual = idTracker.getIdTracking(updatedSchemaWithIdTracking).get();
-    assertEquals(getIdTrackingForEvolvedSchemaWithNestedField(), actual);
   }
 
   @Test
@@ -298,52 +189,6 @@ public class TestIdTracker {
     assertEquals(expected, actual);
   }
 
-  private static IdTracking getIdTrackingForEvolvedSchemaWithNestedField() {
-    // Creating the nested structure for the specified IdMappings
-    List<IdMapping> idMappings =
-        Arrays.asList(
-            // This column is dropped in the evolved schema
-            // new IdMapping("to_be_dropped", 1),
-            new IdMapping("bytes_decimal", 2),
-            new IdMapping(
-                "complex_nested_record",
-                3,
-                Arrays.asList(
-                    new IdMapping(
-                        "record_array",
-                        4,
-                        Arrays.asList(
-                            new IdMapping(
-                                "element",
-                                6,
-                                Arrays.asList(
-                                    new IdMapping(
-                                        "nested_record1",
-                                        7,
-                                        Arrays.asList(
-                                            new IdMapping("string_field", 9),
-                                            new IdMapping("int_field", 10))),
-                                    new IdMapping(
-                                        "nested_record2",
-                                        8,
-                                        Arrays.asList(
-                                            new IdMapping("string_field", 11),
-                                            new IdMapping("int_field", 12))))))),
-                    new IdMapping(
-                        "nested_record3",
-                        5,
-                        Arrays.asList(
-                            new IdMapping("string_field", 13), new IdMapping("int_field", 14))))),
-            new IdMapping(
-                "primitive_map",
-                15,
-                Arrays.asList(new IdMapping("key", 16), new IdMapping("value", 17))),
-            new IdMapping("fixed_decimal", 18));
-
-    // Return the IdTracking object
-    return new IdTracking(idMappings, 18);
-  }
-
   private static IdTracking getExpectTrackingForComplexSchema() {
     List<IdMapping> idMappings =
         Arrays.asList(
@@ -425,8 +270,7 @@ public class TestIdTracker {
                         "double_nested",
                         13,
                         Collections.singletonList(new IdMapping("double_nested_int", 14))),
-                    // new field added
-                    new IdMapping("level", 22))),
+                    new IdMapping("level", 24))),
             new IdMapping(
                 "nullable_map_field",
                 10,
@@ -441,29 +285,28 @@ public class TestIdTracker {
                                 "double_nested",
                                 18,
                                 Collections.singletonList(new IdMapping("double_nested_int", 19))),
-                            // new field added
-                            new IdMapping("level", 23))))),
+                            new IdMapping("level", 25))))),
             new IdMapping(
                 "primitive_map_field",
                 11,
                 Arrays.asList(new IdMapping("key", 20), new IdMapping("value", 21))),
             new IdMapping(
                 "array_field",
-                24,
+                22,
                 Collections.singletonList(
                     new IdMapping(
                         "element",
-                        25,
+                        26,
                         Arrays.asList(
-                            new IdMapping("nested_int", 26),
+                            new IdMapping("nested_int", 27),
                             new IdMapping(
                                 "double_nested",
-                                27,
-                                Collections.singletonList(new IdMapping("double_nested_int", 29))),
-                            new IdMapping("level", 28))))),
+                                28,
+                                Collections.singletonList(new IdMapping("double_nested_int", 30))),
+                            new IdMapping("level", 29))))),
             new IdMapping(
                 "primitive_array_field",
-                30,
+                23,
                 Collections.singletonList(new IdMapping("element", 31))));
     return new IdTracking(idMappings, 31);
   }
@@ -483,7 +326,7 @@ public class TestIdTracker {
                         "double_nested",
                         8,
                         Collections.singletonList(new IdMapping("double_nested_int", 9))),
-                    new IdMapping("level", 17))),
+                    new IdMapping("level", 19))),
             new IdMapping(
                 "nullable_map_field",
                 5,
@@ -498,28 +341,28 @@ public class TestIdTracker {
                                 "double_nested",
                                 13,
                                 Collections.singletonList(new IdMapping("double_nested_int", 14))),
-                            new IdMapping("level", 18))))),
+                            new IdMapping("level", 20))))),
             new IdMapping(
                 "primitive_map_field",
                 6,
                 Arrays.asList(new IdMapping("key", 15), new IdMapping("value", 16))),
             new IdMapping(
                 "array_field",
-                19,
+                17,
                 Collections.singletonList(
                     new IdMapping(
                         "element",
-                        20,
+                        21,
                         Arrays.asList(
-                            new IdMapping("nested_int", 21),
+                            new IdMapping("nested_int", 22),
                             new IdMapping(
                                 "double_nested",
-                                22,
-                                Collections.singletonList(new IdMapping("double_nested_int", 24))),
-                            new IdMapping("level", 23))))),
+                                23,
+                                Collections.singletonList(new IdMapping("double_nested_int", 25))),
+                            new IdMapping("level", 24))))),
             new IdMapping(
                 "primitive_array_field",
-                25,
+                18,
                 Collections.singletonList(new IdMapping("element", 26))));
     return new IdTracking(idMappings, 26);
   }

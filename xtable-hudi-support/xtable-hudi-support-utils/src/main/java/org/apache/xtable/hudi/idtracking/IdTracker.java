@@ -23,7 +23,6 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -128,50 +127,9 @@ public class IdTracker {
             ? HoodieSchemaUtils.addMetadataFields(HoodieSchema.fromAvroSchema(schema))
                 .toAvroSchema()
             : schema;
-    if (currentId.intValue() != 0) {
-      // if the schema has ID tracking, update the existing mappings.
-      List<IdMapping> updatedMappings =
-          updateIdMappings(schemaForIdMapping, currentId, existingState.getIdMappings());
-      return new IdTracking(updatedMappings, currentId.get());
-    } else {
-      // if the schema does not have ID tracking, generate new mappings.
-      List<IdMapping> newMappings =
-          generateIdMappings(schemaForIdMapping, currentId, existingState.getIdMappings());
-      return new IdTracking(newMappings, currentId.get());
-    }
-  }
-
-  /**
-   * Updates the IdMappings for the provided schema. The top-level columns are processed one by one:
-   * existing columns reuse their previously assigned IdMapping while newly added columns are
-   * assigned a new id.
-   *
-   * <p>Unlike {@link #generateIdMappings} which regenerates mappings for the entire schema tree,
-   * this method preserves the existing top-level mappings and delegates to {@link
-   * #generateIdMappings} per column to (re)generate the nested mappings within that column's
-   * subtree.
-   *
-   * @param schema schema to update.
-   * @param currentId last ID used.
-   * @param existingMappings id mapping from the old schema.
-   */
-  private static List<IdMapping> updateIdMappings(
-      Schema schema, AtomicInteger currentId, List<IdMapping> existingMappings) {
-    HashSet<IdMapping> newMappings = new HashSet<>();
-    Map<String, IdMapping> fieldNameToExistingMapping =
-        existingMappings.stream()
-            .collect(Collectors.toMap(IdMapping::getName, Function.identity()));
-    for (Schema.Field field : schema.getFields()) {
-      IdMapping fieldMapping =
-          fieldNameToExistingMapping.computeIfAbsent(
-              field.name(), key -> new IdMapping(key, currentId.incrementAndGet()));
-      Schema fieldSchema = getFieldSchema(field.schema());
-      fieldMapping.setFields(generateIdMappings(fieldSchema, currentId, fieldMapping.getFields()));
-      newMappings.add(fieldMapping);
-    }
-    return newMappings.stream()
-        .sorted(Comparator.comparing(IdMapping::getId))
-        .collect(Collectors.toList());
+    List<IdMapping> newMappings =
+        generateIdMappings(schemaForIdMapping, currentId, existingState.getIdMappings());
+    return new IdTracking(newMappings, currentId.get());
   }
 
   /**
