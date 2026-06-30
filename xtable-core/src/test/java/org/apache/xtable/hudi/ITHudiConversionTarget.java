@@ -226,16 +226,14 @@ public class ITHudiConversionTarget {
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(
         metaClient, partitionPath, Collections.singletonList(Pair.of(fileName, filePath)));
-    if (!partitioned) {
-      try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
-          new HoodieBackedTableMetadata(
-              CONTEXT,
-              metaClient.getStorage(),
-              writeConfig.getMetadataConfig(),
-              tableBasePath,
-              true)) {
-        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
-      }
+    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+        new HoodieBackedTableMetadata(
+            CONTEXT,
+            metaClient.getStorage(),
+            writeConfig.getMetadataConfig(),
+            tableBasePath,
+            true)) {
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
     }
     // include meta fields since the table was created with meta fields enabled
     assertSchema(metaClient, true);
@@ -274,16 +272,14 @@ public class ITHudiConversionTarget {
         HoodieTableMetaClient.builder().setConf(CONFIGURATION).setBasePath(tableBasePath).build();
     assertFileGroupCorrectness(
         metaClient, partitionPath, Collections.singletonList(Pair.of(fileName, filePath)));
-    if (!partitioned) {
-      try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
-          new HoodieBackedTableMetadata(
-              CONTEXT,
-              metaClient.getStorage(),
-              getHoodieWriteConfig(metaClient).getMetadataConfig(),
-              tableBasePath,
-              true)) {
-        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
-      }
+    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+        new HoodieBackedTableMetadata(
+            CONTEXT,
+            metaClient.getStorage(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig(),
+            tableBasePath,
+            true)) {
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName);
     }
     assertSchema(metaClient, false);
   }
@@ -328,16 +324,14 @@ public class ITHudiConversionTarget {
     Pair<String, String> file0Pair = Pair.of(fileName0, filePath0);
     assertFileGroupCorrectness(
         metaClient, partitionPath, Arrays.asList(file0Pair, Pair.of(fileName1, filePath1)));
-    if (!partitioned) {
-      try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
-          new HoodieBackedTableMetadata(
-              CONTEXT,
-              metaClient.getStorage(),
-              getHoodieWriteConfig(metaClient).getMetadataConfig(),
-              tableBasePath,
-              true)) {
-        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
-      }
+    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+        new HoodieBackedTableMetadata(
+            CONTEXT,
+            metaClient.getStorage(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig(),
+            tableBasePath,
+            true)) {
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
     }
 
     // create a new commit that removes fileName1 and adds fileName2
@@ -353,19 +347,17 @@ public class ITHudiConversionTarget {
 
     assertFileGroupCorrectness(
         metaClient, partitionPath, Arrays.asList(file0Pair, Pair.of(fileName2, filePath2)));
-    if (!partitioned) {
-      try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
-          new HoodieBackedTableMetadata(
-              CONTEXT,
-              metaClient.getStorage(),
-              getHoodieWriteConfig(metaClient).getMetadataConfig(),
-              tableBasePath,
-              true)) {
-        // the metadata for fileName1 should still be present until the cleaner kicks in
-        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
-        // new file stats should be present
-        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName2);
-      }
+    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+        new HoodieBackedTableMetadata(
+            CONTEXT,
+            metaClient.getStorage(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig(),
+            tableBasePath,
+            true)) {
+      // the metadata for fileName1 should still be present until the cleaner kicks in
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
+      // new file stats should be present
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName2);
     }
 
     // create a new commit that removes fileName2 and adds fileName3
@@ -413,18 +405,16 @@ public class ITHudiConversionTarget {
             Pair.of(fileName4, filePath4),
             Pair.of(fileName5, filePath5)));
     // col stats should be cleaned up for fileName1 but present for fileName2 and fileName3
-    if (!partitioned) {
-      try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
-          new HoodieBackedTableMetadata(
-              CONTEXT,
-              metaClient.getStorage(),
-              getHoodieWriteConfig(metaClient).getMetadataConfig(),
-              tableBasePath,
-              true)) {
-        // assertEmptyColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
-        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName3);
-        assertColStats(hoodieBackedTableMetadata, partitionPath, fileName4);
-      }
+    try (HoodieBackedTableMetadata hoodieBackedTableMetadata =
+        new HoodieBackedTableMetadata(
+            CONTEXT,
+            metaClient.getStorage(),
+            getHoodieWriteConfig(metaClient).getMetadataConfig(),
+            tableBasePath,
+            true)) {
+      // assertEmptyColStats(hoodieBackedTableMetadata, partitionPath, fileName1);
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName3);
+      assertColStats(hoodieBackedTableMetadata, partitionPath, fileName4);
     }
     // the first commit to the timeline should be archived
     assertEquals(
