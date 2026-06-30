@@ -21,7 +21,9 @@ package org.apache.xtable.hudi;
 import static java.util.stream.Collectors.groupingBy;
 import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -57,11 +59,13 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.client.HoodieReadClient;
+import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import org.apache.xtable.GenericTable;
@@ -281,6 +285,94 @@ public class ITHudiConversionSource {
         allTableChanges.add(tableChange);
       }
       ValidationTestHelper.validateTableChanges(allBaseFilePaths, allTableChanges);
+    }
+  }
+
+  /**
+   * On table version 9 (timeline layout V2) a commit becomes visible at its completion time. This
+   * test creates a commit whose requested (instant) time is older than a later commit but whose
+   * completion is newer (out-of-order completion) and verifies the incremental backlog still
+   * surfaces it. With the legacy requested-time selection the straggler would be skipped because
+   * its requested time precedes the checkpoint.
+   */
+  @Test
+  public void testIncrementalSyncWithOutOfOrderCompletionOnTableVersionNine() {
+    String tableName = GenericTable.getTableName();
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE, HoodieTableVersion.NINE)) {
+      // Baseline commit that the incremental sync resumes from.
+      String baseInstant = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(20), baseInstant, true);
+
+      // "early" is requested first (smaller instant time) but completed last; "late" is requested
+      // second but completed first -> completion order is the reverse of requested order.
+      String earlyRequestedInstant = table.startCommit();
+      List<WriteStatus> earlyStatuses =
+          table.bulkInsertWithoutCommit(table.generateRecords(20), earlyRequestedInstant);
+      String lateRequestedInstant = table.startCommit();
+      List<WriteStatus> lateStatuses =
+          table.bulkInsertWithoutCommit(table.generateRecords(20), lateRequestedInstant);
+      table.commitInstant(lateRequestedInstant, lateStatuses);
+      table.commitInstant(earlyRequestedInstant, earlyStatuses);
+
+      HudiConversionSource hudiClient = getHudiSourceClient(CONFIGURATION, table.getBasePath(), "");
+
+      // Resume from the later-requested commit's instant time. Under requested-time selection the
+      // earlier-requested straggler (earlyRequestedInstant < lateRequestedInstant) would be
+      // dropped; completion-time selection must still return it.
+      InstantsForIncrementalSync instantsForIncrementalSync =
+          InstantsForIncrementalSync.builder()
+              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(lateRequestedInstant))
+              .build();
+      CommitsBacklog<HoodieInstant> backlog =
+          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
+      List<String> backlogInstants =
+          backlog.getCommitsToProcess().stream()
+              .map(HoodieInstant::requestedTime)
+              .collect(Collectors.toList());
+
+      assertEquals(
+          Collections.singletonList(earlyRequestedInstant),
+          backlogInstants,
+          "Out-of-order completed commit must be included in the incremental backlog");
+
+      // The current snapshot must reflect the most-recently-completed commit (the straggler).
+      InternalSnapshot snapshot = hudiClient.getCurrentSnapshot();
+      assertEquals(
+          earlyRequestedInstant,
+          HudiInstantUtils.convertInstantToCommit(snapshot.getTable().getLatestCommitTime()));
+    }
+  }
+
+  /**
+   * Sanity check that ordinary in-order incremental sync on table version 9 returns every commit in
+   * completion-time order.
+   */
+  @Test
+  public void testIncrementalSyncOrderingOnTableVersionNine() {
+    String tableName = GenericTable.getTableName();
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE, HoodieTableVersion.NINE)) {
+      String baseInstant = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(20), baseInstant, true);
+      String second = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(20), second, true);
+      String third = table.startCommit();
+      table.insertRecordsWithCommitAlreadyStarted(table.generateRecords(20), third, true);
+
+      HudiConversionSource hudiClient = getHudiSourceClient(CONFIGURATION, table.getBasePath(), "");
+      CommitsBacklog<HoodieInstant> backlog =
+          hudiClient.getCommitsBacklog(
+              InstantsForIncrementalSync.builder()
+                  .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(baseInstant))
+                  .build());
+      assertIterableEquals(
+          Arrays.asList(second, third),
+          backlog.getCommitsToProcess().stream()
+              .map(HoodieInstant::requestedTime)
+              .collect(Collectors.toList()));
     }
   }
 

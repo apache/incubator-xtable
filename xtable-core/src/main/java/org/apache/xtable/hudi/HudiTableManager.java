@@ -92,10 +92,14 @@ public class HudiTableManager {
    * @param table the table to initialize
    * @param databaseName the database to register the table under; when null/empty the table falls
    *     back to {@link #DEFAULT_DATABASE_NAME}
+   * @param tableVersion the Hudi table format version to initialize the table with
    * @return {@link HoodieTableMetaClient} for the table that was created
    */
   HoodieTableMetaClient initializeHudiTable(
-      String tableDataPath, InternalTable table, String databaseName) {
+      String tableDataPath,
+      InternalTable table,
+      String databaseName,
+      HoodieTableVersion tableVersion) {
     String recordKeyField = "";
     if (table.getReadSchema() != null) {
       List<String> recordKeys =
@@ -119,10 +123,10 @@ public class HudiTableManager {
           .setCommitTimezone(HoodieTimelineTimeZone.UTC)
           .setHiveStylePartitioningEnable(hiveStylePartitioningEnabled)
           .setTableType(HoodieTableType.COPY_ON_WRITE)
-          // Pin new tables to table version 6 for now. Table version 9 (Hudi 1.x) support will be
-          // added in a follow-up PR, tracked in
+          // Table format version (6 = legacy 0.x layout, 9 = Hudi 1.x layout) is selected via the
+          // xtable.hudi.target.table_version config and defaults to 9. See
           // https://github.com/apache/incubator-xtable/issues/834.
-          .setTableVersion(HoodieTableVersion.SIX)
+          .setTableVersion(tableVersion)
           .setTableName(table.getName())
           .setDatabaseName(resolvedDatabaseName)
           .setPayloadClass(HoodieAvroPayload.class)

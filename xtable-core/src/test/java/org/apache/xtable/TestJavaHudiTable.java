@@ -53,6 +53,7 @@ import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieClusteringConfig;
@@ -87,6 +88,16 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       String tableName, Path tempDir, String partitionConfig, HoodieTableType tableType) {
     return new TestJavaHudiTable(
         tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, null, false);
+  }
+
+  public static TestJavaHudiTable forStandardSchema(
+      String tableName,
+      Path tempDir,
+      String partitionConfig,
+      HoodieTableType tableType,
+      HoodieTableVersion tableVersion) {
+    return new TestJavaHudiTable(
+        tableName, BASIC_SCHEMA, tempDir, partitionConfig, tableType, null, false, tableVersion);
   }
 
   public static TestJavaHudiTable forStandardSchemaWithFieldIds(
@@ -170,6 +181,17 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
         tableName, schema, tempDir, partitionConfig, tableType, null, false);
   }
 
+  public static TestJavaHudiTable withSchema(
+      String tableName,
+      Path tempDir,
+      String partitionConfig,
+      HoodieTableType tableType,
+      Schema schema,
+      HoodieTableVersion tableVersion) {
+    return new TestJavaHudiTable(
+        tableName, schema, tempDir, partitionConfig, tableType, null, false, tableVersion);
+  }
+
   private TestJavaHudiTable(
       String name,
       Schema schema,
@@ -178,7 +200,28 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       HoodieTableType hoodieTableType,
       HoodieArchivalConfig archivalConfig,
       boolean addFieldIds) {
+    this(
+        name,
+        schema,
+        tempDir,
+        partitionConfig,
+        hoodieTableType,
+        archivalConfig,
+        addFieldIds,
+        HoodieTableVersion.SIX);
+  }
+
+  private TestJavaHudiTable(
+      String name,
+      Schema schema,
+      Path tempDir,
+      String partitionConfig,
+      HoodieTableType hoodieTableType,
+      HoodieArchivalConfig archivalConfig,
+      boolean addFieldIds,
+      HoodieTableVersion tableVersion) {
     super(name, schema, tempDir, partitionConfig);
+    this.tableVersion = tableVersion;
     this.conf = new Configuration();
     this.conf.set("parquet.avro.write-old-list-structure", "false");
     this.addFieldIds = addFieldIds;
@@ -200,6 +243,21 @@ public class TestJavaHudiTable extends TestAbstractHudiTable {
       assertNoWriteErrors(result);
     }
     return inserts;
+  }
+
+  /**
+   * Writes the records for an already-started commit without finalizing it. Pair with {@link
+   * #commitInstant} to control completion order independently of the requested (instant) time, e.g.
+   * to reproduce out-of-order completion on table version 9.
+   */
+  public List<WriteStatus> bulkInsertWithoutCommit(
+      List<HoodieRecord<HoodieAvroPayload>> inserts, String commitInstant) {
+    return writeClient.bulkInsert(copyRecords(inserts), commitInstant);
+  }
+
+  public void commitInstant(String commitInstant, List<WriteStatus> writeStatuses) {
+    writeClient.commit(commitInstant, writeStatuses);
+    assertNoWriteErrors(writeStatuses);
   }
 
   public List<HoodieRecord<HoodieAvroPayload>> upsertRecordsWithCommitAlreadyStarted(
