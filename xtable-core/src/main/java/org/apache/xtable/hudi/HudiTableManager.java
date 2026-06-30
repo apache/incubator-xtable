@@ -18,6 +18,8 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +34,7 @@ import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.exception.TableNotFoundException;
 
@@ -54,6 +57,11 @@ public class HudiTableManager {
       "org.apache.hudi.keygen.TimestampBasedKeyGenerator";
   private static final String COMPLEX_KEY_GENERATOR = "org.apache.hudi.keygen.ComplexKeyGenerator";
   private static final String SIMPLE_KEY_GENERATOR = "org.apache.hudi.keygen.SimpleKeyGenerator";
+  // Register Hudi tables under a dedicated database: under Hudi 1.x a Spark read against the
+  // "default" database can resolve a same-named Delta table instead of the Hudi table.
+  // TODO: make this configurable / derive from the target namespace, see
+  // https://github.com/apache/incubator-xtable/issues/833
+  static final String DEFAULT_DATABASE_NAME = "default_hudi";
 
   private final Configuration configuration;
 
@@ -68,7 +76,7 @@ public class HudiTableManager {
       return Optional.of(
           HoodieTableMetaClient.builder()
               .setBasePath(tableDataPath)
-              .setConf(configuration)
+              .setConf(getStorageConf(configuration))
               .setLoadActiveTimelineOnLoad(false)
               .build());
     } catch (TableNotFoundException ex) {
@@ -82,9 +90,12 @@ public class HudiTableManager {
    *
    * @param tableDataPath the base path for the data files in the table
    * @param table the table to initialize
+   * @param databaseName the database to register the table under; when null/empty the table falls
+   *     back to {@link #DEFAULT_DATABASE_NAME}
    * @return {@link HoodieTableMetaClient} for the table that was created
    */
-  HoodieTableMetaClient initializeHudiTable(String tableDataPath, InternalTable table) {
+  HoodieTableMetaClient initializeHudiTable(
+      String tableDataPath, InternalTable table, String databaseName) {
     String recordKeyField = "";
     if (table.getReadSchema() != null) {
       List<String> recordKeys =
@@ -101,12 +112,19 @@ public class HudiTableManager {
             table.getPartitioningFields(), table.getReadSchema().getRecordKeyFields());
     boolean hiveStylePartitioningEnabled =
         DataLayoutStrategy.HIVE_STYLE_PARTITION == table.getLayoutStrategy();
+    String resolvedDatabaseName =
+        (databaseName == null || databaseName.isEmpty()) ? DEFAULT_DATABASE_NAME : databaseName;
     try {
-      return HoodieTableMetaClient.withPropertyBuilder()
+      return HoodieTableMetaClient.newTableBuilder()
           .setCommitTimezone(HoodieTimelineTimeZone.UTC)
           .setHiveStylePartitioningEnable(hiveStylePartitioningEnabled)
           .setTableType(HoodieTableType.COPY_ON_WRITE)
+          // Pin new tables to table version 6 for now. Table version 9 (Hudi 1.x) support will be
+          // added in a follow-up PR, tracked in
+          // https://github.com/apache/incubator-xtable/issues/834.
+          .setTableVersion(HoodieTableVersion.SIX)
           .setTableName(table.getName())
+          .setDatabaseName(resolvedDatabaseName)
           .setPayloadClass(HoodieAvroPayload.class)
           .setRecordKeyFields(recordKeyField)
           .setKeyGeneratorClassProp(keyGeneratorClass)
@@ -117,7 +135,7 @@ public class HudiTableManager {
                   .map(InternalPartitionField::getSourceField)
                   .map(InternalField::getPath)
                   .collect(Collectors.joining(",")))
-          .initTable(configuration, tableDataPath);
+          .initTable(getStorageConf(configuration), tableDataPath);
     } catch (IOException ex) {
       throw new UpdateException("Unable to initialize Hudi table", ex);
     }

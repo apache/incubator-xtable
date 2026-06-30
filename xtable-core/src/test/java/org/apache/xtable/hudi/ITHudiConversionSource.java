@@ -19,6 +19,7 @@
 package org.apache.xtable.hudi;
 
 import static java.util.stream.Collectors.groupingBy;
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -700,13 +701,13 @@ public class ITHudiConversionSource {
           hudiClient.getCommitsBacklog(instantsForIncrementalSync);
       for (HoodieInstant instant : instantCommitsBacklog.getCommitsToProcess()) {
         TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
-        if (commitInstant2.equals(instant.getTimestamp())) {
+        if (commitInstant2.equals(instant.requestedTime())) {
           ValidationTestHelper.validateTableChange(
               baseFilesAfterCommit1, baseFilesAfterCommit2, tableChange);
         } else if ("rollback".equals(instant.getAction())) {
           ValidationTestHelper.validateTableChange(
               baseFilesAfterCommit3, baseFilesAfterRollback, tableChange);
-        } else if (commitInstant4.equals(instant.getTimestamp())) {
+        } else if (commitInstant4.equals(instant.requestedTime())) {
           ValidationTestHelper.validateTableChange(
               baseFilesAfterRollback, baseFilesAfterCommit4, tableChange);
         } else {
@@ -739,7 +740,7 @@ public class ITHudiConversionSource {
       Configuration conf, String basePath, String xTablePartitionConfig) {
     HoodieTableMetaClient hoodieTableMetaClient =
         HoodieTableMetaClient.builder()
-            .setConf(conf)
+            .setConf(getStorageConf(conf))
             .setBasePath(basePath)
             .setLoadActiveTimelineOnLoad(true)
             .build();

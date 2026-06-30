@@ -21,12 +21,11 @@ package org.apache.xtable.hudi.extensions;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.avro.Schema;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 
 import org.apache.hudi.callback.HoodieClientInitCallback;
 import org.apache.hudi.client.BaseHoodieClient;
 import org.apache.hudi.common.fs.FSUtils;
+import org.apache.hudi.common.schema.HoodieSchema;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.util.Option;
@@ -63,17 +62,16 @@ public class AddFieldIdsClientInitCallback implements HoodieClientInitCallback {
       try {
         Option<Schema> currentSchema = Option.empty();
         try {
-          Configuration hadoopConfiguration = hoodieClient.getEngineContext().getHadoopConf().get();
-          String tableBasePath = config.getBasePath();
-          FileSystem fs = FSUtils.getFs(tableBasePath, hadoopConfiguration);
-          if (FSUtils.isTableExists(config.getBasePath(), fs)) {
-            HoodieTableMetaClient metaClient =
-                HoodieTableMetaClient.builder()
-                    .setConf(hadoopConfiguration)
-                    .setBasePath(tableBasePath)
-                    .build();
+          HoodieTableMetaClient metaClient =
+              HoodieTableMetaClient.builder()
+                  .setConf(hoodieClient.getEngineContext().getStorageConf())
+                  .setBasePath(config.getBasePath())
+                  .build();
+          if (FSUtils.isTableExists(config.getBasePath(), metaClient.getStorage())) {
             currentSchema =
-                new TableSchemaResolver(metaClient).getTableAvroSchemaFromLatestCommit(true);
+                new TableSchemaResolver(metaClient)
+                    .getTableSchemaFromLatestCommit(true)
+                    .map(HoodieSchema::toAvroSchema);
           }
         } catch (Exception ex) {
           log.warn("Unable to fetch current schema for fieldIds", ex);

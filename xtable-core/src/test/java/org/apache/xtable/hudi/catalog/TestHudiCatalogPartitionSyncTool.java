@@ -46,7 +46,6 @@ import lombok.SneakyThrows;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -59,7 +58,9 @@ import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.TimelineUtils;
+import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.storage.StoragePath;
 import org.apache.hudi.sync.common.model.PartitionValueExtractor;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
@@ -109,7 +110,7 @@ public class TestHudiCatalogPartitionSyncTool {
   @Mock private HudiTableManager mockHudiTableManager;
 
   private final Configuration mockConfiguration = new Configuration();
-  private HudiCatalogPartitionSyncTool mockHudiCatalogPartitionSyncTool;
+  private HudiCatalogPartitionSyncTool hudiCatalogPartitionSyncTool;
 
   private HudiCatalogPartitionSyncTool createMockHudiPartitionSyncTool() {
     return new HudiCatalogPartitionSyncTool(
@@ -117,7 +118,7 @@ public class TestHudiCatalogPartitionSyncTool {
   }
 
   private void setupCommonMocks() {
-    mockHudiCatalogPartitionSyncTool = createMockHudiPartitionSyncTool();
+    hudiCatalogPartitionSyncTool = createMockHudiPartitionSyncTool();
   }
 
   @SneakyThrows
@@ -134,17 +135,17 @@ public class TestHudiCatalogPartitionSyncTool {
       mockZonedDateTime.when(ZonedDateTime::now).thenReturn(zonedDateTime);
       List<String> mockedPartitions = Arrays.asList(partitionKey1, partitionKey2);
       mockFSUtils
-          .when(() -> FSUtils.getAllPartitionPaths(any(), eq(TEST_BASE_PATH), eq(true), eq(false)))
+          .when(() -> FSUtils.getAllPartitionPaths(any(), any(), eq(true)))
           .thenReturn(mockedPartitions);
       mockFSUtils
-          .when(() -> FSUtils.getPartitionPath(new Path(TEST_BASE_PATH), partitionKey1))
-          .thenReturn(new Path(TEST_BASE_PATH + "/" + partitionKey1));
+          .when(() -> FSUtils.constructAbsolutePath(new StoragePath(TEST_BASE_PATH), partitionKey1))
+          .thenReturn(new StoragePath(TEST_BASE_PATH + "/" + partitionKey1));
       mockFSUtils
-          .when(() -> FSUtils.getPartitionPath(new Path(TEST_BASE_PATH), partitionKey2))
-          .thenReturn(new Path(TEST_BASE_PATH + "/" + partitionKey2));
+          .when(() -> FSUtils.constructAbsolutePath(new StoragePath(TEST_BASE_PATH), partitionKey2))
+          .thenReturn(new StoragePath(TEST_BASE_PATH + "/" + partitionKey2));
       when(mockHudiTableManager.loadTableMetaClientIfExists(TEST_BASE_PATH))
           .thenReturn(Optional.of(mockMetaClient));
-      when(mockMetaClient.getBasePathV2()).thenReturn(new Path(TEST_BASE_PATH));
+      when(mockMetaClient.getBasePath()).thenReturn(new StoragePath(TEST_BASE_PATH));
       when(mockPartitionValueExtractor.extractPartitionValuesInPath(partitionKey1))
           .thenReturn(Collections.singletonList(partitionKey1));
       when(mockPartitionValueExtractor.extractPartitionValuesInPath(partitionKey2))
@@ -152,12 +153,22 @@ public class TestHudiCatalogPartitionSyncTool {
 
       HoodieActiveTimeline mockTimeline = mock(HoodieActiveTimeline.class);
       HoodieInstant instant1 =
-          new HoodieInstant(HoodieInstant.State.COMPLETED, "replacecommit", "100", "1000");
+          new HoodieInstant(
+              HoodieInstant.State.COMPLETED,
+              "replacecommit",
+              "100",
+              "1000",
+              InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
       HoodieInstant instant2 =
-          new HoodieInstant(HoodieInstant.State.COMPLETED, "replacecommit", "101", "1100");
+          new HoodieInstant(
+              HoodieInstant.State.COMPLETED,
+              "replacecommit",
+              "101",
+              "1100",
+              InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
       when(mockTimeline.countInstants()).thenReturn(2);
       when(mockTimeline.lastInstant()).thenReturn(Option.of(instant2));
-      when(mockTimeline.getInstantsOrderedByStateTransitionTime())
+      when(mockTimeline.getInstantsOrderedByCompletionTime())
           .thenReturn(Stream.of(instant1, instant2));
       when(mockMetaClient.getActiveTimeline()).thenReturn(mockTimeline);
 
@@ -167,7 +178,7 @@ public class TestHudiCatalogPartitionSyncTool {
           .thenReturn(Collections.singletonList(p1));
 
       assertTrue(
-          mockHudiCatalogPartitionSyncTool.syncPartitions(
+          hudiCatalogPartitionSyncTool.syncPartitions(
               TEST_INTERNAL_TABLE_WITH_SCHEMA, TEST_TABLE_IDENTIFIER));
 
       ArgumentCaptor<List<CatalogPartition>> addPartitionsCaptor =
@@ -209,17 +220,17 @@ public class TestHudiCatalogPartitionSyncTool {
       mockZonedDateTime.when(ZonedDateTime::now).thenReturn(zonedDateTime);
       List<String> mockedPartitions = Arrays.asList(partitionKey1, partitionKey2);
       mockFSUtils
-          .when(() -> FSUtils.getAllPartitionPaths(any(), eq(TEST_BASE_PATH), eq(true), eq(false)))
+          .when(() -> FSUtils.getAllPartitionPaths(any(), any(), eq(true)))
           .thenReturn(mockedPartitions);
       mockFSUtils
-          .when(() -> FSUtils.getPartitionPath(new Path(TEST_BASE_PATH), partitionKey2))
-          .thenReturn(new Path(TEST_BASE_PATH + "/" + partitionKey2));
+          .when(() -> FSUtils.constructAbsolutePath(new StoragePath(TEST_BASE_PATH), partitionKey2))
+          .thenReturn(new StoragePath(TEST_BASE_PATH + "/" + partitionKey2));
       mockFSUtils
-          .when(() -> FSUtils.getPartitionPath(new Path(TEST_BASE_PATH), partitionKey3))
-          .thenReturn(new Path(TEST_BASE_PATH + "/" + partitionKey3));
+          .when(() -> FSUtils.constructAbsolutePath(new StoragePath(TEST_BASE_PATH), partitionKey3))
+          .thenReturn(new StoragePath(TEST_BASE_PATH + "/" + partitionKey3));
       when(mockHudiTableManager.loadTableMetaClientIfExists(TEST_BASE_PATH))
           .thenReturn(Optional.of(mockMetaClient));
-      when(mockMetaClient.getBasePathV2()).thenReturn(new Path(TEST_BASE_PATH));
+      when(mockMetaClient.getBasePath()).thenReturn(new StoragePath(TEST_BASE_PATH));
       when(mockPartitionValueExtractor.extractPartitionValuesInPath(partitionKey2))
           .thenReturn(Collections.singletonList(partitionKey2));
       when(mockPartitionValueExtractor.extractPartitionValuesInPath(partitionKey3))
@@ -227,13 +238,23 @@ public class TestHudiCatalogPartitionSyncTool {
 
       HoodieActiveTimeline mockTimeline = mock(HoodieActiveTimeline.class);
       HoodieInstant instant1 =
-          new HoodieInstant(HoodieInstant.State.COMPLETED, "replacecommit", "100", "1000");
+          new HoodieInstant(
+              HoodieInstant.State.COMPLETED,
+              "replacecommit",
+              "100",
+              "1000",
+              InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
       HoodieInstant instant2 =
-          new HoodieInstant(HoodieInstant.State.COMPLETED, "replacecommit", "101", "1100");
+          new HoodieInstant(
+              HoodieInstant.State.COMPLETED,
+              "replacecommit",
+              "101",
+              "1100",
+              InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
 
       when(mockTimeline.countInstants()).thenReturn(2);
       when(mockTimeline.lastInstant()).thenReturn(Option.of(instant2));
-      when(mockTimeline.getInstantsOrderedByStateTransitionTime())
+      when(mockTimeline.getInstantsOrderedByCompletionTime())
           .thenReturn(Stream.of(instant1, instant2));
       when(mockMetaClient.getActiveTimeline()).thenReturn(mockTimeline);
 
@@ -255,7 +276,7 @@ public class TestHudiCatalogPartitionSyncTool {
               () -> TimelineUtils.getCommitsTimelineAfter(mockMetaClient, "100", Option.of("1000")))
           .thenReturn(mockTimeline);
       mockedTimelineUtils
-          .when(() -> TimelineUtils.getDroppedPartitions(mockTimeline))
+          .when(() -> TimelineUtils.getDroppedPartitions(eq(mockMetaClient), any(), any()))
           .thenReturn(Collections.singletonList(partitionKey2));
 
       CatalogPartition p1 =
@@ -268,7 +289,7 @@ public class TestHudiCatalogPartitionSyncTool {
           .thenReturn(Arrays.asList(p1, p2));
 
       assertTrue(
-          mockHudiCatalogPartitionSyncTool.syncPartitions(
+          hudiCatalogPartitionSyncTool.syncPartitions(
               TEST_INTERNAL_TABLE_WITH_SCHEMA, TEST_TABLE_IDENTIFIER));
 
       // verify add partitions
