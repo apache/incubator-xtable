@@ -228,11 +228,6 @@ public class ITConversionController {
       String sourceTableFormat, SyncMode syncMode, boolean isPartitioned) {
     String tableName = getTableName();
     List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
-    if (sourceTableFormat.equals(PAIMON)) {
-      // TODO: Hudi 1.x target is not supported for un-partitioned Paimon source.
-      targetTableFormats =
-          targetTableFormats.stream().filter(fmt -> !fmt.equals(HUDI)).collect(Collectors.toList());
-    }
     String partitionConfig = null;
     if (isPartitioned) {
       partitionConfig = "level:VALUE";
@@ -538,19 +533,14 @@ public class ITConversionController {
         Arguments.of(
             buildArgsForPartition(
                 ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter)),
-        // TODO(hudi-1.2): re-enable the nested partition column case (HUDI -> ICEBERG partitioned
-        // on
-        // "nested_record.level"). Hudi 1.2's HoodieFileGroupReaderBasedFileFormat is the only batch
-        // reader and it converts the partition column into a top-level Avro field named
-        // "nested_record.level", which Avro rejects ("Illegal character in: nested_record.level").
-        // Delta is excluded here anyway since it does not support nested partition columns.
-        // Arguments.of(
-        //     buildArgsForPartition(
-        //         HUDI,
-        //         Arrays.asList(ICEBERG),
-        //         "nested_record.level:SIMPLE",
-        //         "nested_record.level:VALUE",
-        //         nestedLevelFilter)),
+        // Delta is excluded here since it does not support nested partition columns.
+        Arguments.of(
+            buildArgsForPartition(
+                HUDI,
+                Arrays.asList(ICEBERG),
+                "nested_record.level:SIMPLE",
+                "nested_record.level:VALUE",
+                nestedLevelFilter)),
         Arguments.of(
             buildArgsForPartition(
                 HUDI,

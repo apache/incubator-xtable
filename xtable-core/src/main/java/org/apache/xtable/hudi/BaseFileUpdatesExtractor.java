@@ -75,6 +75,12 @@ public class BaseFileUpdatesExtractor {
   private static final Pattern HUDI_BASE_FILE_PATTERN =
       Pattern.compile(
           "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[0-9]_[0-9a-fA-F-]+_[0-9]+\\.");
+  // External bucketed sources (e.g. Paimon) lay files out as {@code <partition>/bucket-N/<file>}.
+  // Hudi treats the trailing {@code bucket-N} directory as a file-group prefix within the partition
+  // rather than as part of the partition path (see Hudi PR #17788). Detecting such a directory lets
+  // us register the file under its true partition with the prefix encoded into the external-file
+  // marker, so an unpartitioned external table is not mistakenly read as partitioned by "bucket-N".
+  private static final Pattern EXTERNAL_FILE_GROUP_PREFIX_PATTERN = Pattern.compile("bucket-[0-9]+");
   private final HoodieEngineContext engineContext;
   private final Path tableBasePath;
 
@@ -234,7 +240,7 @@ public class BaseFileUpdatesExtractor {
             .map(file -> new CachingPath(file.getPhysicalPath()))
             .collect(
                 Collectors.groupingBy(
-                    path -> HudiPathUtils.getPartitionPath(tableBasePath, path),
+                    path -> truePartitionPath(tableBasePath, path),
                     Collectors.mapping(this::getFileId, Collectors.toList())));
     // For all added files, group by partition and extract the file id
     List<WriteStatus> writeStatuses =
@@ -250,7 +256,42 @@ public class BaseFileUpdatesExtractor {
     if (isFileCreatedByHudiWriter(fileName)) {
       return FSUtils.getFileId(fileName);
     }
-    return fileName;
+    // External bucketed files keep their file-group prefix as part of the fileId so the prefix can
+    // be recovered when Hudi resolves the physical path of the externally created file.
+    return externalFileGroupPrefix(filePath)
+        .map(prefix -> prefix + "/" + fileName)
+        .orElse(fileName);
+  }
+
+  /**
+   * Returns the external file-group prefix (e.g. Paimon's {@code bucket-N}) when the file's
+   * immediate parent directory denotes a file group within the partition rather than a partition
+   * segment, otherwise empty.
+   */
+  private Optional<String> externalFileGroupPrefix(Path filePath) {
+    Path parent = filePath.getParent();
+    if (parent == null) {
+      return Optional.empty();
+    }
+    String parentName = parent.getName();
+    return EXTERNAL_FILE_GROUP_PREFIX_PATTERN.matcher(parentName).matches()
+        ? Optional.of(parentName)
+        : Optional.empty();
+  }
+
+  /**
+   * Resolves the true Hudi partition path for a file, stripping any trailing external file-group
+   * prefix directory (e.g. {@code bucket-N}) so it is not treated as part of the partition.
+   */
+  private String truePartitionPath(Path tableBasePath, Path filePath) {
+    String partitionPath = HudiPathUtils.getPartitionPath(tableBasePath, filePath);
+    Optional<String> prefix = externalFileGroupPrefix(filePath);
+    if (!prefix.isPresent()) {
+      return partitionPath;
+    }
+    return partitionPath.equals(prefix.get())
+        ? ""
+        : partitionPath.substring(0, partitionPath.length() - prefix.get().length() - 1);
   }
 
   /**
@@ -273,17 +314,30 @@ public class BaseFileUpdatesExtractor {
     WriteStatus writeStatus = new WriteStatus();
     Path path = new CachingPath(file.getPhysicalPath());
     String partitionPath =
-        partitionPathOptional.orElseGet(() -> HudiPathUtils.getPartitionPath(tableBasePath, path));
+        partitionPathOptional.orElseGet(() -> truePartitionPath(tableBasePath, path));
     String fileId = getFileId(path);
     String filePath =
         path.toUri().getPath().substring(tableBasePath.toUri().getPath().length() + 1);
     String fileName = path.getName();
+    Optional<String> fileGroupPrefix = externalFileGroupPrefix(path);
+    // For external bucketed files encode the file-group prefix in the marker and keep the file name
+    // (not the bucket-relative path) as the marked name; otherwise fall back to the plain marker on
+    // the full relative path. In both cases the directory portion is preserved as-is.
+    String markedPath =
+        fileGroupPrefix
+            .map(
+                prefix ->
+                    filePath.substring(0, filePath.length() - fileName.length())
+                        + ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
+                            fileName, commitTime, prefix))
+            .orElseGet(
+                () ->
+                    ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(filePath, commitTime));
     writeStatus.setFileId(fileId);
     writeStatus.setPartitionPath(partitionPath);
     HoodieDeltaWriteStat writeStat = new HoodieDeltaWriteStat();
     writeStat.setFileId(fileId);
-    writeStat.setPath(
-        ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(filePath, commitTime));
+    writeStat.setPath(markedPath);
     writeStat.setPartitionPath(partitionPath);
     writeStat.setNumWrites(file.getRecordCount());
     writeStat.setTotalWriteBytes(file.getFileSizeBytes());
@@ -338,7 +392,6 @@ public class BaseFileUpdatesExtractor {
   }
 
   private String getPartitionPath(Path tableBasePath, List<InternalDataFile> files) {
-    return HudiPathUtils.getPartitionPath(
-        tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
+    return truePartitionPath(tableBasePath, new CachingPath(files.get(0).getPhysicalPath()));
   }
 }
