@@ -38,6 +38,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.storage.StorageConfiguration;
 
 import org.apache.xtable.model.InternalTable;
@@ -96,7 +97,7 @@ public class TestHudiTableManager {
             .layoutStrategy(dataLayoutStrategy)
             .build();
 
-    tableManager.initializeHudiTable(tableBasePath, table, null);
+    tableManager.initializeHudiTable(tableBasePath, table, null, HoodieTableVersion.NINE);
 
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder()
@@ -140,7 +141,7 @@ public class TestHudiTableManager {
             .layoutStrategy(DataLayoutStrategy.FLAT)
             .build();
 
-    tableManager.initializeHudiTable(tableBasePath, table, "my_namespace");
+    tableManager.initializeHudiTable(tableBasePath, table, "my_namespace", HoodieTableVersion.NINE);
 
     HoodieTableMetaClient metaClient =
         HoodieTableMetaClient.builder()
