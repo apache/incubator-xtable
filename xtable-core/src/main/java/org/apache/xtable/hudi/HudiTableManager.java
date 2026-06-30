@@ -121,7 +121,7 @@ public class HudiTableManager {
           .setTableType(HoodieTableType.COPY_ON_WRITE)
           // Pin new tables to table version 6 for now. Table version 9 (Hudi 1.x) support will be
           // added in a follow-up PR, tracked in
-          // https://github.com/apache/incubator-xtable/issues/762.
+          // https://github.com/apache/incubator-xtable/issues/834.
           .setTableVersion(HoodieTableVersion.SIX)
           .setTableName(table.getName())
           .setDatabaseName(resolvedDatabaseName)

@@ -59,7 +59,6 @@ import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.util.HadoopOutputFile;
 import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -144,8 +143,6 @@ public class TestHudiFileStatsExtractor {
           .build();
 
   @Test
-  @Disabled(
-      "Hudi 1.1 MDT col-stats generation fails for array and map types - https://github.com/apache/incubator-xtable/issues/773")
   void columnStatsWithMetadataTable(@TempDir Path tempDir) throws Exception {
     String tableName = GenericTable.getTableName();
     String basePath;
@@ -185,7 +182,7 @@ public class TestHudiFileStatsExtractor {
         fileStatsExtractor
             .addStatsToFiles(tableMetadata, Stream.of(inputFile), schema)
             .collect(Collectors.toList());
-    validateOutput(output);
+    validateOutput(output, false);
   }
 
   @Test
@@ -220,13 +217,13 @@ public class TestHudiFileStatsExtractor {
         .when(mockMetaClient)
         .getStorage();
     when(mockMetaClient.getIndexMetadata()).thenReturn(Option.empty());
-    when(mockMetaClient.getTableConfig().getTableVersion()).thenReturn(HoodieTableVersion.NINE);
+    when(mockMetaClient.getTableConfig().getTableVersion()).thenReturn(HoodieTableVersion.SIX);
     HudiFileStatsExtractor fileStatsExtractor = new HudiFileStatsExtractor(mockMetaClient);
     List<InternalDataFile> output =
         fileStatsExtractor
             .addStatsToFiles(null, Stream.of(inputFile), schema)
             .collect(Collectors.toList());
-    validateOutput(output);
+    validateOutput(output, false);
   }
 
   @Test
@@ -237,7 +234,7 @@ public class TestHudiFileStatsExtractor {
     when(mockTableConfig.isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS))
         .thenReturn(true);
 
-    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.NINE);
+    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.SIX);
 
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     doReturn(storageConf).when(mockMetaClient).getStorageConf();
@@ -257,7 +254,7 @@ public class TestHudiFileStatsExtractor {
             .addStatsToFiles(mockMetadataTable, inputFiles.stream(), schema)
             .collect(Collectors.toList());
 
-    validateOutput(output);
+    validateOutput(output, false);
   }
 
   @Test
@@ -273,7 +270,7 @@ public class TestHudiFileStatsExtractor {
     when(mockTableConfig.isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS))
         .thenReturn(true);
 
-    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.NINE);
+    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.SIX);
 
     HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
     doReturn(storageConf).when(mockMetaClient).getStorageConf();
@@ -367,13 +364,16 @@ public class TestHudiFileStatsExtractor {
     return files;
   }
 
-  private void validateOutput(List<InternalDataFile> output) {
+  private void validateOutput(List<InternalDataFile> output, boolean includeDecimal) {
     assertEquals(1, output.size());
     InternalDataFile fileWithStats = output.get(0);
     assertEquals(2, fileWithStats.getRecordCount());
     List<ColumnStat> columnStats = fileWithStats.getColumnStats();
 
-    assertEquals(9, columnStats.size());
+    // Index V1 (table version 6) doesn't support DECIMAL/FIXED columns (HUDI-8585), so
+    // decimal_field
+    // has no stats; V2 (table version 9) does. See #834.
+    assertEquals(includeDecimal ? 9 : 8, columnStats.size());
 
     ColumnStat longColumnStat =
         columnStats.stream().filter(stat -> stat.getField().equals(longField)).findFirst().get();
@@ -449,13 +449,18 @@ public class TestHudiFileStatsExtractor {
     assertEquals(1, arrayElementColumnStat.getRange().getMinValue());
     assertEquals(6, arrayElementColumnStat.getRange().getMaxValue());
 
-    ColumnStat decimalColumnStat =
-        columnStats.stream().filter(stat -> stat.getField().equals(decimalField)).findFirst().get();
-    assertEquals(1, decimalColumnStat.getNumNulls());
-    assertEquals(2, decimalColumnStat.getNumValues());
-    assertTrue(decimalColumnStat.getTotalSize() > 0);
-    assertEquals(new BigDecimal("1234.56"), decimalColumnStat.getRange().getMinValue());
-    assertEquals(new BigDecimal("1234.56"), decimalColumnStat.getRange().getMaxValue());
+    if (includeDecimal) {
+      ColumnStat decimalColumnStat =
+          columnStats.stream()
+              .filter(stat -> stat.getField().equals(decimalField))
+              .findFirst()
+              .get();
+      assertEquals(1, decimalColumnStat.getNumNulls());
+      assertEquals(2, decimalColumnStat.getNumValues());
+      assertTrue(decimalColumnStat.getTotalSize() > 0);
+      assertEquals(new BigDecimal("1234.56"), decimalColumnStat.getRange().getMinValue());
+      assertEquals(new BigDecimal("1234.56"), decimalColumnStat.getRange().getMaxValue());
+    }
   }
 
   private HoodieRecord<HoodieAvroPayload> buildRecord(GenericRecord record) {

@@ -624,7 +624,7 @@ public class HudiConversionTarget implements ConversionTarget {
       return HoodieWriteConfig.newBuilder()
           // Pin writes to table version 6 and disable auto-upgrade so the write client does not
           // upgrade the table to version 9 (Hudi 1.x). Table version 9 support will be added in a
-          // follow-up PR.
+          // follow-up PR, tracked in https://github.com/apache/incubator-xtable/issues/834.
           .withWriteTableVersion(HoodieTableVersion.SIX.versionCode())
           .withAutoUpgradeVersion(false)
           .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(INMEMORY).build())
