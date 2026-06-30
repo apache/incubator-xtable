@@ -446,10 +446,6 @@ public abstract class TestAbstractHudiTable
         HoodieStorageConfig.newBuilder().parquetCompressionCodec("UNCOMPRESSED").build();
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
-    // Hudi 1.x MDT col-stats generation fails for array and map types, so only enable column
-    // stats when the schema does not contain those types.
-    // https://github.com/apache/incubator-xtable/issues/773
-    // boolean columnStatsSupported = !schemaContainsArrayOrMap(schema);
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
             .enable(true)
