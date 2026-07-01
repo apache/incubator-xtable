@@ -80,7 +80,8 @@ public class BaseFileUpdatesExtractor {
   // rather than as part of the partition path (see Hudi PR #17788). Detecting such a directory lets
   // us register the file under its true partition with the prefix encoded into the external-file
   // marker, so an unpartitioned external table is not mistakenly read as partitioned by "bucket-N".
-  private static final Pattern EXTERNAL_FILE_GROUP_PREFIX_PATTERN = Pattern.compile("bucket-[0-9]+");
+  private static final Pattern EXTERNAL_FILE_GROUP_PREFIX_PATTERN =
+      Pattern.compile("bucket-[0-9]+");
   private final HoodieEngineContext engineContext;
   private final Path tableBasePath;
 
@@ -332,7 +333,8 @@ public class BaseFileUpdatesExtractor {
                             fileName, commitTime, prefix))
             .orElseGet(
                 () ->
-                    ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(filePath, commitTime));
+                    ExternalFilePathUtil.appendCommitTimeAndExternalFileMarker(
+                        filePath, commitTime));
     writeStatus.setFileId(fileId);
     writeStatus.setPartitionPath(partitionPath);
     HoodieDeltaWriteStat writeStat = new HoodieDeltaWriteStat();
