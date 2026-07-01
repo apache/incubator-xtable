@@ -40,6 +40,7 @@ import java.util.Optional;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import lombok.SneakyThrows;
 
@@ -51,7 +52,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.avro.model.StringWrapper;
@@ -66,6 +69,7 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieInstantTimeGenerator;
@@ -151,8 +155,8 @@ public class ITHudiConversionTarget {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void syncForExistingTable(boolean partitioned) {
+  @MethodSource("partitionedAndVersion")
+  void syncForExistingTable(boolean partitioned, HoodieTableVersion tableVersion) {
     String partitionPath = partitioned ? "partition_path" : "";
     String commitTime = "20231003013807542";
     String existingFileName1 = "existing_file_1.parquet";
@@ -211,7 +215,7 @@ public class ITHudiConversionTarget {
             .fileRemoved(fileToRemove)
             .build();
     // perform sync
-    HudiConversionTarget targetClient = getTargetClient();
+    HudiConversionTarget targetClient = getTargetClient(tableVersion);
     InternalTable initialState = getState(Instant.now(), partitioned);
     targetClient.beginSync(initialState);
     targetClient.syncFilesForDiff(internalFilesDiff);
@@ -240,8 +244,8 @@ public class ITHudiConversionTarget {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void syncForNewTable(boolean partitioned) {
+  @MethodSource("partitionedAndVersion")
+  void syncForNewTable(boolean partitioned, HoodieTableVersion tableVersion) {
     String partitionPath = partitioned ? "partition_path" : "";
     String fileName = "file_1.parquet";
     String filePath = getFilePath(partitionPath, fileName);
@@ -258,7 +262,7 @@ public class ITHudiConversionTarget {
                 .build());
     // sync snapshot and metadata
     InternalTable initialState = getState(Instant.now(), partitioned);
-    HudiConversionTarget targetClient = getTargetClient();
+    HudiConversionTarget targetClient = getTargetClient(tableVersion);
     targetClient.beginSync(initialState);
     targetClient.syncFilesForSnapshot(snapshot);
     TableSyncMetadata latestState =
@@ -285,8 +289,11 @@ public class ITHudiConversionTarget {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void archiveTimelineAndCleanMetadataTableAfterMultipleCommits(boolean partitioned) {
+  @EnumSource(
+      value = HoodieTableVersion.class,
+      names = {"SIX", "NINE"})
+  void archiveTimelineAndCleanMetadataTableAfterMultipleCommits(HoodieTableVersion tableVersion) {
+    boolean partitioned = true;
     String partitionPath = partitioned ? "partition_path" : "";
     String fileName0 = "file_0.parquet";
     String filePath0 = getFilePath(partitionPath, fileName0);
@@ -309,7 +316,7 @@ public class ITHudiConversionTarget {
                 .build());
     // sync snapshot and metadata
     InternalTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS), partitioned);
-    HudiConversionTarget targetClient = getTargetClient();
+    HudiConversionTarget targetClient = getTargetClient(tableVersion);
     targetClient.beginSync(initialState);
     targetClient.syncFilesForSnapshot(snapshot);
     TableSyncMetadata latestState =
@@ -422,8 +429,9 @@ public class ITHudiConversionTarget {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testSourceTargetMappingWithSnapshotAndIncrementalSync(boolean partitioned) {
+  @MethodSource("partitionedAndVersion")
+  void testSourceTargetMappingWithSnapshotAndIncrementalSync(
+      boolean partitioned, HoodieTableVersion tableVersion) {
     String partitionPath = partitioned ? "partition_path" : "";
     // Step 1: Initialize Test Files for Initial Snapshot
     String fileName0 = "file_0.parquet";
@@ -446,7 +454,7 @@ public class ITHudiConversionTarget {
 
     // Step 2: Sync Initial Snapshot
     InternalTable initialState = getState(Instant.now().minus(24, ChronoUnit.HOURS), partitioned);
-    HudiConversionTarget targetClient = getTargetClient();
+    HudiConversionTarget targetClient = getTargetClient(tableVersion);
     targetClient.beginSync(initialState);
     targetClient.syncFilesForSnapshot(initialSnapshot);
     TableSyncMetadata latestState =
@@ -512,8 +520,9 @@ public class ITHudiConversionTarget {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testGetTargetCommitIdentifierWithNullSourceIdentifier(boolean partitioned) {
+  @MethodSource("partitionedAndVersion")
+  void testGetTargetCommitIdentifierWithNullSourceIdentifier(
+      boolean partitioned, HoodieTableVersion tableVersion) {
     String partitionPath = partitioned ? "partition_path" : "";
     // Initialize Test Files and Snapshot
     String fileName0 = "file_0.parquet";
@@ -534,7 +543,7 @@ public class ITHudiConversionTarget {
                             .build()))
                 .build());
     InternalTable internalTable = getState(Instant.now().minus(24, ChronoUnit.HOURS), partitioned);
-    HudiConversionTarget targetClient = getTargetClient();
+    HudiConversionTarget targetClient = getTargetClient(tableVersion);
 
     targetClient.beginSync(internalTable);
     targetClient.syncFilesForSnapshot(initialSnapshot);
@@ -775,14 +784,26 @@ public class ITHudiConversionTarget {
     return builder.build();
   }
 
-  private HudiConversionTarget getTargetClient() {
+  /** Cross-product of the partitioned flag with the supported Hudi table versions (6 and 9). */
+  private static Stream<Arguments> partitionedAndVersion() {
+    return Stream.of(
+        Arguments.of(true, HoodieTableVersion.SIX),
+        Arguments.of(false, HoodieTableVersion.SIX),
+        Arguments.of(true, HoodieTableVersion.NINE),
+        Arguments.of(false, HoodieTableVersion.NINE));
+  }
+
+  private HudiConversionTarget getTargetClient(HoodieTableVersion tableVersion) {
+    TypedProperties properties = new TypedProperties();
+    properties.setProperty(
+        HudiTargetConfig.HUDI_TABLE_VERSION, String.valueOf(tableVersion.versionCode()));
     return new HudiConversionTarget(
         TargetTable.builder()
             .basePath(tableBasePath)
             .formatName(TableFormat.HUDI)
             .name("test_table")
             .metadataRetention(Duration.of(4, ChronoUnit.HOURS))
-            .additionalProperties(new TypedProperties())
+            .additionalProperties(properties)
             .build(),
         (Configuration) CONFIGURATION.unwrapCopy(),
         3);

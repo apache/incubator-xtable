@@ -234,11 +234,13 @@ public class ITHudiConversionSource {
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void insertAndUpsertData(
-      HoodieTableType tableType, HudiTestUtil.PartitionConfig partitionConfig) {
+      HoodieTableType tableType,
+      HudiTestUtil.PartitionConfig partitionConfig,
+      HoodieTableVersion tableVersion) {
     String tableName = GenericTable.getTableName();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -381,9 +383,9 @@ public class ITHudiConversionSource {
     HoodieTableType tableType = HoodieTableType.MERGE_ON_READ;
     HudiTestUtil.PartitionConfig partitionConfig = HudiTestUtil.PartitionConfig.of(null, null);
     String tableName = "test_table_" + UUID.randomUUID();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -429,9 +431,9 @@ public class ITHudiConversionSource {
     HoodieTableType tableType = HoodieTableType.COPY_ON_WRITE;
     HudiTestUtil.PartitionConfig partitionConfig = HudiTestUtil.PartitionConfig.of(null, null);
     String tableName = GenericTable.getTableName();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType)) {
       String commitInstant1 = table.startCommit();
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(100);
       table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
@@ -465,10 +467,11 @@ public class ITHudiConversionSource {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypes")
-  public void testsForDropPartition(HoodieTableType tableType) {
+  public void testsForDropPartition(HoodieTableType tableType, HoodieTableVersion tableVersion) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
-        TestSparkHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, "level:SIMPLE", tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -514,10 +517,12 @@ public class ITHudiConversionSource {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypes")
-  public void testMultipleInsertOverwriteOnSamePartitions(HoodieTableType tableType) {
+  public void testMultipleInsertOverwriteOnSamePartitions(
+      HoodieTableType tableType, HoodieTableVersion tableVersion) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
-        TestSparkHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, "level:SIMPLE", tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -562,10 +567,12 @@ public class ITHudiConversionSource {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypes")
-  public void testsForDeleteAllRecordsInPartition(HoodieTableType tableType) {
+  public void testsForDeleteAllRecordsInPartition(
+      HoodieTableType tableType, HoodieTableVersion tableVersion) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
-        TestSparkHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, "level:SIMPLE", tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -615,11 +622,13 @@ public class ITHudiConversionSource {
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void testsForClustering(
-      HoodieTableType tableType, HudiTestUtil.PartitionConfig partitionConfig) {
+      HoodieTableType tableType,
+      HudiTestUtil.PartitionConfig partitionConfig,
+      HoodieTableVersion tableVersion) {
     String tableName = "test_table_" + UUID.randomUUID();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -682,11 +691,13 @@ public class ITHudiConversionSource {
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void testsForSavepointRestore(
-      HoodieTableType tableType, HudiTestUtil.PartitionConfig partitionConfig) {
+      HoodieTableType tableType,
+      HudiTestUtil.PartitionConfig partitionConfig,
+      HoodieTableVersion tableVersion) {
     String tableName = "test_table_" + UUID.randomUUID();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, tableVersion)) {
       List<List<String>> allBaseFilePaths = new ArrayList<>();
       List<TableChange> allTableChanges = new ArrayList<>();
 
@@ -749,11 +760,13 @@ public class ITHudiConversionSource {
   @ParameterizedTest
   @MethodSource("testsForAllTableTypesAndPartitions")
   public void testsForRollbacks(
-      HoodieTableType tableType, HudiTestUtil.PartitionConfig partitionConfig) {
+      HoodieTableType tableType,
+      HudiTestUtil.PartitionConfig partitionConfig,
+      HoodieTableVersion tableVersion) {
     String tableName = "test_table_" + UUID.randomUUID();
-    try (TestJavaHudiTable table =
-        TestJavaHudiTable.forStandardSchema(
-            tableName, tempDir, partitionConfig.getHudiConfig(), tableType)) {
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(
+            tableName, tempDir, jsc, partitionConfig.getHudiConfig(), tableType, tableVersion)) {
 
       String commitInstant1 = table.startCommit();
       List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50);
@@ -810,8 +823,13 @@ public class ITHudiConversionSource {
   }
 
   private static Stream<Arguments> testsForAllTableTypes() {
-    return Stream.of(
-        Arguments.of(HoodieTableType.COPY_ON_WRITE), Arguments.of(HoodieTableType.MERGE_ON_READ));
+    List<HoodieTableType> tableTypes =
+        Arrays.asList(HoodieTableType.COPY_ON_WRITE, HoodieTableType.MERGE_ON_READ);
+    List<HoodieTableVersion> tableVersions =
+        Arrays.asList(HoodieTableVersion.SIX, HoodieTableVersion.NINE);
+    return tableTypes.stream()
+        .flatMap(
+            tableType -> tableVersions.stream().map(version -> Arguments.of(tableType, version)));
   }
 
   private static Stream<Arguments> testsForAllTableTypesAndPartitions() {
@@ -822,10 +840,17 @@ public class ITHudiConversionSource {
         Arrays.asList(unPartitionedConfig, partitionedConfig);
     List<HoodieTableType> tableTypes =
         Arrays.asList(HoodieTableType.COPY_ON_WRITE, HoodieTableType.MERGE_ON_READ);
+    List<HoodieTableVersion> tableVersions =
+        Arrays.asList(HoodieTableVersion.SIX, HoodieTableVersion.NINE);
 
     return tableTypes.stream()
         .flatMap(
-            tableType -> partitionConfigs.stream().map(config -> Arguments.of(tableType, config)));
+            tableType ->
+                partitionConfigs.stream()
+                    .flatMap(
+                        config ->
+                            tableVersions.stream()
+                                .map(version -> Arguments.of(tableType, config, version))));
   }
 
   private HudiConversionSource getHudiSourceClient(
