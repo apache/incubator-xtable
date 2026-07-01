@@ -30,11 +30,11 @@ import org.apache.hudi.common.table.HoodieTableVersion;
 public class TestHudiTargetConfig {
 
   @Test
-  void defaultsToTableVersionNine() {
+  void defaultsToTableVersionSix() {
     assertEquals(
-        HoodieTableVersion.NINE,
+        HoodieTableVersion.SIX,
         HudiTargetConfig.fromProperties(new Properties()).getTableVersion());
-    assertEquals(HoodieTableVersion.NINE, HudiTargetConfig.fromProperties(null).getTableVersion());
+    assertEquals(HoodieTableVersion.SIX, HudiTargetConfig.fromProperties(null).getTableVersion());
   }
 
   @Test

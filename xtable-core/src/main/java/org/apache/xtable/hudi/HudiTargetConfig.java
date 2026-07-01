@@ -34,7 +34,7 @@ public class HudiTargetConfig {
    */
   public static final String HUDI_TABLE_VERSION = "xtable.hudi.target.table_version";
 
-  static final HoodieTableVersion DEFAULT_TABLE_VERSION = HoodieTableVersion.NINE;
+  static final HoodieTableVersion DEFAULT_TABLE_VERSION = HoodieTableVersion.SIX;
 
   HoodieTableVersion tableVersion;
 
