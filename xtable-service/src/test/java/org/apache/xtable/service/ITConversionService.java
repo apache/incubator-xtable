@@ -157,12 +157,6 @@ public class ITConversionService {
   public void testVariousOperations(String sourceTableFormat, boolean isPartitioned) {
     String tableName = getTableName();
     List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
-    if (sourceTableFormat.equals(PAIMON)) {
-      // TODO: Hudi 1.x target is not supported for un-partitioned Paimon source.
-      // https://github.com/apache/incubator-xtable/issues/777
-      targetTableFormats =
-          targetTableFormats.stream().filter(fmt -> !fmt.equals(HUDI)).collect(Collectors.toList());
-    }
     String partitionConfig = isPartitioned ? "level:VALUE" : null;
 
     try (GenericTable table =
