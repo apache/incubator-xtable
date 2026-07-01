@@ -303,16 +303,21 @@ public class HudiConversionSource implements ConversionSource<HoodieInstant> {
   }
 
   /**
-   * Merges two completed-commit lists, dedupes by requested time, and orders by completion time.
+   * Merges two completed-commit lists, dedupes by requested time and action, and orders by
+   * completion time. The action is part of the dedup key because distinct actions can legally share
+   * a requested time: a savepoint instant reuses the requested time of the commit it pins, and
+   * keying on requested time alone would drop it from the backlog.
    */
   private List<HoodieInstant> orderByCompletionTimeAndDedup(
       List<HoodieInstant> list1, List<HoodieInstant> list2) {
-    Map<String, HoodieInstant> dedupedByRequestedTime = new LinkedHashMap<>();
+    Map<String, HoodieInstant> dedupedByRequestedTimeAndAction = new LinkedHashMap<>();
     Stream.concat(list1.stream(), list2.stream())
         .forEach(
             hoodieInstant ->
-                dedupedByRequestedTime.putIfAbsent(hoodieInstant.requestedTime(), hoodieInstant));
-    return dedupedByRequestedTime.values().stream()
+                dedupedByRequestedTimeAndAction.putIfAbsent(
+                    hoodieInstant.requestedTime() + "_" + hoodieInstant.getAction(),
+                    hoodieInstant));
+    return dedupedByRequestedTimeAndAction.values().stream()
         .sorted(Comparator.comparing(HoodieInstant::getCompletionTime))
         .collect(Collectors.toList());
   }
