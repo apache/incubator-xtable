@@ -44,6 +44,13 @@ import org.apache.iceberg.hadoop.HadoopTables;
 @AllArgsConstructor(staticName = "of")
 @Log4j2
 public class IcebergTableManager {
+  /**
+   * Hadoop configuration key selecting the Iceberg table format version to write when creating a
+   * table. Defaults to {@link #DEFAULT_ICEBERG_FORMAT_VERSION}.
+   */
+  public static final String ICEBERG_FORMAT_VERSION = "xtable.iceberg.format-version";
+
+  private static final int DEFAULT_ICEBERG_FORMAT_VERSION = 2;
   private static final Map<IcebergCatalogConfig, Catalog> CATALOG_CACHE = new ConcurrentHashMap<>();
   private final Configuration hadoopConfiguration;
 
@@ -100,6 +107,10 @@ public class IcebergTableManager {
         TableMetadata.Builder builder = TableMetadata.buildFrom(tableMetadata);
         builder.setCurrentSchema(schema, schema.highestFieldId());
         builder.setDefaultPartitionSpec(partitionSpec);
+        int formatVersion =
+            hadoopConfiguration.getInt(ICEBERG_FORMAT_VERSION, DEFAULT_ICEBERG_FORMAT_VERSION);
+        // upgradeFormatVersion never downgrades, so requesting the default (or lower) is a no-op.
+        builder.upgradeFormatVersion(formatVersion);
         operations.commit(tableMetadata, builder.build());
         return getTable(catalogConfig, tableIdentifier, basePath);
       } catch (AlreadyExistsException ex) {
