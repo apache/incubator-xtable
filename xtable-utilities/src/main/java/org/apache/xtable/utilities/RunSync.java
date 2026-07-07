@@ -26,9 +26,13 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import lombok.Builder;
@@ -170,7 +174,7 @@ public class RunSync {
       long timeoutInSeconds) {
     ConversionController conversionController = new ConversionController(hadoopConf);
     // use a single-thread executor since tasks are processed sequentially
-    java.util.concurrent.ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
+    ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
     try {
 
       for (DatasetConfig.Table table : datasetConfig.getDatasets()) {
@@ -194,20 +198,20 @@ public class RunSync {
                 .syncMode(SyncMode.INCREMENTAL)
                 .build();
         if (timeoutInSeconds > 0) {
-          java.util.concurrent.Future<?> standardFuture =
+          Future<?> standardFuture =
               syncExecutor.submit(
                   () -> {
                     conversionController.sync(conversionConfig, conversionSourceProvider);
                   });
           try {
             standardFuture.get(timeoutInSeconds, TimeUnit.SECONDS);
-          } catch (java.util.concurrent.TimeoutException e) {
+          } catch (TimeoutException e) {
             log.error(
                 "Sync timed out for {} after {} seconds. Triggering thread interrupt.",
                 table.getTableBasePath(),
                 timeoutInSeconds);
             standardFuture.cancel(true);
-          } catch (java.util.concurrent.ExecutionException e) {
+          } catch (ExecutionException e) {
             log.error("Error running sync for {}", table.getTableBasePath(), e.getCause());
           } catch (InterruptedException e) {
             log.error("Sync main runner thread was interrupted", e);
