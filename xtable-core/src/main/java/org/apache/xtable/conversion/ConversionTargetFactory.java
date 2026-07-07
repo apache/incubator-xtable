@@ -99,8 +99,10 @@ public class ConversionTargetFactory {
         // A registered target whose engine library is not on the classpath (e.g. Delta when only
         // Hudi/Iceberg are provided). Skip it so a subset of engines can still be used; a missing
         // engine for the requested format surfaces below as NotSupportedException.
-        log.debug(
-            "Skipping ConversionTarget whose engine is not available on the classpath", error);
+        log.warn(
+            "Skipping a registered ConversionTarget whose engine library is not on the classpath; "
+                + "provide the missing engine if you need this target format",
+            error);
         continue;
       }
       if (target.getTableFormat().equalsIgnoreCase(tableFormatName)
@@ -114,8 +116,6 @@ public class ConversionTargetFactory {
   private static final String DELTA_KERNEL_TARGET_CLASS =
       "org.apache.xtable.kernel.DeltaKernelConversionTarget";
 
-  // Name-based to avoid loading DeltaKernelConversionTarget (and its io.delta.kernel dependencies)
-  // when Delta is not on the classpath; the target passed in is already loaded.
   private static boolean isDeltaKernelTarget(ConversionTarget target) {
     return DELTA_KERNEL_TARGET_CLASS.equals(target.getClass().getName());
   }

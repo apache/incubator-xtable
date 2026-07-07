@@ -41,6 +41,12 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Command-line parsing for the standalone XTableSparkSync entry point (bundled). -->
+        <dependency>
+            <groupId>commons-cli</groupId>
+            <artifactId>commons-cli</artifactId>
+        </dependency>
+
         <!-- Logging API (lombok @Log4j2); provided by the cluster runtime -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
@@ -76,6 +82,12 @@
         </dependency>
         <dependency>
             <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-hadoop-common</artifactId>
+            <version>${hudi.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-java-client</artifactId>
             <scope>provided</scope>
         </dependency>
@@ -105,6 +117,30 @@
             <scope>provided</scope>
         </dependency>
 
+        <!--
+          Avro and parquet-avro pinned to the versions the engines require (Iceberg 1.9.2 compiles
+          against Avro 1.12 APIs), not the older Avro that Spark 3.5 ships. On a real Iceberg-1.9.2
+          cluster the runtime must already supply these; declaring them provided puts them on the
+          flat engine classpath for the bundle smoke test so the engine's Avro wins over Spark's.
+        -->
+        <dependency>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.parquet</groupId>
+            <artifactId>parquet-avro</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Hudi uses jol for in-memory sizing; the user's Hudi runtime supplies it. Provided so it
+             is on the flat engine classpath for the smoke test. -->
+        <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.apache.xtable</groupId>
@@ -114,15 +150,15 @@
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
-        <!-- Creates a local Hudi source table for the bundle smoke test. -->
+        <!-- Create the Hudi/Iceberg source tables in-JVM and read the targets back for the smoke test. -->
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.binary.version}</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.openjdk.jol</groupId>
-            <artifactId>jol-core</artifactId>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-spark-runtime-${spark.version.prefix}_${scala.binary.version}</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -160,17 +196,30 @@
         <plugins>
             <!--
               The bundle smoke test (ITXTableSparkRuntimeBundle) spark-submits the shaded jar with
-              the engine libraries supplied via the submit packages flag, matching the versions
-              declared in the root pom. Passed through as a system property so the test tracks them.
+              the engine libraries on a FLAT classpath (spark.driver.extraClassPath), not via the
+              submit packages/jars flags. A layered packages/jars classloader puts the engines' avro
+              in a child loader separate from Spark's own avro, which breaks cross-boundary casts
+              (e.g. iceberg PartitionData to avro IndexedRecord). Resolve the engine (provided-scope)
+              jars to a flat classpath here, excluding Spark/Hadoop (the cluster provides them) and
+              xtable (bundled), so a single avro is on one loader, matching a real cluster.
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-failsafe-plugin</artifactId>
-                <configuration>
-                    <systemPropertyVariables>
-                        <xtable.it.enginePackages>org.apache.hudi:hudi-spark${spark.version.prefix}-bundle_${scala.binary.version}:${hudi.version},org.apache.iceberg:iceberg-spark-runtime-${spark.version.prefix}_${scala.binary.version}:${iceberg.version}</xtable.it.enginePackages>
-                    </systemPropertyVariables>
-                </configuration>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>engine-classpath</id>
+                        <phase>pre-integration-test</phase>
+                        <goals>
+                            <goal>build-classpath</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>provided</includeScope>
+                            <excludeGroupIds>org.apache.spark,org.apache.hadoop,org.apache.xtable,org.projectlombok,org.slf4j,org.apache.logging.log4j</excludeGroupIds>
+                            <outputFile>${project.build.directory}/engine-classpath.txt</outputFile>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <!--
               Thin, curated bundle. Spark/Hadoop and the engine libraries (Hudi/Iceberg/Delta) are
@@ -201,6 +250,7 @@
                                     <include>com.google.guava:guava</include>
                                     <include>com.google.guava:failureaccess</include>
                                     <include>com.google.protobuf:protobuf-java</include>
+                                    <include>commons-cli:commons-cli</include>
                                 </includes>
                             </artifactSet>
                             <relocations>
@@ -209,8 +259,16 @@
                                     <shadedPattern>org.apache.xtable.shaded.com.google.common</shadedPattern>
                                 </relocation>
                                 <relocation>
+                                    <pattern>com.google.thirdparty</pattern>
+                                    <shadedPattern>org.apache.xtable.shaded.com.google.thirdparty</shadedPattern>
+                                </relocation>
+                                <relocation>
                                     <pattern>com.google.protobuf</pattern>
                                     <shadedPattern>org.apache.xtable.shaded.com.google.protobuf</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.cli</pattern>
+                                    <shadedPattern>org.apache.xtable.shaded.org.apache.commons.cli</shadedPattern>
                                 </relocation>
                             </relocations>
                             <filters>

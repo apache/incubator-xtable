@@ -34,6 +34,7 @@ import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
+import org.apache.xtable.hudi.HudiSourceConfig;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
@@ -53,14 +54,25 @@ public class XTableSyncService {
 
   /** Runs a single sync for the given spec, returning the per-format results. */
   public Map<String, SyncResult> sync(TableSyncSpec spec, Configuration hadoopConf) {
+    Properties sourceProperties = new Properties();
+    if (spec.getPartitionSpec() != null && !spec.getPartitionSpec().isEmpty()) {
+      sourceProperties.put(HudiSourceConfig.PARTITION_FIELD_SPEC_CONFIG, spec.getPartitionSpec());
+    }
+    // The data files may live at a different path than the source table root (e.g. Iceberg keeps
+    // them under <basePath>/data). Targets write their metadata alongside the data files, so the
+    // target base path is the data path (required by Hudi), defaulting to the source base path.
+    String dataPath =
+        spec.getDataPath() != null && !spec.getDataPath().isEmpty()
+            ? spec.getDataPath()
+            : spec.getBasePath();
     SourceTable sourceTable =
         SourceTable.builder()
             .name(spec.getKey())
             .basePath(spec.getBasePath())
-            .dataPath(spec.getDataPath())
+            .dataPath(dataPath)
             .namespace(spec.getNamespace())
             .formatName(spec.getSourceFormat())
-            .additionalProperties(new Properties())
+            .additionalProperties(sourceProperties)
             .build();
 
     List<TargetTable> targetTables =
@@ -69,7 +81,7 @@ public class XTableSyncService {
                 targetFormat ->
                     TargetTable.builder()
                         .name(spec.getKey())
-                        .basePath(spec.getBasePath())
+                        .basePath(dataPath)
                         .namespace(spec.getNamespace())
                         .formatName(targetFormat)
                         .build())

@@ -18,15 +18,20 @@
  
 package org.apache.xtable.spark;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import lombok.extern.log4j.Log4j2;
 
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.SparkSession;
 
@@ -45,29 +50,98 @@ import org.apache.spark.sql.SparkSession;
 @Log4j2
 public final class XTableSparkSync {
 
+  private static final String BASE_PATH = "basePath";
+  private static final String DATA_PATH = "dataPath";
+  private static final String SOURCE_FORMAT = "sourceFormat";
+  private static final String TARGETS = "targets";
+  private static final String TABLE_NAME = "tableName";
+  private static final String NAMESPACE = "namespace";
+  private static final String PARTITION_SPEC = "partitionSpec";
+  private static final String HELP = "help";
+
+  private static final Options OPTIONS =
+      new Options()
+          .addOption(
+              Option.builder()
+                  .longOpt(BASE_PATH)
+                  .hasArg()
+                  .required()
+                  .desc("The base path of the source table")
+                  .build())
+          .addOption(
+              Option.builder()
+                  .longOpt(SOURCE_FORMAT)
+                  .hasArg()
+                  .required()
+                  .desc("The source table format, e.g. HUDI, DELTA or ICEBERG")
+                  .build())
+          .addOption(
+              Option.builder()
+                  .longOpt(TARGETS)
+                  .hasArg()
+                  .required()
+                  .desc("Comma-separated target formats to sync to, e.g. ICEBERG,DELTA")
+                  .build())
+          .addOption(
+              Option.builder()
+                  .longOpt(DATA_PATH)
+                  .hasArg()
+                  .desc("The path of the data files if different from the base path")
+                  .build())
+          .addOption(
+              Option.builder()
+                  .longOpt(TABLE_NAME)
+                  .hasArg()
+                  .desc("The table name; defaults to the last segment of the base path")
+                  .build())
+          .addOption(
+              Option.builder()
+                  .longOpt(NAMESPACE)
+                  .hasArg()
+                  .desc("The dot-separated table namespace")
+                  .build())
+          .addOption(
+              Option.builder()
+                  .longOpt(PARTITION_SPEC)
+                  .hasArg()
+                  .desc("The Hudi source partition field spec, e.g. level:VALUE")
+                  .build())
+          .addOption(Option.builder().longOpt(HELP).desc("Displays help information").build());
+
   private XTableSparkSync() {}
 
   public static void main(String[] args) {
-    Map<String, String> opts = parseArgs(args);
-    String basePath = required(opts, "basePath");
-    String sourceFormat = required(opts, "sourceFormat");
-    String targets = required(opts, "targets");
-    String tableName = opts.getOrDefault("tableName", basePathToName(basePath));
+    CommandLineParser parser = new DefaultParser();
+    CommandLine cmd;
+    try {
+      cmd = parser.parse(OPTIONS, args);
+    } catch (ParseException e) {
+      new HelpFormatter().printHelp("xtable-spark-sync", OPTIONS, true);
+      throw new IllegalArgumentException("Failed to parse arguments", e);
+    }
+    if (cmd.hasOption(HELP)) {
+      new HelpFormatter().printHelp("xtable-spark-sync", OPTIONS, true);
+      return;
+    }
 
+    String basePath = cmd.getOptionValue(BASE_PATH);
+    String tableName = cmd.getOptionValue(TABLE_NAME, basePathToName(basePath));
     List<String> targetFormats =
-        Arrays.stream(targets.split(","))
+        Arrays.stream(cmd.getOptionValue(TARGETS).split(","))
             .map(String::trim)
             .filter(s -> !s.isEmpty())
-            .map(s -> s.toUpperCase(java.util.Locale.ROOT))
+            .map(s -> s.toUpperCase(Locale.ROOT))
             .collect(Collectors.toList());
+    String namespace = cmd.getOptionValue(NAMESPACE);
 
     TableSyncSpec spec =
         TableSyncSpec.builder()
             .key(tableName)
             .basePath(basePath)
-            .dataPath(opts.get("dataPath"))
-            .namespace(opts.containsKey("namespace") ? opts.get("namespace").split("\\.") : null)
-            .sourceFormat(sourceFormat.toUpperCase(java.util.Locale.ROOT))
+            .dataPath(cmd.getOptionValue(DATA_PATH))
+            .namespace(namespace == null ? null : namespace.split("\\."))
+            .partitionSpec(cmd.getOptionValue(PARTITION_SPEC))
+            .sourceFormat(cmd.getOptionValue(SOURCE_FORMAT).toUpperCase(Locale.ROOT))
             .targets(targetFormats)
             .build();
 
@@ -80,31 +154,6 @@ public final class XTableSparkSync {
     } finally {
       spark.stop();
     }
-  }
-
-  private static Map<String, String> parseArgs(String[] args) {
-    Map<String, String> opts = new HashMap<>();
-    List<String> tokens = new ArrayList<>(Arrays.asList(args));
-    for (int i = 0; i < tokens.size(); i++) {
-      String token = tokens.get(i);
-      if (token.startsWith("--")) {
-        String key = token.substring(2);
-        if (i + 1 < tokens.size() && !tokens.get(i + 1).startsWith("--")) {
-          opts.put(key, tokens.get(++i));
-        } else {
-          opts.put(key, "true");
-        }
-      }
-    }
-    return opts;
-  }
-
-  private static String required(Map<String, String> opts, String key) {
-    String value = opts.get(key);
-    if (value == null || value.trim().isEmpty()) {
-      throw new IllegalArgumentException("Missing required argument: --" + key);
-    }
-    return value.trim();
   }
 
   private static String basePathToName(String basePath) {
