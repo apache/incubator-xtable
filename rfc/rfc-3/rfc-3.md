@@ -144,7 +144,7 @@ modules (`xtable-api`, `xtable-core`, `xtable-hudi-support-utils`) plus the libr
 Critically, libraries XTable **exchanges across the engine API boundary must not be relocated or
 bundled** — e.g. Hudi returns a real `org.apache.avro.Schema`, so a relocated/bundled `avro` in the
 XTable jar produces a `NoSuchMethodError` at runtime. `avro` / `parquet` / `jackson` / `commons` are
-therefore left to the provided runtime. Resulting bundle: **~4 MB**.
+therefore left to the provided runtime. Resulting bundle: **~3.6 MB**.
 
 Because `ConversionTargetFactory` discovers targets via `ServiceLoader` and would otherwise fail if
 any registered engine (e.g. Delta) is absent, target discovery is made **resilient**: providers whose
