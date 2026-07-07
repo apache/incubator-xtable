@@ -18,9 +18,17 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -33,6 +41,7 @@ import java.sql.Date;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,6 +62,7 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import org.apache.hudi.avro.model.HoodieMetadataColumnStats;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.model.HoodieAvroPayload;
@@ -60,9 +70,17 @@ import org.apache.hudi.common.model.HoodieAvroRecord;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.collection.Pair;
+import org.apache.hudi.metadata.HoodieBackedTableMetadata;
 import org.apache.hudi.metadata.HoodieTableMetadata;
+import org.apache.hudi.metadata.MetadataPartitionType;
+import org.apache.hudi.storage.StorageConfiguration;
+import org.apache.hudi.storage.StoragePath;
+import org.apache.hudi.storage.hadoop.HoodieHadoopStorage;
 
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestJavaHudiTable;
@@ -81,7 +99,8 @@ public class TestHudiFileStatsExtractor {
   private static final Schema NESTED_SCHEMA =
       AVRO_SCHEMA.getField("nested_record").schema().getTypes().get(1);
 
-  private final Configuration configuration = new Configuration();
+  private final Configuration hadoopConf = new Configuration();
+  private final StorageConfiguration<?> storageConf = getStorageConf(hadoopConf);
   private final InternalField nestedIntBase = getNestedIntBase();
   private final InternalSchema nestedSchema = getNestedSchema(nestedIntBase, "nested_record");
   private final InternalField longField = getLongField();
@@ -96,6 +115,7 @@ public class TestHudiFileStatsExtractor {
   private final InternalSchema schema =
       InternalSchema.builder()
           .name("schema")
+          .dataType(InternalType.RECORD)
           .fields(
               Arrays.asList(
                   longField,
@@ -107,6 +127,7 @@ public class TestHudiFileStatsExtractor {
                       .name("map_record")
                       .schema(
                           InternalSchema.builder()
+                              .dataType(InternalType.RECORD)
                               .fields(Arrays.asList(mapKeyField, mapValueField))
                               .build())
                       .build(),
@@ -114,6 +135,7 @@ public class TestHudiFileStatsExtractor {
                       .name("repeated_record")
                       .schema(
                           InternalSchema.builder()
+                              .dataType(InternalType.RECORD)
                               .fields(Collections.singletonList(arrayField))
                               .build())
                       .build(),
@@ -124,6 +146,7 @@ public class TestHudiFileStatsExtractor {
   void columnStatsWithMetadataTable(@TempDir Path tempDir) throws Exception {
     String tableName = GenericTable.getTableName();
     String basePath;
+    HoodieTableMetaClient metaClient;
     try (TestJavaHudiTable table =
         TestJavaHudiTable.withSchema(
             tableName, tempDir, "long_field:SIMPLE", HoodieTableType.COPY_ON_WRITE, AVRO_SCHEMA)) {
@@ -131,13 +154,14 @@ public class TestHudiFileStatsExtractor {
           getRecords().stream().map(this::buildRecord).collect(Collectors.toList());
       table.insertRecords(true, records);
       basePath = table.getBasePath();
+      metaClient = table.getMetaClient();
     }
     HoodieTableMetadata tableMetadata =
-        HoodieTableMetadata.create(
-            new HoodieJavaEngineContext(configuration),
+        new HoodieBackedTableMetadata(
+            new HoodieJavaEngineContext(storageConf),
+            metaClient.getStorage(),
             HoodieMetadataConfig.newBuilder().enable(true).build(),
-            basePath,
-            true);
+            basePath);
     Path parquetFile =
         Files.list(Paths.get(new URI(basePath)))
             .filter(path -> path.toString().endsWith(".parquet"))
@@ -152,14 +176,13 @@ public class TestHudiFileStatsExtractor {
             .fileSizeBytes(4321L)
             .recordCount(0)
             .build();
-    HoodieTableMetaClient metaClient =
-        HoodieTableMetaClient.builder().setBasePath(basePath).setConf(configuration).build();
+    metaClient.reloadActiveTimeline();
     HudiFileStatsExtractor fileStatsExtractor = new HudiFileStatsExtractor(metaClient);
     List<InternalDataFile> output =
         fileStatsExtractor
             .addStatsToFiles(tableMetadata, Stream.of(inputFile), schema)
             .collect(Collectors.toList());
-    validateOutput(output);
+    validateOutput(output, false);
   }
 
   @Test
@@ -169,8 +192,7 @@ public class TestHudiFileStatsExtractor {
     genericData.addLogicalTypeConversion(new Conversions.DecimalConversion());
     try (ParquetWriter<GenericRecord> writer =
         AvroParquetWriter.<GenericRecord>builder(
-                HadoopOutputFile.fromPath(
-                    new org.apache.hadoop.fs.Path(file.toUri()), configuration))
+                HadoopOutputFile.fromPath(new org.apache.hadoop.fs.Path(file.toUri()), hadoopConf))
             .withSchema(AVRO_SCHEMA)
             .withDataModel(genericData)
             .build()) {
@@ -189,23 +211,169 @@ public class TestHudiFileStatsExtractor {
             .recordCount(0)
             .build();
 
-    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
-    when(mockMetaClient.getHadoopConf()).thenReturn(configuration);
+    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class, RETURNS_DEEP_STUBS);
+    doReturn(storageConf).when(mockMetaClient).getStorageConf();
+    doReturn(new HoodieHadoopStorage(new StoragePath(tempDir.toUri().getPath()), storageConf))
+        .when(mockMetaClient)
+        .getStorage();
+    when(mockMetaClient.getIndexMetadata()).thenReturn(Option.empty());
+    when(mockMetaClient.getTableConfig().getTableVersion()).thenReturn(HoodieTableVersion.SIX);
     HudiFileStatsExtractor fileStatsExtractor = new HudiFileStatsExtractor(mockMetaClient);
     List<InternalDataFile> output =
         fileStatsExtractor
             .addStatsToFiles(null, Stream.of(inputFile), schema)
             .collect(Collectors.toList());
-    validateOutput(output);
+    validateOutput(output, false);
   }
 
-  private void validateOutput(List<InternalDataFile> output) {
+  @Test
+  void columnStatsWithMetadataTableMissingFallsBackToParquetFooters(@TempDir Path tempDir) {
+    List<InternalDataFile> inputFiles = generateInputFiles(tempDir, 1);
+
+    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
+    when(mockTableConfig.isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS))
+        .thenReturn(true);
+
+    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.SIX);
+
+    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
+    doReturn(storageConf).when(mockMetaClient).getStorageConf();
+    doReturn(new HoodieHadoopStorage(new StoragePath(tempDir.toUri().getPath()), storageConf))
+        .when(mockMetaClient)
+        .getStorage();
+    when(mockMetaClient.getIndexMetadata()).thenReturn(Option.empty());
+    when(mockMetaClient.getBasePath()).thenReturn(new StoragePath(tempDir.toUri().getPath()));
+    when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
+
+    HoodieTableMetadata mockMetadataTable = mock(HoodieTableMetadata.class);
+    when(mockMetadataTable.getColumnStats(any(), anyString())).thenReturn(Collections.emptyMap());
+
+    HudiFileStatsExtractor extractor = new HudiFileStatsExtractor(mockMetaClient);
+    List<InternalDataFile> output =
+        extractor
+            .addStatsToFiles(mockMetadataTable, inputFiles.stream(), schema)
+            .collect(Collectors.toList());
+
+    validateOutput(output, false);
+  }
+
+  @Test
+  void columnStatsWithMetadataTablePartialMissingFallsBackToParquetFooters(@TempDir Path tempDir) {
+    List<InternalDataFile> inputFiles = generateInputFiles(tempDir, 2);
+    InternalDataFile fileWithStats = inputFiles.get(0);
+    InternalDataFile fileWithoutStats = inputFiles.get(1);
+
+    Pair<String, String> fileWithStatsPair =
+        Pair.of("", new org.apache.hadoop.fs.Path(fileWithStats.getPhysicalPath()).getName());
+
+    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
+    when(mockTableConfig.isMetadataPartitionAvailable(MetadataPartitionType.COLUMN_STATS))
+        .thenReturn(true);
+
+    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.SIX);
+
+    HoodieTableMetaClient mockMetaClient = mock(HoodieTableMetaClient.class);
+    doReturn(storageConf).when(mockMetaClient).getStorageConf();
+    doReturn(new HoodieHadoopStorage(new StoragePath(tempDir.toUri().getPath()), storageConf))
+        .when(mockMetaClient)
+        .getStorage();
+    when(mockMetaClient.getIndexMetadata()).thenReturn(Option.empty());
+    when(mockMetaClient.getBasePath()).thenReturn(new StoragePath(tempDir.toUri().getPath()));
+    when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
+
+    // Metadata table only returns stats for fileWithStats; fileWithoutStats is missing entirely
+    HoodieTableMetadata mockMetadataTable = mock(HoodieTableMetadata.class);
+    when(mockMetadataTable.getColumnStats(any(), anyString()))
+        .thenAnswer(
+            invocation -> {
+              String fieldName = invocation.getArgument(1);
+              if (fieldName.equals("long_field")) {
+                Map<Pair<String, String>, HoodieMetadataColumnStats> statsMap = new HashMap<>();
+                statsMap.put(
+                    fileWithStatsPair,
+                    HoodieMetadataColumnStats.newBuilder()
+                        .setFileName(fileWithStatsPair.getRight())
+                        .setColumnName(fieldName)
+                        .setValueCount(2L)
+                        .setNullCount(1L)
+                        .setTotalSize(16L)
+                        .setIsDeleted(false)
+                        .build());
+                return statsMap;
+              }
+              return Collections.emptyMap();
+            });
+
+    HudiFileStatsExtractor extractor = new HudiFileStatsExtractor(mockMetaClient);
+    List<InternalDataFile> output =
+        extractor
+            .addStatsToFiles(mockMetadataTable, inputFiles.stream(), schema)
+            .collect(Collectors.toList());
+
+    assertEquals(2, output.size());
+    // fileWithoutStats must have fallen back to parquet footers and have full stats
+    InternalDataFile fromFooter =
+        output.stream()
+            .filter(f -> f.getPhysicalPath().equals(fileWithoutStats.getPhysicalPath()))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("missing file in output"));
+    assertFalse(fromFooter.getColumnStats().isEmpty());
+    assertEquals(2, fromFooter.getRecordCount());
+    // fileWithStats came from metadata table (only has long_field stat)
+    InternalDataFile fromMeta =
+        output.stream()
+            .filter(f -> f.getPhysicalPath().equals(fileWithStats.getPhysicalPath()))
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("missing file in output"));
+    assertEquals(1, fromMeta.getColumnStats().size());
+    assertEquals(2L, fromMeta.getRecordCount());
+    // verify parquet fallback was invoked for exactly 1 file (fileWithoutStats), not fileWithStats;
+    // getStorage() is only reached on the parquet-footer path, not the metadata-table path
+    verify(mockMetaClient, times(1)).getStorage();
+  }
+
+  private List<InternalDataFile> generateInputFiles(Path tempDir, int numFiles) {
+    GenericData genericData = GenericData.get();
+    genericData.addLogicalTypeConversion(new Conversions.DecimalConversion());
+    List<InternalDataFile> files = new ArrayList<>();
+    for (int i = 0; i < numFiles; i++) {
+      Path file = tempDir.resolve(String.format("tmp-%d.parquet", i));
+      try (ParquetWriter<GenericRecord> writer =
+          AvroParquetWriter.<GenericRecord>builder(
+                  HadoopOutputFile.fromPath(
+                      new org.apache.hadoop.fs.Path(file.toUri()), hadoopConf))
+              .withSchema(AVRO_SCHEMA)
+              .withDataModel(genericData)
+              .build()) {
+        for (GenericRecord record : getRecords()) {
+          writer.write(record);
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      files.add(
+          InternalDataFile.builder()
+              .physicalPath(file.toString())
+              .columnStats(Collections.emptyList())
+              .fileFormat(FileFormat.APACHE_PARQUET)
+              .lastModified(1234L)
+              .fileSizeBytes(4321L)
+              .recordCount(0)
+              .build());
+    }
+    return files;
+  }
+
+  private void validateOutput(List<InternalDataFile> output, boolean includeDecimal) {
     assertEquals(1, output.size());
     InternalDataFile fileWithStats = output.get(0);
     assertEquals(2, fileWithStats.getRecordCount());
     List<ColumnStat> columnStats = fileWithStats.getColumnStats();
 
-    assertEquals(9, columnStats.size());
+    // Index V1 (table version 6) doesn't support DECIMAL/FIXED columns (HUDI-8585), so
+    // decimal_field
+    // has no stats; V2 (table version 9) does. See #834.
+    assertEquals(includeDecimal ? 9 : 8, columnStats.size());
 
     ColumnStat longColumnStat =
         columnStats.stream().filter(stat -> stat.getField().equals(longField)).findFirst().get();
@@ -281,13 +449,18 @@ public class TestHudiFileStatsExtractor {
     assertEquals(1, arrayElementColumnStat.getRange().getMinValue());
     assertEquals(6, arrayElementColumnStat.getRange().getMaxValue());
 
-    ColumnStat decimalColumnStat =
-        columnStats.stream().filter(stat -> stat.getField().equals(decimalField)).findFirst().get();
-    assertEquals(1, decimalColumnStat.getNumNulls());
-    assertEquals(2, decimalColumnStat.getNumValues());
-    assertTrue(decimalColumnStat.getTotalSize() > 0);
-    assertEquals(new BigDecimal("1234.56"), decimalColumnStat.getRange().getMinValue());
-    assertEquals(new BigDecimal("1234.56"), decimalColumnStat.getRange().getMaxValue());
+    if (includeDecimal) {
+      ColumnStat decimalColumnStat =
+          columnStats.stream()
+              .filter(stat -> stat.getField().equals(decimalField))
+              .findFirst()
+              .get();
+      assertEquals(1, decimalColumnStat.getNumNulls());
+      assertEquals(2, decimalColumnStat.getNumValues());
+      assertTrue(decimalColumnStat.getTotalSize() > 0);
+      assertEquals(new BigDecimal("1234.56"), decimalColumnStat.getRange().getMinValue());
+      assertEquals(new BigDecimal("1234.56"), decimalColumnStat.getRange().getMaxValue());
+    }
   }
 
   private HoodieRecord<HoodieAvroPayload> buildRecord(GenericRecord record) {

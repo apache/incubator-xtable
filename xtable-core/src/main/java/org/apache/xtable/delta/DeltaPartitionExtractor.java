@@ -326,9 +326,11 @@ public class DeltaPartitionExtractor {
     if (partitionFieldNames.size() == 1) {
       return values.getOrDefault(partitionFieldNames.get(0), null);
     }
-    return partitionFieldNames.stream()
-        .map(name -> values.get(name))
-        .collect(Collectors.joining("-"));
+    // Composite partition: any null component yields a null value, not joined "null"s.
+    if (partitionFieldNames.stream().anyMatch(name -> values.get(name) == null)) {
+      return null;
+    }
+    return partitionFieldNames.stream().map(values::get).collect(Collectors.joining("-"));
   }
 
   private String getGeneratedColumnName(InternalPartitionField internalPartitionField) {

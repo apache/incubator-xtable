@@ -42,8 +42,12 @@ import lombok.extern.log4j.Log4j2;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.PeekingIterator;
 
-import io.delta.kernel.types.*;
+import io.delta.kernel.types.DataType;
+import io.delta.kernel.types.DateType;
 import io.delta.kernel.types.FieldMetadata;
+import io.delta.kernel.types.IntegerType;
+import io.delta.kernel.types.StructField;
+import io.delta.kernel.types.StructType;
 
 import org.apache.xtable.exception.PartitionSpecException;
 import org.apache.xtable.model.schema.InternalPartitionField;
@@ -315,9 +319,11 @@ public class DeltaKernelPartitionExtractor {
     if (partitionFieldNames.size() == 1) {
       return values.getOrDefault(partitionFieldNames.get(0), null);
     }
-    return partitionFieldNames.stream()
-        .map(name -> values.get(name))
-        .collect(Collectors.joining("-"));
+    // Composite partition: any null component yields a null value, not joined "null"s.
+    if (partitionFieldNames.stream().anyMatch(name -> values.get(name) == null)) {
+      return null;
+    }
+    return partitionFieldNames.stream().map(values::get).collect(Collectors.joining("-"));
   }
 
   private String getGeneratedColumnName(InternalPartitionField internalPartitionField) {

@@ -19,7 +19,6 @@
 package org.apache.xtable.paimon;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -29,7 +28,6 @@ import java.util.Set;
 import lombok.extern.log4j.Log4j2;
 
 import org.apache.paimon.Snapshot;
-import org.apache.paimon.io.DataFileMeta;
 import org.apache.paimon.manifest.FileKind;
 import org.apache.paimon.manifest.ManifestEntry;
 import org.apache.paimon.manifest.ManifestFile;
@@ -39,7 +37,6 @@ import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.source.snapshot.SnapshotReader;
 
 import org.apache.xtable.model.schema.InternalSchema;
-import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.storage.InternalDataFile;
 import org.apache.xtable.model.storage.InternalFilesDiff;
 
@@ -48,6 +45,8 @@ public class PaimonDataFileExtractor {
 
   private final PaimonPartitionExtractor partitionExtractor =
       PaimonPartitionExtractor.getInstance();
+
+  private final PaimonStatsExtractor statsExtractor = PaimonStatsExtractor.getInstance();
 
   private static final PaimonDataFileExtractor INSTANCE = new PaimonDataFileExtractor();
 
@@ -84,7 +83,7 @@ public class PaimonDataFileExtractor {
         .recordCount(entry.file().rowCount())
         .partitionValues(
             partitionExtractor.toPartitionValues(table, entry.partition(), internalSchema))
-        .columnStats(toColumnStats(entry.file()))
+        .columnStats(statsExtractor.extractColumnStats(entry.file(), internalSchema))
         .build();
   }
 
@@ -99,12 +98,6 @@ public class PaimonDataFileExtractor {
     } else {
       return String.join("/", basePath, bucketPath, filePath);
     }
-  }
-
-  private List<ColumnStat> toColumnStats(DataFileMeta file) {
-    // TODO: Implement logic to extract column stats from the file meta
-    // https://github.com/apache/incubator-xtable/issues/755
-    return Collections.emptyList();
   }
 
   /**

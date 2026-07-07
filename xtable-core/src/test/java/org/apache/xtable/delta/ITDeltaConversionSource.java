@@ -18,8 +18,13 @@
  
 package org.apache.xtable.delta;
 
+import static org.apache.spark.sql.types.DataTypes.IntegerType;
+import static org.apache.spark.sql.types.DataTypes.LongType;
+import static org.apache.spark.sql.types.DataTypes.TimestampType;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -41,7 +46,6 @@ import org.apache.spark.serializer.KryoSerializer;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -50,6 +54,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import io.delta.tables.DeltaTable;
 
 import org.apache.xtable.GenericTable;
 import org.apache.xtable.TestSparkDeltaTable;
@@ -68,8 +74,11 @@ import org.apache.xtable.model.schema.PartitionTransformType;
 import org.apache.xtable.model.stat.ColumnStat;
 import org.apache.xtable.model.stat.PartitionValue;
 import org.apache.xtable.model.stat.Range;
-import org.apache.xtable.model.storage.*;
+import org.apache.xtable.model.storage.DataLayoutStrategy;
+import org.apache.xtable.model.storage.FileFormat;
 import org.apache.xtable.model.storage.InternalDataFile;
+import org.apache.xtable.model.storage.PartitionFileGroup;
+import org.apache.xtable.model.storage.TableFormat;
 
 public class ITDeltaConversionSource {
 
@@ -192,7 +201,7 @@ public class ITDeltaConversionSource {
         Collections.emptyList());
     // Validate data files
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
-    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
+    assertEquals(1, snapshot.getPartitionedDataFiles().size());
     validatePartitionDataFiles(
         PartitionFileGroup.builder()
             .files(
@@ -305,7 +314,7 @@ public class ITDeltaConversionSource {
                 .build()));
     // Validate data files
     List<ColumnStat> columnStats = Arrays.asList(COL1_COLUMN_STAT, COL2_COLUMN_STAT);
-    Assertions.assertEquals(1, snapshot.getPartitionedDataFiles().size());
+    assertEquals(1, snapshot.getPartitionedDataFiles().size());
     List<PartitionValue> partitionValue =
         Collections.singletonList(
             PartitionValue.builder()
@@ -362,6 +371,70 @@ public class ITDeltaConversionSource {
         conversionSourceProvider.getConversionSourceInstance(tableConfig);
     // Get current snapshot
     InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
+  }
+
+  @Test
+  void getCurrentSnapshotGenColPartitionedWithNullSourceTest() {
+    // year/month/day partition columns generated from one source column; a null source produces a
+    // null component for each, which must resolve to a null partition value, not "null-null-null".
+    final String tableName = GenericTable.getTableName();
+    final Path basePath = tempDir.resolve(tableName);
+    // Builder API, not CREATE TABLE SQL: Spark 3.4 rejects generated partition columns via SQL.
+    DeltaTable.createIfNotExists(sparkSession)
+        .tableName(tableName)
+        .location(basePath.toString())
+        .addColumn("id", LongType)
+        .addColumn("event_time", TimestampType)
+        .addColumn(
+            DeltaTable.columnBuilder("year_col")
+                .dataType(IntegerType)
+                .generatedAlwaysAs("YEAR(event_time)")
+                .build())
+        .addColumn(
+            DeltaTable.columnBuilder("month_col")
+                .dataType(IntegerType)
+                .generatedAlwaysAs("MONTH(event_time)")
+                .build())
+        .addColumn(
+            DeltaTable.columnBuilder("day_col")
+                .dataType(IntegerType)
+                .generatedAlwaysAs("DAY(event_time)")
+                .build())
+        .partitionedBy("year_col", "month_col", "day_col")
+        .execute();
+    // Second row has a null timestamp, so every generated partition column is null.
+    sparkSession.sql(
+        "INSERT INTO TABLE `"
+            + tableName
+            + "` (id, event_time) VALUES (1, CAST('2013-08-20 00:00:00' AS TIMESTAMP)),"
+            + " (2, CAST(NULL AS TIMESTAMP))");
+
+    SourceTable tableConfig =
+        SourceTable.builder()
+            .name(tableName)
+            .basePath(basePath.toString())
+            .formatName(TableFormat.DELTA)
+            .build();
+    DeltaConversionSource conversionSource =
+        conversionSourceProvider.getConversionSourceInstance(tableConfig);
+
+    InternalSnapshot snapshot = conversionSource.getCurrentSnapshot();
+
+    List<InternalDataFile> dataFiles =
+        snapshot.getPartitionedDataFiles().stream()
+            .flatMap(group -> group.getDataFiles().stream())
+            .collect(Collectors.toList());
+    assertEquals(2, dataFiles.size());
+
+    // Exactly one file is in the null-source partition, with a null partition value.
+    long nullPartitionFiles =
+        dataFiles.stream()
+            .filter(
+                file ->
+                    file.getPartitionValues().stream()
+                        .anyMatch(pv -> pv.getRange().getMaxValue() == null))
+            .count();
+    assertEquals(1, nullPartitionFiles);
   }
 
   @ParameterizedTest
@@ -713,7 +786,7 @@ public class ITDeltaConversionSource {
   private void validateDataFiles(
       List<InternalDataFile> expectedFiles, List<InternalDataFile> actualFiles)
       throws URISyntaxException {
-    Assertions.assertEquals(expectedFiles.size(), actualFiles.size());
+    assertEquals(expectedFiles.size(), actualFiles.size());
     for (int i = 0; i < expectedFiles.size(); i++) {
       InternalDataFile expected = expectedFiles.get(i);
       InternalDataFile actual = actualFiles.get(i);
@@ -723,17 +796,17 @@ public class ITDeltaConversionSource {
 
   private void validatePropertiesDataFile(InternalDataFile expected, InternalDataFile actual)
       throws URISyntaxException {
-    Assertions.assertTrue(
+    assertTrue(
         Paths.get(new URI(actual.getPhysicalPath()).getPath()).isAbsolute(),
         () -> "path == " + actual.getPhysicalPath() + " is not absolute");
-    Assertions.assertEquals(expected.getFileFormat(), actual.getFileFormat());
-    Assertions.assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
-    Assertions.assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
-    Assertions.assertEquals(expected.getRecordCount(), actual.getRecordCount());
+    assertEquals(expected.getFileFormat(), actual.getFileFormat());
+    assertEquals(expected.getPartitionValues(), actual.getPartitionValues());
+    assertEquals(expected.getFileSizeBytes(), actual.getFileSizeBytes());
+    assertEquals(expected.getRecordCount(), actual.getRecordCount());
     Instant now = Instant.now();
     long minRange = now.minus(1, ChronoUnit.HOURS).toEpochMilli();
     long maxRange = now.toEpochMilli();
-    Assertions.assertTrue(
+    assertTrue(
         actual.getLastModified() > minRange && actual.getLastModified() <= maxRange,
         () ->
             "last modified == "
@@ -742,7 +815,7 @@ public class ITDeltaConversionSource {
                 + minRange
                 + " and "
                 + maxRange);
-    Assertions.assertEquals(expected.getColumnStats(), actual.getColumnStats());
+    assertEquals(expected.getColumnStats(), actual.getColumnStats());
   }
 
   private static Stream<Arguments> testWithPartitionToggle() {

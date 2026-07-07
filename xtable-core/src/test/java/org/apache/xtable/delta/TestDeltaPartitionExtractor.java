@@ -19,7 +19,8 @@
 package org.apache.xtable.delta;
 
 import static org.apache.xtable.delta.DeltaPartitionExtractor.DELTA_GENERATION_EXPRESSION;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -488,6 +489,66 @@ public class TestDeltaPartitionExtractor {
             PartitionValue.builder()
                 .partitionField(internalPartitionField2)
                 .range(rangeForPartitionField2)
+                .build());
+    List<PartitionValue> partitionValues =
+        deltaPartitionExtractor.partitionValueExtraction(
+            scalaMap, Arrays.asList(internalPartitionField1, internalPartitionField2));
+    assertEquals(expectedPartitionValues, partitionValues);
+  }
+
+  @Test
+  public void testGeneratedPartitionValueExtractionWithNullSource() {
+    // Composite partition whose components (year/month/day) are all null must resolve to a null
+    // partition value, not the literal "null-null-null".
+    Map<String, String> partitionValuesMap =
+        new HashMap<String, String>() {
+          {
+            put("partition_column1", "partition_value1");
+            put("year_partition_column", null);
+            put("month_partition_column", null);
+            put("day_partition_column", null);
+          }
+        };
+    scala.collection.mutable.Map<String, String> scalaMap =
+        convertJavaMapToScalaMap(partitionValuesMap);
+    InternalPartitionField internalPartitionField1 =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("partition_column1")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("string")
+                            .dataType(InternalType.STRING)
+                            .build())
+                    .build())
+            .transformType(PartitionTransformType.VALUE)
+            .build();
+    InternalPartitionField internalPartitionField2 =
+        InternalPartitionField.builder()
+            .sourceField(
+                InternalField.builder()
+                    .name("some_date_column")
+                    .schema(
+                        InternalSchema.builder()
+                            .name("timestamp")
+                            .dataType(InternalType.TIMESTAMP)
+                            .build())
+                    .build())
+            .partitionFieldNames(
+                Arrays.asList(
+                    "year_partition_column", "month_partition_column", "day_partition_column"))
+            .transformType(PartitionTransformType.DAY)
+            .build();
+    List<PartitionValue> expectedPartitionValues =
+        Arrays.asList(
+            PartitionValue.builder()
+                .partitionField(internalPartitionField1)
+                .range(Range.scalar("partition_value1"))
+                .build(),
+            PartitionValue.builder()
+                .partitionField(internalPartitionField2)
+                .range(Range.scalar(null))
                 .build());
     List<PartitionValue> partitionValues =
         deltaPartitionExtractor.partitionValueExtraction(

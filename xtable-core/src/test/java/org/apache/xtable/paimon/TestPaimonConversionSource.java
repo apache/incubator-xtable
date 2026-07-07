@@ -18,7 +18,13 @@
  
 package org.apache.xtable.paimon;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -100,7 +106,7 @@ public class TestPaimonConversionSource {
     InternalTable result = unpartitionedSource.getTable(snapshot);
 
     assertNotNull(result);
-    assertEquals("test_table", result.getName());
+    assertEquals("unpartitioned_table", result.getName());
     assertEquals(TableFormat.PAIMON, result.getTableFormat());
     assertNotNull(result.getReadSchema());
     assertEquals(DataLayoutStrategy.HIVE_STYLE_PARTITION, result.getLayoutStrategy());

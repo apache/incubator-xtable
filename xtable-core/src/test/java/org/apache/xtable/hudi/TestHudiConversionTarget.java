@@ -18,7 +18,9 @@
  
 package org.apache.xtable.hudi;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,7 +40,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.metadata.HoodieIndexVersion;
 
 import org.apache.xtable.avro.AvroSchemaConverter;
 import org.apache.xtable.exception.NotSupportedException;
@@ -209,15 +213,22 @@ public class TestHudiConversionTarget {
   @Test
   void syncFilesForDiff() {
     HudiConversionTarget targetClient = getTargetClient(null);
-    HudiConversionTarget.CommitState mockCommitState =
-        initMocksForBeginSync(targetClient).getLeft();
+    Pair<HudiConversionTarget.CommitState, HoodieTableMetaClient> mocks =
+        initMocksForBeginSync(targetClient);
+    HudiConversionTarget.CommitState mockCommitState = mocks.getLeft();
+    HoodieTableMetaClient mockMetaClient = mocks.getRight();
     String instant = "commit";
     InternalFilesDiff input = InternalFilesDiff.builder().build();
     BaseFileUpdatesExtractor.ReplaceMetadata output =
         BaseFileUpdatesExtractor.ReplaceMetadata.of(
             Collections.emptyMap(), Collections.emptyList());
     when(mockCommitState.getInstantTime()).thenReturn(instant);
-    when(mockBaseFileUpdatesExtractor.convertDiff(input, instant)).thenReturn(output);
+    when(mockMetaClient.getIndexMetadata()).thenReturn(Option.empty());
+    HoodieTableConfig mockTableConfig = mock(HoodieTableConfig.class);
+    when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
+    when(mockTableConfig.getTableVersion()).thenReturn(HoodieTableVersion.current());
+    when(mockBaseFileUpdatesExtractor.convertDiff(input, instant, HoodieIndexVersion.V2))
+        .thenReturn(output);
 
     targetClient.syncFilesForDiff(input);
     // validate that replace metadata is set in commitState
@@ -265,7 +276,8 @@ public class TestHudiConversionTarget {
     when(mockMetaClient.getTableConfig()).thenReturn(mockTableConfig);
     when(mockTableConfig.getRecordKeyFields())
         .thenReturn(Option.of(new String[] {"record_key_field"}));
-    when(mockHudiTableManager.initializeHudiTable(BASE_PATH, TABLE)).thenReturn(mockMetaClient);
+    when(mockHudiTableManager.initializeHudiTable(BASE_PATH, TABLE, null))
+        .thenReturn(mockMetaClient);
     HudiConversionTarget.CommitState mockCommitState = mock(HudiConversionTarget.CommitState.class);
     when(mockCommitStateCreator.create(
             mockMetaClient, COMMIT, RETENTION_IN_HOURS, MAX_DELTA_COMMITS))

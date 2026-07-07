@@ -33,7 +33,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up JDK 11
         uses: actions/setup-java@v5
@@ -44,3 +44,6 @@ jobs:
 
       - name: Apache License Check
         run: ./mvnw apache-rat:check -B
+
+      - name: Validate Shaded Dependency License Metadata
+        run: release/scripts/validate_shaded_license_coverage.sh

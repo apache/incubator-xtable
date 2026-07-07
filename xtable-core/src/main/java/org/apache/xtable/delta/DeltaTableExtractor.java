@@ -44,6 +44,19 @@ public class DeltaTableExtractor {
 
   public InternalTable table(DeltaLog deltaLog, String tableName, Long version) {
     Snapshot snapshot = deltaLog.getSnapshotAt(version, Option.empty());
+    return table(snapshot, tableName);
+  }
+
+  /**
+   * Builds an {@link InternalTable} from a pre-resolved Delta {@link Snapshot}.
+   *
+   * @param snapshot a valid, non-null snapshot with metadata and schema present
+   * @param tableName name of the table
+   * @return the internal representation of the table at the snapshot's version
+   * @throws IllegalStateException if the snapshot or its metadata/schema is null
+   */
+  public InternalTable table(Snapshot snapshot, String tableName) {
+    requireMetadata(snapshot, tableName);
     InternalSchema schema = schemaExtractor.toInternalSchema(snapshot.metadata().schema());
     List<InternalPartitionField> partitionFields =
         DeltaPartitionExtractor.getInstance()
@@ -64,5 +77,15 @@ public class DeltaTableExtractor {
         .latestCommitTime(Instant.ofEpochMilli(snapshot.timestamp()))
         .latestMetadataPath(snapshot.deltaLog().logPath().toString())
         .build();
+  }
+
+  private static void requireMetadata(Snapshot snapshot, String tableName) {
+    if (snapshot == null || snapshot.metadata() == null || snapshot.metadata().schema() == null) {
+      throw new IllegalStateException(
+          "Missing metadata/schema for table: "
+              + tableName
+              + " at version: "
+              + (snapshot != null ? snapshot.version() : "unknown"));
+    }
   }
 }

@@ -101,7 +101,8 @@ public class DeltaSchemaExtractor {
         type = InternalType.DOUBLE;
         break;
       case "binary":
-        if (originalMetadata.contains(InternalSchema.XTABLE_LOGICAL_TYPE)
+        if (originalMetadata != null
+            && originalMetadata.contains(InternalSchema.XTABLE_LOGICAL_TYPE)
             && "uuid".equals(originalMetadata.getString(InternalSchema.XTABLE_LOGICAL_TYPE))) {
           type = InternalType.UUID;
         } else {
@@ -195,7 +196,7 @@ public class DeltaSchemaExtractor {
             toInternalSchema(
                 mapType.keyType(),
                 SchemaUtils.getFullyQualifiedPath(
-                    parentPath, InternalField.Constants.MAP_VALUE_FIELD_NAME),
+                    parentPath, InternalField.Constants.MAP_KEY_FIELD_NAME),
                 false,
                 null,
                 null);

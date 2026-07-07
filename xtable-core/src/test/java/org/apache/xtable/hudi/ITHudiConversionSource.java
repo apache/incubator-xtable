@@ -19,8 +19,11 @@
 package org.apache.xtable.hudi;
 
 import static java.util.stream.Collectors.groupingBy;
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -419,6 +422,54 @@ public class ITHudiConversionSource {
 
   @ParameterizedTest
   @MethodSource("testsForAllTableTypes")
+  public void testMultipleInsertOverwriteOnSamePartitions(HoodieTableType tableType) {
+    String tableName = "test_table_" + UUID.randomUUID();
+    try (TestSparkHudiTable table =
+        TestSparkHudiTable.forStandardSchema(tableName, tempDir, jsc, "level:SIMPLE", tableType)) {
+      List<List<String>> allBaseFilePaths = new ArrayList<>();
+      List<TableChange> allTableChanges = new ArrayList<>();
+
+      // Initial insert into partition "INFO"
+      String commitInstant1 = table.startCommit();
+      List<HoodieRecord<HoodieAvroPayload>> insertsForCommit1 = table.generateRecords(50, "INFO");
+      table.insertRecordsWithCommitAlreadyStarted(insertsForCommit1, commitInstant1, true);
+      allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
+
+      // INSERT_OVERWRITE on "INFO" partition (replacecommit A — new file groups replace initial)
+      List<HoodieRecord<HoodieAvroPayload>> overwriteRecords1 = table.generateRecords(30, "INFO");
+      table.insertOverwrite(overwriteRecords1, tableType);
+      allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
+
+      // INSERT_OVERWRITE on "INFO" partition again (replacecommit B — new file groups replace A's)
+      List<HoodieRecord<HoodieAvroPayload>> overwriteRecords2 = table.generateRecords(20, "INFO");
+      table.insertOverwrite(overwriteRecords2, tableType);
+      allBaseFilePaths.add(table.getAllLatestBaseFilePaths());
+
+      HudiConversionSource hudiClient =
+          getHudiSourceClient(CONFIGURATION, table.getBasePath(), "level:VALUE");
+      // Get the current snapshot
+      InternalSnapshot internalSnapshot = hudiClient.getCurrentSnapshot();
+      ValidationTestHelper.validateSnapshot(
+          internalSnapshot, allBaseFilePaths.get(allBaseFilePaths.size() - 1));
+      // Get changes in Incremental format since the initial insert
+      InstantsForIncrementalSync instantsForIncrementalSync =
+          InstantsForIncrementalSync.builder()
+              .lastSyncInstant(HudiInstantUtils.parseFromInstantTime(commitInstant1))
+              .build();
+      CommitsBacklog<HoodieInstant> instantCommitsBacklog =
+          hudiClient.getCommitsBacklog(instantsForIncrementalSync);
+      for (HoodieInstant instant : instantCommitsBacklog.getCommitsToProcess()) {
+        TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
+        allTableChanges.add(tableChange);
+      }
+      // Without the fix, replacecommit A would have 0 adds because the FileSystemView
+      // built from the full timeline marks A's file groups as replaced by B.
+      ValidationTestHelper.validateTableChanges(allBaseFilePaths, allTableChanges);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("testsForAllTableTypes")
   public void testsForDeleteAllRecordsInPartition(HoodieTableType tableType) {
     String tableName = "test_table_" + UUID.randomUUID();
     try (TestSparkHudiTable table =
@@ -650,13 +701,13 @@ public class ITHudiConversionSource {
           hudiClient.getCommitsBacklog(instantsForIncrementalSync);
       for (HoodieInstant instant : instantCommitsBacklog.getCommitsToProcess()) {
         TableChange tableChange = hudiClient.getTableChangeForCommit(instant);
-        if (commitInstant2.equals(instant.getTimestamp())) {
+        if (commitInstant2.equals(instant.requestedTime())) {
           ValidationTestHelper.validateTableChange(
               baseFilesAfterCommit1, baseFilesAfterCommit2, tableChange);
         } else if ("rollback".equals(instant.getAction())) {
           ValidationTestHelper.validateTableChange(
               baseFilesAfterCommit3, baseFilesAfterRollback, tableChange);
-        } else if (commitInstant4.equals(instant.getTimestamp())) {
+        } else if (commitInstant4.equals(instant.requestedTime())) {
           ValidationTestHelper.validateTableChange(
               baseFilesAfterRollback, baseFilesAfterCommit4, tableChange);
         } else {
@@ -689,7 +740,7 @@ public class ITHudiConversionSource {
       Configuration conf, String basePath, String xTablePartitionConfig) {
     HoodieTableMetaClient hoodieTableMetaClient =
         HoodieTableMetaClient.builder()
-            .setConf(conf)
+            .setConf(getStorageConf(conf))
             .setBasePath(basePath)
             .setLoadActiveTimelineOnLoad(true)
             .build();

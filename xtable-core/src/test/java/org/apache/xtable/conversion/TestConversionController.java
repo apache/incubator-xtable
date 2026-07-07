@@ -22,7 +22,7 @@ import static org.apache.xtable.conversion.ConversionUtils.convertToSourceTable;
 import static org.apache.xtable.model.storage.TableFormat.DELTA;
 import static org.apache.xtable.model.storage.TableFormat.HUDI;
 import static org.apache.xtable.model.storage.TableFormat.ICEBERG;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -45,6 +45,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatcher;
 
@@ -54,6 +55,7 @@ import org.apache.xtable.catalog.CatalogConversionFactory;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.IncrementalTableChanges;
 import org.apache.xtable.model.InstantsForIncrementalSync;
+import org.apache.xtable.model.InstantsForIncrementalSync.TargetSyncInstant;
 import org.apache.xtable.model.InternalSnapshot;
 import org.apache.xtable.model.InternalTable;
 import org.apache.xtable.model.TableChange;
@@ -89,6 +91,12 @@ public class TestConversionController {
   private final ConversionTarget mockConversionTarget2 = mock(ConversionTarget.class);
   private final CatalogSyncClient mockCatalogSyncClient1 = mock(CatalogSyncClient.class);
   private final CatalogSyncClient mockCatalogSyncClient2 = mock(CatalogSyncClient.class);
+
+  @BeforeEach
+  void setupTargetFormats() {
+    when(mockConversionTarget1.getTableFormat()).thenReturn(ICEBERG);
+    when(mockConversionTarget2.getTableFormat()).thenReturn(DELTA);
+  }
 
   @Test
   void testAllSnapshotSyncAsPerConfig() {
@@ -165,6 +173,10 @@ public class TestConversionController {
     InstantsForIncrementalSync instantsForIncrementalSync =
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(icebergLastSyncInstant)
+            .targetSyncInstants(
+                Arrays.asList(
+                    targetSyncInstant(ICEBERG, icebergLastSyncInstant),
+                    targetSyncInstant(DELTA, deltaLastSyncInstant)))
             .pendingCommits(combinedPendingInstants)
             .build();
     List<Instant> instantsToProcess =
@@ -307,6 +319,8 @@ public class TestConversionController {
     InstantsForIncrementalSync instantsForIncrementalSync =
         InstantsForIncrementalSync.builder()
             .lastSyncInstant(deltaLastSyncInstant)
+            .targetSyncInstants(
+                Collections.singletonList(targetSyncInstant(DELTA, deltaLastSyncInstant)))
             .pendingCommits(pendingInstantsForDelta)
             .build();
     List<Instant> instantsToProcess = Arrays.asList(instantAt8, instantAt2);
@@ -389,10 +403,16 @@ public class TestConversionController {
 
     // Iceberg last synced at instantAt5, the last instant in the source
     Instant icebergLastSyncInstant = instantAt5;
-    // Delta last synced at instantAt10
+    // Delta last synced at instantAt5
     Instant deltaLastSyncInstant = instantAt5;
     InstantsForIncrementalSync instantsForIncrementalSync =
-        InstantsForIncrementalSync.builder().lastSyncInstant(deltaLastSyncInstant).build();
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(deltaLastSyncInstant)
+            .targetSyncInstants(
+                Arrays.asList(
+                    targetSyncInstant(DELTA, deltaLastSyncInstant),
+                    targetSyncInstant(ICEBERG, icebergLastSyncInstant)))
+            .build();
     List<Instant> instantsToProcess = Collections.emptyList();
     CommitsBacklog<Instant> commitsBacklog =
         CommitsBacklog.<Instant>builder().commitsToProcess(instantsToProcess).build();
@@ -639,5 +659,12 @@ public class TestConversionController {
       }
     }
     return !first.hasNext() && !second.hasNext();
+  }
+
+  private static TargetSyncInstant targetSyncInstant(String tableFormat, Instant lastSyncInstant) {
+    return TargetSyncInstant.builder()
+        .tableFormat(tableFormat)
+        .lastSyncInstant(lastSyncInstant)
+        .build();
   }
 }

@@ -18,7 +18,10 @@
  
 package org.apache.xtable.hudi;
 
+import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.hudi.index.HoodieIndex.IndexType.INMEMORY;
+import static org.apache.hudi.metadata.HoodieTableMetadataUtil.PARTITION_NAME_COLUMN_STATS;
+import static org.apache.hudi.metadata.HoodieTableMetadataUtil.existingIndexVersionOrDefault;
 
 import java.io.IOException;
 import java.time.temporal.ChronoUnit;
@@ -44,9 +47,10 @@ import org.apache.hudi.avro.model.HoodieCleanFileInfo;
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
 import org.apache.hudi.avro.model.HoodieCleanerPlan;
 import org.apache.hudi.client.HoodieJavaWriteClient;
-import org.apache.hudi.client.HoodieTimelineArchiver;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
+import org.apache.hudi.client.timeline.HoodieTimelineArchiver;
+import org.apache.hudi.client.timeline.versioning.v1.TimelineArchiverV1;
 import org.apache.hudi.common.HoodieCleanStat;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
@@ -54,13 +58,15 @@ import org.apache.hudi.common.model.HoodieBaseFile;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieFileGroup;
+import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
-import org.apache.hudi.common.table.timeline.TimelineMetadataUtils;
 import org.apache.hudi.common.table.timeline.TimelineUtils;
+import org.apache.hudi.common.table.timeline.versioning.v2.InstantComparatorV2;
 import org.apache.hudi.common.table.view.TableFileSystemView;
 import org.apache.hudi.common.util.CleanerUtils;
 import org.apache.hudi.common.util.ExternalFilePathUtil;
@@ -70,7 +76,8 @@ import org.apache.hudi.config.HoodieArchivalConfig;
 import org.apache.hudi.config.HoodieCleanConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
-import org.apache.hudi.hadoop.CachingPath;
+import org.apache.hudi.hadoop.fs.CachingPath;
+import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.metadata.HoodieTableMetadataWriter;
 import org.apache.hudi.table.HoodieJavaTable;
 import org.apache.hudi.table.action.clean.CleanPlanner;
@@ -103,11 +110,13 @@ public class HudiConversionTarget implements ConversionTarget {
   private String tableDataPath;
   private Optional<HoodieTableMetaClient> metaClient;
   private CommitState commitState;
+  // database to register the target table under, resolved from the target namespace
+  private String databaseName;
 
   public HudiConversionTarget() {}
 
   @VisibleForTesting
-  HudiConversionTarget(
+  public HudiConversionTarget(
       TargetTable targetTable,
       Configuration configuration,
       int maxNumDeltaCommitsBeforeCompaction) {
@@ -116,10 +125,12 @@ public class HudiConversionTarget implements ConversionTarget {
         (int) targetTable.getMetadataRetention().toHours(),
         maxNumDeltaCommitsBeforeCompaction,
         BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(configuration), new CachingPath(targetTable.getBasePath())),
+            new HoodieJavaEngineContext(getStorageConf(configuration)),
+            new CachingPath(targetTable.getBasePath())),
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);
+    this.databaseName = resolveDatabaseName(targetTable);
   }
 
   @VisibleForTesting
@@ -168,10 +179,20 @@ public class HudiConversionTarget implements ConversionTarget {
         (int) targetTable.getMetadataRetention().toHours(),
         HoodieMetadataConfig.COMPACT_NUM_DELTA_COMMITS.defaultValue(),
         BaseFileUpdatesExtractor.of(
-            new HoodieJavaEngineContext(configuration), new CachingPath(targetTable.getBasePath())),
+            new HoodieJavaEngineContext(getStorageConf(configuration)),
+            new CachingPath(targetTable.getBasePath())),
         AvroSchemaConverter.getInstance(),
         HudiTableManager.of(configuration),
         CommitState::new);
+    this.databaseName = resolveDatabaseName(targetTable);
+  }
+
+  /** Uses the first namespace level as the Hudi database name, or the default if none is set. */
+  private static String resolveDatabaseName(TargetTable targetTable) {
+    String[] namespace = targetTable.getNamespace();
+    return namespace != null && namespace.length > 0
+        ? namespace[0]
+        : HudiTableManager.DEFAULT_DATABASE_NAME;
   }
 
   @FunctionalInterface
@@ -252,15 +273,22 @@ public class HudiConversionTarget implements ConversionTarget {
 
   @Override
   public void syncFilesForDiff(InternalFilesDiff internalFilesDiff) {
+    if (!metaClient.isPresent()) {
+      throw new IllegalStateException("Meta client is not initialized");
+    }
+    HoodieIndexVersion indexVersion =
+        existingIndexVersionOrDefault(PARTITION_NAME_COLUMN_STATS, metaClient.get());
     BaseFileUpdatesExtractor.ReplaceMetadata replaceMetadata =
-        baseFileUpdatesExtractor.convertDiff(internalFilesDiff, commitState.getInstantTime());
+        baseFileUpdatesExtractor.convertDiff(
+            internalFilesDiff, commitState.getInstantTime(), indexVersion);
     commitState.setReplaceMetadata(replaceMetadata);
   }
 
   @Override
   public void beginSync(InternalTable table) {
     if (!metaClient.isPresent()) {
-      metaClient = Optional.of(hudiTableManager.initializeHudiTable(tableDataPath, table));
+      metaClient =
+          Optional.of(hudiTableManager.initializeHudiTable(tableDataPath, table, databaseName));
     } else {
       // make sure meta client has up-to-date view of the timeline
       getMetaClient().reloadActiveTimeline();
@@ -303,7 +331,7 @@ public class HudiConversionTarget implements ConversionTarget {
     return getTargetCommitIdentifier(sourceIdentifier, metaClient.get());
   }
 
-  Optional<String> getTargetCommitIdentifier(
+  public Optional<String> getTargetCommitIdentifier(
       String sourceIdentifier, HoodieTableMetaClient metaClient) {
 
     HoodieTimeline commitTimeline = metaClient.getCommitsTimeline();
@@ -317,7 +345,7 @@ public class HudiConversionTarget implements ConversionTarget {
 
         TableSyncMetadata metadata = optionalMetadata.get();
         if (sourceIdentifier.equals(metadata.getSourceIdentifier())) {
-          return Optional.of(instant.getTimestamp());
+          return Optional.of(instant.requestedTime());
         }
       } catch (Exception e) {
         log.warn("Failed to parse commit metadata for instant: {}", instant, e);
@@ -382,7 +410,7 @@ public class HudiConversionTarget implements ConversionTarget {
       if (schema == null) {
         try {
           // reuse existing table schema if no schema is provided as part of this commit
-          schema = new TableSchemaResolver(metaClient).getTableAvroSchema();
+          schema = new TableSchemaResolver(metaClient).getTableSchema().toAvroSchema();
         } catch (Exception ex) {
           throw new ReadException("Unable to read Hudi table schema", ex);
         }
@@ -393,18 +421,23 @@ public class HudiConversionTarget implements ConversionTarget {
               getNumInstantsToRetain(),
               maxNumDeltaCommitsBeforeCompaction,
               timelineRetentionInHours);
-      HoodieEngineContext engineContext = new HoodieJavaEngineContext(metaClient.getHadoopConf());
+      HoodieEngineContext engineContext = new HoodieJavaEngineContext(metaClient.getStorageConf());
       try (HoodieJavaWriteClient<?> writeClient =
           new HoodieJavaWriteClient<>(engineContext, writeConfig)) {
-        writeClient.startCommitWithTime(instantTime, HoodieTimeline.REPLACE_COMMIT_ACTION);
+        metaClient
+            .getActiveTimeline()
+            .createRequestedCommitWithReplaceMetadata(
+                instantTime, HoodieTimeline.REPLACE_COMMIT_ACTION);
         metaClient
             .getActiveTimeline()
             .transitionReplaceRequestedToInflight(
                 new HoodieInstant(
                     HoodieInstant.State.REQUESTED,
                     HoodieTimeline.REPLACE_COMMIT_ACTION,
-                    instantTime),
+                    instantTime,
+                    InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR),
                 Option.empty());
+        writeClient.setOperationType(WriteOperationType.UNKNOWN);
         writeClient.commit(
             instantTime,
             writeStatuses,
@@ -509,7 +542,7 @@ public class HudiConversionTarget implements ConversionTarget {
                     .map(
                         earliestInstantToRetain ->
                             new HoodieActionInstant(
-                                earliestInstantToRetain.getTimestamp(),
+                                earliestInstantToRetain.requestedTime(),
                                 earliestInstantToRetain.getAction(),
                                 earliestInstantToRetain.getState().name()))
                     .orElse(null),
@@ -518,16 +551,18 @@ public class HudiConversionTarget implements ConversionTarget {
                 Collections.emptyMap(),
                 CleanPlanner.LATEST_CLEAN_PLAN_VERSION,
                 cleanInfoPerPartition,
-                Collections.emptyList());
+                Collections.emptyList(),
+                Collections.emptyMap());
         // create a clean instant and mark it as requested with the clean plan
         HoodieInstant requestedCleanInstant =
             new HoodieInstant(
-                HoodieInstant.State.REQUESTED, HoodieTimeline.CLEAN_ACTION, cleanTime);
-        activeTimeline.saveToCleanRequested(
-            requestedCleanInstant, TimelineMetadataUtils.serializeCleanerPlan(cleanerPlan));
+                HoodieInstant.State.REQUESTED,
+                HoodieTimeline.CLEAN_ACTION,
+                cleanTime,
+                InstantComparatorV2.REQUESTED_TIME_BASED_COMPARATOR);
+        activeTimeline.saveToCleanRequested(requestedCleanInstant, Option.of(cleanerPlan));
         HoodieInstant inflightClean =
-            activeTimeline.transitionCleanRequestedToInflight(
-                requestedCleanInstant, Option.empty());
+            activeTimeline.transitionCleanRequestedToInflight(requestedCleanInstant);
         List<HoodieCleanStat> cleanStats =
             cleanInfoPerPartition.entrySet().stream()
                 .map(
@@ -543,19 +578,20 @@ public class HudiConversionTarget implements ConversionTarget {
                           deletePaths,
                           deletePaths,
                           Collections.emptyList(),
-                          earliestInstant.get().getTimestamp(),
+                          earliestInstant.get().requestedTime(),
                           instantTime);
                     })
                 .collect(Collectors.toList());
         HoodieCleanMetadata cleanMetadata =
-            CleanerUtils.convertCleanMetadata(cleanTime, Option.empty(), cleanStats);
+            CleanerUtils.convertCleanMetadata(
+                cleanTime, Option.empty(), cleanStats, Collections.emptyMap());
         // update the metadata table with the clean metadata so the files' metadata are marked for
         // deletion
         hoodieTableMetadataWriter.performTableServices(Option.empty());
         hoodieTableMetadataWriter.update(cleanMetadata, cleanTime);
         // mark the commit as complete on the table timeline
         activeTimeline.transitionCleanInflightToComplete(
-            inflightClean, TimelineMetadataUtils.serializeCleanMetadata(cleanMetadata));
+            false, inflightClean, Option.of(cleanMetadata));
       } catch (Exception ex) {
         throw new UpdateException("Unable to clean Hudi timeline", ex);
       }
@@ -565,7 +601,7 @@ public class HudiConversionTarget implements ConversionTarget {
         HoodieJavaTable<?> table, HoodieWriteConfig config, HoodieEngineContext engineContext) {
       // trigger archiver manually
       try {
-        HoodieTimelineArchiver archiver = new HoodieTimelineArchiver(config, table);
+        HoodieTimelineArchiver archiver = new TimelineArchiverV1(config, table);
         archiver.archiveIfRequired(engineContext, true);
       } catch (IOException ex) {
         throw new UpdateException("Unable to archive Hudi timeline", ex);
@@ -586,8 +622,13 @@ public class HudiConversionTarget implements ConversionTarget {
       Properties properties = new Properties();
       properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
       return HoodieWriteConfig.newBuilder()
+          // Pin writes to table version 6 and disable auto-upgrade so the write client does not
+          // upgrade the table to version 9 (Hudi 1.x). Table version 9 support will be added in a
+          // follow-up PR, tracked in https://github.com/apache/incubator-xtable/issues/834.
+          .withWriteTableVersion(HoodieTableVersion.SIX.versionCode())
+          .withAutoUpgradeVersion(false)
           .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(INMEMORY).build())
-          .withPath(metaClient.getBasePathV2().toString())
+          .withPath(metaClient.getBasePath().toString())
           .withPopulateMetaFields(metaClient.getTableConfig().populateMetaFields())
           .withEmbeddedTimelineServerEnabled(false)
           .withSchema(schema == null ? "" : schema.toString())
@@ -607,7 +648,14 @@ public class HudiConversionTarget implements ConversionTarget {
               HoodieMetadataConfig.newBuilder()
                   .enable(true)
                   .withProperties(properties)
-                  .withMetadataIndexColumnStats(true)
+                  // Hudi 1.2.0 couples the partition-stats index to the column-stats index. For
+                  // partitioned tables, the partition-stats generation path rebuilds a file-system
+                  // view over the committed external parquet files and groups them by fileId.
+                  // XTable's externally-registered files have non-Hudi names whose fileId cannot be
+                  // parsed once the "_hudiext" marker is stripped, which leads to failures. So
+                  // column stats are only enabled for un-partitioned tables for now. Tracked in
+                  // https://github.com/apache/incubator-xtable/issues/832.
+                  .withMetadataIndexColumnStats(!metaClient.getTableConfig().isTablePartitioned())
                   .withMaxNumDeltaCommitsBeforeCompaction(maxNumDeltaCommitsBeforeCompaction)
                   .build())
           .build();
