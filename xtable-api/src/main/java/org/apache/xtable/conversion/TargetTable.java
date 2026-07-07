@@ -43,7 +43,14 @@ public class TargetTable extends ExternalTable {
       Duration metadataRetention,
       Properties additionalProperties,
       Configuration hadoopConf) {
-    super(name, formatName, basePath, namespace, catalogConfig, additionalProperties, hadoopConf);
+    super(
+        name,
+        formatName,
+        basePath,
+        namespace,
+        catalogConfig,
+        additionalProperties,
+        hadoopConf != null ? hadoopConf : new Configuration());
     this.metadataRetention =
         metadataRetention == null ? Duration.of(7, ChronoUnit.DAYS) : metadataRetention;
   }

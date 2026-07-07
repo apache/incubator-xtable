@@ -140,7 +140,7 @@ public class RunSync {
       return sourceTable;
     } else {
       SourceTable sourceTable =
-          new SourceTable(
+          SourceTable.withDetectedFormat(
               table.getTableName(),
               table.getTableBasePath(),
               table.getTableDataPath(),

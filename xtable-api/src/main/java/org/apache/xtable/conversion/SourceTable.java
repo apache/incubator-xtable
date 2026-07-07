@@ -35,8 +35,6 @@ public class SourceTable extends ExternalTable {
   /** The path to the data files, defaults to the basePath */
   @NonNull private final String dataPath;
 
-  private final transient Configuration hadoopConf;
-
   @Builder(toBuilder = true)
   public SourceTable(
       String name,
@@ -49,27 +47,30 @@ public class SourceTable extends ExternalTable {
       Configuration hadoopConf) {
     super(name, formatName, basePath, namespace, catalogConfig, additionalProperties, hadoopConf);
     this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
-    this.hadoopConf = hadoopConf;
   }
 
-  public SourceTable(
-      @NonNull String name,
-      @NonNull String basePath,
+  public static SourceTable withDetectedFormat(
+      String name,
+      String basePath,
       String dataPath,
       String[] namespace,
       CatalogConfig catalogConfig,
       Properties additionalProperties,
       Configuration hadoopConf) {
-    super(
-        name,
-        resolveFormatOrThrow(basePath, hadoopConf),
-        basePath,
-        namespace,
-        catalogConfig,
-        additionalProperties,
-        hadoopConf);
-    this.dataPath = dataPath == null ? this.getBasePath() : sanitizeBasePath(dataPath);
-    this.hadoopConf = hadoopConf;
+
+    Configuration resolvedConf = hadoopConf != null ? hadoopConf : new Configuration();
+    String detectedFormat = resolveFormatOrThrow(basePath, resolvedConf);
+
+    return SourceTable.builder()
+        .name(name)
+        .formatName(detectedFormat)
+        .basePath(basePath)
+        .dataPath(dataPath)
+        .namespace(namespace)
+        .catalogConfig(catalogConfig)
+        .additionalProperties(additionalProperties)
+        .hadoopConf(resolvedConf)
+        .build();
   }
 
   private static String resolveFormatOrThrow(String basePath, Configuration hadoopConf) {
