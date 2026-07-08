@@ -134,7 +134,7 @@ class ITRunSync {
       long durationInSeconds = (System.currentTimeMillis() - startTime) / 1000;
 
       org.junit.jupiter.api.Assertions.assertTrue(
-          durationInSeconds < 3, // being generous with 3 secs
+          durationInSeconds < 3, // being generous with 3 seconds
           "The sync should have cut off and stopped immediately around 1 second. Took: "
               + durationInSeconds);
     }
