@@ -76,7 +76,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import org.apache.hudi.client.HoodieReadClient;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
-import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
@@ -1218,9 +1217,7 @@ public class ITConversionController {
                         // set the metadata path to the data path as the default (required by Hudi)
                         .basePath(table.getDataPath())
                         .metadataRetention(metadataRetention)
-
                         .hadoopConf(jsc.hadoopConfiguration())
-
                         .build())
             .collect(Collectors.toList());
 
