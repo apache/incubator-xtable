@@ -84,7 +84,7 @@ class ITRunSync {
     try (GenericTable table =
         TestJavaHudiTable.withAdditionalColumnsAndFieldIds(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
-      // write more data now that table is initialized and data is synced
+      // write more data now that the table is initialized and data is synced
       table.insertRows(20);
       Path icebergMetadataPath = Paths.get(URI.create(table.getBasePath() + "/metadata"));
       waitForNumIcebergCommits(icebergMetadataPath, 6);
