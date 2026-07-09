@@ -35,6 +35,9 @@ github:
     main:
       required_pull_request_reviews:
         required_approving_review_count: 1
+    main-hudi-0x:
+      required_pull_request_reviews:
+        required_approving_review_count: 1
 notifications:
     commits:      commits@xtable.apache.org
     issues:       commits@xtable.apache.org
