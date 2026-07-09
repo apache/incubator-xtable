@@ -18,20 +18,23 @@
  
 package org.apache.xtable.conversion;
 
+import java.util.Iterator;
 import java.util.Properties;
+import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.xtable.delta.DeltaConversionTargetConfig;
 import org.apache.xtable.exception.NotSupportedException;
-import org.apache.xtable.kernel.DeltaKernelConversionTarget;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.spi.sync.ConversionTarget;
 
+@Log4j2
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ConversionTargetFactory {
   private static final ConversionTargetFactory INSTANCE = new ConversionTargetFactory();
@@ -87,7 +90,21 @@ public class ConversionTargetFactory {
         TableFormat.DELTA.equalsIgnoreCase(tableFormatName)
             && DeltaConversionTargetConfig.fromProperties(properties).isUseKernel();
     ServiceLoader<ConversionTarget> loader = ServiceLoader.load(ConversionTarget.class);
-    for (ConversionTarget target : loader) {
+    Iterator<ConversionTarget> iterator = loader.iterator();
+    while (iterator.hasNext()) {
+      ConversionTarget target;
+      try {
+        target = iterator.next();
+      } catch (ServiceConfigurationError | LinkageError error) {
+        // A registered target whose engine library is not on the classpath (e.g. Delta when only
+        // Hudi/Iceberg are provided). Skip it so a subset of engines can still be used; a missing
+        // engine for the requested format surfaces below as NotSupportedException.
+        log.warn(
+            "Skipping a registered ConversionTarget whose engine library is not on the classpath; "
+                + "provide the missing engine if you need this target format",
+            error);
+        continue;
+      }
       if (target.getTableFormat().equalsIgnoreCase(tableFormatName)
           && isDeltaKernelTarget(target) == useKernel) {
         return target;
@@ -96,7 +113,10 @@ public class ConversionTargetFactory {
     throw new NotSupportedException("Target format is not yet supported: " + tableFormatName);
   }
 
+  private static final String DELTA_KERNEL_TARGET_CLASS =
+      "org.apache.xtable.kernel.DeltaKernelConversionTarget";
+
   private static boolean isDeltaKernelTarget(ConversionTarget target) {
-    return target instanceof DeltaKernelConversionTarget;
+    return DELTA_KERNEL_TARGET_CLASS.equals(target.getClass().getName());
   }
 }
