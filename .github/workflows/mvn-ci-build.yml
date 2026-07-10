@@ -24,10 +24,12 @@ on:
   push:
     branches:
       - "main"
+      - "main-hudi-0x"
 
   pull_request:
     branches:
       - "main"
+      - "main-hudi-0x"
 
 jobs:
   build:
