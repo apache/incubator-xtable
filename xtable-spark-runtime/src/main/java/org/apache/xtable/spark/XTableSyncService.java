@@ -19,6 +19,7 @@
 package org.apache.xtable.spark;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
@@ -107,7 +108,7 @@ public class XTableSyncService {
   }
 
   private static ConversionSourceProvider<?> sourceProviderFor(String sourceFormat) {
-    switch (sourceFormat.toUpperCase()) {
+    switch (sourceFormat.toUpperCase(Locale.ROOT)) {
       case TableFormat.HUDI:
         return new HudiConversionSourceProvider();
       case TableFormat.DELTA:

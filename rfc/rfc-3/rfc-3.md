@@ -69,7 +69,38 @@ Everything needed to run a sync already exists in the engine; the gap is purely 
 
 A new **pure-Java** module `xtable-spark-runtime_${scala.binary.version}` (package `org.apache.xtable.spark`).
 
-### Activation (config only)
+### What ships in v1
+
+This PR delivers the **thin bundle plus the standalone `spark-submit` entry point
+`XTableSparkSync`** — enough to run a relocated, in-cluster sync from one command. The config-only,
+driver-side auto-sync (`XTableSyncListener` registered via `spark.sql.queryExecutionListeners`, with
+`XTableSparkConfig` and `PlanTargetResolver`) is the headline on-ramp this RFC designs toward, but it
+is **deferred to a follow-up PR** — those classes are not in v1. The listener design is retained
+below as the target so the entry point and config schema stay aligned.
+
+### Activation — v1 (CLI entry point)
+
+```
+spark-submit \
+  --jars /path/to/xtable-spark-runtime_2.12-<ver>.jar \
+  --class org.apache.xtable.spark.XTableSparkSync \
+  /path/to/xtable-spark-runtime_2.12-<ver>.jar \
+  --basePath /warehouse/db/orders --sourceFormat HUDI --targets ICEBERG,DELTA --tableName orders
+```
+
+Because the shaded jar is the **main artifact with a dependency-reduced POM** (see Packaging),
+`--packages org.apache.xtable:xtable-spark-runtime_2.12:<ver>` resolves the same relocated bundle and
+pulls no un-relocated transitive deps; `--jars` with the built jar is equivalent.
+
+**Engine Avro / classpath placement (required).** The bundle does not carry avro/parquet — it uses
+the engine's. Iceberg 1.9.2 compiles against Avro >= 1.12, newer than the Avro Spark 3.4 ships (1.11),
+so the engine's Avro must win on the classpath. Supply the engine jars on a **flat** classpath
+(`spark.driver.extraClassPath`/`spark.executor.extraClassPath`, or `--jars`), not layered under a
+child classloader: `--packages` puts a second Avro in a child loader, which breaks cross-boundary Avro
+casts (`NoSuchMethodError`/`ClassCastException`). This is why the bundle smoke test builds a single
+flat `spark.driver.extraClassPath`.
+
+### Planned (follow-up): config-only listener activation
 
 ```
 spark-submit --packages org.apache.xtable:xtable-spark-runtime_2.12:<ver> \
@@ -87,17 +118,22 @@ Config schema (`spark.xtable.*`):
   `spark.xtable.<k>.sourceFormat` and `spark.xtable.<k>.targets` (comma list). Optional:
   `spark.xtable.<k>.dataPath`, `spark.xtable.<k>.namespace`.
 
-Both path-based and name-based table selection are supported from the first release.
+Both path-based and name-based table selection are planned for the listener on-ramp.
 
 ### Components
 
-- **`TableSyncSpec`** — immutable description of one configured table (key, basePath, dataPath,
-  namespace, sourceFormat, targets).
-- **`XTableSparkConfig`** — parse `SparkConf`/`Map` (+ optional `SparkSession` for name resolution)
-  into `List<TableSyncSpec>`, validating required keys and failing fast with clear messages.
+Shipped in v1:
 - **`XTableSyncService`** — for one `TableSyncSpec`: build `SourceTable` + `TargetTable`s +
   `ConversionConfig(syncMode=INCREMENTAL)`, pick the source provider via a small
   `sourceProviderFor(format)` factory, and run `ConversionController.sync(...)`. Mirrors `XTableSyncTool`.
+- **`TableSyncSpec`** — immutable description of one table to sync (key, basePath, dataPath,
+  namespace, sourceFormat, targets).
+- **`XTableSparkSync`** — the standalone `spark-submit` entry point. Parses CLI args (commons-cli)
+  into a `TableSyncSpec` and drives `XTableSyncService`.
+
+Planned (follow-up, **not in v1**):
+- **`XTableSparkConfig`** — parse `SparkConf`/`Map` (+ optional `SparkSession` for name resolution)
+  into `List<TableSyncSpec>`, validating required keys and failing fast with clear messages.
 - **`PlanTargetResolver`** — best-effort extraction of the written output path from `qe.analyzed()`
   (`InsertIntoHadoopFsRelationCommand`, `SaveIntoDataSourceCommand`, and the DataSource-V2
   `AppendData`/`OverwriteByExpression` nodes used by Iceberg). Isolated and unit-testable; returns
@@ -110,11 +146,11 @@ Both path-based and name-based table selection are supported from the first rele
   are caught (as `Throwable`) so one table can't stop the others or destabilize Spark's listener bus.
   `onFailure` logs only.
 
-### Execution model: synchronous and stateless
+### Execution model: synchronous and stateless (planned listener)
 
 The sync watermark already lives in the target's `TableSyncMetadata`, and sync is incremental +
 idempotent, so a client-side dirty/pending/single-flight structure would only duplicate authoritative
-state and could not be more correct. Therefore v1 keeps no execution state.
+state and could not be more correct. Therefore the listener keeps no execution state.
 
 Spark delivers `QueryExecutionListener` callbacks asynchronously via the driver's `LiveListenerBus`
 (off `SparkListenerSQLExecutionEnd`), not on the thread that ran `df.write` — so a listener cannot
@@ -139,12 +175,25 @@ Scala-suffixed artifactId. **Spark, Hadoop, and the engine libraries (Hudi / Ice
 packages/jars flags, and the thin XTable bundle stays compatible across engine versions (Hudi 1.1 /
 1.2, etc.). The `maven-shade-plugin` uses a **curated `artifactSet` allowlist**: only XTable's own
 modules (`xtable-api`, `xtable-core`, `xtable-hudi-support-utils`) plus the libraries XTable uses
-*purely internally* — `guava` and `protobuf` — which are relocated under `org.apache.xtable.shaded.*`.
+*purely internally* — `guava` (and its `failureaccess`) and `commons-cli` for the CLI — which are
+relocated under `org.apache.xtable.shaded.*`. The allowlist is include-only, so its implicit
+"provided by the cluster" assumptions (e.g. `jackson-datatype-jsr310` via `xtable-api`,
+`log4j-1.2-api` via `xtable-core`) are documented in the pom; a `dependency:analyze`/enforcer gate to
+keep it from silently under-bundling is a tracked follow-up.
+
+The shaded jar is published as the **main artifact with a dependency-reduced POM**
+(`shadedArtifactAttached=false`, `createDependencyReducedPom=true`) — the same shape as
+`iceberg-spark-runtime` and `hudi-spark-bundle`, so resolving the coordinate (Maven dep or
+`--packages`) yields the relocated bundle and no un-relocated transitive deps. Because the jar
+relocates and ships `guava`/`failureaccess`/`commons-cli` (all Apache-2.0), its `LICENSE`/`NOTICE`
+carry those attributions (`LICENSE-bundled`/`NOTICE-bundled` via `IncludeResourceTransformer`).
+`protobuf` is **not** bundled — it resolves as `provided` (supplied by the engines), so it needs no
+relocation or notice.
 
 Critically, libraries XTable **exchanges across the engine API boundary must not be relocated or
 bundled** — e.g. Hudi returns a real `org.apache.avro.Schema`, so a relocated/bundled `avro` in the
 XTable jar produces a `NoSuchMethodError` at runtime. `avro` / `parquet` / `jackson` / `commons` are
-therefore left to the provided runtime. Resulting bundle: **~3.6 MB**.
+therefore left to the provided runtime. Resulting bundle: **~3.8 MB**.
 
 Because `ConversionTargetFactory` discovers targets via `ServiceLoader` and would otherwise fail if
 any registered engine (e.g. Delta) is absent, target discovery is made **resilient**: providers whose
@@ -160,22 +209,26 @@ lets the shaded jar run a sync directly and is what the jar-validation test driv
 - **No breaking changes.** This is a new, additive module; existing `RunSync`/`xtable-utilities` and
   `xtable-core` behavior is unchanged.
 - **No impact on existing users** unless they opt in by adding the jar and setting `spark.xtable.*`.
-- **Spark support:** target Spark 3.5 first (Scala 2.12), with a Spark 4 upgrade as a follow-up. The
-  per-Spark-version coupling comes from the Delta-on-Spark path; making Delta Kernel the default
-  (tracked separately) would let a single bundle serve multiple Spark lines.
-- **Deferred (follow-up RFCs/PRs):** a `StreamingQueryListener` variant, a `CALL xtable.sync(...)` SQL
-  procedure, and the async execution opt-in.
+- **Spark support:** this bundle targets the Spark line of its engine build (Spark 3.4, Scala 2.12,
+  for the Hudi 0.x release line), with newer Spark lines as follow-ups. The per-Spark-version coupling
+  comes from the Delta-on-Spark path; making Delta Kernel the default (tracked separately) would let a
+  single bundle serve multiple Spark lines.
+- **Deferred (follow-up RFCs/PRs):** the config-only `XTableSyncListener` on-ramp, a
+  `StreamingQueryListener` variant, a `CALL xtable.sync(...)` SQL procedure, and the async execution
+  opt-in.
 
 ## Test Plan
 
-- **Unit:** `XTableSparkConfig` parsing (path- and name-based, missing-key errors);
-  `PlanTargetResolver` path extraction from representative write plans (and empty result when
-  unresolvable).
-- **Integration (`ITXTableSyncListener`, embedded `local[*]`):** register the listener via
-  `spark.sql.queryExecutionListeners`, configure a Hudi source with `targets=DELTA,ICEBERG`, write the
-  table, then poll-with-timeout (callback delivery is async) and assert both targets by reading them
-  back through Spark (`format("delta")` / `format("iceberg")`) and comparing row counts to the source,
-  mirroring `ITConversionController.checkDatasetEquivalence`.
-- **Bundle sanity:** package the module and inspect the shaded jar — confirm size is tens of MB,
-  `org.apache.spark`/`org.apache.hadoop` are absent, and relocated libraries live under
-  `org.apache.xtable.shaded.*`.
+- **Bundle smoke test (`ITXTableSparkRuntimeBundle`), v1:** `spark-submit` the shaded main jar via
+  `XTableSparkSync` for one case per direction (Hudi↔Iceberg, Hudi↔Delta), supplying the engines on a
+  **flat** `spark.driver.extraClassPath` (single Avro on one loader), and assert the target is
+  data-equivalent to the source by reading both back through Spark (Hudi with metadata enabled;
+  Iceberg non-vectorized to avoid a cross-engine timestamp Arrow-cast). `SPARK_HOME`-gated. This
+  validates that the relocated jar is self-contained and runs a real sync.
+- **Planned (with the listener follow-up):** unit tests for `XTableSparkConfig` parsing (path- and
+  name-based, missing-key errors) and `PlanTargetResolver` path extraction; and an
+  `ITXTableSyncListener` embedded `local[*]` test that registers the listener via
+  `spark.sql.queryExecutionListeners` and poll-asserts both targets appear after a write.
+- **Bundle sanity:** package the module and inspect the shaded main jar — confirm it is a few MB
+  (~3.8 MB), `org.apache.spark`/`org.apache.hadoop`/`org.apache.avro` are absent, and the relocated
+  libraries live under `org.apache.xtable.shaded.*`.

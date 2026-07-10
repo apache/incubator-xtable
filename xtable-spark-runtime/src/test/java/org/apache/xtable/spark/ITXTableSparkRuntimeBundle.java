@@ -258,11 +258,21 @@ class ITXTableSparkRuntimeBundle {
     return cp;
   }
 
+  // The shaded jar is the main artifact (shadedArtifactAttached=false), so it carries no
+  // classifier.
+  // Skip the pre-shade jar the shade plugin renames to original-*, and the sources/javadoc/tests
+  // jars.
   private File findBundleJar() {
     File targetDir = new File("target");
     File[] candidates =
         targetDir.listFiles(
-            (dir, name) -> name.startsWith("xtable-spark-runtime") && name.endsWith("-bundle.jar"));
+            (dir, name) ->
+                name.startsWith("xtable-spark-runtime")
+                    && name.endsWith(".jar")
+                    && !name.startsWith("original-")
+                    && !name.contains("-sources")
+                    && !name.contains("-javadoc")
+                    && !name.contains("-tests"));
     assertTrue(
         candidates != null && candidates.length == 1,
         "Expected exactly one bundle jar in "

@@ -29,8 +29,9 @@
     <artifactId>xtable-spark-runtime_${scala.binary.version}</artifactId>
     <name>XTable Project Spark Runtime</name>
     <description>
-        Thin, drop-in Spark bundle that runs incremental XTable metadata sync in-job via a
-        driver-side QueryExecutionListener, activated through spark.xtable.* config only.
+        Thin, relocated, drop-in Spark bundle that runs incremental XTable metadata sync. v1 ships
+        the standalone spark-submit entry point (XTableSparkSync); the config-only, driver-side
+        QueryExecutionListener on-ramp is a planned follow-up (see rfc/rfc-3).
     </description>
 
     <dependencies>
@@ -154,6 +155,47 @@
             <scope>provided</scope>
         </dependency>
 
+        <!--
+          Jackson, scala-library and the log4j 1.2 bridge arrive transitively through xtable-core but
+          are supplied by every Spark runtime (Spark itself depends on them). Declaring them provided
+          here (nearest-wins over the transitive compile scope) keeps them out of the shaded jar and
+          out of this module's runtime dependency tree, so the shade allowlist stays limited to what
+          XTable actually bundles - which is what release/scripts/validate_shaded_license_coverage.sh
+          enforces (shade <includes> must equal the runtime tree, and every bundled dep must be listed
+          in META-INF/LICENSE-bundled). guava (used internally, relocated) is intentionally left to
+          bundle. Versions come from the parent's dependencyManagement.
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.module</groupId>
+            <artifactId>jackson-module-scala_${scala.binary.version}</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-1.2-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.apache.xtable</groupId>
@@ -224,7 +266,15 @@
                         </goals>
                         <configuration>
                             <includeScope>provided</includeScope>
-                            <excludeGroupIds>org.apache.spark,org.apache.hadoop,org.apache.xtable,org.projectlombok,org.slf4j,org.apache.logging.log4j</excludeGroupIds>
+                            <!--
+                              Only the engine libraries the cluster does NOT already provide belong on
+                              this flat classpath. Exclude Spark/Hadoop, XTable's own modules, logging,
+                              and the libraries Spark itself supplies (jackson, scala-library): putting
+                              a newer jackson/scala ahead of Spark's own would change Spark's runtime.
+                              avro/parquet are deliberately NOT excluded - the engine's newer avro must
+                              win over the one Spark 3.4 ships.
+                            -->
+                            <excludeGroupIds>org.apache.spark,org.apache.hadoop,org.apache.xtable,org.projectlombok,org.slf4j,org.apache.logging.log4j,org.scala-lang,com.fasterxml.jackson.core,com.fasterxml.jackson.datatype,com.fasterxml.jackson.module</excludeGroupIds>
                             <outputFile>${project.build.directory}/engine-classpath.txt</outputFile>
                         </configuration>
                     </execution>
@@ -236,7 +286,14 @@
               (avro, parquet, jackson, commons) - relocating those would break the API boundary
               (e.g. Hudi returning a real org.apache.avro.Schema to relocated XTable code). The
               bundle therefore contains only XTable's own modules plus the libraries it uses purely
-              internally (guava, protobuf), which are relocated to avoid clashes with the cluster.
+              internally (guava), which are relocated to avoid clashes with the cluster.
+
+              The shaded jar is the MAIN artifact (shadedArtifactAttached=false) with a
+              dependency-reduced POM, matching how iceberg-spark-runtime and hudi-spark-bundle
+              publish: resolving the coordinate (a plain Maven dependency or the submit packages flag)
+              yields the relocated bundle and pulls no un-relocated transitive deps. Consuming a thin,
+              un-shaded main jar plus a separate classifier would re-introduce the cluster guava clash
+              that relocation exists to prevent.
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -248,9 +305,21 @@
                             <goal>shade</goal>
                         </goals>
                         <configuration>
-                            <shadedArtifactAttached>true</shadedArtifactAttached>
-                            <shadedClassifierName>bundle</shadedClassifierName>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
+                            <!--
+                              Include-only allowlist. Everything NOT listed here is assumed to be
+                              provided by the user's Spark/engine runtime and is deliberately left out
+                              of the jar. Known implicit "provided by cluster" assumptions carried by
+                              the bundled xtable modules: jackson-datatype-jsr310 (via xtable-api) and
+                              log4j-1.2-api (via xtable-core). If a future compile dependency of
+                              xtable-api/xtable-core is NOT cluster-provided, it must be added here or
+                              it will silently drop out and surface only as a runtime
+                              ClassNotFoundException. protobuf-java is intentionally absent: it
+                              resolves as provided (via the engines), so it is never bundled and needs
+                              no relocation. A hard verification gate (dependency:analyze / enforcer)
+                              over this allowlist is a tracked follow-up.
+                            -->
                             <artifactSet>
                                 <includes>
                                     <include>org.apache.xtable:xtable-api</include>
@@ -258,7 +327,10 @@
                                     <include>org.apache.xtable:xtable-hudi-support-utils</include>
                                     <include>com.google.guava:guava</include>
                                     <include>com.google.guava:failureaccess</include>
-                                    <include>com.google.protobuf:protobuf-java</include>
+                                    <include>com.google.guava:listenablefuture</include>
+                                    <include>com.google.errorprone:error_prone_annotations</include>
+                                    <include>com.google.j2objc:j2objc-annotations</include>
+                                    <include>org.checkerframework:checker-qual</include>
                                     <include>commons-cli:commons-cli</include>
                                 </includes>
                             </artifactSet>
@@ -270,10 +342,6 @@
                                 <relocation>
                                     <pattern>com.google.thirdparty</pattern>
                                     <shadedPattern>org.apache.xtable.shaded.com.google.thirdparty</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>com.google.protobuf</pattern>
-                                    <shadedPattern>org.apache.xtable.shaded.com.google.protobuf</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.commons.cli</pattern>
@@ -300,6 +368,19 @@
                                         <resource>NOTICE</resource>
                                         <resource>NOTICE.txt</resource>
                                     </resources>
+                                </transformer>
+                                <!--
+                                  Bundled-dependency attribution: the shaded jar relocates and ships
+                                  guava, failureaccess and commons-cli (all Apache-2.0), so its
+                                  LICENSE/NOTICE must carry their attributions per ASF policy.
+                                -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/LICENSE</resource>
+                                    <file>target/classes/META-INF/LICENSE-bundled</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/NOTICE</resource>
+                                    <file>target/classes/META-INF/NOTICE-bundled</file>
                                 </transformer>
                             </transformers>
                         </configuration>
