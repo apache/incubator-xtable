@@ -71,17 +71,12 @@
         </dependency>
 
         <!--
-          Engine libraries (Hudi / Iceberg / Delta) are provided by the user's runtime, NOT bundled.
-          The user brings their own version via the cluster or the submit packages/jars flags, and
-          the thin XTable bundle stays compatible across engine versions. Declared provided so they
-          are on the compile/test classpath but excluded from the shaded jar.
-        -->
-        <!--
-          Hudi is supplied by the cluster as the hudi-spark bundle (how Hudi ships for Spark). The
-          bundle carries a clean, regenerated DecimalWrapper; raw hudi-common's Avro-1.8/1.9-generated
-          model classes reference org.apache.avro.data.TimeConversions.TimeConversion, which Avro
-          removed in 1.10 and is therefore absent from the Avro 1.12 that Iceberg 1.9.2 requires.
-          Provided so it is on the compile/test/engine classpath but excluded from the shaded jar.
+          Engine libraries (Hudi / Iceberg / Delta) are provided, not bundled: the user brings their
+          own engine version and the thin bundle stays compatible across versions (see the shade
+          plugin below). Hudi is supplied as the hudi-spark bundle, whose regenerated DecimalWrapper
+          links cleanly on Avro >=1.10; raw hudi-common's Avro-1.8/1.9-generated model classes
+          reference org.apache.avro.data.TimeConversions.TimeConversion, removed in Avro 1.10 and thus
+          absent from the Avro 1.12 that Iceberg 1.9.2 requires.
         -->
         <dependency>
             <groupId>org.apache.hudi</groupId>
@@ -89,10 +84,9 @@
             <scope>provided</scope>
         </dependency>
         <!--
-          XTable's Hudi TARGET writes via the Java client (HoodieJavaEngineContext), which the
-          Spark bundle does not ship. Exclude its transitive hudi-common so the bundle's clean
-          DecimalWrapper is the only one on the classpath - raw hudi-common's DecimalWrapper is
-          Avro-1.8/1.9-generated and fails to link on the Avro >=1.10 required by Iceberg 1.9.2.
+          XTable's Hudi TARGET writes via the Java client (HoodieJavaEngineContext), which the Spark
+          bundle does not ship. Exclude its transitive hudi-common so the bundle's clean DecimalWrapper
+          is the only one on the classpath (see above).
         -->
         <dependency>
             <groupId>org.apache.hudi</groupId>
@@ -132,10 +126,9 @@
         </dependency>
 
         <!--
-          Avro and parquet-avro pinned to the versions the engines require (Iceberg 1.9.2 compiles
-          against Avro 1.12 APIs), not the older Avro that Spark 3.5 ships. On a real Iceberg-1.9.2
-          cluster the runtime must already supply these; declaring them provided puts them on the
-          flat engine classpath for the bundle smoke test so the engine's Avro wins over Spark's.
+          avro/parquet-avro are provided by the engine runtime (Iceberg 1.9.2 needs Avro >=1.12, newer
+          than Spark 3.4's). Kept provided so the smoke test puts them on the flat engine classpath;
+          why the engine's Avro must win is explained on the engine-classpath plugin below.
         -->
         <dependency>
             <groupId>org.apache.avro</groupId>
@@ -267,12 +260,9 @@
                         <configuration>
                             <includeScope>provided</includeScope>
                             <!--
-                              Only the engine libraries the cluster does NOT already provide belong on
-                              this flat classpath. Exclude Spark/Hadoop, XTable's own modules, logging,
-                              and the libraries Spark itself supplies (jackson, scala-library): putting
-                              a newer jackson/scala ahead of Spark's own would change Spark's runtime.
-                              avro/parquet are deliberately NOT excluded - the engine's newer avro must
-                              win over the one Spark 3.4 ships.
+                              Exclude Spark/Hadoop, XTable's own modules, logging, and the libraries
+                              Spark itself supplies (jackson, scala-library) so cluster copies win;
+                              avro/parquet stay so the engine's newer avro wins (see above).
                             -->
                             <excludeGroupIds>org.apache.spark,org.apache.hadoop,org.apache.xtable,org.projectlombok,org.slf4j,org.apache.logging.log4j,org.scala-lang,com.fasterxml.jackson.core,com.fasterxml.jackson.datatype,com.fasterxml.jackson.module</excludeGroupIds>
                             <outputFile>${project.build.directory}/engine-classpath.txt</outputFile>
