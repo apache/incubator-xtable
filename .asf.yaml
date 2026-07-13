@@ -39,4 +39,4 @@ notifications:
     commits:      commits@xtable.apache.org
     issues:       commits@xtable.apache.org
     pullrequests: commits@xtable.apache.org
-    discussions:  commits@xtable.apache.org
+    discussions:  dev@xtable.apache.org
