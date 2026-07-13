@@ -91,14 +91,20 @@ public class ConversionTargetFactory {
             && DeltaConversionTargetConfig.fromProperties(properties).isUseKernel();
     ServiceLoader<ConversionTarget> loader = ServiceLoader.load(ConversionTarget.class);
     Iterator<ConversionTarget> iterator = loader.iterator();
-    while (iterator.hasNext()) {
+    while (true) {
       ConversionTarget target;
       try {
+        // hasNext() also resolves provider classes lazily, so it can throw
+        // ServiceConfigurationError too - it must be inside the guard alongside next().
+        if (!iterator.hasNext()) {
+          break;
+        }
         target = iterator.next();
       } catch (ServiceConfigurationError | LinkageError error) {
         // A registered target whose engine library is not on the classpath (e.g. Delta when only
         // Hudi/Iceberg are provided). Skip it so a subset of engines can still be used; a missing
-        // engine for the requested format surfaces below as NotSupportedException.
+        // engine for the requested format surfaces below as NotSupportedException. The offending
+        // provider is consumed before the error is thrown, so the next hasNext() advances past it.
         log.warn(
             "Skipping a registered ConversionTarget whose engine library is not on the classpath; "
                 + "provide the missing engine if you need this target format",

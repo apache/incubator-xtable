@@ -154,11 +154,26 @@ class ITXTableSparkRuntimeBundle {
     pb.environment().put("SPARK_LOCAL_IP", "127.0.0.1");
     pb.redirectErrorStream(true);
     Process process = pb.start();
-    String output = readOutput(process);
+    // Drain stdout on a separate thread: reading until EOF only returns when the process exits, so
+    // reading inline before waitFor() would block forever on a hung spark-submit and never consult
+    // the timeout below. The background drain also keeps the pipe buffer from filling and stalling
+    // the child.
+    StringBuilder outputBuffer = new StringBuilder();
+    Thread drainer = new Thread(() -> readOutputInto(process, outputBuffer), "spark-submit-stdout");
+    drainer.setDaemon(true);
+    drainer.start();
     boolean finished = process.waitFor(10, TimeUnit.MINUTES);
     if (!finished) {
       process.destroyForcibly();
-      throw new AssertionError("spark-submit timed out. Output:\n" + output);
+      drainer.join(TimeUnit.SECONDS.toMillis(10));
+      synchronized (outputBuffer) {
+        throw new AssertionError("spark-submit timed out. Output:\n" + outputBuffer);
+      }
+    }
+    drainer.join(TimeUnit.SECONDS.toMillis(10));
+    String output;
+    synchronized (outputBuffer) {
+      output = outputBuffer.toString();
     }
     assertEquals(0, process.exitValue(), "spark-submit failed. Output:\n" + output);
 
@@ -281,17 +296,20 @@ class ITXTableSparkRuntimeBundle {
     return candidates[0];
   }
 
-  private static String readOutput(Process process) throws Exception {
-    StringBuilder sb = new StringBuilder();
+  private static void readOutputInto(Process process, StringBuilder sb) {
     try (java.io.BufferedReader reader =
         new java.io.BufferedReader(
             new java.io.InputStreamReader(
                 process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
       String line;
       while ((line = reader.readLine()) != null) {
-        sb.append(line).append(System.lineSeparator());
+        synchronized (sb) {
+          sb.append(line).append(System.lineSeparator());
+        }
       }
+    } catch (java.io.IOException e) {
+      // Stream closed early (e.g. destroyForcibly on timeout) - stop draining; whatever was
+      // captured so far is still surfaced in the failure message.
     }
-    return sb.toString();
   }
 }
