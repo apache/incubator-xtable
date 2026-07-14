@@ -98,4 +98,5 @@ documentation:
 - [Apache Hudi](https://hudi.apache.org/contribute/how-to-contribute)
 - [Apache Spark](https://spark.apache.org/committers.html)
 - [ASF Becoming a Committer](https://community.apache.org/contributors/becomingacommitter.html)
+- [ASF Adding Committers](https://community.apache.org/pmc/adding-committers.html)
 - [ASF Voting Process](https://www.apache.org/foundation/voting.html)
