@@ -60,7 +60,6 @@ public class SourceTableFormatDetector {
     if (fs.exists(new Path(basePath, ".hoodie"))) {
       matches.add(TableFormat.HUDI);
     }
-
     try {
       HadoopTables tables = new HadoopTables(conf);
       org.apache.iceberg.Table table = tables.load(pathStr);
@@ -72,7 +71,6 @@ public class SourceTableFormatDetector {
     } catch (Exception e) {
       log.debug("Unexpected error while probing for Iceberg table at path: {}", pathStr, e);
     }
-
     if (matches.size() == 1) {
       return matches.get(0);
     }
@@ -101,9 +99,13 @@ public class SourceTableFormatDetector {
       if (detectedFormats.contains(TableFormat.ICEBERG)) {
         HadoopTables tables = new HadoopTables(conf);
         org.apache.iceberg.Table table = tables.load(basePath.toString());
-        // check for target property tag during a  sync run
+        // check for target property tag during a sync run
         if (table.properties().containsKey("xtable.conversion.target")) {
           detectedFormats.remove(TableFormat.ICEBERG);
+          // remove Hudi if it was detected as potential source, as it is not the source
+          if (detectedFormats.contains(TableFormat.HUDI)) {
+            detectedFormats.remove(TableFormat.HUDI);
+          }
           if (detectedFormats.size() == 1) {
             return detectedFormats.get(0);
           }
@@ -123,6 +125,10 @@ public class SourceTableFormatDetector {
 
             if (config != null && config.containsKey("xtable.conversion.target")) {
               detectedFormats.remove(TableFormat.DELTA);
+              // remove Hudi if it was detected as potential source, as it is not the source
+              if (detectedFormats.contains(TableFormat.HUDI)) {
+                detectedFormats.remove(TableFormat.HUDI);
+              }
               if (detectedFormats.size() == 1) {
                 return detectedFormats.get(0);
               }

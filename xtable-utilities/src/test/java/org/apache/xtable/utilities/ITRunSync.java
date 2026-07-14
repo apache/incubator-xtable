@@ -28,7 +28,9 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -97,15 +99,34 @@ class ITRunSync {
   @Test
   void testSingleSyncModeWithoutInputTableFormat(@TempDir Path tempDir) throws IOException {
     String tableName = "test-table";
+
     try (GenericTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
       table.insertRows(10);
-      File configFile = writeConfigFileWithoutSourceTableFormat(tempDir, table, tableName);
+
+      File configFile =
+          writeConfigFileWithoutSourceTableFormat(
+              tempDir, table, tableName, Arrays.asList("ICEBERG"));
       String[] args = new String[] {"--datasetConfig", configFile.getPath()};
       RunSync.main(args);
+
       Path icebergMetadataPath = Paths.get(URI.create(table.getBasePath() + "/metadata"));
-      waitForNumIcebergCommits(icebergMetadataPath, 3);
+      waitForNumIcebergCommits(icebergMetadataPath, 1);
+    }
+
+    try (GenericTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
+
+      table.insertRows(5);
+
+      File configFile_2 =
+          writeConfigFileWithoutSourceTableFormat(
+              tempDir, table, tableName, Arrays.asList("DELTA"));
+      String[] args_2 = new String[] {"--datasetConfig", configFile_2.getPath()};
+
+      RunSync.main(args_2);
     }
   }
 
@@ -155,7 +176,7 @@ class ITRunSync {
     return configFile;
   }
 
-  private static File writeConfigFileWithoutSourceTableFormat(
+  /*private static File writeConfigFileWithoutSourceTableFormat(
       Path tempDir, GenericTable table, String tableName) throws IOException {
     RunSync.DatasetConfig config =
         RunSync.DatasetConfig.builder()
@@ -167,6 +188,25 @@ class ITRunSync {
                         .tableName(tableName)
                         .build()))
             .build();
+    File configFile = tempDir.resolve("config.yaml").toFile();
+    RunSync.YAML_MAPPER.writeValue(configFile, config);
+    return configFile;
+  }*/
+  private static File writeConfigFileWithoutSourceTableFormat(
+      Path tempDir, GenericTable table, String tableName, List<String> targetFormats)
+      throws IOException {
+
+    RunSync.DatasetConfig config =
+        RunSync.DatasetConfig.builder()
+            .targetFormats(targetFormats)
+            .datasets(
+                Collections.singletonList(
+                    RunSync.DatasetConfig.Table.builder()
+                        .tableBasePath(table.getBasePath())
+                        .tableName(tableName)
+                        .build()))
+            .build();
+
     File configFile = tempDir.resolve("config.yaml").toFile();
     RunSync.YAML_MAPPER.writeValue(configFile, config);
     return configFile;
