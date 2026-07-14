@@ -99,7 +99,7 @@ class ITRunSync {
   @Test
   void testSingleSyncModeWithoutInputTableFormat(@TempDir Path tempDir) throws IOException {
     String tableName = "test-table";
-
+    // first sync: Hudi to Iceberg
     try (GenericTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
@@ -114,7 +114,7 @@ class ITRunSync {
       Path icebergMetadataPath = Paths.get(URI.create(table.getBasePath() + "/metadata"));
       waitForNumIcebergCommits(icebergMetadataPath, 1);
     }
-
+    // second sync: Hudi to Delta
     try (GenericTable table =
         TestJavaHudiTable.forStandardSchema(
             tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
