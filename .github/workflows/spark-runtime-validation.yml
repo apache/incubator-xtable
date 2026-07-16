@@ -25,30 +25,18 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ !contains(github.ref, 'main') }}
 
+# Runs on every push/PR to the covered branches (no path filter) so the check always
+# reports — required status checks that never trigger leave a PR blocked on a pending check.
 on:
   push:
     branches:
       - "main"
       - "branch-0.4"
-    paths:
-      - "xtable-spark-runtime/**"
-      - "xtable-core/**"
-      - "xtable-api/**"
-      - "xtable-hudi-support/**"
-      - "pom.xml"
-      - ".github/workflows/spark-runtime-validation.yml"
 
   pull_request:
     branches:
       - "main"
       - "branch-0.4"
-    paths:
-      - "xtable-spark-runtime/**"
-      - "xtable-core/**"
-      - "xtable-api/**"
-      - "xtable-hudi-support/**"
-      - "pom.xml"
-      - ".github/workflows/spark-runtime-validation.yml"
 
   workflow_dispatch:
 
