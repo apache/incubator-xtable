@@ -222,10 +222,17 @@
             <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.binary.version}</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+          Hudi's ObjectSizeCalculator loads org.openjdk.jol at runtime (not only in tests),
+          so the bundled utilities jar must ship it. The parent dependencyManagement pins
+          jol-core to test scope, so override to runtime here and add it to the shaded
+          artifactSet below. See https://github.com/apache/incubator-xtable/issues/736.
+        -->
         <dependency>
             <groupId>org.openjdk.jol</groupId>
             <artifactId>jol-core</artifactId>
-            <scope>test</scope>
+            <version>${jol.core.version}</version>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
 
@@ -681,6 +688,7 @@
                             <include>org.json4s:json4s-scalap_${scala.binary.version}</include>
                             <include>org.lz4:lz4-java</include>
                             <include>org.objenesis:objenesis</include>
+                            <include>org.openjdk.jol:jol-core</include>
                             <include>org.reactivestreams:reactive-streams</include>
                             <include>org.roaringbitmap:RoaringBitmap</include>
                             <include>org.roaringbitmap:shims</include>
@@ -692,6 +700,7 @@
                             <include>org.scala-lang.modules:scala-xml_${scala.binary.version}</include>
                             <include>org.slf4j:jcl-over-slf4j</include>
                             <include>org.slf4j:jul-to-slf4j</include>
+                            <include>org.slf4j:slf4j-api</include>
                             <include>org.slf4j:slf4j-reload4j</include>
                             <include>org.threeten:threeten-extra</include>
                             <include>org.threeten:threetenbp</include>

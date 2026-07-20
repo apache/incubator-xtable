@@ -24,10 +24,12 @@ on:
   push:
     branches:
       - "main"
+      - "branch-0.4"
 
   pull_request:
     branches:
       - "main"
+      - "branch-0.4"
 
 jobs:
   build:
