@@ -39,9 +39,20 @@ on:
       - "branch-0.4"
 
   workflow_dispatch:
+    inputs:
+      spark_version:
+        description: "Spark version to validate against"
+        required: false
+        default: "3.4.3"
 
 env:
-  SPARK_VERSION: "3.4.3"
+  # Pinned to the Spark 3.4 line because the bundle's engine versions are a Spark-3.4-compatible set:
+  # Delta 2.4.0 is Spark-3.4-only (Spark 3.5 needs Delta 3.x), and the Hudi/Iceberg runtimes are
+  # published per Spark minor (hudi-spark3.4-bundle, iceberg-spark-runtime-3.4). Moving to Spark 3.5
+  # is therefore a coordinated engine-version bump (a separate runtime), not a drop-in change of this
+  # value. This env var is still the single knob to bump within the 3.4 line; override it for an
+  # ad-hoc run via the workflow_dispatch "spark_version" input.
+  SPARK_VERSION: ${{ github.event.inputs.spark_version || '3.4.3' }}
   SPARK_HADOOP_PROFILE: "hadoop3"
 
 jobs:

@@ -21,6 +21,7 @@
 - @vinishjail97
 
 ## Approvers
+- @vinothchandar
 - Anyone from the XTable community can approve/add feedback.
 
 ## Status
@@ -78,6 +79,28 @@ driver-side auto-sync (`XTableSyncListener` registered via `spark.sql.queryExecu
 is **deferred to a follow-up PR** — those classes are not in v1. The listener design is retained
 below as the target so the entry point and config schema stay aligned.
 
+### Supported formats and engine versions (v1)
+
+The bundle can read from Hudi, Iceberg, Delta, Paimon and Parquet, and write to Hudi, Iceberg and
+Delta. Paimon and Parquet are **source-only** (there is no Paimon/Parquet `ConversionTarget`), so they
+are valid for `--sourceformat` but not `--targets`. Syncing a format to itself is a no-op and not a
+supported combination.
+
+Source \ Target:
+
+- Hudi source: to Iceberg yes, to Delta yes, to Hudi no (self)
+- Iceberg source: to Hudi yes, to Delta yes, to Iceberg no (self)
+- Delta source: to Hudi yes, to Iceberg yes, to Delta no (self)
+- Paimon source (read-only): to Hudi yes, to Iceberg yes, to Delta yes
+- Parquet source (read-only): to Hudi yes, to Iceberg yes, to Delta yes
+
+Engines are **provided by the cluster**, not bundled — the user supplies the engine jars on the
+classpath (see Packaging / classpath notes below). This bundle targets the Spark 3.4 line, pinned to a
+mutually-compatible engine set: Spark 3.4.x, Scala 2.12, Hudi 0.14.0, Iceberg 1.9.2, Delta 2.4.0.
+Delta 2.4.0 is Spark-3.4-only, which is why the line is pinned to Spark 3.4 rather than 3.5. The
+spark-submit smoke test (`ITXTableSparkRuntimeBundle`) currently exercises one case per direction for
+Hudi/Iceberg/Delta; Paimon and Parquet sources are wired but not yet covered by the smoke test.
+
 ### Activation — v1 (CLI entry point)
 
 ```
@@ -85,7 +108,7 @@ spark-submit \
   --jars /path/to/xtable-spark-runtime_2.12-<ver>.jar \
   --class org.apache.xtable.spark.XTableSparkSync \
   /path/to/xtable-spark-runtime_2.12-<ver>.jar \
-  --basePath /warehouse/db/orders --sourceFormat HUDI --targets ICEBERG,DELTA --tableName orders
+  --basepath /warehouse/db/orders --sourceformat HUDI --targets ICEBERG,DELTA --tablename orders
 ```
 
 Because the shaded jar is the **main artifact with a dependency-reduced POM** (see Packaging),
@@ -99,6 +122,46 @@ so the engine's Avro must win on the classpath. Supply the engine jars on a **fl
 child classloader: `--packages` puts a second Avro in a child loader, which breaks cross-boundary Avro
 casts (`NoSuchMethodError`/`ClassCastException`). This is why the bundle smoke test builds a single
 flat `spark.driver.extraClassPath`.
+
+### Activation — v1 (from application code)
+
+The same sync can be triggered from an existing Spark job (Scala/Java or PySpark) instead of a
+separate `spark-submit`, reusing the active `SparkSession`'s Hadoop configuration. This is the
+programmatic equivalent of the CLI above and runs after your own write completes.
+
+Scala / Java:
+
+```scala
+import org.apache.xtable.spark.{TableSyncSpec, XTableSyncService}
+
+// ... after writing the source table with `spark` ...
+val spec = TableSyncSpec.builder()
+  .key("orders")
+  .basePath("/warehouse/db/orders")
+  .sourceFormat("HUDI")
+  .targets(java.util.Arrays.asList("ICEBERG", "DELTA"))
+  .build()
+
+new XTableSyncService().sync(spec, spark.sparkContext.hadoopConfiguration)
+```
+
+PySpark (via the JVM gateway, with the bundle on the driver classpath):
+
+```python
+# after writing the source table with `spark` ...
+jvm = spark._jvm
+spec = (jvm.org.apache.xtable.spark.TableSyncSpec.builder()
+        .key("orders")
+        .basePath("/warehouse/db/orders")
+        .sourceFormat("HUDI")
+        .targets(jvm.java.util.Arrays.asList("ICEBERG", "DELTA"))
+        .build())
+hadoop_conf = spark._jsc.hadoopConfiguration()
+jvm.org.apache.xtable.spark.XTableSyncService().sync(spec, hadoop_conf)
+```
+
+These examples, plus a `--packages`/`--jars` quickstart, should be folded into the docs-site
+quickstart in a docs follow-up.
 
 ### Planned (follow-up): config-only listener activation
 
@@ -209,8 +272,8 @@ lets the shaded jar run a sync directly and is what the jar-validation test driv
 - **No breaking changes.** This is a new, additive module; existing `RunSync`/`xtable-utilities` and
   `xtable-core` behavior is unchanged.
 - **No impact on existing users** unless they opt in by adding the jar and setting `spark.xtable.*`.
-- **Spark support:** this bundle targets the Spark line of its engine build (Spark 3.4, Scala 2.12,
-  for the Hudi 0.x release line), with newer Spark lines as follow-ups. The per-Spark-version coupling
+- **Spark support:** this bundle targets the Spark line of its engine build (Spark 3.4, Scala 2.12),
+  with newer Spark lines as follow-ups. The per-Spark-version coupling
   comes from the Delta-on-Spark path; making Delta Kernel the default (tracked separately) would let a
   single bundle serve multiple Spark lines.
 - **Deferred (follow-up RFCs/PRs):** the config-only `XTableSyncListener` on-ramp, a

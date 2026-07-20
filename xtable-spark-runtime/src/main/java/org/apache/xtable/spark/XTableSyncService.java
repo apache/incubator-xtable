@@ -40,6 +40,8 @@ import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.model.storage.TableFormat;
 import org.apache.xtable.model.sync.SyncMode;
 import org.apache.xtable.model.sync.SyncResult;
+import org.apache.xtable.paimon.PaimonConversionSourceProvider;
+import org.apache.xtable.parquet.ParquetConversionSourceProvider;
 
 /**
  * Builds a {@link ConversionConfig} from a {@link TableSyncSpec} and runs an incremental {@link
@@ -115,6 +117,10 @@ public class XTableSyncService {
         return new DeltaConversionSourceProvider();
       case TableFormat.ICEBERG:
         return new IcebergConversionSourceProvider();
+      case TableFormat.PAIMON:
+        return new PaimonConversionSourceProvider();
+      case TableFormat.PARQUET:
+        return new ParquetConversionSourceProvider();
       default:
         throw new UnsupportedOperationException(
             "Unsupported source format for spark-runtime sync: " + sourceFormat);

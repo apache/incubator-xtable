@@ -55,9 +55,9 @@ import org.apache.xtable.hudi.HudiTestUtil;
  *
  * <p>Covers Hudi, Iceberg and Delta as both source and target (one case per direction). Hudi is
  * supplied via the {@code hudi-spark} bundle (its regenerated Avro model classes link on Avro 1.12,
- * unlike raw hudi-common), so a {@code SPARK_HOME} matching the Hudi/Delta line (Spark 3.4 for the
- * Hudi 0.x line) is required. Local-timestamp columns are excluded from the equivalence check due
- * to known Hudi/Iceberg representation differences (HUDI-7088).
+ * unlike raw hudi-common), so a {@code SPARK_HOME} matching the engine build (Spark 3.4) is
+ * required. Local-timestamp columns are excluded from the equivalence check due to known
+ * Hudi/Iceberg representation differences (HUDI-7088).
  */
 class ITXTableSparkRuntimeBundle {
 
@@ -135,18 +135,18 @@ class ITXTableSparkRuntimeBundle {
     command.add("--class");
     command.add("org.apache.xtable.spark.XTableSparkSync");
     command.add(bundleJar.getAbsolutePath());
-    command.add("--basePath");
+    command.add("--basepath");
     command.add(basePath);
-    command.add("--dataPath");
+    command.add("--datapath");
     command.add(dataPath);
-    command.add("--sourceFormat");
+    command.add("--sourceformat");
     command.add(sourceFormat);
     command.add("--targets");
     command.add(targetFormat);
-    command.add("--tableName");
+    command.add("--tablename");
     command.add(tableName);
     if (partitionSpec != null) {
-      command.add("--partitionSpec");
+      command.add("--partitionspec");
       command.add(partitionSpec);
     }
 

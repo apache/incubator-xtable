@@ -19,8 +19,10 @@
 package org.apache.xtable.spark;
 
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import lombok.extern.log4j.Log4j2;
@@ -35,6 +37,8 @@ import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.spark.sql.SparkSession;
 
+import org.apache.xtable.model.storage.TableFormat;
+
 /**
  * Standalone {@code spark-submit} entry point that runs a single XTable sync using the relocated
  * {@code xtable-spark-runtime} bundle. It is the RunSync-equivalent for this bundle and is
@@ -44,20 +48,44 @@ import org.apache.spark.sql.SparkSession;
  * $SPARK_HOME/bin/spark-submit \
  *   --class org.apache.xtable.spark.XTableSparkSync \
  *   xtable-spark-runtime_2.12-&lt;ver&gt;.jar \
- *   --basePath /warehouse/db/orders --sourceFormat HUDI --targets ICEBERG,DELTA
+ *   --basepath /warehouse/db/orders --sourceformat HUDI --targets ICEBERG,DELTA
  * </pre>
  */
 @Log4j2
 public final class XTableSparkSync {
 
-  private static final String BASE_PATH = "basePath";
-  private static final String DATA_PATH = "dataPath";
-  private static final String SOURCE_FORMAT = "sourceFormat";
+  private static final String BASE_PATH = "basepath";
+  private static final String DATA_PATH = "datapath";
+  private static final String SOURCE_FORMAT = "sourceformat";
   private static final String TARGETS = "targets";
-  private static final String TABLE_NAME = "tableName";
+  private static final String TABLE_NAME = "tablename";
   private static final String NAMESPACE = "namespace";
-  private static final String PARTITION_SPEC = "partitionSpec";
+  private static final String PARTITION_SPEC = "partitionspec";
   private static final String HELP = "help";
+
+  /**
+   * Formats usable as --sourceformat. Must stay in sync with the source providers wired in {@link
+   * XTableSyncService#sourceProviderFor}. Paimon and Parquet are read-only source formats (no
+   * corresponding ConversionTarget exists).
+   */
+  // package-private for unit testing
+  static final Set<String> SUPPORTED_SOURCE_FORMATS =
+      new LinkedHashSet<>(
+          Arrays.asList(
+              TableFormat.HUDI,
+              TableFormat.ICEBERG,
+              TableFormat.DELTA,
+              TableFormat.PAIMON,
+              TableFormat.PARQUET));
+
+  /**
+   * Formats usable as --targets. Must stay in sync with the {@code ConversionTarget}s registered on
+   * the classpath (Hudi/Iceberg/Delta); Paimon and Parquet have no target implementation. Used with
+   * {@link #SUPPORTED_SOURCE_FORMATS} to fail fast on invalid formats before a SparkSession starts.
+   */
+  // package-private for unit testing
+  static final Set<String> SUPPORTED_TARGET_FORMATS =
+      new LinkedHashSet<>(Arrays.asList(TableFormat.HUDI, TableFormat.ICEBERG, TableFormat.DELTA));
 
   private static final Options OPTIONS =
       new Options()
@@ -124,14 +152,27 @@ public final class XTableSparkSync {
       return;
     }
 
+    // Validate all arguments up front so an invalid value fails fast, before a SparkSession is
+    // created (getOrCreate() below): otherwise a bad --sourceformat/--targets only surfaces deep in
+    // the sync, after Spark has already been spun up.
     String basePath = cmd.getOptionValue(BASE_PATH);
-    String tableName = cmd.getOptionValue(TABLE_NAME, basePathToName(basePath));
+    String tableName = cmd.getOptionValue(TABLE_NAME, basePathToTableName(basePath));
+
+    String sourceFormat = cmd.getOptionValue(SOURCE_FORMAT).trim().toUpperCase(Locale.ROOT);
+    validateFormat(SOURCE_FORMAT, sourceFormat, SUPPORTED_SOURCE_FORMATS);
+
     List<String> targetFormats =
         Arrays.stream(cmd.getOptionValue(TARGETS).split(","))
             .map(String::trim)
             .filter(s -> !s.isEmpty())
             .map(s -> s.toUpperCase(Locale.ROOT))
             .collect(Collectors.toList());
+    if (targetFormats.isEmpty()) {
+      throw new IllegalArgumentException(
+          "--targets resolved to an empty list; provide at least one target format, e.g. ICEBERG,DELTA");
+    }
+    targetFormats.forEach(target -> validateFormat(TARGETS, target, SUPPORTED_TARGET_FORMATS));
+
     String namespace = cmd.getOptionValue(NAMESPACE);
 
     TableSyncSpec spec =
@@ -141,7 +182,7 @@ public final class XTableSparkSync {
             .dataPath(cmd.getOptionValue(DATA_PATH))
             .namespace(namespace == null ? null : namespace.split("\\."))
             .partitionSpec(cmd.getOptionValue(PARTITION_SPEC))
-            .sourceFormat(cmd.getOptionValue(SOURCE_FORMAT).toUpperCase(Locale.ROOT))
+            .sourceFormat(sourceFormat)
             .targets(targetFormats)
             .build();
 
@@ -156,10 +197,34 @@ public final class XTableSparkSync {
     }
   }
 
-  private static String basePathToName(String basePath) {
-    String trimmed =
-        basePath.endsWith("/") ? basePath.substring(0, basePath.length() - 1) : basePath;
+  // package-private for unit testing
+  static void validateFormat(String option, String format, Set<String> supported) {
+    if (!supported.contains(format)) {
+      throw new IllegalArgumentException(
+          "Unsupported --" + option + " '" + format + "'; expected one of " + supported);
+    }
+  }
+
+  /**
+   * Derives a table name from the last path segment of {@code basePath}, e.g. {@code
+   * /warehouse/db/orders -> orders}. Trailing slashes are ignored. Throws when no usable segment
+   * can be derived (e.g. {@code "/"} or an empty/blank path) so the caller is told to pass {@code
+   * --tablename} explicitly instead of silently getting an empty table name.
+   */
+  // package-private for unit testing
+  static String basePathToTableName(String basePath) {
+    String trimmed = basePath == null ? "" : basePath;
+    while (trimmed.endsWith("/")) {
+      trimmed = trimmed.substring(0, trimmed.length() - 1);
+    }
     int idx = trimmed.lastIndexOf('/');
-    return idx >= 0 ? trimmed.substring(idx + 1) : trimmed;
+    String name = idx >= 0 ? trimmed.substring(idx + 1) : trimmed;
+    if (name.isEmpty()) {
+      throw new IllegalArgumentException(
+          "Cannot derive a table name from --basepath '"
+              + basePath
+              + "'; pass --tablename explicitly");
+    }
+    return name;
   }
 }

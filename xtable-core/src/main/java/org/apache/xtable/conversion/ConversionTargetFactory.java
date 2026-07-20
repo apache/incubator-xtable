@@ -106,8 +106,12 @@ public class ConversionTargetFactory {
         // engine for the requested format surfaces below as NotSupportedException. The offending
         // provider is consumed before the error is thrown, so the next hasNext() advances past it.
         log.warn(
-            "Skipping a registered ConversionTarget whose engine library is not on the classpath; "
-                + "provide the missing engine if you need this target format",
+            "Skipping a registered ConversionTarget whose engine library is not on the classpath "
+                + "({}: {}); provide the missing engine if you need this target format. This is "
+                + "expected when an engine is intentionally absent, but indicates a linkage problem "
+                + "if the engine is present.",
+            error.getClass().getName(),
+            error.getMessage(),
             error);
         continue;
       }
