@@ -61,6 +61,7 @@ public final class XTableSparkSync {
   private static final String TABLE_NAME = "tablename";
   private static final String NAMESPACE = "namespace";
   private static final String PARTITION_SPEC = "partitionspec";
+  private static final String USE_DELTA_KERNEL = "usedeltakernel";
   private static final String HELP = "help";
 
   /**
@@ -134,6 +135,15 @@ public final class XTableSparkSync {
                   .hasArg()
                   .desc("The Hudi source partition field spec, e.g. level:VALUE")
                   .build())
+          .addOption(
+              Option.builder()
+                  .longOpt(USE_DELTA_KERNEL)
+                  .desc(
+                      "Use the Spark-free Delta Kernel implementation for the Delta source and/or "
+                          + "target instead of the default delta-core path. When omitted this is "
+                          + "auto-enabled on Spark 3.5+ (where the bundled delta-core does not "
+                          + "run); pass it explicitly to force Kernel on any Spark version.")
+                  .build())
           .addOption(Option.builder().longOpt(HELP).desc("Displays help information").build());
 
   private XTableSparkSync() {}
@@ -174,26 +184,60 @@ public final class XTableSparkSync {
     targetFormats.forEach(target -> validateFormat(TARGETS, target, SUPPORTED_TARGET_FORMATS));
 
     String namespace = cmd.getOptionValue(NAMESPACE);
-
-    TableSyncSpec spec =
-        TableSyncSpec.builder()
-            .key(tableName)
-            .basePath(basePath)
-            .dataPath(cmd.getOptionValue(DATA_PATH))
-            .namespace(namespace == null ? null : namespace.split("\\."))
-            .partitionSpec(cmd.getOptionValue(PARTITION_SPEC))
-            .sourceFormat(sourceFormat)
-            .targets(targetFormats)
-            .build();
+    boolean useDeltaKernelFlag = cmd.hasOption(USE_DELTA_KERNEL);
 
     SparkSession spark = SparkSession.builder().appName("xtable-spark-sync").getOrCreate();
     try {
       Configuration hadoopConf = spark.sparkContext().hadoopConfiguration();
+
+      // Use the Spark-free Delta Kernel when --usedeltakernel is passed, or auto-enable it when
+      // Delta is involved and Spark is 3.5+ (where the bundled delta-core does not run).
+      boolean deltaInvolved =
+          TableFormat.DELTA.equals(sourceFormat) || targetFormats.contains(TableFormat.DELTA);
+      boolean useDeltaKernel = useDeltaKernelFlag;
+      if (!useDeltaKernel && deltaInvolved && isSparkAtLeast35(spark.version())) {
+        useDeltaKernel = true;
+        log.info(
+            "Spark {} detected (>= 3.5); auto-enabling the Delta Kernel implementation for Delta "
+                + "source/target. Pass --usedeltakernel to force it on any Spark version.",
+            spark.version());
+      }
+
+      TableSyncSpec spec =
+          TableSyncSpec.builder()
+              .key(tableName)
+              .basePath(basePath)
+              .dataPath(cmd.getOptionValue(DATA_PATH))
+              .namespace(namespace == null ? null : namespace.split("\\."))
+              .partitionSpec(cmd.getOptionValue(PARTITION_SPEC))
+              .sourceFormat(sourceFormat)
+              .targets(targetFormats)
+              .useDeltaKernel(useDeltaKernel)
+              .build();
+
       log.info("Starting standalone XTable sync for {}", spec.getBasePath());
       new XTableSyncService().sync(spec, hadoopConf);
       log.info("Completed XTable sync for {}", spec.getBasePath());
     } finally {
       spark.stop();
+    }
+  }
+
+  /**
+   * True when the Spark version is 3.5 or newer; unparseable/null versions are treated as older.
+   */
+  // package-private for unit testing
+  static boolean isSparkAtLeast35(String sparkVersion) {
+    if (sparkVersion == null || sparkVersion.trim().isEmpty()) {
+      return false;
+    }
+    String[] parts = sparkVersion.trim().split("\\.");
+    try {
+      int major = Integer.parseInt(parts[0]);
+      int minor = parts.length > 1 ? Integer.parseInt(parts[1].replaceAll("[^0-9].*$", "")) : 0;
+      return major > 3 || (major == 3 && minor >= 5);
+    } catch (NumberFormatException e) {
+      return false;
     }
   }
 

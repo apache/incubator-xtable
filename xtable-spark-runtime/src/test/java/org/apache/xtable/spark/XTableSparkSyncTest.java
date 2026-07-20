@@ -19,7 +19,9 @@
 package org.apache.xtable.spark;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -83,5 +85,28 @@ class XTableSparkSyncTest {
         () ->
             XTableSparkSync.validateFormat(
                 "sourceformat", format, XTableSparkSync.SUPPORTED_SOURCE_FORMATS));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"3.5.0", "3.5.9", "3.6.0", "4.0.0", "4.0.0-preview", "10.2.1"})
+  void isSparkAtLeast35TrueFor35AndNewer(String version) {
+    assertTrue(XTableSparkSync.isSparkAtLeast35(version));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"3.4.3", "3.4.0", "3.3.4", "2.4.8", "3.0.0"})
+  void isSparkAtLeast35FalseForOlder(String version) {
+    assertFalse(XTableSparkSync.isSparkAtLeast35(version));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "   ", "not-a-version", "x.y.z"})
+  void isSparkAtLeast35FalseForNullOrUnparseable(String version) {
+    assertFalse(XTableSparkSync.isSparkAtLeast35(version));
+  }
+
+  @Test
+  void isSparkAtLeast35FalseForNull() {
+    assertFalse(XTableSparkSync.isSparkAtLeast35(null));
   }
 }

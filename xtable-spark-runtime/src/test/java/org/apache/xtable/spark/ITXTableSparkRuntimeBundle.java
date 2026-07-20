@@ -86,7 +86,9 @@ class ITXTableSparkRuntimeBundle {
   }
 
   private static Stream<Arguments> directions() {
-    // sourceFormat, targetFormat, hudiPartitionSpec (only used for a partitioned Hudi source)
+    // sourceFormat, targetFormat, hudiPartitionSpec (only used for a partitioned Hudi source).
+    // Delta uses delta-core on Spark 3.4 and auto-switches to the Spark-free Delta Kernel on Spark
+    // 3.5+ (see XTableSparkSync), so every direction runs on either Spark line.
     return Stream.of(
         Arguments.of("HUDI", "ICEBERG", "level:VALUE"),
         Arguments.of("ICEBERG", "HUDI", null),
@@ -149,6 +151,7 @@ class ITXTableSparkRuntimeBundle {
       command.add("--partitionspec");
       command.add(partitionSpec);
     }
+    // No kernel flag passed on purpose: XTableSparkSync auto-selects Delta Kernel on Spark 3.5+.
 
     ProcessBuilder pb = new ProcessBuilder(command);
     pb.environment().put("SPARK_LOCAL_IP", "127.0.0.1");

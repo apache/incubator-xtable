@@ -19,7 +19,9 @@ name: Spark Runtime Bundle Validation
 # Validates the shaded xtable-spark-runtime bundle end-to-end: ITXTableSparkRuntimeBundle
 # spark-submits the bundled jar against a real Spark distribution for one case per direction
 # across Hudi, Iceberg and Delta. The IT self-skips unless SPARK_HOME is set, so the main CI
-# never exercises it; this workflow installs a matching Spark 3.4 distro and runs it.
+# never exercises it; this workflow installs each Spark distro in the matrix and runs it.
+# Runs on both Spark 3.4 and 3.5: Hudi/Iceberg sync is Spark-free, and a Delta target/source
+# auto-switches from delta-core to the Spark-free Delta Kernel on Spark 3.5+.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,26 +41,21 @@ on:
       - "branch-0.4"
 
   workflow_dispatch:
-    inputs:
-      spark_version:
-        description: "Spark version to validate against"
-        required: false
-        default: "3.4.3"
 
 env:
-  # Pinned to the Spark 3.4 line because the bundle's engine versions are a Spark-3.4-compatible set:
-  # Delta 2.4.0 is Spark-3.4-only (Spark 3.5 needs Delta 3.x), and the Hudi/Iceberg runtimes are
-  # published per Spark minor (hudi-spark3.4-bundle, iceberg-spark-runtime-3.4). Moving to Spark 3.5
-  # is therefore a coordinated engine-version bump (a separate runtime), not a drop-in change of this
-  # value. This env var is still the single knob to bump within the 3.4 line; override it for an
-  # ad-hoc run via the workflow_dispatch "spark_version" input.
-  SPARK_VERSION: ${{ github.event.inputs.spark_version || '3.4.3' }}
   SPARK_HADOOP_PROFILE: "hadoop3"
 
 jobs:
   validate-spark-runtime-bundle:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.4: Delta via delta-core. 3.5: Delta auto-switches to the Spark-free Delta Kernel.
+        spark_version: ["3.4.3", "3.5.9"]
+    env:
+      SPARK_VERSION: ${{ matrix.spark_version }}
     steps:
       - uses: actions/checkout@v6
 
