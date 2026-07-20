@@ -31,6 +31,7 @@ on:
 
 jobs:
   build:
+    name: Maven CI Build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
