@@ -61,3 +61,4 @@ services:
       - ./notebook:/home/jovyan/work
       - ./jars:/home/jars
       - ./data:/home/data
+      - ./jupyter/setup-jdk11.sh:/usr/local/bin/before-notebook.d/setup-jdk11.sh
