@@ -39,18 +39,19 @@ if [ "${1:-}" == "-h" ]; then
 Usage: $(basename "$0") [OPTIONS]
 
 Options:
-<version option>  One of the version options below
-${joined}
 -h, --help
 "
   exit 0
 fi
 
 
-COMMON_OPTIONS="-DdeployArtifacts=true -DskipTests -DretryFailedDeploymentCount=10"
+# -Dmaven.build.cache.enabled=false: the build cache (.mvn/extensions.xml) restores the
+# cached source:jar-no-fork execution and then re-attaches the sources jar, which fails the
+# release build with "duplicated artifacts attached". Disable it for release deploys.
+COMMON_OPTIONS="-DdeployArtifacts=true -DskipTests -DretryFailedDeploymentCount=10 -Dmaven.build.cache.enabled=false"
 echo "Cleaning everything before any deployment"
 $MVN clean $COMMON_OPTIONS
-echo "Building with options
+echo "Building with options"
 $MVN install $COMMON_OPTIONS
 
 echo "Deploying to repository.apache.org with version options"
