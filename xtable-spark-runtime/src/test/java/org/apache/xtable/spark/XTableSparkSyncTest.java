@@ -20,8 +20,13 @@ package org.apache.xtable.spark;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -108,5 +113,85 @@ class XTableSparkSyncTest {
   @Test
   void isSparkAtLeast35FalseForNull() {
     assertFalse(XTableSparkSync.isSparkAtLeast35(null));
+  }
+
+  private static InputStream yaml(String content) {
+    return new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Test
+  void parseDatasetConfigReadsAndNormalizesFields() {
+    XTableSparkSync.DatasetConfig config =
+        XTableSparkSync.parseDatasetConfig(
+            yaml(
+                "sourceFormat: hudi\n"
+                    + "targetFormats:\n"
+                    + "  - iceberg\n"
+                    + "  - DELTA\n"
+                    + "datasets:\n"
+                    + "  - tableBasePath: /data/orders\n"
+                    + "    tableName: orders\n"
+                    + "    partitionSpec: level:VALUE\n"
+                    + "  - tableBasePath: /data/customers\n"
+                    + "    namespace: db.sales\n"));
+
+    assertEquals("HUDI", config.sourceFormat);
+    assertEquals(2, config.targetFormats.size());
+    assertEquals("ICEBERG", config.targetFormats.get(0));
+    assertEquals("DELTA", config.targetFormats.get(1));
+    assertEquals(2, config.datasets.size());
+    assertEquals("/data/orders", config.datasets.get(0).tableBasePath);
+    assertEquals("orders", config.datasets.get(0).tableName);
+    assertEquals("level:VALUE", config.datasets.get(0).partitionSpec);
+    assertEquals("/data/customers", config.datasets.get(1).tableBasePath);
+    assertEquals("db.sales", config.datasets.get(1).namespace);
+    assertNull(config.datasets.get(1).tableName);
+  }
+
+  @Test
+  void parseDatasetConfigRejectsMissingSourceFormat() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            XTableSparkSync.parseDatasetConfig(
+                yaml("targetFormats: [ICEBERG]\ndatasets:\n  - tableBasePath: /data/orders\n")));
+  }
+
+  @Test
+  void parseDatasetConfigRejectsEmptyTargetFormats() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            XTableSparkSync.parseDatasetConfig(
+                yaml("sourceFormat: HUDI\ntargetFormats: []\ndatasets:\n  - tableBasePath: /d\n")));
+  }
+
+  @Test
+  void parseDatasetConfigRejectsInvalidTargetFormat() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            XTableSparkSync.parseDatasetConfig(
+                yaml(
+                    "sourceFormat: HUDI\ntargetFormats: [PAIMON]\ndatasets:\n  - tableBasePath: /d\n")));
+  }
+
+  @Test
+  void parseDatasetConfigRejectsMissingDatasets() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            XTableSparkSync.parseDatasetConfig(
+                yaml("sourceFormat: HUDI\ntargetFormats: [DELTA]\n")));
+  }
+
+  @Test
+  void parseDatasetConfigRejectsDatasetWithoutBasePath() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            XTableSparkSync.parseDatasetConfig(
+                yaml(
+                    "sourceFormat: HUDI\ntargetFormats: [DELTA]\ndatasets:\n  - tableName: orders\n")));
   }
 }

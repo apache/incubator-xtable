@@ -215,6 +215,7 @@ com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
 com.google.errorprone:error_prone_annotations:2.21.1
 com.google.j2objc:j2objc-annotations:2.8
 commons-cli:commons-cli:1.5.0
+org.yaml:snakeyaml:2.2
 
 MIT License
 -----------

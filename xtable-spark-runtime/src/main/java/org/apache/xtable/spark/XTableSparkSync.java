@@ -18,10 +18,14 @@
  
 package org.apache.xtable.spark;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,7 +39,11 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.SparkSession;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import org.apache.xtable.model.storage.TableFormat;
 
@@ -61,6 +69,7 @@ public final class XTableSparkSync {
   private static final String TABLE_NAME = "tablename";
   private static final String NAMESPACE = "namespace";
   private static final String PARTITION_SPEC = "partitionspec";
+  private static final String DATASET_CONFIG = "datasetconfig";
   private static final String USE_DELTA_KERNEL = "usedeltakernel";
   private static final String HELP = "help";
 
@@ -94,22 +103,31 @@ public final class XTableSparkSync {
               Option.builder()
                   .longOpt(BASE_PATH)
                   .hasArg()
-                  .required()
-                  .desc("The base path of the source table")
+                  .desc("The base path of the source table (single-table mode)")
                   .build())
           .addOption(
               Option.builder()
                   .longOpt(SOURCE_FORMAT)
                   .hasArg()
-                  .required()
-                  .desc("The source table format, e.g. HUDI, DELTA or ICEBERG")
+                  .desc("The source table format, e.g. HUDI, DELTA or ICEBERG (single-table mode)")
                   .build())
           .addOption(
               Option.builder()
                   .longOpt(TARGETS)
                   .hasArg()
-                  .required()
-                  .desc("Comma-separated target formats to sync to, e.g. ICEBERG,DELTA")
+                  .desc(
+                      "Comma-separated target formats to sync to, e.g. ICEBERG,DELTA "
+                          + "(single-table mode)")
+                  .build())
+          .addOption(
+              Option.builder()
+                  .longOpt(DATASET_CONFIG)
+                  .hasArg()
+                  .argName("path")
+                  .desc(
+                      "Path to a YAML dataset config (sourceFormat, targetFormats, datasets[]) to "
+                          + "sync multiple tables in one run; may be a local or cloud (s3/gcs/abfs) "
+                          + "path. Mutually exclusive with --basepath/--sourceformat/--targets.")
                   .build())
           .addOption(
               Option.builder()
@@ -162,36 +180,72 @@ public final class XTableSparkSync {
       return;
     }
 
-    // Validate all arguments up front so an invalid value fails fast, before a SparkSession is
-    // created (getOrCreate() below): otherwise a bad --sourceformat/--targets only surfaces deep in
-    // the sync, after Spark has already been spun up.
-    String basePath = cmd.getOptionValue(BASE_PATH);
-    String tableName = cmd.getOptionValue(TABLE_NAME, basePathToTableName(basePath));
-
-    String sourceFormat = cmd.getOptionValue(SOURCE_FORMAT).trim().toUpperCase(Locale.ROOT);
-    validateFormat(SOURCE_FORMAT, sourceFormat, SUPPORTED_SOURCE_FORMATS);
-
-    List<String> targetFormats =
-        Arrays.stream(cmd.getOptionValue(TARGETS).split(","))
-            .map(String::trim)
-            .filter(s -> !s.isEmpty())
-            .map(s -> s.toUpperCase(Locale.ROOT))
-            .collect(Collectors.toList());
-    if (targetFormats.isEmpty()) {
+    boolean datasetMode = cmd.hasOption(DATASET_CONFIG);
+    if (datasetMode
+        && (cmd.hasOption(BASE_PATH) || cmd.hasOption(SOURCE_FORMAT) || cmd.hasOption(TARGETS))) {
       throw new IllegalArgumentException(
-          "--targets resolved to an empty list; provide at least one target format, e.g. ICEBERG,DELTA");
+          "--datasetconfig is mutually exclusive with --basepath/--sourceformat/--targets");
     }
-    targetFormats.forEach(target -> validateFormat(TARGETS, target, SUPPORTED_TARGET_FORMATS));
+    // Single-table flags are validated up front so an invalid value fails fast, before a
+    // SparkSession is created. A --datasetconfig is on a local or cloud path, so it is read through
+    // the Spark Hadoop config below and validated there.
+    if (!datasetMode) {
+      requireOption(cmd, BASE_PATH);
+      requireOption(cmd, SOURCE_FORMAT);
+      requireOption(cmd, TARGETS);
+      validateFormat(
+          SOURCE_FORMAT,
+          cmd.getOptionValue(SOURCE_FORMAT).trim().toUpperCase(Locale.ROOT),
+          SUPPORTED_SOURCE_FORMATS);
+      parseTargets(cmd.getOptionValue(TARGETS)); // validates formats and non-emptiness
+    }
 
-    String namespace = cmd.getOptionValue(NAMESPACE);
     boolean useDeltaKernelFlag = cmd.hasOption(USE_DELTA_KERNEL);
 
     SparkSession spark = SparkSession.builder().appName("xtable-spark-sync").getOrCreate();
     try {
       Configuration hadoopConf = spark.sparkContext().hadoopConfiguration();
 
+      String sourceFormat;
+      List<String> targetFormats;
+      List<TableSyncSpec.TableSyncSpecBuilder> builders = new ArrayList<>();
+      if (datasetMode) {
+        DatasetConfig config = readDatasetConfig(cmd.getOptionValue(DATASET_CONFIG), hadoopConf);
+        sourceFormat = config.sourceFormat;
+        targetFormats = config.targetFormats;
+        for (DatasetConfig.Table table : config.datasets) {
+          builders.add(
+              TableSyncSpec.builder()
+                  .key(
+                      table.tableName != null
+                          ? table.tableName
+                          : basePathToTableName(table.tableBasePath))
+                  .basePath(table.tableBasePath)
+                  .dataPath(table.tableDataPath)
+                  .namespace(table.namespace == null ? null : table.namespace.split("\\."))
+                  .partitionSpec(table.partitionSpec)
+                  .sourceFormat(sourceFormat)
+                  .targets(targetFormats));
+        }
+      } else {
+        sourceFormat = cmd.getOptionValue(SOURCE_FORMAT).trim().toUpperCase(Locale.ROOT);
+        targetFormats = parseTargets(cmd.getOptionValue(TARGETS));
+        String basePath = cmd.getOptionValue(BASE_PATH);
+        String namespace = cmd.getOptionValue(NAMESPACE);
+        builders.add(
+            TableSyncSpec.builder()
+                .key(cmd.getOptionValue(TABLE_NAME, basePathToTableName(basePath)))
+                .basePath(basePath)
+                .dataPath(cmd.getOptionValue(DATA_PATH))
+                .namespace(namespace == null ? null : namespace.split("\\."))
+                .partitionSpec(cmd.getOptionValue(PARTITION_SPEC))
+                .sourceFormat(sourceFormat)
+                .targets(targetFormats));
+      }
+
       // Use the Spark-free Delta Kernel when --usedeltakernel is passed, or auto-enable it when
-      // Delta is involved and Spark is 3.5+ (where the bundled delta-core does not run).
+      // Delta is involved and Spark is 3.5+ (where the bundled delta-core does not run). One
+      // decision for the run, applied to every table.
       boolean deltaInvolved =
           TableFormat.DELTA.equals(sourceFormat) || targetFormats.contains(TableFormat.DELTA);
       boolean useDeltaKernel = useDeltaKernelFlag;
@@ -203,23 +257,135 @@ public final class XTableSparkSync {
             spark.version());
       }
 
-      TableSyncSpec spec =
-          TableSyncSpec.builder()
-              .key(tableName)
-              .basePath(basePath)
-              .dataPath(cmd.getOptionValue(DATA_PATH))
-              .namespace(namespace == null ? null : namespace.split("\\."))
-              .partitionSpec(cmd.getOptionValue(PARTITION_SPEC))
-              .sourceFormat(sourceFormat)
-              .targets(targetFormats)
-              .useDeltaKernel(useDeltaKernel)
-              .build();
-
-      log.info("Starting standalone XTable sync for {}", spec.getBasePath());
-      new XTableSyncService().sync(spec, hadoopConf);
-      log.info("Completed XTable sync for {}", spec.getBasePath());
+      XTableSyncService service = new XTableSyncService();
+      int failures = 0;
+      for (TableSyncSpec.TableSyncSpecBuilder builder : builders) {
+        TableSyncSpec spec = builder.useDeltaKernel(useDeltaKernel).build();
+        try {
+          log.info("Starting XTable sync for {} ({})", spec.getKey(), spec.getBasePath());
+          service.sync(spec, hadoopConf);
+          log.info("Completed XTable sync for {}", spec.getKey());
+        } catch (RuntimeException e) {
+          // One table failing should not abort the rest of the batch; report at the end.
+          failures++;
+          log.error("XTable sync failed for {} ({})", spec.getKey(), spec.getBasePath(), e);
+        }
+      }
+      if (failures > 0) {
+        throw new IllegalStateException(
+            failures + " of " + builders.size() + " table sync(s) failed; see logs above");
+      }
     } finally {
       spark.stop();
+    }
+  }
+
+  private static void requireOption(CommandLine cmd, String option) {
+    if (!cmd.hasOption(option)) {
+      throw new IllegalArgumentException(
+          "--" + option + " is required unless --" + DATASET_CONFIG + " is provided");
+    }
+  }
+
+  // Splits the comma-separated --targets value, upper-cases and validates each, and requires at
+  // least one. package-private for unit testing.
+  static List<String> parseTargets(String targetsValue) {
+    List<String> targetFormats =
+        Arrays.stream(targetsValue.split(","))
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .map(s -> s.toUpperCase(Locale.ROOT))
+            .collect(Collectors.toList());
+    if (targetFormats.isEmpty()) {
+      throw new IllegalArgumentException(
+          "--targets resolved to an empty list; provide at least one target format, e.g. ICEBERG,DELTA");
+    }
+    targetFormats.forEach(target -> validateFormat(TARGETS, target, SUPPORTED_TARGET_FORMATS));
+    return targetFormats;
+  }
+
+  // Reads the --datasetconfig YAML (local or cloud path) through the Spark Hadoop config.
+  static DatasetConfig readDatasetConfig(String path, Configuration hadoopConf) {
+    Path configPath = new Path(path);
+    try (InputStream in = configPath.getFileSystem(hadoopConf).open(configPath)) {
+      return parseDatasetConfig(in);
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Failed to read --datasetconfig at " + path, e);
+    }
+  }
+
+  // Parses the dataset YAML with SnakeYAML's SafeConstructor (plain maps/lists/scalars only, no
+  // arbitrary-type instantiation) and validates required fields. package-private for unit testing.
+  @SuppressWarnings("unchecked")
+  static DatasetConfig parseDatasetConfig(InputStream in) {
+    Object loaded = new Yaml(new SafeConstructor(new LoaderOptions())).load(in);
+    if (!(loaded instanceof Map)) {
+      throw new IllegalArgumentException("--datasetconfig is empty or not a YAML mapping");
+    }
+    Map<String, Object> root = (Map<String, Object>) loaded;
+
+    DatasetConfig config = new DatasetConfig();
+    config.sourceFormat = requireString(root, "sourceFormat").trim().toUpperCase(Locale.ROOT);
+    validateFormat(SOURCE_FORMAT, config.sourceFormat, SUPPORTED_SOURCE_FORMATS);
+
+    Object targetsRaw = root.get("targetFormats");
+    if (!(targetsRaw instanceof List) || ((List<?>) targetsRaw).isEmpty()) {
+      throw new IllegalArgumentException(
+          "--datasetconfig 'targetFormats' must be a non-empty list");
+    }
+    config.targetFormats =
+        ((List<Object>) targetsRaw)
+            .stream()
+                .map(String::valueOf)
+                .map(s -> s.trim().toUpperCase(Locale.ROOT))
+                .collect(Collectors.toList());
+    config.targetFormats.forEach(t -> validateFormat(TARGETS, t, SUPPORTED_TARGET_FORMATS));
+
+    Object datasetsRaw = root.get("datasets");
+    if (!(datasetsRaw instanceof List) || ((List<?>) datasetsRaw).isEmpty()) {
+      throw new IllegalArgumentException("--datasetconfig 'datasets' must be a non-empty list");
+    }
+    config.datasets = new ArrayList<>();
+    for (Object entry : (List<Object>) datasetsRaw) {
+      if (!(entry instanceof Map)) {
+        throw new IllegalArgumentException("--datasetconfig 'datasets' entries must be mappings");
+      }
+      Map<String, Object> raw = (Map<String, Object>) entry;
+      DatasetConfig.Table table = new DatasetConfig.Table();
+      table.tableBasePath = requireString(raw, "tableBasePath");
+      table.tableDataPath = asString(raw.get("tableDataPath"));
+      table.tableName = asString(raw.get("tableName"));
+      table.partitionSpec = asString(raw.get("partitionSpec"));
+      table.namespace = asString(raw.get("namespace"));
+      config.datasets.add(table);
+    }
+    return config;
+  }
+
+  private static String requireString(Map<String, Object> map, String key) {
+    String value = asString(map.get(key));
+    if (value == null || value.trim().isEmpty()) {
+      throw new IllegalArgumentException("--datasetconfig is missing required field '" + key + "'");
+    }
+    return value;
+  }
+
+  private static String asString(Object value) {
+    return value == null ? null : String.valueOf(value);
+  }
+
+  /** Parsed {@code --datasetconfig}; mirrors the RunSync dataset YAML so configs are shareable. */
+  static final class DatasetConfig {
+    String sourceFormat;
+    List<String> targetFormats;
+    List<Table> datasets;
+
+    static final class Table {
+      String tableBasePath;
+      String tableDataPath;
+      String tableName;
+      String partitionSpec;
+      String namespace;
     }
   }
 

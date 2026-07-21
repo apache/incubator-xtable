@@ -48,6 +48,14 @@
             <artifactId>commons-cli</artifactId>
         </dependency>
 
+        <!-- Parses the optional dataset-config YAML. Bundled (relocated below) because it is not
+             reliably on a Spark runtime classpath; Apache-2.0 and has no transitive dependencies. -->
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>2.2</version>
+        </dependency>
+
         <!-- Logging API (lombok @Log4j2); provided by the cluster runtime -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
@@ -322,6 +330,7 @@
                                     <include>com.google.j2objc:j2objc-annotations</include>
                                     <include>org.checkerframework:checker-qual</include>
                                     <include>commons-cli:commons-cli</include>
+                                    <include>org.yaml:snakeyaml</include>
                                 </includes>
                             </artifactSet>
                             <relocations>
@@ -337,6 +346,10 @@
                                     <pattern>org.apache.commons.cli</pattern>
                                     <shadedPattern>org.apache.xtable.shaded.org.apache.commons.cli</shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>org.yaml.snakeyaml</pattern>
+                                    <shadedPattern>org.apache.xtable.shaded.org.yaml.snakeyaml</shadedPattern>
+                                </relocation>
                             </relocations>
                             <filters>
                                 <filter>
@@ -346,6 +359,18 @@
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
                                         <exclude>**/Log4j2Plugins.dat</exclude>
+                                    </excludes>
+                                </filter>
+                                <!--
+                                  Drop SnakeYAML's multi-release (Java 9+) copies: shade does not
+                                  relocate classes under META-INF/versions, so keeping them would
+                                  leave un-relocated org.yaml.snakeyaml classes in the bundle. The
+                                  base (relocated) classes work on all supported Java versions.
+                                -->
+                                <filter>
+                                    <artifact>org.yaml:snakeyaml</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/versions/**</exclude>
                                     </excludes>
                                 </filter>
                             </filters>
