@@ -21,6 +21,8 @@ This demo was created for the 2023 Open Source Data Summit. It shows how XTable 
 
 Use `./start_demo.sh` to spin up a local notebook with a scala interpreter, Hive Metastore, Presto and Trino in docker containers. The script will first build the XTable jars required for the demo and then start the containers.  
 
+When you are done, use `./stop_demo.sh` to stop and remove the containers. Pass `--reset-data` to also restore the seed datasets under `demo/data` to their original state so the demo can be re-run from scratch.
+
 ## Accessing Services
 ### Jupyter Notebook
 To access the notebook, look for a log line during startup that contains `To access the server, open this file in a browser: ...  Or copy and paste one of these URLs: ...` and use the `http://127.0.0.1:8888/...` url to open the notebook in your browser. The demo is located at `work/demo.ipynb`. 

@@ -26,6 +26,14 @@ cd demo
 ./start_demo.sh
 ```
 
+When you are done with the demo, stop and remove the containers with the `stop_demo.sh` script.
+Pass `--reset-data` to also restore the seed datasets under `demo/data` to their original state
+so the demo can be re-run from scratch.
+
+```shell md title="shell"
+./stop_demo.sh --reset-data
+```
+
 ### Accessing Services
 #### Trino
 You can access the local Trino container by running `docker exec -it trino trino`
