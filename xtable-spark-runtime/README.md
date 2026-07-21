@@ -52,9 +52,10 @@ $SPARK_HOME/bin/spark-submit \
 
 | Option | Required | Description |
 | --- | --- | --- |
-| `--basepath` | yes | Base path of the source table. |
-| `--sourceformat` | yes | `HUDI`, `ICEBERG`, `DELTA`, `PAIMON`, or `PARQUET`. |
-| `--targets` | yes | Comma-separated target formats, e.g. `ICEBERG,DELTA`. |
+| `--basepath` | yes\* | Base path of the source table. Required unless `--datasetconfig` is given. |
+| `--sourceformat` | yes\* | `HUDI`, `ICEBERG`, `DELTA`, `PAIMON`, or `PARQUET`. Required unless `--datasetconfig` is given. |
+| `--targets` | yes\* | Comma-separated target formats, e.g. `ICEBERG,DELTA`. Required unless `--datasetconfig` is given. |
+| `--datasetconfig` | yes\* | Path (local or cloud) to a YAML dataset config for syncing multiple tables. Mutually exclusive with `--basepath`/`--sourceformat`/`--targets`. |
 | `--datapath` | no | Path to the data files if different from the base path. |
 | `--tablename` | no | Table name; defaults to the last segment of the base path. |
 | `--namespace` | no | Dot-separated table namespace. |
@@ -63,6 +64,54 @@ $SPARK_HOME/bin/spark-submit \
 | `--help` | no | Print usage. |
 
 Paimon and Parquet are read-only sources; targets are Hudi, Iceberg, and Delta.
+
+## Adding to an existing Spark job
+
+If a Spark job already writes a table in one format (for example Hudi) and the same table should
+also be readable as Iceberg or Delta, the bundle's `provided` engine libraries let it reuse the
+Hudi, Iceberg, and Delta libraries already on that job's Spark runtime — the only additional
+artifact is this jar. Add it to that Spark runtime's classpath and run `XTableSparkSync` against the
+table as a follow-on step after the write completes, with `--sourceformat` set to the format the job
+writes and the formats to add listed in `--targets`:
+
+```shell
+$SPARK_HOME/bin/spark-submit \
+  --class org.apache.xtable.spark.XTableSparkSync \
+  xtable-spark-runtime_2.12-<version>.jar \
+  --basepath s3://example-warehouse/db/orders \
+  --sourceformat HUDI \
+  --targets ICEBERG,DELTA
+```
+
+The sync reads the existing source-format metadata and writes the target metadata alongside the data
+files the job already produced; no data is rewritten.
+
+## Sync multiple tables
+
+Pass `--datasetconfig` with a YAML file instead of the per-table flags to sync several tables in one
+submit. `sourceFormat` and `targetFormats` apply to every table; each `datasets` entry needs only a
+`tableBasePath` (`tableName`, `tableDataPath`, `namespace`, and `partitionSpec` are optional):
+
+```yaml
+sourceFormat: HUDI
+targetFormats:
+  - ICEBERG
+  - DELTA
+datasets:
+  - tableBasePath: s3://tpcds-datasets/100GB/store_sales
+  - tableBasePath: s3://tpcds-datasets/100GB/store_returns
+  - tableBasePath: s3://tpcds-datasets/100GB/item
+```
+
+```shell
+$SPARK_HOME/bin/spark-submit \
+  --class org.apache.xtable.spark.XTableSparkSync \
+  xtable-spark-runtime_2.12-<version>.jar \
+  --datasetconfig dataset.yaml
+```
+
+A complete example covering the 24 tables of the TPC-DS schema is at
+[`examples/tpcds-dataset.yaml`](examples/tpcds-dataset.yaml).
 
 ## Spark version compatibility
 
