@@ -1,0 +1,407 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~     http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.apache.xtable</groupId>
+        <artifactId>xtable</artifactId>
+        <version>0.2.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>xtable-spark-runtime_${scala.binary.version}</artifactId>
+    <name>XTable Project Spark Runtime</name>
+    <description>
+        Thin, relocated, drop-in Spark bundle that runs incremental XTable metadata sync. v1 ships
+        the standalone spark-submit entry point (XTableSparkSync); the config-only, driver-side
+        QueryExecutionListener on-ramp is a planned follow-up (see rfc/rfc-3).
+    </description>
+
+    <dependencies>
+        <!-- XTable engine (bundled) -->
+        <dependency>
+            <groupId>org.apache.xtable</groupId>
+            <artifactId>xtable-core_${scala.binary.version}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Command-line parsing for the standalone XTableSparkSync entry point (bundled). -->
+        <dependency>
+            <groupId>commons-cli</groupId>
+            <artifactId>commons-cli</artifactId>
+        </dependency>
+
+        <!-- Parses the optional dataset-config YAML. Bundled (relocated below) because it is not
+             reliably on a Spark runtime classpath; Apache-2.0 and has no transitive dependencies. -->
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>2.2</version>
+        </dependency>
+
+        <!-- Logging API (lombok @Log4j2); provided by the cluster runtime -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Spark: provided by the cluster. Brings QueryExecutionListener, QueryExecution,
+             Catalyst LogicalPlan, and SparkSession. -->
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-sql_${scala.binary.version}</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Hadoop: provided by the cluster. -->
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+          Engine libraries (Hudi / Iceberg / Delta) are provided, not bundled: the user brings their
+          own engine version and the thin bundle stays compatible across versions (see the shade
+          plugin below). Hudi is supplied as the hudi-spark bundle, whose regenerated DecimalWrapper
+          links cleanly on Avro >=1.10; raw hudi-common's Avro-1.8/1.9-generated model classes
+          reference org.apache.avro.data.TimeConversions.TimeConversion, removed in Avro 1.10 and thus
+          absent from the Avro 1.12 that Iceberg 1.9.2 requires.
+        -->
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-spark${spark.version.prefix}-bundle_${scala.binary.version}</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!--
+          XTable's Hudi TARGET writes via the Java client (HoodieJavaEngineContext), which the Spark
+          bundle does not ship. Exclude its transitive hudi-common so the bundle's clean DecimalWrapper
+          is the only one on the classpath (see above).
+        -->
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-java-client</artifactId>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.hudi</groupId>
+                    <artifactId>hudi-common</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-core_${scala.binary.version}</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-kernel-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-kernel-defaults</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+          avro/parquet-avro are provided by the engine runtime (Iceberg 1.9.2 needs Avro >=1.12, newer
+          than Spark 3.4's). Kept provided so the smoke test puts them on the flat engine classpath;
+          why the engine's Avro must win is explained on the engine-classpath plugin below.
+        -->
+        <dependency>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.parquet</groupId>
+            <artifactId>parquet-avro</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Hudi uses jol for in-memory sizing; the user's Hudi runtime supplies it. Provided so it
+             is on the flat engine classpath for the smoke test. -->
+        <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+          Jackson, scala-library and the log4j 1.2 bridge arrive transitively through xtable-core but
+          are supplied by every Spark runtime (Spark itself depends on them). Declaring them provided
+          here (nearest-wins over the transitive compile scope) keeps them out of the shaded jar and
+          out of this module's runtime dependency tree, so the shade allowlist stays limited to what
+          XTable actually bundles - which is what release/scripts/validate_shaded_license_coverage.sh
+          enforces (shade <includes> must equal the runtime tree, and every bundled dep must be listed
+          in META-INF/LICENSE-bundled). guava (used internally, relocated) is intentionally left to
+          bundle. Versions come from the parent's dependencyManagement.
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.module</groupId>
+            <artifactId>jackson-module-scala_${scala.binary.version}</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-1.2-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Test Dependencies -->
+        <dependency>
+            <groupId>org.apache.xtable</groupId>
+            <artifactId>xtable-core_${scala.binary.version}</artifactId>
+            <version>${project.version}</version>
+            <classifier>tests</classifier>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <!-- Iceberg Spark runtime to create the Iceberg source table in-JVM and read targets back.
+             Hudi's in-JVM table creation uses the provided hudi-spark bundle above. -->
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-spark-runtime-${spark.version.prefix}_${scala.binary.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Junit -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-params</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Test logging -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j2-impl</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              The bundle smoke test (ITXTableSparkRuntimeBundle) spark-submits the shaded jar with
+              the engine libraries on a FLAT classpath (spark.driver.extraClassPath), not via the
+              submit packages/jars flags. A layered packages/jars classloader puts the engines' avro
+              in a child loader separate from Spark's own avro, which breaks cross-boundary casts
+              (e.g. iceberg PartitionData to avro IndexedRecord). Resolve the engine (provided-scope)
+              jars to a flat classpath here, excluding Spark/Hadoop (the cluster provides them) and
+              xtable (bundled), so a single avro is on one loader, matching a real cluster.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>engine-classpath</id>
+                        <phase>pre-integration-test</phase>
+                        <goals>
+                            <goal>build-classpath</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>provided</includeScope>
+                            <!--
+                              Exclude Spark/Hadoop, XTable's own modules, logging, and the libraries
+                              Spark itself supplies (jackson, scala-library) so cluster copies win;
+                              avro/parquet stay so the engine's newer avro wins (see above).
+                            -->
+                            <excludeGroupIds>org.apache.spark,org.apache.hadoop,org.apache.xtable,org.projectlombok,org.slf4j,org.apache.logging.log4j,org.scala-lang,com.fasterxml.jackson.core,com.fasterxml.jackson.datatype,com.fasterxml.jackson.module</excludeGroupIds>
+                            <outputFile>${project.build.directory}/engine-classpath.txt</outputFile>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--
+              Thin, curated bundle. Spark/Hadoop and the engine libraries (Hudi/Iceberg/Delta) are
+              provided by the user's runtime, and so are the libraries XTable exchanges with them
+              (avro, parquet, jackson, commons) - relocating those would break the API boundary
+              (e.g. Hudi returning a real org.apache.avro.Schema to relocated XTable code). The
+              bundle therefore contains only XTable's own modules plus the libraries it uses purely
+              internally (guava), which are relocated to avoid clashes with the cluster.
+
+              The shaded jar is the MAIN artifact (shadedArtifactAttached=false) with a
+              dependency-reduced POM, matching how iceberg-spark-runtime and hudi-spark-bundle
+              publish: resolving the coordinate (a plain Maven dependency or the submit packages flag)
+              yields the relocated bundle and pulls no un-relocated transitive deps. Consuming a thin,
+              un-shaded main jar plus a separate classifier would re-introduce the cluster guava clash
+              that relocation exists to prevent.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <createDependencyReducedPom>true</createDependencyReducedPom>
+                            <!--
+                              Include-only allowlist. Everything NOT listed here is assumed to be
+                              provided by the user's Spark/engine runtime and is deliberately left out
+                              of the jar. Known implicit "provided by cluster" assumptions carried by
+                              the bundled xtable modules: jackson-datatype-jsr310 (via xtable-api) and
+                              log4j-1.2-api (via xtable-core). If a future compile dependency of
+                              xtable-api/xtable-core is NOT cluster-provided, it must be added here or
+                              it will silently drop out and surface only as a runtime
+                              ClassNotFoundException. protobuf-java is intentionally absent: it
+                              resolves as provided (via the engines), so it is never bundled and needs
+                              no relocation. A hard verification gate (dependency:analyze / enforcer)
+                              over this allowlist is a tracked follow-up.
+                            -->
+                            <artifactSet>
+                                <includes>
+                                    <include>org.apache.xtable:xtable-api</include>
+                                    <include>org.apache.xtable:xtable-core_${scala.binary.version}</include>
+                                    <include>org.apache.xtable:xtable-hudi-support-utils</include>
+                                    <include>com.google.guava:guava</include>
+                                    <include>com.google.guava:failureaccess</include>
+                                    <include>com.google.guava:listenablefuture</include>
+                                    <include>com.google.errorprone:error_prone_annotations</include>
+                                    <include>com.google.j2objc:j2objc-annotations</include>
+                                    <include>org.checkerframework:checker-qual</include>
+                                    <include>commons-cli:commons-cli</include>
+                                    <include>org.yaml:snakeyaml</include>
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>com.google.common</pattern>
+                                    <shadedPattern>org.apache.xtable.shaded.com.google.common</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.google.thirdparty</pattern>
+                                    <shadedPattern>org.apache.xtable.shaded.com.google.thirdparty</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.cli</pattern>
+                                    <shadedPattern>org.apache.xtable.shaded.org.apache.commons.cli</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.yaml.snakeyaml</pattern>
+                                    <shadedPattern>org.apache.xtable.shaded.org.yaml.snakeyaml</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>**/Log4j2Plugins.dat</exclude>
+                                    </excludes>
+                                </filter>
+                                <!--
+                                  Drop SnakeYAML's multi-release (Java 9+) copies: shade does not
+                                  relocate classes under META-INF/versions, so keeping them would
+                                  leave un-relocated org.yaml.snakeyaml classes in the bundle. The
+                                  base (relocated) classes work on all supported Java versions.
+                                -->
+                                <filter>
+                                    <artifact>org.yaml:snakeyaml</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/versions/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.DontIncludeResourceTransformer">
+                                    <resources>
+                                        <resource>LICENSE</resource>
+                                        <resource>NOTICE</resource>
+                                        <resource>NOTICE.txt</resource>
+                                    </resources>
+                                </transformer>
+                                <!--
+                                  Bundled-dependency attribution: the shaded jar relocates and ships
+                                  guava, failureaccess and commons-cli (all Apache-2.0), so its
+                                  LICENSE/NOTICE must carry their attributions per ASF policy.
+                                -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/LICENSE</resource>
+                                    <file>target/classes/META-INF/LICENSE-bundled</file>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+                                    <resource>META-INF/NOTICE</resource>
+                                    <file>target/classes/META-INF/NOTICE-bundled</file>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
