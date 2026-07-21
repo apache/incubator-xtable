@@ -4,7 +4,7 @@ title: "Run XTable on Apache Spark"
 
 # Running Apache XTable™ (Incubating) on Apache Spark
 
-The `xtable-spark-runtime` module publishes a self-contained (shaded) bundle jar that runs an
+The `xtable-spark-runtime` module publishes a self-contained runtime jar that runs an
 XTable metadata sync with `spark-submit` on an existing Apache Spark cluster. It is the
 `spark-submit` equivalent of the `RunSync` utility: no data is rewritten, only the target table
 format metadata is generated alongside the existing data files.
@@ -12,7 +12,7 @@ format metadata is generated alongside the existing data files.
 Use this when you already run Spark (EMR, Dataproc, HDInsight, Databricks, or a local install) and
 want to add interoperability without standing up a separate process.
 
-## Build the bundle
+## Build the runtime jar
 
 From the project root:
 
@@ -20,7 +20,7 @@ From the project root:
 ./mvnw clean package -pl xtable-spark-runtime -am -DskipTests
 ```
 
-This produces the shaded bundle at
+This produces the runtime jar at
 `xtable-spark-runtime/target/xtable-spark-runtime_2.12-<version>.jar`.
 
 ## Quick start
@@ -60,17 +60,17 @@ $SPARK_HOME/bin/spark-submit \
   --partitionspec level:VALUE
 ```
 
-The engine libraries (Hudi, Iceberg, Delta, Avro, Parquet) are `provided` — the bundle expects them
-on the Spark runtime classpath, which is the case on a standard Spark install with the relevant
+The engine libraries (Hudi, Iceberg, Delta, Avro, Parquet) are `provided`. The runtime jar expects
+them on the Spark runtime classpath, which is the case on a standard Spark install with the relevant
 format support.
 
 ## Adding to an existing Spark job
 
-A common setup is a Spark job that already writes a table in one format — for example a job that
-writes Hudi — where the same table should also be readable as Iceberg or Delta. Because the bundle's
-engine libraries are `provided`, it reuses the Hudi, Iceberg, and Delta libraries already present on
-the Spark runtime that job uses; the only additional artifact is this jar. Add it to that Spark
-runtime's classpath and run the sync — no separate installation is required.
+A common setup is a Spark job that already writes a table in one format (for example a job that
+writes Hudi) where the same table should also be readable as Iceberg or Delta. Because the runtime
+jar's engine libraries are `provided`, it reuses the Hudi, Iceberg, and Delta libraries already
+present on the Spark runtime that job uses; the only additional artifact is this jar. Add it to that
+Spark runtime's classpath and run the sync, with no separate installation required.
 
 Run `XTableSparkSync` on the same Spark cluster, pointed at the table the job writes, as a follow-on
 step after the write completes. Set `--sourceformat` to the format the job writes and list the
@@ -150,7 +150,7 @@ Paimon and Parquet are read-only sources (there is no corresponding write target
 ## Spark version compatibility
 
 Hudi and Iceberg conversion use only Spark-free core classes, so they run on any of the Spark lines
-below. Delta is the only Spark-version-sensitive engine, and the bundle picks the right
+below. Delta is the only Spark-version-sensitive engine, and the runtime jar picks the right
 implementation automatically:
 
 | Spark version | Hudi / Iceberg | Delta implementation |
@@ -158,10 +158,10 @@ implementation automatically:
 | 3.4.x | ✅ | Delta Standalone (`delta-core`) |
 | 3.5.x and newer | ✅ | Delta Kernel (Spark-free), selected automatically |
 
-On Spark 3.5+, the bundled `delta-core` does not run, so a Delta source or target is routed through
-the Spark-free [Delta Kernel](https://docs.delta.io/latest/delta-kernel.html) implementation
-automatically — no flag needed. To force Kernel on any Spark version (e.g. Spark 3.4), pass
-`--usedeltakernel`.
+On Spark 3.5+, the `delta-core` in the runtime jar does not run, so a Delta source or target is
+routed through the Spark-free [Delta Kernel](https://docs.delta.io/latest/delta-kernel.html)
+implementation automatically, with no flag needed. To force Kernel on any Spark version (e.g. Spark
+3.4), pass `--usedeltakernel`.
 
 ## Next steps
 

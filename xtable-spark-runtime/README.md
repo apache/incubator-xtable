@@ -19,13 +19,13 @@
 
 # XTable Spark Runtime
 
-`xtable-spark-runtime` publishes a self-contained (shaded, relocated) bundle jar that runs an
+`xtable-spark-runtime` publishes a self-contained (shaded, relocated) runtime jar that runs an
 Apache XTable™ metadata sync with `spark-submit` on an existing Apache Spark cluster. It is the
-`spark-submit` equivalent of the `RunSync` utility — no data is rewritten, only the target table
+`spark-submit` equivalent of the `RunSync` utility: no data is rewritten, only the target table
 format metadata is generated alongside the existing data files.
 
 The engine libraries (Hudi, Iceberg, Delta, Avro, Parquet) are `provided`: the user brings their
-own engine versions from the Spark runtime, so the thin bundle stays compatible across versions.
+own engine versions from the Spark runtime, so the thin runtime jar stays compatible across versions.
 
 ## Build
 
@@ -35,7 +35,7 @@ From the project root:
 ./mvnw clean package -pl xtable-spark-runtime -am -DskipTests
 ```
 
-The shaded bundle is written to
+The runtime jar is written to
 `xtable-spark-runtime/target/xtable-spark-runtime_2.12-<version>.jar`.
 
 ## Usage
@@ -68,8 +68,8 @@ Paimon and Parquet are read-only sources; targets are Hudi, Iceberg, and Delta.
 ## Adding to an existing Spark job
 
 If a Spark job already writes a table in one format (for example Hudi) and the same table should
-also be readable as Iceberg or Delta, the bundle's `provided` engine libraries let it reuse the
-Hudi, Iceberg, and Delta libraries already on that job's Spark runtime — the only additional
+also be readable as Iceberg or Delta, the runtime jar's `provided` engine libraries let it reuse the
+Hudi, Iceberg, and Delta libraries already on that job's Spark runtime; the only additional
 artifact is this jar. Add it to that Spark runtime's classpath and run `XTableSparkSync` against the
 table as a follow-on step after the write completes, with `--sourceformat` set to the format the job
 writes and the formats to add listed in `--targets`:
@@ -116,19 +116,19 @@ A complete example covering the 24 tables of the TPC-DS schema is at
 ## Spark version compatibility
 
 Hudi and Iceberg conversion use only Spark-free core classes and run on any Spark line below. Delta
-is the only Spark-version-sensitive engine, and the bundle selects the implementation automatically:
+is the only Spark-version-sensitive engine, and the runtime jar selects the implementation automatically:
 
 | Spark version | Hudi / Iceberg | Delta |
 | --- | :---: | --- |
 | 3.4.x | ✅ | Delta Standalone (`delta-core`) |
 | 3.5.x and newer | ✅ | Delta Kernel (Spark-free), selected automatically |
 
-On Spark 3.5+ the bundled `delta-core` does not run, so a Delta source/target is routed through the
+On Spark 3.5+ the `delta-core` in the runtime jar does not run, so a Delta source/target is routed through the
 Spark-free Delta Kernel automatically. Pass `--usedeltakernel` to force it on any Spark version.
 
-## Bundle validation IT
+## Runtime jar validation IT
 
-`ITXTableSparkRuntimeBundle` `spark-submit`s the shaded jar against a real Spark distribution, one
+`ITXTableSparkRuntimeBundle` `spark-submit`s the runtime jar against a real Spark distribution, one
 case per direction across Hudi, Iceberg, and Delta, and asserts the target is data-equivalent to
 the source. It self-skips unless `SPARK_HOME` is set, so it does not run in the normal build:
 
