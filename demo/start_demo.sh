@@ -15,38 +15,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-## Create the require jars for the demo and copy them into a directory we'll mount in our notebook container
+## Start the demo containers in the background. Builds the XTable jars first
+## (via build_demo.sh) if they are not present. Use stop_demo.sh to stop the
+## demo when you are done.
+
+set -e
 
 CURRENT_DIR="$( cd "$(dirname "$0")" ; pwd -P )"
-XTABLE_HOME="$( cd "$(dirname "$CURRENT_DIR")" ; pwd -P )"
-cd $XTABLE_HOME
 
-## Read a property from the root pom so the demo always matches the versions
-## xtable is built against.
-get_property() {
-  ./mvnw -q help:evaluate -Dexpression="$1" -DforceStdout
-}
+## Validate the demo jars are built; build them if anything is missing.
+if [ ! -f "${CURRENT_DIR}/jars/versions.properties" ] || ! ls "${CURRENT_DIR}"/jars/xtable-core_*.jar > /dev/null 2>&1; then
+  echo "XTable demo jars not found. Building the XTable jars first..."
+  "${CURRENT_DIR}/build_demo.sh"
+fi
 
-PROJECT_VERSION=$(get_property project.version)
-SCALA_BINARY_VERSION=$(get_property scala.binary.version)
+if [ ! -f "${CURRENT_DIR}/jars/versions.properties" ] || ! ls "${CURRENT_DIR}"/jars/xtable-core_*.jar > /dev/null 2>&1; then
+  echo "ERROR: the XTable build did not produce the expected demo jars under demo/jars." >&2
+  echo "Fix the build (see output above) and re-run this script." >&2
+  exit 1
+fi
 
-./mvnw install -am -pl xtable-core -DskipTests -T 2
-mkdir -p demo/jars
-cp "xtable-hudi-support/xtable-hudi-support-utils/target/xtable-hudi-support-utils-${PROJECT_VERSION}.jar" demo/jars
-cp "xtable-api/target/xtable-api-${PROJECT_VERSION}.jar" demo/jars
-cp "xtable-core/target/xtable-core_${SCALA_BINARY_VERSION}-${PROJECT_VERSION}.jar" demo/jars
+cd "${CURRENT_DIR}"
+docker-compose up -d
 
-## Export the dependency versions used by the notebook. The notebook reads this
-## file from /home/jars/versions.properties instead of hardcoding versions.
-{
-  cat style/text-license-header
-  echo "scala.binary.version=${SCALA_BINARY_VERSION}"
-  for prop in spark.version spark.version.prefix hudi.version delta.version delta.kernel.version iceberg.hive.runtime.version; do
-    echo "${prop}=$(get_property "${prop}")"
-  done
-} > demo/jars/versions.properties
-echo "Generated demo/jars/versions.properties:"
-cat demo/jars/versions.properties
+## Wait for the Jupyter server and print the notebook URL. The first start can
+## take a few minutes while the container installs a JDK 11 for the kernels.
+echo "Waiting for the Jupyter server to start (the first start can take a few minutes)..."
+JUPYTER_URL=""
+for _ in $(seq 1 150); do
+  JUPYTER_URL=$(docker logs jupyter 2>&1 | grep -o 'http://127.0.0.1:8888/lab?token=[a-zA-Z0-9]*' | tail -1)
+  if [ -n "${JUPYTER_URL}" ]; then
+    break
+  fi
+  sleep 2
+done
 
-cd demo
-docker-compose up
+if [ -n "${JUPYTER_URL}" ]; then
+  echo ""
+  echo "Jupyter is running at: ${JUPYTER_URL}"
+  echo "The demo notebooks are under the work/ directory."
+else
+  echo "Jupyter did not report a URL yet; check its status with: docker logs jupyter"
+fi
+echo "Run ./stop_demo.sh when you are done (add --reset-data to restore the seed datasets)."
