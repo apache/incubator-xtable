@@ -29,6 +29,30 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 REPO = pathlib.Path.home() / ".m2" / "repository"
 NS = {"m": "http://maven.apache.org/POM/4.0.0"}
 
+# Curated license texts for bundled dependencies whose own jar does not carry a
+# license file (asm, protobuf, jamon, ...). One file per artifactId; the text is
+# copied verbatim into every shaded module that bundles that dependency.
+OVERRIDES_DIR = pathlib.Path(__file__).resolve().parent / "license_overrides"
+
+# The Apache License 2.0 family is already covered in full by the Apache banner
+# at the top of LICENSE-bundled, so those dependencies do not need a per-artifact
+# license text file.
+APACHE_FAMILY = "Apache License 2.0"
+
+# Locations, in priority order, where a dependency jar may carry its own license.
+JAR_LICENSE_CANDIDATES = (
+    "META-INF/LICENSE",
+    "META-INF/LICENSE.txt",
+    "META-INF/LICENSE.md",
+    "META-INF/LICENSE-MIT",
+    "LICENSE",
+    "LICENSE.txt",
+    "LICENSE.md",
+    "license/LICENSE",
+    "license.txt",
+    "COPYING",
+)
+
 FAMILY_ORDER = [
     "Apache License 2.0",
     "Apache Software License 1.1",
@@ -39,6 +63,7 @@ FAMILY_ORDER = [
     "CDDL + GPLv2 with classpath exception",
     "CDDL",
     "EPL 2.0",
+    "EPL 1.0",
     "Common Public License Version 1.0",
     "Mozilla Public License 2.0",
     "Public Domain",
@@ -277,6 +302,7 @@ GROUP_OVERRIDES = {
     "javax.servlet": "Apache License 2.0",
     "javax.servlet.jsp": "Apache License 2.0",
     "javax.transaction": "Apache License 2.0",
+    "org.apache.hadoop": "Apache License 2.0",
     "org.apache.hbase": "Apache License 2.0",
     "org.apache.velocity": "Apache License 2.0",
     "org.apache.zookeeper": "Apache License 2.0",
@@ -392,6 +418,8 @@ def normalize_family(group: str, artifact: str, version: str) -> str:
         return "Common Public License Version 1.0"
     if "EPL 2.0" in joined or "Eclipse Public License 2.0" in joined:
         return "EPL 2.0"
+    if "EPL 1.0" in joined or "Eclipse Public License 1.0" in joined or "Eclipse Public License - v 1.0" in joined:
+        return "EPL 1.0"
     if "CDDL + GPLv2 with classpath exception" in joined or "CDDL/GPLv2+CE" in joined:
         return "CDDL + GPLv2 with classpath exception"
     if "CDDL" in joined or "GPL2 w/ CPE" in joined:
@@ -447,6 +475,86 @@ def notice_text_for(group: str, artifact: str, version: str) -> str | None:
     return None
 
 
+@lru_cache(maxsize=None)
+def license_text_from_jar(group: str, artifact: str, version: str) -> str | None:
+    path = jar_path(group, artifact, version)
+    if not path.exists():
+        return None
+    with zipfile.ZipFile(path) as jar_file:
+        names = set(jar_file.namelist())
+        for candidate in JAR_LICENSE_CANDIDATES:
+            if candidate not in names:
+                continue
+            text = jar_file.read(candidate).decode("utf-8", errors="replace")
+            lines = [line.rstrip() for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+            normalized = "\n".join(lines).strip()
+            if normalized:
+                return normalized + "\n"
+    return None
+
+
+def license_text_for(group: str, artifact: str, version: str) -> str | None:
+    """Return the license text for a bundled dependency.
+
+    A curated override keyed by artifactId is consulted first: it is human
+    verified and is required for dependencies whose jar carries no license, or a
+    misleading one (e.g. junit bundles Hamcrest's BSD text rather than its own
+    Common Public License). Otherwise the dependency's own jar is authoritative.
+    Returns None when neither source has a text, so the caller can fail loudly
+    rather than ship an unattributed dependency.
+    """
+    override = OVERRIDES_DIR / f"LICENSE-{artifact}"
+    if override.exists():
+        content = override.read_text()
+        return content if content.endswith("\n") else content + "\n"
+
+    return license_text_from_jar(group, artifact, version)
+
+
+def bundled_non_apache_coords(license_path: pathlib.Path) -> list[tuple[str, str, str]]:
+    """Parse the non-Apache dependency coordinates out of a LICENSE-bundled file.
+
+    License texts are keyed off the committed LICENSE-bundled (the canonical list
+    of what the shaded jar bundles) rather than a freshly resolved dependency
+    tree, so the texts stay reproducible regardless of the local ~/.m2 state.
+    """
+    coords: list[tuple[str, str, str]] = []
+    family = None
+    lines = license_path.read_text().splitlines()
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped:
+            family = None
+            continue
+        if index + 1 < len(lines) and re.fullmatch(r"-{3,}", lines[index + 1].strip()):
+            family = stripped
+            continue
+        if re.fullmatch(r"-{3,}", stripped):
+            continue
+        if family and family != APACHE_FAMILY and stripped.count(":") == 2:
+            group, artifact, version = stripped.split(":")
+            coords.append((group, artifact, version))
+    return coords
+
+
+def sync_license_texts(module: pathlib.Path, coords: list[tuple[str, str, str]]) -> list[tuple[str, str, str]]:
+    """Regenerate META-INF/licenses/ for a module; return coords with no text."""
+    licenses_dir = module / "src" / "main" / "resources" / "META-INF" / "licenses"
+    licenses_dir.mkdir(parents=True, exist_ok=True)
+
+    for stale in licenses_dir.glob("LICENSE-*"):
+        stale.unlink()
+
+    missing = []
+    for group, artifact, version in coords:
+        text = license_text_for(group, artifact, version)
+        if text is None:
+            missing.append((group, artifact, version))
+            continue
+        (licenses_dir / f"LICENSE-{artifact}").write_text(text)
+    return missing
+
+
 def render_notice(module: pathlib.Path) -> str:
     grouped_notices: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
     for coord in third_party_coords(module):
@@ -471,7 +579,15 @@ def render_notice(module: pathlib.Path) -> str:
 
 
 def main() -> None:
+    missing_texts: dict[pathlib.Path, list[tuple[str, str, str]]] = {}
     for module in shade_modules():
+        if not (module / "target" / "dependency-tree-runtime.txt").exists():
+            print(
+                f"skipping {module.relative_to(ROOT)}: no target/dependency-tree-runtime.txt "
+                "(build the module and run dependency:tree first)"
+            )
+            continue
+
         groups: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
         for coord in third_party_coords(module):
             family = normalize_family(*coord)
@@ -482,6 +598,21 @@ def main() -> None:
         license_path.parent.mkdir(parents=True, exist_ok=True)
         license_path.write_text(render_license(groups))
         notice_path.write_text(render_notice(module))
+
+        missing = sync_license_texts(module, bundled_non_apache_coords(license_path))
+        if missing:
+            missing_texts[module] = missing
+
+    if missing_texts:
+        lines = [
+            "No license text found for the following bundled dependencies.",
+            f"Add a curated text under {OVERRIDES_DIR.relative_to(ROOT)}/<artifactId>:",
+        ]
+        for module, coords in missing_texts.items():
+            lines.append(f"  {module.relative_to(ROOT)}:")
+            for group, artifact, version in coords:
+                lines.append(f"    - {group}:{artifact}:{version}")
+        raise SystemExit("\n".join(lines))
 
 
 if __name__ == "__main__":

@@ -254,6 +254,38 @@ for module in "${SHADE_MODULES[@]}"; do
     printf '  - %s\n' "${unknown[@]}"
     overall_status=1
   fi
+
+  # Every dependency bundled under a non-Apache-2.0 license must ship its own
+  # license text under META-INF/licenses/LICENSE-<artifactId>. The Apache banner
+  # at the top of LICENSE-bundled only covers the Apache License 2.0 family.
+  licenses_dir="${module}/src/main/resources/META-INF/licenses"
+  missing_license_texts=()
+  while IFS= read -r artifact_id; do
+    [[ -z "${artifact_id}" ]] && continue
+    if [[ ! -f "${licenses_dir}/LICENSE-${artifact_id}" ]]; then
+      missing_license_texts+=("${artifact_id}")
+    fi
+  done < <(
+    awk '
+      /This section summarizes those components and their licenses\./ {in_summary=1; next}
+      in_summary {
+        if ($0 ~ /^-+$/) {family=prevline; prevline=$0; next}
+        if ($0 ~ /^[[:space:]]*$/) {family=""; prevline=$0; next}
+        if (family != "" && family != "Apache License 2.0" && $0 ~ /^[^:]+:[^:]+:[^:]+$/) {
+          split($0, coord, ":"); print coord[2]
+        }
+        prevline=$0
+      }
+    ' "${license_file}" | sort -u
+  )
+
+  if [[ ${#missing_license_texts[@]} -gt 0 ]]; then
+    overall_status=1
+    echo "FAIL ${module}: missing META-INF/licenses/ text for non-Apache-2.0 dependencies:"
+    printf '  - LICENSE-%s\n' "${missing_license_texts[@]}"
+  else
+    echo "OK   ${module}: every non-Apache-2.0 bundled dependency has a license text."
+  fi
 done
 
 exit "${overall_status}"
