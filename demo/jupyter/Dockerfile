@@ -18,24 +18,14 @@
 # Everything the notebooks need at runtime is baked in at build time so the
 # first cell does not spend minutes provisioning:
 #   - OpenJDK 11 for the Scala kernels (Hudi 1.x jars require Java 11+)
-#   - the Scala kernels re-pointed at that JDK
 #   - all notebook dependencies (Spark, Hudi, Delta, Iceberg, JDBC drivers)
 #     pre-fetched into the coursier cache
+#   - the Scala kernels re-pointed at that JDK, with a bounded heap and a
+#     predef that puts every dependency on the classpath at kernel startup
 FROM almondsh/almond:latest
 
 # Install a JDK 11 for the Scala kernels; the base image only ships Java 8.
 RUN mamba create -y -q -n jdk11 -c conda-forge openjdk=11 && mamba clean -afy
-
-# The kernel predef loads all notebook dependencies at kernel startup, so the
-# notebooks contain no dependency management code.
-COPY jupyter/predef.sc /usr/local/share/xtable/predef.sc
-
-# Point all Scala kernels at the JDK 11 and wire in the predef.
-RUN python3 -c "import glob, json; \
-paths = glob.glob('/home/jovyan/.local/share/jupyter/kernels/scala*/kernel.json'); \
-kernels = [(p, json.load(open(p))) for p in paths]; \
-[(k['argv'].__setitem__(0, '/opt/conda/envs/jdk11/bin/java'), k['argv'].extend(['--predef', '/usr/local/share/xtable/predef.sc']), k.setdefault('env', {}).__setitem__('JAVA_HOME', '/opt/conda/envs/jdk11'), json.dump(k, open(p, 'w'), indent=2)) for p, k in kernels]; \
-print('patched kernels:', [p for p, _ in kernels])"
 
 # Pre-fetch the notebook dependencies into the coursier cache. The versions
 # come from demo/jars/versions.properties, generated from the root pom by
@@ -43,3 +33,16 @@ print('patched kernels:', [p for p, _ in kernels])"
 COPY jars/versions.properties /tmp/versions.properties
 COPY jupyter/prefetch_dependencies.sh /tmp/prefetch_dependencies.sh
 RUN bash /tmp/prefetch_dependencies.sh /tmp/versions.properties
+
+# The kernel predef loads all notebook dependencies at kernel startup, so the
+# notebooks contain no dependency management code.
+COPY jupyter/predef.sc /usr/local/share/xtable/predef.sc
+
+# Point all Scala kernels at the JDK 11 with a bounded heap (local Spark for
+# the demo fits comfortably in 4g and this keeps the kernel JVM from starving
+# the other demo containers) and wire in the predef.
+RUN python3 -c "import glob, json; \
+paths = glob.glob('/home/jovyan/.local/share/jupyter/kernels/scala*/kernel.json'); \
+kernels = [(p, json.load(open(p))) for p in paths]; \
+[(k['argv'].__setitem__(0, '/opt/conda/envs/jdk11/bin/java'), k['argv'].insert(1, '-Xmx4g'), k['argv'].extend(['--predef', '/usr/local/share/xtable/predef.sc']), k.setdefault('env', {}).__setitem__('JAVA_HOME', '/opt/conda/envs/jdk11'), json.dump(k, open(p, 'w'), indent=2)) for p, k in kernels]; \
+print('patched kernels:', [p for p, _ in kernels])"

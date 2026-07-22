@@ -25,7 +25,6 @@ When you are done, use `./stop_demo.sh` to stop and remove the containers. Pass 
 
 ## Notebooks
 - `work/demo.ipynb` — the main demo: two existing datasets (Hudi and Delta) are synced across Hudi, Delta and Iceberg, updated from Trino, joined, and validated from Trino.
-- `work/hms_sync_demo.ipynb` — follows the [how-to](https://xtable.apache.org/docs/how-to) and [Hive Metastore](https://xtable.apache.org/docs/hms) guides: creates a Hudi table, syncs it to Delta and Iceberg with XTable, registers all three in the Hive Metastore, and queries them from Trino and Presto.
 
 ## Accessing Services
 ### Jupyter Notebook
