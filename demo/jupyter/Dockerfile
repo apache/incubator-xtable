@@ -26,11 +26,15 @@ FROM almondsh/almond:latest
 # Install a JDK 11 for the Scala kernels; the base image only ships Java 8.
 RUN mamba create -y -q -n jdk11 -c conda-forge openjdk=11 && mamba clean -afy
 
-# Point all Scala kernels at the JDK 11.
+# The kernel predef loads all notebook dependencies at kernel startup, so the
+# notebooks contain no dependency management code.
+COPY jupyter/predef.sc /usr/local/share/xtable/predef.sc
+
+# Point all Scala kernels at the JDK 11 and wire in the predef.
 RUN python3 -c "import glob, json; \
 paths = glob.glob('/home/jovyan/.local/share/jupyter/kernels/scala*/kernel.json'); \
 kernels = [(p, json.load(open(p))) for p in paths]; \
-[(k['argv'].__setitem__(0, '/opt/conda/envs/jdk11/bin/java'), k.setdefault('env', {}).__setitem__('JAVA_HOME', '/opt/conda/envs/jdk11'), json.dump(k, open(p, 'w'), indent=2)) for p, k in kernels]; \
+[(k['argv'].__setitem__(0, '/opt/conda/envs/jdk11/bin/java'), k['argv'].extend(['--predef', '/usr/local/share/xtable/predef.sc']), k.setdefault('env', {}).__setitem__('JAVA_HOME', '/opt/conda/envs/jdk11'), json.dump(k, open(p, 'w'), indent=2)) for p, k in kernels]; \
 print('patched kernels:', [p for p, _ in kernels])"
 
 # Pre-fetch the notebook dependencies into the coursier cache. The versions
