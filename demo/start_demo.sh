@@ -52,7 +52,7 @@ done
 
 if [ -n "${JUPYTER_READY}" ]; then
   echo ""
-  echo "Jupyter is running at: http://localhost:8888/lab (no login required)"
+  echo "Jupyter is running at: http://localhost:8888/lab"
   echo "The demo notebooks are under the work/ directory."
 else
   echo "Jupyter did not report as running yet; check its status with: docker logs jupyter"
