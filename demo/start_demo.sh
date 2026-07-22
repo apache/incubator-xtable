@@ -41,20 +41,20 @@ cd "${CURRENT_DIR}"
 docker-compose up -d --build
 
 echo "Waiting for the Jupyter server to start..."
-JUPYTER_URL=""
+JUPYTER_READY=""
 for _ in $(seq 1 150); do
-  JUPYTER_URL=$(docker logs jupyter 2>&1 | grep -o 'http://127.0.0.1:8888/lab?token=[a-zA-Z0-9]*' | tail -1)
-  if [ -n "${JUPYTER_URL}" ]; then
+  if docker logs jupyter 2>&1 | grep -qE "Jupyter Server .* is running at"; then
+    JUPYTER_READY="yes"
     break
   fi
   sleep 2
 done
 
-if [ -n "${JUPYTER_URL}" ]; then
+if [ -n "${JUPYTER_READY}" ]; then
   echo ""
-  echo "Jupyter is running at: ${JUPYTER_URL}"
+  echo "Jupyter is running at: http://localhost:8888/lab (no login required)"
   echo "The demo notebooks are under the work/ directory."
 else
-  echo "Jupyter did not report a URL yet; check its status with: docker logs jupyter"
+  echo "Jupyter did not report as running yet; check its status with: docker logs jupyter"
 fi
 echo "Run ./stop_demo.sh when you are done (add --reset-data to restore the seed datasets)."
