@@ -30,9 +30,13 @@ RUN mamba create -y -q -n jdk11 -c conda-forge openjdk=11 && mamba clean -afy
 # Pre-fetch the notebook dependencies into the coursier cache. The versions
 # come from demo/jars/versions.properties, generated from the root pom by
 # build_demo.sh, so the image always matches what xtable is built against.
-COPY jars/versions.properties /tmp/versions.properties
-COPY jupyter/prefetch_dependencies.sh /tmp/prefetch_dependencies.sh
-RUN bash /tmp/prefetch_dependencies.sh /tmp/versions.properties
+COPY jars/versions.properties /usr/local/share/xtable/versions.properties
+COPY jupyter/prefetch_dependencies.sh /usr/local/share/xtable/prefetch_dependencies.sh
+RUN bash /usr/local/share/xtable/prefetch_dependencies.sh /usr/local/share/xtable/versions.properties
+
+# Startup gate: re-verify (and complete, if versions changed since the image
+# was built) the dependency cache before the Jupyter server is started.
+COPY jupyter/verify_dependencies.sh /usr/local/bin/before-notebook.d/10-xtable-verify-dependencies.sh
 
 # The kernel predef loads all notebook dependencies at kernel startup, so the
 # notebooks contain no dependency management code.
