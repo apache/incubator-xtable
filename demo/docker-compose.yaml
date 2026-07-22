@@ -54,11 +54,13 @@ services:
   jupyter:
     container_name: jupyter
     hostname: jupyter
-    image: 'almondsh/almond:latest'
+    build:
+      context: .
+      dockerfile: jupyter/Dockerfile
+    image: 'xtable-demo-jupyter'
     ports:
       - '8888:8888'
     volumes:
       - ./notebook:/home/jovyan/work
       - ./jars:/home/jars
       - ./data:/home/data
-      - ./jupyter/setup-jdk11.sh:/usr/local/bin/before-notebook.d/setup-jdk11.sh

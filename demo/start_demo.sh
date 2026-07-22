@@ -36,11 +36,11 @@ if [ ! -f "${CURRENT_DIR}/jars/versions.properties" ] || ! ls "${CURRENT_DIR}"/j
 fi
 
 cd "${CURRENT_DIR}"
-docker-compose up -d
+## The first start builds the notebook image (JDK 11 and all notebook
+## dependencies are baked in); later starts reuse the cached image.
+docker-compose up -d --build
 
-## Wait for the Jupyter server and print the notebook URL. The first start can
-## take a few minutes while the container installs a JDK 11 for the kernels.
-echo "Waiting for the Jupyter server to start (the first start can take a few minutes)..."
+echo "Waiting for the Jupyter server to start..."
 JUPYTER_URL=""
 for _ in $(seq 1 150); do
   JUPYTER_URL=$(docker logs jupyter 2>&1 | grep -o 'http://127.0.0.1:8888/lab?token=[a-zA-Z0-9]*' | tail -1)
