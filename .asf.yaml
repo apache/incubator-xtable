@@ -38,6 +38,7 @@ github:
       required_status_checks:
         contexts:
           - validate-commit-coauthor
+          - validate-pr-title
 notifications:
     commits:      commits@xtable.apache.org
     issues:       commits@xtable.apache.org
