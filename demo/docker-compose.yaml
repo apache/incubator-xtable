@@ -54,7 +54,12 @@ services:
   jupyter:
     container_name: jupyter
     hostname: jupyter
-    image: 'almondsh/almond:latest'
+    build:
+      context: .
+      dockerfile: jupyter/Dockerfile
+    image: 'xtable-demo-jupyter'
+    ## Local demo only: start the notebook server without authentication.
+    command: ["start-notebook.sh", "--IdentityProvider.token=", "--ServerApp.password="]
     ports:
       - '8888:8888'
     volumes:
