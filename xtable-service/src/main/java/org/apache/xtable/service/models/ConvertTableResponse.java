@@ -29,7 +29,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @Getter
 @Builder
 public class ConvertTableResponse {
-  @JsonProperty("convertedTables")
+  @JsonProperty("converted-tables")
   private List<ConvertedTable> convertedTables;
 
   @JsonCreator
