@@ -613,6 +613,51 @@ public class ITConversionController {
     }
   }
 
+  /**
+   * Verifies that incremental sync emits a REMOVE when Hudi CLEAN deletes the previous base file
+   * version from storage before XTable processes the UPSERT commit.
+   */
+  @Test
+  public void testIncrementalSyncEmitsRemoveWhenHudiCleanRunsBeforeSync() {
+    String tableName = getTableName();
+    ConversionSourceProvider<?> conversionSourceProvider = getConversionSourceProvider(HUDI);
+    try (TestJavaHudiTable table =
+        TestJavaHudiTable.forStandardSchema(
+            tableName, tempDir, null, HoodieTableType.COPY_ON_WRITE)) {
+      ConversionConfig conversionConfig =
+          getTableSyncConfig(
+              HUDI, SyncMode.INCREMENTAL, tableName, table, ImmutableList.of(DELTA), null, null);
+      ConversionController conversionController =
+          new ConversionController(jsc.hadoopConfiguration());
+
+      // Commit A: insert 100 records; sync so Delta has ADD actions for commitA files.
+      List<HoodieRecord<HoodieAvroPayload>> insertedRecords = table.insertRecords(100, true);
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(DELTA), 100);
+
+      // Commit B: upsert 50 records, creating new file versions for those file groups.
+      // XTable does NOT sync here — simulating the lag between Hudi writes and XTable runs.
+      table.upsertRecords(insertedRecords.subList(0, 50), true);
+
+      // Commit C: insert 20 brand-new records. A third commit is required before CLEAN so
+      // that Hudi's clean plan is non-empty (retainCommits=1 needs N+1 commits to purge N).
+      table.insertRecords(20, true);
+
+      // CLEAN physically deletes commitA's file versions from disk — this is the race condition.
+      // After this point getAllBaseFiles() for the upserted file groups returns only commitB files.
+      table.clean();
+
+      // Incremental sync picks up commits B and C. For the upserted file groups in commit B, the
+      // fix recovers the commitA file path from prevCommit metadata and emits a REMOVE, preventing
+      // Delta from retaining a stale ADD that would cause FileNotFoundException on read.
+      conversionController.sync(conversionConfig, conversionSourceProvider);
+
+      // 100 original + 20 new inserts = 120 records (50 upserted records are updated, not added).
+      // Reading via Spark would throw FileNotFoundException on stale commitA ADDs without the fix.
+      checkDatasetEquivalence(HUDI, table, Collections.singletonList(DELTA), 120);
+    }
+  }
+
   @ParameterizedTest
   @EnumSource(value = SyncMode.class)
   public void testSyncWithSingleFormat(SyncMode syncMode) {
