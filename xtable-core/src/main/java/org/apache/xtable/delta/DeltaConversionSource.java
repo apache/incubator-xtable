@@ -38,6 +38,9 @@ import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.Action;
 import org.apache.spark.sql.delta.actions.AddFile;
+import org.apache.spark.sql.delta.actions.CommitInfo;
+import org.apache.spark.sql.delta.actions.Metadata;
+import org.apache.spark.sql.delta.actions.Protocol;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import scala.Option;
@@ -78,6 +81,13 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   private final String tableName;
   private final String basePath;
 
+  // Cache the version-stable snapshot/table/format across an incremental backlog to avoid
+  // reconstructing the Delta snapshot (a full checkpoint read) on every commit. Invalidated
+  // whenever a commit carries a metadata/protocol change (see getTableChangeForCommit).
+  private Snapshot cachedSnapshot;
+  private InternalTable cachedTable;
+  private FileFormat cachedFileFormat;
+
   @Override
   public InternalTable getTable(Long version) {
     return tableExtractor.table(deltaLog, tableName, version);
@@ -103,10 +113,28 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   @Override
   public TableChange getTableChangeForCommit(Long versionNumber) {
     List<Action> actionsForVersion = getChangesState().getActionsForVersion(versionNumber);
-    Snapshot snapshotAtVersion = deltaLog.getSnapshotAt(versionNumber, Option.empty());
-    InternalTable tableAtVersion = tableExtractor.table(snapshotAtVersion, tableName);
-    FileFormat fileFormat =
-        actionsConverter.convertToFileFormat(snapshotAtVersion.metadata().format().provider());
+    // Reconstructing the snapshot per commit reloads the table checkpoint each time, which is
+    // expensive when the checkpoint is large. Reuse it across the backlog and reload only when a
+    // commit changes schema or protocol.
+    boolean metadataMayHaveChanged =
+        actionsForVersion.stream()
+            .anyMatch(action -> (action instanceof Metadata) || (action instanceof Protocol));
+    if (cachedSnapshot == null || metadataMayHaveChanged) {
+      cachedSnapshot = deltaLog.getSnapshotAt(versionNumber, Option.empty());
+      cachedTable = tableExtractor.table(cachedSnapshot, tableName);
+      cachedFileFormat =
+          actionsConverter.convertToFileFormat(cachedSnapshot.metadata().format().provider());
+    }
+    Snapshot snapshotAtVersion = cachedSnapshot;
+    // The cached snapshot supplies version-stable schema/partitioning/format/base path, but
+    // latestCommitTime is persisted as the incremental-sync watermark, so it must reflect this
+    // commit rather than the (possibly older) cached reload version. Read it from the commit's
+    // CommitInfo, which is already present in the loaded actions.
+    InternalTable tableAtVersion =
+        cachedTable.toBuilder()
+            .latestCommitTime(getCommitTimestamp(versionNumber, actionsForVersion))
+            .build();
+    FileFormat fileFormat = cachedFileFormat;
 
     // All 3 of the following data structures use data file's absolute path as the key
     Map<String, InternalDataFile> addedFiles = new HashMap<>();
@@ -171,6 +199,23 @@ public class DeltaConversionSource implements ConversionSource<Long> {
         .filesDiff(internalFilesDiff)
         .sourceIdentifier(getCommitIdentifier(versionNumber))
         .build();
+  }
+
+  /**
+   * Returns the timestamp of the given commit for use as the incremental-sync watermark. Prefers
+   * the commit's CommitInfo (already loaded in the incremental actions, so no extra checkpoint
+   * read); falls back to the snapshot timestamp only when the commit carries no CommitInfo.
+   */
+  private Instant getCommitTimestamp(long versionNumber, List<Action> actionsForVersion) {
+    for (Action action : actionsForVersion) {
+      if (action instanceof CommitInfo) {
+        Timestamp commitTimestamp = ((CommitInfo) action).timestamp();
+        if (commitTimestamp != null) {
+          return commitTimestamp.toInstant();
+        }
+      }
+    }
+    return Instant.ofEpochMilli(deltaLog.getSnapshotAt(versionNumber, Option.empty()).timestamp());
   }
 
   @Override

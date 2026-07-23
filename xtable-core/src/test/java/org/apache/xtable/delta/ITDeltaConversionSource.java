@@ -25,6 +25,11 @@ import static org.apache.xtable.testutil.ITTestUtils.validateTable;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -54,6 +59,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+
+import org.apache.spark.sql.delta.DeltaLog;
 
 import io.delta.tables.DeltaTable;
 
@@ -828,5 +835,134 @@ public class ITDeltaConversionSource {
             .map(oneDf -> oneDf.getPhysicalPath())
             .collect(Collectors.toSet());
     return filePathsRemoved.contains(activePath);
+  }
+
+  @Test
+  public void getTableChangeForCommitReconstructsSnapshotOnceForAppendOnlyBacklog() {
+    String tableName = GenericTable.getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
+    List<List<String>> allActiveFiles = new ArrayList<>();
+    testSparkDeltaTable.insertRows(50);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    // Spy the DeltaLog so we can count how many times a snapshot is reconstructed (each
+    // reconstruction reads the table checkpoint from storage).
+    DeltaLog spiedDeltaLog =
+        spy(DeltaLog.forTable(sparkSession, testSparkDeltaTable.getBasePath()));
+    DeltaConversionSource conversionSource =
+        DeltaConversionSource.builder()
+            .sparkSession(sparkSession)
+            .deltaLog(spiedDeltaLog)
+            .deltaTable(DeltaTable.forPath(sparkSession, testSparkDeltaTable.getBasePath()))
+            .tableName(tableName)
+            .basePath(testSparkDeltaTable.getBasePath())
+            .build();
+
+    InstantsForIncrementalSync instantsForIncrementalSync =
+        InstantsForIncrementalSync.builder()
+            .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+            .build();
+    CommitsBacklog<Long> commitsBacklog =
+        conversionSource.getCommitsBacklog(instantsForIncrementalSync);
+    List<TableChange> allTableChanges = new ArrayList<>();
+    for (Long version : commitsBacklog.getCommitsToProcess()) {
+      allTableChanges.add(conversionSource.getTableChangeForCommit(version));
+    }
+
+    // Behaviour is unchanged relative to reconstructing the snapshot per commit.
+    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
+    // The backlog spans multiple commits with no schema/protocol change, so the snapshot is
+    // reconstructed exactly once and reused (previously: once per commit).
+    assertTrue(
+        commitsBacklog.getCommitsToProcess().size() >= 2,
+        "backlog must span multiple commits for this assertion to be meaningful");
+    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any());
+  }
+
+  @Test
+  public void incrementalSyncWatermarkAdvancesAndDoesNotReprocessSyncedCommits() {
+    String tableName = GenericTable.getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
+    testSparkDeltaTable.insertRows(50);
+    Long syncStart = testSparkDeltaTable.getLastCommitTimestamp();
+    // First backlog: several append-only commits (no schema/protocol change), so the snapshot is
+    // cached and reused across all of them.
+    testSparkDeltaTable.insertRows(50);
+    testSparkDeltaTable.insertRows(50);
+    testSparkDeltaTable.insertRows(50);
+
+    DeltaConversionSource firstRun =
+        DeltaConversionSource.builder()
+            .sparkSession(sparkSession)
+            .deltaLog(DeltaLog.forTable(sparkSession, testSparkDeltaTable.getBasePath()))
+            .deltaTable(DeltaTable.forPath(sparkSession, testSparkDeltaTable.getBasePath()))
+            .tableName(tableName)
+            .basePath(testSparkDeltaTable.getBasePath())
+            .build();
+    List<Long> firstVersions =
+        firstRun
+            .getCommitsBacklog(
+                InstantsForIncrementalSync.builder()
+                    .lastSyncInstant(Instant.ofEpochMilli(syncStart))
+                    .build())
+            .getCommitsToProcess();
+    assertTrue(firstVersions.size() >= 3, "first backlog should span multiple commits");
+
+    Instant firstCommitTime = null;
+    Instant watermark = null;
+    for (Long version : firstVersions) {
+      Instant commitTime =
+          firstRun.getTableChangeForCommit(version).getTableAsOfChange().getLatestCommitTime();
+      if (firstCommitTime == null) {
+        firstCommitTime = commitTime;
+      }
+      watermark = commitTime;
+    }
+    // Regression guard: latestCommitTime feeds the persisted sync watermark, so it must advance per
+    // commit even though the snapshot is cached. If it came from the cached reload snapshot, every
+    // commit would report the first version's timestamp and the watermark would not move.
+    assertTrue(
+        !firstCommitTime.equals(watermark),
+        "latestCommitTime did not advance across the cached backlog (watermark stuck at first version)");
+
+    // Append more commits, then sync again from the watermark the first run would have persisted.
+    testSparkDeltaTable.insertRows(50);
+    testSparkDeltaTable.insertRows(50);
+    DeltaConversionSource secondRun =
+        DeltaConversionSource.builder()
+            .sparkSession(sparkSession)
+            .deltaLog(DeltaLog.forTable(sparkSession, testSparkDeltaTable.getBasePath()))
+            .deltaTable(DeltaTable.forPath(sparkSession, testSparkDeltaTable.getBasePath()))
+            .tableName(tableName)
+            .basePath(testSparkDeltaTable.getBasePath())
+            .build();
+    List<Long> secondVersions =
+        secondRun
+            .getCommitsBacklog(
+                InstantsForIncrementalSync.builder().lastSyncInstant(watermark).build())
+            .getCommitsToProcess();
+
+    // The second run must not re-process the already-synced tail. (At most the boundary commit may
+    // reappear, since CommitInfo timestamps are the writer's wall-clock rather than the commit
+    // file's mtime; the stuck-watermark bug would instead re-include the whole synced tail.)
+    List<Long> reprocessed = new ArrayList<>(firstVersions);
+    reprocessed.retainAll(secondVersions);
+    assertTrue(
+        reprocessed.size() <= 1,
+        "second run reprocessed already-synced commits: reprocessed="
+            + reprocessed
+            + " first="
+            + firstVersions
+            + " second="
+            + secondVersions);
   }
 }
