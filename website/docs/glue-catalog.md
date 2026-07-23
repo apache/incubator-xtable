@@ -99,6 +99,7 @@ From your terminal, create a glue database.
  aws glue create-database --database-input "{\"Name\":\"xtable_synced_db\"}"
  ```
 
+#### Method 1: Using Glue Crawler
 From your terminal, create a glue crawler. Modify the `<yourAccountId>`, `<yourRoleName>` 
 and `<path/to/your/data>`, with appropriate values.
 
@@ -149,6 +150,47 @@ From your terminal, run the glue crawler.
 Once the crawler succeeds, you’ll be able to query this Iceberg table from Athena,
 EMR and/or Redshift query engines.
 
+
+#### Method 2: Using XTable APIs to sync with AWS Glue Data Catalog directly
+This applies for Iceberg target format only.
+
+**Pre-requisites:**
+* Download iceberg-aws-X.X.X.jar from the [Maven repository](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws)
+* Download bundle-X.X.X.jar from the [Maven repository](https://mvnrepository.com/artifact/software.amazon.awssdk/bundle)
+
+Create a `glue-sync-config.yaml` file:
+
+```yaml md title="yaml"
+sourceFormat: HUDI|DELTA # choose only one
+targetFormats:
+   - ICEBERG
+datasets:
+   -
+      tableBasePath: s3://path/to/source/data
+      tableName: table_name
+      partitionSpec: partitionpath:VALUE
+      namespace: xtable_synced_db
+```
+
+Create a `glue-sync-catalog.yaml` file:
+
+```yaml md title="yaml"
+catalogImpl: org.apache.iceberg.aws.glue.GlueCatalog
+catalogName: <catalog_name>
+catalogOptions:
+   io-impl: org.apache.iceberg.aws.s3.S3FileIO
+   warehouse: s3://path/to/source
+```
+
+Sample command to sync the table with Glue Data Catalog:
+
+```shell md title="shell"
+java -cp /path/to/xtable-utilities-0.2.0-SNAPSHOT-bundled.jar:/path/to/iceberg-aws-1.3.1.jar:/path/to/bundle-2.23.9.jar org.apache.xtable.utilities.RunSync  --datasetConfig glue-sync-config.yaml --icebergCatalogConfig glue-sync-catalog.yaml
+```
+### Validating the results
+Once the sync is complete (or in case of Glue Crawler option, once the crawler succeeds) you can inspect the catalogued tables in Glue
+and also query the table in Amazon Athena like below:
+
 <Tabs
 groupId="table-format"
 defaultValue="hudi"
@@ -169,10 +211,6 @@ supports Hudi version 0.14.0 as mentioned [here](/docs/features-and-limitations#
 </TabItem>
 <TabItem value="delta">
 
-### Validating the results
-After the crawler runs successfully, you can inspect the catalogued tables in Glue
-and also query the table in Amazon Athena like below:
-
 ```sql
 SELECT * FROM xtable_synced_db.<table_name>;
 ```
@@ -180,9 +218,7 @@ SELECT * FROM xtable_synced_db.<table_name>;
 </TabItem>
 <TabItem value="iceberg">
 
-### Validating the results
-After the crawler runs successfully, you can inspect the catalogued tables in Glue
-and also query the table in Amazon Athena like below:
+
 
 ```sql
 SELECT * FROM xtable_synced_db.<table_name>;
