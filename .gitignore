@@ -50,3 +50,7 @@ spec/generated
 
 # SDKMan
 .sdkmanrc
+
+# Claude Code personal settings (team settings in settings.json are committed)
+.claude/settings.local.json
+.claude/skills/xtable-converter/scripts/__pycache__/
