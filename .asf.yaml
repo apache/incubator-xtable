@@ -35,6 +35,17 @@ github:
     main:
       required_pull_request_reviews:
         required_approving_review_count: 1
+    # NOTE: ASF applies these github settings only from the default branch's
+    # .asf.yaml (main), so this branch-0.4 block documents the intended
+    # protection but takes effect via main's .asf.yaml, not this file.
+    branch-0.4:
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+      required_status_checks:
+        contexts:
+          - "Maven CI Build"
+          - "License Check"
+          - "spark-runtime-validation-required"
 notifications:
     commits:      commits@xtable.apache.org
     issues:       commits@xtable.apache.org
