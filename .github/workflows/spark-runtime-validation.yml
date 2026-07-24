@@ -91,3 +91,21 @@ jobs:
         env:
           SPARK_LOCAL_IP: "127.0.0.1"
         run: ./mvnw verify -ntp -B -pl xtable-spark-runtime
+
+  # Single stable status context that aggregates every matrix leg, so branch
+  # protection can require one check name instead of listing each Spark version.
+  # `if: always()` is required: without it this job is skipped when a leg fails,
+  # and a skipped required check leaves the PR stuck on a pending status.
+  spark-runtime-validation-required:
+    needs: validate-spark-runtime-bundle
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all spark-runtime matrix legs to pass
+        run: |
+          result="${{ needs.validate-spark-runtime-bundle.result }}"
+          echo "Aggregated validate-spark-runtime-bundle matrix result: ${result}"
+          if [[ "${result}" != "success" ]]; then
+            echo "One or more validate-spark-runtime-bundle matrix legs did not succeed."
+            exit 1
+          fi
