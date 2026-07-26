@@ -106,8 +106,13 @@ npm run serve
 2. Update the [downloads](releases/downloads.mdx) file to include the new release similar to the existing releases
 
 ## Changes to the website homepage
-1. The homepage is a `.html` file located at `website/static/index.html`
+1. The homepage is a `.html` file located at `website/homepage/index.html`. That directory holds the
+   hand-written Webflow pages for the site root (`index.html` and `404.html`); a small plugin in
+   `docusaurus.config.js` copies them over the generated output at the end of `npm run build`.
+   They are deliberately **not** in `website/static/`, because the dev server would then serve a
+   second `index.html` next to webpack's own and the asset name conflict breaks hot reload.
 2. If you're making changes to the page, test it locally using `python 3 -m http.server` and visiting http://localhost:8000/ before pushing the changes.
+   Note that `npm start` serves the Docusaurus shell at `/`, not this page — use `npm run build && npm run serve` to preview the homepage as deployed.
 
 ## Add community sync page 
 1. Create a `.md` file with all the content for Community page.

@@ -1,8 +1,11 @@
 // @ts-check
 // Note: type annotations allow type checking and IDEs autocompletion
 
-const lightCodeTheme = require('prism-react-renderer/themes/github');
-const darkCodeTheme = require('prism-react-renderer/themes/dracula');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const {themes: prismThemes} = require('prism-react-renderer');
+const lightCodeTheme = prismThemes.github;
+const darkCodeTheme = prismThemes.dracula;
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -16,7 +19,12 @@ const config = {
   projectName: 'incubator-xtable',
 
   onBrokenLinks: 'ignore',
-  onBrokenMarkdownLinks: 'warn',
+
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
+  },
 
   i18n: {
     defaultLocale: 'en',
@@ -25,6 +33,29 @@ const config = {
 
   // add new pages here
     plugins: [
+      // Copies the hand-written Webflow pages in `website/homepage/`
+      // (`index.html` and `404.html`) into the site root, after Docusaurus has
+      // written its own output, so they take precedence over the generated
+      // pages of the same name.
+      //
+      // They cannot live in `static/`: the dev server serves static
+      // directories alongside webpack's own `index.html`, and the duplicate
+      // asset name fails compilation with "Conflict: Multiple assets emit
+      // different content to the same filename index.html", which stops hot
+      // reload ("Reload prevented"). Copying after the build is also what keeps
+      // the hand-written `404.html`: placed in `static/` it survived on
+      // Docusaurus 3.0, but on 3.10 the generated 404 page overwrites it.
+      function webflowRootPages() {
+        return {
+          name: 'xtable-webflow-root-pages',
+          async postBuild({outDir}) {
+            await fs.cp(path.join(__dirname, 'homepage'), outDir, {
+              recursive: true,
+              force: true,
+            });
+          },
+        };
+      },
       [
         '@docusaurus/plugin-content-docs',
         {
