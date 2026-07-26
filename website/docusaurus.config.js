@@ -4,8 +4,6 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const {themes: prismThemes} = require('prism-react-renderer');
-const lightCodeTheme = prismThemes.github;
-const darkCodeTheme = prismThemes.dracula;
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -36,9 +34,11 @@ const config = {
       // Copies the hand-written Webflow pages in `website/homepage/`
       // (`index.html` and `404.html`) into the site root, after Docusaurus has
       // written its own output, so they take precedence over the generated
-      // pages of the same name.
+      // pages of the same name. Their CSS, JS, fonts and images stay in
+      // `static/` and are merged into the same output directory by the build;
+      // a re-export from Webflow has to be split the same way.
       //
-      // They cannot live in `static/`: the dev server serves static
+      // The pages cannot live in `static/`: the dev server serves static
       // directories alongside webpack's own `index.html`, and the duplicate
       // asset name fails compilation with "Conflict: Multiple assets emit
       // different content to the same filename index.html", which stops hot
@@ -49,10 +49,23 @@ const config = {
         return {
           name: 'xtable-webflow-root-pages',
           async postBuild({outDir}) {
-            await fs.cp(path.join(__dirname, 'homepage'), outDir, {
-              recursive: true,
-              force: true,
-            });
+            const srcDir = path.join(__dirname, 'homepage');
+            const files = await fs.readdir(srcDir);
+            // Overwriting the generated 404.html is the point; anything else
+            // means a Docusaurus page is being shadowed, so say so out loud —
+            // moving these files out of `static/` gave up webpack's own
+            // duplicate-asset error.
+            for (const file of files) {
+              const generated = await fs
+                .access(path.join(outDir, file))
+                .then(() => true, () => false);
+              if (generated && file !== '404.html') {
+                console.warn(
+                  `[WARNING] homepage/${file} overwrites a generated page of the same name.`,
+                );
+              }
+            }
+            await fs.cp(srcDir, outDir, {recursive: true});
           },
         };
       },
@@ -121,8 +134,8 @@ const config = {
         ],
       },
       prism: {
-        theme: lightCodeTheme,
-        darkTheme: darkCodeTheme,
+        theme: prismThemes.github,
+        darkTheme: prismThemes.dracula,
       },
     }),
 };

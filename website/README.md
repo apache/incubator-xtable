@@ -111,8 +111,12 @@ npm run serve
    `docusaurus.config.js` copies them over the generated output at the end of `npm run build`.
    They are deliberately **not** in `website/static/`, because the dev server would then serve a
    second `index.html` next to webpack's own and the asset name conflict breaks hot reload.
-2. If you're making changes to the page, test it locally using `python 3 -m http.server` and visiting http://localhost:8000/ before pushing the changes.
-   Note that `npm start` serves the Docusaurus shell at `/`, not this page — use `npm run build && npm run serve` to preview the homepage as deployed.
+   Their CSS, JS, fonts and images do stay in `website/static/`, so a fresh export from Webflow has
+   to be split the same way: the `.html` files into `homepage/`, everything else into `static/`.
+2. Because the pages and their assets live in separate directories, they only come together in a
+   build — preview changes with `npm run build && npm run serve` and open http://localhost:3000/.
+   `npm start` does not serve them at all: the dev server has no route for `/`, so it renders the
+   Docusaurus 404 page there, and the custom `404.html` is not exercised either.
 
 ## Add community sync page 
 1. Create a `.md` file with all the content for Community page.
