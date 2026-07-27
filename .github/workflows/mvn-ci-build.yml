@@ -45,13 +45,16 @@ jobs:
 
       # Anyone building the source release runs `mvn package` without a prior
       # `mvn install`, so xtable-service has to resolve xtable-core from the
-      # reactor rather than from a repository. Delete locally installed XTable
-      # artifacts first, otherwise the ~/.m2 restored by `cache: maven` hides
-      # such a failure.
+      # reactor rather than from a repository. Both caches have to be out of the
+      # way for that to be what is actually exercised: delete locally installed
+      # XTable artifacts, which `cache: maven` would otherwise restore, and
+      # disable the build cache extension, which would otherwise be able to
+      # serve a module from a previous build instead of building it here.
       - name: Verify xtable-service builds without installed XTable artifacts
         run: |
           rm -rf ~/.m2/repository/org/apache/xtable
-          ./mvnw clean package -pl xtable-service -am -DskipTests -ntp -B
+          ./mvnw clean package -pl xtable-service -am -DskipTests -ntp -B \
+            -Dmaven.build.cache.enabled=false
 
       - name: Build all module with Maven
         run: ./mvnw clean install -ntp -B
