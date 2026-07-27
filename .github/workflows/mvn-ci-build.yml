@@ -46,30 +46,15 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # Anyone building the source release runs `mvn package` without a prior
+      # `mvn install`, so xtable-service has to resolve xtable-core from the
+      # reactor rather than from a repository. Delete locally installed XTable
+      # artifacts first, otherwise the ~/.m2 restored by `cache: maven` hides
+      # such a failure.
+      - name: Verify xtable-service builds without installed XTable artifacts
+        run: |
+          rm -rf ~/.m2/repository/org/apache/xtable
+          ./mvnw clean package -pl xtable-service -am -DskipTests -ntp -B
+
       - name: Build all module with Maven
         run: ./mvnw clean install -ntp -B
-
-  package:
-    name: Maven CI Build (package only)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up JDK 11
-        uses: actions/setup-java@v5
-        with:
-          java-version: '11'
-          distribution: 'temurin'
-          cache: maven
-
-      # Anyone building the source release runs `mvn package` without a prior
-      # `mvn install`, so no XTable artifact of this version is available from a
-      # repository and every inter-module dependency has to resolve from the
-      # reactor. Drop locally installed XTable artifacts so the cached ~/.m2 from
-      # the install job above cannot hide such a failure.
-      - name: Remove locally installed XTable artifacts
-        run: rm -rf ~/.m2/repository/org/apache/xtable
-
-      - name: Build all modules without installing them
-        run: ./mvnw clean package -ntp -B -DskipTests

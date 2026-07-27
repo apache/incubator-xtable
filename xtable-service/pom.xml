@@ -251,13 +251,11 @@
     <build>
         <plugins>
             <!--
-              The quarkus-maven-plugin bootstraps the application to generate code, which means it
-              resolves this module's dependencies on its own. Its default workspace discovery reads
-              the raw poms, so it cannot match xtable-core_${scala.binary.version} against the
-              reactor and falls back to the remote repositories, where that artifact only exists
-              once a release has been published. That makes `mvn package` fail on a source release
-              unless quarkus.bootstrap.effective-model-builder is enabled, so it is set for every
-              build from .mvn/maven.config (Quarkus only reads it as a system property).
+              This plugin resolves the module's dependencies itself, and its workspace discovery
+              only matches xtable-core_${scala.binary.version} against the reactor with
+              quarkus.bootstrap.effective-model-builder enabled. It is a system property, so it is
+              set in .mvn/maven.config rather than here.
+              https://quarkus.io/guides/maven-tooling#bootstrap-maven-properties
             -->
             <plugin>
                 <groupId>${quarkus.platform.group-id}</groupId>
