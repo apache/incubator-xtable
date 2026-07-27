@@ -93,6 +93,13 @@ const config = {
         style: 'dark',
         links: [
           {
+            items: [
+              {
+                html: '<a href="pathname:///" class="footer__logo-link"><img src="/images/xtable-white.png" alt="Apache XTable™ (Incubating)" class="footer__xtable-logo" width="170" /></a>',
+              },
+            ],
+          },
+          {
             title: 'XTable',
             items: [
               {label: 'Docs', to: '/docs/setup/'},
@@ -115,17 +122,10 @@ const config = {
             ],
           },
         ],
-        logo: {
-          alt: 'Apache Incubator',
-          src: 'https://www.apache.org/logos/res/incubator/incubator.png',
-          href: 'https://incubator.apache.org/',
-          width: 150,
-        },
         copyright:
-          'Apache XTable™ is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects. ' +
-          'Copyright © ' + new Date().getFullYear() + ' The Apache Software Foundation. ' +
-          'Apache XTable™, XTable, Apache, the Apache feather logo and the Apache XTable™ project logo are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries. ' +
-          'Licensed under the Apache License, Version 2.0.',
+          '<a href="https://incubator.apache.org/" target="_blank" rel="noopener"><img src="https://www.apache.org/logos/res/incubator/incubator.png" alt="Apache Incubator" width="150" style="margin:12px 0;background:#ffffff;padding:4px;border-radius:4px;" /></a><br/>' +
+          'Apache XTable™ is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects. While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF. ' +
+          'Copyright © ' + new Date().getFullYear() + ' Apache XTable™, XTable, Apache, the Apache feather logo and the Apache XTable™ project logo are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries.',
       },
       prism: {
         theme: lightCodeTheme,
