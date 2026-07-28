@@ -1,0 +1,59 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+name: Source Build Check
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !contains(github.ref, 'main') }}
+
+on:
+  push:
+    branches:
+      - "main"
+      - "branch-0.4"
+
+  pull_request:
+    branches:
+      - "main"
+      - "branch-0.4"
+
+jobs:
+  # Whoever builds the source release runs `mvn package` without a prior
+  # `mvn install`, so every inter-module dependency has to resolve from the
+  # reactor. This job reproduces that, and it only does so while nothing can
+  # supply a previously built XTable artifact, hence no `cache: maven` here,
+  # the build cache extension disabled, and the local repository cleared of
+  # XTable artifacts. Adding any form of caching to this job would let it pass
+  # against a source release that does not build.
+  package:
+    name: Build xtable-service without installed XTable artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up JDK 11
+        uses: actions/setup-java@v5
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+
+      - name: Build with package only
+        run: |
+          rm -rf ~/.m2/repository/org/apache/xtable
+          ./mvnw clean package -pl xtable-service -am -DskipTests -ntp -B \
+            -Dmaven.build.cache.enabled=false
