@@ -250,6 +250,13 @@
     </dependencies>
     <build>
         <plugins>
+            <!--
+              This plugin resolves the module's dependencies itself, and its workspace discovery
+              only matches xtable-core_${scala.binary.version} against the reactor with
+              quarkus.bootstrap.effective-model-builder enabled. It is a system property, so it is
+              set in .mvn/maven.config rather than here.
+              https://quarkus.io/guides/maven-tooling#bootstrap-maven-properties
+            -->
             <plugin>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
