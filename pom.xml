@@ -697,20 +697,26 @@
                                               the shaded jars also carried each dependency's own copy in
                                               whatever location it happened to ship it, which made the
                                               licensing of the bundle very hard to review.
+
+                                              These are deliberately broad rather than an enumeration of
+                                              the suffixes seen so far: dependencies use names like
+                                              LICENSE.txt, LICENSE-junit.txt, META-INF/ASM_LICENSE.txt and
+                                              META-INF/NOTICE.markdown, and which of them show up changes
+                                              with the dependency tree, so branch-0.4 and main did not even
+                                              produce the same set. Our own META-INF/LICENSE and
+                                              META-INF/NOTICE are written by IncludeResourceTransformer, and
+                                              META-INF/licenses/ has a path segment of its own, so none of
+                                              these patterns can match what we ship.
                                             -->
                                             <exclude>about_files/**</exclude>
                                             <exclude>license/**</exclude>
                                             <exclude>licenses/**</exclude>
                                             <exclude>META-INF/license/**</exclude>
-                                            <exclude>META-INF/*LICENSE*.txt</exclude>
-                                            <exclude>META-INF/*NOTICE*.txt</exclude>
-                                            <exclude>META-INF/LICENSE.md</exclude>
-                                            <exclude>META-INF/NOTICE.md</exclude>
-                                            <exclude>META-INF/NOTICE.markdown</exclude>
-                                            <exclude>LICENSE.txt</exclude>
-                                            <exclude>LICENSE.md</exclude>
-                                            <exclude>NOTICE.txt</exclude>
-                                            <exclude>NOTICE.md</exclude>
+                                            <exclude>META-INF/*LICENSE*</exclude>
+                                            <exclude>META-INF/*NOTICE*</exclude>
+                                            <exclude>LICENSE*</exclude>
+                                            <exclude>NOTICE*</exclude>
+                                            <exclude>COPYING*</exclude>
                                         </excludes>
                                     </filter>
                                 </filters>
