@@ -652,6 +652,26 @@
             <plugins>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <configuration>
+                        <!--
+                          LICENSE-bundled / NOTICE-bundled are inputs for the shade plugin, not
+                          artifacts in their own right: the shaded jar gets their content written
+                          out as META-INF/LICENSE and META-INF/NOTICE by IncludeResourceTransformer.
+                          Leaving them in the jar produced a second, differently named copy of the
+                          licensing information in every jar, and in the non-shaded jars that copy
+                          described dependencies that are not even present. Excluding them here
+                          keeps them out of both jars while still leaving them in target/classes,
+                          which is where the transformer reads them from.
+                        -->
+                        <excludes>
+                            <exclude>META-INF/LICENSE-bundled</exclude>
+                            <exclude>META-INF/NOTICE-bundled</exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-shade-plugin</artifactId>
                     <executions>
                         <execution>
@@ -669,6 +689,28 @@
                                             <exclude>META-INF/*.DSA</exclude>
                                             <exclude>META-INF/*.RSA</exclude>
                                             <exclude>**/Log4j2Plugins.dat</exclude>
+                                            <!--
+                                              Licensing information for bundled dependencies belongs in
+                                              META-INF/LICENSE and META-INF/licenses/ and nowhere else.
+                                              DontIncludeResourceTransformer only drops the exact names
+                                              LICENSE, NOTICE and NOTICE.txt, so without these excludes
+                                              the shaded jars also carried each dependency's own copy in
+                                              whatever location it happened to ship it, which made the
+                                              licensing of the bundle very hard to review.
+                                            -->
+                                            <exclude>about_files/**</exclude>
+                                            <exclude>license/**</exclude>
+                                            <exclude>licenses/**</exclude>
+                                            <exclude>META-INF/license/**</exclude>
+                                            <exclude>META-INF/*LICENSE*.txt</exclude>
+                                            <exclude>META-INF/*NOTICE*.txt</exclude>
+                                            <exclude>META-INF/LICENSE.md</exclude>
+                                            <exclude>META-INF/NOTICE.md</exclude>
+                                            <exclude>META-INF/NOTICE.markdown</exclude>
+                                            <exclude>LICENSE.txt</exclude>
+                                            <exclude>LICENSE.md</exclude>
+                                            <exclude>NOTICE.txt</exclude>
+                                            <exclude>NOTICE.md</exclude>
                                         </excludes>
                                     </filter>
                                 </filters>
