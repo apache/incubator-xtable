@@ -47,3 +47,9 @@ jobs:
 
       - name: Validate Shaded Dependency License Metadata
         run: release/scripts/validate_shaded_license_coverage.sh
+
+      # Builds the shaded modules itself if their jars are not present, so it also
+      # covers the shape of the jars we actually publish rather than only the
+      # metadata in the source tree.
+      - name: Validate Jar License Layout
+        run: release/scripts/validate_jar_license_layout.sh
