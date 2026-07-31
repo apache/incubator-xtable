@@ -2,7 +2,7 @@ import React from 'react';
 import Link from '@docusaurus/Link';
 import {useLocation} from 'react-router-dom';
 import {useBaseUrlUtils} from '@docusaurus/useBaseUrl';
-import {useBlogPost} from '@docusaurus/theme-common/internal';
+import {useBlogPost} from '@docusaurus/plugin-content-blog/client';
 
 export default function BlogPostItemContainer({children, className}) {
   const {
