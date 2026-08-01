@@ -24,7 +24,7 @@ Additionally, Apache XTable™ (Incubating) allows you to convert the table form
 1. Source table(s) (Hudi/Delta/Iceberg) already written to your local storage or external storage locations like S3/GCS/ADLS. 
    If you don't have the source table written in place already, you can follow the steps in this [tutorial](/docs/how-to#create-dataset) to set it up.
 2. Clone the Apache XTable™ (Incubating) [repository](https://github.com/apache/incubator-xtable) and create the
-   `xtable-utilities_2.12-0.2.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
+   `xtable-utilities_2.12-0.5.0-SNAPSHOT-bundled.jar` by following the steps on the [Installation page](/docs/setup)
 3. Hive Metastore is configured and running—either locally or on platforms like EMR, Dataproc, or HDInsight.
 4. Setup access to interact with AWS APIs from the command line.
    If you haven’t installed AWSCLIv2, you do so by following the steps outlined in
@@ -193,7 +193,7 @@ To override this setting, specify a different implementation with the `--awsCred
 In your terminal under the cloned Apache XTable™ (Incubating) directory, run the below command.
 
 ```shell md title="shell"
-java -cp xtable-utilities/target/xtable-utilities_2.12-0.2.0-SNAPSHOT-bundled.jar org.apache.xtable.utilities.RunCatalogSync --catalogSyncConfig my_config_catalog.yaml
+java -cp xtable-utilities/target/xtable-utilities_2.12-0.5.0-SNAPSHOT-bundled.jar org.apache.xtable.utilities.RunCatalogSync --catalogSyncConfig my_config_catalog.yaml
 ```
 
 **Optional:**

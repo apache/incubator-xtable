@@ -85,7 +85,7 @@ html[data-theme='dark'] {
   --docusaurus-highlighted-code-line-bg: rgba(105, 105, 105, 0.3);
 }
 
-/* Footer: match the home page (static/index.html) footer — the same blue
+/* Footer: match the home page (homepage/index.html) footer — the same blue
    gradient background and translucent-white links, in both light and dark mode. */
 .footer {
   background-image: linear-gradient(130deg, #04548c, #043c74);

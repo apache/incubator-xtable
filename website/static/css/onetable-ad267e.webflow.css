@@ -681,9 +681,9 @@
 .icon-2.accordion-icon {
   color: rgba(0, 0, 0, .6);
   cursor: pointer;
-  font-family: Material Icons, sans-serif;
-  font-size: 32px;
-  line-height: 30px;
+  align-items: center;
+  height: 32px;
+  display: flex;
 }
 
 .section {
