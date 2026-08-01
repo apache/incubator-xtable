@@ -139,7 +139,10 @@ const config = {
           {
             items: [
               {
-                html: '<a href="pathname:///" class="footer__logo-link"><img src="/images/xtable-white.png" alt="Apache XTable™ (Incubating)" class="footer__xtable-logo" width="170" /></a>',
+                // Plain href (not `pathname:///`): the prefix is only resolved
+                // in `to`/`href` config fields, not inside raw html, and a full
+                // page load is what serves the hand-written home page at `/`.
+                html: '<a href="/" target="_self" class="footer__logo-link"><img src="/images/xtable-white.png" alt="Apache XTable™ (Incubating)" class="footer__xtable-logo" width="170" /></a>',
               },
             ],
           },
