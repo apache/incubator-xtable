@@ -31,6 +31,7 @@ on:
 
 jobs:
   build:
+    name: License Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

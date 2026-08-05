@@ -35,6 +35,19 @@ github:
     main:
       required_pull_request_reviews:
         required_approving_review_count: 1
+      required_status_checks:
+        contexts:
+          - "Maven CI Build"
+          - "License Check"
+    branch-0.4:
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+      required_status_checks:
+        contexts:
+          - "Maven CI Build"
+          - "License Check"
+          - "validate-spark-runtime-bundle (3.4.3)"
+          - "validate-spark-runtime-bundle (3.5.9)"
 notifications:
     commits:      commits@xtable.apache.org
     issues:       commits@xtable.apache.org
