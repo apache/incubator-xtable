@@ -67,7 +67,7 @@
         <log4j.version>2.22.0</log4j.version>
         <junit.version>5.11.4</junit.version>
         <junit.platform.runner.version>1.11.4</junit.platform.runner.version>
-        <lombok.version>1.18.36</lombok.version>
+        <lombok.version>1.18.46</lombok.version>
         <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
         <hadoop.version>3.4.1</hadoop.version>
         <hudi.version>1.2.0</hudi.version>
@@ -1058,13 +1058,22 @@
                       which reads ${delombok.output.dir} so that the generated builders, getters
                       and equals/hashCode show up in the javadoc jar. Running it on ordinary
                       builds costs time and forces every contributor through
-                      lombok-maven-plugin, whose last release is 1.18.20.0 (April 2021) and
-                      which cannot delombok on newer JDKs.
+                      lombok-maven-plugin, whose last release is 1.18.20.0 (April 2021).
                     -->
                     <plugin>
                         <groupId>org.projectlombok</groupId>
                         <artifactId>lombok-maven-plugin</artifactId>
                         <version>${lombok-maven-plugin.version}</version>
+                        <dependencies>
+                            <!-- 1.18.20.0 ships lombok 1.18.20, which cannot delombok on
+                                 JDK 21+. Override it with the lombok the build compiles
+                                 against so a release can be cut on a modern JDK. -->
+                            <dependency>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </dependency>
+                        </dependencies>
                         <configuration>
                             <sourceDirectory>${project.basedir}/src/main/java</sourceDirectory>
                             <addOutputDirectory>false</addOutputDirectory>
