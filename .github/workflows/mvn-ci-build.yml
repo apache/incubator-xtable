@@ -43,5 +43,25 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # `cache: maven` above only persists ~/.m2/repository. The build cache
+      # extension configured in .mvn/extensions.xml writes to ~/.m2/build-cache,
+      # so without this it starts empty on every run and never restores a module.
+      # Only `main` writes an entry, so pull requests warm up from `main` instead
+      # of each branch filling the repository-wide cache budget.
+      - name: Restore Maven build cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.m2/build-cache
+          key: maven-build-cache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            maven-build-cache-${{ runner.os }}-
+
       - name: Build all module with Maven
         run: ./mvnw clean install -ntp -B
+
+      - name: Save Maven build cache
+        if: github.ref == 'refs/heads/main' && success()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.m2/build-cache
+          key: maven-build-cache-${{ runner.os }}-${{ github.sha }}
