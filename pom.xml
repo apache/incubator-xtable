@@ -67,7 +67,7 @@
         <log4j.version>2.22.0</log4j.version>
         <junit.version>5.11.4</junit.version>
         <junit.platform.runner.version>1.11.4</junit.platform.runner.version>
-        <lombok.version>1.18.36</lombok.version>
+        <lombok.version>1.18.46</lombok.version>
         <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
         <hadoop.version>3.4.1</hadoop.version>
         <hudi.version>1.2.0</hudi.version>
@@ -723,6 +723,15 @@
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok-maven-plugin</artifactId>
                 <version>${lombok-maven-plugin.version}</version>
+                <dependencies>
+                    <!-- lombok-maven-plugin 1.18.20.0 is its last release and ships lombok
+                         1.18.20, which cannot delombok on JDK 21+ -->
+                    <dependency>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok</artifactId>
+                        <version>${lombok.version}</version>
+                    </dependency>
+                </dependencies>
                 <configuration>
                     <sourceDirectory>${project.basedir}/src/main/java</sourceDirectory>
                     <addOutputDirectory>false</addOutputDirectory>
