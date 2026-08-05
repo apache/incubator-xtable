@@ -14,11 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-connector.name=delta_lake
-hive.metastore.uri=thrift://hive-metastore:9083
-hive.metastore-cache-ttl=0s
-hive.metastore-refresh-interval=5s
-hive.metastore-timeout=10s
-delta.enable-non-concurrent-writes=true
-delta.security=ALLOW_ALL
-delta.register-table-procedure.enabled=true
+## Only jars/versions.properties and jupyter/ are needed in the image build
+## context; everything else is mounted at runtime.
+data
+notebook
+presto
+trino
+jars/*.jar
