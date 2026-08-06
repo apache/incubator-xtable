@@ -405,6 +405,17 @@
                                     <include>xmlenc:xmlenc</include>
                                 </includes>
                             </artifactSet>
+                            <!-- Third-party license files that would otherwise land alongside the
+                                 curated texts in META-INF/licenses/. Ours carry no file extension. -->
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/license/**</exclude>
+                                        <exclude>META-INF/licenses/*.txt</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>
