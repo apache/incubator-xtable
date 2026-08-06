@@ -50,3 +50,6 @@ spec/generated
 
 # SDKMan
 .sdkmanrc
+demo/notebook/spark-warehouse/
+demo/notebook/metastore_db/
+demo/notebook/derby.log
