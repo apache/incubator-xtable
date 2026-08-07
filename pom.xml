@@ -720,25 +720,6 @@
             </configuration>
             </plugin>
             <plugin>
-                <groupId>org.projectlombok</groupId>
-                <artifactId>lombok-maven-plugin</artifactId>
-                <version>${lombok-maven-plugin.version}</version>
-                <configuration>
-                    <sourceDirectory>${project.basedir}/src/main/java</sourceDirectory>
-                    <addOutputDirectory>false</addOutputDirectory>
-                    <outputDirectory>${delombok.output.dir}</outputDirectory>
-                    <encoding>UTF-8</encoding>
-                </configuration>
-                <executions>
-                    <execution>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>delombok</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
                 <executions>
@@ -1078,6 +1059,33 @@
             </activation>
             <build>
                 <plugins>
+                    <!--
+                      Delombok only runs here: its sole consumer is the javadoc plugin below,
+                      which reads ${delombok.output.dir} so that the generated builders, getters
+                      and equals/hashCode show up in the javadoc jar. Running it on ordinary
+                      builds costs time and forces every contributor through
+                      lombok-maven-plugin, whose last release is 1.18.20.0 (April 2021) and
+                      which cannot delombok on newer JDKs.
+                    -->
+                    <plugin>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok-maven-plugin</artifactId>
+                        <version>${lombok-maven-plugin.version}</version>
+                        <configuration>
+                            <sourceDirectory>${project.basedir}/src/main/java</sourceDirectory>
+                            <addOutputDirectory>false</addOutputDirectory>
+                            <outputDirectory>${delombok.output.dir}</outputDirectory>
+                            <encoding>UTF-8</encoding>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <phase>generate-sources</phase>
+                                <goals>
+                                    <goal>delombok</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-source-plugin</artifactId>
