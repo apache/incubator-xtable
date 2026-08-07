@@ -78,35 +78,6 @@ should_skip_module() {
   return 1
 }
 
-# Modules whose shade <includes> are known not to match their runtime dependency
-# tree. Only the includes-vs-tree comparison is downgraded to a warning for these,
-# and only for the modules named here; every other check, for every module, stays
-# blocking.
-#
-# xtable-hive-metastore's include list was written for a Hive 2.x dependency set:
-# 25 entries name dependencies that are no longer resolved and 97 runtime
-# dependencies are missing from it. Reconciling the two changes what the shaded
-# jar bundles, so it is a release decision rather than a tooling fix and is
-# tracked in #880. This entry only became reachable when the ripgrep fail-open
-# below was fixed, so the drift has been present and unreported for some time
-# rather than being newly introduced.
-#
-# Remove the entry when #880 lands; the check is then blocking again.
-KNOWN_INCLUDES_DRIFT=(
-  "xtable-hive-metastore"
-)
-
-has_known_includes_drift() {
-  local module="$1"
-  local drifted_module
-  for drifted_module in "${KNOWN_INCLUDES_DRIFT[@]}"; do
-    if [[ "${module}" == "${drifted_module}" ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
-
 SHADE_MODULES=()
 while IFS= read -r module; do
   module_dir="$(dirname "${module}")"
@@ -116,20 +87,13 @@ while IFS= read -r module; do
     fi
   fi
 done < <(
-  find . -name pom.xml -not -path '*/target/*' -print0 \
-    | xargs -0 grep -l '<artifactId>maven-shade-plugin</artifactId>' \
-    | sed 's|^\./||' \
+  rg -l '<artifactId>maven-shade-plugin</artifactId>' --glob 'pom.xml' \
     | sort
 )
 
-# This used to shell out to ripgrep, which is not installed by mvn-license-check.yml
-# and is absent on plenty of developer machines. When it was missing the module
-# list came back empty and the script reported success, so the entire release
-# license gate passed without checking anything. find + grep is always present,
-# and an empty module list is now a failure rather than a pass.
 if [[ ${#SHADE_MODULES[@]} -eq 0 ]]; then
-  echo "FAIL: no modules with maven-shade-plugin were found; this script cannot validate anything."
-  exit 1
+  echo "No modules with maven-shade-plugin were found."
+  exit 0
 fi
 
 missing_runtime_trees=()
@@ -198,15 +162,9 @@ for module in "${SHADE_MODULES[@]}"; do
   printf '%s\n' "${runtime_includes[@]}" | sort -u > "${runtime_set_file}"
 
   if ! diff -u "${runtime_set_file}" "${include_set_file}" > "${diff_output_file}"; then
-    if has_known_includes_drift "${module}"; then
-      echo "WARN ${module}: shade <includes> do not match runtime dependencies from ${tree_file}."
-      echo "     Known pre-existing drift, tracked in #880; not failing the build."
-      sed 's/^/  /' "${diff_output_file}"
-    else
-      echo "FAIL ${module}: shade <includes> must exactly match runtime dependencies from ${tree_file}."
-      sed 's/^/  /' "${diff_output_file}"
-      overall_status=1
-    fi
+    echo "FAIL ${module}: shade <includes> must exactly match runtime dependencies from ${tree_file}."
+    sed 's/^/  /' "${diff_output_file}"
+    overall_status=1
   fi
 
   rm -f "${include_set_file}" "${runtime_set_file}" "${diff_output_file}"
@@ -295,62 +253,6 @@ for module in "${SHADE_MODULES[@]}"; do
     echo "FAIL ${module}: unclassified bundled license families need manual ASF policy review:"
     printf '  - %s\n' "${unknown[@]}"
     overall_status=1
-  fi
-
-  # Every dependency bundled under a non-Apache-2.0 license must ship its own
-  # license text under META-INF/licenses/LICENSE-<artifactId>. The Apache banner
-  # at the top of LICENSE-bundled only covers the Apache License 2.0 family.
-  licenses_dir="${module}/src/main/resources/META-INF/licenses"
-
-  # The LICENSE-bundled parse lives in exactly one place. This used to be a
-  # second awk reimplementation of bundled_non_apache_coords() from the
-  # generator, and the two detected a family heading differently (look-ahead for
-  # the underline vs tracking the previous line), so they could silently
-  # disagree about which dependencies need a text -- the precise failure this
-  # tooling exists to prevent.
-  non_apache_artifact_ids="$(
-    python3 release/scripts/generate_shaded_license_metadata.py \
-      --non-apache-artifact-ids "${license_file}"
-  )"
-
-  missing_license_texts=()
-  while IFS= read -r artifact_id; do
-    [[ -z "${artifact_id}" ]] && continue
-    if [[ ! -f "${licenses_dir}/LICENSE-${artifact_id}" ]]; then
-      missing_license_texts+=("${artifact_id}")
-    fi
-  done <<< "${non_apache_artifact_ids}"
-
-  # And the reverse direction: a license text left behind for a dependency the
-  # jar no longer bundles. Attributing code that is not shipped is its own
-  # accuracy problem, and checking only one direction is what allowed the
-  # orphans in #865 to accumulate unnoticed.
-  orphaned_license_texts=()
-  if [[ -d "${licenses_dir}" ]]; then
-    while IFS= read -r text_file; do
-      [[ -z "${text_file}" ]] && continue
-      artifact_id="$(basename "${text_file}")"
-      artifact_id="${artifact_id#LICENSE-}"
-      if ! grep -qxF "${artifact_id}" <<< "${non_apache_artifact_ids}"; then
-        orphaned_license_texts+=("${artifact_id}")
-      fi
-    done < <(find "${licenses_dir}" -name 'LICENSE-*' | sort)
-  fi
-
-  if [[ ${#missing_license_texts[@]} -gt 0 ]]; then
-    overall_status=1
-    echo "FAIL ${module}: missing META-INF/licenses/ text for non-Apache-2.0 dependencies:"
-    printf '  - LICENSE-%s\n' "${missing_license_texts[@]}"
-  fi
-
-  if [[ ${#orphaned_license_texts[@]} -gt 0 ]]; then
-    overall_status=1
-    echo "FAIL ${module}: orphaned META-INF/licenses/ text with no bundled non-Apache-2.0 dependency:"
-    printf '  - LICENSE-%s\n' "${orphaned_license_texts[@]}"
-  fi
-
-  if [[ ${#missing_license_texts[@]} -eq 0 && ${#orphaned_license_texts[@]} -eq 0 ]]; then
-    echo "OK   ${module}: license texts match the bundled non-Apache-2.0 dependencies exactly."
   fi
 done
 

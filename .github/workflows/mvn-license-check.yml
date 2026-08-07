@@ -47,3 +47,14 @@ jobs:
 
       - name: Validate Shaded Dependency License Metadata
         run: release/scripts/validate_shaded_license_coverage.sh
+
+      # The bundled jars are what a release reviewer inspects, so the license
+      # texts are checked against the built artifact rather than the poms.
+      - name: Build Shaded Bundles
+        run: >
+          ./mvnw -B -DskipTests -Dmaven.build.cache.enabled=false
+          -pl xtable-aws,xtable-hive-metastore,xtable-hudi-support/xtable-hudi-support-extensions
+          -am package
+
+      - name: Validate Bundled License Texts
+        run: python3 release/scripts/validate_bundled_license_texts.py
