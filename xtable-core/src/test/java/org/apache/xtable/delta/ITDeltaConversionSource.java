@@ -879,12 +879,110 @@ public class ITDeltaConversionSource {
 
     // Behaviour is unchanged relative to reconstructing the snapshot per commit.
     ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
-    // The backlog spans multiple commits with no schema/protocol change, so the snapshot is
-    // reconstructed exactly once and reused (previously: once per commit).
+    // The backlog spans multiple commits with no schema change, so the baseline snapshot is read
+    // exactly once and its metadata reused (previously: one snapshot reconstruction per commit).
     assertTrue(
         commitsBacklog.getCommitsToProcess().size() >= 2,
         "backlog must span multiple commits for this assertion to be meaningful");
     verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any());
+  }
+
+  @Test
+  public void schemaChangeMidBacklogRefreshesCachedMetadataWithoutSnapshotReload() {
+    String tableName = GenericTable.getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
+    testSparkDeltaTable.insertRows(50);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+    testSparkDeltaTable.insertRows(50);
+    // A metaData action lands mid-backlog in its own commit. Unlike includeAdditionalColumns
+    // (a creation-time flag), this evolves the schema while a single source instance holds a
+    // populated metadata cache.
+    sparkSession.sql(
+        String.format(
+            "ALTER TABLE delta.`%s` ADD COLUMNS (street string)",
+            testSparkDeltaTable.getBasePath()));
+    testSparkDeltaTable.insertRows(50);
+
+    DeltaLog spiedDeltaLog =
+        spy(DeltaLog.forTable(sparkSession, testSparkDeltaTable.getBasePath()));
+    DeltaConversionSource conversionSource =
+        DeltaConversionSource.builder()
+            .sparkSession(sparkSession)
+            .deltaLog(spiedDeltaLog)
+            .deltaTable(DeltaTable.forPath(sparkSession, testSparkDeltaTable.getBasePath()))
+            .tableName(tableName)
+            .basePath(testSparkDeltaTable.getBasePath())
+            .build();
+
+    CommitsBacklog<Long> commitsBacklog =
+        conversionSource.getCommitsBacklog(
+            InstantsForIncrementalSync.builder()
+                .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+                .build());
+    List<Long> versions = commitsBacklog.getCommitsToProcess();
+    // insert, ALTER, insert — in ascending version order
+    assertEquals(3, versions.size(), "expected backlog of insert, alter, insert");
+
+    for (int i = 0; i < versions.size(); i++) {
+      TableChange tableChange = conversionSource.getTableChangeForCommit(versions.get(i));
+      boolean hasNewColumn =
+          tableChange.getTableAsOfChange().getReadSchema().getAllFields().stream()
+              .anyMatch(field -> "street".equals(field.getName()));
+      if (i == 0) {
+        assertFalse(hasNewColumn, "commit before the schema change must not carry the new column");
+      } else {
+        assertTrue(
+            hasNewColumn,
+            String.format("commit at index %d must carry the schema added mid-backlog", i));
+      }
+    }
+    // The refresh comes from the commit's own metaData action, not a snapshot reload: the only
+    // snapshot read is the baseline at the first commit.
+    verify(spiedDeltaLog, times(1)).getSnapshotAt(anyLong(), any());
+  }
+
+  @Test
+  public void reuseMetadataDisabledReconstructsSnapshotPerCommit() {
+    String tableName = GenericTable.getTableName();
+    TestSparkDeltaTable testSparkDeltaTable =
+        new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
+    List<List<String>> allActiveFiles = new ArrayList<>();
+    testSparkDeltaTable.insertRows(50);
+    Long timestamp1 = testSparkDeltaTable.getLastCommitTimestamp();
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+    testSparkDeltaTable.insertRows(50);
+    allActiveFiles.add(testSparkDeltaTable.getAllActiveFiles());
+
+    DeltaLog spiedDeltaLog =
+        spy(DeltaLog.forTable(sparkSession, testSparkDeltaTable.getBasePath()));
+    DeltaConversionSource conversionSource =
+        DeltaConversionSource.builder()
+            .sparkSession(sparkSession)
+            .deltaLog(spiedDeltaLog)
+            .deltaTable(DeltaTable.forPath(sparkSession, testSparkDeltaTable.getBasePath()))
+            .tableName(tableName)
+            .basePath(testSparkDeltaTable.getBasePath())
+            .reuseMetadataAcrossCommits(false)
+            .build();
+
+    CommitsBacklog<Long> commitsBacklog =
+        conversionSource.getCommitsBacklog(
+            InstantsForIncrementalSync.builder()
+                .lastSyncInstant(Instant.ofEpochMilli(timestamp1))
+                .build());
+    List<TableChange> allTableChanges = new ArrayList<>();
+    for (Long version : commitsBacklog.getCommitsToProcess()) {
+      allTableChanges.add(conversionSource.getTableChangeForCommit(version));
+    }
+
+    ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
+    // With reuse disabled, the pre-optimization behaviour is restored: one snapshot
+    // reconstruction per commit.
+    verify(spiedDeltaLog, times(commitsBacklog.getCommitsToProcess().size()))
+        .getSnapshotAt(anyLong(), any());
   }
 
   @Test
@@ -894,8 +992,8 @@ public class ITDeltaConversionSource {
         new TestSparkDeltaTable(tableName, tempDir, sparkSession, null, false);
     testSparkDeltaTable.insertRows(50);
     Long syncStart = testSparkDeltaTable.getLastCommitTimestamp();
-    // First backlog: several append-only commits (no schema/protocol change), so the snapshot is
-    // cached and reused across all of them.
+    // First backlog: several append-only commits (no schema change), so the metadata is cached
+    // and reused across all of them.
     testSparkDeltaTable.insertRows(50);
     testSparkDeltaTable.insertRows(50);
     testSparkDeltaTable.insertRows(50);
@@ -928,8 +1026,8 @@ public class ITDeltaConversionSource {
       watermark = commitTime;
     }
     // Regression guard: latestCommitTime feeds the persisted sync watermark, so it must advance per
-    // commit even though the snapshot is cached. If it came from the cached reload snapshot, every
-    // commit would report the first version's timestamp and the watermark would not move.
+    // commit even though the metadata is cached. If it came from the baseline reload version, every
+    // commit would report that version's timestamp and the watermark would not move.
     assertTrue(
         !firstCommitTime.equals(watermark),
         "latestCommitTime did not advance across the cached backlog (watermark stuck at first version)");

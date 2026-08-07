@@ -38,9 +38,7 @@ import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.Snapshot;
 import org.apache.spark.sql.delta.actions.Action;
 import org.apache.spark.sql.delta.actions.AddFile;
-import org.apache.spark.sql.delta.actions.CommitInfo;
 import org.apache.spark.sql.delta.actions.Metadata;
-import org.apache.spark.sql.delta.actions.Protocol;
 import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import scala.Option;
@@ -81,12 +79,13 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   private final String tableName;
   private final String basePath;
 
-  // Cache the version-stable snapshot/table/format across an incremental backlog to avoid
-  // reconstructing the Delta snapshot (a full checkpoint read) on every commit. Invalidated
-  // whenever a commit carries a metadata/protocol change (see getTableChangeForCommit).
-  private Snapshot cachedSnapshot;
-  private InternalTable cachedTable;
-  private FileFormat cachedFileFormat;
+  // When enabled (default), the table metadata is carried across an incremental backlog instead
+  // of reconstructing the Delta snapshot (a full checkpoint read) on every commit. The baseline
+  // comes from one snapshot read; a commit carrying a Metadata action refreshes the cache from
+  // the action itself (see getTableChangeForCommit).
+  @Builder.Default private final boolean reuseMetadataAcrossCommits = true;
+
+  private Metadata cachedMetadata;
 
   @Override
   public InternalTable getTable(Long version) {
@@ -114,27 +113,34 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   public TableChange getTableChangeForCommit(Long versionNumber) {
     List<Action> actionsForVersion = getChangesState().getActionsForVersion(versionNumber);
     // Reconstructing the snapshot per commit reloads the table checkpoint each time, which is
-    // expensive when the checkpoint is large. Reuse it across the backlog and reload only when a
-    // commit changes schema or protocol.
-    boolean metadataMayHaveChanged =
-        actionsForVersion.stream()
-            .anyMatch(action -> (action instanceof Metadata) || (action instanceof Protocol));
-    if (cachedSnapshot == null || metadataMayHaveChanged) {
-      cachedSnapshot = deltaLog.getSnapshotAt(versionNumber, Option.empty());
-      cachedTable = tableExtractor.table(cachedSnapshot, tableName);
-      cachedFileFormat =
-          actionsConverter.convertToFileFormat(cachedSnapshot.metadata().format().provider());
+    // expensive when the checkpoint is large. Everything the commit conversion needs from the
+    // snapshot derives from the table metadata, so carry that across the backlog instead: one
+    // snapshot read supplies the baseline, and a commit carrying a Metadata action refreshes the
+    // cache from the action itself (mirroring InMemoryLogReplay, the last one in a commit wins).
+    Metadata metadataInCommit = null;
+    for (Action action : actionsForVersion) {
+      if (action instanceof Metadata) {
+        metadataInCommit = (Metadata) action;
+      }
     }
-    Snapshot snapshotAtVersion = cachedSnapshot;
-    // The cached snapshot supplies version-stable schema/partitioning/format/base path, but
-    // latestCommitTime is persisted as the incremental-sync watermark, so it must reflect this
-    // commit rather than the (possibly older) cached reload version. Read it from the commit's
-    // CommitInfo, which is already present in the loaded actions.
+    if (cachedMetadata == null || !reuseMetadataAcrossCommits) {
+      // baseline (or reuse disabled); the snapshot is read for its metadata and not retained
+      cachedMetadata = deltaLog.getSnapshotAt(versionNumber, Option.empty()).metadata();
+    } else if (metadataInCommit != null) {
+      cachedMetadata = metadataInCommit;
+    }
+    String tableBasePath = deltaLog.dataPath().toUri().toString();
+    // latestCommitTime is persisted as the incremental-sync watermark and is matched against
+    // commit-file modification times on the next run (getCommitsBacklog), so it must come from
+    // the same clock: the commit file's mtime, which the changes state already carries.
     InternalTable tableAtVersion =
-        cachedTable.toBuilder()
-            .latestCommitTime(getCommitTimestamp(versionNumber, actionsForVersion))
-            .build();
-    FileFormat fileFormat = cachedFileFormat;
+        tableExtractor.table(
+            cachedMetadata,
+            deltaLog,
+            tableName,
+            getChangesState().getCommitTimestamp(versionNumber));
+    FileFormat fileFormat =
+        actionsConverter.convertToFileFormat(cachedMetadata.format().provider());
 
     // All 3 of the following data structures use data file's absolute path as the key
     Map<String, InternalDataFile> addedFiles = new HashMap<>();
@@ -147,7 +153,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
         InternalDataFile dataFile =
             actionsConverter.convertAddActionToInternalDataFile(
                 (AddFile) action,
-                snapshotAtVersion,
+                tableBasePath,
                 fileFormat,
                 tableAtVersion.getPartitioningFields(),
                 tableAtVersion.getReadSchema().getAllFields(),
@@ -156,7 +162,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
                 DeltaStatsExtractor.getInstance());
         addedFiles.put(dataFile.getPhysicalPath(), dataFile);
         String deleteVectorPath =
-            actionsConverter.extractDeletionVectorFile(snapshotAtVersion, (AddFile) action);
+            actionsConverter.extractDeletionVectorFile(tableBasePath, (AddFile) action);
         if (deleteVectorPath != null) {
           deletionVectors.add(deleteVectorPath);
         }
@@ -164,7 +170,7 @@ public class DeltaConversionSource implements ConversionSource<Long> {
         InternalDataFile dataFile =
             actionsConverter.convertRemoveActionToInternalDataFile(
                 (RemoveFile) action,
-                snapshotAtVersion,
+                tableBasePath,
                 fileFormat,
                 tableAtVersion.getPartitioningFields(),
                 DeltaPartitionExtractor.getInstance());
@@ -199,23 +205,6 @@ public class DeltaConversionSource implements ConversionSource<Long> {
         .filesDiff(internalFilesDiff)
         .sourceIdentifier(getCommitIdentifier(versionNumber))
         .build();
-  }
-
-  /**
-   * Returns the timestamp of the given commit for use as the incremental-sync watermark. Prefers
-   * the commit's CommitInfo (already loaded in the incremental actions, so no extra checkpoint
-   * read); falls back to the snapshot timestamp only when the commit carries no CommitInfo.
-   */
-  private Instant getCommitTimestamp(long versionNumber, List<Action> actionsForVersion) {
-    for (Action action : actionsForVersion) {
-      if (action instanceof CommitInfo) {
-        Timestamp commitTimestamp = ((CommitInfo) action).timestamp();
-        if (commitTimestamp != null) {
-          return commitTimestamp.toInstant();
-        }
-      }
-    }
-    return Instant.ofEpochMilli(deltaLog.getSnapshotAt(versionNumber, Option.empty()).timestamp());
   }
 
   @Override

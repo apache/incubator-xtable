@@ -18,6 +18,7 @@
  
 package org.apache.xtable.delta;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -25,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 import lombok.Builder;
+
+import org.apache.hadoop.fs.FileStatus;
 
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.actions.Action;
@@ -41,6 +44,7 @@ public class DeltaIncrementalChangesState {
   private final Long endVersion;
 
   private final Map<Long, List<Action>> incrementalChangesByVersion = new HashMap<>();
+  private final Map<Long, Instant> commitTimestampByVersion = new HashMap<>();
 
   /**
    * Reloads the cache store with incremental changes. Intentionally thread safety is the
@@ -60,6 +64,19 @@ public class DeltaIncrementalChangesState {
       incrementalChangesByVersion.put(versionNumber, actions);
       maxSeenVersion =
           maxSeenVersion == null ? versionNumber : Math.max(maxSeenVersion, versionNumber);
+    }
+    // Carry each commit's file modification time alongside its actions. This is the same clock
+    // Snapshot.timestamp() reads and the same one getCommitsBacklog matches the persisted
+    // watermark against, so it stays consistent regardless of the writer's clock. The log has
+    // already been listed once for getChanges above; this second pass reads no file contents.
+    Iterator<Tuple2<Object, FileStatus>> logFiles =
+        JavaConverters.asJavaIteratorConverter(
+                deltaLog.getChangeLogFiles(versionToStartFrom, false))
+            .asJava();
+    while (logFiles.hasNext()) {
+      Tuple2<Object, FileStatus> logFile = logFiles.next();
+      commitTimestampByVersion.put(
+          (Long) logFile._1(), Instant.ofEpochMilli(logFile._2().getModificationTime()));
     }
     startVersion = versionToStartFrom;
     endVersion = maxSeenVersion;
@@ -83,6 +100,14 @@ public class DeltaIncrementalChangesState {
         incrementalChangesByVersion.containsKey(version),
         String.format("Version %s not found in the DeltaIncrementalChangesState.", version));
     return incrementalChangesByVersion.get(version);
+  }
+
+  /** Returns the commit-file modification time of the given version. */
+  public Instant getCommitTimestamp(Long version) {
+    Preconditions.checkArgument(
+        commitTimestampByVersion.containsKey(version),
+        String.format("Version %s not found in the DeltaIncrementalChangesState.", version));
+    return commitTimestampByVersion.get(version);
   }
 
   private List<Tuple2<Long, List<Action>>> getChangesList(
