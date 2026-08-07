@@ -75,17 +75,35 @@ def parse_bundled_listing(text: str) -> dict[str, list[tuple[str, str, str]]]:
     return groups
 
 
+def _classes_in(path: pathlib.Path) -> list[str]:
+    with zipfile.ZipFile(path) as dependency:
+        return [entry for entry in dependency.namelist() if entry.endswith(".class")]
+
+
 def dependency_classes(group: str, artifact: str, version: str) -> list[str] | None:
-    """Class entries of the dependency's own jar, or None if it cannot be found."""
-    base = M2 / pathlib.Path(group.replace(".", "/")) / artifact / version
-    candidates = [base / f"{artifact}-{version}.jar", *sorted(base.glob(f"{artifact}-{version}-*.jar"))]
-    for path in candidates:
-        if not path.exists():
-            continue
-        with zipfile.ZipFile(path) as dependency:
-            classes = [entry for entry in dependency.namelist() if entry.endswith(".class")]
-        if classes:
-            return classes[:SAMPLE]
+    """Class entries of the dependency's own jar, or None if it cannot be found.
+
+    The version in the listing is not trusted to be the one that resolves. Where
+    it has gone stale -- the listing says jersey 1.9 and 1.19 is what builds --
+    only the resolved version is ever downloaded, so keying strictly on the
+    listed version finds nothing in ~/.m2 and the dependency reads as absent
+    from the jar. Its committed text then looks like an orphan and the check
+    fails for a dependency that is genuinely bundled.
+
+    Any version of the same groupId:artifactId answers the question actually
+    being asked, which is whether this artifact's classes are in the bundle.
+    Whether the listed version is right is a separate accuracy problem, and one
+    this check is not able to settle.
+    """
+    home = M2 / pathlib.Path(group.replace(".", "/")) / artifact
+    exact = home / version
+    for directory in [exact, *(d for d in sorted(home.glob("*")) if d.is_dir() and d != exact)]:
+        for path in sorted(directory.glob(f"{artifact}-*.jar")):
+            if path.name.endswith(("-sources.jar", "-javadoc.jar")):
+                continue
+            classes = _classes_in(path)
+            if classes:
+                return classes[:SAMPLE]
     return None
 
 
