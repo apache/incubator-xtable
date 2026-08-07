@@ -23,6 +23,20 @@ pom chain declares none. Anything not Apache-2.0 must have
 META-INF/licenses/LICENSE-<artifactId>, and a text with no dependency behind it
 is reported too.
 
+Flow, for each */target/*-bundled.jar:
+
+  main()            find the jars, print each report, exit non-zero on any failure
+  check()           everything below, for one jar
+    tree_coords()     exact coordinates Maven resolved for the module
+    shade_includes()  which of those the shade plugin bundles
+    class_entries()   a dependency is bundled when every class it declares is
+                      in the jar; native and aggregator jars declare none
+    license_names()   its license, from its pom, walking the parent chain
+    jar_license()     or from the license file it ships, when the pom is silent
+    is_apache_2()     Apache-2.0 needs no text, the banner already covers it
+    text_disagrees()  otherwise LICENSE-<artifactId> must exist and must match
+                      the declared license, via identify()
+
 Requires <module>/target/dependency-tree.txt, written by:
 
   ./mvnw -DskipTests dependency:tree -DoutputType=text -DoutputFile=target/dependency-tree.txt
@@ -76,11 +90,13 @@ def shade_includes(pom: pathlib.Path) -> set[str]:
 
 
 def dependency_jar(group: str, artifact: str, version: str, classifier: str) -> pathlib.Path:
+    """Where a resolved coordinate lives in the local repository."""
     name = f"{artifact}-{version}-{classifier}.jar" if classifier else f"{artifact}-{version}.jar"
     return M2 / pathlib.Path(group.replace(".", "/")) / artifact / version / name
 
 
 def class_entries(jar: pathlib.Path) -> set[str]:
+    """The classes a dependency declares, less what shade cannot carry over."""
     with zipfile.ZipFile(jar) as archive:
         return {
             entry
@@ -90,15 +106,18 @@ def class_entries(jar: pathlib.Path) -> set[str]:
 
 
 def _tag(xml: str, tag: str) -> str:
+    """The text of an element, by regex, for poms ElementTree will not parse."""
     match = re.search(rf"<{tag}>(.*?)</{tag}>", xml, re.DOTALL)
     return match.group(1).strip() if match else ""
 
 
 def _children(element: ET.Element, name: str) -> list[ET.Element]:
+    """Direct children with this name, ignoring how the pom binds its namespace."""
     return [child for child in element if child.tag.rsplit("}", 1)[-1] == name]
 
 
 def _text(element: ET.Element, name: str) -> str:
+    """The text of the first child with this name."""
     for child in _children(element, name):
         return (child.text or "").strip()
     return ""
@@ -156,6 +175,7 @@ def jar_license(jar: pathlib.Path) -> str | None:
 
 
 def is_apache_2(names: tuple[str, ...]) -> bool:
+    """Whether any declared name is Apache-2.0, which needs no per-artifact text."""
     return any(re.search(r"apache", n, re.I) and re.search(r"2(\.0)?\b", n) for n in names)
 
 
@@ -210,6 +230,7 @@ def text_disagrees(declared: str, text: str) -> str | None:
 
 
 def check(module: pathlib.Path, jar_path: pathlib.Path) -> dict[str, list]:
+    """Every way one bundled jar's license texts can be wrong, keyed by kind."""
     tree = module / TREE
     if not tree.exists():
         raise SystemExit(f"FAIL {module.name}: {TREE} is missing; see this script's usage.")
@@ -275,6 +296,7 @@ REPORTS = [
 
 
 def main() -> None:
+    """Check every bundled jar, or only those named on the command line."""
     jars = [pathlib.Path(a) for a in sys.argv[1:]] or sorted(ROOT.glob("**/target/*-bundled.jar"))
     if not jars:
         raise SystemExit(
