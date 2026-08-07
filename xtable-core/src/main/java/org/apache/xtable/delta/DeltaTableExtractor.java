@@ -25,6 +25,7 @@ import lombok.Builder;
 
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.Snapshot;
+import org.apache.spark.sql.delta.actions.Metadata;
 
 import scala.Option;
 
@@ -76,6 +77,44 @@ public class DeltaTableExtractor {
         .readSchema(schema)
         .latestCommitTime(Instant.ofEpochMilli(snapshot.timestamp()))
         .latestMetadataPath(snapshot.deltaLog().logPath().toString())
+        .build();
+  }
+
+  /**
+   * Builds an {@link InternalTable} from the table's {@link Metadata} directly, without a resolved
+   * {@link Snapshot}. Everything an InternalTable carries is either constant for the table (paths)
+   * or derived from the metadata, so callers that already know the metadata at a version — e.g. an
+   * incremental backlog reusing it across commits — can avoid reconstructing the snapshot.
+   *
+   * @param metadata the table metadata in effect at the commit
+   * @param deltaLog the delta log, used only for the table and log paths
+   * @param tableName name of the table
+   * @param commitTimestamp the commit-file modification time of the commit, used as the
+   *     incremental-sync watermark
+   * @return the internal representation of the table at the commit
+   */
+  public InternalTable table(
+      Metadata metadata, DeltaLog deltaLog, String tableName, Instant commitTimestamp) {
+    if (metadata == null || metadata.schema() == null) {
+      throw new IllegalStateException("Missing metadata/schema for table: " + tableName);
+    }
+    InternalSchema schema = schemaExtractor.toInternalSchema(metadata.schema());
+    List<InternalPartitionField> partitionFields =
+        DeltaPartitionExtractor.getInstance()
+            .convertFromDeltaPartitionFormat(schema, metadata.partitionSchema());
+    DataLayoutStrategy dataLayoutStrategy =
+        !partitionFields.isEmpty()
+            ? DataLayoutStrategy.HIVE_STYLE_PARTITION
+            : DataLayoutStrategy.FLAT;
+    return InternalTable.builder()
+        .tableFormat(TableFormat.DELTA)
+        .basePath(deltaLog.dataPath().toString())
+        .name(tableName)
+        .layoutStrategy(dataLayoutStrategy)
+        .partitioningFields(partitionFields)
+        .readSchema(schema)
+        .latestCommitTime(commitTimestamp)
+        .latestMetadataPath(deltaLog.logPath().toString())
         .build();
   }
 
