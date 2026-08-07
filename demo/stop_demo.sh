@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -14,11 +15,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-connector.name=delta_lake
-hive.metastore.uri=thrift://hive-metastore:9083
-hive.metastore-cache-ttl=0s
-hive.metastore-refresh-interval=5s
-hive.metastore-timeout=10s
-delta.enable-non-concurrent-writes=true
-delta.security=ALLOW_ALL
-delta.register-table-procedure.enabled=true
+## Stop the demo containers started by start_demo.sh. Pass --reset-data to also
+## restore the seed datasets under demo/data to their original state so the
+## demo notebook can be re-run from scratch.
+
+CURRENT_DIR="$( cd "$(dirname "$0")" ; pwd -P )"
+XTABLE_HOME="$( cd "$(dirname "$CURRENT_DIR")" ; pwd -P )"
+
+cd "$CURRENT_DIR"
+docker-compose down
+
+if [ "$1" = "--reset-data" ]; then
+  echo "Resetting demo datasets under demo/data..."
+  cd "$XTABLE_HOME"
+  git checkout -- demo/data
+  git clean -fdxq demo/data
+fi
