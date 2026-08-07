@@ -80,6 +80,7 @@ import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 
 import org.apache.iceberg.Snapshot;
@@ -101,6 +102,7 @@ import org.apache.xtable.conversion.SourceTable;
 import org.apache.xtable.conversion.TargetTable;
 import org.apache.xtable.delta.DeltaConversionSourceProvider;
 import org.apache.xtable.hudi.HudiConversionSourceProvider;
+import org.apache.xtable.hudi.HudiTargetConfig;
 import org.apache.xtable.hudi.HudiTestUtil;
 import org.apache.xtable.iceberg.IcebergConversionSourceProvider;
 import org.apache.xtable.iceberg.TestIcebergDataHelper;
@@ -153,7 +155,16 @@ public class ITConversionController {
     for (String sourceFormat : Arrays.asList(HUDI, DELTA, ICEBERG, PAIMON)) {
       for (SyncMode syncMode : SyncMode.values()) {
         for (boolean isPartitioned : new boolean[] {true, false}) {
-          arguments.add(Arguments.of(sourceFormat, syncMode, isPartitioned));
+          if (sourceFormat.equals(HUDI)) {
+            // Hudi is the source here (not a target), so the Hudi target version does not apply.
+            arguments.add(Arguments.of(sourceFormat, syncMode, isPartitioned, null));
+          } else {
+            // Hudi is one of the targets; exercise both supported target versions.
+            arguments.add(
+                Arguments.of(sourceFormat, syncMode, isPartitioned, HoodieTableVersion.SIX));
+            arguments.add(
+                Arguments.of(sourceFormat, syncMode, isPartitioned, HoodieTableVersion.NINE));
+          }
         }
       }
     }
@@ -225,14 +236,12 @@ public class ITConversionController {
   @ParameterizedTest
   @MethodSource("generateTestParametersForFormatsSyncModesAndPartitioning")
   public void testVariousOperations(
-      String sourceTableFormat, SyncMode syncMode, boolean isPartitioned) {
+      String sourceTableFormat,
+      SyncMode syncMode,
+      boolean isPartitioned,
+      HoodieTableVersion hudiTargetVersion) {
     String tableName = getTableName();
     List<String> targetTableFormats = getOtherFormats(sourceTableFormat);
-    if (sourceTableFormat.equals(PAIMON)) {
-      // TODO: Hudi 1.x target is not supported for un-partitioned Paimon source.
-      targetTableFormats =
-          targetTableFormats.stream().filter(fmt -> !fmt.equals(HUDI)).collect(Collectors.toList());
-    }
     String partitionConfig = null;
     if (isPartitioned) {
       partitionConfig = "level:VALUE";
@@ -253,7 +262,8 @@ public class ITConversionController {
               table,
               targetTableFormats,
               partitionConfig,
-              null);
+              null,
+              hudiTargetVersion);
       conversionController.sync(conversionConfig, conversionSourceProvider);
       checkDatasetEquivalence(sourceTableFormat, table, targetTableFormats, 100);
 
@@ -285,7 +295,8 @@ public class ITConversionController {
               tableWithUpdatedSchema,
               targetTableFormats,
               partitionConfig,
-              null);
+              null,
+              hudiTargetVersion);
       List<Row> insertsAfterSchemaUpdate = tableWithUpdatedSchema.insertRows(100);
       tableWithUpdatedSchema.reload();
       conversionController.sync(conversionConfig, conversionSourceProvider);
@@ -529,48 +540,53 @@ public class ITConversionController {
     String severityFilter = "severity = 1";
     String timestampAndLevelFilter = String.format("%s and %s", timestampFilter, levelFilter);
     return Stream.of(
-        Arguments.of(
             buildArgsForPartition(
-                HUDI, Arrays.asList(ICEBERG, DELTA), "level:SIMPLE", "level:VALUE", levelFilter)),
-        Arguments.of(
+                HUDI, Arrays.asList(ICEBERG, DELTA), "level:SIMPLE", "level:VALUE", levelFilter),
             buildArgsForPartition(
-                DELTA, Arrays.asList(ICEBERG, HUDI), null, "level:VALUE", levelFilter)),
-        Arguments.of(
+                DELTA, Arrays.asList(ICEBERG, HUDI), null, "level:VALUE", levelFilter),
             buildArgsForPartition(
-                ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter)),
-        // TODO(hudi-1.2): re-enable the nested partition column case (HUDI -> ICEBERG partitioned
-        // on
-        // "nested_record.level"). Hudi 1.2's HoodieFileGroupReaderBasedFileFormat is the only batch
-        // reader and it converts the partition column into a top-level Avro field named
-        // "nested_record.level", which Avro rejects ("Illegal character in: nested_record.level").
-        // Delta is excluded here anyway since it does not support nested partition columns.
-        // Arguments.of(
-        //     buildArgsForPartition(
-        //         HUDI,
-        //         Arrays.asList(ICEBERG),
-        //         "nested_record.level:SIMPLE",
-        //         "nested_record.level:VALUE",
-        //         nestedLevelFilter)),
-        Arguments.of(
+                ICEBERG, Arrays.asList(DELTA, HUDI), null, "level:VALUE", levelFilter),
+            // Delta is excluded here since it does not support nested partition columns.
+            buildArgsForPartition(
+                HUDI,
+                Arrays.asList(ICEBERG),
+                "nested_record.level:SIMPLE",
+                "nested_record.level:VALUE",
+                nestedLevelFilter),
             buildArgsForPartition(
                 HUDI,
                 Arrays.asList(ICEBERG, DELTA),
                 "severity:SIMPLE",
                 "severity:VALUE",
-                severityFilter)),
-        Arguments.of(
+                severityFilter),
             buildArgsForPartition(
                 HUDI,
                 Arrays.asList(ICEBERG, DELTA),
                 "timestamp_micros_nullable_field:TIMESTAMP,level:SIMPLE",
                 "timestamp_micros_nullable_field:DAY:yyyy/MM/dd,level:VALUE",
                 timestampAndLevelFilter,
-                getAdditionalHudiReadOptions())));
+                getAdditionalHudiReadOptions()))
+        .flatMap(ITConversionController::withHudiTargetVersions);
+  }
+
+  /**
+   * Expands a partition-test case across both Hudi target versions (6 and 9) when Hudi is one of
+   * the target formats; otherwise yields the single case with no version override.
+   */
+  private static Stream<Arguments> withHudiTargetVersions(TableFormatPartitionDataHolder holder) {
+    if (holder.getTargetTableFormats().contains(HUDI)) {
+      return Stream.of(
+          Arguments.of(holder, HoodieTableVersion.SIX),
+          Arguments.of(holder, HoodieTableVersion.NINE));
+    }
+    return Stream.of(Arguments.of(holder, (HoodieTableVersion) null));
   }
 
   @ParameterizedTest
   @MethodSource("provideArgsForPartitionTesting")
-  public void testPartitionedData(TableFormatPartitionDataHolder tableFormatPartitionDataHolder) {
+  public void testPartitionedData(
+      TableFormatPartitionDataHolder tableFormatPartitionDataHolder,
+      HoodieTableVersion hudiTargetVersion) {
     String tableName = getTableName();
     String sourceTableFormat = tableFormatPartitionDataHolder.getSourceTableFormat();
     List<String> targetTableFormats = tableFormatPartitionDataHolder.getTargetTableFormats();
@@ -597,7 +613,8 @@ public class ITConversionController {
               table,
               targetTableFormats,
               xTablePartitionConfig,
-              null);
+              null,
+              hudiTargetVersion);
       tableToClose.insertRows(100);
       conversionController.sync(conversionConfig, conversionSourceProvider);
       // Do a second sync to force the test to read back the metadata it wrote earlier
@@ -1194,6 +1211,26 @@ public class ITConversionController {
       List<String> targetTableFormats,
       String partitionConfig,
       Duration metadataRetention) {
+    return getTableSyncConfig(
+        sourceTableFormat,
+        syncMode,
+        tableName,
+        table,
+        targetTableFormats,
+        partitionConfig,
+        metadataRetention,
+        null);
+  }
+
+  private static ConversionConfig getTableSyncConfig(
+      String sourceTableFormat,
+      SyncMode syncMode,
+      String tableName,
+      GenericTable table,
+      List<String> targetTableFormats,
+      String partitionConfig,
+      Duration metadataRetention,
+      HoodieTableVersion hudiTargetVersion) {
     Properties sourceProperties = new Properties();
     if (partitionConfig != null) {
       sourceProperties.put(PARTITION_FIELD_SPEC_CONFIG, partitionConfig);
@@ -1217,7 +1254,7 @@ public class ITConversionController {
                         // set the metadata path to the data path as the default (required by Hudi)
                         .basePath(table.getDataPath())
                         .metadataRetention(metadataRetention)
-                        .additionalProperties(new TypedProperties())
+                        .additionalProperties(hudiTargetProperties(formatName, hudiTargetVersion))
                         .build())
             .collect(Collectors.toList());
 
@@ -1226,5 +1263,19 @@ public class ITConversionController {
         .targetTables(targetTables)
         .syncMode(syncMode)
         .build();
+  }
+
+  /**
+   * Returns the additional properties for a target table, pinning the Hudi target table version
+   * when one is supplied (and the target is Hudi) so a single test can exercise both v6 and v9.
+   */
+  private static TypedProperties hudiTargetProperties(
+      String formatName, HoodieTableVersion hudiTargetVersion) {
+    TypedProperties properties = new TypedProperties();
+    if (HUDI.equals(formatName) && hudiTargetVersion != null) {
+      properties.setProperty(
+          HudiTargetConfig.HUDI_TABLE_VERSION, String.valueOf(hudiTargetVersion.versionCode()));
+    }
+    return properties;
   }
 }

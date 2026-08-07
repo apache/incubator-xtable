@@ -50,7 +50,7 @@ import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.client.timeline.HoodieTimelineArchiver;
-import org.apache.hudi.client.timeline.versioning.v1.TimelineArchiverV1;
+import org.apache.hudi.client.timeline.TimelineArchivers;
 import org.apache.hudi.common.HoodieCleanStat;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
@@ -80,6 +80,7 @@ import org.apache.hudi.hadoop.fs.CachingPath;
 import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.metadata.HoodieTableMetadataWriter;
 import org.apache.hudi.table.HoodieJavaTable;
+import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.action.clean.CleanPlanner;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -112,6 +113,9 @@ public class HudiConversionTarget implements ConversionTarget {
   private CommitState commitState;
   // database to register the target table under, resolved from the target namespace
   private String databaseName;
+  // Hudi table format version to write (6 = legacy 0.x layout, 9 = Hudi 1.x layout), resolved from
+  // the xtable.hudi.target.table_version config; defaults to version 9.
+  private HoodieTableVersion tableVersion = HudiTargetConfig.DEFAULT_TABLE_VERSION;
 
   public HudiConversionTarget() {}
 
@@ -131,6 +135,8 @@ public class HudiConversionTarget implements ConversionTarget {
         HudiTableManager.of(configuration),
         CommitState::new);
     this.databaseName = resolveDatabaseName(targetTable);
+    this.tableVersion =
+        HudiTargetConfig.fromProperties(targetTable.getAdditionalProperties()).getTableVersion();
   }
 
   @VisibleForTesting
@@ -185,6 +191,8 @@ public class HudiConversionTarget implements ConversionTarget {
         HudiTableManager.of(configuration),
         CommitState::new);
     this.databaseName = resolveDatabaseName(targetTable);
+    this.tableVersion =
+        HudiTargetConfig.fromProperties(targetTable.getAdditionalProperties()).getTableVersion();
   }
 
   /** Uses the first namespace level as the Hudi database name, or the default if none is set. */
@@ -288,7 +296,9 @@ public class HudiConversionTarget implements ConversionTarget {
   public void beginSync(InternalTable table) {
     if (!metaClient.isPresent()) {
       metaClient =
-          Optional.of(hudiTableManager.initializeHudiTable(tableDataPath, table, databaseName));
+          Optional.of(
+              hudiTableManager.initializeHudiTable(
+                  tableDataPath, table, databaseName, tableVersion));
     } else {
       // make sure meta client has up-to-date view of the timeline
       getMetaClient().reloadActiveTimeline();
@@ -572,14 +582,15 @@ public class HudiConversionTarget implements ConversionTarget {
                           entry.getValue().stream()
                               .map(HoodieCleanFileInfo::getFilePath)
                               .collect(Collectors.toList());
-                      return new HoodieCleanStat(
-                          HoodieCleaningPolicy.KEEP_LATEST_COMMITS,
-                          partitionPath,
-                          deletePaths,
-                          deletePaths,
-                          Collections.emptyList(),
-                          earliestInstant.get().requestedTime(),
-                          instantTime);
+                      return HoodieCleanStat.builder()
+                          .withPolicy(HoodieCleaningPolicy.KEEP_LATEST_COMMITS)
+                          .withPartitionPath(partitionPath)
+                          .withDeletePathPatterns(deletePaths)
+                          .withSuccessDeleteFiles(deletePaths)
+                          .withFailedDeleteFiles(Collections.emptyList())
+                          .withEarliestCommitToRetain(earliestInstant.get().requestedTime())
+                          .withLastCompletedCommitTimestamp(instantTime)
+                          .build();
                     })
                 .collect(Collectors.toList());
         HoodieCleanMetadata cleanMetadata =
@@ -599,9 +610,13 @@ public class HudiConversionTarget implements ConversionTarget {
 
     private void runArchiver(
         HoodieJavaTable<?> table, HoodieWriteConfig config, HoodieEngineContext engineContext) {
-      // trigger archiver manually
+      // trigger archiver manually, selecting the archiver implementation that matches the table's
+      // timeline layout (V1 for table version 6, V2/LSM for table version 9).
       try {
-        HoodieTimelineArchiver archiver = new TimelineArchiverV1(config, table);
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        HoodieTimelineArchiver archiver =
+            TimelineArchivers.getInstance(
+                table.getMetaClient().getTimelineLayoutVersion(), config, (HoodieTable) table);
         archiver.archiveIfRequired(engineContext, true);
       } catch (IOException ex) {
         throw new UpdateException("Unable to archive Hudi timeline", ex);
@@ -622,10 +637,11 @@ public class HudiConversionTarget implements ConversionTarget {
       Properties properties = new Properties();
       properties.setProperty(HoodieMetadataConfig.AUTO_INITIALIZE.key(), "false");
       return HoodieWriteConfig.newBuilder()
-          // Pin writes to table version 6 and disable auto-upgrade so the write client does not
-          // upgrade the table to version 9 (Hudi 1.x). Table version 9 support will be added in a
-          // follow-up PR, tracked in https://github.com/apache/incubator-xtable/issues/834.
-          .withWriteTableVersion(HoodieTableVersion.SIX.versionCode())
+          // Write at the table's own format version (selected via xtable.hudi.target.table_version,
+          // default 9) and disable auto-upgrade so the write client never migrates the table to a
+          // different version behind our back. See
+          // https://github.com/apache/incubator-xtable/issues/834.
+          .withWriteTableVersion(metaClient.getTableConfig().getTableVersion().versionCode())
           .withAutoUpgradeVersion(false)
           .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(INMEMORY).build())
           .withPath(metaClient.getBasePath().toString())
@@ -648,14 +664,17 @@ public class HudiConversionTarget implements ConversionTarget {
               HoodieMetadataConfig.newBuilder()
                   .enable(true)
                   .withProperties(properties)
-                  // Hudi 1.2.0 couples the partition-stats index to the column-stats index. For
-                  // partitioned tables, the partition-stats generation path rebuilds a file-system
-                  // view over the committed external parquet files and groups them by fileId.
-                  // XTable's externally-registered files have non-Hudi names whose fileId cannot be
-                  // parsed once the "_hudiext" marker is stripped, which leads to failures. So
-                  // column stats are only enabled for un-partitioned tables for now. Tracked in
-                  // https://github.com/apache/incubator-xtable/issues/832.
-                  .withMetadataIndexColumnStats(!metaClient.getTableConfig().isTablePartitioned())
+                  // Build the column-stats index for all tables. The partition-stats index is
+                  // disabled independently: its generation path rebuilds a file-system view over
+                  // the
+                  // committed external parquet files and groups them by fileId, but XTable's
+                  // externally-registered files have non-Hudi names whose fileId cannot be parsed
+                  // once the "_hudiext" marker is stripped, which leads to failures on partitioned
+                  // tables. Disabling partition stats (while keeping column stats) requires the
+                  // independent toggle added in https://github.com/apache/hudi/pull/19111. Tracked
+                  // in https://github.com/apache/incubator-xtable/issues/832.
+                  .withMetadataIndexColumnStats(true)
+                  .withMetadataIndexPartitionStats(false)
                   .withMaxNumDeltaCommitsBeforeCompaction(maxNumDeltaCommitsBeforeCompaction)
                   .build())
           .build();
