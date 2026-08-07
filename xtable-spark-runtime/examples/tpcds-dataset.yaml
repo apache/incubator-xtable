@@ -1,0 +1,57 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+## Example --datasetconfig for a multi-table sync. This syncs the 24 tables of the
+# TPC-DS schema from Hudi to Iceberg and Delta in a single spark-submit:
+#
+#   $SPARK_HOME/bin/spark-submit \
+#     --class org.apache.xtable.spark.XTableSparkSync \
+#     xtable-spark-runtime_2.12-<version>.jar \
+#     --datasetconfig examples/tpcds-dataset.yaml
+#
+# sourceFormat and targetFormats apply to every table. Each entry needs only a
+# tableBasePath; tableName, tableDataPath, namespace, and partitionSpec are optional
+# (a Hudi source reads its partitioning from the table itself). Replace the bucket and
+# prefix with the location of your tables.
+sourceFormat: HUDI
+targetFormats:
+  - ICEBERG
+  - DELTA
+datasets:
+  - tableBasePath: s3://tpcds-datasets/100GB/call_center
+  - tableBasePath: s3://tpcds-datasets/100GB/catalog_page
+  - tableBasePath: s3://tpcds-datasets/100GB/catalog_returns
+  - tableBasePath: s3://tpcds-datasets/100GB/catalog_sales
+  - tableBasePath: s3://tpcds-datasets/100GB/customer
+  - tableBasePath: s3://tpcds-datasets/100GB/customer_address
+  - tableBasePath: s3://tpcds-datasets/100GB/customer_demographics
+  - tableBasePath: s3://tpcds-datasets/100GB/date_dim
+  - tableBasePath: s3://tpcds-datasets/100GB/household_demographics
+  - tableBasePath: s3://tpcds-datasets/100GB/income_band
+  - tableBasePath: s3://tpcds-datasets/100GB/inventory
+  - tableBasePath: s3://tpcds-datasets/100GB/item
+  - tableBasePath: s3://tpcds-datasets/100GB/promotion
+  - tableBasePath: s3://tpcds-datasets/100GB/reason
+  - tableBasePath: s3://tpcds-datasets/100GB/ship_mode
+  - tableBasePath: s3://tpcds-datasets/100GB/store
+  - tableBasePath: s3://tpcds-datasets/100GB/store_returns
+  - tableBasePath: s3://tpcds-datasets/100GB/store_sales
+  - tableBasePath: s3://tpcds-datasets/100GB/time_dim
+  - tableBasePath: s3://tpcds-datasets/100GB/warehouse
+  - tableBasePath: s3://tpcds-datasets/100GB/web_page
+  - tableBasePath: s3://tpcds-datasets/100GB/web_returns
+  - tableBasePath: s3://tpcds-datasets/100GB/web_sales
+  - tableBasePath: s3://tpcds-datasets/100GB/web_site

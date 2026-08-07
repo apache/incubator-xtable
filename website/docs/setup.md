@@ -24,3 +24,6 @@ For more information on the steps, follow the project's GitHub [README.md](https
 ## Next Steps
 See the [Quickstart](/docs/how-to) guide to learn to use Apache XTable™ (Incubating) to add interoperability between
 different table formats.
+
+To run a sync on an existing Apache Spark cluster with `spark-submit`, see
+[Run XTable on Apache Spark](/docs/spark-runtime).
