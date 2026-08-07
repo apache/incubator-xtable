@@ -22,7 +22,7 @@
     <parent>
         <groupId>org.apache</groupId>
         <artifactId>apache</artifactId>
-        <version>33</version>
+        <version>39</version>
     </parent>
 
     <groupId>org.apache.xtable</groupId>
@@ -61,13 +61,13 @@
         <project.version>0.2.0-SNAPSHOT</project.version>
         <!-- To ensure build content is re-producible -->
         <project.build.outputTimestamp>2026-07-21T19:16:22Z</project.build.outputTimestamp>
-        <maven.compiler.target>8</maven.compiler.target>
+        <javaVersion>8</javaVersion>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <avro.version>1.12.0</avro.version>
         <log4j.version>2.22.0</log4j.version>
         <junit.version>5.11.4</junit.version>
         <junit.platform.runner.version>1.11.4</junit.platform.runner.version>
-        <lombok.version>1.18.36</lombok.version>
+        <lombok.version>1.18.46</lombok.version>
         <lombok-maven-plugin.version>1.18.20.0</lombok-maven-plugin.version>
         <hadoop.version>3.4.1</hadoop.version>
         <hudi.version>1.2.0</hudi.version>
@@ -707,22 +707,31 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>${maven-compiler-plugin.version}</version> <configuration>
-                <source>${maven.compiler.source}</source>
-                <target>${maven.compiler.target}</target>
-                <annotationProcessorPaths>
-                    <path>
-                        <groupId>org.projectlombok</groupId>
-                        <artifactId>lombok</artifactId>
-                        <version>${lombok.version}</version>
-                    </path>
-                </annotationProcessorPaths>
-            </configuration>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <release>${javaVersion}</release>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok-maven-plugin</artifactId>
                 <version>${lombok-maven-plugin.version}</version>
+                <dependencies>
+                    <!-- lombok-maven-plugin 1.18.20.0 is its last release and ships lombok
+                         1.18.20, which cannot delombok on JDK 21+ -->
+                    <dependency>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok</artifactId>
+                        <version>${lombok.version}</version>
+                    </dependency>
+                </dependencies>
                 <configuration>
                     <sourceDirectory>${project.basedir}/src/main/java</sourceDirectory>
                     <addOutputDirectory>false</addOutputDirectory>
@@ -759,13 +768,6 @@
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <release>${maven.compiler.target}</release>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
