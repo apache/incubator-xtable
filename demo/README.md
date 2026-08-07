@@ -19,7 +19,12 @@
 # Running a Local Demo
 This demo was created for the 2023 Open Source Data Summit. It shows how XTable can be used with two existing datasets.
 
-Use `./start_demo.sh` to spin up a local notebook with a scala interpreter, Hive Metastore, Presto and Trino in docker containers. The script will first build the XTable jars required for the demo and then start the containers.  
+Use `./start_demo.sh` to spin up a local notebook with a scala interpreter, Hive Metastore, Presto and Trino in docker containers (in the background). The script builds the XTable jars required for the demo first (if they are not already present) and then starts the containers and prints the notebook URL. The jars can also be (re)built explicitly with `./build_demo.sh`, for example after making code changes.
+
+When you are done, use `./stop_demo.sh` to stop and remove the containers. Pass `--reset-data` to also restore the seed datasets under `demo/data` to their original state so the demo can be re-run from scratch.
+
+## Notebooks
+- `work/demo.ipynb` — the main demo: two existing datasets (Hudi and Delta) are synced across Hudi, Delta and Iceberg, updated from Trino, joined, and validated from Trino.
 
 ## Accessing Services
 ### Jupyter Notebook
