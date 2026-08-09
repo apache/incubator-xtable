@@ -32,7 +32,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # A cold build is ~27 min, which left no headroom under the previous 30.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
 
@@ -48,20 +49,46 @@ jobs:
       # so without this it starts empty on every run and never restores a module.
       # Only `main` writes an entry, so pull requests warm up from `main` instead
       # of each branch filling the repository-wide cache budget.
+      #
+      # The modules producing large bundled jars opt out of the cache entirely
+      # with <maven.build.cache.enabled>false</maven.build.cache.enabled> in their
+      # own poms, which keeps this entry around 15 MB. Without that opt-out the
+      # entry is 1.2 GB, 97% of it three shaded jars that account for only ~3 of
+      # the 27 minutes a cold build takes.
+      #
+      # Note: a cache-restored xtable-service does not reproduce
+      # target/quarkus-app. No step consumes that directory today; anything added
+      # later that does must not rely on it being present.
       - name: Restore Maven build cache
         uses: actions/cache/restore@v6
         with:
           path: ~/.m2/build-cache
-          key: maven-build-cache-${{ runner.os }}-${{ github.sha }}
+          key: maven-build-cache-${{ runner.os }}-jdk11-${{ github.sha }}
           restore-keys: |
-            maven-build-cache-${{ runner.os }}-
+            maven-build-cache-${{ runner.os }}-jdk11-
 
       - name: Build all module with Maven
         run: ./mvnw clean install -ntp -B
 
+      # Guard against a module starting to cache large artifacts again: warn and
+      # skip the save rather than churn the repository-wide 10 GB cache budget,
+      # which is otherwise mostly the ~/.m2/repository entries above. Checking the
+      # size rather than specific paths keeps this working across module renames.
+      - name: Check Maven build cache size
+        id: build-cache-size
+        if: success() && github.ref == 'refs/heads/main'
+        run: |
+          size_mb=$(du -sm ~/.m2/build-cache 2>/dev/null | cut -f1)
+          size_mb=${size_mb:-0}
+          echo "size_mb=${size_mb}" >> "$GITHUB_OUTPUT"
+          echo "~/.m2/build-cache is ${size_mb} MB"
+          if [ "${size_mb}" -gt 100 ]; then
+            echo "::warning title=Maven build cache not saved::~/.m2/build-cache is ${size_mb} MB (limit 100 MB). A module is caching large artifacts; opt it out with <maven.build.cache.enabled>false</maven.build.cache.enabled> in its pom."
+          fi
+
       - name: Save Maven build cache
-        if: github.ref == 'refs/heads/main' && success()
+        if: success() && github.ref == 'refs/heads/main' && steps.build-cache-size.outputs.size_mb < 100
         uses: actions/cache/save@v6
         with:
           path: ~/.m2/build-cache
-          key: maven-build-cache-${{ runner.os }}-${{ github.sha }}
+          key: maven-build-cache-${{ runner.os }}-jdk11-${{ github.sha }}

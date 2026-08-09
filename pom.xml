@@ -953,7 +953,8 @@
                         </excludes>
                         <licenseHeader>
                             <file>style/xml-license-header</file>
-                            <delimiter>^&lt;project|^&lt;configuration|^&lt;Configuration|^&lt;extensions|^&lt;component</delimiter>
+                            <!-- ^&lt;cache is the root element of .mvn/maven-build-cache-config.xml -->
+                            <delimiter>^&lt;project|^&lt;configuration|^&lt;Configuration|^&lt;extensions|^&lt;component|^&lt;cache</delimiter>
                             <skipLinesMatching>^&lt;.*xml.+?$</skipLinesMatching>
                         </licenseHeader>
                     </pom>

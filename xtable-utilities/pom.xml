@@ -27,6 +27,17 @@
 
     <artifactId>xtable-utilities_${scala.binary.version}</artifactId>
     <name>XTable Project Utilities</name>
+    <properties>
+        <!--
+          This module produces a large bundled jar (~1 GB). Keep it out of the
+          maven-build-cache entirely: the property disables both restore and save
+          for this project, so the artifact never enters the cache directory that
+          CI persists between runs. Shading is cheap relative to the test suites
+          the cache is there to skip, so there is nothing worth caching here.
+          See .mvn/maven-build-cache-config.xml.
+        -->
+        <maven.build.cache.enabled>false</maven.build.cache.enabled>
+    </properties>
 
     <dependencies>
         <dependency>
