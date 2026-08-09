@@ -92,3 +92,17 @@ jobs:
         with:
           path: ~/.m2/build-cache
           key: maven-build-cache-${{ runner.os }}-jdk11-${{ github.sha }}
+
+      # `install` above puts this project's own artifacts into ~/.m2/repository,
+      # including the bundled jars (~1.2 GB, xtable-utilities alone is ~1 GB).
+      # actions/setup-java caches that whole directory with no way to exclude a
+      # path, so drop them before its post step runs. They are rebuilt from
+      # source on every run and can never produce a useful cache hit, and a
+      # stale SNAPSHOT left in the local repository can shadow a reactor build.
+      #
+      # In practice License Check wins the cache key first and it only runs
+      # `package`, so today's entry already excludes these. This keeps that true
+      # if this job ever becomes the one that saves.
+      - name: Drop this project's own artifacts from the Maven repository cache
+        if: always()
+        run: rm -rf ~/.m2/repository/org/apache/xtable
