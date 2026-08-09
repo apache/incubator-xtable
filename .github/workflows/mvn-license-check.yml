@@ -52,8 +52,14 @@ jobs:
       # license, so it populates exactly what the other jobs need, and it stops
       # at `package`, so this project's own artifacts never enter the entry.
       # Maven CI Build restores the same key read-only.
-      - name: Cache Maven repository
-        uses: actions/cache@v6
+      #
+      # Restore and save are split so that only `main` writes. The entry is
+      # ~1 GB against a repository-wide 10 GB budget, so letting every branch
+      # write one would crowd out the entry they all restore from. Pull requests
+      # warm from `main` via the prefix and re-download only their own delta.
+      - name: Restore Maven repository cache
+        id: m2-repository
+        uses: actions/cache/restore@v6
         with:
           path: ~/.m2/repository
           key: m2-repository-${{ runner.os }}-jdk11-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}
@@ -62,7 +68,8 @@ jobs:
 
       # Replaces the separate wrapper cache that setup-java's `cache: maven`
       # used to provide. Keyed only on the wrapper properties, which change
-      # rarely, so it survives the pom changes that rotate the key above.
+      # rarely, so it survives the pom changes that rotate the key above. Left
+      # unsplit unlike the repository cache: at ~9 MB it is not worth gating.
       - name: Cache Maven wrapper
         uses: actions/cache@v6
         with:
@@ -93,7 +100,19 @@ jobs:
       # holds third-party dependencies only is enforced here. The steps above
       # stop at `package`, so this is a no-op today; it exists so that adding
       # an `install` later cannot silently add ~1.2 GB of bundled jars to the
-      # entry. Runs before actions/cache's post-job save.
+      # entry. Must stay ahead of the save below.
       - name: Drop this project's own artifacts from the Maven repository
         if: always()
         run: rm -rf ~/.m2/repository/org/apache/xtable
+
+      # Only when the exact key missed - entries are immutable, so saving over
+      # an existing key just fails. This is what actions/cache does internally
+      # when restore and save are not split.
+      - name: Save Maven repository cache
+        if: >
+          success() && github.ref == 'refs/heads/main'
+          && steps.m2-repository.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.m2/repository
+          key: m2-repository-${{ runner.os }}-jdk11-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}

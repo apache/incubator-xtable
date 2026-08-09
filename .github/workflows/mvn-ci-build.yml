@@ -43,10 +43,10 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
 
-      # Restore only. License Check writes this cache: it resolves every
-      # dependency to inspect each jar's license, so it populates exactly what
-      # this job needs, it finishes in a couple of minutes, and it stops at
-      # `package` so the entry never carries this project's own artifacts.
+      # Restore only. License Check writes this cache, and only on `main`: it
+      # resolves every dependency to inspect each jar's license, so it populates
+      # exactly what this job needs, it finishes in a couple of minutes, and it
+      # stops at `package` so the entry never carries this project's artifacts.
       # Previously both jobs used setup-java's `cache: maven`, which gave them
       # the same key, and whichever finished first reserved it - this job then
       # logged "Unable to reserve cache with key" on every single run. Making
