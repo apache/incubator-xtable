@@ -42,11 +42,32 @@ jobs:
         with:
           java-version: '11'
           distribution: 'temurin'
-          cache: maven
 
-      # `cache: maven` above only persists ~/.m2/repository. The build cache
-      # extension configured in .mvn/extensions.xml writes to ~/.m2/build-cache,
-      # so without this it starts empty on every run and never restores a module.
+      # Restore only. License Check writes this cache: it resolves every
+      # dependency to inspect each jar's license, so it populates exactly what
+      # this job needs, it finishes in a couple of minutes, and it stops at
+      # `package` so the entry never carries this project's own artifacts.
+      # Previously both jobs used setup-java's `cache: maven`, which gave them
+      # the same key, and whichever finished first reserved it - this job then
+      # logged "Unable to reserve cache with key" on every single run. Making
+      # the reader explicit removes the race rather than winning it.
+      - name: Restore Maven repository cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.m2/repository
+          key: m2-repository-${{ runner.os }}-jdk11-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}
+          restore-keys: |
+            m2-repository-${{ runner.os }}-jdk11-
+
+      - name: Restore Maven wrapper cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.m2/wrapper/dists
+          key: m2-wrapper-${{ runner.os }}-${{ hashFiles('**/.mvn/wrapper/maven-wrapper.properties') }}
+
+      # A separate cache from the repository above: the build cache extension
+      # configured in .mvn/extensions.xml writes to ~/.m2/build-cache, so
+      # without this it starts empty every run and never restores a module.
       # Only `main` writes an entry, so pull requests warm up from `main` instead
       # of each branch filling the repository-wide cache budget.
       #
@@ -99,10 +120,11 @@ jobs:
       # path, so drop them before its post step runs. They are rebuilt from
       # source on every run and can never produce a useful cache hit, and a
       # stale SNAPSHOT left in the local repository can shadow a reactor build.
+      # Source Build Check clears the same path for the same reason.
       #
-      # In practice License Check wins the cache key first and it only runs
-      # `package`, so today's entry already excludes these. This keeps that true
-      # if this job ever becomes the one that saves.
-      - name: Drop this project's own artifacts from the Maven repository cache
+      # This job no longer saves that cache, so nothing depends on this today.
+      # It is kept so the invariant holds by construction rather than by which
+      # step happens to write last.
+      - name: Drop this project's own artifacts from the Maven repository
         if: always()
         run: rm -rf ~/.m2/repository/org/apache/xtable

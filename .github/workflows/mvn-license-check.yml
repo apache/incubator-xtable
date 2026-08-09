@@ -40,7 +40,34 @@ jobs:
         with:
           java-version: '11'
           distribution: 'temurin'
-          cache: maven
+
+      # ~/.m2/repository is cached here rather than via setup-java's
+      # `cache: maven`, which restores on an exact key match only - it sets no
+      # restore-keys by design (actions/setup-java#269), so any pom change made
+      # every job re-download the whole dependency tree from Central. The prefix
+      # fallback below warms from the previous entry and downloads just the delta.
+      #
+      # This job is the writer for that cache, and deliberately the only one.
+      # It has to resolve every dependency in order to inspect each jar's
+      # license, so it populates exactly what the other jobs need, and it stops
+      # at `package`, so this project's own artifacts never enter the entry.
+      # Maven CI Build restores the same key read-only.
+      - name: Cache Maven repository
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/repository
+          key: m2-repository-${{ runner.os }}-jdk11-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}
+          restore-keys: |
+            m2-repository-${{ runner.os }}-jdk11-
+
+      # Replaces the separate wrapper cache that setup-java's `cache: maven`
+      # used to provide. Keyed only on the wrapper properties, which change
+      # rarely, so it survives the pom changes that rotate the key above.
+      - name: Cache Maven wrapper
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/wrapper/dists
+          key: m2-wrapper-${{ runner.os }}-${{ hashFiles('**/.mvn/wrapper/maven-wrapper.properties') }}
 
       - name: Apache License Check
         run: ./mvnw apache-rat:check -B
@@ -61,3 +88,12 @@ jobs:
 
       - name: Validate Bundled License Texts
         run: python3 release/scripts/validate_bundled_license_texts.py
+
+      # This job writes the repository cache, so the invariant that the entry
+      # holds third-party dependencies only is enforced here. The steps above
+      # stop at `package`, so this is a no-op today; it exists so that adding
+      # an `install` later cannot silently add ~1.2 GB of bundled jars to the
+      # entry. Runs before actions/cache's post-job save.
+      - name: Drop this project's own artifacts from the Maven repository
+        if: always()
+        run: rm -rf ~/.m2/repository/org/apache/xtable
