@@ -83,7 +83,7 @@ jobs:
       #
       # The modules producing large bundled jars opt out of the cache entirely
       # with <maven.build.cache.enabled>false</maven.build.cache.enabled> in their
-      # own poms, which keeps this entry around 15 MB. Without that opt-out the
+      # own poms, which keeps this entry around 12 MB. Without that opt-out the
       # entry is 1.2 GB, 97% of it three shaded jars that account for only ~3 of
       # the 27 minutes a cold build takes.
       #
@@ -91,6 +91,7 @@ jobs:
       # target/quarkus-app. No step consumes that directory today; anything added
       # later that does must not rely on it being present.
       - name: Restore Maven build cache
+        id: build-cache
         uses: actions/cache/restore@v6
         with:
           path: ~/.m2/build-cache
@@ -113,12 +114,24 @@ jobs:
           size_mb=${size_mb:-0}
           echo "size_mb=${size_mb}" >> "$GITHUB_OUTPUT"
           echo "~/.m2/build-cache is ${size_mb} MB"
-          if [ "${size_mb}" -gt 100 ]; then
+          # The two bounds below are what the save step gates on, so they have to
+          # cover the whole range between them: 0 means the extension wrote
+          # nothing and there is no path for the save action to read.
+          if [ "${size_mb}" -eq 0 ]; then
+            echo "::warning title=Maven build cache not saved::~/.m2/build-cache is empty or absent. The build cache extension did not write anything; check that .mvn/extensions.xml is still in effect."
+          elif [ "${size_mb}" -ge 100 ]; then
             echo "::warning title=Maven build cache not saved::~/.m2/build-cache is ${size_mb} MB (limit 100 MB). A module is caching large artifacts; opt it out with <maven.build.cache.enabled>false</maven.build.cache.enabled> in its pom."
           fi
 
+      # Skipped when the exact key already hit on restore - a re-run of the same
+      # commit would otherwise try to write over an immutable entry and log the
+      # "Unable to reserve cache with key" that splitting these jobs removed.
       - name: Save Maven build cache
-        if: success() && github.ref == 'refs/heads/main' && steps.build-cache-size.outputs.size_mb < 100
+        if: >
+          success() && github.ref == 'refs/heads/main'
+          && steps.build-cache.outputs.cache-hit != 'true'
+          && steps.build-cache-size.outputs.size_mb > 0
+          && steps.build-cache-size.outputs.size_mb < 100
         uses: actions/cache/save@v6
         with:
           path: ~/.m2/build-cache
