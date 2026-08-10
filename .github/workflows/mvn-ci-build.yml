@@ -50,13 +50,17 @@ jobs:
           distribution: 'temurin'
 
       # Restore only. License Check writes this cache, and only on `main`: it
-      # resolves every dependency to inspect each jar's license, so it populates
-      # exactly what this job needs, it finishes in a couple of minutes, and it
-      # stops at `package` so the entry never carries this project's artifacts.
+      # finishes in a couple of minutes against this job's 27, and it stops at
+      # `package` so the entry never carries this project's artifacts. It
+      # resolves the reactor explicitly for this job's benefit; its own license
+      # steps reach only part of it.
       # Previously both jobs used setup-java's `cache: maven`, which gave them
       # the same key, and whichever finished first reserved it - this job then
       # logged "Unable to reserve cache with key" on every single run. Making
       # the reader explicit removes the race rather than winning it.
+      #
+      # A warm start, not a guarantee: `install` here runs plugins that a build
+      # stopping at `package` never resolves, so expect a delta every run.
       - name: Restore Maven repository cache
         uses: actions/cache/restore@v6
         with:

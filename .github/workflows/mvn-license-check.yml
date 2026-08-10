@@ -52,11 +52,16 @@ jobs:
       # every job re-download the whole dependency tree from Central. The prefix
       # fallback below warms from the previous entry and downloads just the delta.
       #
-      # This job is the writer for that cache, and deliberately the only one.
-      # It has to resolve every dependency in order to inspect each jar's
-      # license, so it populates exactly what the other jobs need, and it stops
-      # at `package`, so this project's own artifacts never enter the entry.
-      # Maven CI Build restores the same key read-only.
+      # This job is the writer for that cache, and deliberately the only one:
+      # it is the short job, so making it the writer costs the least, and it
+      # stops at `package`, so this project's own artifacts never enter the
+      # entry. Maven CI Build restores the same key read-only.
+      #
+      # Being the only writer means this job has to resolve what the readers
+      # need, which the license steps below do not do on their own - they build
+      # the shaded modules and their `-am` closure, which excludes the two
+      # leaves, xtable-utilities and xtable-service. The explicit resolve step
+      # after them covers the rest of the reactor.
       #
       # Restore and save are split so that only `main` writes. The entry is
       # ~1 GB against a repository-wide 10 GB budget, so letting every branch
@@ -100,6 +105,24 @@ jobs:
 
       - name: Validate Bundled License Texts
         run: python3 release/scripts/validate_bundled_license_texts.py
+
+      # Nothing above this line resolves xtable-utilities or xtable-service:
+      # `apache-rat:check` requires no dependency resolution, `dependency:tree`
+      # collects poms rather than jars, and the shaded-bundle build reaches only
+      # the `-am` closure of the three modules it names, which excludes both
+      # leaves. Without this step the entry never gains the Quarkus stack or
+      # xtable-utilities' bundled dependencies, and Maven CI Build - which
+      # cannot write the cache - would re-download them from Central on every
+      # run, permanently. This job exists to warm the cache for that one, so it
+      # has to cover the whole reactor even where a license check does not.
+      #
+      # Failure here must not fail a license check, hence `|| true`: an
+      # incomplete cache entry costs download time on the next run and nothing
+      # else. `go-offline` does not catch plugin dependencies resolved at
+      # execution time, so expect a small delta regardless.
+      - name: Resolve the rest of the reactor for the cache
+        if: success() && github.ref == 'refs/heads/main'
+        run: ./mvnw -B -ntp -q dependency:go-offline -Dmaven.build.cache.enabled=false || true
 
       # This job writes the repository cache, so the invariant that the entry
       # holds third-party dependencies only is enforced here. The steps above
