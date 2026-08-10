@@ -53,6 +53,47 @@
                         <reconcile propertyName="testFailureIgnore"/>
                     </reconciles>
                 </plugin>
+                <!--
+                  Failsafe is bound in the parent POM to integration-test and verify,
+                  and CI runs `install`, so integration tests run on every build and a
+                  restored module skips them exactly as it skips unit tests. -DskipITs
+                  is a command line flag, so the same gap applies. Reconciles are
+                  matched per goal, hence both entries; the parameter lists differ
+                  because testFailureIgnore exists on verify only, and naming a
+                  parameter a goal does not have earns a warning on every build.
+                -->
+                <plugin artifactId="maven-failsafe-plugin" goal="integration-test">
+                    <reconciles>
+                        <reconcile propertyName="skip"/>
+                        <reconcile propertyName="skipExec"/>
+                        <reconcile propertyName="skipITs"/>
+                        <reconcile propertyName="skipTests"/>
+                    </reconciles>
+                </plugin>
+                <plugin artifactId="maven-failsafe-plugin" goal="verify">
+                    <reconciles>
+                        <reconcile propertyName="skip"/>
+                        <reconcile propertyName="skipExec"/>
+                        <reconcile propertyName="skipITs"/>
+                        <reconcile propertyName="skipTests"/>
+                        <reconcile propertyName="testFailureIgnore"/>
+                    </reconciles>
+                </plugin>
+                <!--
+                  -Dmaven.test.skip=true never reaches surefire in this build: the
+                  parent POM pins <skip>${skipUTs}</skip>, and explicit plugin
+                  configuration wins over the user property, so surefire's skip
+                  parameter reads identically whether the flag is present or not.
+                  What the flag actually suppresses is test compilation. Without
+                  this entry the module checksum is byte-identical across the two,
+                  and a cache seeded by a `-Dmaven.test.skip=true` build restores
+                  into a plain `install` with the tests never having run.
+                -->
+                <plugin artifactId="maven-compiler-plugin" goal="testCompile">
+                    <reconciles>
+                        <reconcile propertyName="skip"/>
+                    </reconciles>
+                </plugin>
             </plugins>
         </reconcile>
     </executionControl>
