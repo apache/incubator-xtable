@@ -29,6 +29,12 @@ on:
     branches:
       - "main"
 
+# The build cache extension does not hash the JDK, so it is part of every cache
+# key below. Defined once here rather than repeated, so that changing the JDK
+# cannot leave a key asserting the old one.
+env:
+  JDK_VERSION: '11'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -37,10 +43,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Set up JDK 11
+      - name: Set up JDK ${{ env.JDK_VERSION }}
         uses: actions/setup-java@v5
         with:
-          java-version: '11'
+          java-version: ${{ env.JDK_VERSION }}
           distribution: 'temurin'
 
       # Restore only. License Check writes this cache, and only on `main`: it
@@ -55,9 +61,9 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ~/.m2/repository
-          key: m2-repository-${{ runner.os }}-jdk11-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}
+          key: m2-repository-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}
           restore-keys: |
-            m2-repository-${{ runner.os }}-jdk11-
+            m2-repository-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-
 
       - name: Restore Maven wrapper cache
         uses: actions/cache/restore@v6
@@ -84,9 +90,9 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ~/.m2/build-cache
-          key: maven-build-cache-${{ runner.os }}-jdk11-${{ github.sha }}
+          key: maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ github.sha }}
           restore-keys: |
-            maven-build-cache-${{ runner.os }}-jdk11-
+            maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-
 
       - name: Build all module with Maven
         run: ./mvnw clean install -ntp -B
@@ -112,7 +118,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: ~/.m2/build-cache
-          key: maven-build-cache-${{ runner.os }}-jdk11-${{ github.sha }}
+          key: maven-build-cache-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ github.sha }}
 
       # `install` above puts this project's own artifacts into ~/.m2/repository,
       # including the bundled jars (~1.2 GB, xtable-utilities alone is ~1 GB).

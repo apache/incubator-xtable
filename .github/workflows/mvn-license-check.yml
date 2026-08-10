@@ -29,16 +29,21 @@ on:
     branches:
       - "main"
 
+# Kept in step with mvn-ci-build.yml: this job writes the cache that job reads,
+# and the JDK is part of the key on both sides.
+env:
+  JDK_VERSION: '11'
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: Set up JDK 11
+      - name: Set up JDK ${{ env.JDK_VERSION }}
         uses: actions/setup-java@v5
         with:
-          java-version: '11'
+          java-version: ${{ env.JDK_VERSION }}
           distribution: 'temurin'
 
       # ~/.m2/repository is cached here rather than via setup-java's
@@ -62,9 +67,9 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ~/.m2/repository
-          key: m2-repository-${{ runner.os }}-jdk11-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}
+          key: m2-repository-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}
           restore-keys: |
-            m2-repository-${{ runner.os }}-jdk11-
+            m2-repository-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-
 
       # Replaces the separate wrapper cache that setup-java's `cache: maven`
       # used to provide. Keyed only on the wrapper properties, which change
@@ -115,4 +120,4 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: ~/.m2/repository
-          key: m2-repository-${{ runner.os }}-jdk11-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}
+          key: m2-repository-${{ runner.os }}-jdk${{ env.JDK_VERSION }}-${{ hashFiles('**/pom.xml', '**/.mvn/extensions.xml') }}
