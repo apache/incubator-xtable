@@ -26,7 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -864,6 +866,7 @@ public class ITDeltaConversionSource {
             .deltaTable(DeltaTable.forPath(sparkSession, testSparkDeltaTable.getBasePath()))
             .tableName(tableName)
             .basePath(testSparkDeltaTable.getBasePath())
+            .reuseMetadataAcrossCommits(true)
             .build();
 
     InstantsForIncrementalSync instantsForIncrementalSync =
@@ -913,6 +916,7 @@ public class ITDeltaConversionSource {
             .deltaTable(DeltaTable.forPath(sparkSession, testSparkDeltaTable.getBasePath()))
             .tableName(tableName)
             .basePath(testSparkDeltaTable.getBasePath())
+            .reuseMetadataAcrossCommits(true)
             .build();
 
     CommitsBacklog<Long> commitsBacklog =
@@ -979,10 +983,11 @@ public class ITDeltaConversionSource {
     }
 
     ValidationTestHelper.validateTableChanges(allActiveFiles, allTableChanges);
-    // With reuse disabled, the pre-optimization behaviour is restored: one snapshot
-    // reconstruction per commit.
+    // With reuse disabled the pre-optimization behaviour is restored in full: one snapshot
+    // reconstruction per commit, and no second listing of the log for commit-file mtimes.
     verify(spiedDeltaLog, times(commitsBacklog.getCommitsToProcess().size()))
         .getSnapshotAt(anyLong(), any());
+    verify(spiedDeltaLog, never()).getChangeLogFiles(anyLong(), anyBoolean());
   }
 
   @Test
@@ -1005,6 +1010,7 @@ public class ITDeltaConversionSource {
             .deltaTable(DeltaTable.forPath(sparkSession, testSparkDeltaTable.getBasePath()))
             .tableName(tableName)
             .basePath(testSparkDeltaTable.getBasePath())
+            .reuseMetadataAcrossCommits(true)
             .build();
     List<Long> firstVersions =
         firstRun
@@ -1042,6 +1048,7 @@ public class ITDeltaConversionSource {
             .deltaTable(DeltaTable.forPath(sparkSession, testSparkDeltaTable.getBasePath()))
             .tableName(tableName)
             .basePath(testSparkDeltaTable.getBasePath())
+            .reuseMetadataAcrossCommits(true)
             .build();
     List<Long> secondVersions =
         secondRun
@@ -1049,9 +1056,12 @@ public class ITDeltaConversionSource {
                 InstantsForIncrementalSync.builder().lastSyncInstant(watermark).build())
             .getCommitsToProcess();
 
-    // The second run must not re-process the already-synced tail. (At most the boundary commit may
-    // reappear, since CommitInfo timestamps are the writer's wall-clock rather than the commit
-    // file's mtime; the stuck-watermark bug would instead re-include the whole synced tail.)
+    // The second run must not re-process the already-synced tail; the stuck-watermark bug would
+    // re-include all of it. The bound is <= 1 rather than 0 because the boundary commit can
+    // legitimately reappear: getActiveCommitAtTime compares against monotonizeCommitTimestamps
+    // output while we persist the raw mtime, so a commit whose mtime tied with its predecessor
+    // resolves to an earlier version. Unchanged from main, where Snapshot.timestamp() is the same
+    // raw mtime. Tightening to isEmpty() would flake on coarse mtime granularity.
     List<Long> reprocessed = new ArrayList<>(firstVersions);
     reprocessed.retainAll(secondVersions);
     assertTrue(

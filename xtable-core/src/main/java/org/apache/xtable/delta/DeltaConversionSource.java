@@ -43,6 +43,8 @@ import org.apache.spark.sql.delta.actions.RemoveFile;
 
 import scala.Option;
 
+import com.google.common.base.Preconditions;
+
 import io.delta.tables.DeltaTable;
 
 import org.apache.xtable.exception.ReadException;
@@ -79,13 +81,12 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   private final String tableName;
   private final String basePath;
 
-  // When enabled (default), the table metadata is carried across an incremental backlog instead
-  // of reconstructing the Delta snapshot (a full checkpoint read) on every commit. The baseline
-  // comes from one snapshot read; a commit carrying a Metadata action refreshes the cache from
-  // the action itself (see getTableChangeForCommit).
-  @Builder.Default private final boolean reuseMetadataAcrossCommits = true;
+  // See DeltaConversionSourceConfig#REUSE_METADATA_ACROSS_COMMITS.
+  @Builder.Default private final boolean reuseMetadataAcrossCommits = false;
 
+  // Scoped to a single backlog; cleared by resetState.
   private Metadata cachedMetadata;
+  private Long lastProcessedVersion;
 
   @Override
   public InternalTable getTable(Long version) {
@@ -112,35 +113,52 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   @Override
   public TableChange getTableChangeForCommit(Long versionNumber) {
     List<Action> actionsForVersion = getChangesState().getActionsForVersion(versionNumber);
-    // Reconstructing the snapshot per commit reloads the table checkpoint each time, which is
-    // expensive when the checkpoint is large. Everything the commit conversion needs from the
-    // snapshot derives from the table metadata, so carry that across the backlog instead: one
-    // snapshot read supplies the baseline, and a commit carrying a Metadata action refreshes the
-    // cache from the action itself (mirroring InMemoryLogReplay, the last one in a commit wins).
-    Metadata metadataInCommit = null;
-    for (Action action : actionsForVersion) {
-      if (action instanceof Metadata) {
-        metadataInCommit = (Metadata) action;
-      }
-    }
-    if (cachedMetadata == null || !reuseMetadataAcrossCommits) {
-      // baseline (or reuse disabled); the snapshot is read for its metadata and not retained
-      cachedMetadata = deltaLog.getSnapshotAt(versionNumber, Option.empty()).metadata();
-    } else if (metadataInCommit != null) {
-      cachedMetadata = metadataInCommit;
-    }
     String tableBasePath = deltaLog.dataPath().toUri().toString();
-    // latestCommitTime is persisted as the incremental-sync watermark and is matched against
-    // commit-file modification times on the next run (getCommitsBacklog), so it must come from
-    // the same clock: the commit file's mtime, which the changes state already carries.
-    InternalTable tableAtVersion =
-        tableExtractor.table(
-            cachedMetadata,
-            deltaLog,
-            tableName,
-            getChangesState().getCommitTimestamp(versionNumber));
-    FileFormat fileFormat =
-        actionsConverter.convertToFileFormat(cachedMetadata.format().provider());
+    InternalTable tableAtVersion;
+    FileFormat fileFormat;
+    if (reuseMetadataAcrossCommits) {
+      // Everything the conversion needs from the snapshot derives from the table metadata, so
+      // carry that across the backlog rather than re-reading the checkpoint per commit. Walking
+      // backwards would convert a commit with metadata the table did not have yet, and nothing
+      // would correct it, so pin the ordering the SPI does not state.
+      Preconditions.checkArgument(
+          lastProcessedVersion == null || versionNumber >= lastProcessedVersion,
+          String.format(
+              "Version %s is before the last processed version %s. A backlog must be walked in "
+                  + "non-decreasing version order when %s is enabled.",
+              versionNumber,
+              lastProcessedVersion,
+              DeltaConversionSourceConfig.REUSE_METADATA_ACROSS_COMMITS));
+      lastProcessedVersion = versionNumber;
+      Metadata metadataInCommit = null;
+      for (Action action : actionsForVersion) {
+        if (action instanceof Metadata) {
+          // last one in a commit wins, mirroring InMemoryLogReplay
+          metadataInCommit = (Metadata) action;
+        }
+      }
+      if (cachedMetadata == null) {
+        // baseline; the snapshot is read for its metadata and not retained
+        cachedMetadata = deltaLog.getSnapshotAt(versionNumber, Option.empty()).metadata();
+      } else if (metadataInCommit != null) {
+        cachedMetadata = metadataInCommit;
+      }
+      // latestCommitTime is persisted as the sync watermark and matched against commit-file mtimes
+      // on the next run, so it must come from that clock. Snapshot.timestamp() is the same mtime;
+      // the changes state carries it without the read.
+      tableAtVersion =
+          tableExtractor.table(
+              cachedMetadata,
+              deltaLog,
+              tableName,
+              getChangesState().getCommitTimestamp(versionNumber));
+      fileFormat = actionsConverter.convertToFileFormat(cachedMetadata.format().provider());
+    } else {
+      Snapshot snapshotAtVersion = deltaLog.getSnapshotAt(versionNumber, Option.empty());
+      tableAtVersion = tableExtractor.table(snapshotAtVersion, tableName);
+      fileFormat =
+          actionsConverter.convertToFileFormat(snapshotAtVersion.metadata().format().provider());
+    }
 
     // All 3 of the following data structures use data file's absolute path as the key
     Map<String, InternalDataFile> addedFiles = new HashMap<>();
@@ -248,11 +266,17 @@ public class DeltaConversionSource implements ConversionSource<Long> {
   }
 
   private void resetState(long versionToStartFrom) {
+    // The cache is scoped to one backlog, not to the source instance: an embedder holding a source
+    // across syncs can start a later backlog at an earlier version, which would otherwise convert
+    // those commits with newer metadata. Clearing costs one snapshot read per backlog.
+    cachedMetadata = null;
+    lastProcessedVersion = null;
     deltaIncrementalChangesState =
         Optional.of(
             DeltaIncrementalChangesState.builder()
                 .deltaLog(deltaLog)
                 .versionToStartFrom(versionToStartFrom)
+                .loadCommitTimestamps(reuseMetadataAcrossCommits)
                 .build());
   }
 

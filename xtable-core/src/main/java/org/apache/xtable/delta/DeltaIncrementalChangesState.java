@@ -52,9 +52,13 @@ public class DeltaIncrementalChangesState {
    *
    * @param deltaLog The DeltaLog instance.
    * @param versionToStartFrom The version to start from.
+   * @param loadCommitTimestamps whether to also collect each commit file's modification time for
+   *     {@link #getCommitTimestamp(Long)}. Costs a second listing of the log, so callers that
+   *     resolve a snapshot per commit leave it off and read {@code Snapshot.timestamp()}.
    */
   @Builder
-  public DeltaIncrementalChangesState(DeltaLog deltaLog, Long versionToStartFrom) {
+  public DeltaIncrementalChangesState(
+      DeltaLog deltaLog, Long versionToStartFrom, boolean loadCommitTimestamps) {
     List<Tuple2<Long, List<Action>>> changesList =
         getChangesList(deltaLog.getChanges(versionToStartFrom, false));
     Long maxSeenVersion = null;
@@ -65,18 +69,18 @@ public class DeltaIncrementalChangesState {
       maxSeenVersion =
           maxSeenVersion == null ? versionNumber : Math.max(maxSeenVersion, versionNumber);
     }
-    // Carry each commit's file modification time alongside its actions. This is the same clock
-    // Snapshot.timestamp() reads and the same one getCommitsBacklog matches the persisted
-    // watermark against, so it stays consistent regardless of the writer's clock. The log has
-    // already been listed once for getChanges above; this second pass reads no file contents.
-    Iterator<Tuple2<Object, FileStatus>> logFiles =
-        JavaConverters.asJavaIteratorConverter(
-                deltaLog.getChangeLogFiles(versionToStartFrom, false))
-            .asJava();
-    while (logFiles.hasNext()) {
-      Tuple2<Object, FileStatus> logFile = logFiles.next();
-      commitTimestampByVersion.put(
-          (Long) logFile._1(), Instant.ofEpochMilli(logFile._2().getModificationTime()));
+    if (loadCommitTimestamps) {
+      // The same clock Snapshot.timestamp() reads and getCommitsBacklog matches the watermark
+      // against, so it holds regardless of the writer's clock. This pass reads no file contents.
+      Iterator<Tuple2<Object, FileStatus>> logFiles =
+          JavaConverters.asJavaIteratorConverter(
+                  deltaLog.getChangeLogFiles(versionToStartFrom, false))
+              .asJava();
+      while (logFiles.hasNext()) {
+        Tuple2<Object, FileStatus> logFile = logFiles.next();
+        commitTimestampByVersion.put(
+            (Long) logFile._1(), Instant.ofEpochMilli(logFile._2().getModificationTime()));
+      }
     }
     startVersion = versionToStartFrom;
     endVersion = maxSeenVersion;
@@ -102,11 +106,17 @@ public class DeltaIncrementalChangesState {
     return incrementalChangesByVersion.get(version);
   }
 
-  /** Returns the commit-file modification time of the given version. */
+  /**
+   * Returns the commit-file modification time of the given version. Only available when the state
+   * was built with {@code loadCommitTimestamps}.
+   */
   public Instant getCommitTimestamp(Long version) {
     Preconditions.checkArgument(
         commitTimestampByVersion.containsKey(version),
-        String.format("Version %s not found in the DeltaIncrementalChangesState.", version));
+        String.format(
+            "Version %s not found in the DeltaIncrementalChangesState. Timestamps are only "
+                + "collected when the state is built with loadCommitTimestamps.",
+            version));
     return commitTimestampByVersion.get(version);
   }
 

@@ -58,26 +58,11 @@ public class DeltaTableExtractor {
    */
   public InternalTable table(Snapshot snapshot, String tableName) {
     requireMetadata(snapshot, tableName);
-    InternalSchema schema = schemaExtractor.toInternalSchema(snapshot.metadata().schema());
-    List<InternalPartitionField> partitionFields =
-        DeltaPartitionExtractor.getInstance()
-            .convertFromDeltaPartitionFormat(schema, snapshot.metadata().partitionSchema());
-    // Delta follows Hive Style partitioning layout
-    // (https://delta.io/blog/2023-01-18-add-remove-partition-delta-lake/)
-    DataLayoutStrategy dataLayoutStrategy =
-        !partitionFields.isEmpty()
-            ? DataLayoutStrategy.HIVE_STYLE_PARTITION
-            : DataLayoutStrategy.FLAT;
-    return InternalTable.builder()
-        .tableFormat(TableFormat.DELTA)
-        .basePath(snapshot.deltaLog().dataPath().toString())
-        .name(tableName)
-        .layoutStrategy(dataLayoutStrategy)
-        .partitioningFields(partitionFields)
-        .readSchema(schema)
-        .latestCommitTime(Instant.ofEpochMilli(snapshot.timestamp()))
-        .latestMetadataPath(snapshot.deltaLog().logPath().toString())
-        .build();
+    return table(
+        snapshot.metadata(),
+        snapshot.deltaLog(),
+        tableName,
+        Instant.ofEpochMilli(snapshot.timestamp()));
   }
 
   /**
@@ -102,6 +87,8 @@ public class DeltaTableExtractor {
     List<InternalPartitionField> partitionFields =
         DeltaPartitionExtractor.getInstance()
             .convertFromDeltaPartitionFormat(schema, metadata.partitionSchema());
+    // Delta follows Hive Style partitioning layout
+    // (https://delta.io/blog/2023-01-18-add-remove-partition-delta-lake/)
     DataLayoutStrategy dataLayoutStrategy =
         !partitionFields.isEmpty()
             ? DataLayoutStrategy.HIVE_STYLE_PARTITION

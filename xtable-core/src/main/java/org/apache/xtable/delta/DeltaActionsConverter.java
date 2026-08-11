@@ -154,11 +154,6 @@ public class DeltaActionsConverter {
    *     is present
    */
   public String extractDeletionVectorFile(Snapshot snapshot, AddFile addFile) {
-    // Check for the deletion vector before resolving the base path, so an add file without one
-    // never touches the snapshot.
-    if (addFile.deletionVector() == null) {
-      return null;
-    }
     return extractDeletionVectorFile(tableBasePath(snapshot), addFile);
   }
 

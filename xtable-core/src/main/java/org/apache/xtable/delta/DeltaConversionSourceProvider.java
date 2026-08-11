@@ -27,31 +27,19 @@ import org.apache.xtable.conversion.SourceTable;
 
 /** A concrete implementation of {@link ConversionSourceProvider} for Delta Lake table format. */
 public class DeltaConversionSourceProvider extends ConversionSourceProvider<Long> {
-  /**
-   * When true (default), an incremental backlog carries the table metadata across commits instead
-   * of reconstructing the Delta snapshot (a full checkpoint read) for every commit. Set to false to
-   * restore the per-commit snapshot reconstruction.
-   */
-  static final String REUSE_METADATA_ACROSS_COMMITS =
-      "xtable.delta.source.reuse_metadata_across_commits";
-
   @Override
   public DeltaConversionSource getConversionSourceInstance(SourceTable sourceTable) {
     SparkSession sparkSession = DeltaConversionUtils.buildSparkSession(hadoopConf);
     DeltaTable deltaTable = DeltaTable.forPath(sparkSession, sourceTable.getBasePath());
-    boolean reuseMetadataAcrossCommits =
-        sourceTable.getAdditionalProperties() == null
-            || Boolean.parseBoolean(
-                sourceTable
-                    .getAdditionalProperties()
-                    .getProperty(REUSE_METADATA_ACROSS_COMMITS, "true"));
+    DeltaConversionSourceConfig sourceConfig =
+        DeltaConversionSourceConfig.fromProperties(sourceTable.getAdditionalProperties());
     return DeltaConversionSource.builder()
         .sparkSession(sparkSession)
         .tableName(sourceTable.getName())
         .basePath(sourceTable.getBasePath())
         .deltaTable(deltaTable)
         .deltaLog(deltaTable.deltaLog())
-        .reuseMetadataAcrossCommits(reuseMetadataAcrossCommits)
+        .reuseMetadataAcrossCommits(sourceConfig.isReuseMetadataAcrossCommits())
         .build();
   }
 }
