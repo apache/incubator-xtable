@@ -45,6 +45,9 @@ class TestDeltaActionsConverter {
     String filePath = "https://container.blob.core.windows.net/tablepath/file_path";
     Snapshot snapshot = Mockito.mock(Snapshot.class);
     DeltaLog deltaLog = Mockito.mock(DeltaLog.class);
+    Mockito.when(snapshot.deltaLog()).thenReturn(deltaLog);
+    Mockito.when(deltaLog.dataPath())
+        .thenReturn(new Path("https://container.blob.core.windows.net/tablepath"));
 
     DeletionVectorDescriptor deletionVector = null;
     AddFile addFileAction =
@@ -58,9 +61,6 @@ class TestDeltaActionsConverter {
     addFileAction =
         new AddFile(filePath, null, size, time, dataChange, stats, null, deletionVector);
 
-    Mockito.when(snapshot.deltaLog()).thenReturn(deltaLog);
-    Mockito.when(deltaLog.dataPath())
-        .thenReturn(new Path("https://container.blob.core.windows.net/tablepath"));
     Assertions.assertEquals(
         filePath, actionsConverter.extractDeletionVectorFile(snapshot, addFileAction));
   }

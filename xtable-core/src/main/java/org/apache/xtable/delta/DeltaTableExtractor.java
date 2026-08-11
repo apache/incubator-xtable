@@ -25,6 +25,7 @@ import lombok.Builder;
 
 import org.apache.spark.sql.delta.DeltaLog;
 import org.apache.spark.sql.delta.Snapshot;
+import org.apache.spark.sql.delta.actions.Metadata;
 
 import scala.Option;
 
@@ -57,10 +58,35 @@ public class DeltaTableExtractor {
    */
   public InternalTable table(Snapshot snapshot, String tableName) {
     requireMetadata(snapshot, tableName);
-    InternalSchema schema = schemaExtractor.toInternalSchema(snapshot.metadata().schema());
+    return table(
+        snapshot.metadata(),
+        snapshot.deltaLog(),
+        tableName,
+        Instant.ofEpochMilli(snapshot.timestamp()));
+  }
+
+  /**
+   * Builds an {@link InternalTable} from the table's {@link Metadata} directly, without a resolved
+   * {@link Snapshot}. Everything an InternalTable carries is either constant for the table (paths)
+   * or derived from the metadata, so callers that already know the metadata at a version — e.g. an
+   * incremental backlog reusing it across commits — can avoid reconstructing the snapshot.
+   *
+   * @param metadata the table metadata in effect at the commit
+   * @param deltaLog the delta log, used only for the table and log paths
+   * @param tableName name of the table
+   * @param commitTimestamp the commit-file modification time of the commit, used as the
+   *     incremental-sync watermark
+   * @return the internal representation of the table at the commit
+   */
+  public InternalTable table(
+      Metadata metadata, DeltaLog deltaLog, String tableName, Instant commitTimestamp) {
+    if (metadata == null || metadata.schema() == null) {
+      throw new IllegalStateException("Missing metadata/schema for table: " + tableName);
+    }
+    InternalSchema schema = schemaExtractor.toInternalSchema(metadata.schema());
     List<InternalPartitionField> partitionFields =
         DeltaPartitionExtractor.getInstance()
-            .convertFromDeltaPartitionFormat(schema, snapshot.metadata().partitionSchema());
+            .convertFromDeltaPartitionFormat(schema, metadata.partitionSchema());
     // Delta follows Hive Style partitioning layout
     // (https://delta.io/blog/2023-01-18-add-remove-partition-delta-lake/)
     DataLayoutStrategy dataLayoutStrategy =
@@ -69,13 +95,13 @@ public class DeltaTableExtractor {
             : DataLayoutStrategy.FLAT;
     return InternalTable.builder()
         .tableFormat(TableFormat.DELTA)
-        .basePath(snapshot.deltaLog().dataPath().toString())
+        .basePath(deltaLog.dataPath().toString())
         .name(tableName)
         .layoutStrategy(dataLayoutStrategy)
         .partitioningFields(partitionFields)
         .readSchema(schema)
-        .latestCommitTime(Instant.ofEpochMilli(snapshot.timestamp()))
-        .latestMetadataPath(snapshot.deltaLog().logPath().toString())
+        .latestCommitTime(commitTimestamp)
+        .latestMetadataPath(deltaLog.logPath().toString())
         .build();
   }
 
