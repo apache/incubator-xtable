@@ -18,6 +18,4 @@
  
 package org.apache.xtable.timeline;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 class TestIcebergActiveTimeline {}
