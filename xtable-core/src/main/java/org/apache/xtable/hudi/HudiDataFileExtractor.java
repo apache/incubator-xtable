@@ -190,10 +190,14 @@ public class HudiDataFileExtractor implements AutoCloseable {
                     FSUtils.constructAbsolutePath(metaClient.getBasePath(), writeStat.getPath());
                 if (FSUtils.getCommitTimeWithFullPath(baseFileFullPath.toString())
                     .equals(commit.requestedTime())) {
+                  // getFullPathToInfo keys the map by the absolute path, not the file name
+                  StoragePathInfo pathInfo = fullPathInfo.get(baseFileFullPath.toString());
+                  if (pathInfo == null) {
+                    throw new ReadException(
+                        "Commit metadata has no file info for base file " + baseFileFullPath);
+                  }
                   filesAddedWithoutStats.add(
-                      buildFileWithoutStats(
-                          partitionValues,
-                          new HoodieBaseFile(fullPathInfo.get(baseFileFullPath.getName()))));
+                      buildFileWithoutStats(partitionValues, new HoodieBaseFile(pathInfo)));
                 }
                 if (currentBaseFilesInPartition.containsKey(writeStat.getFileId())) {
                   filesToRemove.add(
