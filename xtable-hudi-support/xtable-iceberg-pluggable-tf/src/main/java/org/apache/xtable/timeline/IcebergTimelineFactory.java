@@ -64,6 +64,12 @@ public class IcebergTimelineFactory extends TimelineFactory {
   }
 
   @Override
+  public HoodieArchivedTimeline createArchivedTimeline(
+      HoodieTableMetaClient metaClient, boolean loadInstantDetails) {
+    return new ArchivedTimelineV2(metaClient, loadInstantDetails);
+  }
+
+  @Override
   public ArchivedTimelineLoader createArchivedTimelineLoader() {
     return new ArchivedTimelineLoaderV2();
   }
@@ -82,11 +88,5 @@ public class IcebergTimelineFactory extends TimelineFactory {
   @Override
   public CompletionTimeQueryView createCompletionTimeQueryView(HoodieTableMetaClient metaClient) {
     return new CompletionTimeQueryViewV2(metaClient);
-  }
-
-  @Override
-  public CompletionTimeQueryView createCompletionTimeQueryView(
-      HoodieTableMetaClient metaClient, String eagerInstant) {
-    return new CompletionTimeQueryViewV2(metaClient, eagerInstant);
   }
 }

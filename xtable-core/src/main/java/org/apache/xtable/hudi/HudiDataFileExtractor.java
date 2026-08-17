@@ -118,7 +118,7 @@ public class HudiDataFileExtractor implements AutoCloseable {
 
   public HudiDataFileExtractor(
       HoodieTableMetaClient metaClient,
-      HudiPartitionValuesExtractor hudiPartitionValuesExtractor,
+      PathBasedPartitionValuesExtractor hudiPartitionValuesExtractor,
       HudiFileStatsExtractor hudiFileStatsExtractor,
       FileSystemViewManager fileSystemViewManager) {
     this.engineContext = new HoodieLocalEngineContext(metaClient.getStorageConf());

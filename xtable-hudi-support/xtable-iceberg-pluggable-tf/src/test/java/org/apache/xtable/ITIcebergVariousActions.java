@@ -21,7 +21,9 @@ package org.apache.xtable;
 import static java.util.stream.Collectors.groupingBy;
 import static org.apache.hudi.hadoop.fs.HadoopFSUtils.getStorageConf;
 import static org.apache.xtable.testutil.ITTestUtils.validateTable;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.Closeable;
 import java.nio.file.Path;
@@ -61,12 +63,11 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
 
-import org.apache.xtable.hudi.ConfigurationBasedPartitionSpecExtractor;
 import org.apache.xtable.hudi.HudiConversionSource;
 import org.apache.xtable.hudi.HudiInstantUtils;
 import org.apache.xtable.hudi.HudiSourceConfig;
-import org.apache.xtable.hudi.HudiSourcePartitionSpecExtractor;
 import org.apache.xtable.hudi.HudiTestUtil;
+import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
 import org.apache.xtable.model.CommitsBacklog;
 import org.apache.xtable.model.InstantsForIncrementalSync;
 import org.apache.xtable.model.InternalSnapshot;
@@ -244,7 +245,7 @@ public class ITIcebergVariousActions {
           internalSchema,
           DataLayoutStrategy.FLAT,
           "file:" + basePath + "_v1",
-          internalTable.getLatestMetdataPath(),
+          internalTable.getLatestMetadataPath(),
           Collections.emptyList());
     } finally {
       safeClose(hudiClient);
@@ -736,9 +737,9 @@ public class ITIcebergVariousActions {
             .setBasePath(basePath)
             .setLoadActiveTimelineOnLoad(true)
             .build();
-    HudiSourcePartitionSpecExtractor partitionSpecExtractor =
-        new ConfigurationBasedPartitionSpecExtractor(
-            HudiSourceConfig.fromPartitionFieldSpecConfig(xTablePartitionConfig));
+    PathBasedPartitionSpecExtractor partitionSpecExtractor =
+        HudiSourceConfig.fromPartitionFieldSpecConfig(xTablePartitionConfig)
+            .loadSourcePartitionSpecExtractor();
     return new HudiConversionSource(hoodieTableMetaClient, partitionSpecExtractor);
   }
 

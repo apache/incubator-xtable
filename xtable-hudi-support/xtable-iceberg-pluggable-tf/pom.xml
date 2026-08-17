@@ -23,10 +23,10 @@
     <parent>
         <groupId>org.apache.xtable</groupId>
         <artifactId>xtable-hudi-support</artifactId>
-        <version>0.2.0-SNAPSHOT</version>
+        <version>0.5.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>xtable-iceberg-pluggable-tf</artifactId>
+    <artifactId>xtable-iceberg-pluggable-tf_${scala.binary.version}</artifactId>
     <name>XTable Project Iceberg Pluggable Table Format</name>
 
     <dependencies>
@@ -140,6 +140,12 @@
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-spark-runtime-${spark.version.prefix}_${scala.binary.version}</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- The shared HudiTestUtil.getSparkConf registers the Delta catalog and extension -->
+        <dependency>
+            <groupId>io.delta</groupId>
+            <artifactId>delta-core_${scala.binary.version}</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

@@ -18,6 +18,4 @@
  
 package org.apache.xtable.metadata;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 class TestIcebergBackedTableMetadata {}
