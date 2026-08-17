@@ -31,8 +31,9 @@ import lombok.SneakyThrows;
 
 import org.apache.avro.Schema;
 
-import org.apache.hudi.avro.HoodieAvroUtils;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
+import org.apache.hudi.common.schema.HoodieSchema;
+import org.apache.hudi.common.schema.HoodieSchemaUtils;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.TableSchemaResolver;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
@@ -127,9 +128,10 @@ public class HudiTableExtractor {
   }
 
   private InternalSchema getCanonicalSchema(HoodieCommitMetadata commitMetadata) {
+    HoodieSchema writerSchema =
+        HoodieSchema.parse(commitMetadata.getExtraMetadata().get(SCHEMA_KEY));
     return schemaExtractor.schema(
-        HoodieAvroUtils.addMetadataFields(
-            new Schema.Parser().parse(commitMetadata.getExtraMetadata().get(SCHEMA_KEY)), false));
+        HoodieSchemaUtils.addMetadataFields(writerSchema, false).toAvroSchema());
   }
 
   private InternalSchema getCanonicalSchema(

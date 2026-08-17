@@ -23,12 +23,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hudi.avro.model.HoodieCleanMetadata;
-import org.apache.hudi.common.TableFormat;
+import org.apache.hudi.common.HoodieTableFormat;
 import org.apache.hudi.common.config.HoodieConfig;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieCommitMetadata;
@@ -46,11 +47,11 @@ import org.apache.xtable.exception.UpdateException;
 import org.apache.xtable.hudi.HudiDataFileExtractor;
 import org.apache.xtable.hudi.HudiFileStatsExtractor;
 import org.apache.xtable.hudi.HudiIncrementalTableChangeExtractor;
-import org.apache.xtable.hudi.HudiPartitionValuesExtractor;
 import org.apache.xtable.hudi.HudiSchemaExtractor;
 import org.apache.xtable.hudi.HudiSourceConfig;
-import org.apache.xtable.hudi.HudiSourcePartitionSpecExtractor;
 import org.apache.xtable.hudi.HudiTableExtractor;
+import org.apache.xtable.hudi.PathBasedPartitionSpecExtractor;
+import org.apache.xtable.hudi.PathBasedPartitionValuesExtractor;
 import org.apache.xtable.iceberg.IcebergConversionTarget;
 import org.apache.xtable.metadata.IcebergMetadataFactory;
 import org.apache.xtable.model.IncrementalTableChanges;
@@ -61,7 +62,7 @@ import org.apache.xtable.timeline.IcebergRollbackExecutor;
 import org.apache.xtable.timeline.IcebergTimelineArchiver;
 import org.apache.xtable.timeline.IcebergTimelineFactory;
 
-public class IcebergTableFormat implements TableFormat {
+public class IcebergTableFormat implements HoodieTableFormat {
   private transient TableFormatSync tableFormatSync;
 
   public IcebergTableFormat() {}
@@ -103,7 +104,7 @@ public class IcebergTableFormat implements TableFormat {
 
   @Override
   public void archive(
-      List<HoodieInstant> archivedInstants,
+      Supplier<List<HoodieInstant>> archivedInstants,
       HoodieEngineContext engineContext,
       HoodieTableMetaClient metaClient,
       FileSystemViewManager viewManager) {
@@ -115,7 +116,7 @@ public class IcebergTableFormat implements TableFormat {
             .table(
                 metaClient,
                 metaClient.getActiveTimeline().filterCompletedInstants().lastInstant().get());
-    archiveInstants(metaClient, internalTable, archivedInstants);
+    archiveInstants(metaClient, internalTable, archivedInstants.get());
   }
 
   @Override
@@ -204,7 +205,7 @@ public class IcebergTableFormat implements TableFormat {
                         .map(p -> String.format("%s:VALUE", p))
                         .collect(Collectors.joining(",")))
             .orElse(null);
-    final HudiSourcePartitionSpecExtractor sourcePartitionSpecExtractor =
+    final PathBasedPartitionSpecExtractor sourcePartitionSpecExtractor =
         HudiSourceConfig.fromPartitionFieldSpecConfig(partitionSpec)
             .loadSourcePartitionSpecExtractor();
     return new HudiIncrementalTableChangeExtractor(
@@ -212,7 +213,7 @@ public class IcebergTableFormat implements TableFormat {
         new HudiTableExtractor(new HudiSchemaExtractor(), sourcePartitionSpecExtractor),
         new HudiDataFileExtractor(
             metaClient,
-            new HudiPartitionValuesExtractor(
+            new PathBasedPartitionValuesExtractor(
                 sourcePartitionSpecExtractor.getPathToPartitionFieldFormat()),
             new HudiFileStatsExtractor(metaClient),
             viewManager));

@@ -74,7 +74,11 @@ public class TableSyncMetadata {
       String sourceTableFormat,
       String sourceIdentifier) {
     return TableSyncMetadata.of(
-        lastInstantSynced, instantsToConsiderForNextSync, sourceTableFormat, sourceIdentifier, null);
+        lastInstantSynced,
+        instantsToConsiderForNextSync,
+        sourceTableFormat,
+        sourceIdentifier,
+        null);
   }
 
   public static TableSyncMetadata of(
