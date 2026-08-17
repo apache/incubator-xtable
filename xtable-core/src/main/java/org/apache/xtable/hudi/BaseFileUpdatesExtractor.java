@@ -57,9 +57,9 @@ import org.apache.hudi.common.util.ExternalFilePathUtil;
 import org.apache.hudi.hadoop.fs.CachingPath;
 import org.apache.hudi.metadata.HoodieIndexVersion;
 import org.apache.hudi.metadata.HoodieTableMetadata;
-import org.apache.hudi.stats.HoodieColumnRangeMetadata;
-import org.apache.hudi.stats.ValueMetadata;
-import org.apache.hudi.stats.XTableValueMetadata;
+import org.apache.hudi.metadata.stats.HoodieColumnRangeMetadata;
+import org.apache.hudi.metadata.stats.ValueMetadata;
+import org.apache.hudi.metadata.stats.XTableValueMetadata;
 
 import org.apache.xtable.collectors.CustomCollectors;
 import org.apache.xtable.exception.ReadException;
