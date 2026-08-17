@@ -81,6 +81,7 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.HoodieTimelineTimeZone;
 import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.model.WriteConcurrencyMode;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.HoodieTableVersion;
 import org.apache.hudi.common.table.marker.MarkerType;
@@ -446,10 +447,15 @@ public abstract class TestAbstractHudiTable
         HoodieStorageConfig.newBuilder().parquetCompressionCodec("UNCOMPRESSED").build();
     HoodieArchivalConfig archivalConfig =
         HoodieArchivalConfig.newBuilder().archiveCommitsWith(3, 4).build();
+    // A table format that supplies its own metadata, such as a pluggable format, can turn the
+    // Hudi metadata table off through the properties.
+    boolean metadataTableEnabled =
+        Boolean.parseBoolean(
+            keyGenProperties.getProperty(HoodieMetadataConfig.ENABLE.key(), "true"));
     HoodieMetadataConfig metadataConfig =
         HoodieMetadataConfig.newBuilder()
-            .enable(true)
-            .withMetadataIndexColumnStats(true)
+            .enable(metadataTableEnabled)
+            .withMetadataIndexColumnStats(metadataTableEnabled)
             .withColumnStatsIndexForColumns(getColumnsFromSchema(schema))
             .build();
     Properties lockProperties = new Properties();
@@ -611,6 +617,35 @@ public abstract class TestAbstractHudiTable
       HoodieTableType hoodieTableType,
       Configuration conf,
       boolean populateMetaFields) {
+    return getMetaClient(
+        keyGenProperties, hoodieTableType, conf, populateMetaFields, new Properties());
+  }
+
+  /**
+   * Returns the table version named by {@code hoodie.table.version} in the given table-level
+   * properties, or {@code defaultVersion} when the properties do not set one.
+   */
+  protected static HoodieTableVersion tableVersionFrom(
+      Properties tableProperties, HoodieTableVersion defaultVersion) {
+    String configured = tableProperties.getProperty(HoodieTableConfig.VERSION.key());
+    return configured == null
+        ? defaultVersion
+        : HoodieTableVersion.fromVersionCode(Integer.parseInt(configured));
+  }
+
+  /**
+   * @param tableProperties table-level properties to persist into {@code hoodie.properties}, for
+   *     example {@code hoodie.table.format} or {@code hoodie.table.version}. {@code
+   *     builder.set(Map)} does not persist these, so they are applied through {@code
+   *     fromProperties} instead.
+   */
+  @SneakyThrows
+  protected HoodieTableMetaClient getMetaClient(
+      TypedProperties keyGenProperties,
+      HoodieTableType hoodieTableType,
+      Configuration conf,
+      boolean populateMetaFields,
+      Properties tableProperties) {
     LocalFileSystem fs = (LocalFileSystem) HadoopFSUtils.getFs(basePath, conf);
     // Enforce checksum such that fs.open() is consistent to DFS
     fs.setVerifyChecksum(true);
@@ -627,10 +662,12 @@ public abstract class TestAbstractHudiTable
     Map<String, Object> keyGenPropsMap = (Map) keyGenProperties;
     return HoodieTableMetaClient.newTableBuilder()
         .set(keyGenPropsMap)
+        .fromProperties(tableProperties)
         .setTableName(tableName)
         .setTableType(hoodieTableType)
         // Use the configured table version (default 6) so tests can exercise both the legacy and
-        // Hudi 1.x layouts.
+        // Hudi 1.x layouts. A test may also set it through tableProperties, for example a
+        // pluggable table format that needs the v2 timeline.
         .setTableVersion(tableVersion)
         .setKeyGeneratorClassProp(keyGenerator.getClass().getCanonicalName())
         .setPartitionFields(String.join(",", partitionFieldNames))
